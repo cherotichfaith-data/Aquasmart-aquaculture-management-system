@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useAuth } from "@/components/auth-provider"
 import {
   Activity,
   BarChart3,
@@ -9,15 +10,18 @@ import {
   Droplets,
   Fish,
   LayoutDashboard,
+  LogOut,
   Settings,
   Skull,
   TestTube,
   Warehouse,
   X,
+  PlusCircle,
 } from "lucide-react"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Data Entry", href: "/data-entry", icon: PlusCircle },
   { name: "Transactions", href: "/transactions", icon: ClipboardList },
   { name: "Inventory", href: "/inventory", icon: Warehouse },
   { name: "Water Quality", href: "/water-quality", icon: Droplets },
@@ -31,15 +35,16 @@ const navigation = [
 
 export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { signOut } = useAuth()
 
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/50 md:hidden z-30" onClick={onToggle} />}
 
       <aside
-        className={`fixed md:static top-0 left-0 h-screen md:h-auto w-64 bg-sidebar border-r border-sidebar-border shadow-lg transform transition-transform duration-300 z-40 ${
-          open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        }`}
+        className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-sidebar border-r border-sidebar-border shadow-lg transform transition-transform duration-300 z-40 flex flex-col ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          }`}
       >
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border md:hidden">
           <h1 className="font-semibold text-lg text-sidebar-foreground">AQ</h1>
@@ -68,7 +73,7 @@ export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: (
           </div>
         </div>
 
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-2 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           <p className="px-2 text-xs uppercase tracking-wide text-sidebar-foreground/60">Menu</p>
           {navigation.map((item) => {
             const isActive = pathname === item.href
@@ -77,11 +82,10 @@ export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-sm transition-colors ${
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                }`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-sm transition-colors ${isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 <span className="text-sm font-medium">{item.name}</span>
@@ -89,6 +93,19 @@ export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: (
             )
           })}
         </nav>
+
+        <div className="p-4 border-t border-sidebar-border">
+          <button
+            onClick={async () => {
+              await signOut()
+              router.push("/auth")
+            }}
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="text-sm font-medium">Log out</span>
+          </button>
+        </div>
       </aside>
     </>
   )

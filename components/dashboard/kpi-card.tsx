@@ -50,7 +50,7 @@ export default function KPICard({
   return (
     <button
       onClick={onClick}
-      className="bg-card border border-border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all text-left w-full"
+      className="cursor-pointer bg-card border border-border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all text-left w-full"
     >
       <div className="flex items-center justify-between gap-4">
         <div>

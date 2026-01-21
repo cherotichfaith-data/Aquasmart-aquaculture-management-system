@@ -198,7 +198,7 @@ export default function AnalysisOverview({
             <ResponsiveContainer width="100%" height={320}>
               <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickFormatter={formatAxisDate} />
+                <XAxis dataKey="date" tickFormatter={(value) => formatAxisDate(value)} />
                 <YAxis yAxisId="left" />
                 <YAxis yAxisId="right" orientation="right" />
                 <Tooltip
@@ -239,6 +239,16 @@ export default function AnalysisOverview({
                   dot={false}
                   name="eFCR"
                 />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="total_fish"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  name="Population"
+                />
               </ComposedChart>
             </ResponsiveContainer>
           ) : (
@@ -252,7 +262,7 @@ export default function AnalysisOverview({
           title="Total Fish"
           value={formatValue(latestTotals?.totalFish)}
           icon={<Fish />}
-          accent="border-chart-2"
+          accent="border-blue-500"
         />
         <StatCard
           title="Total Biomass"

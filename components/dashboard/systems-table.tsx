@@ -56,7 +56,7 @@ export default function SystemsTable({
       system: String(systemId),
       period: toMetricsPeriod(timePeriod),
     })
-    router.push(`/metrics/efcr_periodic?${params.toString()}`)
+    router.push(`/production?${params.toString()}`)
   }
 
   useEffect(() => {

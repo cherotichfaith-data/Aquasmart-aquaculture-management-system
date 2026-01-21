@@ -1,6 +1,6 @@
 import { supabaseInsert, supabaseQuery } from "./supabase-client"
 import type { QueryResult } from "./supabase-client"
-import type { Enums, Tables } from "./types/database"
+import type { Enums, Tables, TablesInsert } from "./types/database"
 
 type DashboardRow = Tables<"dashboard">
 type DashboardConsolidatedRow = Tables<"dashboard_consolidated">
@@ -18,6 +18,10 @@ type FingerlingBatchRow = Tables<"fingerling_batch">
 type FeedIncomingRow = Tables<"feed_incoming">
 type FeedTypeRow = Tables<"feed_type">
 type FeedingRecordRow = Tables<"feeding_record">
+type SystemsRow = Tables<"systems">
+type SuppliersRow = Tables<"suppliers">
+type FeedsMetadataRow = Tables<"feeds_metadata">
+
 
 type SystemListItem = Pick<SystemRow, "id" | "name">
 type BatchListItem = Pick<FingerlingBatchRow, "id" | "name">
@@ -119,7 +123,7 @@ export async function fetchSystems(filters?: {
   ongoing_cycle?: boolean
   limit?: number
 }): Promise<QueryResult<ProductionSummaryRow>> {
-  const eq: Record<string, string | number> = {}
+  const eq: Record<string, string | number | boolean> = {}
 
   if (filters?.system_id) eq.system_id = filters.system_id
   if (filters?.growth_stage) eq.growth_stage = filters.growth_stage
@@ -267,10 +271,100 @@ export async function fetchHarvests(filters?: {
 }
 
 export async function insertWaterQualityMeasurement(
-  payload: Tables<"water_quality_measurement">["Insert"],
+  payload: TablesInsert<"water_quality_measurement">,
 ): Promise<QueryResult<WaterQualityMeasurementRow>> {
-  return supabaseInsert<WaterQualityMeasurementRow, Tables<"water_quality_measurement">["Insert"]>(
+  return supabaseInsert<WaterQualityMeasurementRow, TablesInsert<"water_quality_measurement">>(
     "water_quality_measurement",
     payload,
   )
+}
+
+// Export moved to supabase-queries-server.ts
+
+
+export async function fetchSuppliers(): Promise<QueryResult<SuppliersRow>> {
+  return supabaseQuery<SuppliersRow>("suppliers", {
+    select: "*",
+    order: "name.asc",
+  })
+}
+
+export async function fetchFeeds(): Promise<QueryResult<FeedsMetadataRow>> {
+  return supabaseQuery<FeedsMetadataRow>("feeds_metadata", {
+    select: "*",
+    order: "feed_name.asc",
+  })
+}
+
+// Recent Entries Fetchers
+export async function fetchRecentMortalityEvents(limit = 5) {
+  return supabaseQuery<Tables<"mortality_events">>("mortality_events", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
+}
+
+export async function fetchRecentFeedingEvents(limit = 5) {
+  return supabaseQuery<Tables<"feeding_events">>("feeding_events", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
+}
+
+export async function fetchRecentSamplingEvents(limit = 5) {
+  return supabaseQuery<Tables<"sampling_events">>("sampling_events", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
+}
+
+export async function fetchRecentTransferEvents(limit = 5) {
+  return supabaseQuery<Tables<"transfer_events">>("transfer_events", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
+}
+
+export async function fetchRecentHarvestEvents(limit = 5) {
+  return supabaseQuery<Tables<"harvest_events">>("harvest_events", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
+}
+
+export async function fetchRecentWaterQualityEvents(limit = 5) {
+  return supabaseQuery<Tables<"water_quality_events">>("water_quality_events", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
+}
+
+export async function fetchRecentIncomingFeedEvents(limit = 5) {
+  return supabaseQuery<Tables<"incoming_feed_events">>("incoming_feed_events", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
+}
+
+export async function fetchRecentStockingEvents(limit = 5) {
+  return supabaseQuery<Tables<"stocking_events">>("stocking_events", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
+}
+
+export async function fetchRecentSystems(limit = 5) {
+  return supabaseQuery<Tables<"systems">>("systems", {
+    select: "*",
+    order: { column: "created_at", ascending: false },
+    limit,
+  })
 }

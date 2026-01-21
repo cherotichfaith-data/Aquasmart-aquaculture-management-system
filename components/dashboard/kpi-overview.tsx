@@ -68,7 +68,7 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
     }
 
     const query = params.toString()
-    const targetPath = `/metrics/${metricKey}`
+    const targetPath = `/production`
     router.push(query ? `${targetPath}?${query}` : targetPath)
   }
 

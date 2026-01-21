@@ -14,6 +14,432 @@ export type Database = {
   }
   public: {
     Tables: {
+      systems: {
+        Row: {
+          system_id: string
+          system_type: string | null
+          volume: number | null
+          width: number | null
+          length: number | null
+          depth: number | null
+          diameter: number | null
+          created_at: string
+        }
+        Insert: {
+          system_id: string
+          system_type?: string | null
+          volume?: number | null
+          width?: number | null
+          length?: number | null
+          depth?: number | null
+          diameter?: number | null
+          created_at?: string
+        }
+        Update: {
+          system_id?: string
+          system_type?: string | null
+          volume?: number | null
+          width?: number | null
+          length?: number | null
+          depth?: number | null
+          diameter?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      suppliers: {
+        Row: {
+          supplier_id: string
+          name: string
+          contact_info: string | null
+          created_at: string
+        }
+        Insert: {
+          supplier_id?: string
+          name: string
+          contact_info?: string | null
+          created_at?: string
+        }
+        Update: {
+          supplier_id?: string
+          name?: string
+          contact_info?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      feeds_metadata: {
+        Row: {
+          feed_id: string
+          brand: string | null
+          feed_name: string | null
+          pellet_size: string | null
+          manufacturing_location: string | null
+          created_at: string
+        }
+        Insert: {
+          feed_id: string
+          brand?: string | null
+          feed_name?: string | null
+          pellet_size?: string | null
+          manufacturing_location?: string | null
+          created_at?: string
+        }
+        Update: {
+          feed_id?: string
+          brand?: string | null
+          feed_name?: string | null
+          pellet_size?: string | null
+          manufacturing_location?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      fingerlings_metadata: {
+        Row: {
+          fingerling_id: string
+          supplier_id: string | null
+          brand: string | null
+          fingerling_name: string | null
+          manufacturing_location: string | null
+          created_at: string
+        }
+        Insert: {
+          fingerling_id?: string
+          supplier_id?: string | null
+          brand?: string | null
+          fingerling_name?: string | null
+          manufacturing_location?: string | null
+          created_at?: string
+        }
+        Update: {
+          fingerling_id?: string
+          supplier_id?: string | null
+          brand?: string | null
+          fingerling_name?: string | null
+          manufacturing_location?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fingerlings_metadata_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["supplier_id"]
+          }
+        ]
+      }
+      mortality_events: {
+        Row: {
+          id: string
+          system_id: string | null
+          date: string
+          number_of_fish: number | null
+          total_weight: number | null
+          average_body_weight: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          system_id?: string | null
+          date: string
+          number_of_fish?: number | null
+          total_weight?: number | null
+          average_body_weight?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          system_id?: string | null
+          date?: string
+          number_of_fish?: number | null
+          total_weight?: number | null
+          average_body_weight?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mortality_events_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          }
+        ]
+      }
+      feeding_events: {
+        Row: {
+          id: string
+          system_id: string | null
+          date: string
+          amount: number | null
+          feed_id: string | null
+          feeding_response: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          system_id?: string | null
+          date: string
+          amount?: number | null
+          feed_id?: string | null
+          feeding_response?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          system_id?: string | null
+          date?: string
+          amount?: number | null
+          feed_id?: string | null
+          feeding_response?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feeding_events_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          },
+          {
+            foreignKeyName: "feeding_events_feed_id_fkey"
+            columns: ["feed_id"]
+            isOneToOne: false
+            referencedRelation: "feeds_metadata"
+            referencedColumns: ["feed_id"]
+          }
+        ]
+      }
+      sampling_events: {
+        Row: {
+          id: string
+          system_id: string | null
+          date: string
+          number_of_samples: number | null
+          total_weight: number | null
+          average_body_weight: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          system_id?: string | null
+          date: string
+          number_of_samples?: number | null
+          total_weight?: number | null
+          average_body_weight?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          system_id?: string | null
+          date?: string
+          number_of_samples?: number | null
+          total_weight?: number | null
+          average_body_weight?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sampling_events_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          }
+        ]
+      }
+      transfer_events: {
+        Row: {
+          id: string
+          origin_system_id: string | null
+          target_system_id: string | null
+          date: string
+          number_of_fish: number | null
+          total_weight: number | null
+          average_body_weight: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          origin_system_id?: string | null
+          target_system_id?: string | null
+          date: string
+          number_of_fish?: number | null
+          total_weight?: number | null
+          average_body_weight?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          origin_system_id?: string | null
+          target_system_id?: string | null
+          date?: string
+          number_of_fish?: number | null
+          total_weight?: number | null
+          average_body_weight?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_events_origin_system_id_fkey"
+            columns: ["origin_system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          },
+          {
+            foreignKeyName: "transfer_events_target_system_id_fkey"
+            columns: ["target_system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          }
+        ]
+      }
+      harvest_events: {
+        Row: {
+          id: string
+          system_id: string | null
+          date: string
+          number_of_fish: number | null
+          total_weight: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          system_id?: string | null
+          date: string
+          number_of_fish?: number | null
+          total_weight?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          system_id?: string | null
+          date?: string
+          number_of_fish?: number | null
+          total_weight?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "harvest_events_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          }
+        ]
+      }
+      water_quality_events: {
+        Row: {
+          id: string
+          system_id: string | null
+          date: string
+          dissolved_oxygen: number | null
+          total_ammonia: number | null
+          no2: number | null
+          temperature: number | null
+          ph: number | null
+          no3: number | null
+          secchi_disk: number | null
+          salinity: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          system_id?: string | null
+          date: string
+          dissolved_oxygen?: number | null
+          total_ammonia?: number | null
+          no2?: number | null
+          temperature?: number | null
+          ph?: number | null
+          no3?: number | null
+          secchi_disk?: number | null
+          salinity?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          system_id?: string | null
+          date?: string
+          dissolved_oxygen?: number | null
+          total_ammonia?: number | null
+          no2?: number | null
+          temperature?: number | null
+          ph?: number | null
+          no3?: number | null
+          secchi_disk?: number | null
+          salinity?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "water_quality_events_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          }
+        ]
+      }
+      incoming_feed_events: {
+        Row: {
+          id: string
+          feed_id: string | null
+          date_of_arrival: string
+          amount: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          feed_id?: string | null
+          date_of_arrival: string
+          amount?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          feed_id?: string | null
+          date_of_arrival?: string
+          amount?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incoming_feed_events_feed_id_fkey"
+            columns: ["feed_id"]
+            isOneToOne: false
+            referencedRelation: "feeds_metadata"
+            referencedColumns: ["feed_id"]
+          }
+        ]
+      }
       _affected_systems: {
         Row: {
           system_id: number
@@ -142,8 +568,8 @@ export type Database = {
           rating_numeric: number | null
           system_id: number
           worst_parameter:
-            | Database["public"]["Enums"]["water_quality_parameters"]
-            | null
+          | Database["public"]["Enums"]["water_quality_parameters"]
+          | null
           worst_parameter_unit: string | null
           worst_parameter_value: number | null
         }
@@ -155,8 +581,8 @@ export type Database = {
           rating_numeric?: number | null
           system_id: number
           worst_parameter?:
-            | Database["public"]["Enums"]["water_quality_parameters"]
-            | null
+          | Database["public"]["Enums"]["water_quality_parameters"]
+          | null
           worst_parameter_unit?: string | null
           worst_parameter_value?: number | null
         }
@@ -168,8 +594,8 @@ export type Database = {
           rating_numeric?: number | null
           system_id?: number
           worst_parameter?:
-            | Database["public"]["Enums"]["water_quality_parameters"]
-            | null
+          | Database["public"]["Enums"]["water_quality_parameters"]
+          | null
           worst_parameter_unit?: string | null
           worst_parameter_value?: number | null
         }
@@ -802,6 +1228,50 @@ export type Database = {
         }
         Relationships: []
       }
+      stocking_events: {
+        Row: {
+          average_body_weight_g: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          number_of_fish: number
+          source: string | null
+          stocking_date: string
+          system_id: string
+          total_weight_kg: number
+        }
+        Insert: {
+          average_body_weight_g: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          number_of_fish: number
+          source?: string | null
+          stocking_date: string
+          system_id: string
+          total_weight_kg: number
+        }
+        Update: {
+          average_body_weight_g?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          number_of_fish?: number
+          source?: string | null
+          stocking_date?: string
+          system_id?: string
+          total_weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stocking_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       system: {
         Row: {
           created_at: string
@@ -919,9 +1389,10 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
+
     }
     Views: {
       dashboard: {
@@ -932,8 +1403,8 @@ export type Database = {
           efcr: number | null
           efcr_arrow: Database["public"]["Enums"]["arrows"] | null
           growth_stage:
-            | Database["public"]["Enums"]["system_growth_stage"]
-            | null
+          | Database["public"]["Enums"]["system_growth_stage"]
+          | null
           mortality_count: number | null
           prev_efcr: number | null
           prev_mortality: number | null
@@ -952,6 +1423,100 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      transfer_events: {
+        Row: {
+          average_body_weight: number | null
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          number_of_fish: number | null
+          origin_system_id: string | null
+          target_system_id: string | null
+          total_weight: number | null
+        }
+        Insert: {
+          average_body_weight?: number | null
+          created_at?: string
+          created_by?: string | null
+          date: string
+          id?: string
+          number_of_fish?: number | null
+          origin_system_id?: string | null
+          target_system_id?: string | null
+          total_weight?: number | null
+        }
+        Update: {
+          average_body_weight?: number | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          number_of_fish?: number | null
+          origin_system_id?: string | null
+          target_system_id?: string | null
+          total_weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_events_origin_system_id_fkey"
+            columns: ["origin_system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          },
+          {
+            foreignKeyName: "transfer_events_target_system_id_fkey"
+            columns: ["target_system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
+          }
+        ]
+      }
+      systems: {
+        Row: {
+          system_id: string
+          system_type: Database["public"]["Enums"]["system_type"] | null
+          growth_stage: Database["public"]["Enums"]["system_growth_stage"] | null
+          volume: number | null
+          width: number | null
+          length: number | null
+          depth: number | null
+          diameter: number | null
+          created_at: string
+        }
+        Insert: {
+          system_id: string
+          system_type?: Database["public"]["Enums"]["system_type"] | null
+          growth_stage?: Database["public"]["Enums"]["system_growth_stage"] | null
+          volume?: number | null
+          width?: number | null
+          length?: number | null
+          depth?: number | null
+          diameter?: number | null
+          created_at?: string
+        }
+        Update: {
+          system_id?: string
+          system_type?: Database["public"]["Enums"]["system_type"] | null
+          growth_stage?: Database["public"]["Enums"]["system_growth_stage"] | null
+          volume?: number | null
+          width?: number | null
+          length?: number | null
+          depth?: number | null
+          diameter?: number | null
+          created_at?: string
+        }
+        Relationships: []
       }
       dashboard_consolidated: {
         Row: {
@@ -980,8 +1545,8 @@ export type Database = {
           efcr_period: number | null
           feeding_amount_aggregated: number | null
           growth_stage:
-            | Database["public"]["Enums"]["system_growth_stage"]
-            | null
+          | Database["public"]["Enums"]["system_growth_stage"]
+          | null
           number_of_fish_inventory: number | null
           system_id: number | null
           system_name: string | null
@@ -1017,48 +1582,48 @@ export type Database = {
       arrows: "up" | "down" | "straight"
       change_type_enum: "INSERT" | "UPDATE" | "DELETE"
       feed_category:
-        | "pre-starter"
-        | "starter"
-        | "pre-grower"
-        | "grower"
-        | "finisher"
-        | "broodstock"
+      | "pre-starter"
+      | "starter"
+      | "pre-grower"
+      | "grower"
+      | "finisher"
+      | "broodstock"
       feed_pellet_size:
-        | "mash_powder"
-        | "<0.49mm"
-        | "0.5-0.99mm"
-        | "1.0-1.5mm"
-        | "1.5-1.99mm"
-        | "2mm"
-        | "2.5mm"
-        | "3mm"
-        | "3.5mm"
-        | "4mm"
-        | "4.5mm"
-        | "5mm"
+      | "mash_powder"
+      | "<0.49mm"
+      | "0.5-0.99mm"
+      | "1.0-1.5mm"
+      | "1.5-1.99mm"
+      | "2mm"
+      | "2.5mm"
+      | "3mm"
+      | "3.5mm"
+      | "4mm"
+      | "4.5mm"
+      | "5mm"
       feeding_response: "very_good" | "good" | "bad"
       system_growth_stage: "grow_out" | "nursing"
       system_type: "cage" | "compartment" | "all_active_cages"
       time_period:
-        | "day"
-        | "week"
-        | "2 weeks"
-        | "month"
-        | "quarter"
-        | "6 months"
-        | "year"
+      | "day"
+      | "week"
+      | "2 weeks"
+      | "month"
+      | "quarter"
+      | "6 months"
+      | "year"
       type_of_harvest: "partial" | "final"
       type_of_stocking: "empty" | "already_stocked"
       units: "m" | "mg/l" | "ppt" | "┬░C"
       water_quality_parameters:
-        | "pH"
-        | "temperature"
-        | "dissolved_oxygen"
-        | "secchi_disk_depth"
-        | "nitrite"
-        | "nitrate"
-        | "ammonia_ammonium"
-        | "salinity"
+      | "pH"
+      | "temperature"
+      | "dissolved_oxygen"
+      | "secchi_disk_depth"
+      | "nitrite"
+      | "nitrate"
+      | "ammonia_ammonium"
+      | "salinity"
       water_quality_rating: "optimal" | "acceptable" | "critical" | "lethal"
     }
     CompositeTypes: {
@@ -1073,116 +1638,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
+    Insert: infer I
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
+    Update: infer U
+  }
+  ? U
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   public: {
@@ -1213,7 +1778,15 @@ export const Constants = {
       ],
       feeding_response: ["very_good", "good", "bad"],
       system_growth_stage: ["grow_out", "nursing"],
-      system_type: ["cage", "compartment", "all_active_cages"],
+      system_type: [
+        "cage",
+        "compartment",
+        "all_active_cages",
+        "rectangular_cage",
+        "circular_cage",
+        "pond",
+        "tank",
+      ],
       time_period: [
         "day",
         "week",

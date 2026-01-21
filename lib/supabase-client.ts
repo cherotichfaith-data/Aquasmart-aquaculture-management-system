@@ -1,7 +1,7 @@
 export interface QueryParams {
   select?: string
   eq?: Record<string, string | number | boolean>
-  order?: string
+  order?: string | { column: string; ascending: boolean }
   limit?: number
 }
 
@@ -30,7 +30,13 @@ export async function supabaseQuery<T = any>(table: string, params: QueryParams 
     const sp = new URLSearchParams()
 
     sp.set("select", params.select ?? "*")
-    if (params.order) sp.set("order", params.order)
+    if (params.order) {
+      if (typeof params.order === "string") {
+        sp.set("order", params.order)
+      } else {
+        sp.set("order", `${params.order.column}.${params.order.ascending ? "asc" : "desc"}`)
+      }
+    }
     if (params.limit) sp.set("limit", String(params.limit))
 
     if (params.eq) {
