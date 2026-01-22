@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
@@ -34,6 +35,7 @@ interface IncomingFeedFormProps {
 export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
+    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -49,11 +51,12 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
             const { error } = await supabase.from("incoming_feed_events").insert({
-                date: values.date,
+                date_of_arrival: values.date,
                 feed_id: values.feed_id,
-                quantity: values.quantity,
+                amount: values.quantity,
                 cost_per_unit: values.cost_per_unit || 0,
                 supplier_id: values.supplier_id === "none" ? null : values.supplier_id,
+                created_by: user?.id
             })
 
             if (error) throw error

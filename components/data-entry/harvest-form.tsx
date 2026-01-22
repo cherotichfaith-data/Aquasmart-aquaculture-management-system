@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -33,6 +34,7 @@ interface HarvestFormProps {
 export function HarvestForm({ systems }: HarvestFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
+    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -51,8 +53,9 @@ export function HarvestForm({ systems }: HarvestFormProps) {
                 system_id: values.system_id,
                 date: values.date,
                 number_of_fish: values.number_of_fish,
-                amount_kg: values.amount_kg,
+                total_weight: values.amount_kg,
                 type_of_harvest: values.type_of_harvest as any,
+                created_by: user?.id
             })
 
             if (error) throw error

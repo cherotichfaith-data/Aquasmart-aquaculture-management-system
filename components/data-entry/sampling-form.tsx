@@ -18,6 +18,7 @@ import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
 import { useEffect } from "react"
+import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -34,6 +35,7 @@ interface SamplingFormProps {
 export function SamplingForm({ systems }: SamplingFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
+    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -63,9 +65,10 @@ export function SamplingForm({ systems }: SamplingFormProps) {
             const { error } = await supabase.from("sampling_events").insert({
                 system_id: values.system_id,
                 date: values.date,
-                number_of_fish: values.number_of_fish,
-                total_weight_kg: values.total_weight_kg,
-                average_body_weight_g: values.average_body_weight_g || 0,
+                number_of_samples: values.number_of_fish,
+                total_weight: values.total_weight_kg,
+                average_body_weight: values.average_body_weight_g || 0,
+                created_by: user?.id
             })
 
             if (error) throw error

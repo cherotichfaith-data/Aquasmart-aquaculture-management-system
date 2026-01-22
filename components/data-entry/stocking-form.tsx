@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -60,7 +61,18 @@ export function StockingForm({ systems }: StockingFormProps) {
     }
 
 
+    const { user } = useAuth()
+
     async function onSubmit(values: z.infer<typeof formSchema>) {
+        if (!user) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "You must be logged in to submit data.",
+            })
+            return
+        }
+
         try {
             // Calculate ABW if not provided or just use the one provided
             const calculatedAbw = (values.total_weight_kg * 1000) / values.number_of_fish
@@ -72,7 +84,8 @@ export function StockingForm({ systems }: StockingFormProps) {
                 number_of_fish: values.number_of_fish,
                 total_weight_kg: values.total_weight_kg,
                 average_body_weight_g: parseFloat(abw.toFixed(2)),
-                source: values.source || null, // Handle empty string as null
+                source: values.source || null,
+                created_by: user.id
             })
 
             if (error) throw error

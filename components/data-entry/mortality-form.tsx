@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client" // Adjust import path
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useAuth } from "@/components/auth-provider"
 
 // Schema
 const formSchema = z.object({
@@ -34,6 +35,7 @@ interface MortalityFormProps {
 export function MortalityForm({ systems }: MortalityFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
+    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -54,6 +56,7 @@ export function MortalityForm({ systems }: MortalityFormProps) {
                 number_of_fish: values.number_of_fish,
                 total_weight: values.total_weight,
                 average_body_weight: values.average_body_weight,
+                created_by: user?.id
             })
 
             if (error) throw error

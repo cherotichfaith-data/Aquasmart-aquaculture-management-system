@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     origin_system_id: z.string().min(1, "Origin system is required"),
@@ -34,6 +35,7 @@ interface TransferFormProps {
 export function TransferForm({ systems }: TransferFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
+    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -59,6 +61,7 @@ export function TransferForm({ systems }: TransferFormProps) {
                 number_of_fish: values.number_of_fish,
                 total_weight: values.total_weight_kg,
                 average_body_weight: values.average_body_weight_g,
+                created_by: user?.id
             })
 
             if (error) throw error

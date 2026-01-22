@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -38,6 +39,7 @@ interface WaterQualityFormProps {
 export function WaterQualityForm({ systems }: WaterQualityFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
+    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -75,6 +77,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                 no3: values.no3,
                 salinity: values.salinity,
                 secchi_disk: values.secchi_disk,
+                created_by: user?.id
             })
 
             if (error) throw error
