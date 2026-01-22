@@ -40,6 +40,9 @@ export function FeedingForm({ systems, feeds }: FeedingFormProps) {
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             amount_kg: 0,
+            system_id: "",
+            feed_id: "",
+            // feeding_response is optional, undefined is fine if select handles it, but better to be safe or leave undefined if not controlled by input text
         },
     })
 

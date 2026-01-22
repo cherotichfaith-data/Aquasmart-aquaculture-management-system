@@ -33,6 +33,8 @@ interface DataEntryInterfaceProps {
 }
 
 const sidebarItems = [
+    { id: "system", label: "System" },
+    { id: "stocking", label: "Stocking" },
     { id: "mortality", label: "Mortality" },
     { id: "feeding", label: "Feeding" },
     { id: "sampling", label: "Sampling" },
@@ -40,12 +42,10 @@ const sidebarItems = [
     { id: "harvest", label: "Harvest" },
     { id: "water_quality", label: "Water Quality" },
     { id: "incoming_feed", label: "Incoming Feed" },
-    { id: "stocking", label: "Stocking" },
-    { id: "system", label: "System" },
 ]
 
 export function DataEntryInterface({ systems, suppliers, feeds, recentEntries }: DataEntryInterfaceProps) {
-    const [activeTab, setActiveTab] = useState("mortality")
+    const [activeTab, setActiveTab] = useState("stocking")
 
     return (
         <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-6">
@@ -58,7 +58,7 @@ export function DataEntryInterface({ systems, suppliers, feeds, recentEntries }:
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
                                 className={cn(
-                                    "text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+                                    "text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer",
                                     activeTab === item.id ? "bg-accent text-accent-foreground" : "text-muted-foreground"
                                 )}
                             >

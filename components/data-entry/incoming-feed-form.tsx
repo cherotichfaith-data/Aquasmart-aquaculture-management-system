@@ -40,6 +40,9 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             quantity: 0,
+            cost_per_unit: 0,
+            feed_id: "",
+            supplier_id: "none",
         },
     })
 

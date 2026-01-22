@@ -41,6 +41,8 @@ export function SamplingForm({ systems }: SamplingFormProps) {
             date: new Date().toISOString().split("T")[0],
             number_of_fish: 0,
             total_weight_kg: 0,
+            system_id: "",
+            average_body_weight_g: 0,
         },
     })
 

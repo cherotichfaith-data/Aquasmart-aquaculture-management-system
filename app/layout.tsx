@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/components/auth-provider"
+import { ToastProvider } from "@/components/shared/toast-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <AuthProvider>
           {children}
+          <ToastProvider />
         </AuthProvider>
         <Analytics />
       </body>

@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
+import { insertData } from "@/lib/supabase-actions"
 
 const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -33,7 +33,6 @@ import { useRouter } from "next/navigation"
 export function SystemForm() {
     const { toast } = useToast()
     const router = useRouter()
-    const supabase = createClient()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -51,8 +50,9 @@ export function SystemForm() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            const { error } = await supabase.from("systems").insert({
-                system_id: values.name,
+            console.log("..submitting....")
+            const result = await insertData("systems", {
+                system_id: values.name, // Note: system_id in DB vs name in Form
                 system_type: values.type,
                 growth_stage: values.growth_stage,
                 volume: values.volume,
@@ -62,7 +62,7 @@ export function SystemForm() {
                 diameter: values.diameter,
             })
 
-            if (error) throw error
+            if (!result.success) throw result.error
 
             toast({
                 title: "Success",

@@ -42,6 +42,7 @@ export function StockingForm({ systems }: StockingFormProps) {
             number_of_fish: 0,
             total_weight_kg: 0,
             average_body_weight_g: 0,
+            source: "",
         },
     })
 
@@ -62,15 +63,16 @@ export function StockingForm({ systems }: StockingFormProps) {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
             // Calculate ABW if not provided or just use the one provided
-            const abw = values.average_body_weight_g || (values.total_weight_kg * 1000) / values.number_of_fish
+            const calculatedAbw = (values.total_weight_kg * 1000) / values.number_of_fish
+            const abw = values.average_body_weight_g || (Number.isFinite(calculatedAbw) ? calculatedAbw : 0)
 
             const { error } = await supabase.from("stocking_events").insert({
                 system_id: values.system_id,
                 stocking_date: values.stocking_date,
                 number_of_fish: values.number_of_fish,
                 total_weight_kg: values.total_weight_kg,
-                average_body_weight_g: abw,
-                source: values.source,
+                average_body_weight_g: parseFloat(abw.toFixed(2)),
+                source: values.source || null, // Handle empty string as null
             })
 
             if (error) throw error

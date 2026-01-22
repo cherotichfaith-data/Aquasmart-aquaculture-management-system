@@ -41,6 +41,7 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
           growth_stage: stage === "all" ? undefined : stage,
           time_period: timePeriod,
         })
+        console.log("....snapshot....", data)
         setSnapshot(data)
       } catch (err) {
         console.error("[v0] Error loading KPI metrics:", err)

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { Bell, Download } from "lucide-react"
+import { Download } from "lucide-react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import FarmSelector from "@/components/shared/farm-selector"
@@ -53,13 +53,6 @@ export default function DashboardPage() {
               <h1 className="text-3xl font-semibold text-balance">Dashboard</h1>
               <p className="text-muted-foreground mt-2">Monitor your farm check-ins and system performance</p>
             </div>
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="h-9 w-9 rounded-full border border-border bg-card shadow-sm hover:bg-accent transition-colors"
-            >
-              <Bell className="mx-auto h-4 w-4 text-muted-foreground" />
-            </button>
           </div>
 
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -86,12 +79,13 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center gap-2">
               <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} />
               <Link href="/data-entry">
-                <Button>Add Data</Button>
+                <Button className="h-9 rounded-full px-4 text-xs font-semibold shadow-sm cursor-pointer bg-sidebar-primary hover:bg-sidebar-primary/80">
+                Add Data</Button>
               </Link>
               <Button
                 size="sm"
                 onClick={handleDownload}
-                className="h-9 rounded-full px-4 text-xs font-semibold shadow-sm"
+                className="h-9 rounded-full px-4 text-xs font-semibold shadow-sm cursor-pointer bg-sidebar-primary hover:bg-sidebar-primary/80"
               >
                 <Download className="mr-2 h-4 w-4" />
                 Download
@@ -113,11 +107,11 @@ export default function DashboardPage() {
 
         <KPIOverview stage={selectedStage} timePeriod={timePeriod} batch={selectedBatch} system={selectedSystem} />
 
-        {/* <PopulationOverview
+        <PopulationOverview
           stage={selectedStage === "all" ? null : selectedStage}
           system={selectedSystem}
           timePeriod={timePeriod}
-        /> */}
+        />
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
           <div className="space-y-6">

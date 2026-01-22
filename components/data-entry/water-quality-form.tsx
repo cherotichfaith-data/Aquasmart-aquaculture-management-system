@@ -43,6 +43,22 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
         resolver: zodResolver(formSchema),
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
+            system_id: "",
+            // Use empty strings for optional number inputs to avoid "0" default if not desired, 
+            // or 0 if acceptable. For paramters like pH, 0 is invalid/extreme.
+            // We use standard values or undefined->"" via controller if possible, 
+            // but to fix the "uncontrolled" error, we need a defined value.
+            // Let's use undefined, BUT we must ensure the Input field uses value={field.value ?? ""}
+            // However, the error says it changing from undefined to defined.
+            // So we MUST initialize with "".
+            temperature: "" as any,
+            dissolved_oxygen: "" as any,
+            ph: "" as any,
+            total_ammonia: "" as any,
+            no2: "" as any,
+            no3: "" as any,
+            salinity: "" as any,
+            secchi_disk: "" as any,
         },
     })
 

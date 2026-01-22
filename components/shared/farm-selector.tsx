@@ -34,7 +34,7 @@ export default function FarmSelector({
     { value: "nursing", label: "Nursing Stage" },
     { value: "grow_out", label: "Grow-out Stage" },
   ] as const
-
+  
   useEffect(() => {
     const loadOptions = async () => {
       const [batchResult, systemResult] = await Promise.all([fetchBatchesList(), fetchSystemsList()])

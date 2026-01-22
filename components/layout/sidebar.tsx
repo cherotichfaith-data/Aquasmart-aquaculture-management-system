@@ -63,18 +63,10 @@ export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: (
           </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-3 px-4 py-4 border-b border-sidebar-border">
-          <div className="w-9 h-9 rounded-full bg-sidebar-accent flex items-center justify-center">
-            <span className="text-xs font-semibold text-sidebar-accent-foreground">FM</span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-sidebar-foreground">Farm Manager</p>
-            <p className="text-xs text-sidebar-foreground/70">Operations</p>
-          </div>
-        </div>
+        
 
         <nav className="p-4 space-y-2 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          <p className="px-2 text-xs uppercase tracking-wide text-sidebar-foreground/60">Menu</p>
+          {/* <p className="px-2 text-xs uppercase tracking-wide text-sidebar-foreground/60">Menu</p> */}
           {navigation.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
@@ -100,7 +92,7 @@ export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: (
               await signOut()
               router.push("/auth")
             }}
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors cursor-pointer"
           >
             <LogOut className="h-4 w-4" />
             <span className="text-sm font-medium">Log out</span>

@@ -40,6 +40,8 @@ export function TransferForm({ systems }: TransferFormProps) {
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             number_of_fish: 0,
+            origin_system_id: "",
+            target_system_id: "",
         },
     })
 
@@ -118,11 +120,11 @@ export function TransferForm({ systems }: TransferFormProps) {
                         />
                         <FormField
                             control={form.control}
-                            name="destination_system_id"
+                            name="target_system_id"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Destination System</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select destination" />

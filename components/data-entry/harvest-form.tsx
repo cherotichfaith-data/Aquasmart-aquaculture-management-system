@@ -41,6 +41,7 @@ export function HarvestForm({ systems }: HarvestFormProps) {
             number_of_fish: 0,
             amount_kg: 0,
             type_of_harvest: "partial",
+            system_id: "",
         },
     })
 

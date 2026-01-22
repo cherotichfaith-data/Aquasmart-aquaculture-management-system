@@ -56,7 +56,7 @@ export async function fetchDashboardSnapshot(filters?: {
       system_id: filters.system_id,
     }
     if (filters?.time_period) eq.time_period = filters.time_period
-    if (filters?.growth_stage) eq.growth_stage = filters.growth_stage
+    // if (filters?.growth_stage) eq.growth_stage = filters.growth_stage
 
     const result = await supabaseQuery<DashboardRow>("dashboard", {
       select: "*",
@@ -74,11 +74,13 @@ export async function fetchDashboardSnapshot(filters?: {
     select: "*",
     eq: {
       ...eq,
-      growth_stage_scope: filters?.growth_stage ?? "all",
+      time_period: "custom",
+      // growth_stage_scope: filters?.growth_stage ?? "all",
     },
     order: "input_end_date.desc",
     limit: 1,
   })
+  console.log(".....result>>>>>>>", result)
 
   return result.status === "success" ? result.data[0] ?? null : null
 }

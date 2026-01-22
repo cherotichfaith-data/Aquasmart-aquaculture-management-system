@@ -40,6 +40,9 @@ export function MortalityForm({ systems }: MortalityFormProps) {
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             number_of_fish: 0,
+            total_weight: 0,
+            average_body_weight: 0,
+            system_id: "",
         },
     })
 
