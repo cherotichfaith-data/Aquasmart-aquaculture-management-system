@@ -1,6 +1,7 @@
 "use client"
 
 import { Bell, LogOut, Menu, Settings, User as UserIcon } from "lucide-react"
+import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -65,7 +66,8 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
                 {/* Mock Notifications */}
                 <div className="p-4 text-sm text-center text-muted-foreground">
                   <div className="flex flex-col gap-2 text-left">
-                    <div className="py-2 border-b border-border last:border-0 cursor-pointer">
+                    <p className="text-center">No New Notifications</p>
+                    {/* <div className="py-2 border-b border-border last:border-0 cursor-pointer">
                       <p className="font-medium text-foreground">Low Oxygen Alert</p>
                       <p className="text-xs text-muted-foreground">System A dissolved oxygen fell below 4.0 mg/L.</p>
                       <p className="text-[10px] text-muted-foreground mt-1">2 hours ago</p>
@@ -74,7 +76,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
                       <p className="font-medium text-foreground">Stocking Recorded</p>
                       <p className="text-xs text-muted-foreground">New batch stocked in Cage 101.</p>
                       <p className="text-[10px] text-muted-foreground mt-1">5 hours ago</p>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </div>
@@ -105,11 +107,15 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer">
                 <UserIcon className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                <Link href="/settings">
+                  <span>Profile</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+                <Link href="/settings">
+                  <span>Settings</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive cursor-pointer">

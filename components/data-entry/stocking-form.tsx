@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 import {
     Form,
     FormControl,
@@ -216,7 +217,10 @@ export function StockingForm({ systems }: StockingFormProps) {
                         )}
                     />
 
-                    <Button type="submit">Submit Entry</Button>
+                    <Button type="submit" disabled={form.formState.isSubmitting}>
+                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Submit Entry
+                    </Button>
                 </form>
             </Form>
         </div>

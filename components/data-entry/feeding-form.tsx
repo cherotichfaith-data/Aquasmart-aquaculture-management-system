@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 import {
     Form,
     FormControl,
@@ -17,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -34,6 +36,7 @@ interface FeedingFormProps {
 export function FeedingForm({ systems, feeds }: FeedingFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
+    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -52,8 +55,9 @@ export function FeedingForm({ systems, feeds }: FeedingFormProps) {
                 system_id: values.system_id,
                 date: values.date,
                 feed_id: values.feed_id,
-                amount_kg: values.amount_kg,
+                amount: values.amount_kg,
                 feeding_response: values.feeding_response as any,
+                created_by: user?.id
             })
 
             if (error) throw error
@@ -188,7 +192,10 @@ export function FeedingForm({ systems, feeds }: FeedingFormProps) {
                             )}
                         />
                     </div>
-                    <Button type="submit">Submit Entry</Button>
+                    <Button type="submit" disabled={form.formState.isSubmitting}>
+                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Submit Entry
+                    </Button>
                 </form>
             </Form>
         </div>

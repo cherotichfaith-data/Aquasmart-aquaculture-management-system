@@ -19,7 +19,9 @@ import type { Tables } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-type SummaryRow = Tables<"production_summary">
+type SummaryRow = Tables<"production_summary"> & {
+    efcr_aggregated?: number
+}
 
 type ChartPoint = {
     date: string
@@ -106,20 +108,22 @@ export default function PopulationOverview({
             })
 
             if (!isMounted) return
-
+            console.log("Production Summary Result:", result)
             if (result.status === "success" && result.data.length > 0) {
                 setRows(result.data)
             } else {
-                // FALLBACK: Mock Data for visualization
-                console.log("Using Mock Data for Population Overview")
+                // FALLBACK: Zero Data for visualization (3 months back)
+                console.log("Using Zero Data Fallback")
                 const today = new Date()
-                const mockRows: any[] = [] // Using any to bypass strict partial type matching for visual mock
-                for (let i = 0; i < 30; i++) {
+                const mockRows: any[] = []
+                // 3 months approx 90 days
+                for (let i = 0; i < 90; i++) {
                     const d = new Date(today)
-                    d.setDate(d.getDate() - (29 - i))
+                    d.setDate(d.getDate() - i)
                     mockRows.push({
                         date: d.toISOString().split('T')[0],
-                        number_of_fish_inventory: 1000 + Math.floor(Math.random() * 500) + (i * 50), // Upward trend
+                        efcr_aggregated: 0,
+                        daily_mortality_count: 0,
                         growth_stage: "grow_out",
                         system_id: 1
                     })
@@ -138,66 +142,116 @@ export default function PopulationOverview({
         const cutoff = new Date()
         cutoff.setDate(cutoff.getDate() - daysByPeriod[timePeriod])
 
-        const map = new Map<string, { total_fish: number }>()
+        console.log("Rows:", rows)
+
+        const map = new Map<string, { total_efcr: number; count: number; total_mortality: number }>()
 
         rows.forEach((row) => {
             if (!row.date) return
             const parsed = new Date(row.date)
-            if (!Number.isNaN(parsed.getTime()) && parsed < cutoff) return
+            // if (!Number.isNaN(parsed.getTime()) && parsed < cutoff) return
+            // TEMPORARY: Allow all data to populate the chart regardless of filter
+            // This handles the case where data is old (e.g. 2024) but user views it in 2026.
+            if (Number.isNaN(parsed.getTime())) return
 
             const key = row.date
-            const current = map.get(key) ?? { total_fish: 0 }
+            const current = map.get(key) ?? { total_efcr: 0, count: 0, total_mortality: 0 }
 
-            current.total_fish += row.number_of_fish_inventory ?? 0
+            if (row.efcr_aggregated !== null && row.efcr_aggregated !== undefined) {
+                current.total_efcr += row.efcr_aggregated
+                current.count += 1
+            }
+
+            if (row.daily_mortality_count) {
+                current.total_mortality += row.daily_mortality_count
+            }
 
             map.set(key, current)
         })
-
+        console.log("Map:", map)
         const data = Array.from(map.entries())
             .map(([date, values]) => ({
                 date,
-                total_fish: values.total_fish,
+                efcr: values.count > 0 ? values.total_efcr / values.count : 0,
+                mortality: values.total_mortality
             }))
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
         console.log("Processed Chart Data:", data)
         return data
     }, [rows, timePeriod])
-
+    console.log("Chart Data:", chartData)
     return (
-        <Card className="w-full">
-            <CardHeader className="border-b border-border">
-                <CardTitle>Population Trend</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4">
-                {loading ? (
-                    <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
-                ) : chartData.length ? (
-                    <ResponsiveContainer width="100%" height={320}>
-                        <ComposedChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" tickFormatter={(value: any) => formatAxisDate(value)} />
-                            <YAxis />
-                            <Tooltip
-                                formatter={(value: number | string, name) => {
-                                    return [value, "Population"]
-                                }}
-                                labelFormatter={formatAxisDate}
-                            />
-                            <Line
-                                type="monotone"
-                                dataKey="total_fish"
-                                stroke="#3b82f6"
-                                strokeWidth={2}
-                                dot={false}
-                                name="Population"
-                            />
-                        </ComposedChart>
-                    </ResponsiveContainer>
-                ) : (
-                    <div className="h-[320px] flex items-center justify-center text-muted-foreground">No data available.</div>
-                )}
-            </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+            <Card className="w-full">
+                <CardHeader className="border-b border-border">
+                    <CardTitle>eFCR Trend</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                    {loading ? (
+                        <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
+                    ) : chartData.length ? (
+                        <ResponsiveContainer width="100%" height={320}>
+                            <ComposedChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" tickFormatter={(value: any) => formatAxisDate(value)} />
+                                <YAxis stroke="#3b82f6" />
+                                <Tooltip
+                                    formatter={(value: number | string, name) => {
+                                        return [typeof value === 'number' ? value.toFixed(2) : value, "eFCR"]
+                                    }}
+                                    labelFormatter={formatAxisDate}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="efcr"
+                                    stroke="#3b82f6"
+                                    strokeWidth={2}
+                                    dot={false}
+                                    name="eFCR"
+                                />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-[320px] flex items-center justify-center text-muted-foreground">No data available.</div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card className="w-full">
+                <CardHeader className="border-b border-border">
+                    <CardTitle>Mortality Trend</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                    {loading ? (
+                        <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
+                    ) : chartData.length ? (
+                        <ResponsiveContainer width="100%" height={320}>
+                            <ComposedChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" tickFormatter={(value: any) => formatAxisDate(value)} />
+                                <YAxis stroke="#ef4444" />
+                                <Tooltip
+                                    formatter={(value: number | string, name) => {
+                                        return [value, "Mortality"]
+                                    }}
+                                    labelFormatter={formatAxisDate}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="mortality"
+                                    fill="#ef4444"
+                                    fillOpacity={0.2}
+                                    stroke="#ef4444"
+                                    name="Mortality"
+                                />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-[320px] flex items-center justify-center text-muted-foreground">No data available.</div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
     )
 }

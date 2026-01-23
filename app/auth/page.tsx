@@ -89,8 +89,8 @@ export default function AuthPage() {
                 <CardContent>
                     <Tabs defaultValue="signin" className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="signin">Sign In</TabsTrigger>
-                            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                            <TabsTrigger className="cursor-pointer" value="signin">Sign In</TabsTrigger>
+                            <TabsTrigger className="cursor-pointer" value="signup">Sign Up</TabsTrigger>
                         </TabsList>
                         <TabsContent value="signin">
                             <div className="grid gap-4 py-4">
@@ -131,11 +131,11 @@ export default function AuthPage() {
                                             <SelectValue placeholder="Select a role" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="viewer">Viewer</SelectItem>
-                                            <SelectItem value="farm_manager">Farm Manager</SelectItem>
-                                            <SelectItem value="system_operator">System Operator</SelectItem>
-                                            <SelectItem value="data_analyst">Data Analyst</SelectItem>
-                                            <SelectItem value="admin">Admin</SelectItem>
+                                            <SelectItem className="cursor-pointer" value="viewer">Viewer</SelectItem>
+                                            <SelectItem className="cursor-pointer" value="farm_manager">Farm Manager</SelectItem>
+                                            <SelectItem className="cursor-pointer" value="system_operator">System Operator</SelectItem>
+                                            <SelectItem className="cursor-pointer" value="data_analyst">Data Analyst</SelectItem>
+                                            <SelectItem className="cursor-pointer" value="admin">Admin</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
