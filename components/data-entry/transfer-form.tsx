@@ -18,11 +18,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
-import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     origin_system_id: z.string().min(1, "Origin system is required"),
     target_system_id: z.string().min(1, "Destination system is required"),
+    batch_id: z.string().optional(),
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(1, "Count must be positive"),
     total_weight_kg: z.coerce.number().min(0, "Weight must be positive"),
@@ -30,13 +30,13 @@ const formSchema = z.object({
 })
 
 interface TransferFormProps {
-    systems: Tables<"systems">[]
+    systems: Tables<"system">[]
+    batches: Tables<"fingerling_batch">[]
 }
 
-export function TransferForm({ systems }: TransferFormProps) {
+export function TransferForm({ systems, batches }: TransferFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
-    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -45,6 +45,7 @@ export function TransferForm({ systems }: TransferFormProps) {
             number_of_fish: 0,
             origin_system_id: "",
             target_system_id: "",
+            batch_id: "none",
         },
     })
 
@@ -55,14 +56,18 @@ export function TransferForm({ systems }: TransferFormProps) {
                 return
             }
 
-            const { error } = await supabase.from("transfer_events").insert({
-                origin_system_id: values.origin_system_id,
-                target_system_id: values.target_system_id,
+            const originId = Number(values.origin_system_id)
+            const targetId = Number(values.target_system_id)
+            const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+
+            const { error } = await supabase.from("fish_transfer").insert({
+                origin_system_id: originId,
+                target_system_id: targetId,
+                batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
-                number_of_fish: values.number_of_fish,
-                total_weight: values.total_weight_kg,
-                average_body_weight: values.average_body_weight_g,
-                created_by: user?.id
+                number_of_fish_transfer: values.number_of_fish,
+                total_weight_transfer: values.total_weight_kg,
+                abw: values.average_body_weight_g ?? null,
             })
 
             if (error) throw error
@@ -78,6 +83,7 @@ export function TransferForm({ systems }: TransferFormProps) {
                 average_body_weight_g: 0,
                 origin_system_id: values.origin_system_id,
                 target_system_id: "",
+                batch_id: values.batch_id,
             })
         } catch (error) {
             console.error(error)
@@ -112,8 +118,8 @@ export function TransferForm({ systems }: TransferFormProps) {
                                         </FormControl>
                                         <SelectContent>
                                             {systems.map((s) => (
-                                                <SelectItem key={s.system_id} value={s.system_id}>
-                                                    {s.system_id}
+                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                    {s.name ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -136,8 +142,8 @@ export function TransferForm({ systems }: TransferFormProps) {
                                         </FormControl>
                                         <SelectContent>
                                             {systems.map((s) => (
-                                                <SelectItem key={s.system_id} value={s.system_id}>
-                                                    {s.system_id}
+                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                    {s.name ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -147,6 +153,31 @@ export function TransferForm({ systems }: TransferFormProps) {
                             )}
                         />
                     </div>
+                    <FormField
+                        control={form.control}
+                        name="batch_id"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Batch (Optional)</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select batch" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="none">No batch</SelectItem>
+                                        {batches.map((batch) => (
+                                            <SelectItem key={batch.id} value={String(batch.id)}>
+                                                {batch.name || `Batch ${batch.id}`}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
 
                     <FormField
                         control={form.control}

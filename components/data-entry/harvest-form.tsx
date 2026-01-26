@@ -18,10 +18,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
-import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
+    batch_id: z.string().optional(),
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(0, "Count must be positive"),
     amount_kg: z.coerce.number().min(0, "Weight must be positive"),
@@ -29,13 +29,13 @@ const formSchema = z.object({
 })
 
 interface HarvestFormProps {
-    systems: Tables<"systems">[]
+    systems: Tables<"system">[]
+    batches: Tables<"fingerling_batch">[]
 }
 
-export function HarvestForm({ systems }: HarvestFormProps) {
+export function HarvestForm({ systems, batches }: HarvestFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
-    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -45,18 +45,26 @@ export function HarvestForm({ systems }: HarvestFormProps) {
             amount_kg: 0,
             type_of_harvest: "partial",
             system_id: "",
+            batch_id: "none",
         },
     })
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            const { error } = await supabase.from("harvest_events").insert({
-                system_id: values.system_id,
+            const systemId = Number(values.system_id)
+            const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+            const abw = values.number_of_fish > 0
+                ? (values.amount_kg * 1000) / values.number_of_fish
+                : 0
+
+            const { error } = await supabase.from("fish_harvest").insert({
+                system_id: systemId,
+                batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
-                number_of_fish: values.number_of_fish,
-                total_weight: values.amount_kg,
-                type_of_harvest: values.type_of_harvest as any,
-                created_by: user?.id
+                number_of_fish_harvest: values.number_of_fish,
+                total_weight_harvest: values.amount_kg,
+                type_of_harvest: values.type_of_harvest,
+                abw: Number.isFinite(abw) ? Number(abw.toFixed(2)) : 0,
             })
 
             if (error) throw error
@@ -71,6 +79,7 @@ export function HarvestForm({ systems }: HarvestFormProps) {
                 amount_kg: 0,
                 type_of_harvest: "partial",
                 system_id: values.system_id,
+                batch_id: values.batch_id,
             })
         } catch (error) {
             console.error(error)
@@ -104,8 +113,33 @@ export function HarvestForm({ systems }: HarvestFormProps) {
                                         </FormControl>
                                         <SelectContent>
                                             {systems.map((s) => (
-                                                <SelectItem key={s.system_id} value={s.system_id}>
-                                                    {s.system_id}
+                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                    {s.name ?? `System ${s.id}`}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="batch_id"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Batch (Optional)</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select batch" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="none">No batch</SelectItem>
+                                            {batches.map((batch) => (
+                                                <SelectItem key={batch.id} value={String(batch.id)}>
+                                                    {batch.name || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

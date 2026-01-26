@@ -25,8 +25,39 @@ export default function TransactionsPage() {
     loadActivities()
   }, [selectedBatch, selectedSystem, selectedStage])
 
-  const getIcon = (table: string) => {
+  const normalizeTableName = (table: string) => {
     switch (table) {
+      case "feeding_events":
+      case "feeding_record":
+        return "feeding_record"
+      case "sampling_events":
+      case "fish_sampling_weight":
+        return "fish_sampling_weight"
+      case "water_quality_events":
+      case "water_quality_measurement":
+        return "water_quality_measurement"
+      case "mortality_events":
+      case "fish_mortality":
+        return "fish_mortality"
+      case "transfer_events":
+      case "fish_transfer":
+        return "fish_transfer"
+      case "harvest_events":
+      case "fish_harvest":
+        return "fish_harvest"
+      case "incoming_feed_events":
+      case "feed_incoming":
+        return "feed_incoming"
+      case "stocking_events":
+      case "fish_stocking":
+        return "fish_stocking"
+      default:
+        return table
+    }
+  }
+
+  const getIcon = (table: string) => {
+    switch (normalizeTableName(table)) {
       case "feeding_record":
         return <Clock size={16} />
       case "fish_sampling_weight":
@@ -37,13 +68,19 @@ export default function TransactionsPage() {
         return <AlertCircle size={16} />
       case "fish_transfer":
         return <CornerDownRight size={16} />
+      case "fish_harvest":
+        return <Fish size={16} />
+      case "feed_incoming":
+        return <Clock size={16} />
+      case "fish_stocking":
+        return <Fish size={16} />
       default:
         return <Clock size={16} />
     }
   }
 
   const getColor = (table: string) => {
-    switch (table) {
+    switch (normalizeTableName(table)) {
       case "feeding_record":
         return "bg-blue-500/10 text-blue-600"
       case "fish_sampling_weight":
@@ -54,6 +91,12 @@ export default function TransactionsPage() {
         return "bg-red-500/10 text-red-600"
       case "fish_transfer":
         return "bg-orange-500/10 text-orange-600"
+      case "fish_harvest":
+        return "bg-lime-500/10 text-lime-600"
+      case "feed_incoming":
+        return "bg-sky-500/10 text-sky-600"
+      case "fish_stocking":
+        return "bg-indigo-500/10 text-indigo-600"
       default:
         return "bg-gray-500/10 text-gray-600"
     }
@@ -139,19 +182,19 @@ export default function TransactionsPage() {
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Feeding Records</p>
             <p className="text-2xl font-bold mt-1">
-              {activities.filter((a) => a.table_name === "feeding_record").length}
+              {activities.filter((a) => normalizeTableName(a.table_name) === "feeding_record").length}
             </p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Mortality Events</p>
             <p className="text-2xl font-bold mt-1">
-              {activities.filter((a) => a.table_name === "fish_mortality").length}
+              {activities.filter((a) => normalizeTableName(a.table_name) === "fish_mortality").length}
             </p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Samplings</p>
             <p className="text-2xl font-bold mt-1">
-              {activities.filter((a) => a.table_name === "fish_sampling_weight").length}
+              {activities.filter((a) => normalizeTableName(a.table_name) === "fish_sampling_weight").length}
             </p>
           </div>
         </div>

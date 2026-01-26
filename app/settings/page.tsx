@@ -1,10 +1,30 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Save, AlertCircle, Check } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { createClient } from "@/utils/supabase/client"
 
 export default function SettingsPage() {
+  const formatError = (err: unknown) => {
+    if (!err) return "Unknown error"
+    if (typeof err === "string") return err
+    if (err instanceof Error) return err.message
+    const maybe = err as { message?: string; details?: string; hint?: string }
+    if (maybe.message) {
+      const details = maybe.details ? ` (${maybe.details})` : ""
+      const hint = maybe.hint ? ` Hint: ${maybe.hint}` : ""
+      return `${maybe.message}${details}${hint}`
+    }
+    try {
+      return JSON.stringify(err)
+    } catch {
+      return String(err)
+    }
+  }
   const [settings, setSettings] = useState({
     farmName: "AquaSmart Farm 1",
     location: "Lake Zone - Kimbwela",
@@ -20,8 +40,69 @@ export default function SettingsPage() {
 
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
+  const [thresholdId, setThresholdId] = useState<string | null>(null)
+  const { user, profile } = useAuth()
+  const { farm, farmId, loading: farmLoading } = useActiveFarm()
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
+    const loadSettings = async () => {
+      if (!user?.id) return
+      if (farmLoading) return
+      if (hasLoadedSettings) return
+
+      setLoading(true)
+      try {
+        const farmRow = farm ?? null
+
+        let thresholdRow: any = null
+        if (farmId) {
+          const { data } = await supabase
+            .from("alert_threshold")
+            .select("*")
+            .eq("scope", "farm")
+            .eq("farm_id", farmId)
+            .maybeSingle()
+          thresholdRow = data ?? null
+        }
+
+        const { data: userProfileRow } = await supabase
+          .from("user_profile")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle()
+
+        setThresholdId(thresholdRow?.id ?? null)
+
+        setSettings((prev) => ({
+          ...prev,
+          farmName: farmRow?.name ?? profile?.farm_name ?? prev.farmName,
+          location: farmRow?.location ?? profile?.location ?? prev.location,
+          owner: farmRow?.owner ?? profile?.owner ?? prev.owner,
+          email: farmRow?.email ?? profile?.email ?? prev.email,
+          phone: farmRow?.phone ?? profile?.phone ?? prev.phone,
+          lowDoThreshold: thresholdRow?.low_do_threshold ?? prev.lowDoThreshold,
+          highAmmoniaThreshold: thresholdRow?.high_ammonia_threshold ?? prev.highAmmoniaThreshold,
+          highMortalityThreshold: thresholdRow?.high_mortality_threshold ?? prev.highMortalityThreshold,
+          theme: userProfileRow?.theme ?? prev.theme,
+        }))
+        setHasLoadedSettings(true)
+      } catch (err) {
+        console.error("[settings] Error loading settings:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void loadSettings()
+  }, [farm, farmId, farmLoading, hasLoadedSettings, profile, supabase, user?.id])
+
+  useEffect(() => {
+    if (user?.id) return
     const savedSettings = localStorage.getItem("aqua_settings")
     if (savedSettings) {
       try {
@@ -31,7 +112,7 @@ export default function SettingsPage() {
       }
     }
     setLoading(false)
-  }, [])
+  }, [user?.id])
 
   const handleChange = (field: string, value: string | number) => {
     setSettings((prev) => ({ ...prev, [field]: value }))
@@ -39,9 +120,125 @@ export default function SettingsPage() {
   }
 
   const handleSave = () => {
-    localStorage.setItem("aqua_settings", JSON.stringify(settings))
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    const save = async () => {
+      setIsSaving(true)
+      setErrorMsg(null)
+      try {
+        if (user?.id) {
+          let resolvedFarmId = farmId
+          if (!resolvedFarmId) {
+            const { data: newFarm, error: farmCreateError } = await supabase
+              .from("farm")
+              .insert({
+                name: settings.farmName,
+                location: settings.location,
+                owner: settings.owner,
+                email: settings.email,
+                phone: settings.phone,
+              })
+              .select("id")
+              .single()
+
+            if (farmCreateError) {
+              throw farmCreateError
+            }
+
+            resolvedFarmId = newFarm?.id ?? null
+            if (resolvedFarmId) {
+              const role = profile?.role ?? "admin"
+              const { error: membershipError } = await supabase
+                .from("farm_user")
+                .insert({ farm_id: resolvedFarmId, user_id: user.id, role })
+              if (membershipError) {
+                throw membershipError
+              }
+            }
+          }
+
+          if (!resolvedFarmId) {
+            setErrorMsg("No farm selected for this account.")
+            setIsSaving(false)
+            return
+          }
+
+          const farmPayload = {
+            name: settings.farmName,
+            location: settings.location,
+            owner: settings.owner,
+            email: settings.email,
+            phone: settings.phone,
+          }
+
+          const { error: farmError } = await supabase
+            .from("farm")
+            .update(farmPayload)
+            .eq("id", resolvedFarmId)
+
+          if (farmError) {
+            throw farmError
+          }
+
+          const thresholdPayload = {
+            scope: "farm",
+            farm_id: resolvedFarmId,
+            low_do_threshold: settings.lowDoThreshold,
+            high_ammonia_threshold: settings.highAmmoniaThreshold,
+            high_mortality_threshold: settings.highMortalityThreshold,
+          }
+
+          if (thresholdId) {
+            const { error: thresholdError } = await supabase
+              .from("alert_threshold")
+              .update(thresholdPayload)
+              .eq("id", thresholdId)
+            if (thresholdError) throw thresholdError
+          } else {
+            const { data: insertedThreshold, error: thresholdError } = await supabase
+              .from("alert_threshold")
+              .insert(thresholdPayload)
+              .select("id")
+              .single()
+            if (thresholdError) throw thresholdError
+            setThresholdId(insertedThreshold?.id ?? null)
+          }
+
+          const userProfilePayload = {
+            user_id: user.id,
+            theme: settings.theme,
+          }
+
+          const { error: profileError } = await supabase
+            .from("user_profile")
+            .upsert(userProfilePayload)
+
+          if (profileError) {
+            throw profileError
+          }
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId: resolvedFarmId } }))
+          }
+
+          setSaved(true)
+          setTimeout(() => setSaved(false), 3000)
+          router.replace("/")
+          if (typeof window !== "undefined") {
+            window.location.href = "/"
+          }
+        } else {
+          localStorage.setItem("aqua_settings", JSON.stringify(settings))
+          setSaved(true)
+          setTimeout(() => setSaved(false), 3000)
+        }
+      } catch (err) {
+        console.error("Error saving settings:", err)
+        setErrorMsg(formatError(err))
+      } finally {
+        setIsSaving(false)
+      }
+    }
+
+    void save()
   }
 
   if (loading) {
@@ -67,6 +264,12 @@ export default function SettingsPage() {
           <div className="bg-green-500/10 border border-green-500 rounded-lg p-4 flex items-center gap-3">
             <Check className="text-green-600" size={20} />
             <p className="text-green-700 font-medium">Settings saved successfully</p>
+          </div>
+        )}
+        {errorMsg && (
+          <div className="bg-red-500/10 border border-red-500 rounded-lg p-4 flex items-center gap-3">
+            <AlertCircle className="text-red-600" size={20} />
+            <p className="text-red-700 font-medium">{errorMsg}</p>
           </div>
         )}
 
@@ -136,8 +339,8 @@ export default function SettingsPage() {
                 <input
                   type="number"
                   step="0.1"
-                  value={settings.lowDoThreshold}
-                  onChange={(e) => handleChange("lowDoThreshold", Number.parseFloat(e.target.value))}
+                  value={settings.lowDoThreshold ?? ""}
+                  onChange={(e) => handleChange("lowDoThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
                   className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -146,8 +349,8 @@ export default function SettingsPage() {
                 <input
                   type="number"
                   step="0.01"
-                  value={settings.highAmmoniaThreshold}
-                  onChange={(e) => handleChange("highAmmoniaThreshold", Number.parseFloat(e.target.value))}
+                  value={settings.highAmmoniaThreshold ?? ""}
+                  onChange={(e) => handleChange("highAmmoniaThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
                   className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -156,8 +359,8 @@ export default function SettingsPage() {
                 <input
                   type="number"
                   step="0.1"
-                  value={settings.highMortalityThreshold}
-                  onChange={(e) => handleChange("highMortalityThreshold", Number.parseFloat(e.target.value))}
+                  value={settings.highMortalityThreshold ?? ""}
+                  onChange={(e) => handleChange("highMortalityThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
                   className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -215,10 +418,11 @@ export default function SettingsPage() {
           <div className="flex justify-end">
             <button
               onClick={handleSave}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity font-semibold"
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:cursor-not-allowed disabled:opacity-70"
             >
               <Save size={18} />
-              Save Settings
+              {isSaving ? "Saving..." : "Save Settings"}
             </button>
           </div>
         </div>

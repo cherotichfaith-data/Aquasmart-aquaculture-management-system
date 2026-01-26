@@ -19,10 +19,10 @@ import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
 import { useEffect } from "react"
-import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
+    batch_id: z.string().optional(),
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(1, "Sample count must be at least 1"),
     total_weight_kg: z.coerce.number().min(0, "Weight must be positive"),
@@ -30,13 +30,13 @@ const formSchema = z.object({
 })
 
 interface SamplingFormProps {
-    systems: Tables<"systems">[]
+    systems: Tables<"system">[]
+    batches: Tables<"fingerling_batch">[]
 }
 
-export function SamplingForm({ systems }: SamplingFormProps) {
+export function SamplingForm({ systems, batches }: SamplingFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
-    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -46,6 +46,7 @@ export function SamplingForm({ systems }: SamplingFormProps) {
             total_weight_kg: 0,
             system_id: "",
             average_body_weight_g: 0,
+            batch_id: "none",
         },
     })
 
@@ -63,13 +64,16 @@ export function SamplingForm({ systems }: SamplingFormProps) {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            const { error } = await supabase.from("sampling_events").insert({
-                system_id: values.system_id,
+            const systemId = Number(values.system_id)
+            const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+
+            const { error } = await supabase.from("fish_sampling_weight").insert({
+                system_id: systemId,
+                batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
-                number_of_samples: values.number_of_fish,
-                total_weight: values.total_weight_kg,
-                average_body_weight: values.average_body_weight_g || 0,
-                created_by: user?.id
+                number_of_fish_sampling: values.number_of_fish,
+                total_weight_sampling: values.total_weight_kg,
+                abw: values.average_body_weight_g || 0,
             })
 
             if (error) throw error
@@ -84,6 +88,7 @@ export function SamplingForm({ systems }: SamplingFormProps) {
                 total_weight_kg: 0,
                 average_body_weight_g: 0,
                 system_id: values.system_id,
+                batch_id: values.batch_id,
             })
         } catch (error) {
             console.error(error)
@@ -118,8 +123,33 @@ export function SamplingForm({ systems }: SamplingFormProps) {
                                         </FormControl>
                                         <SelectContent>
                                             {systems.map((s) => (
-                                                <SelectItem key={s.system_id} value={s.system_id}>
-                                                    {s.system_id}
+                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                    {s.name ?? `System ${s.id}`}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="batch_id"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Batch (Optional)</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select batch" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="none">No batch</SelectItem>
+                                            {batches.map((batch) => (
+                                                <SelectItem key={batch.id} value={String(batch.id)}>
+                                                    {batch.name || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

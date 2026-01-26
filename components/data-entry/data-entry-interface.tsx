@@ -16,9 +16,10 @@ import { RecentEntriesList } from "./recent-entries-list"
 import type { Tables } from "@/lib/types/database"
 
 interface DataEntryInterfaceProps {
-    systems: Tables<"systems">[]
+    systems: Tables<"system">[]
     suppliers: Tables<"suppliers">[]
-    feeds: Tables<"feeds_metadata">[]
+    feeds: Tables<"feed_type">[]
+    batches: Tables<"fingerling_batch">[]
     recentEntries: {
         mortality: any[]
         feeding: any[]
@@ -44,7 +45,7 @@ const sidebarItems = [
     { id: "incoming_feed", label: "Incoming Feed" },
 ]
 
-export function DataEntryInterface({ systems, suppliers, feeds, recentEntries }: DataEntryInterfaceProps) {
+export function DataEntryInterface({ systems, suppliers, feeds, batches, recentEntries }: DataEntryInterfaceProps) {
     const [activeTab, setActiveTab] = useState("stocking")
 
     return (
@@ -72,31 +73,31 @@ export function DataEntryInterface({ systems, suppliers, feeds, recentEntries }:
             <main className="flex-1 bg-card border rounded-lg p-6 overflow-y-auto shadow-sm">
                 {activeTab === "mortality" && (
                     <>
-                        <MortalityForm systems={systems} />
+                        <MortalityForm systems={systems} batches={batches} />
                         <RecentEntriesList data={recentEntries.mortality} type="mortality" />
                     </>
                 )}
                 {activeTab === "feeding" && (
                     <>
-                        <FeedingForm systems={systems} feeds={feeds} />
+                        <FeedingForm systems={systems} feeds={feeds} batches={batches} />
                         <RecentEntriesList data={recentEntries.feeding} type="feeding" />
                     </>
                 )}
                 {activeTab === "sampling" && (
                     <>
-                        <SamplingForm systems={systems} />
+                        <SamplingForm systems={systems} batches={batches} />
                         <RecentEntriesList data={recentEntries.sampling} type="sampling" />
                     </>
                 )}
                 {activeTab === "transfer" && (
                     <>
-                        <TransferForm systems={systems} />
+                        <TransferForm systems={systems} batches={batches} />
                         <RecentEntriesList data={recentEntries.transfer} type="transfer" />
                     </>
                 )}
                 {activeTab === "harvest" && (
                     <>
-                        <HarvestForm systems={systems} />
+                        <HarvestForm systems={systems} batches={batches} />
                         <RecentEntriesList data={recentEntries.harvest} type="harvest" />
                     </>
                 )}
@@ -114,7 +115,7 @@ export function DataEntryInterface({ systems, suppliers, feeds, recentEntries }:
                 )}
                 {activeTab === "stocking" && (
                     <>
-                        <StockingForm systems={systems} />
+                        <StockingForm systems={systems} batches={batches} />
                         <RecentEntriesList data={recentEntries.stocking} type="stocking" />
                     </>
                 )}

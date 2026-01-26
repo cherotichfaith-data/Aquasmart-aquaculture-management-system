@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/components/auth-provider"
 import { ToastProvider } from "@/components/shared/toast-provider"
+import { InitialSplash } from "@/components/InitialSplash"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -34,7 +35,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+      </head>
       <body className={`font-sans antialiased`}>
+        <InitialSplash />
         <AuthProvider>
           {children}
           <ToastProvider />

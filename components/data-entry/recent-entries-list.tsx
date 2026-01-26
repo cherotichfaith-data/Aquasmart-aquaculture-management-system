@@ -32,8 +32,8 @@ export function RecentEntriesList({ data, type }: RecentEntriesListProps) {
                         {type === "transfer" && <><TableHead>Origin</TableHead><TableHead>Dest</TableHead><TableHead>Count</TableHead></>}
                         {type === "harvest" && <><TableHead>System</TableHead><TableHead>Type</TableHead><TableHead>Weight (kg)</TableHead></>}
                         {type === "water_quality" && <><TableHead>System</TableHead><TableHead>Parameter</TableHead><TableHead>Value</TableHead></>}
-                        {type === "incoming_feed" && <><TableHead>Feed ID</TableHead><TableHead>Qty (kg)</TableHead><TableHead>Supplier</TableHead></>}
-                        {type === "stocking" && <><TableHead>System</TableHead><TableHead>Count</TableHead><TableHead>Source</TableHead></>}
+                        {type === "incoming_feed" && <><TableHead>Feed</TableHead><TableHead>Qty (kg)</TableHead></>}
+                        {type === "stocking" && <><TableHead>System</TableHead><TableHead>Count</TableHead><TableHead>Type</TableHead></>}
                         {type === "system" && <><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Stage</TableHead></>}
                         <TableHead className="text-right">Created At</TableHead>
                     </TableRow>
@@ -41,40 +41,40 @@ export function RecentEntriesList({ data, type }: RecentEntriesListProps) {
                 <TableBody>
                     {data.map((row) => (
                         <TableRow key={row.id}>
-                            <TableCell>{row.date || row.stocking_date || "N/A"}</TableCell>
+                            <TableCell>{row.date || "N/A"}</TableCell>
 
                             {type === "mortality" && (
                                 <>
                                     <TableCell>{row.system_id}</TableCell>
-                                    <TableCell>{row.number_of_fish}</TableCell>
+                                    <TableCell>{row.number_of_fish_mortality}</TableCell>
                                 </>
                             )}
                             {type === "feeding" && (
                                 <>
                                     <TableCell>{row.system_id}</TableCell>
-                                    <TableCell>{row.feed_id}</TableCell>
-                                    <TableCell>{row.amount_kg}</TableCell>
+                                    <TableCell>{row.feed_type_id}</TableCell>
+                                    <TableCell>{row.feeding_amount}</TableCell>
                                 </>
                             )}
                             {type === "sampling" && (
                                 <>
                                     <TableCell>{row.system_id}</TableCell>
-                                    <TableCell>{row.number_of_fish}</TableCell>
-                                    <TableCell>{row.average_body_weight_g}</TableCell>
+                                    <TableCell>{row.number_of_fish_sampling}</TableCell>
+                                    <TableCell>{row.abw}</TableCell>
                                 </>
                             )}
                             {type === "transfer" && (
                                 <>
                                     <TableCell>{row.origin_system_id}</TableCell>
-                                    <TableCell>{row.destination_system_id}</TableCell>
-                                    <TableCell>{row.number_of_fish}</TableCell>
+                                    <TableCell>{row.target_system_id}</TableCell>
+                                    <TableCell>{row.number_of_fish_transfer}</TableCell>
                                 </>
                             )}
                             {type === "harvest" && (
                                 <>
                                     <TableCell>{row.system_id}</TableCell>
                                     <TableCell>{row.type_of_harvest}</TableCell>
-                                    <TableCell>{row.amount_kg}</TableCell>
+                                    <TableCell>{row.total_weight_harvest}</TableCell>
                                 </>
                             )}
                             {type === "water_quality" && (
@@ -86,16 +86,15 @@ export function RecentEntriesList({ data, type }: RecentEntriesListProps) {
                             )}
                             {type === "incoming_feed" && (
                                 <>
-                                    <TableCell>{row.feed_id}</TableCell>
-                                    <TableCell>{row.quantity}</TableCell>
-                                    <TableCell>{row.supplier_id || "-"}</TableCell>
+                                    <TableCell>{row.feed_type_id}</TableCell>
+                                    <TableCell>{row.feed_amount}</TableCell>
                                 </>
                             )}
                             {type === "stocking" && (
                                 <>
                                     <TableCell>{row.system_id}</TableCell>
-                                    <TableCell>{row.number_of_fish}</TableCell>
-                                    <TableCell>{row.source || "-"}</TableCell>
+                                    <TableCell>{row.number_of_fish_stocking}</TableCell>
+                                    <TableCell>{row.type_of_stocking}</TableCell>
                                 </>
                             )}
                             {type === "system" && (

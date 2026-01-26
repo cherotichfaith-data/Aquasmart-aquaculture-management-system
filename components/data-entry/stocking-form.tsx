@@ -22,18 +22,20 @@ import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
+    batch_id: z.string().min(1, "Batch is required"),
     stocking_date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(1, "Quantity must be positive"),
     total_weight_kg: z.coerce.number().min(0, "Weight must be positive"),
     average_body_weight_g: z.coerce.number().min(0).optional(),
-    source: z.string().optional(),
+    type_of_stocking: z.enum(["empty", "already_stocked"]),
 })
 
 interface StockingFormProps {
-    systems: Tables<"systems">[]
+    systems: Tables<"system">[]
+    batches: Tables<"fingerling_batch">[]
 }
 
-export function StockingForm({ systems }: StockingFormProps) {
+export function StockingForm({ systems, batches }: StockingFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
 
@@ -44,7 +46,9 @@ export function StockingForm({ systems }: StockingFormProps) {
             number_of_fish: 0,
             total_weight_kg: 0,
             average_body_weight_g: 0,
-            source: "",
+            system_id: "",
+            batch_id: "",
+            type_of_stocking: "empty",
         },
     })
 
@@ -79,14 +83,17 @@ export function StockingForm({ systems }: StockingFormProps) {
             const calculatedAbw = (values.total_weight_kg * 1000) / values.number_of_fish
             const abw = values.average_body_weight_g || (Number.isFinite(calculatedAbw) ? calculatedAbw : 0)
 
-            const { error } = await supabase.from("stocking_events").insert({
-                system_id: values.system_id,
-                stocking_date: values.stocking_date,
-                number_of_fish: values.number_of_fish,
-                total_weight_kg: values.total_weight_kg,
-                average_body_weight_g: parseFloat(abw.toFixed(2)),
-                source: values.source || null,
-                created_by: user.id
+            const systemId = Number(values.system_id)
+            const batchId = Number(values.batch_id)
+
+            const { error } = await supabase.from("fish_stocking").insert({
+                system_id: systemId,
+                batch_id: batchId,
+                date: values.stocking_date,
+                number_of_fish_stocking: values.number_of_fish,
+                total_weight_stocking: values.total_weight_kg,
+                abw: Number.isFinite(abw) ? Number(abw.toFixed(2)) : 0,
+                type_of_stocking: values.type_of_stocking,
             })
 
             if (error) throw error
@@ -100,8 +107,9 @@ export function StockingForm({ systems }: StockingFormProps) {
                 number_of_fish: 0,
                 total_weight_kg: 0,
                 average_body_weight_g: 0,
-                source: "",
                 system_id: values.system_id,
+                batch_id: values.batch_id,
+                type_of_stocking: values.type_of_stocking,
             })
         } catch (error) {
             console.error(error)
@@ -136,8 +144,32 @@ export function StockingForm({ systems }: StockingFormProps) {
                                         </FormControl>
                                         <SelectContent>
                                             {systems.map((s) => (
-                                                <SelectItem key={s.system_id} value={s.system_id}>
-                                                    {s.system_id}
+                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                    {s.name ?? `System ${s.id}`}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="batch_id"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Batch</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select batch" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {batches.map((batch) => (
+                                                <SelectItem key={batch.id} value={String(batch.id)}>
+                                                    {batch.name || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -205,13 +237,21 @@ export function StockingForm({ systems }: StockingFormProps) {
 
                     <FormField
                         control={form.control}
-                        name="source"
+                        name="type_of_stocking"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Source (Optional)</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="e.g. Hatchery A" {...field} />
-                                </FormControl>
+                                <FormLabel>Stocking Type</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="empty">Empty system</SelectItem>
+                                        <SelectItem value="already_stocked">Already stocked</SelectItem>
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}

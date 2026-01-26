@@ -41,7 +41,8 @@ export function AddStockingDataDialog() {
     const [quantity, setQuantity] = useState("")
     const [totalWeight, setTotalWeight] = useState("")
     const [abw, setAbw] = useState("")
-    const [source, setSource] = useState("")
+    const [batchId, setBatchId] = useState("")
+    const [typeOfStocking, setTypeOfStocking] = useState("empty")
 
     // Excel Upload State
     const [file, setFile] = useState<File | null>(null)
@@ -53,14 +54,15 @@ export function AddStockingDataDialog() {
 
         try {
             const { error: insertError } = await supabase
-                .from("stocking_events")
+                .from("fish_stocking")
                 .insert({
-                    stocking_date: date,
+                    date: date,
                     system_id: parseInt(systemId),
-                    number_of_fish: parseInt(quantity),
-                    total_weight_kg: parseFloat(totalWeight),
-                    average_body_weight_g: parseFloat(abw),
-                    source: source,
+                    batch_id: parseInt(batchId),
+                    number_of_fish_stocking: parseInt(quantity),
+                    total_weight_stocking: parseFloat(totalWeight),
+                    abw: parseFloat(abw),
+                    type_of_stocking: typeOfStocking,
                 })
 
             if (insertError) throw insertError
@@ -75,7 +77,8 @@ export function AddStockingDataDialog() {
             setQuantity("")
             setTotalWeight("")
             setAbw("")
-            setSource("")
+            setBatchId("")
+            setTypeOfStocking("empty")
 
         } catch (err: any) {
             setError(err.message || "Failed to add stocking data")
@@ -106,20 +109,21 @@ export function AddStockingDataDialog() {
             const worksheet = workbook.Sheets[workbook.SheetNames[0]]
             const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
 
-            // Expected columns: Date, System ID, Number of Fish, Total Weight, ABW, Source
+            // Expected columns: Date, System ID, Batch ID, Number of Fish, Total Weight, ABW, Type of Stocking
             // We map these to database columns
             const formattedData = jsonData.map((row) => ({
-                stocking_date: row["Date"] || row["date"], // Adjust keys based on expected Excel header
+                date: row["Date"] || row["date"], // Adjust keys based on expected Excel header
                 system_id: row["System ID"] || row["system_id"],
-                number_of_fish: row["Number of Fish"] || row["number_of_fish"],
-                total_weight_kg: row["Total Weight"] || row["total_weight"],
-                average_body_weight_g: row["ABW"] || row["abw"],
-                source: row["Source"] || row["source"],
+                batch_id: row["Batch ID"] || row["batch_id"],
+                number_of_fish_stocking: row["Number of Fish"] || row["number_of_fish"],
+                total_weight_stocking: row["Total Weight"] || row["total_weight"],
+                abw: row["ABW"] || row["abw"],
+                type_of_stocking: row["Type of Stocking"] || row["type_of_stocking"] || "empty",
             }))
 
             // Validate data (basic check)
             const invalidRows = formattedData.filter(
-                (r) => !r.stocking_date || !r.system_id || !r.number_of_fish || !r.total_weight_kg
+                (r) => !r.date || !r.system_id || !r.batch_id || !r.number_of_fish_stocking || !r.total_weight_stocking
             )
 
             if (invalidRows.length > 0) {
@@ -127,7 +131,7 @@ export function AddStockingDataDialog() {
             }
 
             const { error: insertError } = await supabase
-                .from("stocking_events")
+                .from("fish_stocking")
                 .insert(formattedData)
 
             if (insertError) throw insertError
@@ -174,6 +178,10 @@ export function AddStockingDataDialog() {
                             <Label htmlFor="systemId">System ID</Label>
                             <Input id="systemId" type="number" placeholder="Enter System ID (e.g., 1)" value={systemId} onChange={(e) => setSystemId(e.target.value)} />
                         </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="batchId">Batch ID</Label>
+                            <Input id="batchId" type="number" placeholder="Enter Batch ID" value={batchId} onChange={(e) => setBatchId(e.target.value)} />
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="quantity">Quantity</Label>
@@ -190,15 +198,14 @@ export function AddStockingDataDialog() {
                                 <Input id="abw" type="number" placeholder="Avg Body Weight" value={abw} onChange={(e) => setAbw(e.target.value)} />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="source">Source</Label>
-                                <Select value={source} onValueChange={setSource}>
+                                <Label htmlFor="typeOfStocking">Stocking Type</Label>
+                                <Select value={typeOfStocking} onValueChange={setTypeOfStocking}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select Source" />
+                                        <SelectValue placeholder="Select Type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Hatchery">Hatchery</SelectItem>
-                                        <SelectItem value="Farm">Farm</SelectItem>
-                                        <SelectItem value="Wild">Wild</SelectItem>
+                                        <SelectItem value="empty">Empty</SelectItem>
+                                        <SelectItem value="already_stocked">Already Stocked</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -214,7 +221,7 @@ export function AddStockingDataDialog() {
                             <Label htmlFor="excel">Excel File</Label>
                             <Input id="excel" type="file" accept=".xlsx, .xls" onChange={handleFileUpload} />
                             <p className="text-xs text-muted-foreground mt-2">
-                                Expected columns: Date, System ID, Number of Fish, Total Weight, ABW, Source.
+                                Expected columns: Date, System ID, Batch ID, Number of Fish, Total Weight, ABW, Type of Stocking.
                             </p>
                         </div>
                         <Button className="w-full mt-4" onClick={handleExcelSubmit} disabled={isLoading || !file}>

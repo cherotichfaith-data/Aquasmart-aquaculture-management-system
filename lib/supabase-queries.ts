@@ -24,7 +24,7 @@ type FeedsMetadataRow = Tables<"feeds_metadata">
 
 
 type SystemListItem = Pick<SystemRow, "id" | "name">
-type BatchListItem = Pick<FingerlingBatchRow, "id" | "name">
+type BatchListItem = FingerlingBatchRow
 
 export type FeedIncomingWithType = FeedIncomingRow & { feed_type: FeedTypeRow | null }
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
@@ -41,7 +41,7 @@ export async function fetchSystemsList(): Promise<QueryResult<SystemListItem>> {
 
 export async function fetchBatchesList(): Promise<QueryResult<BatchListItem>> {
   return supabaseQuery<BatchListItem>("fingerling_batch", {
-    select: "id,name",
+    select: "*",
     order: "name.asc",
   })
 }
@@ -50,37 +50,46 @@ export async function fetchDashboardSnapshot(filters?: {
   system_id?: number
   time_period?: Enums<"time_period">
   growth_stage?: Enums<"system_growth_stage">
-}): Promise<DashboardRow | DashboardConsolidatedRow | null> {
+}): Promise<DashboardRow | null> {
+  const eq: Record<string, string | number> = {}
+
   if (filters?.system_id) {
-    const eq: Record<string, string | number> = {
-      system_id: filters.system_id,
-    }
-    if (filters?.time_period) eq.time_period = filters.time_period
-    // if (filters?.growth_stage) eq.growth_stage = filters.growth_stage
-
-    const result = await supabaseQuery<DashboardRow>("dashboard", {
-      select: "*",
-      eq,
-      limit: 1,
-    })
-
-    return result.status === "success" ? result.data[0] ?? null : null
+    eq.system_id = filters.system_id
   }
 
-  const eq: Record<string, string | number | boolean> = {}
-  if (filters?.time_period) eq.time_period = filters.time_period
+  if (filters?.time_period) {
+    eq.time_period = filters.time_period
+  }
 
-  const result = await supabaseQuery<DashboardConsolidatedRow>("dashboard_consolidated", {
+  if (filters?.growth_stage) {
+    eq.growth_stage = filters.growth_stage
+  }
+
+  const result = await supabaseQuery<DashboardRow>("dashboard", {
     select: "*",
-    eq: {
-      ...eq,
-      time_period: "custom",
-      // growth_stage_scope: filters?.growth_stage ?? "all",
-    },
+    eq: Object.keys(eq).length > 0 ? eq : undefined,
     order: "input_end_date.desc",
     limit: 1,
   })
-  console.log(".....result>>>>>>>", result)
+
+  return result.status === "success" ? result.data[0] ?? null : null
+}
+
+export async function fetchDashboardConsolidatedSnapshot(filters?: {
+  time_period?: Enums<"time_period">
+}): Promise<DashboardConsolidatedRow | null> {
+  const eq: Record<string, string | number> = {}
+
+  if (filters?.time_period) {
+    eq.time_period = filters.time_period
+  }
+
+  const result = await supabaseQuery<DashboardConsolidatedRow>("dashboard_consolidated", {
+    select: "*",
+    eq: Object.keys(eq).length > 0 ? eq : undefined,
+    order: "input_end_date.desc",
+    limit: 1,
+  })
 
   return result.status === "success" ? result.data[0] ?? null : null
 }
@@ -135,6 +144,26 @@ export async function fetchSystems(filters?: {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
     order: "date.desc",
+    limit: filters?.limit,
+  })
+}
+
+export async function fetchSystemsDashboard(filters?: {
+  system_id?: number
+  growth_stage?: Enums<"system_growth_stage">
+  time_period?: Enums<"time_period">
+  limit?: number
+}): Promise<QueryResult<DashboardRow>> {
+  const eq: Record<string, string | number | boolean> = {}
+
+  if (filters?.system_id) eq.system_id = filters.system_id
+  if (filters?.growth_stage) eq.growth_stage = filters.growth_stage
+  if (filters?.time_period) eq.time_period = filters.time_period
+
+  return supabaseQuery<DashboardRow>("dashboard", {
+    select: "*",
+    eq: Object.keys(eq).length ? eq : undefined,
+    order: "input_end_date.desc",
     limit: filters?.limit,
   })
 }
@@ -300,71 +329,71 @@ export async function fetchFeeds(): Promise<QueryResult<FeedsMetadataRow>> {
 
 // Recent Entries Fetchers
 export async function fetchRecentMortalityEvents(limit = 5) {
-  return supabaseQuery<Tables<"mortality_events">>("mortality_events", {
+  return supabaseQuery<Tables<"fish_mortality">>("fish_mortality", {
     select: "*",
-    order: { column: "created_at", ascending: false },
+    order: { column: "date", ascending: false },
     limit,
   })
 }
 
 export async function fetchRecentFeedingEvents(limit = 5) {
-  return supabaseQuery<Tables<"feeding_events">>("feeding_events", {
+  return supabaseQuery<Tables<"feeding_record">>("feeding_record", {
     select: "*",
-    order: { column: "created_at", ascending: false },
+    order: { column: "date", ascending: false },
     limit,
   })
 }
 
 export async function fetchRecentSamplingEvents(limit = 5) {
-  return supabaseQuery<Tables<"sampling_events">>("sampling_events", {
+  return supabaseQuery<Tables<"fish_sampling_weight">>("fish_sampling_weight", {
     select: "*",
-    order: { column: "created_at", ascending: false },
+    order: { column: "date", ascending: false },
     limit,
   })
 }
 
 export async function fetchRecentTransferEvents(limit = 5) {
-  return supabaseQuery<Tables<"transfer_events">>("transfer_events", {
+  return supabaseQuery<Tables<"fish_transfer">>("fish_transfer", {
     select: "*",
-    order: { column: "created_at", ascending: false },
+    order: { column: "date", ascending: false },
     limit,
   })
 }
 
 export async function fetchRecentHarvestEvents(limit = 5) {
-  return supabaseQuery<Tables<"harvest_events">>("harvest_events", {
+  return supabaseQuery<Tables<"fish_harvest">>("fish_harvest", {
     select: "*",
-    order: { column: "created_at", ascending: false },
+    order: { column: "date", ascending: false },
     limit,
   })
 }
 
 export async function fetchRecentWaterQualityEvents(limit = 5) {
-  return supabaseQuery<Tables<"water_quality_events">>("water_quality_events", {
+  return supabaseQuery<Tables<"water_quality_measurement">>("water_quality_measurement", {
     select: "*",
-    order: { column: "created_at", ascending: false },
+    order: { column: "date", ascending: false },
     limit,
   })
 }
 
 export async function fetchRecentIncomingFeedEvents(limit = 5) {
-  return supabaseQuery<Tables<"incoming_feed_events">>("incoming_feed_events", {
+  return supabaseQuery<Tables<"feed_incoming">>("feed_incoming", {
     select: "*",
-    order: { column: "created_at", ascending: false },
+    order: { column: "date", ascending: false },
     limit,
   })
 }
 
 export async function fetchRecentStockingEvents(limit = 5) {
-  return supabaseQuery<Tables<"stocking_events">>("stocking_events", {
+  return supabaseQuery<Tables<"fish_stocking">>("fish_stocking", {
     select: "*",
-    order: { column: "created_at", ascending: false },
+    order: { column: "date", ascending: false },
     limit,
   })
 }
 
 export async function fetchRecentSystems(limit = 5) {
-  return supabaseQuery<Tables<"systems">>("systems", {
+  return supabaseQuery<Tables<"system">>("system", {
     select: "*",
     order: { column: "created_at", ascending: false },
     limit,

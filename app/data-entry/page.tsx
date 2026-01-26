@@ -1,15 +1,16 @@
 import {
-    fetchSuppliers,
-    fetchFeeds,
-    fetchRecentMortalityEvents,
+    fetchBatchesList,
+    fetchFeedTypes,
     fetchRecentFeedingEvents,
-    fetchRecentSamplingEvents,
-    fetchRecentTransferEvents,
     fetchRecentHarvestEvents,
-    fetchRecentWaterQualityEvents,
     fetchRecentIncomingFeedEvents,
+    fetchRecentMortalityEvents,
+    fetchRecentSamplingEvents,
     fetchRecentStockingEvents,
-    fetchRecentSystems
+    fetchRecentSystems,
+    fetchRecentTransferEvents,
+    fetchRecentWaterQualityEvents,
+    fetchSuppliers,
 } from "@/lib/supabase-queries"
 import { fetchSystemsEntryList } from "@/lib/supabase-queries-server"
 import { DataEntryInterface } from "@/components/data-entry/data-entry-interface"
@@ -26,6 +27,7 @@ export default async function DataEntryPage() {
         systemsResult,
         suppliersResult,
         feedsResult,
+        batchesResult,
         recentMortality,
         recentFeeding,
         recentSampling,
@@ -38,7 +40,8 @@ export default async function DataEntryPage() {
     ] = await Promise.all([
         fetchSystemsEntryList(),
         fetchSuppliers(),
-        fetchFeeds(),
+        fetchFeedTypes(),
+        fetchBatchesList(),
         fetchRecentMortalityEvents(),
         fetchRecentFeedingEvents(),
         fetchRecentSamplingEvents(),
@@ -53,6 +56,7 @@ export default async function DataEntryPage() {
     const systems = systemsResult.data || []
     const suppliers = suppliersResult.data || []
     const feeds = feedsResult.data || []
+    const batches = batchesResult.data || []
 
     const recentEntries = {
         mortality: recentMortality.data || [],
@@ -79,6 +83,7 @@ export default async function DataEntryPage() {
                     systems={systems}
                     suppliers={suppliers}
                     feeds={feeds}
+                    batches={batches}
                     recentEntries={recentEntries}
                 />
             </div>

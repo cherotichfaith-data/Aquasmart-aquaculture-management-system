@@ -1,73 +1,69 @@
+import { createClient } from "@/utils/supabase/client"
+
 export interface QueryParams {
   select?: string
   eq?: Record<string, string | number | boolean>
+  in?: Record<string, Array<string | number | boolean>>
+  gte?: Record<string, string | number>
+  lte?: Record<string, string | number>
   order?: string | { column: string; ascending: boolean }
   limit?: number
 }
 
 export type QueryResult<T> = { status: "success"; data: T[] } | { status: "error"; data: null; error: string }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(
-    "[v0] Missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local",
-  )
+function applyOrder<T>(query: any, order: QueryParams["order"]) {
+  if (!order) return query
+  if (typeof order === "string") {
+    const [column, direction] = order.split(".")
+    return query.order(column, { ascending: direction !== "desc" })
+  }
+  return query.order(order.column, { ascending: order.ascending })
 }
 
 export async function supabaseQuery<T = any>(table: string, params: QueryParams = {}): Promise<QueryResult<T>> {
   try {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return {
-        status: "error",
-        data: null,
-        error: "Missing Supabase credentials in environment variables",
-      }
-    }
-
-    const url = new URL(`${supabaseUrl}/rest/v1/${table}`)
-    const sp = new URLSearchParams()
-
-    sp.set("select", params.select ?? "*")
-    if (params.order) {
-      if (typeof params.order === "string") {
-        sp.set("order", params.order)
-      } else {
-        sp.set("order", `${params.order.column}.${params.order.ascending ? "asc" : "desc"}`)
-      }
-    }
-    if (params.limit) sp.set("limit", String(params.limit))
+    const supabase = createClient()
+    let query = supabase.from(table).select(params.select ?? "*")
 
     if (params.eq) {
       Object.entries(params.eq).forEach(([k, v]) => {
-        sp.set(k, `eq.${String(v)}`)
+        query = query.eq(k, v as any)
       })
     }
 
-    url.search = sp.toString()
-
-    const res = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${supabaseAnonKey}`,
-        apikey: supabaseAnonKey,
-        "Content-Type": "application/json",
-      },
-    })
-
-    if (!res.ok) {
-      const text = await res.text()
-      return {
-        status: "error",
-        data: null,
-        error: `Supabase error ${res.status}: ${text}`,
-      }
+    if (params.in) {
+      Object.entries(params.in).forEach(([k, values]) => {
+        if (!values.length) return
+        query = query.in(k, values as any)
+      })
     }
 
-    const json = await res.json()
-    const data = Array.isArray(json) ? json : [json]
-    return { status: "success", data: data as T[] }
+    if (params.gte) {
+      Object.entries(params.gte).forEach(([k, v]) => {
+        query = query.gte(k, v as any)
+      })
+    }
+
+    if (params.lte) {
+      Object.entries(params.lte).forEach(([k, v]) => {
+        query = query.lte(k, v as any)
+      })
+    }
+
+    query = applyOrder(query, params.order)
+
+    if (params.limit) {
+      query = query.limit(params.limit)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      return { status: "error", data: null, error: error.message }
+    }
+
+    return { status: "success", data: (data ?? []) as T[] }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { status: "error", data: null, error: message }
@@ -79,37 +75,14 @@ export async function supabaseInsert<T = any, InsertPayload extends object = obj
   payload: InsertPayload | InsertPayload[],
 ): Promise<QueryResult<T>> {
   try {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return {
-        status: "error",
-        data: null,
-        error: "Missing Supabase credentials in environment variables",
-      }
+    const supabase = createClient()
+    const { data, error } = await supabase.from(table).insert(payload).select()
+
+    if (error) {
+      return { status: "error", data: null, error: error.message }
     }
 
-    const res = await fetch(`${supabaseUrl}/rest/v1/${table}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${supabaseAnonKey}`,
-        apikey: supabaseAnonKey,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify(payload),
-    })
-
-    if (!res.ok) {
-      const text = await res.text()
-      return {
-        status: "error",
-        data: null,
-        error: `Supabase error ${res.status}: ${text}`,
-      }
-    }
-
-    const json = await res.json()
-    const data = Array.isArray(json) ? json : [json]
-    return { status: "success", data: data as T[] }
+    return { status: "success", data: (data ?? []) as T[] }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { status: "error", data: null, error: message }

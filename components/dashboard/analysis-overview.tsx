@@ -51,7 +51,7 @@ const daysByPeriod: Record<TimePeriod, number> = {
 const formatAxisDate = (value: string | number) => {
   const text = String(value)
   const parsed = new Date(text)
-  if (Number.isNaN(parsed.getTime())) return value
+  if (Number.isNaN(parsed.getTime())) return text
   return format(parsed, "MMM d")
 }
 

@@ -18,11 +18,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client" // Adjust import path
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
-import { useAuth } from "@/components/auth-provider"
 
 // Schema
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
+    batch_id: z.string().optional(),
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(0, "Must be positive"),
     total_weight: z.coerce.number().min(0).optional(),
@@ -30,13 +30,13 @@ const formSchema = z.object({
 })
 
 interface MortalityFormProps {
-    systems: Tables<"systems">[]
+    systems: Tables<"system">[]
+    batches: Tables<"fingerling_batch">[]
 }
 
-export function MortalityForm({ systems }: MortalityFormProps) {
+export function MortalityForm({ systems, batches }: MortalityFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
-    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -46,18 +46,22 @@ export function MortalityForm({ systems }: MortalityFormProps) {
             total_weight: 0,
             average_body_weight: 0,
             system_id: "",
+            batch_id: "none",
         },
     })
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            const { error } = await supabase.from("mortality_events").insert({
-                system_id: values.system_id === "all_active_cages" ? null : values.system_id, // Handle special case/type mismatch if needed? system_id is string.
+            const systemId = Number(values.system_id)
+            const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+
+            const { error } = await supabase.from("fish_mortality").insert({
+                system_id: systemId,
+                batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
-                number_of_fish: values.number_of_fish,
-                total_weight: values.total_weight,
-                average_body_weight: values.average_body_weight,
-                created_by: user?.id
+                number_of_fish_mortality: values.number_of_fish,
+                total_weight_mortality: values.total_weight ?? null,
+                abw: values.average_body_weight ?? null,
             })
 
             if (error) throw error
@@ -70,6 +74,7 @@ export function MortalityForm({ systems }: MortalityFormProps) {
                 date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
                 system_id: values.system_id, // Keep system selected
+                batch_id: values.batch_id,
             })
         } catch (error) {
             console.error(error)
@@ -105,8 +110,33 @@ export function MortalityForm({ systems }: MortalityFormProps) {
                                         </FormControl>
                                         <SelectContent>
                                             {systems.map((s) => (
-                                                <SelectItem key={s.system_id} value={s.system_id}>
-                                                    {s.system_id} {/* Assuming ID is display name or add Name if available */}
+                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                    {s.name ?? `System ${s.id}`}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="batch_id"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Batch (Optional)</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select batch" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="none">No batch</SelectItem>
+                                            {batches.map((batch) => (
+                                                <SelectItem key={batch.id} value={String(batch.id)}>
+                                                    {batch.name || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

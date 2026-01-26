@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { insertData } from "@/lib/supabase-actions"
+import { useActiveFarm } from "@/hooks/use-active-farm"
 
 const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -34,6 +35,7 @@ import { useRouter } from "next/navigation"
 export function SystemForm() {
     const { toast } = useToast()
     const router = useRouter()
+    const { farmId } = useActiveFarm()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -52,15 +54,17 @@ export function SystemForm() {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
             console.log("..submitting....")
-            const result = await insertData("systems", {
-                system_id: values.name, // Note: system_id in DB vs name in Form
-                system_type: values.type,
+            const result = await insertData("system", {
+                name: values.name,
+                type: values.type,
                 growth_stage: values.growth_stage,
                 volume: values.volume,
                 depth: values.depth,
                 length: values.length,
                 width: values.width,
                 diameter: values.diameter,
+                is_active: true,
+                farm_id: farmId ?? null,
             })
 
             if (!result.success) throw result.error

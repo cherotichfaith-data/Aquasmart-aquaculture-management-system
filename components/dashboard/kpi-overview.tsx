@@ -1,10 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
 import KPICard from "./kpi-card"
 import type { Enums } from "@/lib/types/database"
-import { fetchDashboardSnapshot } from "@/lib/supabase-queries"
+import { fetchDashboardConsolidatedSnapshot, fetchDashboardSnapshot } from "@/lib/supabase-queries"
 
 interface KPIOverviewProps {
   stage: "all" | Enums<"system_growth_stage">
@@ -14,21 +13,21 @@ interface KPIOverviewProps {
 }
 
 export default function KPIOverview({ stage, timePeriod = "week", batch = "all", system = "all" }: KPIOverviewProps) {
-  const router = useRouter()
   const [snapshot, setSnapshot] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isFarmSnapshot, setIsFarmSnapshot] = useState(false)
 
-  const toMetricsPeriod = (period: Enums<"time_period">) => {
-    const map: Record<Enums<"time_period">, "7d" | "30d" | "90d" | "180d" | "365d"> = {
-      day: "7d",
-      week: "7d",
-      "2 weeks": "30d",
-      month: "30d",
-      quarter: "90d",
-      "6 months": "180d",
-      year: "365d",
-    }
-    return map[period] ?? "30d"
+  const percentChange = (current: number | null | undefined, delta: number | null | undefined) => {
+    if (!Number.isFinite(current) || !Number.isFinite(delta)) return null
+    const previous = current - delta
+    if (!Number.isFinite(previous) || previous === 0) return null
+    return (delta / previous) * 100
+  }
+
+  const scaleValue = (value: number | null | undefined, scale: number) => {
+    if (!Number.isFinite(value)) return value
+    const scaled = value * scale
+    return Number.isFinite(scaled) ? scaled : value
   }
 
   useEffect(() => {
@@ -36,15 +35,25 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
       setLoading(true)
       try {
         const systemId = system !== "all" ? Number(system) : undefined
-        const data = await fetchDashboardSnapshot({
-          system_id: Number.isFinite(systemId) ? systemId : undefined,
-          growth_stage: stage === "all" ? undefined : stage,
-          time_period: timePeriod,
-        })
-        console.log("....snapshot....", data)
-        setSnapshot(data)
+        
+        // Fetch pre-calculated KPI data from materialized view
+        if (system === "all") {
+          const data = await fetchDashboardConsolidatedSnapshot({
+            time_period: timePeriod,
+          })
+          setSnapshot(data)
+          setIsFarmSnapshot(true)
+        } else {
+          const data = await fetchDashboardSnapshot({
+            system_id: Number.isFinite(systemId) ? systemId : undefined,
+            growth_stage: stage === "all" ? undefined : stage,
+            time_period: timePeriod,
+          })
+          setSnapshot(data)
+          setIsFarmSnapshot(false)
+        }
       } catch (err) {
-        console.error("[v0] Error loading KPI metrics:", err)
+        console.error("[KPI] Error loading KPI metrics:", err)
         setSnapshot(null)
       }
       setLoading(false)
@@ -52,72 +61,87 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
     loadMetrics()
   }, [stage, timePeriod, batch, system])
 
-  const handleKPIClick = (metric: string) => {
-    const metricMap: Record<string, string> = {
-      efcr: "efcr_periodic",
-      mortality: "mortality",
-      biomass: "biomass_increase",
-      "water-quality": "water_quality",
-    }
-    const metricKey = metricMap[metric] ?? "efcr_periodic"
-    const params = new URLSearchParams()
-    const period = toMetricsPeriod(timePeriod)
-
-    params.set("period", period)
-    if (system !== "all") {
-      params.set("system", system)
-    }
-
-    const query = params.toString()
-    const targetPath = `/production`
-    router.push(query ? `${targetPath}?${query}` : targetPath)
-  }
-
   const metrics = useMemo(() => {
     if (!snapshot) return []
-    const isConsolidated = system === "all"
-    const efcrValue = isConsolidated ? snapshot.efcr_period_consolidated : snapshot.efcr
-    const mortalityRate = snapshot.mortality_rate
-    const mortalityValue =
-      typeof mortalityRate === "number" && Number.isFinite(mortalityRate) ? mortalityRate * 100 : mortalityRate
-    const biomassValue = snapshot.average_biomass
-    const waterQualityValue = snapshot.water_quality_rating_numeric_average
+    
+    if (isFarmSnapshot) {
+      return [
+        {
+          key: "efcr",
+          label: "eFCR",
+          value: snapshot.efcr_period_consolidated,
+          decimals: 2,
+          trend: percentChange(snapshot.efcr_period_consolidated, snapshot.efcr_period_consolidated_delta),
+          invertTrend: true,
+        },
+        {
+          key: "mortality",
+          label: "Daily Mortality Rate",
+          value: scaleValue(snapshot.mortality_rate, 100),
+          unit: "%",
+          decimals: 2,
+          trend: percentChange(snapshot.mortality_rate, snapshot.mortality_rate_delta),
+          invertTrend: true,
+        },
+        {
+          key: "biomass",
+          label: "Avg Biomass",
+          value: snapshot.average_biomass,
+          unit: "kg",
+          decimals: 1,
+          trend: percentChange(snapshot.average_biomass, snapshot.average_biomass_delta),
+          invertTrend: false,
+        },
+        {
+          key: "feeding",
+          label: "Feeding Rate",
+          value: snapshot.feeding_rate,
+          unit: "kg/t",
+          decimals: 2,
+          trend: null,
+          invertTrend: false,
+        },
+      ]
+    }
 
     return [
       {
         key: "efcr",
         label: "eFCR",
-        value: efcrValue,
+        value: snapshot.efcr,
         decimals: 2,
-        previous: null,
-        inverse: true,
+        trend: null,
+        invertTrend: true,
       },
       {
         key: "mortality",
-        label: "Mortality",
-        value: mortalityValue,
+        label: "Daily Mortality Rate",
+        value: scaleValue(snapshot.mortality_rate, 100),
         unit: "%",
-        decimals: 1,
-        previous: null,
-        inverse: true,
+        decimals: 2,
+        trend: null,
+        invertTrend: true,
       },
       {
         key: "biomass",
-        label: "Biomass",
-        value: biomassValue,
+        label: "Avg Biomass",
+        value: snapshot.average_biomass,
         unit: "kg",
         decimals: 1,
-        inverse: false,
+        trend: null,
+        invertTrend: false,
       },
       {
-        key: "water-quality",
-        label: "Water Quality",
-        value: waterQualityValue,
-        decimals: 1,
-        inverse: false,
+        key: "feeding",
+        label: "Feeding Rate",
+        value: snapshot.feeding_rate,
+        unit: "kg/t",
+        decimals: 2,
+        trend: null,
+        invertTrend: false,
       },
     ]
-  }, [snapshot, system])
+  }, [isFarmSnapshot, percentChange, snapshot])
 
   const formatValue = (value: number | null, unit?: string, decimals?: number) => {
     if (value === null || value === undefined) return "--"
@@ -125,28 +149,6 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
       return `${value.toFixed(decimals)}${unit ? unit : ""}`
     }
     return `${value}${unit ? unit : ""}`
-  }
-
-  const formatChange = (
-    current: number | null,
-    previous: number | null,
-    inverse: boolean,
-  ): { text: string | null; trend: "up" | "down" | "flat"; status: "positive" | "negative" | "neutral" } => {
-    if (current === null || current === undefined || previous === null || previous === undefined || previous === 0) {
-      return { text: null, trend: "flat", status: "neutral" }
-    }
-
-    const diff = ((current - previous) / previous) * 100
-    const trend = diff > 0 ? "up" : diff < 0 ? "down" : "flat"
-    const text = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}% from last period`
-    const positive = diff > 0
-    const negative = diff < 0
-
-    if (inverse) {
-      return { text, trend, status: positive ? "negative" : negative ? "positive" : "neutral" }
-    }
-
-    return { text, trend, status: positive ? "positive" : negative ? "negative" : "neutral" }
   }
 
   if (loading) {
@@ -162,7 +164,7 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
   }
 
   if (!snapshot) {
-    const placeholders = ["eFCR", "Mortality", "Biomass", "Water Quality"]
+    const placeholders = ["eFCR", "Mortality", "Biomass", "Feeding"]
     return (
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">No KPI data available for the selected period.</p>
@@ -184,16 +186,16 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => {
           const formattedValue = formatValue(metric.value, metric.unit, metric.decimals)
-          const { text, trend, status } = formatChange(metric.value, metric.previous ?? null, metric.inverse ?? false)
           return (
             <KPICard
               key={metric.key}
               title={metric.label}
-              value={formattedValue}
-              change={text ?? undefined}
-              status={status}
-              trend={trend}
-              onClick={() => handleKPIClick(metric.key)}
+              average={metric.value}
+              trend={metric.trend}
+              decimals={metric.decimals}
+              formatUnit={metric.unit}
+              invertTrend={metric.invertTrend}
+              href={`/production?metric=${metric.key}&period=${timePeriod}${snapshot?.input_start_date && snapshot?.input_end_date ? `&startDate=${snapshot.input_start_date}&endDate=${snapshot.input_end_date}` : ""}${system !== "all" ? `&system=${system}` : ""}`}
             />
           )
         })}

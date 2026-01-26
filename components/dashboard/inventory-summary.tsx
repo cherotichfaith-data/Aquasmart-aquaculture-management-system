@@ -24,7 +24,7 @@ export default function InventorySummary() {
       const totals = new Map<string, number>()
       if (result.status === "success") {
         result.data.forEach((row) => {
-          const name = row.feed_type?.name || "Unassigned"
+          const name = row.feed_type?.feed_line || row.feed_type?.feed_category || "Unassigned"
           totals.set(name, (totals.get(name) ?? 0) + (row.feed_amount ?? 0))
         })
       }

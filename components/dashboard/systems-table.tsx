@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { Enums } from "@/lib/types/database"
-import { fetchSystems } from "@/lib/supabase-queries"
+import { fetchSystemsDashboard } from "@/lib/supabase-queries"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -26,6 +26,13 @@ const formatWithUnit = (value: number | null | undefined, decimals: number, unit
   return formatted === "--" ? "--" : `${formatted} ${unit}`
 }
 
+const formatPercent = (value: number | null | undefined, decimals = 2) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "--"
+  const scaled = value * 100
+  if (!Number.isFinite(scaled)) return "--"
+  return `${scaled.toLocaleString(undefined, { maximumFractionDigits: decimals })} %`
+}
+
 export default function SystemsTable({
   stage,
   batch = "all",
@@ -37,24 +44,12 @@ export default function SystemsTable({
   const [loading, setLoading] = useState(true)
   const [pageIndex, setPageIndex] = useState(0)
 
-  const toMetricsPeriod = (period: Enums<"time_period">) => {
-    const map: Record<Enums<"time_period">, "7d" | "30d" | "90d" | "180d" | "365d"> = {
-      day: "7d",
-      week: "7d",
-      "2 weeks": "30d",
-      month: "30d",
-      quarter: "90d",
-      "6 months": "180d",
-      year: "365d",
-    }
-    return map[period] ?? "30d"
-  }
-
-  const handleRowClick = (systemId: number) => {
+  const handleRowClick = (systemId: number, startDate: string, endDate: string) => {
     if (!Number.isFinite(systemId)) return
     const params = new URLSearchParams({
       system: String(systemId),
-      period: toMetricsPeriod(timePeriod),
+      startDate,
+      endDate,
     })
     router.push(`/production?${params.toString()}`)
   }
@@ -64,33 +59,35 @@ export default function SystemsTable({
       setLoading(true)
       setPageIndex(0)
       const systemId = system !== "all" ? Number(system) : undefined
-      const result = await fetchSystems({
+      
+      // Fetch all dashboard data for the selected time period and stage
+      const result = await fetchSystemsDashboard({
         growth_stage: stage,
         system_id: Number.isFinite(systemId) ? systemId : undefined,
-        ongoing_cycle: true,
+        time_period: timePeriod,
       })
-      const rows = result.status === "success" ? result.data : []
-      const latestBySystem = new Map<number, any>()
-
-      rows.forEach((row) => {
-        const id = row.system_id
-        if (!Number.isFinite(id)) return
-        if (!latestBySystem.has(id)) {
-          latestBySystem.set(id, row)
+      
+      const dashboardRows = result.status === "success" ? result.data : []
+      
+      // Group by system and get the latest/only record per system for this time period
+      const systemsMap = new Map<number, any>()
+      dashboardRows.forEach((row) => {
+        if (row.system_id && !systemsMap.has(row.system_id)) {
+          systemsMap.set(row.system_id, row)
         }
       })
 
-      const latestSystems = Array.from(latestBySystem.values()).sort((a, b) => {
+      const systemsList = Array.from(systemsMap.values()).sort((a, b) => {
         const nameA = String(a.system_name ?? a.system_id ?? "")
         const nameB = String(b.system_name ?? b.system_id ?? "")
         return nameA.localeCompare(nameB)
       })
 
-      setSystems(latestSystems)
+      setSystems(systemsList)
       setLoading(false)
     }
     loadSystems()
-  }, [stage, batch, system])
+  }, [stage, batch, system, timePeriod])
 
   const totalRows = systems.length
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
@@ -119,7 +116,7 @@ export default function SystemsTable({
     <div className="rounded-md border bg-card p-6">
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-foreground">Production</h2>
-        <p className="text-sm text-muted-foreground">{systems.length} systems tracked</p>
+        <p className="text-sm text-muted-foreground mt-2">{systems.length} systems tracked</p>
       </div>
       <div className="max-h-[60vh] overflow-auto">
         <Table>
@@ -135,10 +132,10 @@ export default function SystemsTable({
                 ABW
               </TableHead>
               <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right hidden lg:table-cell">
-                Feed
+                Feeding Rate
               </TableHead>
               <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right hidden lg:table-cell">
-                Mortality
+                Mortality Rate
               </TableHead>
               <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right hidden xl:table-cell">
                 Density
@@ -154,11 +151,11 @@ export default function SystemsTable({
                 <TableRow
                   key={i}
                   className="cursor-pointer"
-                  onClick={() => handleRowClick(system.system_id)}
+                  onClick={() => handleRowClick(system.system_id, system.input_start_date || "", system.input_end_date || "")}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault()
-                      handleRowClick(system.system_id)
+                      handleRowClick(system.system_id, system.input_start_date || "", system.input_end_date || "")
                     }
                   }}
                   role="button"
@@ -169,24 +166,29 @@ export default function SystemsTable({
                       <span className="h-2 w-2 rounded-full bg-primary" />
                       <div>
                         <p className="text-sm font-medium text-foreground">{system.system_name || system.system_id}</p>
-                        {system.date ? <p className="text-[11px] text-muted-foreground">{system.date}</p> : null}
+                        {system.sampling_end_date ? <p className="text-[11px] text-muted-foreground">{system.sampling_end_date}</p> : null}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">{formatNumber(system.efcr_period, 2)}</TableCell>
-                  <TableCell className="text-right">{formatWithUnit(system.average_body_weight, 1, "g")}</TableCell>
+                  <TableCell className="text-right">{formatNumber(system.efcr, 2)}</TableCell>
+                  <TableCell className="text-right">{formatWithUnit(system.abw, 1, "g")}</TableCell>
                   <TableCell className="text-right hidden lg:table-cell">
-                    {formatWithUnit(system.total_feed_amount_period, 1, "kg")}
+                    {formatWithUnit(system.feeding_rate, 2, "kg/t")}
                   </TableCell>
                   <TableCell className="text-right hidden lg:table-cell">
-                    {formatNumber(system.daily_mortality_count, 0)}
+                    {formatPercent(system.mortality_rate, 2)}
                   </TableCell>
                   <TableCell className="text-right hidden xl:table-cell">
                     {formatNumber(system.biomass_density, 2)}
                   </TableCell>
                   <TableCell className="text-right hidden xl:table-cell">
-                    <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-600 px-2 py-1 text-[11px] font-semibold">
-                      Good
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${
+                      system.water_quality_rating_average === "optimal" ? "bg-emerald-50 text-emerald-600" :
+                      system.water_quality_rating_average === "acceptable" ? "bg-blue-50 text-blue-600" :
+                      system.water_quality_rating_average === "critical" ? "bg-amber-50 text-amber-600" :
+                      "bg-red-50 text-red-600"
+                    }`}>
+                      {system.water_quality_rating_average || "Unknown"}
                     </span>
                   </TableCell>
                 </TableRow>

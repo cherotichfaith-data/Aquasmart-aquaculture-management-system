@@ -18,11 +18,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
-import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
     date: z.string().min(1, "Date is required"),
+    time: z.string().min(1, "Time is required"),
+    water_depth: z.coerce.number().min(0, "Depth must be positive"),
     temperature: z.coerce.number().optional(),
     dissolved_oxygen: z.coerce.number().optional(),
     ph: z.coerce.number().optional(),
@@ -34,19 +35,20 @@ const formSchema = z.object({
 })
 
 interface WaterQualityFormProps {
-    systems: Tables<"systems">[]
+    systems: Tables<"system">[]
 }
 
 export function WaterQualityForm({ systems }: WaterQualityFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
-    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             system_id: "",
+            time: new Date().toISOString().split("T")[1]?.slice(0, 5) ?? "08:00",
+            water_depth: 0,
             // Use empty strings for optional number inputs to avoid "0" default if not desired, 
             // or 0 if acceptable. For paramters like pH, 0 is invalid/extreme.
             // We use standard values or undefined->"" via controller if possible, 
@@ -67,19 +69,51 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            const { error } = await supabase.from("water_quality_events").insert({
-                system_id: values.system_id,
+            const systemId = Number(values.system_id)
+            const measurements: Array<{
+                parameter_name: Tables<"water_quality_measurement">["parameter_name"]
+                parameter_value: number
+            }> = []
+
+            if (typeof values.temperature === "number") {
+                measurements.push({ parameter_name: "temperature", parameter_value: values.temperature })
+            }
+            if (typeof values.dissolved_oxygen === "number") {
+                measurements.push({ parameter_name: "dissolved_oxygen", parameter_value: values.dissolved_oxygen })
+            }
+            if (typeof values.ph === "number") {
+                measurements.push({ parameter_name: "pH", parameter_value: values.ph })
+            }
+            if (typeof values.total_ammonia === "number") {
+                measurements.push({ parameter_name: "ammonia_ammonium", parameter_value: values.total_ammonia })
+            }
+            if (typeof values.no2 === "number") {
+                measurements.push({ parameter_name: "nitrite", parameter_value: values.no2 })
+            }
+            if (typeof values.no3 === "number") {
+                measurements.push({ parameter_name: "nitrate", parameter_value: values.no3 })
+            }
+            if (typeof values.salinity === "number") {
+                measurements.push({ parameter_name: "salinity", parameter_value: values.salinity })
+            }
+            if (typeof values.secchi_disk === "number") {
+                measurements.push({ parameter_name: "secchi_disk_depth", parameter_value: values.secchi_disk })
+            }
+
+            if (measurements.length === 0) {
+                throw new Error("Enter at least one water quality measurement.")
+            }
+
+            const payload = measurements.map((measurement) => ({
+                system_id: systemId,
                 date: values.date,
-                temperature: values.temperature,
-                dissolved_oxygen: values.dissolved_oxygen,
-                ph: values.ph,
-                total_ammonia: values.total_ammonia,
-                no2: values.no2,
-                no3: values.no3,
-                salinity: values.salinity,
-                secchi_disk: values.secchi_disk,
-                created_by: user?.id
-            })
+                time: values.time,
+                water_depth: values.water_depth,
+                parameter_name: measurement.parameter_name,
+                parameter_value: measurement.parameter_value,
+            }))
+
+            const { error } = await supabase.from("water_quality_measurement").insert(payload)
 
             if (error) throw error
 
@@ -90,13 +124,15 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 system_id: values.system_id,
+                time: values.time,
+                water_depth: values.water_depth,
             })
         } catch (error) {
             console.error(error)
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: "Failed to record water quality data.",
+                description: error instanceof Error ? error.message : "Failed to record water quality data.",
             })
         }
     }
@@ -123,8 +159,8 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                         </FormControl>
                                         <SelectContent>
                                             {systems.map((s) => (
-                                                <SelectItem key={s.system_id} value={s.system_id}>
-                                                    {s.system_id}
+                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                    {s.name ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -141,6 +177,32 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                     <FormLabel>Date</FormLabel>
                                     <FormControl>
                                         <Input type="date" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="time"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Time</FormLabel>
+                                    <FormControl>
+                                        <Input type="time" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="water_depth"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Water Depth (m)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" step="0.1" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

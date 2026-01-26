@@ -3,13 +3,10 @@
 import { useState } from "react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import FarmSelector from "@/components/shared/farm-selector"
-import WaterQualityForm from "@/components/water-quality/water-quality-form"
 import WaterQualityCharts from "@/components/water-quality/water-quality-charts"
 import WaterQualityHistory from "@/components/water-quality/water-quality-history"
-import { Plus } from "lucide-react"
 
 export default function WaterQualityPage() {
-  const [showForm, setShowForm] = useState(false)
   const [selectedBatch, setSelectedBatch] = useState<string>("all")
   const [selectedSystem, setSelectedSystem] = useState<string>("all")
   const [selectedStage, setSelectedStage] = useState<"all" | "nursing" | "grow_out">("all")
@@ -32,23 +29,8 @@ export default function WaterQualityPage() {
               onSystemChange={setSelectedSystem}
               onStageChange={setSelectedStage}
             />
-
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
-            >
-              <Plus size={18} />
-              Record Reading
-            </button>
           </div>
         </div>
-
-        {showForm && (
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Water Quality Measurement</h2>
-            <WaterQualityForm onClose={() => setShowForm(false)} />
-          </div>
-        )}
 
         <WaterQualityCharts />
         <WaterQualityHistory />

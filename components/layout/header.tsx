@@ -21,8 +21,16 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const router = useRouter()
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push("/auth")
+    try {
+      await signOut()
+    } catch (err) {
+      console.error("Sign out failed:", err)
+    } finally {
+      router.replace("/auth")
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth"
+      }
+    }
   }
 
   // Helper to format role name (e.g., "farm_manager" -> "Farm Manager")

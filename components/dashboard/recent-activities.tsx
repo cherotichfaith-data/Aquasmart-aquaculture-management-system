@@ -20,8 +20,39 @@ export default function RecentActivities({ batch = "all", system = "all" }: { ba
     loadActivities()
   }, [batch, system])
 
-  const getIcon = (table: string) => {
+  const normalizeTableName = (table: string) => {
     switch (table) {
+      case "feeding_events":
+      case "feeding_record":
+        return "feeding_record"
+      case "sampling_events":
+      case "fish_sampling_weight":
+        return "fish_sampling_weight"
+      case "water_quality_events":
+      case "water_quality_measurement":
+        return "water_quality_measurement"
+      case "mortality_events":
+      case "fish_mortality":
+        return "fish_mortality"
+      case "transfer_events":
+      case "fish_transfer":
+        return "fish_transfer"
+      case "harvest_events":
+      case "fish_harvest":
+        return "fish_harvest"
+      case "incoming_feed_events":
+      case "feed_incoming":
+        return "feed_incoming"
+      case "stocking_events":
+      case "fish_stocking":
+        return "fish_stocking"
+      default:
+        return table
+    }
+  }
+
+  const getIcon = (table: string) => {
+    switch (normalizeTableName(table)) {
       case "feeding_record":
         return <Clock size={16} />
       case "fish_sampling_weight":
@@ -32,13 +63,19 @@ export default function RecentActivities({ batch = "all", system = "all" }: { ba
         return <AlertCircle size={16} />
       case "fish_transfer":
         return <CornerDownRight size={16} />
+      case "fish_harvest":
+        return <Fish size={16} />
+      case "feed_incoming":
+        return <Clock size={16} />
+      case "fish_stocking":
+        return <Fish size={16} />
       default:
         return <Clock size={16} />
     }
   }
 
   const getColor = (table: string) => {
-    switch (table) {
+    switch (normalizeTableName(table)) {
       case "feeding_record":
         return "bg-sky-500/10 text-sky-600"
       case "fish_sampling_weight":
@@ -49,13 +86,19 @@ export default function RecentActivities({ batch = "all", system = "all" }: { ba
         return "bg-rose-500/10 text-rose-600"
       case "fish_transfer":
         return "bg-amber-500/10 text-amber-600"
+      case "fish_harvest":
+        return "bg-lime-500/10 text-lime-600"
+      case "feed_incoming":
+        return "bg-blue-500/10 text-blue-600"
+      case "fish_stocking":
+        return "bg-indigo-500/10 text-indigo-600"
       default:
         return "bg-slate-500/10 text-slate-600"
     }
   }
 
   const getLabel = (table: string) => {
-    switch (table) {
+    switch (normalizeTableName(table)) {
       case "feeding_record":
         return "Feeding"
       case "fish_sampling_weight":
@@ -66,8 +109,14 @@ export default function RecentActivities({ batch = "all", system = "all" }: { ba
         return "Mortality"
       case "fish_transfer":
         return "Transfer"
+      case "fish_harvest":
+        return "Harvest"
+      case "feed_incoming":
+        return "Incoming feed"
+      case "fish_stocking":
+        return "Stocking"
       default:
-        return table.replace(/_/g, " ")
+        return normalizeTableName(table).replace(/_/g, " ")
     }
   }
 

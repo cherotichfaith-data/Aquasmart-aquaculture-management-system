@@ -6,6 +6,8 @@ import { Download } from "lucide-react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import FarmSelector from "@/components/shared/farm-selector"
+import { useAuth } from "@/components/auth-provider"
+import { useActiveFarm } from "@/hooks/use-active-farm"
 import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
 import KPIOverview from "@/components/dashboard/kpi-overview"
 import PopulationOverview from "@/components/dashboard/population-overview"
@@ -17,6 +19,8 @@ import * as XLSX from "xlsx"
 import { fetchProductionSummary } from "@/lib/supabase-queries"
 
 export default function DashboardPage() {
+  const { profile } = useAuth()
+  const { farm: activeFarm } = useActiveFarm()
   const [selectedBatch, setSelectedBatch] = useState<string>("all")
   const [selectedSystem, setSelectedSystem] = useState<string>("all")
   const [selectedStage, setSelectedStage] = useState<"all" | "nursing" | "grow_out">("all")
@@ -50,7 +54,9 @@ export default function DashboardPage() {
         <div className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-semibold text-balance">Dashboard</h1>
+              <h1 className="text-3xl font-semibold text-balance">
+                {activeFarm?.name ?? profile?.farm_name ?? "Dashboard"}
+              </h1>
               <p className="text-muted-foreground mt-2">Monitor your farm check-ins and system performance</p>
             </div>
           </div>

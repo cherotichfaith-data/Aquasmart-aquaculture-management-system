@@ -98,9 +98,6 @@ export default function PopulationOverview({
         const loadSummary = async () => {
             setLoading(true)
             const systemId = system && system !== "all" ? Number(system) : undefined
-            console.log("Fetching production summary with filters:", { stage, systemId, timePeriod })
-
-            // Try fetching real data
             const result = await fetchProductionSummary({
                 growth_stage: stage ?? undefined,
                 system_id: Number.isFinite(systemId) ? systemId : undefined,
@@ -108,28 +105,7 @@ export default function PopulationOverview({
             })
 
             if (!isMounted) return
-            console.log("Production Summary Result:", result)
-            if (result.status === "success" && result.data.length > 0) {
-                setRows(result.data)
-            } else {
-                // FALLBACK: Zero Data for visualization (3 months back)
-                console.log("Using Zero Data Fallback")
-                const today = new Date()
-                const mockRows: any[] = []
-                // 3 months approx 90 days
-                for (let i = 0; i < 90; i++) {
-                    const d = new Date(today)
-                    d.setDate(d.getDate() - i)
-                    mockRows.push({
-                        date: d.toISOString().split('T')[0],
-                        efcr_aggregated: 0,
-                        daily_mortality_count: 0,
-                        growth_stage: "grow_out",
-                        system_id: 1
-                    })
-                }
-                setRows(mockRows)
-            }
+            setRows(result.status === "success" ? result.data : [])
             setLoading(false)
         }
         loadSummary()
@@ -142,45 +118,46 @@ export default function PopulationOverview({
         const cutoff = new Date()
         cutoff.setDate(cutoff.getDate() - daysByPeriod[timePeriod])
 
-        console.log("Rows:", rows)
-
-        const map = new Map<string, { total_efcr: number; count: number; total_mortality: number }>()
+        const map = new Map<
+            string,
+            { total_efcr: number; count: number; total_mortality: number; total_fish: number }
+        >()
 
         rows.forEach((row) => {
             if (!row.date) return
             const parsed = new Date(row.date)
-            // if (!Number.isNaN(parsed.getTime()) && parsed < cutoff) return
-            // TEMPORARY: Allow all data to populate the chart regardless of filter
-            // This handles the case where data is old (e.g. 2024) but user views it in 2026.
-            if (Number.isNaN(parsed.getTime())) return
+            if (Number.isNaN(parsed.getTime()) || parsed < cutoff) return
 
             const key = row.date
-            const current = map.get(key) ?? { total_efcr: 0, count: 0, total_mortality: 0 }
+            const current =
+                map.get(key) ?? { total_efcr: 0, count: 0, total_mortality: 0, total_fish: 0 }
 
-            if (row.efcr_aggregated !== null && row.efcr_aggregated !== undefined) {
-                current.total_efcr += row.efcr_aggregated
+            const efcrValue = row.efcr_period ?? row.efcr_aggregated
+            if (efcrValue !== null && efcrValue !== undefined) {
+                current.total_efcr += efcrValue
                 current.count += 1
             }
 
-            if (row.daily_mortality_count) {
+            if (row.daily_mortality_count !== null && row.daily_mortality_count !== undefined) {
                 current.total_mortality += row.daily_mortality_count
+            }
+
+            if (row.number_of_fish_inventory !== null && row.number_of_fish_inventory !== undefined) {
+                current.total_fish += row.number_of_fish_inventory
             }
 
             map.set(key, current)
         })
-        console.log("Map:", map)
         const data = Array.from(map.entries())
             .map(([date, values]) => ({
                 date,
                 efcr: values.count > 0 ? values.total_efcr / values.count : 0,
-                mortality: values.total_mortality
+                mortality_rate: values.total_fish > 0 ? (values.total_mortality / values.total_fish) * 100 : 0,
             }))
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
-        console.log("Processed Chart Data:", data)
         return data
     }, [rows, timePeriod])
-    console.log("Chart Data:", chartData)
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
             <Card className="w-full">
@@ -198,7 +175,7 @@ export default function PopulationOverview({
                                 <YAxis stroke="#3b82f6" />
                                 <Tooltip
                                     formatter={(value: number | string, name) => {
-                                        return [typeof value === 'number' ? value.toFixed(2) : value, "eFCR"]
+                                        return [typeof value === "number" ? value.toFixed(2) : value, "eFCR"]
                                     }}
                                     labelFormatter={formatAxisDate}
                                 />
@@ -233,17 +210,20 @@ export default function PopulationOverview({
                                 <YAxis stroke="#ef4444" />
                                 <Tooltip
                                     formatter={(value: number | string, name) => {
-                                        return [value, "Mortality"]
+                                        if (typeof value === "number") {
+                                            return [`${value.toFixed(2)}%`, "Mortality rate"]
+                                        }
+                                        return [value, "Mortality rate"]
                                     }}
                                     labelFormatter={formatAxisDate}
                                 />
                                 <Area
                                     type="monotone"
-                                    dataKey="mortality"
+                                    dataKey="mortality_rate"
                                     fill="#ef4444"
                                     fillOpacity={0.2}
                                     stroke="#ef4444"
-                                    name="Mortality"
+                                    name="Mortality rate"
                                 />
                             </ComposedChart>
                         </ResponsiveContainer>

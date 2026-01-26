@@ -18,46 +18,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
-import { useAuth } from "@/components/auth-provider"
 
 const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
     feed_id: z.string().min(1, "Feed type is required"),
     quantity: z.coerce.number().min(0, "Quantity must be positive"),
-    cost_per_unit: z.coerce.number().min(0).optional(),
-    supplier_id: z.string().optional(),
 })
 
 interface IncomingFeedFormProps {
-    feeds: Tables<"feeds_metadata">[]
+    feeds: Tables<"feed_type">[]
     suppliers: Tables<"suppliers">[]
 }
 
 export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
     const { toast } = useToast()
     const supabase = createClient()
-    const { user } = useAuth()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             quantity: 0,
-            cost_per_unit: 0,
             feed_id: "",
-            supplier_id: "none",
         },
     })
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            const { error } = await supabase.from("incoming_feed_events").insert({
-                date_of_arrival: values.date,
-                feed_id: values.feed_id,
-                amount: values.quantity,
-                cost_per_unit: values.cost_per_unit || 0,
-                supplier_id: values.supplier_id === "none" ? null : values.supplier_id,
-                created_by: user?.id
+            const feedTypeId = Number(values.feed_id)
+
+            const { error } = await supabase.from("feed_incoming").insert({
+                date: values.date,
+                feed_amount: values.quantity,
+                feed_type_id: feedTypeId,
             })
 
             if (error) throw error
@@ -70,7 +63,6 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
                 date: new Date().toISOString().split("T")[0],
                 quantity: 0,
                 feed_id: values.feed_id,
-                supplier_id: values.supplier_id,
             })
         } catch (error) {
             console.error(error)
@@ -119,34 +111,8 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
                                         </FormControl>
                                         <SelectContent>
                                             {feeds.map((f) => (
-                                                <SelectItem key={f.feed_id} value={f.feed_id}>
-                                                    {f.feed_name} ({f.brand})
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="supplier_id"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Supplier (Optional)</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select supplier" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="none">None</SelectItem>
-                                            {suppliers.map((s) => (
-                                                <SelectItem key={s.supplier_id} value={s.supplier_id}>
-                                                    {s.name}
+                                                <SelectItem key={f.id} value={String(f.id)}>
+                                                    {f.feed_line ?? `Feed ${f.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -164,19 +130,6 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Quantity (kg)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="cost_per_unit"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Cost per Unit (Optional)</FormLabel>
                                     <FormControl>
                                         <Input type="number" step="0.01" {...field} />
                                     </FormControl>

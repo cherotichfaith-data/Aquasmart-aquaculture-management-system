@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { fetchFeedingRecords, type FeedingRecordWithType } from "@/lib/supabase-queries"
 
-export default function FeedingReport({ dateRange }: { dateRange?: string }) {
+export default function FeedingReport({ dateRange }: { dateRange?: { from: string; to: string } }) {
   const [records, setRecords] = useState<FeedingRecordWithType[]>([])
   const [loading, setLoading] = useState(true)
 
