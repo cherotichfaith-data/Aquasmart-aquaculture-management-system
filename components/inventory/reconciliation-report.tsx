@@ -3,29 +3,37 @@
 import { useEffect, useState } from "react"
 import { fetchHarvests } from "@/lib/supabase-queries"
 
-export default function ReconciliationReport() {
+export default function ReconciliationReport({
+  selectedBatch,
+  selectedSystem,
+  selectedStage,
+}: {
+  selectedBatch: string
+  selectedSystem: string
+  selectedStage: "all" | "nursing" | "grow_out"
+}) {
   const [harvests, setHarvests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadHarvests = async () => {
       setLoading(true)
-      const result = await fetchHarvests({ limit: 50 })
+      const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
+      const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
+      const result = await fetchHarvests({
+        limit: 50,
+        system_id: Number.isFinite(systemId) ? systemId : undefined,
+        batch_id: Number.isFinite(batchId) ? batchId : undefined,
+      })
       setHarvests(result.status === "success" ? result.data : [])
       setLoading(false)
     }
     loadHarvests()
-  }, [])
-
-  const totalHarvestWeight = harvests.reduce((sum, row) => sum + (row.total_weight_harvest || 0), 0)
+  }, [selectedBatch, selectedStage, selectedSystem])
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground mb-1">Total Harvested (kg)</p>
-          <p className="text-3xl font-bold">{totalHarvestWeight.toFixed(1)}</p>
-        </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Harvest Events</p>
           <p className="text-3xl font-bold">{harvests.length}</p>

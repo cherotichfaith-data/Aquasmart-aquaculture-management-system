@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { fetchProductionSummary } from "@/lib/supabase-queries"
@@ -12,7 +12,11 @@ export default function GrowthReport({ dateRange }: { dateRange?: { from: string
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
-      const result = await fetchProductionSummary({ limit: 100 })
+      const result = await fetchProductionSummary({
+        limit: 100,
+        date_from: dateRange?.from,
+        date_to: dateRange?.to,
+      })
       setRows(result.status === "success" ? result.data : [])
       setLoading(false)
     }
@@ -20,15 +24,6 @@ export default function GrowthReport({ dateRange }: { dateRange?: { from: string
   }, [dateRange])
 
   const latest = rows[0]
-  const latestBySystem = useMemo(() => {
-    const map = new Map<number, any>()
-    rows.forEach((row) => {
-      if (!map.has(row.system_id)) {
-        map.set(row.system_id, row)
-      }
-    })
-    return Array.from(map.values())
-  }, [rows])
 
   return (
     <div className="space-y-6">
@@ -145,9 +140,9 @@ export default function GrowthReport({ dateRange }: { dateRange?: { from: string
                     Loading...
                   </td>
                 </tr>
-              ) : latestBySystem.length > 0 ? (
-                latestBySystem.map((row) => (
-                  <tr key={row.system_id} className="border-b border-border hover:bg-muted/30">
+              ) : rows.length > 0 ? (
+                rows.map((row) => (
+                  <tr key={`${row.system_id}-${row.date}`} className="border-b border-border hover:bg-muted/30">
                     <td className="px-4 py-2 font-medium">{row.system_name ?? row.system_id}</td>
                     <td className="px-4 py-2 text-center">{row.average_body_weight ?? "-"}</td>
                     <td className="px-4 py-2 text-center">{row.total_biomass ?? "-"}</td>

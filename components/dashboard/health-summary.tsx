@@ -3,8 +3,9 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { Droplets, HeartPulse } from "lucide-react"
-import { fetchDashboardSnapshot, fetchWaterQualityRatings } from "@/lib/supabase-queries"
 import type { Enums } from "@/lib/types/database"
+import { createClient } from "@/utils/supabase/client"
+import { useActiveFarm } from "@/hooks/use-active-farm"
 
 type Tone = "good" | "warn" | "bad"
 
@@ -66,94 +67,89 @@ function StatusCard({
 
 export default function HealthSummary({
   system,
-  timePeriod,
+  timePeriod: _timePeriod,
 }: {
   system?: string
   timePeriod?: Enums<"time_period">
 }) {
+  const { farmId } = useActiveFarm()
   const [waterQuality, setWaterQuality] = useState<HealthState | null>(null)
   const [fishHealth, setFishHealth] = useState<HealthState | null>(null)
 
   useEffect(() => {
     let isMounted = true
+    const supabase = createClient()
+
+    const ratingToneMap: Record<string, { status: string; tone: Tone; progress: number }> = {
+      optimal: { status: "Good", tone: "good", progress: 0.85 },
+      acceptable: { status: "Fair", tone: "warn", progress: 0.6 },
+      critical: { status: "Poor", tone: "bad", progress: 0.35 },
+      lethal: { status: "Critical", tone: "bad", progress: 0.2 },
+    }
+
     const load = async () => {
       const systemId = system && system !== "all" ? Number(system) : undefined
-      const [ratingResult, snapshot] = await Promise.all([
-        fetchWaterQualityRatings({ system_id: Number.isFinite(systemId) ? systemId : undefined, limit: 1 }),
-        fetchDashboardSnapshot({
-          system_id: Number.isFinite(systemId) ? systemId : undefined,
-          time_period: timePeriod,
-        }),
-      ])
+      const resolvedSystemId = Number.isFinite(systemId) ? systemId : undefined
 
-      if (!isMounted) return
-
-      const latestRating = ratingResult.status === "success" ? ratingResult.data[0] : null
-      if (latestRating) {
-        const rating = latestRating.rating
-        const ratingMap: Record<string, { status: string; tone: Tone; progress: number }> = {
-          optimal: { status: "Good", tone: "good", progress: 0.85 },
-          moderate: { status: "Fair", tone: "warn", progress: 0.6 },
-          critical: { status: "Poor", tone: "bad", progress: 0.35 },
-          lethal: { status: "Critical", tone: "bad", progress: 0.2 },
-        }
-        const mapped = ratingMap[rating] || { status: "Good", tone: "good", progress: 0.85 }
-        setWaterQuality({
-          title: "Water quality",
-          status: mapped.status,
-          tone: mapped.tone,
-          progress: mapped.progress,
-          detail: latestRating.worst_parameter
-            ? `Worst: ${latestRating.worst_parameter}`
-            : "All parameters stable",
-        })
-      } else {
-        setWaterQuality({
-          title: "Water quality",
-          status: "Good",
-          tone: "good",
-          progress: 0.8,
-          detail: "All parameters stable",
-        })
-      }
-
-      const survivalRate = snapshot && "farm_survival_rate" in snapshot ? snapshot.farm_survival_rate : null
-      let fishState: HealthState = {
-        title: "Fish health",
-        status: "Good",
+      const waterQualityState: HealthState = {
+        title: "Water quality",
+        status: "Monitoring",
         tone: "good",
         progress: 0.8,
-        detail: "Steady growth trend",
+        detail: resolvedSystemId ? "Latest system rating" : "Latest farm rating",
       }
 
-      if (typeof survivalRate === "number") {
-        if (survivalRate >= 95) {
-          fishState = {
-            title: "Fish health",
-            status: "Good",
-            tone: "good",
-            progress: 0.88,
-            detail: `Survival ${survivalRate.toFixed(1)}%`,
-          }
-        } else if (survivalRate >= 90) {
-          fishState = {
-            title: "Fish health",
-            status: "Stable",
-            tone: "warn",
-            progress: 0.65,
-            detail: `Survival ${survivalRate.toFixed(1)}%`,
-          }
-        } else {
-          fishState = {
-            title: "Fish health",
-            status: "Attention",
-            tone: "bad",
-            progress: 0.4,
-            detail: `Survival ${survivalRate.toFixed(1)}%`,
-          }
+      const fishState: HealthState = {
+        title: "Fish health",
+        status: "Monitoring",
+        tone: "warn",
+        progress: 0.6,
+        detail: "Latest snapshot from dashboard view",
+      }
+
+      if (resolvedSystemId) {
+        const { data: snapshot } = await supabase
+          .from("dashboard")
+          .select("water_quality_rating_average,mortality_rate")
+          .eq("system_id", resolvedSystemId)
+          .order("input_end_date", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (snapshot?.water_quality_rating_average) {
+          const mapped = ratingToneMap[snapshot.water_quality_rating_average] ?? ratingToneMap.optimal
+          waterQualityState.tone = mapped.tone
+          waterQualityState.status = mapped.status
+          waterQualityState.progress = mapped.progress
+          waterQualityState.detail = `Rating: ${snapshot.water_quality_rating_average}`
+        }
+
+        if (snapshot?.mortality_rate != null) {
+          fishState.detail = `Mortality rate: ${snapshot.mortality_rate}`
+        }
+      } else {
+        const { data: snapshot } = await supabase
+          .from("dashboard_consolidated")
+          .select("water_quality_rating_average,mortality_rate")
+          .order("input_end_date", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (snapshot?.water_quality_rating_average) {
+          const mapped = ratingToneMap[snapshot.water_quality_rating_average] ?? ratingToneMap.optimal
+          waterQualityState.tone = mapped.tone
+          waterQualityState.status = mapped.status
+          waterQualityState.progress = mapped.progress
+          waterQualityState.detail = `Rating: ${snapshot.water_quality_rating_average}`
+        }
+
+        if (snapshot?.mortality_rate != null) {
+          fishState.detail = `Mortality rate: ${snapshot.mortality_rate}`
         }
       }
 
+      if (!isMounted) return
+      setWaterQuality(waterQualityState)
       setFishHealth(fishState)
     }
 
@@ -161,7 +157,7 @@ export default function HealthSummary({
     return () => {
       isMounted = false
     }
-  }, [system, timePeriod])
+  }, [farmId, system, _timePeriod])
 
   if (!waterQuality || !fishHealth) {
     return (

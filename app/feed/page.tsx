@@ -9,17 +9,8 @@ import type { Tables } from "@/lib/types/database"
 import {
   fetchFeedData,
   fetchFeedTypes,
-  fetchFeedingRecords,
-  fetchProductionSummary,
   type FeedIncomingWithType,
-  type FeedingRecordWithType,
 } from "@/lib/supabase-queries"
-
-type FeedEfficiencyRow = {
-  feedType: string
-  efcr: number
-  totalFeed: number
-}
 
 export default function FeedManagementPage() {
   const [selectedBatch, setSelectedBatch] = useState<string>("all")
@@ -27,8 +18,6 @@ export default function FeedManagementPage() {
   const [selectedStage, setSelectedStage] = useState<"all" | "nursing" | "grow_out">("all")
   const [feedData, setFeedData] = useState<FeedIncomingWithType[]>([])
   const [feedTypes, setFeedTypes] = useState<Tables<"feed_type">[]>([])
-  const [feedEfficiency, setFeedEfficiency] = useState<FeedEfficiencyRow[]>([])
-  const [efficiencyLoading, setEfficiencyLoading] = useState(true)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -42,59 +31,7 @@ export default function FeedManagementPage() {
     loadData()
   }, [selectedBatch, selectedSystem, selectedStage])
 
-  useEffect(() => {
-    const loadEfficiency = async () => {
-      setEfficiencyLoading(true)
-      const [summaryResult, feedingResult] = await Promise.all([
-        fetchProductionSummary({ limit: 200 }),
-        fetchFeedingRecords({ limit: 200 }),
-      ])
-      const summaryRows = summaryResult.status === "success" ? summaryResult.data : []
-      const feedingRows = feedingResult.status === "success" ? feedingResult.data : []
-
-      const efcrBySystem = new Map<number, number>()
-      summaryRows.forEach((row) => {
-        if (!row.system_id || efcrBySystem.has(row.system_id)) return
-        if (typeof row.efcr_period === "number" && Number.isFinite(row.efcr_period)) {
-          efcrBySystem.set(row.system_id, row.efcr_period)
-        }
-      })
-
-      const totals = new Map<
-        string,
-        { label: string; totalFeed: number; weightedEfcr: number; records: number }
-      >()
-
-      feedingRows.forEach((row: FeedingRecordWithType) => {
-        const feedTypeId = row.feed_type_id ?? row.feed_type?.id ?? null
-        const key = feedTypeId ? String(feedTypeId) : "unassigned"
-        const label = row.feed_type?.feed_line ?? (feedTypeId ? `Feed ${feedTypeId}` : "Unassigned")
-        const amount = typeof row.feeding_amount === "number" ? row.feeding_amount : null
-        const efcr = row.system_id ? efcrBySystem.get(row.system_id) : undefined
-        if (efcr === undefined || !Number.isFinite(efcr)) return
-        if (amount === null || !Number.isFinite(amount) || amount <= 0) return
-
-        const entry = totals.get(key) ?? { label, totalFeed: 0, weightedEfcr: 0, records: 0 }
-        entry.totalFeed += amount
-        entry.weightedEfcr += efcr * amount
-        entry.records += 1
-        totals.set(key, entry)
-      })
-
-      const chartRows = Array.from(totals.values())
-        .map((entry) => ({
-          feedType: entry.label,
-          efcr: entry.totalFeed > 0 ? entry.weightedEfcr / entry.totalFeed : 0,
-          totalFeed: entry.totalFeed,
-        }))
-        .filter((row) => Number.isFinite(row.efcr))
-        .sort((a, b) => a.efcr - b.efcr)
-
-      setFeedEfficiency(chartRows)
-      setEfficiencyLoading(false)
-    }
-    loadEfficiency()
-  }, [selectedBatch, selectedSystem, selectedStage])
+  // Feed efficiency aggregations are provided by backend views.
 
   const chartData = feedTypes.map((item) => ({
     feedType: item.feed_line ?? `Feed ${item.id}`,
@@ -145,43 +82,12 @@ export default function FeedManagementPage() {
 
         <div className="bg-card border border-border rounded-lg p-6">
           <div className="mb-4">
-            <h2 className="text-lg font-semibold">Feed Efficiency (eFCR) by Type</h2>
+            <h2 className="text-lg font-semibold">Feed Efficiency (eFCR)</h2>
             <p className="text-sm text-muted-foreground">
-              Weighted by recent feed usage; eFCR sourced from production summaries.
+              Aggregated efficiency metrics are provided by backend materialized views.
             </p>
           </div>
-          {efficiencyLoading ? (
-            <div className="h-80 flex items-center justify-center text-muted-foreground">Loading chart...</div>
-          ) : feedEfficiency.length > 0 ? (
-            <ChartContainer config={{ efcr: { label: "eFCR", color: "hsl(var(--chart-1))" } }}>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={feedEfficiency}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="feedType" />
-                  <YAxis tickFormatter={(value) => Number(value).toFixed(2)} />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length) return null
-                      const row = payload[0].payload as FeedEfficiencyRow
-                      return (
-                        <div className="rounded-md border border-border bg-card px-3 py-2 shadow-md">
-                          <p className="text-xs text-muted-foreground">{label}</p>
-                          <p className="text-sm font-medium text-foreground">eFCR: {row.efcr.toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Feed used: {row.totalFeed.toFixed(1)} kg
-                          </p>
-                        </div>
-                      )
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="efcr" fill="hsl(var(--chart-1))" name="eFCR" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          ) : (
-            <div className="h-80 flex items-center justify-center text-muted-foreground">No data available</div>
-          )}
+          <div className="h-80 flex items-center justify-center text-muted-foreground">Awaiting backend series.</div>
         </div>
 
         <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -240,21 +146,6 @@ export default function FeedManagementPage() {
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Feed Types</p>
             <p className="text-2xl font-bold mt-1">{feedTypes.length}</p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-sm text-muted-foreground">Avg Protein Content</p>
-            <p className="text-2xl font-bold mt-1">
-              {feedTypes.length > 0
-                ? (
-                    feedTypes.reduce((sum, f) => sum + (f.crude_protein_percentage || 0), 0) / feedTypes.length
-                  ).toFixed(1)
-                : 0}
-              %
-            </p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-sm text-muted-foreground">Total Received (kg)</p>
-            <p className="text-2xl font-bold mt-1">{feedData.reduce((sum, f) => sum + (f.feed_amount || 0), 0)}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Incoming Shipments</p>

@@ -5,13 +5,6 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { fetchWaterQualityMeasurements, type WaterQualityMeasurementWithUnit } from "@/lib/supabase-queries"
 
-const parameterKeyMap = {
-  dissolved_oxygen: "do",
-  temperature: "temp",
-  pH: "ph",
-  ammonia_ammonium: "ammonia",
-} as const
-
 type ChartRow = {
   timestamp: string
   do?: number
@@ -20,9 +13,19 @@ type ChartRow = {
   ammonia?: number
 }
 
+type WaterQualityParameter = WaterQualityMeasurementWithUnit["parameter_name"]
+type ChartValueKey = Exclude<keyof ChartRow, "timestamp">
+
+const parameterKeyMap: Partial<Record<WaterQualityParameter, ChartValueKey>> = {
+  dissolved_oxygen: "do",
+  temperature: "temp",
+  pH: "ph",
+  ammonia_ammonium: "ammonia",
+}
+
 const buildSeries = (
   rows: WaterQualityMeasurementWithUnit[],
-  parameters: Array<keyof typeof parameterKeyMap>,
+  parameters: WaterQualityParameter[],
 ) => {
   const seriesMap = new Map<string, ChartRow>()
 
@@ -31,6 +34,7 @@ const buildSeries = (
     const key = `${row.date} ${row.time}`
     const entry = seriesMap.get(key) ?? { timestamp: key }
     const valueKey = parameterKeyMap[row.parameter_name]
+    if (!valueKey) return
     entry[valueKey] = row.parameter_value
     seriesMap.set(key, entry)
   })

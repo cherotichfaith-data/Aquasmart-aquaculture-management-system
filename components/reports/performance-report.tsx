@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   LineChart,
   Line,
@@ -24,23 +24,19 @@ export default function PerformanceReport({ dateRange }: { dateRange?: { from: s
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
-      const [summarySnapshot, summaryRows] = await Promise.all([fetchDashboardSnapshot(), fetchProductionSummary()])
+      const [summarySnapshot, summaryRows] = await Promise.all([
+        fetchDashboardSnapshot(),
+        fetchProductionSummary({
+          date_from: dateRange?.from,
+          date_to: dateRange?.to,
+        }),
+      ])
       setSummary(summarySnapshot)
       setRows(summaryRows.status === "success" ? summaryRows.data : [])
       setLoading(false)
     }
     loadData()
   }, [dateRange])
-
-  const latestBySystem = useMemo(() => {
-    const map = new Map<number, any>()
-    rows.forEach((row) => {
-      if (!map.has(row.system_id)) {
-        map.set(row.system_id, row)
-      }
-    })
-    return Array.from(map.values())
-  }, [rows])
 
   return (
     <div className="space-y-6">
@@ -124,7 +120,7 @@ export default function PerformanceReport({ dateRange }: { dateRange?: { from: s
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={latestBySystem}>
+              <BarChart data={rows}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="system_name" />
                 <YAxis />

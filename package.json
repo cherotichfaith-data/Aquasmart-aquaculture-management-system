@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "set ESLINT_USE_FLAT_CONFIG=false&& next lint"
+    "lint": "node -e \"process.env.ESLINT_USE_FLAT_CONFIG='false';const cmd=process.platform==='win32'?'npx.cmd':'npx';require('child_process').spawnSync(cmd,['next','lint'],{stdio:'inherit'});\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

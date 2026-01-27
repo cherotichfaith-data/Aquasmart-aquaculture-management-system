@@ -41,15 +41,27 @@ export default function InventoryPage() {
           </TabsList>
 
           <TabsContent value="feed" className="mt-6">
-            <FeedInventory />
+            <FeedInventory
+              selectedBatch={selectedBatch}
+              selectedSystem={selectedSystem}
+              selectedStage={selectedStage}
+            />
           </TabsContent>
 
           <TabsContent value="fish" className="mt-6">
-            <FishInventory />
+            <FishInventory
+              selectedBatch={selectedBatch}
+              selectedSystem={selectedSystem}
+              selectedStage={selectedStage}
+            />
           </TabsContent>
 
           <TabsContent value="harvest" className="mt-6">
-            <ReconciliationReport />
+            <ReconciliationReport
+              selectedBatch={selectedBatch}
+              selectedSystem={selectedSystem}
+              selectedStage={selectedStage}
+            />
           </TabsContent>
         </Tabs>
       </div>

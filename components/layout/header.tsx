@@ -15,12 +15,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { useNotifications } from "@/components/notifications/notifications-provider"
 
 export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, role, signOut } = useAuth()
   const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
+  const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
 
   const handleSignOut = async () => {
+    if (signingOut) return
+    setSigningOut(true)
     try {
       await signOut()
     } catch (err) {
@@ -30,6 +36,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       if (typeof window !== "undefined") {
         window.location.href = "/auth"
       }
+      setSigningOut(false)
     }
   }
 
@@ -59,11 +66,15 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
           )}
 
           {/* Notifications Dropdown */}
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => open && markAllRead()}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full cursor-pointer">
                 <Bell className="h-4 w-4" />
-                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive border-2 border-background"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-4 px-1 h-4 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
                 <span className="sr-only">Notifications</span>
               </Button>
             </DropdownMenuTrigger>
@@ -71,26 +82,33 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
               <DropdownMenuLabel>Notifications</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <div className="max-h-[300px] overflow-y-auto">
-                {/* Mock Notifications */}
-                <div className="p-4 text-sm text-center text-muted-foreground">
-                  <div className="flex flex-col gap-2 text-left">
-                    <p className="text-center">No New Notifications</p>
-                    {/* <div className="py-2 border-b border-border last:border-0 cursor-pointer">
-                      <p className="font-medium text-foreground">Low Oxygen Alert</p>
-                      <p className="text-xs text-muted-foreground">System A dissolved oxygen fell below 4.0 mg/L.</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">2 hours ago</p>
-                    </div>
-                    <div className="py-2 border-b border-border last:border-0 cursor-pointer">
-                      <p className="font-medium text-foreground">Stocking Recorded</p>
-                      <p className="text-xs text-muted-foreground">New batch stocked in Cage 101.</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">5 hours ago</p>
-                    </div> */}
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-sm text-center text-muted-foreground">
+                    <p>No New Notifications</p>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex flex-col gap-2 p-2">
+                    {notifications.map((note) => (
+                      <button
+                        key={note.id}
+                        type="button"
+                        onClick={() => markRead(note.id)}
+                        className={`text-left rounded-md px-3 py-2 border ${note.read ? "border-border/40" : "border-primary/50 bg-primary/5"
+                          }`}
+                      >
+                        <p className="font-medium text-foreground">{note.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{note.description}</p>
+                        <p className="text-[10px] text-muted-foreground mt-2">
+                          {new Date(note.createdAt).toLocaleString()}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer justify-center text-primary font-medium">
-                View all notifications
+              <DropdownMenuItem className="cursor-pointer justify-center text-primary font-medium" onClick={clearAll}>
+                Clear notifications
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -126,9 +144,13 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive cursor-pointer">
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="text-destructive focus:text-destructive cursor-pointer"
+                disabled={signingOut}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+                <span>{signingOut ? "Logging out..." : "Log out"}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

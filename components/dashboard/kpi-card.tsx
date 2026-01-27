@@ -50,12 +50,13 @@ function Sparkline({
   }
 
   const stroke =
-    status === "negative" ? "stroke-rose-400" : status === "positive" ? "stroke-sky-500" : "stroke-slate-300"
-  const fill = status === "negative" ? "fill-rose-100/80" : status === "positive" ? "fill-sky-100/80" : "fill-slate-100"
+    status === "negative" ? "stroke-[#F06474]" : status === "positive" ? "stroke-[#4C7DFF]" : "stroke-slate-300"
+  const fill =
+    status === "negative" ? "fill-[#FFE9ED]" : status === "positive" ? "fill-[#E9F1FF]" : "fill-slate-50"
   const path = trendPaths[trendDirection]
 
   return (
-    <svg width="60" height="36" viewBox="0 0 46 28" className="shrink-0">
+    <svg width="78" height="36" viewBox="0 0 46 28" className="shrink-0">
       <path d={`${path} L44 27 L1 27 Z`} className={fill} />
       <path d={path} className={`${stroke} fill-none`} strokeWidth="2" strokeLinecap="round" />
     </svg>
@@ -72,7 +73,8 @@ function KPICardContent({
   invertTrend,
   neutral,
 }: KPICardProps) {
-  const formattedValue = average === null || average === undefined ? "--" : `${average.toFixed(decimals)}${formatUnit ? formatUnit : ""}`
+  const formattedValue =
+    average === null || average === undefined ? "--" : `${average.toFixed(decimals)}${formatUnit ? formatUnit : ""}`
 
   const trendText =
     trend !== undefined && trend !== null
@@ -104,19 +106,21 @@ function KPICardContent({
     trendDirection === "down" ? ArrowDownRight : trendDirection === "up" ? ArrowUpRight : Minus
 
   return (
-    <div className="cursor-pointer bg-card border border-border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all text-left w-full">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-          <p className="text-2xl font-semibold text-foreground mt-2">{formattedValue}</p>
+    <div className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition-all hover:shadow-[0_4px_14px_rgba(15,23,42,0.08)] text-left w-full">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+          <p className="text-[20px] font-semibold text-slate-900 mt-2 leading-tight">{formattedValue}</p>
           {trendText && (
-            <p className={`text-xs mt-2 inline-flex items-center gap-1 ${toneStyles[status]}`}>
+            <p className={`text-[11px] mt-2 inline-flex items-center gap-1 ${toneStyles[status]}`}>
               <TrendIcon className="h-3 w-3" />
-              <span>{trendText}</span>
+              <span>{trendText} from previous period</span>
             </p>
           )}
         </div>
-        <Sparkline data={data} trend={trend} invertTrend={invertTrend} neutral={neutral} />
+        <div className="rounded-md bg-slate-50 p-1.5">
+          <Sparkline data={data} trend={trend} invertTrend={invertTrend} neutral={neutral} />
+        </div>
       </div>
     </div>
   )
@@ -148,11 +152,15 @@ export default function KPICard({
   )
 
   if (href) {
-    return <Link href={href}>{cardContent}</Link>
+    return (
+      <Link href={href} className="block w-full">
+        {cardContent}
+      </Link>
+    )
   }
 
   return (
-    <button onClick={onClick} className="w-full">
+    <button onClick={onClick} className="w-full text-left">
       {cardContent}
     </button>
   )

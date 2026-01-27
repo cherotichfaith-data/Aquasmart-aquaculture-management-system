@@ -129,15 +129,9 @@ export default function SamplingPage() {
             <p className="text-2xl font-bold mt-1">{samplingData.length}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-sm text-muted-foreground">Avg ABW (Current)</p>
+            <p className="text-sm text-muted-foreground">Latest ABW</p>
             <p className="text-2xl font-bold mt-1">
-              {samplingData.length > 0 ? samplingData[samplingData.length - 1]?.abw : 0}g
-            </p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-sm text-muted-foreground">Total Fish Sampled</p>
-            <p className="text-2xl font-bold mt-1">
-              {samplingData.reduce((sum, r) => sum + (r.number_of_fish_sampling || 0), 0)}
+              {samplingData.length > 0 ? samplingData[0]?.abw : "--"}g
             </p>
           </div>
         </div>

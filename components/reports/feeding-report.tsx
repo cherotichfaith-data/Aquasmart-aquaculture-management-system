@@ -12,35 +12,29 @@ export default function FeedingReport({ dateRange }: { dateRange?: { from: strin
   useEffect(() => {
     const loadRecords = async () => {
       setLoading(true)
-      const result = await fetchFeedingRecords({ limit: 100 })
+      const result = await fetchFeedingRecords({
+        limit: 100,
+        date_from: dateRange?.from,
+        date_to: dateRange?.to,
+      })
       setRecords(result.status === "success" ? result.data : [])
       setLoading(false)
     }
     loadRecords()
   }, [dateRange])
 
-  const totalFeed = records.reduce((sum, row) => sum + (row.feeding_amount || 0), 0)
-  const avgFeed = records.length > 0 ? totalFeed / records.length : 0
+  const latest = records[0]
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Feed Used</CardTitle>
+            <CardTitle className="text-sm font-medium">Latest Feed Amount</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalFeed.toFixed(1)} kg</div>
-            <p className="text-xs text-muted-foreground mt-1">Latest records</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Avg Feed Amount</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{avgFeed.toFixed(1)} kg</div>
-            <p className="text-xs text-muted-foreground mt-1">Per feeding record</p>
+            <div className="text-2xl font-bold">{latest?.feeding_amount ?? "N/A"} kg</div>
+            <p className="text-xs text-muted-foreground mt-1">Most recent record</p>
           </CardContent>
         </Card>
         <Card>

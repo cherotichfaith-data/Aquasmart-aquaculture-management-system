@@ -53,10 +53,6 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
         try {
             const systemId = Number(values.system_id)
             const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
-            const abw = values.number_of_fish > 0
-                ? (values.amount_kg * 1000) / values.number_of_fish
-                : 0
-
             const { error } = await supabase.from("fish_harvest").insert({
                 system_id: systemId,
                 batch_id: Number.isFinite(batchId as number) ? batchId : null,
@@ -64,7 +60,7 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
                 number_of_fish_harvest: values.number_of_fish,
                 total_weight_harvest: values.amount_kg,
                 type_of_harvest: values.type_of_harvest,
-                abw: Number.isFinite(abw) ? Number(abw.toFixed(2)) : 0,
+                abw: null,
             })
 
             if (error) throw error

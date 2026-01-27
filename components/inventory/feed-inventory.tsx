@@ -4,7 +4,15 @@ import { useEffect, useState } from "react"
 import type { Tables } from "@/lib/types/database"
 import { fetchFeedData, fetchFeedTypes, type FeedIncomingWithType } from "@/lib/supabase-queries"
 
-export default function FeedInventory() {
+export default function FeedInventory({
+  selectedBatch,
+  selectedSystem,
+  selectedStage,
+}: {
+  selectedBatch: string
+  selectedSystem: string
+  selectedStage: "all" | "nursing" | "grow_out"
+}) {
   const [feedData, setFeedData] = useState<FeedIncomingWithType[]>([])
   const [feedTypes, setFeedTypes] = useState<Tables<"feed_type">[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,25 +26,11 @@ export default function FeedInventory() {
       setLoading(false)
     }
     loadFeed()
-  }, [])
-
-  const totalReceived = feedData.reduce((sum, row) => sum + (row.feed_amount || 0), 0)
-  const avgProtein =
-    feedTypes.length > 0
-      ? feedTypes.reduce((sum, row) => sum + (row.crude_protein_percentage || 0), 0) / feedTypes.length
-      : 0
+  }, [selectedBatch, selectedSystem, selectedStage])
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground mb-1">Total Received (kg)</p>
-          <p className="text-3xl font-bold">{totalReceived.toFixed(1)}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground mb-1">Avg Protein %</p>
-          <p className="text-3xl font-bold">{avgProtein.toFixed(1)}</p>
-        </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Feed Types</p>
           <p className="text-3xl font-bold">{feedTypes.length}</p>

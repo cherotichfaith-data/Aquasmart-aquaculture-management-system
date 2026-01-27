@@ -4,38 +4,49 @@ import { useEffect, useState } from "react"
 import type { Tables } from "@/lib/types/database"
 import { fetchProductionSummary } from "@/lib/supabase-queries"
 
-export default function FishInventory() {
+export default function FishInventory({
+  selectedBatch,
+  selectedSystem,
+  selectedStage,
+}: {
+  selectedBatch: string
+  selectedSystem: string
+  selectedStage: "all" | "nursing" | "grow_out"
+}) {
   const [rows, setRows] = useState<Tables<"production_summary">[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadInventory = async () => {
       setLoading(true)
-      const result = await fetchProductionSummary({ limit: 50 })
+      const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
+      const result = await fetchProductionSummary({
+        limit: 50,
+        system_id: Number.isFinite(systemId) ? systemId : undefined,
+        growth_stage: selectedStage === "all" ? undefined : selectedStage,
+      })
       setRows(result.status === "success" ? result.data : [])
       setLoading(false)
     }
     loadInventory()
-  }, [])
+  }, [selectedBatch, selectedStage, selectedSystem])
 
-  const totalFish = rows.reduce((sum, row) => sum + (row.number_of_fish_inventory || 0), 0)
-  const totalBiomass = rows.reduce((sum, row) => sum + (row.total_biomass || 0), 0)
-  const totalMortality = rows.reduce((sum, row) => sum + (row.daily_mortality_count || 0), 0)
+  const latest = rows[0]
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground mb-1">Total Fish (Latest)</p>
-          <p className="text-3xl font-bold">{totalFish.toLocaleString()}</p>
+          <p className="text-sm text-muted-foreground mb-1">Fish Count (Latest)</p>
+          <p className="text-3xl font-bold">{latest?.number_of_fish_inventory ?? "--"}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground mb-1">Total Biomass</p>
-          <p className="text-3xl font-bold">{totalBiomass.toFixed(1)} kg</p>
+          <p className="text-sm text-muted-foreground mb-1">Biomass (Latest)</p>
+          <p className="text-3xl font-bold">{latest?.total_biomass ?? "--"} kg</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground mb-1">Daily Mortality</p>
-          <p className="text-3xl font-bold text-destructive">{totalMortality}</p>
+          <p className="text-sm text-muted-foreground mb-1">Daily Mortality (Latest)</p>
+          <p className="text-3xl font-bold text-destructive">{latest?.daily_mortality_count ?? "--"}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Snapshots</p>

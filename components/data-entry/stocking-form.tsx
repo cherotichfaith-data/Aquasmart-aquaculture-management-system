@@ -52,20 +52,6 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
         },
     })
 
-    // Auto-calculate ABW calculation
-    const numberOfFish = form.watch("number_of_fish")
-    const totalWeight = form.watch("total_weight_kg")
-
-    if (numberOfFish > 0 && totalWeight > 0) {
-        const calculatedAbw = (totalWeight * 1000) / numberOfFish
-        // Only set if drastically different to avoid loops or user overwrite?
-        // Better to just display it or set it on blur.
-        // For now, let's just let user input or keep simple.
-        // Actually, let's sync it.
-        // form.setValue("average_body_weight_g", parseFloat(calculatedAbw.toFixed(2)))
-    }
-
-
     const { user } = useAuth()
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -79,9 +65,7 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
         }
 
         try {
-            // Calculate ABW if not provided or just use the one provided
-            const calculatedAbw = (values.total_weight_kg * 1000) / values.number_of_fish
-            const abw = values.average_body_weight_g || (Number.isFinite(calculatedAbw) ? calculatedAbw : 0)
+            const abw = values.average_body_weight_g ?? null
 
             const systemId = Number(values.system_id)
             const batchId = Number(values.batch_id)
@@ -92,7 +76,7 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
                 date: values.stocking_date,
                 number_of_fish_stocking: values.number_of_fish,
                 total_weight_stocking: values.total_weight_kg,
-                abw: Number.isFinite(abw) ? Number(abw.toFixed(2)) : 0,
+                abw,
                 type_of_stocking: values.type_of_stocking,
             })
 

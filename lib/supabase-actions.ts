@@ -3,7 +3,7 @@ import { createClient } from "@/utils/supabase/client"
 import { Database, Tables, TablesInsert, TablesUpdate } from "@/lib/types/database"
 import { PostgrestError } from "@supabase/supabase-js"
 
-type TableName = keyof Tables<any>
+type TableName = keyof Database["public"]["Tables"]
 
 export type MutationResult<T> =
     | { success: true; data: T; error: null }

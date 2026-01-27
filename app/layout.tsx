@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/components/auth-provider"
 import { ToastProvider } from "@/components/shared/toast-provider"
 import { InitialSplash } from "@/components/InitialSplash"
+import { NotificationsProvider } from "@/components/notifications/notifications-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -41,8 +42,10 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <InitialSplash />
         <AuthProvider>
-          {children}
-          <ToastProvider />
+          <NotificationsProvider>
+            {children}
+            <ToastProvider />
+          </NotificationsProvider>
         </AuthProvider>
         <Analytics />
       </body>

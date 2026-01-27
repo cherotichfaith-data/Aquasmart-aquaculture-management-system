@@ -1,26 +1,23 @@
--- Create materialized view for production summary with all eFCR calculations
--- This view aggregates data from multiple production tables (feeding, mortality, transfer, harvest, stocking)
--- and calculates period and aggregated eFCR metrics for each activity in each cycle
-
-CREATE MATERIALIZED VIEW IF NOT EXISTS public.production_summary AS
-WITH
-  asof AS (
-    SELECT
+create materialized view public.production_summary as
+with
+  asof as (
+    select
       COALESCE(
         (
-          SELECT
+          select
             i.input_end_date
-          FROM
+          from
             input i
-          ORDER BY
-            i.id DESC
-          LIMIT 1
+          order by
+            i.id desc
+          limit
+            1
         ),
         CURRENT_DATE
-      ) AS as_of_date
+      ) as as_of_date
   ),
-  cycle_map AS (
-    SELECT
+  cycle_map as (
+    select
       pc.cycle_id,
       pc.system_id,
       pc.cycle_start,
@@ -28,520 +25,339 @@ WITH
         COALESCE(
           pc.cycle_end,
           (
-            SELECT
+            select
               asof.as_of_date
-            FROM
+            from
               asof
           )
         ),
         (
-          SELECT
+          select
             asof.as_of_date
-          FROM
+          from
             asof
         )
-      ) AS cycle_end,
-      pc.cycle_end IS NULL
-      OR pc.cycle_end > (
+      ) as cycle_end,
+      pc.cycle_end is null
+      or pc.cycle_end > (
         (
-          SELECT
+          select
             asof.as_of_date
-          FROM
+          from
             asof
         )
-      ) AS ongoing_cycle
-    FROM
+      ) as ongoing_cycle
+    from
       production_cycle pc
   ),
-  base_data AS (
-    -- Sampling data from fish_sampling_weight
-    SELECT
-      fs.date,
-      fs.system_id,
-      sys.name AS system_name,
-      sys.growth_stage,
-      fs.abw AS average_body_weight,
-      dfi.number_of_fish AS number_of_fish_inventory,
-      'sampling'::text AS activity,
-      2 AS activity_rank
-    FROM
-      fish_sampling_weight fs
-      JOIN daily_fish_inventory_table dfi ON dfi.inventory_date = fs.date
-      AND dfi.system_id = fs.system_id
-      JOIN system sys ON sys.id = fs.system_id
-    WHERE
-      fs.date <= (
+  daily as (
+    select
+      d.inventory_date as date,
+      d.system_id::bigint as system_id,
+      s.name as system_name,
+      s.growth_stage,
+      d.abw_last_sampling::double precision as average_body_weight,
+      d.number_of_fish as number_of_fish_inventory,
+      COALESCE(
+        d.biomass_last_sampling,
+        d.number_of_fish * d.abw_last_sampling::double precision / 1000.0::double precision
+      ) as total_biomass,
+      COALESCE(d.feeding_amount, 0::numeric)::double precision as total_feed_amount_period,
+      COALESCE(d.number_of_fish_mortality, 0::numeric)::double precision as daily_mortality_count
+    from
+      daily_fish_inventory_table d
+      join system s on s.id = d.system_id::bigint
+    where
+      d.inventory_date <= (
         (
-          SELECT
+          select
             asof.as_of_date
-          FROM
-            asof
-        )
-      )
-    UNION ALL
-    -- Stocking data at cycle start
-    SELECT
-      cm.cycle_start AS date,
-      fst.system_id,
-      sys.name,
-      sys.growth_stage,
-      fst.abw,
-      fst.number_of_fish_stocking::double precision AS number_of_fish_stocking,
-      'stocking'::text,
-      1
-    FROM
-      cycle_map cm
-      JOIN fish_stocking fst ON fst.system_id = cm.system_id
-      AND fst.date = cm.cycle_start
-      JOIN system sys ON sys.id = fst.system_id
-    WHERE
-      cm.cycle_start <= (
-        (
-          SELECT
-            asof.as_of_date
-          FROM
-            asof
-        )
-      )
-    UNION ALL
-    -- Final harvest data at cycle end
-    SELECT
-      pc.cycle_end AS date,
-      fh.system_id,
-      sys.name,
-      sys.growth_stage,
-      fh.abw,
-      fh.number_of_fish_harvest::double precision AS number_of_fish_harvest,
-      'final harvest'::text,
-      3
-    FROM
-      production_cycle pc
-      JOIN fish_harvest fh ON fh.system_id = pc.system_id
-      AND fh.date = pc.cycle_end
-      JOIN system sys ON sys.id = fh.system_id
-    WHERE
-      pc.cycle_end IS NOT NULL
-      AND pc.cycle_end <= (
-        (
-          SELECT
-            asof.as_of_date
-          FROM
+          from
             asof
         )
       )
   ),
-  periods AS (
-    -- Map each activity to its cycle and calculate previous date for period calculations
-    SELECT
+  daily_with_cycle as (
+    select
+      d.date,
+      d.system_id,
+      d.system_name,
+      d.growth_stage,
+      d.average_body_weight,
+      d.number_of_fish_inventory,
+      d.total_biomass,
+      d.total_feed_amount_period,
+      d.daily_mortality_count,
       cm.cycle_id,
-      cm.ongoing_cycle,
-      bd.date,
-      bd.system_id,
-      bd.system_name,
-      bd.growth_stage,
-      bd.average_body_weight,
-      bd.number_of_fish_inventory,
-      bd.activity,
-      bd.activity_rank,
-      LAG(bd.date) OVER (
-        PARTITION BY
-          bd.system_id,
-          cm.cycle_id
-        ORDER BY
-          bd.date,
-          bd.activity_rank
-      ) AS previous_date
-    FROM
-      base_data bd
-      JOIN cycle_map cm ON cm.system_id = bd.system_id
-      AND bd.date >= cm.cycle_start
-      AND bd.date <= cm.cycle_end
+      cm.ongoing_cycle
+    from
+      daily d
+      left join cycle_map cm on cm.system_id = d.system_id
+      and d.date >= cm.cycle_start
+      and d.date <= cm.cycle_end
   ),
-  total_feed_amounts AS (
-    -- Sum feeding records between periods
-    SELECT
-      p.cycle_id,
-      p.system_id,
-      p.date,
-      p.activity,
-      COALESCE(SUM(fr.feeding_amount), 0::double precision) AS total_feed_amount_period
-    FROM
-      periods p
-      LEFT JOIN feeding_record fr ON fr.system_id = p.system_id
-      AND p.previous_date IS NOT NULL
-      AND (
-        p.activity = 'final harvest'::text
-        AND fr.date >= p.previous_date
-        AND fr.date <= p.date
-        OR p.activity <> 'final harvest'::text
-        AND fr.date >= p.previous_date
-        AND fr.date < p.date
-      )
-    GROUP BY
-      p.cycle_id,
-      p.system_id,
-      p.date,
-      p.activity
-  ),
-  mortality_amounts AS (
-    -- Sum mortality records between periods
-    SELECT
-      p.cycle_id,
-      p.system_id,
-      p.date,
-      p.activity,
-      COALESCE(SUM(fm.number_of_fish_mortality), 0::numeric)::double precision AS mortality_period
-    FROM
-      periods p
-      LEFT JOIN fish_mortality fm ON fm.system_id = p.system_id
-      AND p.previous_date IS NOT NULL
-      AND fm.date > p.previous_date
-      AND fm.date <= p.date
-    GROUP BY
-      p.cycle_id,
-      p.system_id,
-      p.date,
-      p.activity
-  ),
-  biomass_data AS (
-    -- Calculate biomass at each activity point
-    SELECT
-      p.cycle_id,
-      p.ongoing_cycle,
-      p.date,
-      p.system_id,
-      p.system_name,
-      p.growth_stage,
-      p.average_body_weight,
-      p.number_of_fish_inventory,
-      p.activity,
-      p.activity_rank,
-      p.previous_date,
-      fa.total_feed_amount_period,
-      ma.mortality_period AS daily_mortality_count,
-      p.average_body_weight * p.number_of_fish_inventory / 1000.0::double precision AS total_biomass,
-      LAG(
-        p.average_body_weight * p.number_of_fish_inventory / 1000.0::double precision
-      ) OVER (
-        PARTITION BY
-          p.system_id,
-          p.cycle_id
-        ORDER BY
-          p.date,
-          p.activity_rank
-      ) AS previous_total_biomass
-    FROM
-      periods p
-      LEFT JOIN total_feed_amounts fa ON fa.cycle_id = p.cycle_id
-      AND fa.system_id = p.system_id
-      AND fa.date = p.date
-      AND fa.activity = p.activity
-      LEFT JOIN mortality_amounts ma ON ma.cycle_id = p.cycle_id
-      AND ma.system_id = p.system_id
-      AND ma.date = p.date
-      AND ma.activity = p.activity
-  ),
-  transfer_out_data AS (
-    -- Sum fish transfers out between periods
-    SELECT
-      bd.cycle_id,
-      bd.system_id,
-      bd.date,
-      bd.activity,
+  transfers_out as (
+    select
+      ft.origin_system_id as system_id,
+      ft.date,
       COALESCE(
-        SUM(ft.number_of_fish_transfer),
+        sum(ft.number_of_fish_transfer),
         0::double precision
-      ) AS number_of_fish_transfer_out,
+      ) as number_of_fish_transfer_out,
       COALESCE(
-        SUM(ft.total_weight_transfer),
+        sum(ft.total_weight_transfer),
         0::double precision
-      ) AS total_weight_transfer_out
-    FROM
-      biomass_data bd
-      LEFT JOIN fish_transfer ft ON ft.origin_system_id = bd.system_id
-      AND bd.previous_date IS NOT NULL
-      AND ft.date > bd.previous_date
-      AND ft.date <= bd.date
-    GROUP BY
-      bd.cycle_id,
-      bd.system_id,
-      bd.date,
-      bd.activity
+      ) as total_weight_transfer_out
+    from
+      fish_transfer ft
+    group by
+      ft.origin_system_id,
+      ft.date
   ),
-  transfer_in_data AS (
-    -- Sum fish transfers in between periods
-    SELECT
-      bd.cycle_id,
-      bd.system_id,
-      bd.date,
-      bd.activity,
+  transfers_in as (
+    select
+      ft.target_system_id as system_id,
+      ft.date,
       COALESCE(
-        SUM(ft.number_of_fish_transfer),
+        sum(ft.number_of_fish_transfer),
         0::double precision
-      ) AS number_of_fish_transfer_in,
+      ) as number_of_fish_transfer_in,
       COALESCE(
-        SUM(ft.total_weight_transfer),
+        sum(ft.total_weight_transfer),
         0::double precision
-      ) AS total_weight_transfer_in
-    FROM
-      biomass_data bd
-      LEFT JOIN fish_transfer ft ON ft.target_system_id = bd.system_id
-      AND bd.previous_date IS NOT NULL
-      AND ft.date > bd.previous_date
-      AND ft.date <= bd.date
-    GROUP BY
-      bd.cycle_id,
-      bd.system_id,
-      bd.date,
-      bd.activity
+      ) as total_weight_transfer_in
+    from
+      fish_transfer ft
+    group by
+      ft.target_system_id,
+      ft.date
   ),
-  harvest_data AS (
-    -- Sum harvest records between periods
-    SELECT
-      bd.cycle_id,
-      bd.system_id,
-      bd.date,
-      bd.activity,
-      COALESCE(SUM(fh.number_of_fish_harvest), 0::numeric)::double precision AS number_of_fish_harvested,
-      COALESCE(SUM(fh.total_weight_harvest), 0::double precision) AS total_weight_harvested
-    FROM
-      biomass_data bd
-      LEFT JOIN fish_harvest fh ON fh.system_id = bd.system_id
-      AND bd.previous_date IS NOT NULL
-      AND fh.date > bd.previous_date
-      AND fh.date <= bd.date
-    GROUP BY
-      bd.cycle_id,
-      bd.system_id,
-      bd.date,
-      bd.activity
+  harvest as (
+    select
+      fh.system_id,
+      fh.date,
+      COALESCE(sum(fh.number_of_fish_harvest), 0::numeric)::double precision as number_of_fish_harvested,
+      COALESCE(sum(fh.total_weight_harvest), 0::double precision) as total_weight_harvested
+    from
+      fish_harvest fh
+    group by
+      fh.system_id,
+      fh.date
   ),
-  stocking_data AS (
-    -- Sum stocking records between periods
-    SELECT
-      bd.cycle_id,
-      bd.system_id,
-      bd.date,
-      bd.activity,
-      COALESCE(SUM(fs.number_of_fish_stocking), 0::numeric)::double precision AS number_of_fish_stocked,
+  stocking as (
+    select
+      fs.system_id,
+      fs.date,
+      COALESCE(sum(fs.number_of_fish_stocking), 0::numeric)::double precision as number_of_fish_stocked,
       COALESCE(
-        SUM(fs.total_weight_stocking),
+        sum(fs.total_weight_stocking),
         0::double precision
-      ) AS total_weight_stocked
-    FROM
-      biomass_data bd
-      LEFT JOIN fish_stocking fs ON fs.system_id = bd.system_id
-      AND bd.previous_date IS NOT NULL
-      AND fs.date > bd.previous_date
-      AND fs.date <= bd.date
-    GROUP BY
-      bd.cycle_id,
-      bd.system_id,
-      bd.date,
-      bd.activity
+      ) as total_weight_stocked
+    from
+      fish_stocking fs
+    group by
+      fs.system_id,
+      fs.date
   ),
-  consolidated AS (
-    -- Consolidate all metrics and calculate aggregated values using window functions
-    SELECT
-      bd.cycle_id,
-      bd.date,
-      bd.system_id,
-      bd.system_name,
-      bd.growth_stage,
-      bd.ongoing_cycle,
-      bd.average_body_weight,
-      bd.number_of_fish_inventory,
-      bd.total_feed_amount_period,
-      bd.activity,
-      bd.activity_rank,
-      bd.total_biomass,
+  wq as (
+    select
+      r.system_id,
+      r.rating_date as date,
+      r.rating_numeric::double precision as water_quality_rating_numeric,
+      r.rating::text as water_quality_rating
+    from
+      daily_water_quality_rating r
+  ),
+  enriched as (
+    select
+      d.cycle_id,
+      d.date,
+      d.system_id,
+      d.system_name,
+      d.growth_stage,
+      d.ongoing_cycle,
+      d.average_body_weight,
+      d.number_of_fish_inventory,
+      d.total_biomass,
+      d.total_feed_amount_period,
       COALESCE(
-        bd.total_biomass - bd.previous_total_biomass,
+        d.total_biomass - lag(d.total_biomass) over (
+          partition by
+            d.system_id,
+            d.cycle_id
+          order by
+            d.date
+        ),
         0::double precision
-      ) AS biomass_increase_period,
-      SUM(bd.total_feed_amount_period) OVER (
-        PARTITION BY
-          bd.cycle_id
-        ORDER BY
-          bd.date,
-          bd.activity_rank
-      ) AS total_feed_amount_aggregated,
-      SUM(
-        COALESCE(
-          bd.total_biomass - bd.previous_total_biomass,
-          0::double precision
-        )
-      ) OVER (
-        PARTITION BY
-          bd.cycle_id
-        ORDER BY
-          bd.date,
-          bd.activity_rank
-      ) AS biomass_increase_aggregated,
-      bd.daily_mortality_count,
-      SUM(bd.daily_mortality_count) OVER (
-        PARTITION BY
-          bd.cycle_id
-        ORDER BY
-          bd.date,
-          bd.activity_rank
-      ) AS cumulative_mortality,
-      tod.number_of_fish_transfer_out,
-      tod.total_weight_transfer_out,
-      SUM(tod.total_weight_transfer_out) OVER (
-        PARTITION BY
-          tod.cycle_id
-        ORDER BY
-          tod.date,
-          bd.activity_rank
-      ) AS total_weight_transfer_out_aggregated,
-      tid.number_of_fish_transfer_in,
-      tid.total_weight_transfer_in,
-      SUM(tid.total_weight_transfer_in) OVER (
-        PARTITION BY
-          tid.cycle_id
-        ORDER BY
-          tid.date,
-          bd.activity_rank
-      ) AS total_weight_transfer_in_aggregated,
-      hd.number_of_fish_harvested,
-      hd.total_weight_harvested,
-      SUM(hd.total_weight_harvested) OVER (
-        PARTITION BY
-          hd.cycle_id
-        ORDER BY
-          hd.date,
-          bd.activity_rank
-      ) AS total_weight_harvested_aggregated,
-      CASE
-        WHEN bd.activity = 'stocking'::text THEN bd.number_of_fish_inventory
-        ELSE sd.number_of_fish_stocked
-      END AS number_of_fish_stocked,
-      CASE
-        WHEN bd.activity = 'stocking'::text THEN bd.total_biomass
-        ELSE sd.total_weight_stocked
-      END AS total_weight_stocked,
-      SUM(
-        CASE
-          WHEN bd.activity = 'stocking'::text THEN bd.total_biomass
-          ELSE sd.total_weight_stocked
-        END
-      ) OVER (
-        PARTITION BY
-          bd.cycle_id
-        ORDER BY
-          bd.date,
-          bd.activity_rank
-      ) AS total_weight_stocked_aggregated
-    FROM
-      biomass_data bd
-      LEFT JOIN transfer_out_data tod ON tod.cycle_id = bd.cycle_id
-      AND tod.system_id = bd.system_id
-      AND tod.date = bd.date
-      AND tod.activity = bd.activity
-      LEFT JOIN transfer_in_data tid ON tid.cycle_id = bd.cycle_id
-      AND tid.system_id = bd.system_id
-      AND tid.date = bd.date
-      AND tid.activity = bd.activity
-      LEFT JOIN harvest_data hd ON hd.cycle_id = bd.cycle_id
-      AND hd.system_id = bd.system_id
-      AND hd.date = bd.date
-      AND hd.activity = bd.activity
-      LEFT JOIN stocking_data sd ON sd.cycle_id = bd.cycle_id
-      AND sd.system_id = bd.system_id
-      AND sd.date = bd.date
-      AND sd.activity = bd.activity
+      ) as biomass_increase_period,
+      d.daily_mortality_count,
+      COALESCE(
+        to1.number_of_fish_transfer_out,
+        0::double precision
+      ) as number_of_fish_transfer_out,
+      COALESCE(
+        to1.total_weight_transfer_out,
+        0::double precision
+      ) as total_weight_transfer_out,
+      COALESCE(
+        ti1.number_of_fish_transfer_in,
+        0::double precision
+      ) as number_of_fish_transfer_in,
+      COALESCE(ti1.total_weight_transfer_in, 0::double precision) as total_weight_transfer_in,
+      COALESCE(h.number_of_fish_harvested, 0::double precision) as number_of_fish_harvested,
+      COALESCE(h.total_weight_harvested, 0::double precision) as total_weight_harvested,
+      COALESCE(st.number_of_fish_stocked, 0::double precision) as number_of_fish_stocked,
+      COALESCE(st.total_weight_stocked, 0::double precision) as total_weight_stocked,
+      w.water_quality_rating_numeric,
+      w.water_quality_rating
+    from
+      daily_with_cycle d
+      left join transfers_out to1 on to1.system_id = d.system_id
+      and to1.date = d.date
+      left join transfers_in ti1 on ti1.system_id = d.system_id
+      and ti1.date = d.date
+      left join harvest h on h.system_id = d.system_id
+      and h.date = d.date
+      left join stocking st on st.system_id = d.system_id
+      and st.date = d.date
+      left join wq w on w.system_id = d.system_id
+      and w.date = d.date
+  ),
+  final as (
+    select
+      e.cycle_id,
+      e.date,
+      e.system_id,
+      e.system_name,
+      e.growth_stage,
+      e.ongoing_cycle,
+      e.average_body_weight,
+      e.number_of_fish_inventory,
+      e.total_biomass,
+      e.total_feed_amount_period,
+      e.biomass_increase_period,
+      e.daily_mortality_count,
+      e.number_of_fish_transfer_out,
+      e.total_weight_transfer_out,
+      e.number_of_fish_transfer_in,
+      e.total_weight_transfer_in,
+      e.number_of_fish_harvested,
+      e.total_weight_harvested,
+      e.number_of_fish_stocked,
+      e.total_weight_stocked,
+      e.water_quality_rating_numeric,
+      e.water_quality_rating,
+      sum(e.total_feed_amount_period) over (
+        partition by
+          e.system_id,
+          e.cycle_id
+        order by
+          e.date
+      ) as total_feed_amount_aggregated,
+      sum(e.biomass_increase_period) over (
+        partition by
+          e.system_id,
+          e.cycle_id
+        order by
+          e.date
+      ) as biomass_increase_aggregated,
+      sum(e.daily_mortality_count) over (
+        partition by
+          e.system_id,
+          e.cycle_id
+        order by
+          e.date
+      ) as cumulative_mortality,
+      sum(e.total_weight_transfer_out) over (
+        partition by
+          e.system_id,
+          e.cycle_id
+        order by
+          e.date
+      ) as total_weight_transfer_out_aggregated,
+      sum(e.total_weight_transfer_in) over (
+        partition by
+          e.system_id,
+          e.cycle_id
+        order by
+          e.date
+      ) as total_weight_transfer_in_aggregated,
+      sum(e.total_weight_harvested) over (
+        partition by
+          e.system_id,
+          e.cycle_id
+        order by
+          e.date
+      ) as total_weight_harvested_aggregated,
+      sum(e.total_weight_stocked) over (
+        partition by
+          e.system_id,
+          e.cycle_id
+        order by
+          e.date
+      ) as total_weight_stocked_aggregated
+    from
+      enriched e
   )
-SELECT
-  c.cycle_id,
-  c.date,
-  c.system_id,
-  c.system_name,
-  c.growth_stage,
-  c.ongoing_cycle,
-  c.average_body_weight,
-  c.number_of_fish_inventory,
-  c.total_feed_amount_period,
-  c.activity,
-  c.activity_rank,
-  c.total_biomass,
-  c.biomass_increase_period,
-  c.total_feed_amount_aggregated,
-  c.biomass_increase_aggregated,
-  c.daily_mortality_count,
-  c.cumulative_mortality,
-  -- Daily mortality rate (%) = (daily mortality count / avg fish inventory) * 100
-  CASE
-    WHEN c.number_of_fish_inventory > 0 THEN (c.daily_mortality_count / c.number_of_fish_inventory) * 100.0
-    ELSE NULL::double precision
-  END AS daily_mortality_rate,
-  -- Cumulative mortality rate (%) = (cumulative mortality / initial stocking count) * 100
-  CASE
-    WHEN c.number_of_fish_inventory > 0 THEN (c.cumulative_mortality / c.number_of_fish_inventory) * 100.0
-    ELSE NULL::double precision
-  END AS cumulative_mortality_rate,
-  -- Feeding rate (kg/day per fish) = total feed / number of fish / days in period
-  CASE
-    WHEN c.number_of_fish_inventory > 0 AND c.biomass_increase_period IS NOT NULL THEN c.total_feed_amount_period / c.number_of_fish_inventory
-    ELSE NULL::double precision
-  END AS feeding_rate_per_fish,
-  -- Feeding rate (kg/day per ton biomass) = total feed / total biomass
-  CASE
-    WHEN c.total_biomass > 0 THEN (c.total_feed_amount_period / c.total_biomass) * 1000.0
-    ELSE NULL::double precision
-  END AS feeding_rate_per_biomass,
-  c.number_of_fish_transfer_out,
-  c.total_weight_transfer_out,
-  c.total_weight_transfer_out_aggregated,
-  c.number_of_fish_transfer_in,
-  c.total_weight_transfer_in,
-  c.total_weight_transfer_in_aggregated,
-  c.number_of_fish_harvested,
-  c.total_weight_harvested,
-  c.total_weight_harvested_aggregated,
-  c.number_of_fish_stocked,
-  c.total_weight_stocked,
-  c.total_weight_stocked_aggregated,
-  -- eFCR for current period (between activities)
-  CASE
-    WHEN NULLIF(
-      COALESCE(c.biomass_increase_period, 0::double precision) + c.total_weight_transfer_out - c.total_weight_transfer_in + c.total_weight_harvested - c.total_weight_stocked,
+select
+  f.cycle_id,
+  f.date,
+  f.system_id,
+  f.system_name,
+  f.growth_stage,
+  f.ongoing_cycle,
+  f.average_body_weight,
+  f.number_of_fish_inventory,
+  f.total_feed_amount_period,
+  f.total_biomass,
+  f.biomass_increase_period as daily_biomass_gain,
+  f.biomass_increase_period,
+  f.total_feed_amount_aggregated,
+  f.biomass_increase_aggregated,
+  f.daily_mortality_count,
+  f.cumulative_mortality,
+  f.number_of_fish_transfer_out,
+  f.total_weight_transfer_out,
+  f.total_weight_transfer_out_aggregated,
+  f.number_of_fish_transfer_in,
+  f.total_weight_transfer_in,
+  f.total_weight_transfer_in_aggregated,
+  f.number_of_fish_harvested,
+  f.total_weight_harvested,
+  f.total_weight_harvested_aggregated,
+  f.number_of_fish_stocked,
+  f.total_weight_stocked,
+  f.total_weight_stocked_aggregated,
+  f.water_quality_rating_numeric as water_quality_rating,
+  f.water_quality_rating as water_quality_rating_label,
+  case
+    when NULLIF(
+      COALESCE(f.biomass_increase_period, 0::double precision) + f.total_weight_transfer_out - f.total_weight_transfer_in + f.total_weight_harvested - f.total_weight_stocked,
       0::double precision
-    ) IS NULL THEN NULL::double precision
-    ELSE c.total_feed_amount_period / NULLIF(
-      COALESCE(c.biomass_increase_period, 0::double precision) + c.total_weight_transfer_out - c.total_weight_transfer_in + c.total_weight_harvested - c.total_weight_stocked,
+    ) is null then null::double precision
+    else f.total_feed_amount_period / NULLIF(
+      COALESCE(f.biomass_increase_period, 0::double precision) + f.total_weight_transfer_out - f.total_weight_transfer_in + f.total_weight_harvested - f.total_weight_stocked,
       0::double precision
     )
-  END AS efcr_period,
-  -- eFCR aggregated from cycle start to current activity
-  CASE
-    WHEN c.activity = 'final harvest'::text
-    AND NULLIF(
-      c.total_weight_harvested_aggregated + c.total_weight_transfer_out_aggregated - c.total_weight_transfer_in_aggregated - c.total_weight_stocked_aggregated,
+  end as efcr_period,
+  case
+    when NULLIF(
+      COALESCE(
+        f.biomass_increase_aggregated,
+        0::double precision
+      ) + f.total_weight_transfer_out_aggregated - f.total_weight_transfer_in_aggregated + f.total_weight_harvested_aggregated - f.total_weight_stocked_aggregated,
       0::double precision
-    ) IS NOT NULL THEN c.total_feed_amount_aggregated / NULLIF(
-      c.total_weight_harvested_aggregated + c.total_weight_transfer_out_aggregated - c.total_weight_transfer_in_aggregated - c.total_weight_stocked_aggregated,
-      0::double precision
-    )
-    WHEN NULLIF(
-      c.biomass_increase_aggregated + c.total_weight_transfer_out_aggregated - c.total_weight_transfer_in_aggregated + c.total_weight_harvested_aggregated,
-      0::double precision
-    ) IS NULL THEN NULL::double precision
-    ELSE c.total_feed_amount_aggregated / NULLIF(
-      c.biomass_increase_aggregated + c.total_weight_transfer_out_aggregated - c.total_weight_transfer_in_aggregated + c.total_weight_harvested_aggregated,
+    ) is null then null::double precision
+    else f.total_feed_amount_aggregated / NULLIF(
+      COALESCE(
+        f.biomass_increase_aggregated,
+        0::double precision
+      ) + f.total_weight_transfer_out_aggregated - f.total_weight_transfer_in_aggregated + f.total_weight_harvested_aggregated - f.total_weight_stocked_aggregated,
       0::double precision
     )
-  END AS efcr_aggregated
-FROM
-  consolidated c
-ORDER BY
-  c.system_id,
-  c.cycle_id,
-  c.date,
-  c.activity_rank;
-
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_production_summary_system_id ON public.production_summary(system_id);
-CREATE INDEX IF NOT EXISTS idx_production_summary_cycle_id ON public.production_summary(cycle_id);
-CREATE INDEX IF NOT EXISTS idx_production_summary_date ON public.production_summary(date);
-CREATE INDEX IF NOT EXISTS idx_production_summary_system_date ON public.production_summary(system_id, date);
+  end as efcr_aggregated
+from
+  final f
+order by
+  f.system_id,
+  f.date;

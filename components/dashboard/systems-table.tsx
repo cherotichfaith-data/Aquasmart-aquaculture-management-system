@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { Enums } from "@/lib/types/database"
-import { fetchSystemsDashboard } from "@/lib/supabase-queries"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { createClient } from "@/utils/supabase/client"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import type { Tables } from "@/lib/types/database"
 
 interface SystemsTableProps {
   stage: Enums<"system_growth_stage">
@@ -28,9 +30,8 @@ const formatWithUnit = (value: number | null | undefined, decimals: number, unit
 
 const formatPercent = (value: number | null | undefined, decimals = 2) => {
   if (value === null || value === undefined || Number.isNaN(value)) return "--"
-  const scaled = value * 100
-  if (!Number.isFinite(scaled)) return "--"
-  return `${scaled.toLocaleString(undefined, { maximumFractionDigits: decimals })} %`
+  if (!Number.isFinite(value)) return "--"
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: decimals })} %`
 }
 
 export default function SystemsTable({
@@ -40,6 +41,8 @@ export default function SystemsTable({
   timePeriod = "week",
 }: SystemsTableProps) {
   const router = useRouter()
+  const supabase = createClient()
+  const { farmId } = useActiveFarm()
   const [systems, setSystems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [pageIndex, setPageIndex] = useState(0)
@@ -59,35 +62,47 @@ export default function SystemsTable({
       setLoading(true)
       setPageIndex(0)
       const systemId = system !== "all" ? Number(system) : undefined
-      
-      // Fetch all dashboard data for the selected time period and stage
-      const result = await fetchSystemsDashboard({
-        growth_stage: stage,
-        system_id: Number.isFinite(systemId) ? systemId : undefined,
-        time_period: timePeriod,
-      })
-      
-      const dashboardRows = result.status === "success" ? result.data : []
-      
-      // Group by system and get the latest/only record per system for this time period
-      const systemsMap = new Map<number, any>()
-      dashboardRows.forEach((row) => {
-        if (row.system_id && !systemsMap.has(row.system_id)) {
-          systemsMap.set(row.system_id, row)
-        }
-      })
+      const systemIds: number[] = []
+      if (Number.isFinite(systemId)) {
+        systemIds.push(systemId as number)
+      } else if (farmId) {
+        const { data: systemRows } = await supabase
+          .from("system")
+          .select("id,name,growth_stage")
+          .eq("farm_id", farmId)
+          .eq("is_active", true)
 
-      const systemsList = Array.from(systemsMap.values()).sort((a, b) => {
-        const nameA = String(a.system_name ?? a.system_id ?? "")
-        const nameB = String(b.system_name ?? b.system_id ?? "")
-        return nameA.localeCompare(nameB)
-      })
+        const filtered = (systemRows ?? []).filter((row) =>
+          stage ? row.growth_stage === stage : true,
+        )
+        filtered.forEach((row) => systemIds.push(row.id as number))
+      }
 
-      setSystems(systemsList)
+      if (!systemIds.length) {
+        setSystems([])
+        setLoading(false)
+        return
+      }
+
+      const { data: dashboardRows } = await supabase
+        .from("dashboard")
+        .select(
+          "system_id,system_name,abw,efcr,feeding_rate,mortality_rate,biomass_density,water_quality_rating_average,input_start_date,input_end_date,sampling_end_date,growth_stage,time_period",
+        )
+        .in("system_id", systemIds)
+        .eq("time_period", timePeriod)
+        .order("input_end_date", { ascending: false })
+
+      const filtered = (dashboardRows as Tables<"dashboard">[] | null)?.filter((row) =>
+        stage ? row.growth_stage === stage : true,
+      ) ?? []
+
+      filtered.sort((a, b) => String(a.system_name ?? "").localeCompare(String(b.system_name ?? "")))
+      setSystems(filtered)
       setLoading(false)
     }
     loadSystems()
-  }, [stage, batch, system, timePeriod])
+  }, [batch, farmId, stage, system, supabase, timePeriod])
 
   const totalRows = systems.length
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
@@ -99,48 +114,48 @@ export default function SystemsTable({
 
   if (loading) {
     return (
-      <div className="rounded-md border bg-card p-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Production</h2>
-            <p className="text-sm text-muted-foreground">Loading systems...</p>
+            <h2 className="text-base font-semibold text-slate-900">Production</h2>
+            <p className="text-xs text-slate-500">Loading systems...</p>
           </div>
-          <span className="text-xs text-muted-foreground">Loading</span>
+          <span className="text-xs text-slate-400">Loading</span>
         </div>
-        <div className="h-[240px] rounded-md border border-dashed border-border/70 bg-muted/20" />
+        <div className="h-[240px] rounded-md border border-dashed border-slate-200 bg-slate-50/60" />
       </div>
     )
   }
 
   return (
-    <div className="rounded-md border bg-card p-6">
+    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-foreground">Production</h2>
-        <p className="text-sm text-muted-foreground mt-2">{systems.length} systems tracked</p>
+        <h2 className="text-base font-semibold text-slate-900">Production</h2>
+        <p className="text-xs text-slate-500 mt-2">{systems.length} systems tracked</p>
       </div>
       <div className="max-h-[60vh] overflow-auto">
         <Table>
-          <TableHeader className="bg-muted/40">
+          <TableHeader className="bg-slate-50">
             <TableRow>
-              <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                 System
               </TableHead>
-              <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right">
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right">
                 eFCR
               </TableHead>
-              <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right">
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right">
                 ABW
               </TableHead>
-              <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right hidden lg:table-cell">
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right hidden lg:table-cell">
                 Feeding Rate
               </TableHead>
-              <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right hidden lg:table-cell">
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right hidden lg:table-cell">
                 Mortality Rate
               </TableHead>
-              <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right hidden xl:table-cell">
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right hidden xl:table-cell">
                 Density
               </TableHead>
-              <TableHead className="sticky top-0 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground text-right hidden xl:table-cell">
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right hidden xl:table-cell">
                 Water Quality
               </TableHead>
             </TableRow>
@@ -150,7 +165,7 @@ export default function SystemsTable({
               pagedSystems.map((system, i) => (
                 <TableRow
                   key={i}
-                  className="cursor-pointer"
+                  className="cursor-pointer hover:bg-slate-50/70"
                   onClick={() => handleRowClick(system.system_id, system.input_start_date || "", system.input_end_date || "")}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
@@ -163,22 +178,24 @@ export default function SystemsTable({
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-primary" />
+                      <span className="h-2 w-2 rounded-full bg-[#4C7DFF]" />
                       <div>
-                        <p className="text-sm font-medium text-foreground">{system.system_name || system.system_id}</p>
-                        {system.sampling_end_date ? <p className="text-[11px] text-muted-foreground">{system.sampling_end_date}</p> : null}
+                        <p className="text-sm font-medium text-slate-900">{system.system_name || system.system_id}</p>
+                        {system.sampling_end_date ? (
+                          <p className="text-[11px] text-slate-500">{system.sampling_end_date}</p>
+                        ) : null}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">{formatNumber(system.efcr, 2)}</TableCell>
-                  <TableCell className="text-right">{formatWithUnit(system.abw, 1, "g")}</TableCell>
-                  <TableCell className="text-right hidden lg:table-cell">
-                    {formatWithUnit(system.feeding_rate, 2, "kg/t")}
+                  <TableCell className="text-right text-sm text-slate-900">{formatNumber(system.efcr, 2)}</TableCell>
+                  <TableCell className="text-right text-sm text-slate-900">{formatWithUnit(system.abw, 1, "g")}</TableCell>
+                  <TableCell className="text-right text-sm text-slate-900 hidden lg:table-cell">
+                    {formatPercent(system.feeding_rate, 2)}
                   </TableCell>
-                  <TableCell className="text-right hidden lg:table-cell">
+                  <TableCell className="text-right text-sm text-slate-900 hidden lg:table-cell">
                     {formatPercent(system.mortality_rate, 2)}
                   </TableCell>
-                  <TableCell className="text-right hidden xl:table-cell">
+                  <TableCell className="text-right text-sm text-slate-900 hidden xl:table-cell">
                     {formatNumber(system.biomass_density, 2)}
                   </TableCell>
                   <TableCell className="text-right hidden xl:table-cell">
@@ -204,7 +221,7 @@ export default function SystemsTable({
         </Table>
       </div>
       {showPagination ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-500">
           <span>
             Showing {startIndex + 1}-{endIndex} of {totalRows}
           </span>

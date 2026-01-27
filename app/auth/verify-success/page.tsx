@@ -1,10 +1,22 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2 } from "lucide-react"
 
 export default function VerifySuccessPage() {
+    const router = useRouter()
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            router.replace("/")
+        }, 2500)
+
+        return () => window.clearTimeout(timer)
+    }, [router])
+
     return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-muted/40">
             <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg dark:bg-zinc-950 border">
@@ -16,13 +28,13 @@ export default function VerifySuccessPage() {
                         Email Verified
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        Your email has been successfully verified. You can now access your account.
+                        You’re signed in. Redirecting you to the dashboard…
                     </p>
                 </div>
 
                 <div className="flex flex-col gap-2 pt-4">
                     <Button asChild className="w-full" variant="default">
-                        <Link href="/auth">Continue to Login</Link>
+                        <Link href="/">Go to Dashboard</Link>
                     </Button>
                 </div>
             </div>

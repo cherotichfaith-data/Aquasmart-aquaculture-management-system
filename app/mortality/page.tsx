@@ -27,11 +27,7 @@ export default function MortalityPage() {
     loadData()
   }, [selectedBatch, selectedSystem, selectedStage])
 
-  const totalMortality = mortalityData.reduce(
-    (sum, item) => sum + (item.number_of_fish_mortality || 0),
-    0,
-  )
-  const uniqueSystems = new Set(mortalityData.map((item) => item.system_id)).size
+  const latest = mortalityData[0]
 
   return (
     <DashboardLayout>
@@ -106,16 +102,8 @@ export default function MortalityPage() {
             <p className="text-2xl font-bold mt-1">{mortalityData.length}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-sm text-muted-foreground">Total Fish Dead</p>
-            <p className="text-2xl font-bold mt-1 text-destructive">{totalMortality}</p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-sm text-muted-foreground">Unique Systems</p>
-            <p className="text-2xl font-bold mt-1">{uniqueSystems}</p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Latest Record</p>
-            <p className="text-2xl font-bold mt-1">{mortalityData[0]?.date || "N/A"}</p>
+            <p className="text-2xl font-bold mt-1">{latest?.date || "N/A"}</p>
           </div>
         </div>
       </div>

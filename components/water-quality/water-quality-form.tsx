@@ -60,6 +60,7 @@ export default function WaterQualityForm({ onClose }: { onClose: () => void }) {
 
     const systemId = Number(formData.systemId)
     const value = Number(formData.value)
+    const depth = formData.depth === "" ? 0 : Number(formData.depth)
 
     if (!Number.isFinite(systemId)) {
       setError("Select a system.")
@@ -71,6 +72,11 @@ export default function WaterQualityForm({ onClose }: { onClose: () => void }) {
       setSaving(false)
       return
     }
+    if (!Number.isFinite(depth)) {
+      setError("Enter a valid water depth.")
+      setSaving(false)
+      return
+    }
 
     const result = await insertWaterQualityMeasurement({
       date: formData.date,
@@ -78,7 +84,7 @@ export default function WaterQualityForm({ onClose }: { onClose: () => void }) {
       system_id: systemId,
       parameter_name: formData.parameter,
       parameter_value: value,
-      water_depth: formData.depth ? Number(formData.depth) : null,
+      water_depth: depth,
     })
 
     if (result.status === "error") {

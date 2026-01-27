@@ -20,10 +20,7 @@ export default function SamplingForm({ onSubmit }: { onSubmit: () => void }) {
     })
   }
 
-  const abw =
-    formData.fishSampled && formData.totalWeight
-      ? (Number(formData.totalWeight) / Number(formData.fishSampled)).toFixed(2)
-      : "-"
+  const abw = "--"
 
   return (
     <form

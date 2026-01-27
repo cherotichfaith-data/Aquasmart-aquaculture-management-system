@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useState } from "react"
 import { useAuth } from "@/components/auth-provider"
 import {
   Activity,
@@ -37,6 +38,7 @@ export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: (
   const pathname = usePathname()
   const router = useRouter()
   const { signOut } = useAuth()
+  const [signingOut, setSigningOut] = useState(false)
 
   return (
     <>
@@ -89,13 +91,20 @@ export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: (
         <div className="p-4 border-t border-sidebar-border">
           <button
             onClick={async () => {
-              await signOut()
-              router.push("/auth")
+              if (signingOut) return
+              setSigningOut(true)
+              try {
+                await signOut()
+              } finally {
+                router.push("/auth")
+                setSigningOut(false)
+              }
             }}
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors cursor-pointer"
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors cursor-pointer disabled:opacity-60"
+            disabled={signingOut}
           >
             <LogOut className="h-4 w-4" />
-            <span className="text-sm font-medium">Log out</span>
+            <span className="text-sm font-medium">{signingOut ? "Logging out..." : "Log out"}</span>
           </button>
         </div>
       </aside>

@@ -14,34 +14,13 @@ import {
 } from "recharts"
 import { Activity, Fish } from "lucide-react"
 import { format } from "date-fns"
-import { fetchProductionSummary } from "@/lib/supabase-queries"
+import { fetchProductionSummary, fetchTimeWindow } from "@/lib/supabase-queries"
 import type { Tables } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 type SummaryRow = Tables<"production_summary"> & {
-    efcr_aggregated?: number
-}
-
-type ChartPoint = {
-    date: string
-    total_biomass: number
-    total_fish: number
-}
-
-type Totals = {
-    totalBiomass: number
-    totalFish: number
-}
-
-const daysByPeriod: Record<TimePeriod, number> = {
-    day: 1,
-    week: 7,
-    "2 weeks": 14,
-    month: 30,
-    quarter: 90,
-    "6 months": 180,
-    year: 365,
+    efcr_aggregated?: number | null
 }
 
 const formatAxisDate = (value: string | number) => {
@@ -97,15 +76,18 @@ export default function PopulationOverview({
         let isMounted = true
         const loadSummary = async () => {
             setLoading(true)
-            const systemId = system && system !== "all" ? Number(system) : undefined
-            const result = await fetchProductionSummary({
-                growth_stage: stage ?? undefined,
-                system_id: Number.isFinite(systemId) ? systemId : undefined,
-                limit: 500,
-            })
+      const systemId = system && system !== "all" ? Number(system) : undefined
+      const bounds = await fetchTimeWindow({ timePeriod })
+      const summaryResult = await fetchProductionSummary({
+        growth_stage: stage ?? undefined,
+        system_id: Number.isFinite(systemId) ? systemId : undefined,
+        date_from: bounds.start ?? undefined,
+        date_to: bounds.end ?? undefined,
+        limit: 500,
+      })
 
-            if (!isMounted) return
-            setRows(result.status === "success" ? result.data : [])
+      if (!isMounted) return
+      setRows(summaryResult.status === "success" ? summaryResult.data : [])
             setLoading(false)
         }
         loadSummary()
@@ -114,50 +96,7 @@ export default function PopulationOverview({
         }
     }, [stage, system, timePeriod])
 
-    const chartData = useMemo(() => {
-        const cutoff = new Date()
-        cutoff.setDate(cutoff.getDate() - daysByPeriod[timePeriod])
-
-        const map = new Map<
-            string,
-            { total_efcr: number; count: number; total_mortality: number; total_fish: number }
-        >()
-
-        rows.forEach((row) => {
-            if (!row.date) return
-            const parsed = new Date(row.date)
-            if (Number.isNaN(parsed.getTime()) || parsed < cutoff) return
-
-            const key = row.date
-            const current =
-                map.get(key) ?? { total_efcr: 0, count: 0, total_mortality: 0, total_fish: 0 }
-
-            const efcrValue = row.efcr_period ?? row.efcr_aggregated
-            if (efcrValue !== null && efcrValue !== undefined) {
-                current.total_efcr += efcrValue
-                current.count += 1
-            }
-
-            if (row.daily_mortality_count !== null && row.daily_mortality_count !== undefined) {
-                current.total_mortality += row.daily_mortality_count
-            }
-
-            if (row.number_of_fish_inventory !== null && row.number_of_fish_inventory !== undefined) {
-                current.total_fish += row.number_of_fish_inventory
-            }
-
-            map.set(key, current)
-        })
-        const data = Array.from(map.entries())
-            .map(([date, values]) => ({
-                date,
-                efcr: values.count > 0 ? values.total_efcr / values.count : 0,
-                mortality_rate: values.total_fish > 0 ? (values.total_mortality / values.total_fish) * 100 : 0,
-            }))
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-        return data
-    }, [rows, timePeriod])
+    const chartData = useMemo(() => rows, [rows])
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
             <Card className="w-full">
@@ -173,15 +112,10 @@ export default function PopulationOverview({
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" tickFormatter={(value: any) => formatAxisDate(value)} />
                                 <YAxis stroke="#3b82f6" />
-                                <Tooltip
-                                    formatter={(value: number | string, name) => {
-                                        return [typeof value === "number" ? value.toFixed(2) : value, "eFCR"]
-                                    }}
-                                    labelFormatter={formatAxisDate}
-                                />
+                                <Tooltip labelFormatter={formatAxisDate} />
                                 <Line
                                     type="monotone"
-                                    dataKey="efcr"
+                                    dataKey="efcr_period"
                                     stroke="#3b82f6"
                                     strokeWidth={2}
                                     dot={false}
@@ -208,22 +142,14 @@ export default function PopulationOverview({
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" tickFormatter={(value: any) => formatAxisDate(value)} />
                                 <YAxis stroke="#ef4444" />
-                                <Tooltip
-                                    formatter={(value: number | string, name) => {
-                                        if (typeof value === "number") {
-                                            return [`${value.toFixed(2)}%`, "Mortality rate"]
-                                        }
-                                        return [value, "Mortality rate"]
-                                    }}
-                                    labelFormatter={formatAxisDate}
-                                />
+                                <Tooltip labelFormatter={formatAxisDate} />
                                 <Area
                                     type="monotone"
-                                    dataKey="mortality_rate"
+                                    dataKey="daily_mortality_count"
                                     fill="#ef4444"
                                     fillOpacity={0.2}
                                     stroke="#ef4444"
-                                    name="Mortality rate"
+                                    name="Mortality count"
                                 />
                             </ComposedChart>
                         </ResponsiveContainer>

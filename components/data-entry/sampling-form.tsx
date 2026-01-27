@@ -18,7 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
-import { useEffect } from "react"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -49,18 +48,6 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
             batch_id: "none",
         },
     })
-
-    // Auto-calculate ABW
-    const numberOfFish = form.watch("number_of_fish")
-    const totalWeight = form.watch("total_weight_kg")
-
-    useEffect(() => {
-        if (numberOfFish > 0 && totalWeight > 0) {
-            const abw = (totalWeight * 1000) / numberOfFish
-            form.setValue("average_body_weight_g", parseFloat(abw.toFixed(2)))
-        }
-    }, [numberOfFish, totalWeight, form])
-
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
@@ -205,9 +192,9 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
                             name="average_body_weight_g"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Calc. ABW (g)</FormLabel>
+                            <FormLabel>ABW (g) (Optional)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" {...field} readOnly className="bg-muted" />
+                                <Input type="number" step="0.01" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

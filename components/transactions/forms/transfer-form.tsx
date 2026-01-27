@@ -22,10 +22,7 @@ export default function TransferForm({ onSubmit }: { onSubmit: () => void }) {
     })
   }
 
-  const abw =
-    formData.fishCount && formData.totalWeight
-      ? ((Number(formData.totalWeight) / Number(formData.fishCount)) * 1000).toFixed(2)
-      : "-"
+  const abw = "--"
 
   return (
     <form

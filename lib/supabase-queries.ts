@@ -18,9 +18,10 @@ type FingerlingBatchRow = Tables<"fingerling_batch">
 type FeedIncomingRow = Tables<"feed_incoming">
 type FeedTypeRow = Tables<"feed_type">
 type FeedingRecordRow = Tables<"feeding_record">
-type SystemsRow = Tables<"systems">
+type SystemsRow = Tables<"system">
 type SuppliersRow = Tables<"suppliers">
 type FeedsMetadataRow = Tables<"feeds_metadata">
+type DashboardTimePeriodRow = Tables<"dashboard_time_period_resolved">
 
 
 type SystemListItem = Pick<SystemRow, "id" | "name">
@@ -94,9 +95,43 @@ export async function fetchDashboardConsolidatedSnapshot(filters?: {
   return result.status === "success" ? result.data[0] ?? null : null
 }
 
+export async function fetchTimePeriodBounds(timePeriod: Enums<"time_period">) {
+  const result = await supabaseQuery<DashboardTimePeriodRow>("dashboard_time_period_resolved", {
+    select: "input_start_date,input_end_date,time_period",
+    eq: { time_period: timePeriod },
+    limit: 1,
+  })
+
+  if (result.status === "success") {
+    const row = result.data[0] ?? null
+    return { start: row?.input_start_date ?? null, end: row?.input_end_date ?? null }
+  }
+
+  return { start: null, end: null }
+}
+
+export async function fetchTimeWindow(params: {
+  timePeriod: Enums<"time_period">
+}) {
+  const periodResult = await supabaseQuery<DashboardTimePeriodRow>("dashboard_time_period_resolved", {
+    select: "input_start_date,input_end_date,time_period",
+    eq: { time_period: params.timePeriod },
+    limit: 1,
+  })
+
+  if (periodResult.status === "success") {
+    const row = periodResult.data[0] ?? null
+    return { start: row?.input_start_date ?? null, end: row?.input_end_date ?? null }
+  }
+
+  return { start: null, end: null }
+}
+
 export async function fetchProductionSummary(filters?: {
   system_id?: number
   growth_stage?: Enums<"system_growth_stage">
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<ProductionSummaryRow>> {
   const eq: Record<string, string | number> = {}
@@ -107,6 +142,8 @@ export async function fetchProductionSummary(filters?: {
   return supabaseQuery<ProductionSummaryRow>("production_summary", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { date: filters.date_to } : undefined,
     order: "date.desc",
     limit: filters?.limit ?? 50,
   })
@@ -114,6 +151,8 @@ export async function fetchProductionSummary(filters?: {
 
 export async function fetchDailyFishInventory(filters?: {
   system_id?: number
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<DailyFishInventoryRow>> {
   const eq: Record<string, string | number> = {}
@@ -123,6 +162,8 @@ export async function fetchDailyFishInventory(filters?: {
   return supabaseQuery<DailyFishInventoryRow>("daily_fish_inventory_table", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { inventory_date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { inventory_date: filters.date_to } : undefined,
     order: "inventory_date.desc",
     limit: filters?.limit ?? 100,
   })
@@ -132,6 +173,8 @@ export async function fetchSystems(filters?: {
   system_id?: number
   growth_stage?: Enums<"system_growth_stage">
   ongoing_cycle?: boolean
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<ProductionSummaryRow>> {
   const eq: Record<string, string | number | boolean> = {}
@@ -143,6 +186,8 @@ export async function fetchSystems(filters?: {
   return supabaseQuery<ProductionSummaryRow>("production_summary", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { date: filters.date_to } : undefined,
     order: "date.desc",
     limit: filters?.limit,
   })
@@ -152,6 +197,8 @@ export async function fetchSystemsDashboard(filters?: {
   system_id?: number
   growth_stage?: Enums<"system_growth_stage">
   time_period?: Enums<"time_period">
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<DashboardRow>> {
   const eq: Record<string, string | number | boolean> = {}
@@ -163,6 +210,8 @@ export async function fetchSystemsDashboard(filters?: {
   return supabaseQuery<DashboardRow>("dashboard", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { input_end_date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { input_end_date: filters.date_to } : undefined,
     order: "input_end_date.desc",
     limit: filters?.limit,
   })
@@ -171,6 +220,8 @@ export async function fetchSystemsDashboard(filters?: {
 export async function fetchActivities(filters?: {
   table_name?: string
   change_type?: Enums<"change_type_enum">
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<ChangeLogRow>> {
   const eq: Record<string, string | number> = {}
@@ -180,6 +231,8 @@ export async function fetchActivities(filters?: {
   return supabaseQuery<ChangeLogRow>("change_log", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { change_time: filters.date_from } : undefined,
+    lte: filters?.date_to ? { change_time: filters.date_to } : undefined,
     order: "change_time.desc",
     limit: filters?.limit ?? 50,
   })
@@ -187,6 +240,8 @@ export async function fetchActivities(filters?: {
 
 export async function fetchWaterQualityRatings(filters?: {
   system_id?: number
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<DailyWaterQualityRatingRow>> {
   const eq: Record<string, string | number> = {}
@@ -195,6 +250,8 @@ export async function fetchWaterQualityRatings(filters?: {
   return supabaseQuery<DailyWaterQualityRatingRow>("daily_water_quality_rating", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { rating_date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { rating_date: filters.date_to } : undefined,
     order: "rating_date.desc",
     limit: filters?.limit ?? 30,
   })
@@ -203,6 +260,8 @@ export async function fetchWaterQualityRatings(filters?: {
 export async function fetchWaterQualityMeasurements(filters?: {
   system_id?: number
   parameter_name?: Enums<"water_quality_parameters">
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<WaterQualityMeasurementWithUnit>> {
   const eq: Record<string, string | number> = {}
@@ -212,6 +271,8 @@ export async function fetchWaterQualityMeasurements(filters?: {
   return supabaseQuery<WaterQualityMeasurementWithUnit>("water_quality_measurement", {
     select: "*,water_quality_framework(unit)",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { date: filters.date_to } : undefined,
     order: "date.desc",
     limit: filters?.limit ?? 100,
   })
@@ -220,6 +281,8 @@ export async function fetchWaterQualityMeasurements(filters?: {
 export async function fetchSamplingData(filters?: {
   system_id?: number
   batch_id?: number
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<FishSamplingWeightRow>> {
   const eq: Record<string, string | number> = {}
@@ -229,14 +292,18 @@ export async function fetchSamplingData(filters?: {
   return supabaseQuery<FishSamplingWeightRow>("fish_sampling_weight", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { date: filters.date_to } : undefined,
     order: "date.desc",
     limit: filters?.limit ?? 100,
   })
 }
 
-export async function fetchFeedData(filters?: { limit?: number }): Promise<QueryResult<FeedIncomingWithType>> {
+export async function fetchFeedData(filters?: { limit?: number; date_from?: string; date_to?: string }): Promise<QueryResult<FeedIncomingWithType>> {
   return supabaseQuery<FeedIncomingWithType>("feed_incoming", {
     select: "*,feed_type(*)",
+    gte: filters?.date_from ? { date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { date: filters.date_to } : undefined,
     order: "date.desc",
     limit: filters?.limit ?? 100,
   })
@@ -253,6 +320,8 @@ export async function fetchFeedTypes(filters?: { limit?: number }): Promise<Quer
 export async function fetchFeedingRecords(filters?: {
   system_id?: number
   batch_id?: number
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<FeedingRecordWithType>> {
   const eq: Record<string, string | number> = {}
@@ -262,6 +331,8 @@ export async function fetchFeedingRecords(filters?: {
   return supabaseQuery<FeedingRecordWithType>("feeding_record", {
     select: "*,feed_type(*)",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { date: filters.date_to } : undefined,
     order: "date.desc",
     limit: filters?.limit ?? 100,
   })
@@ -270,6 +341,8 @@ export async function fetchFeedingRecords(filters?: {
 export async function fetchMortalityData(filters?: {
   system_id?: number
   batch_id?: number
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<FishMortalityRow>> {
   const eq: Record<string, string | number> = {}
@@ -279,6 +352,8 @@ export async function fetchMortalityData(filters?: {
   return supabaseQuery<FishMortalityRow>("fish_mortality", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { date: filters.date_to } : undefined,
     order: "date.desc",
     limit: filters?.limit ?? 100,
   })
@@ -287,6 +362,8 @@ export async function fetchMortalityData(filters?: {
 export async function fetchHarvests(filters?: {
   system_id?: number
   batch_id?: number
+  date_from?: string
+  date_to?: string
   limit?: number
 }): Promise<QueryResult<FishHarvestRow>> {
   const eq: Record<string, string | number> = {}
@@ -296,6 +373,8 @@ export async function fetchHarvests(filters?: {
   return supabaseQuery<FishHarvestRow>("fish_harvest", {
     select: "*",
     eq: Object.keys(eq).length ? eq : undefined,
+    gte: filters?.date_from ? { date: filters.date_from } : undefined,
+    lte: filters?.date_to ? { date: filters.date_to } : undefined,
     order: "date.desc",
     limit: filters?.limit ?? 50,
   })
