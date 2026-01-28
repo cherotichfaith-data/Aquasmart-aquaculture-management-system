@@ -5,7 +5,8 @@ export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
     // if "next" is in param, use it as the redirect URL
-    const next = searchParams.get('next') ?? '/dashboard'
+    const nextParam = searchParams.get('next')
+    const next = nextParam && nextParam.startsWith('/') ? nextParam : '/'
 
     // Check for errors first
     const error = searchParams.get('error')
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
             // This implies they might NOT be auto-redirected to dashboard, or they want a confirmation screen.
             // Let's redirect to verify-success for clarity, then they can click "Login" (or "Dashboard" if session works).
 
-            return NextResponse.redirect(`${origin}/auth/verify-success`)
+            return NextResponse.redirect(`${origin}${next}`)
         } else {
             return NextResponse.redirect(`${origin}/auth/auth-error?error=ExchangeError&error_description=${error.message}`)
         }

@@ -31,6 +31,7 @@ export default function SettingsPage() {
     owner: "John Doe",
     email: "john@aquafarm.com",
     phone: "+255 123 456 789",
+    role: "farm_manager",
     lowDoThreshold: 4.0,
     highAmmoniaThreshold: 0.05,
     highMortalityThreshold: 2.0,
@@ -85,6 +86,7 @@ export default function SettingsPage() {
           owner: farmRow?.owner ?? profile?.owner ?? prev.owner,
           email: farmRow?.email ?? profile?.email ?? prev.email,
           phone: farmRow?.phone ?? profile?.phone ?? prev.phone,
+          role: profile?.role ?? prev.role,
           lowDoThreshold: thresholdRow?.low_do_threshold ?? prev.lowDoThreshold,
           highAmmoniaThreshold: thresholdRow?.high_ammonia_threshold ?? prev.highAmmoniaThreshold,
           highMortalityThreshold: thresholdRow?.high_mortality_threshold ?? prev.highMortalityThreshold,
@@ -215,8 +217,27 @@ export default function SettingsPage() {
             throw profileError
           }
 
+          const profilePayload = {
+            id: user.id,
+            email: settings.email,
+            role: settings.role,
+            owner: settings.owner,
+            farm_name: settings.farmName,
+            location: settings.location,
+            phone: settings.phone,
+          }
+
+          const { error: mainProfileError } = await supabase
+            .from("profiles")
+            .upsert(profilePayload, { onConflict: "id" })
+
+          if (mainProfileError) {
+            throw mainProfileError
+          }
+
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId: resolvedFarmId } }))
+            window.dispatchEvent(new Event("profile-updated"))
           }
 
           setSaved(true)
@@ -322,6 +343,20 @@ export default function SettingsPage() {
                   onChange={(e) => handleChange("phone", e.target.value)}
                   className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Role</label>
+                <select
+                  value={settings.role}
+                  onChange={(e) => handleChange("role", e.target.value)}
+                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="farm_manager">Farm Manager</option>
+                  <option value="system_operator">System Operator</option>
+                  <option value="data_analyst">Data Analyst</option>
+                  <option value="viewer">Viewer</option>
+                </select>
               </div>
             </div>
           </div>
