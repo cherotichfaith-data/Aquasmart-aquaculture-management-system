@@ -122,11 +122,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
 
     const signOut = async () => {
-        await supabase.auth.signOut();
+        // Clear local state immediately so UI responds quickly, even if network is slow.
         setUser(null);
         setSession(null);
         setRole(null);
         setProfile(null);
+
+        try {
+            const timeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("Sign out timed out")), 4000)
+            );
+            await Promise.race([supabase.auth.signOut(), timeout]);
+        } catch (err) {
+            console.warn("Sign out request failed or timed out:", err);
+        }
     };
 
     return (

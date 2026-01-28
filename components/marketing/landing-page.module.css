@@ -11,6 +11,7 @@
   color: var(--pearl-white);
   position: relative;
   overflow: hidden;
+  font-family: "Georgia", "Times New Roman", serif;
 }
 
 .page::before {
@@ -37,22 +38,25 @@
   z-index: 1;
 }
 
-.bubble {
+.fish {
   position: absolute;
-  bottom: -100px;
-  width: 40px;
-  height: 40px;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), rgba(45, 212, 191, 0.1));
-  border-radius: 50%;
-  opacity: 0.5;
-  animation: rise 15s infinite ease-in;
+  bottom: -120px;
+  width: 56px;
+  height: auto;
+  object-fit: contain;
+  opacity: 0.6;
+  filter: drop-shadow(0 4px 10px rgba(14, 165, 233, 0.2));
+  border-radius: 999px;
+  -webkit-mask-image: radial-gradient(closest-side, rgba(0, 0, 0, 1) 62%, rgba(0, 0, 0, 0) 100%);
+  mask-image: radial-gradient(closest-side, rgba(0, 0, 0, 1) 62%, rgba(0, 0, 0, 0) 100%);
+  animation: swimUp 16s infinite ease-in;
 }
 
-.bubble:nth-child(1) { left: 10%; width: 22px; height: 22px; animation-delay: 0s; animation-duration: 12s; }
-.bubble:nth-child(2) { left: 28%; width: 36px; height: 36px; animation-delay: 2s; animation-duration: 14s; }
-.bubble:nth-child(3) { left: 48%; width: 18px; height: 18px; animation-delay: 4s; animation-duration: 10s; }
-.bubble:nth-child(4) { left: 68%; width: 30px; height: 30px; animation-delay: 1s; animation-duration: 13s; }
-.bubble:nth-child(5) { left: 86%; width: 26px; height: 26px; animation-delay: 3s; animation-duration: 11s; }
+.fish:nth-child(1) { left: 10%; width: 44px; animation-delay: 0s; animation-duration: 13s; }
+.fish:nth-child(2) { left: 28%; width: 64px; animation-delay: 2s; animation-duration: 16s; }
+.fish:nth-child(3) { left: 48%; width: 36px; animation-delay: 4s; animation-duration: 12s; }
+.fish:nth-child(4) { left: 68%; width: 56px; animation-delay: 1s; animation-duration: 15s; }
+.fish:nth-child(5) { left: 86%; width: 46px; animation-delay: 3s; animation-duration: 14s; }
 
 .header {
   position: sticky;
@@ -164,7 +168,7 @@
 }
 
 .heroTitle {
-  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-size: clamp(2.1rem, 4.6vw, 4.2rem);
   font-weight: 900;
   margin-bottom: 1.5rem;
   background: linear-gradient(135deg, var(--aqua-teal), var(--seafoam), var(--wave-blue));
@@ -243,7 +247,7 @@
 }
 
 .sectionTitle h2 {
-  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-size: clamp(2.1rem, 4.6vw, 4.2rem);
   font-weight: 700;
   margin-bottom: 1rem;
   color: var(--seafoam);
@@ -362,7 +366,7 @@
 }
 
 .ctaSection h2 {
-  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-size: clamp(2.1rem, 4.6vw, 4.2rem);
   font-weight: 700;
   margin-bottom: 1.5rem;
   color: var(--seafoam);
@@ -434,11 +438,12 @@
   50% { transform: scale(1.05) translateY(-10px); opacity: 0.9; }
 }
 
-@keyframes rise {
-  0% { bottom: -100px; transform: translateX(0); opacity: 0; }
-  10% { opacity: 0.5; }
-  90% { opacity: 0.3; }
-  100% { bottom: 110vh; transform: translateX(100px); opacity: 0; }
+@keyframes swimUp {
+  0% { bottom: -120px; transform: translateX(0) translateY(0) scale(0.95); opacity: 0; }
+  10% { opacity: 0.6; }
+  50% { transform: translateX(40px) translateY(-10px) scale(1); }
+  90% { opacity: 0.35; }
+  100% { bottom: 110vh; transform: translateX(90px) translateY(-20px) scale(1.05); opacity: 0; }
 }
 
 @keyframes fadeInUp {

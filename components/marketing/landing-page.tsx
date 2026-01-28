@@ -3,13 +3,10 @@
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { MouseEvent } from "react"
-import { Orbitron, Montserrat } from "next/font/google"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import styles from "@/components/marketing/landing-page.module.css"
-
-const orbitron = Orbitron({ subsets: ["latin"], weight: ["400", "600", "700", "900"] })
-const montserrat = Montserrat({ subsets: ["latin"], weight: ["300", "400", "500", "600"] })
+import fishImage from "@/image/fish.jpg"
 
 const featureCards = [
   {
@@ -163,25 +160,21 @@ export default function LandingPage() {
   }, [])
 
   const handlePrimaryAction = () => {
-    toast({
-      title: "Redirecting to sign in",
-      description: "Access your farm dashboard in AquaSmart.",
-    })
     router.push("/auth")
   }
 
   return (
-    <div ref={rootRef} className={`${styles.page} ${montserrat.className}`}>
+    <div ref={rootRef} className={styles.page}>
       <div className={styles.bubbles} aria-hidden="true">
         {Array.from({ length: 5 }).map((_, index) => (
-          <span key={index} className={styles.bubble} />
+          <img key={index} className={styles.fish} src={fishImage.src} alt="" />
         ))}
       </div>
 
       <div className={styles.content} onClick={handleAnchorClick}>
         <header className={`${styles.header} ${hideHeader ? styles.headerHidden : ""}`}>
           <nav className={styles.nav}>
-            <Link href="/" className={`${styles.logo} ${orbitron.className}`} aria-label="AquaSmart Home">
+            <Link href="/" className={styles.logo} aria-label="AquaSmart Home">
               <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path
                   d="M22 64 C 22 44, 56 44, 70 64 C 56 84, 22 84, 22 64 Z"
@@ -243,7 +236,7 @@ export default function LandingPage() {
 
         <section className={styles.hero} id="top">
           <div className={styles.heroContent}>
-            <h1 className={`${styles.heroTitle} ${orbitron.className}`}>REAL-TIME AQUACULTURE INTELLIGENCE</h1>
+            <h1 className={styles.heroTitle}>Real-Time Aquaculture Intelligence</h1>
             <p className={styles.heroText}>
               AquaSmart gives Farm Managers a single source of truth for KPIs, inventory, feeding, sampling, mortality,
               and water quality. Every action is traceable, every metric refreshes in minutes.
@@ -261,7 +254,7 @@ export default function LandingPage() {
 
         <section className={styles.features} id="modules">
           <div className={`${styles.sectionTitle} ${styles.reveal}`} data-reveal>
-            <h2 className={orbitron.className}>CORE MODULES</h2>
+            <h2>Core Modules</h2>
             <p>Phase 1 focuses on the Farm Manager workflow with daily operational control.</p>
           </div>
 
@@ -273,7 +266,7 @@ export default function LandingPage() {
                     {feature.icon}
                   </svg>
                 </div>
-                <h3 className={orbitron.className}>{feature.title}</h3>
+                <h3>{feature.title}</h3>
                 <p>{feature.description}</p>
               </article>
             ))}
@@ -283,27 +276,27 @@ export default function LandingPage() {
         <section className={`${styles.stats} ${styles.reveal}`} id="vision" data-reveal>
           <div className={styles.statsGrid}>
             <div className={styles.statItem}>
-              <h3 className={orbitron.className}>&lt;= 5 min</h3>
+              <h3>&lt;= 5 min</h3>
               <p>KPI refresh target</p>
             </div>
             <div className={styles.statItem}>
-              <h3 className={orbitron.className}>RLS</h3>
+              <h3>RLS</h3>
               <p>Row-level security by farm</p>
             </div>
             <div className={styles.statItem}>
-              <h3 className={orbitron.className}>24/7</h3>
+              <h3>24/7</h3>
               <p>Operational traceability</p>
             </div>
             <div className={styles.statItem}>
-              <h3 className={orbitron.className}>CSV / PDF</h3>
+              <h3>CSV / PDF</h3>
               <p>Compliance-ready exports</p>
             </div>
           </div>
         </section>
 
         <section className={styles.ctaSection} id="plans">
-          <h2 className={`${orbitron.className} ${styles.reveal}`} data-reveal>
-            RUN YOUR FARM LIKE AN ENGINEERING SYSTEM
+          <h2 className={styles.reveal} data-reveal>
+            Run Your Farm Like an Engineering System
           </h2>
           <p className={styles.reveal} data-reveal>
             AquaSmart v1 is built for Farm Managers: KPIs, inventory, feeding, sampling, mortality, and water quality in
@@ -322,14 +315,14 @@ export default function LandingPage() {
         <footer className={styles.footer} id="about">
           <div className={styles.footerContent}>
             <div className={styles.footerSection}>
-              <h4 className={orbitron.className}>AQUASMART</h4>
+              <h4>AQUASMART</h4>
               <p>
                 Aquaculture farm intelligence with real-time KPIs, traceable data entry, and compliance-ready reporting.
               </p>
             </div>
 
             <div className={styles.footerSection}>
-              <h4 className={orbitron.className}>Product</h4>
+              <h4>Product</h4>
               <a href="#modules">Modules</a>
               <Link href="/reports">Reports</Link>
               <Link href="/water-quality">Water Quality</Link>
@@ -337,14 +330,14 @@ export default function LandingPage() {
             </div>
 
             <div className={styles.footerSection}>
-              <h4 className={orbitron.className}>Company</h4>
+              <h4>Company</h4>
               <a href="#about">About</a>
               <a href="#vision">Vision</a>
               <Link href="/auth">Sign In</Link>
             </div>
 
             <div className={styles.footerSection}>
-              <h4 className={orbitron.className}>Support</h4>
+              <h4>Support</h4>
               <Link href="/settings">Account</Link>
               <a href="#top">Contact</a>
               <a href="#plans">Roadmap</a>

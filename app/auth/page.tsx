@@ -701,7 +701,6 @@ export default function AuthPage() {
               </div>
 
               <h2>Sign in to your dashboard</h2>
-              <p>Use your email and password to access your AquaSmart account.</p>
             </div>
 
             <form
@@ -725,7 +724,6 @@ export default function AuthPage() {
                   onChange={(event) => setEmail(event.target.value)}
                 />
                 <div className="hint-row">
-                  <span className="hint">Use the email for your AquaSmart account.</span>
                   <Link className="link" href="/">
                     Back to home
                   </Link>
@@ -746,13 +744,11 @@ export default function AuthPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
-                <div className="hint-row">
-                  <span className="hint">
-                    {authMode === "signin"
-                      ? "Use your password to sign in instantly."
-                      : "Use 8+ characters to create a secure password."}
-                  </span>
-                </div>
+                {authMode === "signup" && (
+                  <div className="hint-row">
+                    <span className="hint">Use 8+ characters to create a secure password.</span>
+                  </div>
+                )}
               </div>
 
               <button
