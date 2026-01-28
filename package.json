@@ -2,6 +2,7 @@
   "name": "aquasmart",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10",  
   "scripts": {
     "db:types": "npx supabase gen types typescript --project-id zgiqgiwfnzulkxlqmcgw > lib/types/database.ts",
     "dev": "next dev",
