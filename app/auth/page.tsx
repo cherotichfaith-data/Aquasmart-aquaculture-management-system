@@ -2,12 +2,16 @@
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/utils/supabase/client"
 
 export default function AuthPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [email, setEmail] = useState("")
-  const [loadingButton, setLoadingButton] = useState<"send" | "continue" | null>(null)
+  const [password, setPassword] = useState("")
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin")
+  const [loadingButton, setLoadingButton] = useState<"continue" | null>(null)
   const [toasts, setToasts] = useState<
     Array<{ id: number; title?: string; description?: string; variant?: "success" | "error" | "warning" }>
   >([])
@@ -24,17 +28,28 @@ export default function AuthPage() {
   }
 
   const validateEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  const validatePassword = (value: string) => value.length >= 8
 
-  const sendMagicLink = async (button: "send" | "continue") => {
+  const handlePasswordAuth = async () => {
     if (isLoading) return
     const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
 
     if (!validateEmail(trimmedEmail)) {
       addToast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "error" })
       return
     }
 
-    setLoadingButton(button)
+    if (!validatePassword(trimmedPassword)) {
+      addToast({
+        title: "Weak Password",
+        description: "Password must be at least 8 characters.",
+        variant: "warning",
+      })
+      return
+    }
+
+    setLoadingButton("continue")
     try {
       if (!navigator.onLine) {
         addToast({ title: "Offline", description: "Check your connection and try again.", variant: "warning" })
@@ -50,35 +65,39 @@ export default function AuthPage() {
         return
       }
 
-      const redirectTo = `${window.location.origin}/auth/callback?next=/`
-      const { error } = await supabase.auth.signInWithOtp({
-        email: trimmedEmail,
-        options: {
-          emailRedirectTo: redirectTo,
-          shouldCreateUser: true,
-        },
-      })
+      if (authMode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password: trimmedPassword,
+        })
+        if (error) {
+          addToast({ title: "Sign in failed", description: error.message, variant: "error" })
+          return
+        }
 
+        addToast({ title: "Signed in", description: "Redirecting to your dashboard.", variant: "success" })
+        router.replace("/")
+        return
+      }
+
+      const redirectTo = `${window.location.origin}/auth/callback?next=/`
+      const { error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: trimmedPassword,
+        options: { emailRedirectTo: redirectTo },
+      })
       if (error) {
-        addToast({ title: "Error", description: error.message || "Could not send link.", variant: "error" })
+        addToast({ title: "Sign up failed", description: error.message, variant: "error" })
         return
       }
 
       addToast({
-        title: "Magic Link Sent",
-        description: `Check ${trimmedEmail} to continue signing in.`,
+        title: "Confirm your email",
+        description: "Check your inbox to finish creating your account.",
         variant: "success",
       })
     } catch (err: any) {
-      if (err instanceof TypeError && /failed to fetch/i.test(String(err.message))) {
-        addToast({
-          title: "Network Error",
-          description: "Request failed: check CORS, network, or Supabase URL.",
-          variant: "error",
-        })
-      } else {
-        addToast({ title: "Unexpected Error", description: err?.message ?? "Try again.", variant: "error" })
-      }
+      addToast({ title: "Unexpected Error", description: err?.message ?? "Try again.", variant: "error" })
     } finally {
       setLoadingButton(null)
     }
@@ -88,7 +107,7 @@ export default function AuthPage() {
     const timer = window.setTimeout(() => {
       addToast({
         title: "Welcome to AquaSmart",
-        description: "Enter your email to receive a secure sign-in link.",
+        description: "Enter your email and password to continue.",
         variant: "success",
       })
     }, 450)
@@ -682,15 +701,13 @@ export default function AuthPage() {
               </div>
 
               <h2>Sign in to your dashboard</h2>
-              <p>
-                AquaSmart uses secure email login links. Enter your email and we&apos;ll send a magic link to continue.
-              </p>
+              <p>Use your email and password to access your AquaSmart account.</p>
             </div>
 
             <form
               onSubmit={(event) => {
                 event.preventDefault()
-                void sendMagicLink("continue")
+                void handlePasswordAuth()
               }}
             >
               <div className="form-group">
@@ -708,35 +725,61 @@ export default function AuthPage() {
                   onChange={(event) => setEmail(event.target.value)}
                 />
                 <div className="hint-row">
-                  <span className="hint">We&apos;ll send a sign-in link to your inbox.</span>
+                  <span className="hint">Use the email for your AquaSmart account.</span>
                   <Link className="link" href="/">
                     Back to home
                   </Link>
                 </div>
               </div>
 
-              <div className="divider">or</div>
-
-              <button
-                type="button"
-                className={`alt-btn ${loadingButton === "send" ? "btn-loading" : ""}`}
-                disabled={isLoading}
-                onClick={() => void sendMagicLink("send")}
-              >
-                Send Magic Link
-              </button>
+              <div className="form-group">
+                <label htmlFor="password" className="form-label">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  className="form-input"
+                  placeholder="••••••••"
+                  required
+                  autoComplete={authMode === "signin" ? "current-password" : "new-password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <div className="hint-row">
+                  <span className="hint">
+                    {authMode === "signin"
+                      ? "Use your password to sign in instantly."
+                      : "Use 8+ characters to create a secure password."}
+                  </span>
+                </div>
+              </div>
 
               <button
                 type="submit"
                 className={`sign-in-btn ${loadingButton === "continue" ? "btn-loading" : ""}`}
                 disabled={isLoading}
               >
-                Continue
+                {authMode === "signin" ? "Sign In" : "Create Account"}
               </button>
             </form>
 
             <div className="signup-link">
-              New to AquaSmart? <a href="#signup">Create your account with the same email link.</a>
+              {authMode === "signin" ? (
+                <>
+                  New to AquaSmart?{" "}
+                  <button type="button" className="link" onClick={() => setAuthMode("signup")}>
+                    Create your account
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button type="button" className="link" onClick={() => setAuthMode("signin")}>
+                    Sign in instead
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
