@@ -327,7 +327,6 @@ export default function SettingsPage() {
           const profilePayload = {
             id: user.id,
             email: settings.email,
-            role: settings.role,
             owner: settings.owner,
             farm_name: settings.farmName,
             location: settings.location,
