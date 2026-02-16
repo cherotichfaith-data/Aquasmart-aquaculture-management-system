@@ -1,80 +1,95 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { useAuth } from "@/components/auth-provider"
-import { createClient } from "@/utils/supabase/client"
-import type { Tables } from "@/lib/types/database"
+import { useEffect, useMemo, useState } from "react"
+import { useAuth } from "@/components/providers/auth-provider"
+import { useFarmOptions } from "@/lib/hooks/use-options"
 
-type FarmRow = Tables<"farm">
+type FarmOption = {
+  id: string
+  label: string | null
+  location: string | null
+}
 
+type ActiveFarm = {
+  id: string
+  name: string | null
+  location: string | null
+  owner?: string | null
+  email?: string | null
+  phone?: string | null
+}
+
+const getStorageKey = (userId: string) => `aquasmart:${userId}:activeFarmId`
 export function useActiveFarm() {
-  const { user } = useAuth()
-  const supabase = createClient()
-  const [farm, setFarm] = useState<FarmRow | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const { user, session, isLoading } = useAuth()
+  const [activeFarmId, setActiveFarmId] = useState<string | null>(null)
 
-  const fetchFarm = useCallback(async () => {
-    if (!user?.id) {
-      setFarm(null)
-      setLoading(false)
+  const farmsQuery = useFarmOptions({ enabled: Boolean(session) })
+
+  useEffect(() => {
+    if (!session) {
+      setActiveFarmId(null)
       return
     }
 
-    setLoading(true)
-    setError(null)
-    try {
-      const { data: membership, error: membershipError } = await supabase
-        .from("farm_user")
-        .select("farm_id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle()
-
-      if (membershipError) {
-        throw membershipError
-      }
-
-      if (!membership?.farm_id) {
-        setFarm(null)
-        setLoading(false)
-        return
-      }
-
-      const { data: farmRow, error: farmError } = await supabase
-        .from("farm")
-        .select("*")
-        .eq("id", membership.farm_id)
-        .single()
-
-      if (farmError) {
-        throw farmError
-      }
-
-      setFarm(farmRow ?? null)
-    } catch (err) {
-      setError(err as Error)
-      setFarm(null)
-    } finally {
-      setLoading(false)
+    const farms = (farmsQuery.data?.status === "success" ? farmsQuery.data.data : []) as FarmOption[]
+    if (!farms.length) {
+      setActiveFarmId(null)
+      return
     }
-  }, [supabase, user?.id])
+
+    let urlFarmId: string | null = null
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      urlFarmId = params.get("farmId")
+    }
+
+    let storedFarmId: string | null = null
+    if (user?.id && typeof window !== "undefined") {
+      storedFarmId = window.localStorage.getItem(getStorageKey(user.id))
+    }
+
+    const farmIds = farms.map((row) => row.id)
+    const resolvedFarmId =
+      (urlFarmId && farmIds.includes(urlFarmId) ? urlFarmId : null) ??
+      (storedFarmId && farmIds.includes(storedFarmId) ? storedFarmId : null) ??
+      farmIds[0] ??
+      null
+
+    if (resolvedFarmId && user?.id && typeof window !== "undefined") {
+      window.localStorage.setItem(getStorageKey(user.id), resolvedFarmId)
+    }
+
+    setActiveFarmId(resolvedFarmId)
+  }, [farmsQuery.data, session, user?.id])
 
   useEffect(() => {
-    void fetchFarm()
-  }, [fetchFarm])
-
-  useEffect(() => {
-    const handler = () => {
-      void fetchFarm()
+    const handler = (event: Event) => {
+      const maybeCustom = event as CustomEvent<{ farmId?: string }>
+      if (maybeCustom?.detail?.farmId) {
+        setActiveFarmId(maybeCustom.detail.farmId)
+      }
     }
 
     if (typeof window !== "undefined") {
       window.addEventListener("farm-updated", handler)
       return () => window.removeEventListener("farm-updated", handler)
     }
-  }, [fetchFarm])
+  }, [])
 
-  return { farm, farmId: farm?.id ?? null, loading, error, refresh: fetchFarm }
+  const farm = useMemo<ActiveFarm | null>(() => {
+    const farms = (farmsQuery.data?.status === "success" ? farmsQuery.data.data : []) as FarmOption[]
+    if (!activeFarmId) return null
+    const match = farms.find((row) => row.id === activeFarmId)
+    if (!match) return null
+    return { id: match.id, name: match.label ?? null, location: match.location ?? null }
+  }, [activeFarmId, farmsQuery.data])
+
+  return {
+    farm,
+    farmId: activeFarmId ?? null,
+    loading: isLoading || (Boolean(session) && farmsQuery.isLoading),
+    error: farmsQuery.error as Error | null,
+    refresh: farmsQuery.refetch,
+  }
 }

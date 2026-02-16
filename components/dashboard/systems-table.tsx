@@ -5,15 +5,15 @@ import { useRouter } from "next/navigation"
 import type { Enums } from "@/lib/types/database"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { createClient } from "@/utils/supabase/client"
 import { useActiveFarm } from "@/hooks/use-active-farm"
-import type { Tables } from "@/lib/types/database"
+import { useSystemsTable } from "@/lib/hooks/use-dashboard"
 
 interface SystemsTableProps {
-  stage: Enums<"system_growth_stage">
+  stage: Enums<"system_growth_stage"> | "all"
   batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
+  periodParam?: string | null
 }
 
 const PAGE_SIZE = 8
@@ -38,13 +38,11 @@ export default function SystemsTable({
   stage,
   batch = "all",
   system = "all",
-  timePeriod = "week",
+  timePeriod = "2 weeks",
+  periodParam,
 }: SystemsTableProps) {
   const router = useRouter()
-  const supabase = createClient()
   const { farmId } = useActiveFarm()
-  const [systems, setSystems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
   const [pageIndex, setPageIndex] = useState(0)
 
   const handleRowClick = (systemId: number, startDate: string, endDate: string) => {
@@ -58,51 +56,24 @@ export default function SystemsTable({
   }
 
   useEffect(() => {
-    const loadSystems = async () => {
-      setLoading(true)
-      setPageIndex(0)
-      const systemId = system !== "all" ? Number(system) : undefined
-      const systemIds: number[] = []
-      if (Number.isFinite(systemId)) {
-        systemIds.push(systemId as number)
-      } else if (farmId) {
-        const { data: systemRows } = await supabase
-          .from("system")
-          .select("id,name,growth_stage")
-          .eq("farm_id", farmId)
-          .eq("is_active", true)
+    setPageIndex(0)
+  }, [batch, farmId, stage, system, timePeriod, periodParam])
 
-        const filtered = (systemRows ?? []).filter((row) =>
-          stage ? row.growth_stage === stage : true,
-        )
-        filtered.forEach((row) => systemIds.push(row.id as number))
-      }
+  const systemsQuery = useSystemsTable({
+    farmId,
+    stage,
+    system,
+    timePeriod,
+    periodParam,
+  })
 
-      if (!systemIds.length) {
-        setSystems([])
-        setLoading(false)
-        return
-      }
-
-      const { data: dashboardRows } = await supabase
-        .from("dashboard")
-        .select(
-          "system_id,system_name,abw,efcr,feeding_rate,mortality_rate,biomass_density,water_quality_rating_average,input_start_date,input_end_date,sampling_end_date,growth_stage,time_period",
-        )
-        .in("system_id", systemIds)
-        .eq("time_period", timePeriod)
-        .order("input_end_date", { ascending: false })
-
-      const filtered = (dashboardRows as Tables<"dashboard">[] | null)?.filter((row) =>
-        stage ? row.growth_stage === stage : true,
-      ) ?? []
-
-      filtered.sort((a, b) => String(a.system_name ?? "").localeCompare(String(b.system_name ?? "")))
-      setSystems(filtered)
-      setLoading(false)
-    }
-    loadSystems()
-  }, [batch, farmId, stage, system, supabase, timePeriod])
+  const systems = systemsQuery.data?.rows ?? []
+  const meta = systemsQuery.data?.meta
+  const loading = systemsQuery.isLoading
+  const debugReason =
+    meta && "reason" in meta && typeof meta.reason === "string" ? meta.reason : null
+  const debugError =
+    meta && "error" in meta && typeof meta.error === "string" ? meta.error : null
 
   const totalRows = systems.length
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
@@ -132,6 +103,11 @@ export default function SystemsTable({
       <div className="mb-6">
         <h2 className="text-base font-semibold text-slate-900">Production</h2>
         <p className="text-xs text-slate-500 mt-2">{systems.length} systems tracked</p>
+        {debugReason ? (
+          <p className="mt-2 text-[11px] text-amber-600">
+            Debug: {debugReason}{debugError ? ` (${debugError})` : ""}
+          </p>
+        ) : null}
       </div>
       <div className="max-h-[60vh] overflow-auto">
         <Table>
@@ -190,7 +166,7 @@ export default function SystemsTable({
                   <TableCell className="text-right text-sm text-slate-900">{formatNumber(system.efcr, 2)}</TableCell>
                   <TableCell className="text-right text-sm text-slate-900">{formatWithUnit(system.abw, 1, "g")}</TableCell>
                   <TableCell className="text-right text-sm text-slate-900 hidden lg:table-cell">
-                    {formatPercent(system.feeding_rate, 2)}
+                    {formatWithUnit(system.feeding_rate, 2, "kg/t")}
                   </TableCell>
                   <TableCell className="text-right text-sm text-slate-900 hidden lg:table-cell">
                     {formatPercent(system.mortality_rate, 2)}

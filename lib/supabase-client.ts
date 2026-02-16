@@ -1,4 +1,6 @@
 import { createClient } from "@/utils/supabase/client"
+import { isSbPermissionDenied, logSbError } from "@/utils/supabase/log"
+import { getSessionUser } from "@/utils/supabase/session"
 
 export interface QueryParams {
   select?: string
@@ -24,6 +26,10 @@ function applyOrder<T>(query: any, order: QueryParams["order"]) {
 export async function supabaseQuery<T = any>(table: string, params: QueryParams = {}): Promise<QueryResult<T>> {
   try {
     const supabase = createClient()
+    const sessionUser = await getSessionUser(supabase, `supabaseQuery:${table}:getSession`)
+    if (!sessionUser) {
+      return { status: "error", data: null, error: "No active session" }
+    }
     let query = supabase.from(table).select(params.select ?? "*")
 
     if (params.eq) {
@@ -60,11 +66,15 @@ export async function supabaseQuery<T = any>(table: string, params: QueryParams 
     const { data, error } = await query
 
     if (error) {
+      if (!isSbPermissionDenied(error)) {
+        logSbError(`supabaseQuery:${table}`, error)
+      }
       return { status: "error", data: null, error: error.message }
     }
 
     return { status: "success", data: (data ?? []) as T[] }
   } catch (err) {
+    logSbError(`supabaseQuery:${table}:catch`, err)
     const message = err instanceof Error ? err.message : String(err)
     return { status: "error", data: null, error: message }
   }
@@ -76,14 +86,20 @@ export async function supabaseInsert<T = any, InsertPayload extends object = obj
 ): Promise<QueryResult<T>> {
   try {
     const supabase = createClient()
+    const sessionUser = await getSessionUser(supabase, `supabaseInsert:${table}:getSession`)
+    if (!sessionUser) {
+      return { status: "error", data: null, error: "No active session" }
+    }
     const { data, error } = await supabase.from(table).insert(payload).select()
 
     if (error) {
+      logSbError(`supabaseInsert:${table}`, error)
       return { status: "error", data: null, error: error.message }
     }
 
     return { status: "success", data: (data ?? []) as T[] }
   } catch (err) {
+    logSbError(`supabaseInsert:${table}:catch`, err)
     const message = err instanceof Error ? err.message : String(err)
     return { status: "error", data: null, error: message }
   }

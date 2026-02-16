@@ -1,5 +1,7 @@
 
 import { createClient } from "@/utils/supabase/client"
+import { logSbError } from "@/utils/supabase/log"
+import { getSessionUser } from "@/utils/supabase/session"
 import { Database, Tables, TablesInsert, TablesUpdate } from "@/lib/types/database"
 import { PostgrestError } from "@supabase/supabase-js"
 
@@ -20,21 +22,24 @@ export async function insertData<T extends TableName>(
     data: TablesInsert<T> | TablesInsert<T>[]
 ): Promise<MutationResult<Tables<T>[]>> {
     const supabase = createClient()
-    // console.log("....inserting into table", table, data)
     try {
+        const sessionUser = await getSessionUser(supabase, `insertData:${String(table)}:getSession`)
+        if (!sessionUser) {
+            return { success: false, data: null, error: new Error("No active session") }
+        }
         const { data: result, error } = await supabase
             .from(table)
             .insert(data as any) // Type assertion needed for array/single union sometimes, but standard insert handles object or array
             .select()
 
         if (error) {
-            console.error(`Error inserting into ${table}:`, error)
+            logSbError(`insertData:${String(table)}`, error)
             return { success: false, data: null, error }
         }
 
         return { success: true, data: result as Tables<T>[], error: null }
     } catch (err) {
-        console.error(`Unexpected error inserting into ${table}:`, err)
+        logSbError(`insertData:${String(table)}:catch`, err)
         return { success: false, data: null, error: err as Error }
     }
 }
@@ -53,6 +58,10 @@ export async function updateData<T extends TableName>(
 ): Promise<MutationResult<Tables<T>[]>> {
     const supabase = createClient()
     try {
+        const sessionUser = await getSessionUser(supabase, `updateData:${String(table)}:getSession`)
+        if (!sessionUser) {
+            return { success: false, data: null, error: new Error("No active session") }
+        }
         const { data: result, error } = await supabase
             .from(table)
             .update(data as any)
@@ -60,13 +69,13 @@ export async function updateData<T extends TableName>(
             .select()
 
         if (error) {
-            console.error(`Error updating ${table}:`, error)
+            logSbError(`updateData:${String(table)}`, error)
             return { success: false, data: null, error }
         }
 
         return { success: true, data: result as Tables<T>[], error: null }
     } catch (err) {
-        console.error(`Unexpected error updating ${table}:`, err)
+        logSbError(`updateData:${String(table)}:catch`, err)
         return { success: false, data: null, error: err as Error }
     }
 }
@@ -83,6 +92,10 @@ export async function deleteData<T extends TableName>(
 ): Promise<MutationResult<Tables<T>[]>> {
     const supabase = createClient()
     try {
+        const sessionUser = await getSessionUser(supabase, `deleteData:${String(table)}:getSession`)
+        if (!sessionUser) {
+            return { success: false, data: null, error: new Error("No active session") }
+        }
         const { data: result, error } = await supabase
             .from(table)
             .delete()
@@ -90,13 +103,13 @@ export async function deleteData<T extends TableName>(
             .select()
 
         if (error) {
-            console.error(`Error deleting from ${table}:`, error)
+            logSbError(`deleteData:${String(table)}`, error)
             return { success: false, data: null, error }
         }
 
         return { success: true, data: result as Tables<T>[], error: null }
     } catch (err) {
-        console.error(`Unexpected error deleting from ${table}:`, err)
+        logSbError(`deleteData:${String(table)}:catch`, err)
         return { success: false, data: null, error: err as Error }
     }
 }

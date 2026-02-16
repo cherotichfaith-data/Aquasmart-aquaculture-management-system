@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client"
-import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { refreshMaterializedViews } from "@/lib/api/admin"
+import { useRecordFeeding } from "@/lib/hooks/use-feeding"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -29,14 +29,13 @@ const formSchema = z.object({
 })
 
 interface FeedingFormProps {
-    systems: Tables<"system">[]
-    feeds: Tables<"feed_type">[]
-    batches: Tables<"fingerling_batch">[]
+    systems: Tables<"api_system_options">[]
+    feeds: Tables<"api_feed_type_options">[]
+    batches: Tables<"api_fingerling_batch_options">[]
 }
 
 export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
-    const { toast } = useToast()
-    const supabase = createClient()
+    const mutation = useRecordFeeding()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -56,7 +55,7 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
             const feedTypeId = Number(values.feed_id)
             const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
 
-            const { error } = await supabase.from("feeding_record").insert({
+            await mutation.mutateAsync({
                 system_id: systemId,
                 batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
@@ -64,13 +63,11 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
                 feeding_amount: values.amount_kg,
                 feeding_response: values.feeding_response,
             })
+            const refreshResult = await refreshMaterializedViews()
+            if (refreshResult.status === "error") {
+                console.warn("[feeding] MV refresh failed:", refreshResult.error)
+            }
 
-            if (error) throw error
-
-            toast({
-                title: "Success",
-                description: "Feeding event recorded.",
-            })
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 amount_kg: 0,
@@ -81,11 +78,6 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
             })
         } catch (error) {
             console.error(error)
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to record feeding event.",
-            })
         }
     }
 
@@ -113,7 +105,7 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
                                         <SelectContent>
                                             {systems.map((s) => (
                                                 <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.name ?? `System ${s.id}`}
+                                                    {s.label ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -138,7 +130,7 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
                                             <SelectItem value="none">No batch</SelectItem>
                                             {batches.map((batch) => (
                                                 <SelectItem key={batch.id} value={String(batch.id)}>
-                                                    {batch.name || `Batch ${batch.id}`}
+                                                    {batch.label || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -177,7 +169,7 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
                                     <SelectContent>
                                         {feeds.map((f) => (
                                             <SelectItem key={f.id} value={String(f.id)}>
-                                                {f.feed_line ?? `Feed ${f.id}`}
+                                                {f.label ?? f.feed_line ?? `Feed ${f.id}`}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -224,8 +216,8 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
                             )}
                         />
                     </div>
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+                        {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
                     </Button>
                 </form>

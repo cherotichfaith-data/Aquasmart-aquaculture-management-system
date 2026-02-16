@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
 import { Droplets, HeartPulse } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
-import { createClient } from "@/utils/supabase/client"
 import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useHealthSummary } from "@/lib/hooks/use-dashboard"
 
 type Tone = "good" | "warn" | "bad"
 
@@ -68,98 +68,24 @@ function StatusCard({
 export default function HealthSummary({
   system,
   timePeriod: _timePeriod,
+  periodParam,
 }: {
   system?: string
   timePeriod?: Enums<"time_period">
+  periodParam?: string | null
 }) {
   const { farmId } = useActiveFarm()
-  const [waterQuality, setWaterQuality] = useState<HealthState | null>(null)
-  const [fishHealth, setFishHealth] = useState<HealthState | null>(null)
+  const summaryQuery = useHealthSummary({
+    farmId,
+    system,
+    timePeriod: _timePeriod ?? "2 weeks",
+    periodParam,
+  })
 
-  useEffect(() => {
-    let isMounted = true
-    const supabase = createClient()
+  const waterQuality = useMemo(() => summaryQuery.data?.waterQuality ?? null, [summaryQuery.data])
+  const fishHealth = useMemo(() => summaryQuery.data?.fishHealth ?? null, [summaryQuery.data])
 
-    const ratingToneMap: Record<string, { status: string; tone: Tone; progress: number }> = {
-      optimal: { status: "Good", tone: "good", progress: 0.85 },
-      acceptable: { status: "Fair", tone: "warn", progress: 0.6 },
-      critical: { status: "Poor", tone: "bad", progress: 0.35 },
-      lethal: { status: "Critical", tone: "bad", progress: 0.2 },
-    }
-
-    const load = async () => {
-      const systemId = system && system !== "all" ? Number(system) : undefined
-      const resolvedSystemId = Number.isFinite(systemId) ? systemId : undefined
-
-      const waterQualityState: HealthState = {
-        title: "Water quality",
-        status: "Monitoring",
-        tone: "good",
-        progress: 0.8,
-        detail: resolvedSystemId ? "Latest system rating" : "Latest farm rating",
-      }
-
-      const fishState: HealthState = {
-        title: "Fish health",
-        status: "Monitoring",
-        tone: "warn",
-        progress: 0.6,
-        detail: "Latest snapshot from dashboard view",
-      }
-
-      if (resolvedSystemId) {
-        const { data: snapshot } = await supabase
-          .from("dashboard")
-          .select("water_quality_rating_average,mortality_rate")
-          .eq("system_id", resolvedSystemId)
-          .order("input_end_date", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (snapshot?.water_quality_rating_average) {
-          const mapped = ratingToneMap[snapshot.water_quality_rating_average] ?? ratingToneMap.optimal
-          waterQualityState.tone = mapped.tone
-          waterQualityState.status = mapped.status
-          waterQualityState.progress = mapped.progress
-          waterQualityState.detail = `Rating: ${snapshot.water_quality_rating_average}`
-        }
-
-        if (snapshot?.mortality_rate != null) {
-          fishState.detail = `Mortality rate: ${snapshot.mortality_rate}`
-        }
-      } else {
-        const { data: snapshot } = await supabase
-          .from("dashboard_consolidated")
-          .select("water_quality_rating_average,mortality_rate")
-          .order("input_end_date", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (snapshot?.water_quality_rating_average) {
-          const mapped = ratingToneMap[snapshot.water_quality_rating_average] ?? ratingToneMap.optimal
-          waterQualityState.tone = mapped.tone
-          waterQualityState.status = mapped.status
-          waterQualityState.progress = mapped.progress
-          waterQualityState.detail = `Rating: ${snapshot.water_quality_rating_average}`
-        }
-
-        if (snapshot?.mortality_rate != null) {
-          fishState.detail = `Mortality rate: ${snapshot.mortality_rate}`
-        }
-      }
-
-      if (!isMounted) return
-      setWaterQuality(waterQualityState)
-      setFishHealth(fishState)
-    }
-
-    load()
-    return () => {
-      isMounted = false
-    }
-  }, [farmId, system, _timePeriod])
-
-  if (!waterQuality || !fishHealth) {
+  if (summaryQuery.isLoading || !waterQuality || !fishHealth) {
     return (
       <div className="grid gap-4">
         <div className="bg-muted/30 rounded-2xl h-32 animate-pulse" />

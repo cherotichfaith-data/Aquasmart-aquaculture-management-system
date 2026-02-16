@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client"
-import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { refreshMaterializedViews } from "@/lib/api/admin"
+import { useRecordHarvest } from "@/lib/hooks/use-harvest"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -29,13 +29,12 @@ const formSchema = z.object({
 })
 
 interface HarvestFormProps {
-    systems: Tables<"system">[]
-    batches: Tables<"fingerling_batch">[]
+    systems: Tables<"api_system_options">[]
+    batches: Tables<"api_fingerling_batch_options">[]
 }
 
 export function HarvestForm({ systems, batches }: HarvestFormProps) {
-    const { toast } = useToast()
-    const supabase = createClient()
+    const mutation = useRecordHarvest()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -53,22 +52,21 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
         try {
             const systemId = Number(values.system_id)
             const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
-            const { error } = await supabase.from("fish_harvest").insert({
+            await mutation.mutateAsync({
                 system_id: systemId,
                 batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
                 number_of_fish_harvest: values.number_of_fish,
                 total_weight_harvest: values.amount_kg,
                 type_of_harvest: values.type_of_harvest,
-                abw: null,
+                abw: values.number_of_fish > 0 ? (values.amount_kg * 1000) / values.number_of_fish : 0,
             })
 
-            if (error) throw error
+            const refreshResult = await refreshMaterializedViews()
+            if (refreshResult.status === "error") {
+                console.warn("[harvest] MV refresh failed:", refreshResult.error)
+            }
 
-            toast({
-                title: "Success",
-                description: "Harvest recorded.",
-            })
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
@@ -79,11 +77,6 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
             })
         } catch (error) {
             console.error(error)
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to record harvest.",
-            })
         }
     }
 
@@ -110,7 +103,7 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
                                         <SelectContent>
                                             {systems.map((s) => (
                                                 <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.name ?? `System ${s.id}`}
+                                                    {s.label ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -135,7 +128,7 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
                                             <SelectItem value="none">No batch</SelectItem>
                                             {batches.map((batch) => (
                                                 <SelectItem key={batch.id} value={String(batch.id)}>
-                                                    {batch.name || `Batch ${batch.id}`}
+                                                    {batch.label || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -209,8 +202,8 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
                         )}
                     />
 
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+                        {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
                     </Button>
                 </form>

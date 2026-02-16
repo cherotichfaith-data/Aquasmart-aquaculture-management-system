@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { fetchHarvests } from "@/lib/supabase-queries"
+import { useHarvests } from "@/lib/hooks/use-reports"
 
 export default function ReconciliationReport({
   selectedBatch,
@@ -12,24 +11,16 @@ export default function ReconciliationReport({
   selectedSystem: string
   selectedStage: "all" | "nursing" | "grow_out"
 }) {
-  const [harvests, setHarvests] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
+  const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
+  const harvestsQuery = useHarvests({
+    limit: 50,
+    systemId: Number.isFinite(systemId) ? systemId : undefined,
+    batchId: Number.isFinite(batchId) ? batchId : undefined,
+  })
 
-  useEffect(() => {
-    const loadHarvests = async () => {
-      setLoading(true)
-      const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
-      const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
-      const result = await fetchHarvests({
-        limit: 50,
-        system_id: Number.isFinite(systemId) ? systemId : undefined,
-        batch_id: Number.isFinite(batchId) ? batchId : undefined,
-      })
-      setHarvests(result.status === "success" ? result.data : [])
-      setLoading(false)
-    }
-    loadHarvests()
-  }, [selectedBatch, selectedStage, selectedSystem])
+  const harvests = harvestsQuery.data?.status === "success" ? harvestsQuery.data.data : []
+  const loading = harvestsQuery.isLoading
 
   return (
     <div className="space-y-6">

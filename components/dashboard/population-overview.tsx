@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import type React from "react"
 import {
     Area,
@@ -14,12 +14,13 @@ import {
 } from "recharts"
 import { Activity, Fish } from "lucide-react"
 import { format } from "date-fns"
-import { fetchProductionSummary, fetchTimeWindow } from "@/lib/supabase-queries"
 import type { Tables } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useProductionTrend } from "@/lib/hooks/use-dashboard"
 
-type SummaryRow = Tables<"production_summary"> & {
+type SummaryRow = Tables<"api_production_summary"> & {
     efcr_aggregated?: number | null
 }
 
@@ -64,39 +65,22 @@ export default function PopulationOverview({
     stage,
     system,
     timePeriod,
+    periodParam,
 }: {
     stage: SummaryRow["growth_stage"]
     system?: string
     timePeriod: TimePeriod
+    periodParam?: string | null
 }) {
-    const [rows, setRows] = useState<SummaryRow[]>([])
-    const [loading, setLoading] = useState(true)
+    const { farmId } = useActiveFarm()
+    const summaryQuery = useProductionTrend({
+        farmId,
+        stage: stage ?? undefined,
+        system,
+        timePeriod: periodParam ?? timePeriod,
+    })
 
-    useEffect(() => {
-        let isMounted = true
-        const loadSummary = async () => {
-            setLoading(true)
-      const systemId = system && system !== "all" ? Number(system) : undefined
-      const bounds = await fetchTimeWindow({ timePeriod })
-      const summaryResult = await fetchProductionSummary({
-        growth_stage: stage ?? undefined,
-        system_id: Number.isFinite(systemId) ? systemId : undefined,
-        date_from: bounds.start ?? undefined,
-        date_to: bounds.end ?? undefined,
-        limit: 500,
-      })
-
-      if (!isMounted) return
-      setRows(summaryResult.status === "success" ? summaryResult.data : [])
-            setLoading(false)
-        }
-        loadSummary()
-        return () => {
-            isMounted = false
-        }
-    }, [stage, system, timePeriod])
-
-    const chartData = useMemo(() => rows, [rows])
+    const chartData = useMemo(() => summaryQuery.data ?? [], [summaryQuery.data])
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
             <Card className="w-full">
@@ -104,7 +88,7 @@ export default function PopulationOverview({
                     <CardTitle>eFCR Trend</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
-                    {loading ? (
+                    {summaryQuery.isLoading ? (
                         <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
                     ) : chartData.length ? (
                         <ResponsiveContainer width="100%" height={320}>
@@ -134,7 +118,7 @@ export default function PopulationOverview({
                     <CardTitle>Mortality Trend</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
-                    {loading ? (
+                    {summaryQuery.isLoading ? (
                         <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
                     ) : chartData.length ? (
                         <ResponsiveContainer width="100%" height={320}>

@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import type { Tables } from "@/lib/types/database"
-import { fetchProductionSummary } from "@/lib/supabase-queries"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 
 export default function FishInventory({
   selectedBatch,
@@ -13,23 +13,16 @@ export default function FishInventory({
   selectedSystem: string
   selectedStage: "all" | "nursing" | "grow_out"
 }) {
-  const [rows, setRows] = useState<Tables<"production_summary">[]>([])
-  const [loading, setLoading] = useState(true)
+  const { farmId } = useActiveFarm()
+  const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
+  const inventoryQuery = useDailyFishInventory({
+    farmId,
+    systemId: Number.isFinite(systemId) ? systemId : undefined,
+    limit: 50,
+  })
 
-  useEffect(() => {
-    const loadInventory = async () => {
-      setLoading(true)
-      const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
-      const result = await fetchProductionSummary({
-        limit: 50,
-        system_id: Number.isFinite(systemId) ? systemId : undefined,
-        growth_stage: selectedStage === "all" ? undefined : selectedStage,
-      })
-      setRows(result.status === "success" ? result.data : [])
-      setLoading(false)
-    }
-    loadInventory()
-  }, [selectedBatch, selectedStage, selectedSystem])
+  const rows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
+  const loading = inventoryQuery.isLoading
 
   const latest = rows[0]
 
@@ -38,15 +31,15 @@ export default function FishInventory({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Fish Count (Latest)</p>
-          <p className="text-3xl font-bold">{latest?.number_of_fish_inventory ?? "--"}</p>
+          <p className="text-3xl font-bold">{latest?.number_of_fish ?? "--"}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Biomass (Latest)</p>
-          <p className="text-3xl font-bold">{latest?.total_biomass ?? "--"} kg</p>
+          <p className="text-3xl font-bold">{latest?.biomass_last_sampling ?? "--"} kg</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Daily Mortality (Latest)</p>
-          <p className="text-3xl font-bold text-destructive">{latest?.daily_mortality_count ?? "--"}</p>
+          <p className="text-3xl font-bold text-destructive">{latest?.number_of_fish_mortality ?? "--"}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Snapshots</p>
@@ -80,14 +73,14 @@ export default function FishInventory({
                 </tr>
               ) : rows.length > 0 ? (
                 rows.map((row) => (
-                  <tr key={`${row.system_id}-${row.date}`} className="border-b border-border hover:bg-muted/30">
-                    <td className="px-4 py-3 font-medium">{row.date}</td>
+                  <tr key={`${row.system_id}-${row.inventory_date}`} className="border-b border-border hover:bg-muted/30">
+                    <td className="px-4 py-3 font-medium">{row.inventory_date}</td>
                     <td className="px-4 py-3">{row.system_name ?? row.system_id}</td>
-                    <td className="px-4 py-3">{row.growth_stage ?? "-"}</td>
-                    <td className="px-4 py-3">{row.number_of_fish_inventory ?? "-"}</td>
-                    <td className="px-4 py-3">{row.total_biomass ?? "-"}</td>
-                    <td className="px-4 py-3">{row.average_body_weight ?? "-"}</td>
-                    <td className="px-4 py-3">{row.daily_mortality_count ?? "-"}</td>
+                    <td className="px-4 py-3">-</td>
+                    <td className="px-4 py-3">{row.number_of_fish ?? "-"}</td>
+                    <td className="px-4 py-3">{row.biomass_last_sampling ?? "-"}</td>
+                    <td className="px-4 py-3">{row.abw_last_sampling ?? "-"}</td>
+                    <td className="px-4 py-3">{row.number_of_fish_mortality ?? "-"}</td>
                   </tr>
                 ))
               ) : (

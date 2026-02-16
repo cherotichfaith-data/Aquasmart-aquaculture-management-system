@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client"
-import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { refreshMaterializedViews } from "@/lib/api/admin"
+import { useRecordSampling } from "@/lib/hooks/use-sampling"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -29,13 +29,12 @@ const formSchema = z.object({
 })
 
 interface SamplingFormProps {
-    systems: Tables<"system">[]
-    batches: Tables<"fingerling_batch">[]
+    systems: Tables<"api_system_options">[]
+    batches: Tables<"api_fingerling_batch_options">[]
 }
 
 export function SamplingForm({ systems, batches }: SamplingFormProps) {
-    const { toast } = useToast()
-    const supabase = createClient()
+    const mutation = useRecordSampling()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -54,7 +53,7 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
             const systemId = Number(values.system_id)
             const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
 
-            const { error } = await supabase.from("fish_sampling_weight").insert({
+            await mutation.mutateAsync({
                 system_id: systemId,
                 batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
@@ -62,13 +61,11 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
                 total_weight_sampling: values.total_weight_kg,
                 abw: values.average_body_weight_g || 0,
             })
+            const refreshResult = await refreshMaterializedViews()
+            if (refreshResult.status === "error") {
+                console.warn("[sampling] MV refresh failed:", refreshResult.error)
+            }
 
-            if (error) throw error
-
-            toast({
-                title: "Success",
-                description: "Sampling event recorded.",
-            })
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
@@ -79,11 +76,6 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
             })
         } catch (error) {
             console.error(error)
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to record sampling event.",
-            })
         }
     }
 
@@ -111,7 +103,7 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
                                         <SelectContent>
                                             {systems.map((s) => (
                                                 <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.name ?? `System ${s.id}`}
+                                                    {s.label ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -136,7 +128,7 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
                                             <SelectItem value="none">No batch</SelectItem>
                                             {batches.map((batch) => (
                                                 <SelectItem key={batch.id} value={String(batch.id)}>
-                                                    {batch.name || `Batch ${batch.id}`}
+                                                    {batch.label || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -201,8 +193,8 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
                             )}
                         />
                     </div>
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+                        {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
                     </Button>
                 </form>

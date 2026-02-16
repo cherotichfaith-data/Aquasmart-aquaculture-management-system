@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client" // Adjust import path
-import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { refreshMaterializedViews } from "@/lib/api/admin"
+import { useRecordMortality } from "@/lib/hooks/use-mortality"
 
 // Schema
 const formSchema = z.object({
@@ -30,13 +30,12 @@ const formSchema = z.object({
 })
 
 interface MortalityFormProps {
-    systems: Tables<"system">[]
-    batches: Tables<"fingerling_batch">[]
+    systems: Tables<"api_system_options">[]
+    batches: Tables<"api_fingerling_batch_options">[]
 }
 
 export function MortalityForm({ systems, batches }: MortalityFormProps) {
-    const { toast } = useToast()
-    const supabase = createClient()
+    const mutation = useRecordMortality()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -55,7 +54,7 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
             const systemId = Number(values.system_id)
             const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
 
-            const { error } = await supabase.from("fish_mortality").insert({
+            await mutation.mutateAsync({
                 system_id: systemId,
                 batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
@@ -63,13 +62,11 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
                 total_weight_mortality: values.total_weight ?? null,
                 abw: values.average_body_weight ?? null,
             })
+            const refreshResult = await refreshMaterializedViews()
+            if (refreshResult.status === "error") {
+                console.warn("[mortality] MV refresh failed:", refreshResult.error)
+            }
 
-            if (error) throw error
-
-            toast({
-                title: "Success",
-                description: "Mortality event recorded.",
-            })
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
@@ -78,11 +75,6 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
             })
         } catch (error) {
             console.error(error)
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to record mortality event.",
-            })
         }
     }
 
@@ -111,7 +103,7 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
                                         <SelectContent>
                                             {systems.map((s) => (
                                                 <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.name ?? `System ${s.id}`}
+                                                    {s.label ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -136,7 +128,7 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
                                             <SelectItem value="none">No batch</SelectItem>
                                             {batches.map((batch) => (
                                                 <SelectItem key={batch.id} value={String(batch.id)}>
-                                                    {batch.name || `Batch ${batch.id}`}
+                                                    {batch.label || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -205,8 +197,8 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
                         />
                     </div>
 
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+                        {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
                     </Button>
                 </form>

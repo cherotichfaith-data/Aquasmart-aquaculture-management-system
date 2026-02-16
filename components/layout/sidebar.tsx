@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useState } from "react"
-import { useAuth } from "@/components/auth-provider"
+import { useAuth } from "@/components/providers/auth-provider"
 import {
   Activity,
   BarChart3,
@@ -64,11 +64,7 @@ export default function Sidebar({ open, onToggle }: { open: boolean; onToggle: (
             <p className="text-xs text-sidebar-foreground/70">Overview</p>
           </div>
         </div>
-
-        
-
         <nav className="p-4 space-y-2 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          {/* <p className="px-2 text-xs uppercase tracking-wide text-sidebar-foreground/60">Menu</p> */}
           {navigation.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon

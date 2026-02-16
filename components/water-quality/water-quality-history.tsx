@@ -1,21 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { fetchWaterQualityMeasurements, type WaterQualityMeasurementWithUnit } from "@/lib/supabase-queries"
+import { useWaterQualityRatings } from "@/lib/hooks/use-water-quality"
+import { useActiveFarm } from "@/hooks/use-active-farm"
 
 export default function WaterQualityHistory() {
-  const [history, setHistory] = useState<WaterQualityMeasurementWithUnit[]>([])
-  const [loading, setLoading] = useState(true)
+  const { farmId } = useActiveFarm()
+  const historyQuery = useWaterQualityRatings({ limit: 120, farmId })
 
-  useEffect(() => {
-    const loadHistory = async () => {
-      setLoading(true)
-      const result = await fetchWaterQualityMeasurements({ limit: 20 })
-      setHistory(result.status === "success" ? result.data : [])
-      setLoading(false)
-    }
-    loadHistory()
-  }, [])
+  const history =
+    historyQuery.data?.status === "success" ? historyQuery.data.data.slice(0, 20) : []
+  const loading = historyQuery.isLoading
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -27,34 +21,30 @@ export default function WaterQualityHistory() {
           <thead>
             <tr className="bg-muted/50 border-b border-border">
               <th className="px-4 py-3 text-left font-semibold">Date</th>
-              <th className="px-4 py-3 text-left font-semibold">Time</th>
               <th className="px-4 py-3 text-left font-semibold">System</th>
-              <th className="px-4 py-3 text-left font-semibold">Parameter</th>
-              <th className="px-4 py-3 text-left font-semibold">Value</th>
-              <th className="px-4 py-3 text-left font-semibold">Unit</th>
+              <th className="px-4 py-3 text-left font-semibold">Rating</th>
+              <th className="px-4 py-3 text-left font-semibold">Score</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
                   Loading...
                 </td>
               </tr>
             ) : history.length > 0 ? (
               history.map((row) => (
-                <tr key={row.id} className="border-b border-border hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium">{row.date}</td>
-                  <td className="px-4 py-3">{row.time}</td>
-                  <td className="px-4 py-3">{row.system_id}</td>
-                  <td className="px-4 py-3">{row.parameter_name}</td>
-                  <td className="px-4 py-3">{row.parameter_value}</td>
-                  <td className="px-4 py-3">{row.water_quality_framework?.unit ?? "-"}</td>
+                <tr key={`${row.system_id ?? "farm"}-${row.rating_date ?? "unknown"}`} className="border-b border-border hover:bg-muted/30">
+                  <td className="px-4 py-3 font-medium">{row.rating_date ?? "--"}</td>
+                  <td className="px-4 py-3">{row.system_id ?? "Farm"}</td>
+                  <td className="px-4 py-3">{row.rating ?? "--"}</td>
+                  <td className="px-4 py-3">{row.rating_numeric ?? "--"}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
                   No measurements found
                 </td>
               </tr>

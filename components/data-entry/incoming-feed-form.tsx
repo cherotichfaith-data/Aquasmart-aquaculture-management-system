@@ -15,9 +15,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client"
-import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useRecordIncomingFeed } from "@/lib/hooks/use-incoming-feed"
 
 const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
@@ -26,13 +25,12 @@ const formSchema = z.object({
 })
 
 interface IncomingFeedFormProps {
-    feeds: Tables<"feed_type">[]
+    feeds: Tables<"api_feed_type_options">[]
     suppliers: Tables<"suppliers">[]
 }
 
 export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
-    const { toast } = useToast()
-    const supabase = createClient()
+    const mutation = useRecordIncomingFeed()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -47,17 +45,10 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
         try {
             const feedTypeId = Number(values.feed_id)
 
-            const { error } = await supabase.from("feed_incoming").insert({
+            await mutation.mutateAsync({
                 date: values.date,
                 feed_amount: values.quantity,
                 feed_type_id: feedTypeId,
-            })
-
-            if (error) throw error
-
-            toast({
-                title: "Success",
-                description: "Incoming feed recorded.",
             })
             form.reset({
                 date: new Date().toISOString().split("T")[0],
@@ -66,11 +57,6 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
             })
         } catch (error) {
             console.error(error)
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to record incoming feed.",
-            })
         }
     }
 
@@ -112,7 +98,7 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
                                         <SelectContent>
                                             {feeds.map((f) => (
                                                 <SelectItem key={f.id} value={String(f.id)}>
-                                                    {f.feed_line ?? `Feed ${f.id}`}
+                                                    {f.label ?? f.feed_line ?? `Feed ${f.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -139,8 +125,8 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
                         />
                     </div>
 
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+                        {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
                     </Button>
                 </form>

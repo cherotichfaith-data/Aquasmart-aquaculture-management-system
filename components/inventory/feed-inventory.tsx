@@ -1,8 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import type { Tables } from "@/lib/types/database"
-import { fetchFeedData, fetchFeedTypes, type FeedIncomingWithType } from "@/lib/supabase-queries"
+import { useFeedIncoming, useFeedTypes } from "@/lib/hooks/use-reports"
 
 export default function FeedInventory({
   selectedBatch,
@@ -13,20 +11,12 @@ export default function FeedInventory({
   selectedSystem: string
   selectedStage: "all" | "nursing" | "grow_out"
 }) {
-  const [feedData, setFeedData] = useState<FeedIncomingWithType[]>([])
-  const [feedTypes, setFeedTypes] = useState<Tables<"feed_type">[]>([])
-  const [loading, setLoading] = useState(true)
+  const feedIncomingQuery = useFeedIncoming()
+  const feedTypesQuery = useFeedTypes()
 
-  useEffect(() => {
-    const loadFeed = async () => {
-      setLoading(true)
-      const [incomingResult, typesResult] = await Promise.all([fetchFeedData(), fetchFeedTypes()])
-      setFeedData(incomingResult.status === "success" ? incomingResult.data : [])
-      setFeedTypes(typesResult.status === "success" ? typesResult.data : [])
-      setLoading(false)
-    }
-    loadFeed()
-  }, [selectedBatch, selectedSystem, selectedStage])
+  const feedData = feedIncomingQuery.data?.status === "success" ? feedIncomingQuery.data.data : []
+  const feedTypes = feedTypesQuery.data?.status === "success" ? feedTypesQuery.data.data : []
+  const loading = feedIncomingQuery.isLoading || feedTypesQuery.isLoading
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import type React from "react"
 import {
   Area,
@@ -14,13 +14,13 @@ import {
 } from "recharts"
 import { Activity, Fish, Package, Skull } from "lucide-react"
 import { format } from "date-fns"
-import { fetchProductionSummary, fetchTimeWindow } from "@/lib/supabase-queries"
 import type { Tables } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useProductionTrend } from "@/lib/hooks/use-dashboard"
 
-type SummaryRow = Tables<"production_summary">
+type SummaryRow = Tables<"api_production_summary">
 
 type Totals = {
   totalBiomass: number
@@ -71,45 +71,26 @@ export default function AnalysisOverview({
   stage,
   system,
   timePeriod,
+  periodParam,
 }: {
   stage: SummaryRow["growth_stage"]
   system?: string
   timePeriod: TimePeriod
+  periodParam?: string | null
 }) {
   const { farmId } = useActiveFarm()
-  const [rows, setRows] = useState<SummaryRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const summaryQuery = useProductionTrend({
+    farmId,
+    stage: stage ?? undefined,
+    system,
+    timePeriod: periodParam ?? timePeriod,
+  })
 
-  useEffect(() => {
-    let isMounted = true
-    const loadSummary = async () => {
-      setLoading(true)
-      const systemId = system && system !== "all" ? Number(system) : undefined
-      const [bounds] = await Promise.all([
-        fetchTimeWindow({ timePeriod }),
-      ])
-      const summaryResult = await fetchProductionSummary({
-        growth_stage: stage ?? undefined,
-        system_id: Number.isFinite(systemId) ? systemId : undefined,
-        date_from: bounds.start ?? undefined,
-        date_to: bounds.end ?? undefined,
-        limit: 500,
-      })
-      if (!isMounted) return
-      setRows(summaryResult.status === "success" ? summaryResult.data : [])
-      setLoading(false)
-    }
-    loadSummary()
-    return () => {
-      isMounted = false
-    }
-  }, [farmId, stage, system, timePeriod])
-
-  const chartData = useMemo(() => rows, [rows])
+  const chartData = useMemo(() => summaryQuery.data ?? [], [summaryQuery.data])
 
   const latestTotals = useMemo<Totals | null>(() => {
     if (!chartData.length) return null
-    const latest = chartData[0]
+    const latest = chartData[chartData.length - 1]
     return {
       totalBiomass: latest.total_biomass ?? 0,
       totalFeed: latest.total_feed_amount_period ?? 0,
@@ -126,7 +107,7 @@ export default function AnalysisOverview({
           <CardTitle>Production Trend</CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          {loading ? (
+          {summaryQuery.isLoading ? (
             <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
           ) : chartData.length ? (
             <ResponsiveContainer width="100%" height={320}>
