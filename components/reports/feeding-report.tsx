@@ -1,27 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { fetchFeedingRecords, type FeedingRecordWithType } from "@/lib/supabase-queries"
+import { useFeedingRecords } from "@/lib/hooks/use-reports"
+import { sortByDateAsc } from "@/lib/utils"
 
 export default function FeedingReport({ dateRange }: { dateRange?: { from: string; to: string } }) {
-  const [records, setRecords] = useState<FeedingRecordWithType[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadRecords = async () => {
-      setLoading(true)
-      const result = await fetchFeedingRecords({
-        limit: 100,
-        date_from: dateRange?.from,
-        date_to: dateRange?.to,
-      })
-      setRecords(result.status === "success" ? result.data : [])
-      setLoading(false)
-    }
-    loadRecords()
-  }, [dateRange])
+  const feedingRecordsQuery = useFeedingRecords({
+    limit: 100,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+  })
+  const records = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
+  const loading = feedingRecordsQuery.isLoading
+  const chartRecords = useMemo(() => sortByDateAsc(records, (row) => row.date), [records])
 
   const latest = records[0]
 
@@ -67,7 +60,7 @@ export default function FeedingReport({ dateRange }: { dateRange?: { from: strin
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={records}>
+              <LineChart data={chartRecords}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />

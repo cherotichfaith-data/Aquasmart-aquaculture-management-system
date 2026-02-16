@@ -15,9 +15,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/hooks/use-toast"
-import { insertData } from "@/lib/supabase-actions"
 import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useCreateSystem } from "@/lib/hooks/use-system"
 
 const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -30,12 +29,9 @@ const formSchema = z.object({
     diameter: z.coerce.number().min(0).optional(),
 })
 
-import { useRouter } from "next/navigation"
-
 export function SystemForm() {
-    const { toast } = useToast()
-    const router = useRouter()
     const { farmId } = useActiveFarm()
+    const createSystem = useCreateSystem()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -51,47 +47,38 @@ export function SystemForm() {
         },
     })
 
-    async function onSubmit(values: z.infer<typeof formSchema>) {
-        try {
-            console.log("..submitting....")
-            const result = await insertData("system", {
-                name: values.name,
-                type: values.type,
-                growth_stage: values.growth_stage,
-                ...(values.volume !== undefined ? { volume: values.volume } : {}),
-                ...(values.depth !== undefined ? { depth: values.depth } : {}),
-                ...(values.length !== undefined ? { length: values.length } : {}),
-                ...(values.width !== undefined ? { width: values.width } : {}),
-                ...(values.diameter !== undefined ? { diameter: values.diameter } : {}),
-                is_active: true,
-                farm_id: farmId ?? null,
-            })
-
-            if (!result.success) throw result.error
-
-            toast({
-                title: "Success",
-                description: "System created successfully.",
-            })
-            form.reset({
-                name: "",
-                type: "rectangular_cage",
-                growth_stage: "grow_out",
-                volume: 0,
-                depth: 0,
-                length: 0,
-                width: 0,
-                diameter: 0,
-            })
-            router.refresh()
-        } catch (error) {
-            console.error(error)
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to create system.",
-            })
+    function onSubmit(values: z.infer<typeof formSchema>) {
+        if (!farmId) {
+            return
         }
+
+        const payload = {
+            name: values.name,
+            type: values.type,
+            growth_stage: values.growth_stage,
+            ...(values.volume !== undefined ? { volume: values.volume } : {}),
+            ...(values.depth !== undefined ? { depth: values.depth } : {}),
+            ...(values.length !== undefined ? { length: values.length } : {}),
+            ...(values.width !== undefined ? { width: values.width } : {}),
+            ...(values.diameter !== undefined ? { diameter: values.diameter } : {}),
+            is_active: true,
+            farm_id: farmId,
+        }
+
+        createSystem.mutate(payload, {
+            onSuccess: () => {
+                form.reset({
+                    name: "",
+                    type: "rectangular_cage",
+                    growth_stage: "grow_out",
+                    volume: 0,
+                    depth: 0,
+                    length: 0,
+                    width: 0,
+                    diameter: 0,
+                })
+            },
+        })
     }
 
     const type = form.watch("type")
@@ -242,8 +229,8 @@ export function SystemForm() {
                         />
                     )}
 
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" disabled={createSystem.isPending}>
+                        {createSystem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Create System
                     </Button>
                 </form>

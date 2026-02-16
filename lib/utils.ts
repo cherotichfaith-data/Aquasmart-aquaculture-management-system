@@ -2,8 +2,59 @@ import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import type { Enums } from './types/database'
 
+const TIME_PERIOD_VALUES = [
+  "day",
+  "week",
+  "2 weeks",
+  "month",
+  "quarter",
+  "6 months",
+  "year",
+] as const
+
+type TimePeriodValue = Enums<"time_period">
+type ParsedTimePeriod =
+  | { kind: "preset"; period: TimePeriodValue }
+  | { kind: "custom"; period: "custom"; startDate: string; endDate: string }
+
+const isTimePeriodValue = (value: string | null | undefined): value is TimePeriodValue =>
+  Boolean(value && (TIME_PERIOD_VALUES as readonly string[]).includes(value))
+
+const parseCustomRange = (value: string): { startDate: string; endDate: string } | null => {
+  const match = /^custom_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(value)
+  if (!match) return null
+
+  const [, startDate, endDate] = match
+  const start = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T00:00:00`)
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  if (start > end) return null
+
+  return { startDate, endDate }
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+export function parseDateToTimePeriod(
+  input: string | null | undefined,
+  defaultPeriod: TimePeriodValue = "2 weeks",
+): ParsedTimePeriod {
+  const trimmed = input?.trim()
+  if (isTimePeriodValue(trimmed)) {
+    return { kind: "preset", period: trimmed }
+  }
+
+  if (trimmed) {
+    const custom = parseCustomRange(trimmed)
+    if (custom) {
+      return { kind: "custom", period: "custom", ...custom }
+    }
+  }
+
+  return { kind: "preset", period: defaultPeriod }
 }
 
 /**
@@ -59,6 +110,28 @@ export function getDateRangeFromPeriod(period: Enums<"time_period"> | string) {
 }
 
 /**
+ * Calculate date range for either a preset time period or a custom range.
+ */
+export function getDateRange(input: string | null | undefined, defaultPeriod: TimePeriodValue = "2 weeks") {
+  const parsed = parseDateToTimePeriod(input, defaultPeriod)
+  if (parsed.kind === "custom") {
+    return {
+      startDate: parsed.startDate,
+      endDate: parsed.endDate,
+      period: parsed.period,
+      isCustom: true,
+    }
+  }
+
+  const range = getDateRangeFromPeriod(parsed.period)
+  return {
+    ...range,
+    period: parsed.period,
+    isCustom: false,
+  }
+}
+
+/**
  * Format date range for display
  */
 export function formatDateRange(startDate: string, endDate: string): string {
@@ -85,4 +158,9 @@ export function toMetricsPeriod(period: Enums<"time_period"> | string): "7d" | "
     "6 months": "180d",
     year: "365d",
   }
-  return map[period] ?? "30d"}
+  return map[period] ?? "30d"
+}
+
+export function sortByDateAsc<T>(rows: T[], getDate: (row: T) => string | null | undefined): T[] {
+  return [...rows].sort((a, b) => String(getDate(a) ?? "").localeCompare(String(getDate(b) ?? "")))
+}

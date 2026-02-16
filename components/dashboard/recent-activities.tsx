@@ -1,24 +1,23 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Clock, Fish, Droplets, AlertCircle, CornerDownRight } from "lucide-react"
-import { fetchActivities } from "@/lib/supabase-queries"
+import { useRecentActivities } from "@/lib/hooks/use-dashboard"
 
-export default function RecentActivities({ batch = "all", system = "all" }: { batch?: string; system?: string }) {
-  const [activities, setActivities] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+export default function RecentActivities({
+  batch = "all",
+  system = "all",
+  title = "Activities",
+  countLabel = "updates",
+}: {
+  batch?: string
+  system?: string
+  title?: string
+  countLabel?: string
+}) {
+  const activitiesQuery = useRecentActivities({ limit: 5 })
 
-  useEffect(() => {
-    const loadActivities = async () => {
-      setLoading(true)
-      const result = await fetchActivities({
-        limit: 5,
-      })
-      setActivities(result.data || [])
-      setLoading(false)
-    }
-    loadActivities()
-  }, [batch, system])
+  const activities = activitiesQuery.data?.status === "success" ? activitiesQuery.data.data : []
+  const loading = activitiesQuery.isLoading
 
   const normalizeTableName = (table: string) => {
     switch (table) {
@@ -130,7 +129,7 @@ export default function RecentActivities({ batch = "all", system = "all" }: { ba
     return (
       <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
         <div className="p-4 border-b border-border">
-          <h2 className="font-semibold text-sm">Activities</h2>
+          <h2 className="font-semibold text-sm">{title}</h2>
         </div>
         <div className="p-4 text-center text-muted-foreground text-sm">Loading...</div>
       </div>
@@ -140,8 +139,10 @@ export default function RecentActivities({ batch = "all", system = "all" }: { ba
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
       <div className="p-4 border-b border-border flex items-center justify-between">
-        <h2 className="font-semibold text-sm">Activities</h2>
-        <span className="text-xs text-muted-foreground">{activities.length} updates</span>
+        <h2 className="font-semibold text-sm">{title}</h2>
+        <span className="text-xs text-muted-foreground">
+          {activities.length} {countLabel}
+        </span>
       </div>
       <div className="divide-y divide-border">
         {activities.length > 0 ? (

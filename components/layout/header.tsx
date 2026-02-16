@@ -2,7 +2,7 @@
 
 import { Bell, LogOut, Menu, Settings, User as UserIcon } from "lucide-react"
 import Link from "next/link"
-import { useAuth } from "@/components/auth-provider"
+import { useAuth } from "@/components/providers/auth-provider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {

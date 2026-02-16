@@ -1,209 +1,236 @@
-# AquaSmart – Aquaculture Farm Intelligence Platform
+# AquaSmart - Aquaculture Farm Intelligence Platform
 
-AquaSmart is a real-time operational intelligence dashboard for modern aquaculture farms. Built with Next.js and Supabase, it empowers Farm Managers to monitor key performance indicators (KPIs), manage inventory, track feeding and mortality, analyze water quality, and generate compliance-ready reports—all from a single, secure interface.
+AquaSmart is a real-time operational intelligence dashboard for modern aquaculture farms. Built with Next.js and Supabase, it supports KPI monitoring, inventory, feeding, mortality, water quality, and compliance-ready reporting.
 
 ---
 
-## 🎯 Vision
-
+## Vision
 Enable data-driven decision-making in aquaculture through:
-- Real-time visibility into farm performance  
-- Automated alerts for critical anomalies  
-- Role-based access control and auditability  
-- Regulatory compliance and reporting  
-- Scalable architecture for single or multi-farm operations  
+- Real-time visibility into farm performance
+- Automated alerts for critical anomalies
+- Role-based access control and auditability
+- Regulatory compliance and reporting
+- Scalable architecture for single or multi-farm operations
 
-> Current Scope: Phase 1 focuses exclusively on the Farm Manager role, with core modules for KPIs, inventory, feeding, sampling, mortality, and water quality.
+Current scope: Phase 1 focuses on the Farm Manager role with core modules for KPIs, inventory, feeding, sampling, mortality, and water quality.
 
 ---
 
-## 🧩 Core Features (v1.0)
-
-### ✅ Dashboard & Core KPIs
-- Real-time display of ABW, FCR, mortality, and more (≤5 min refresh)
+## Core Features (v1.0)
+### Dashboard and KPIs
+- ABW, eFCR, mortality, water quality, feeding rate, biomass
 - Drill-down by system, batch, and growth stage
-- Configurable threshold alerts with alert history feed
+- Alerts and recent activity feed
 
-### ✅ Inventory Management
-- Fish stock tracking with mortality-adjusted population
-- Feed inventory monitoring with reorder point alerts
-- Full transaction log for stocking, consumption, and adjustments
+### Inventory
+- Fish inventory snapshots
+- Feed inventory tracking
+- Reconciliation views
 
-### ✅ Feed Management
-- Daily feeding logs with operator attribution
-- Effective Feed Conversion Ratio (eFCR) calculation
-- Consumption trend analysis
+### Data Entry
+- Feeding, mortality, sampling, transfer, harvest, stocking, water quality
+- Recent entries lists
 
-### ✅ Sampling & Mortality
-- ABW sampling with statistical summary (avg, CV, std dev)
-- Growth projections vs. target harvest weight
-- Mortality logging with root cause classification and trend dashboards
+### Reporting
+- Performance, growth, feeding, mortality reports
 
-### ✅ Water-Quality Module
-- Manual logging of DO, pH, temperature, ammonia, depth
-- Per-parameter threshold alerts (green/yellow/red status)
-- Historical trends and compliance-ready export
-
-### ✅ Reporting & Exports
-- Pre-built PDF/CSV reports: performance, feed, mortality, water quality
-- One-click CSV export from any data view
-- Branded PDF templates with farm logo and commentary
-
-### ✅ Security & Access Control
-- Email/password authentication with email verification
-- Role-Based Access Control (RBAC) – currently scoped to Farm Manager
-- Row-Level Security (RLS) enforced at the database level
-- Full audit trail of all data changes
+### Security
+- Email/password authentication with verification
+- Row Level Security enforced in Supabase
+- Read access via `api_*` views, writes to base tables
 
 ---
 
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|------|------------|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, Chart.js |
-| Backend | Supabase (PostgreSQL, Auth, Realtime, Storage) |
-| Auth | Supabase Auth (JWT, email/password) |
-| Deployment | Vercel (frontend), Supabase Cloud (backend) |
-| Testing | Vitest, Playwright, Supabase Test DB |
+## Tech Stack
+- Frontend: Next.js (App Router), TypeScript, Tailwind CSS
+- Backend: Supabase (PostgreSQL, Auth, Realtime, Storage)
+- Data: TanStack Query (React Query) for client-side caching and mutations
+- Auth: Supabase Auth (email/password)
+- Deployment: Vercel + Supabase Cloud
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
-aquasmart/
-├── src/
-│   ├── app/                 # Next.js App Router
-│   │   ├── (auth)/          # Auth pages (login, register)
-│   │   ├── dashboard/       # Main Farm Manager dashboard
-│   │   └── layout.tsx       # Root layout with AuthProvider
-│   ├── contexts/            # React contexts (AuthContext)
-│   ├── lib/                 # Utilities, Supabase client, API services
-│   ├── components/          # Reusable UI components
-│   ├── types/               # TypeScript interfaces
-│   └── styles/              # Global CSS & Tailwind config
-├── public/                  # Static assets (logos, favicons)
-├── .env.local.example       # Environment template
-├── next.config.js
-├── tailwind.config.ts
-├── package.json
-└── README.md
-```
+Root
+- `app/` Next.js App Router pages
+- `components/` UI and feature components
+- `hooks/` React hooks
+- `lib/` data access, React Query hooks, helpers, types
+- `lib/api/` Supabase read APIs (views and base table reads)
+- `lib/hooks/` React Query hooks for pages and features
+- `lib/react-query/` Query client configuration
+- `utils/` Supabase client + middleware helpers
+- `public/` static assets
+- `styles/` global styles
+- `supabase/` local Supabase CLI artifacts
+
+Route pattern
+- `app/*/page.tsx` server component guard (auth + data preflight)
+- `app/*/page.client.tsx` client UI and React Query hooks
 
 ---
 
-## 🚀 Getting Started
+## File Catalog (Per-File Purpose)
 
-### Prerequisites
-- Node.js ≥18.x
+Root
+- `.env.local` local environment variables.
+- `.eslintrc.json` ESLint configuration.
+- `.gitignore` Git ignore rules.
+- `components.json` shadcn/ui configuration.
+- `proxy.ts` Next.js proxy that syncs Supabase session and redirects unauthenticated users.
+- `next-env.d.ts` Next.js TypeScript globals.
+- `next.config.mjs` Next.js configuration.
+- `package.json` project dependencies and scripts.
+- `package-lock.json` npm lockfile.
+- `postcss.config.mjs` PostCSS configuration.
+- `README.md` project documentation.
+- `tsconfig.json` TypeScript configuration.
+
+App Router
+- `app/layout.tsx` root layout and providers.
+- `app/page.tsx` root route (landing vs dashboard).
+- `app/*/page.tsx` server shells (auth + data preflight).
+- `app/*/page.client.tsx` client UIs (React Query + UI composition).
+
+Core components
+- `components/providers/*` app providers (auth, theme, react-query).
+- `components/layout/*` shared dashboard layout.
+- `components/dashboard/*` KPI dashboards and widgets.
+- `components/data-entry/*` data entry forms.
+- `components/reports/*` reporting UI.
+- `components/shared/*` shared selectors and providers.
+- `components/ui/*` shadcn/ui primitives.
+
+Data layer
+- `lib/api/*` Supabase read APIs (views + base reads).
+- `lib/hooks/*` React Query hooks (queries + mutations).
+- `lib/supabase-queries*.ts` shared Supabase read helpers.
+- `lib/supabase-actions.ts` base table writes.
+- `lib/react-query/query-client.ts` React Query defaults.
+- `lib/types/database.ts` generated Supabase types.
+
+Supabase utils
+- `utils/supabase/*` client/server helpers, middleware, auth guard.
+
+---
+
+## API/View Usage (Per File)
+
+Legend
+- `api_*` = read-only views
+- `base` = base tables (writes)
+- `rpc` = stored procedures
+
+app/
+- `app/data-entry/page.tsx` reads: `api_system_options`, `api_fingerling_batch_options`, `api_feed_type_options`; base reads: `suppliers`, recent base event tables via `fetchRecent*` helpers.
+- `app/feed/page.client.tsx` reads: `api_efcr_trend`, `api_dashboard`, `api_dashboard_consolidated`, `api_feed_type_options`, `feed_incoming` (via `feed_incoming` + `feed_type` join).
+- `app/inventory/page.client.tsx` reads: `api_daily_fish_inventory`, `api_feed_type_options`, `feed_incoming`.
+- `app/metrics/page.client.tsx` reads: via `metrics-explorer` (see components/metrics).
+- `app/mortality/page.client.tsx` reads: `api_system_options`, `api_fingerling_batch_options`, `fish_mortality` (history).
+- `app/production/page.client.tsx` reads: `api_production_summary`, `api_efcr_trend`, `api_dashboard`.
+- `app/reports/page.client.tsx` reads: `api_production_summary`, `api_dashboard`.
+- `app/sampling/page.client.tsx` reads: `api_system_options`, `api_fingerling_batch_options`, `fish_sampling_weight` (history).
+- `app/settings/page.client.tsx` reads: `user_profile` (RLS), `alert_threshold` (RLS); writes: `farm`, `farm_user`, `alert_threshold`, `user_profile`, `profiles`.
+- `app/transactions/page.client.tsx` reads: `change_log` (RLS) and activity helpers.
+- `app/water-quality/page.client.tsx` reads: `api_system_options`, `water_quality_measurement` (history).
+
+components/dashboard/
+- `components/dashboard/health-summary.tsx` reads: `api_dashboard`, `api_dashboard_consolidated`, `api_daily_fish_inventory`, `daily_water_quality_rating`.
+- `components/dashboard/kpi-overview.tsx` reads: `api_system_options`, `api_dashboard`, `api_dashboard_consolidated`, `api_daily_fish_inventory`, `api_production_summary`, `daily_water_quality_rating`.
+- `components/dashboard/systems-table.tsx` reads: `api_system_options`, `api_dashboard`, `api_daily_fish_inventory`, `api_production_summary`, `daily_water_quality_rating`.
+- `components/dashboard/recent-activities.tsx` reads: `change_log`.
+- `components/dashboard/recommended-actions.tsx` reads: `api_daily_fish_inventory`, `daily_water_quality_rating`.
+
+components/data-entry/
+- `components/data-entry/feeding-form.tsx` reads: `api_system_options`, `api_feed_type_options`, `api_fingerling_batch_options`; writes: `feeding_record` (base).
+- `components/data-entry/harvest-form.tsx` reads: `api_system_options`, `api_fingerling_batch_options`; writes: `fish_harvest` (base).
+- `components/data-entry/incoming-feed-form.tsx` reads: `api_feed_type_options`; writes: `feed_incoming` (base).
+- `components/data-entry/mortality-form.tsx` reads: `api_system_options`, `api_fingerling_batch_options`; writes: `fish_mortality` (base).
+- `components/data-entry/sampling-form.tsx` reads: `api_system_options`, `api_fingerling_batch_options`; writes: `fish_sampling_weight` (base).
+- `components/data-entry/stocking-form.tsx` reads: `api_system_options`, `api_fingerling_batch_options`; writes: `fish_stocking` (base).
+- `components/data-entry/transfer-form.tsx` reads: `api_system_options`, `api_fingerling_batch_options`; writes: `fish_transfer` (base).
+- `components/data-entry/water-quality-form.tsx` reads: `api_system_options`; writes: `water_quality_measurement` (base).
+- `components/data-entry/system-form.tsx` writes: `system` (base).
+
+components/inventory/
+- `components/inventory/fish-inventory.tsx` reads: `api_daily_fish_inventory`.
+- `components/inventory/feed-inventory.tsx` reads: `api_feed_type_options`, `feed_incoming`.
+
+components/metrics/
+- `components/metrics/metrics-explorer.tsx` reads: `api_daily_fish_inventory`, `api_production_summary`, `daily_water_quality_rating`.
+
+components/notifications/
+- `components/notifications/notifications-provider.tsx` reads: `api_system_options`, `alert_threshold` (RLS); realtime: `water_quality_measurement` and `daily_fish_inventory_table` inserts.
+
+components/onboarding/
+- `components/onboarding/onboarding-screen.tsx` writes: `profiles` (base).
+
+components/reports/
+- `components/reports/performance-report.tsx` reads: `api_dashboard`, `api_production_summary`.
+- `components/reports/feeding-report.tsx` reads: `feeding_record` + `feed_type`.
+- `components/reports/mortality-report.tsx` reads: `fish_mortality`.
+- `components/reports/growth-report.tsx` reads: `api_production_summary`.
+
+components/shared/
+- `components/shared/farm-selector.tsx` reads: `api_system_options`, `api_fingerling_batch_options`.
+- `components/shared/time-period-selector.tsx` no API use.
+
+components/water-quality/
+- `components/water-quality/water-quality-history.tsx` reads: `water_quality_measurement`.
+- `components/water-quality/water-quality-charts.tsx` reads: `water_quality_measurement`.
+- `components/water-quality/water-quality-form.tsx` reads: `api_system_options`; writes: `water_quality_measurement`.
+
+lib/
+- `lib/supabase-queries.ts` centralizes reads for `api_*` views and base tables.
+- `lib/supabase-actions.ts` base table writes (insert/update/delete).
+- `lib/supabase-client.ts` shared query wrapper for all reads.
+- `lib/api/*` thin modules that wrap Supabase reads for features.
+- `lib/hooks/*` React Query hooks that consume `lib/api/*` and coordinate cache/mutations.
+
+---
+
+## Getting Started
+
+Prerequisites
+- Node.js 18+
 - npm or pnpm
-- Supabase project (free tier supported)
+- Supabase project
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/your-org/aquasmart.git
-cd aquasmart
-```
-
-### 2. Install dependencies
+Install
 ```bash
 npm install
 # or
 pnpm install
 ```
 
-### 3. Set up environment variables
-Copy the example file and fill in your Supabase credentials:
+Environment
 ```bash
 cp .env.local.example .env.local
 ```
 
-Then edit `.env.local`:
+`.env.local`
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-# SUPABASE_SERVICE_ROLE_KEY=your_service_role_key (optional, for admin tasks)
 ```
 
-> 🔐 Never commit `.env.local` to version control.
-
-### 4. Run the development server
+Run
 ```bash
 npm run dev
-# or
-pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open http://localhost:3000
 
 ---
 
-## 🔒 Authentication & Roles
-
-- Supported Role (v1.0): `farm_manager`
-- User roles are stored in `auth.users.raw_user_meta_data.role`
-- All data queries enforce Row-Level Security (RLS) based on:
-  - User’s assigned farm(s)
-  - Role permissions
-- Farm Managers can only access data from farms they are assigned to
-
-> 💡 During development, you can manually set a test user’s role via Supabase SQL:
-> ```sql
-> UPDATE auth.users 
-> SET raw_user_meta_data = jsonb_set(
->   COALESCE(raw_user_meta_data, '{}'),
->   '{role}',
->   '"farm_manager"'
-> )
-> WHERE email = 'test@example.com';
-> ```
+## Authentication and RLS Notes
+- Read access uses `api_*` views.
+- Writes use base tables and are protected by RLS.
+- Middleware checks user session on protected routes.
+- Server `page.tsx` shells call `requireUser()` before rendering `page.client.tsx`.
 
 ---
 
-## 📊 Data Model Highlights
-
-Key tables (in Supabase):
-- `farms` – Farm metadata (name, location, KPI targets)
-- `systems` – Individual tanks/ponds within a farm
-- `batches` – Fish cohorts with stocking date and species
-- `feed_logs`, `mortality_logs`, `sampling_logs`, `water_quality_logs`
-- `inventory_transactions` – Unified log for fish/feed movements
-- `alerts` – Triggered threshold violations
-
-All KPIs (ABW, FCR, mortality %) are computed via materialized views for performance.
-
----
-
-## 🧪 Testing
-
-- Unit tests: `npm run test`
-- E2E tests: `npm run test:e2e`
-- Linting: `npm run lint`
-
-Ensure ≥80% coverage on core logic (KPI calculators, data transforms).
-
----
-
-## 📅 Roadmap (Phase 2 / R2)
-
-- Mobile offline app for field data entry
-- Custom report builder (drag-and-drop)
-- REST API for external integrations
-- IoT sensor auto-sync (water quality, feeders)
-- Predictive alerts using trend analysis
-- Support for additional roles (System Operator, Data Analyst, Admin)
-
----
-
-## 📄 License
-
-Proprietary – © 2026 AquaSmart. All rights reserved.
-
----
-
-## 🙋 Support
-
-For issues or feature requests, contact the product team or open an internal ticket.
-
-> Note: This project is currently in active development for Farm Manager workflows. Other roles and advanced analytics will be added in future phases.
-```
+## License
+Proprietary - Copyright 2026 AquaSmart. All rights reserved.

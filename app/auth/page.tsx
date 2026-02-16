@@ -29,6 +29,14 @@ export default function AuthPage() {
 
   const validateEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
   const validatePassword = (value: string) => value.length >= 8
+  const withTimeout = async <T,>(promise: Promise<T>, ms = 15000): Promise<T> => {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error("Request timed out. Please try again.")), ms)
+      }),
+    ])
+  }
 
   const handlePasswordAuth = async () => {
     if (isLoading) return
@@ -66,10 +74,12 @@ export default function AuthPage() {
       }
 
       if (authMode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
-          password: trimmedPassword,
-        })
+        const { error } = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password: trimmedPassword,
+          }),
+        )
         if (error) {
           addToast({ title: "Sign in failed", description: error.message, variant: "error" })
           return
@@ -80,20 +90,44 @@ export default function AuthPage() {
         return
       }
 
-      const redirectTo = `${window.location.origin}/auth/callback?next=/`
-      const { error } = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password: trimmedPassword,
-        options: { emailRedirectTo: redirectTo },
-      })
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin
+      const redirectTo = `${baseUrl}/auth/callback?next=/auth/verify-success`
+      const { data, error } = await withTimeout(
+        supabase.auth.signUp({
+          email: trimmedEmail,
+          password: trimmedPassword,
+          options: { emailRedirectTo: redirectTo },
+        }),
+      )
       if (error) {
         addToast({ title: "Sign up failed", description: error.message, variant: "error" })
         return
       }
 
+      if (data.session) {
+        addToast({
+          title: "Account created",
+          description: "You are signed in and will be redirected.",
+          variant: "success",
+        })
+        router.replace("/")
+        return
+      }
+
+      const identities = data.user?.identities ?? []
+      if (identities.length === 0) {
+        addToast({
+          title: "Account already exists",
+          description: "If this email is already registered, sign in or reset your password.",
+          variant: "warning",
+        })
+        setAuthMode("signin")
+        return
+      }
+
       addToast({
         title: "Confirm your email",
-        description: "Check your inbox to finish creating your account.",
+        description: "Check inbox/spam for the confirmation email.",
         variant: "success",
       })
     } catch (err: any) {
@@ -656,7 +690,7 @@ export default function AuthPage() {
               aria-label="Dismiss notification"
               onClick={() => setToasts((prev) => prev.filter((item) => item.id !== toast.id))}
             >
-              ×
+              x
             </button>
           </div>
         ))}
@@ -738,7 +772,7 @@ export default function AuthPage() {
                   type="password"
                   id="password"
                   className="form-input"
-                  placeholder="••••••••"
+                  placeholder=""
                   required
                   autoComplete={authMode === "signin" ? "current-password" : "new-password"}
                   value={password}

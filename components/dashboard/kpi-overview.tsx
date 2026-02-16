@@ -1,165 +1,67 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
 import KPICard from "./kpi-card"
 import type { Enums } from "@/lib/types/database"
-import {
-  fetchDashboardConsolidatedSnapshot,
-  fetchDashboardSnapshot,
-  fetchTimePeriodBounds,
-} from "@/lib/supabase-queries"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useKpiOverview, type KPIOverviewMetric } from "@/lib/hooks/use-dashboard"
 
 interface KPIOverviewProps {
   stage: "all" | Enums<"system_growth_stage">
   timePeriod?: Enums<"time_period">
   batch?: string
   system?: string
+  periodParam?: string | null
 }
 
-type Metric = {
-  key: string
-  label: string
-  value: number | null
-  unit?: string
-  decimals?: number
-  trend: number | null
-  invertTrend: boolean
-}
-
-export default function KPIOverview({ stage, timePeriod = "week", batch = "all", system = "all" }: KPIOverviewProps) {
-  const [metrics, setMetrics] = useState<Metric[]>([])
-  const [loading, setLoading] = useState(true)
-  const [dateBounds, setDateBounds] = useState<{ start: string | null; end: string | null }>({
-    start: null,
-    end: null,
+export default function KPIOverview({
+  stage,
+  timePeriod = "2 weeks",
+  batch = "all",
+  system = "all",
+  periodParam,
+}: KPIOverviewProps) {
+  const { farmId } = useActiveFarm()
+  const metricsQuery = useKpiOverview({
+    farmId,
+    stage,
+    timePeriod,
+    batch,
+    system,
+    periodParam,
   })
 
-  useEffect(() => {
-    const loadMetrics = async () => {
-      setLoading(true)
-      try {
-        const bounds = await fetchTimePeriodBounds(timePeriod)
-        setDateBounds({ start: bounds.start, end: bounds.end })
+  const metrics = metricsQuery.data?.metrics ?? []
+  const dateBounds = metricsQuery.data?.dateBounds ?? { start: null, end: null }
 
-        if (system === "all") {
-          const snapshot = await fetchDashboardConsolidatedSnapshot({ time_period: timePeriod })
-          if (!snapshot) {
-            setMetrics([])
-            setLoading(false)
-            return
-          }
-
-          const nextMetrics: Metric[] = [
-            {
-              key: "efcr",
-              label: "eFCR",
-              value: snapshot.efcr_period_consolidated ?? null,
-              decimals: 2,
-              trend: snapshot.efcr_period_consolidated_delta ?? null,
-              invertTrend: true,
-            },
-            {
-              key: "mortality",
-              label: "Daily Mortality Rate",
-              value: snapshot.mortality_rate ?? null,
-              unit: "%",
-              decimals: 2,
-              trend: snapshot.mortality_rate_delta ?? null,
-              invertTrend: true,
-            },
-            {
-              key: "biomass",
-              label: "Avg Biomass",
-              value: snapshot.average_biomass ?? null,
-              unit: "kg",
-              decimals: 1,
-              trend: snapshot.average_biomass_delta ?? null,
-              invertTrend: false,
-            },
-            {
-              key: "feeding",
-              label: "Feeding Rate",
-              value: snapshot.feeding_rate ?? null,
-              unit: "%",
-              decimals: 2,
-              trend: null,
-              invertTrend: false,
-            },
-          ]
-
-          setMetrics(nextMetrics)
-          setLoading(false)
-          return
-        }
-
-        const systemId = Number(system)
-        if (!Number.isFinite(systemId)) {
-          setMetrics([])
-          setLoading(false)
-          return
-        }
-
-        const snapshot = await fetchDashboardSnapshot({
-          system_id: systemId,
-          time_period: timePeriod,
-          growth_stage: stage === "all" ? undefined : stage,
-        })
-
-        if (!snapshot) {
-          setMetrics([])
-          setLoading(false)
-          return
-        }
-
-        const nextMetrics: Metric[] = [
-          {
-            key: "efcr",
-            label: "eFCR",
-            value: snapshot.efcr ?? null,
-            decimals: 2,
-            trend: null,
-            invertTrend: true,
-          },
-          {
-            key: "mortality",
-            label: "Daily Mortality Rate",
-            value: snapshot.mortality_rate ?? null,
-            unit: "%",
-            decimals: 2,
-            trend: null,
-            invertTrend: true,
-          },
-          {
-            key: "biomass",
-            label: "Avg Biomass",
-            value: snapshot.average_biomass ?? null,
-            unit: "kg",
-            decimals: 1,
-            trend: null,
-            invertTrend: false,
-          },
-          {
-            key: "feeding",
-            label: "Feeding Rate",
-            value: snapshot.feeding_rate ?? null,
-            unit: "%",
-            decimals: 2,
-            trend: null,
-            invertTrend: false,
-          },
-        ]
-
-        setMetrics(nextMetrics)
-      } catch (err) {
-        console.error("[KPI] Error loading KPI metrics:", err)
-        setMetrics([])
+  const withTone = (metrics: KPIOverviewMetric[]): KPIOverviewMetric[] => {
+    return metrics.map((metric): KPIOverviewMetric => {
+      if (metric.tone || metric.badge) {
+        return { ...metric, tone: metric.tone ?? "neutral", badge: metric.badge }
       }
-      setLoading(false)
-    }
-    loadMetrics()
-  }, [stage, timePeriod, batch, system])
+      if (metric.value === null || metric.value === undefined) {
+        return { ...metric, tone: "neutral", badge: "No data" }
+      }
 
-  if (loading) {
+      if (metric.trend === null || metric.trend === undefined) {
+        return { ...metric, tone: "neutral", badge: "Monitoring" }
+      }
+
+      if (metric.trend === 0) {
+        return { ...metric, tone: "neutral", badge: "Stable" }
+      }
+
+      const positive =
+        metric.invertTrend ? metric.trend < 0 : metric.trend > 0
+      return {
+        ...metric,
+        tone: positive ? "good" : "warn",
+        badge: positive ? "Good" : "Watch",
+      }
+    })
+  }
+
+  if (metricsQuery.isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array(4)
@@ -189,10 +91,12 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
     )
   }
 
+  const tonedMetrics = withTone(metrics)
+
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {metrics.map((metric) => {
+        {tonedMetrics.map((metric) => {
           return (
             <KPICard
               key={metric.key}
@@ -202,6 +106,8 @@ export default function KPIOverview({ stage, timePeriod = "week", batch = "all",
               decimals={metric.decimals}
               formatUnit={metric.unit}
               invertTrend={metric.invertTrend}
+              tone={metric.tone}
+              badge={metric.badge}
               href={`/production?metric=${metric.key}&period=${timePeriod}${dateBounds.start && dateBounds.end ? `&startDate=${dateBounds.start}&endDate=${dateBounds.end}` : ""}${system !== "all" ? `&system=${system}` : ""}`}
             />
           )

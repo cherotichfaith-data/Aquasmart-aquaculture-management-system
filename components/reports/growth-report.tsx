@@ -1,29 +1,25 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { fetchProductionSummary } from "@/lib/supabase-queries"
+import { useProductionSummary } from "@/lib/hooks/use-production"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { sortByDateAsc } from "@/lib/utils"
 
 export default function GrowthReport({ dateRange }: { dateRange?: { from: string; to: string } }) {
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      const result = await fetchProductionSummary({
-        limit: 100,
-        date_from: dateRange?.from,
-        date_to: dateRange?.to,
-      })
-      setRows(result.status === "success" ? result.data : [])
-      setLoading(false)
-    }
-    loadData()
-  }, [dateRange])
+  const { farmId } = useActiveFarm()
+  const productionSummaryQuery = useProductionSummary({
+    limit: 100,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    farmId: farmId ?? null,
+  })
+  const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const loading = productionSummaryQuery.isLoading
 
   const latest = rows[0]
+  const chartRows = useMemo(() => sortByDateAsc(rows, (row) => row.date), [rows])
 
   return (
     <div className="space-y-6">
@@ -39,10 +35,10 @@ export default function GrowthReport({ dateRange }: { dateRange?: { from: string
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Daily Biomass Gain</CardTitle>
+            <CardTitle className="text-sm font-medium">Biomass Increase</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{latest?.daily_biomass_gain ?? "N/A"}</div>
+            <div className="text-2xl font-bold">{latest?.biomass_increase_period ?? "N/A"}</div>
             <p className="text-xs text-muted-foreground mt-1">Latest period</p>
           </CardContent>
         </Card>
@@ -76,7 +72,7 @@ export default function GrowthReport({ dateRange }: { dateRange?: { from: string
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={rows}>
+              <AreaChart data={chartRows}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
@@ -104,7 +100,7 @@ export default function GrowthReport({ dateRange }: { dateRange?: { from: string
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={rows}>
+              <LineChart data={chartRows}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
@@ -147,7 +143,7 @@ export default function GrowthReport({ dateRange }: { dateRange?: { from: string
                     <td className="px-4 py-2 text-center">{row.average_body_weight ?? "-"}</td>
                     <td className="px-4 py-2 text-center">{row.total_biomass ?? "-"}</td>
                     <td className="px-4 py-2 text-center">{row.number_of_fish_inventory ?? "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.daily_biomass_gain ?? "-"}</td>
+                    <td className="px-4 py-2 text-center">{row.biomass_increase_period ?? "-"}</td>
                   </tr>
                 ))
               ) : (

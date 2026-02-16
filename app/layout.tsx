@@ -1,7 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
-import { AuthProvider } from "@/components/auth-provider"
+import { AuthProvider, ThemeProvider, QueryProvider } from "@/components/providers"
 import { ToastProvider } from "@/components/shared/toast-provider"
 import { InitialSplash } from "@/components/InitialSplash"
 import { NotificationsProvider } from "@/components/notifications/notifications-provider"
@@ -35,18 +35,23 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className={`font-sans antialiased`}>
         <InitialSplash />
-        <AuthProvider>
-          <NotificationsProvider>
-            {children}
-            <ToastProvider />
-          </NotificationsProvider>
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider>
+            <QueryProvider>
+              <ToastProvider>
+                <NotificationsProvider>
+                  {children}
+                </NotificationsProvider>
+              </ToastProvider>
+            </QueryProvider>
+          </AuthProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

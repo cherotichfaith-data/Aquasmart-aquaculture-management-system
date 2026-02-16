@@ -2,9 +2,11 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { Enums } from "@/lib/types/database"
-import { fetchSystemsList, insertWaterQualityMeasurement } from "@/lib/supabase-queries"
+import { useSystemOptions } from "@/lib/hooks/use-options"
+import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
+import { useActiveFarm } from "@/hooks/use-active-farm"
 
 type Parameter = Enums<"water_quality_parameters">
 
@@ -20,7 +22,8 @@ const parameters: Parameter[] = [
 ]
 
 export default function WaterQualityForm({ onClose }: { onClose: () => void }) {
-  const [systems, setSystems] = useState<Array<{ id: number; name: string }>>([])
+  const { farmId } = useActiveFarm()
+  const [systems, setSystems] = useState<Array<{ id: number; label: string | null }>>([])
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     time: new Date().toISOString().split("T")[1].slice(0, 5),
@@ -32,18 +35,27 @@ export default function WaterQualityForm({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const systemsQuery = useSystemOptions({ farmId })
+  const recordMutation = useRecordWaterQuality()
+
+  const systemsData = useMemo(
+    () => (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
+    [systemsQuery.data],
+  )
+
   useEffect(() => {
-    const loadSystems = async () => {
-      const result = await fetchSystemsList()
-      if (result.status === "success") {
-        setSystems(result.data)
-        if (!formData.systemId && result.data.length > 0) {
-          setFormData((prev) => ({ ...prev, systemId: String(result.data[0].id) }))
-        }
+    if (systemsData.length > 0) {
+      const mappedSystems = systemsData
+        .filter((system): system is typeof system & { id: number } => system.id != null)
+        .map((system) => ({ id: system.id, label: system.label }))
+      setSystems(mappedSystems)
+      if (!formData.systemId) {
+        setFormData((prev) => ({ ...prev, systemId: String(mappedSystems[0]?.id ?? "") }))
       }
+    } else if (!systemsQuery.isLoading) {
+      setSystems([])
     }
-    loadSystems()
-  }, [])
+  }, [formData.systemId, systemsData, systemsQuery.isLoading])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -78,17 +90,18 @@ export default function WaterQualityForm({ onClose }: { onClose: () => void }) {
       return
     }
 
-    const result = await insertWaterQualityMeasurement({
-      date: formData.date,
-      time: formData.time,
-      system_id: systemId,
-      parameter_name: formData.parameter,
-      parameter_value: value,
-      water_depth: depth,
-    })
-
-    if (result.status === "error") {
-      setError(result.error)
+    try {
+      await recordMutation.mutateAsync({
+        date: formData.date,
+        time: formData.time,
+        system_id: systemId,
+        parameter_name: formData.parameter,
+        parameter_value: value,
+        water_depth: depth,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to record water quality."
+      setError(message)
       setSaving(false)
       return
     }
@@ -130,7 +143,7 @@ export default function WaterQualityForm({ onClose }: { onClose: () => void }) {
           >
             {systems.map((system) => (
               <option key={system.id} value={String(system.id)}>
-                {system.name}
+                {system.label ?? `System ${system.id}`}
               </option>
             ))}
           </select>

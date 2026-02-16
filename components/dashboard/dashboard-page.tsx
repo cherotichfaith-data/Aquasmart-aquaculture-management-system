@@ -2,11 +2,13 @@
 
 import Link from "next/link"
 import { useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { Download } from "lucide-react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import FarmSelector from "@/components/shared/farm-selector"
-import { useAuth } from "@/components/auth-provider"
+import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
 import KPIOverview from "@/components/dashboard/kpi-overview"
@@ -14,25 +16,50 @@ import PopulationOverview from "@/components/dashboard/population-overview"
 import SystemsTable from "@/components/dashboard/systems-table"
 import RecentActivities from "@/components/dashboard/recent-activities"
 import HealthSummary from "@/components/dashboard/health-summary"
-import InventorySummary from "@/components/dashboard/inventory-summary"
+import RecommendedActions from "@/components/dashboard/recommended-actions"
 import * as XLSX from "xlsx"
-import { fetchProductionSummary } from "@/lib/supabase-queries"
+import { getProductionSummary } from "@/lib/api/production"
+import { parseDateToTimePeriod } from "@/lib/utils"
+import { logSbError } from "@/utils/supabase/log"
 
 export default function DashboardPage() {
   const { profile } = useAuth()
-  const { farm: activeFarm } = useActiveFarm()
+  const { farm, farmId } = useActiveFarm()
+  const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
+  const periodParam = searchParams.get("period")
+  const parsedPeriod = parseDateToTimePeriod(periodParam)
   const [selectedBatch, setSelectedBatch] = useState<string>("all")
   const [selectedSystem, setSelectedSystem] = useState<string>("all")
   const [selectedStage, setSelectedStage] = useState<"all" | "nursing" | "grow_out">("all")
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("week")
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(
+    parsedPeriod.kind === "preset" ? parsedPeriod.period : "2 weeks",
+  )
 
   const handleDownload = async () => {
     try {
       const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
-      const result = await fetchProductionSummary({
-        growth_stage: selectedStage === "all" ? undefined : selectedStage,
-        system_id: Number.isFinite(systemId) ? systemId : undefined,
-        limit: 1000,
+      const stage = selectedStage === "all" ? undefined : selectedStage
+      const resolvedSystemId = Number.isFinite(systemId) ? systemId : undefined
+      const result = await queryClient.fetchQuery({
+        queryKey: [
+          "production",
+          "summary",
+          farmId ?? "all",
+          resolvedSystemId ?? "all",
+          stage ?? "all",
+          "",
+          "",
+          1000,
+          "download",
+        ],
+        queryFn: () =>
+          getProductionSummary({
+            stage,
+            systemId: resolvedSystemId,
+            limit: 1000,
+            farmId: farmId ?? null,
+          }),
       })
 
       if (result.status === "success" && result.data && result.data.length > 0) {
@@ -40,22 +67,20 @@ export default function DashboardPage() {
         const workbook = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(workbook, worksheet, "Production Summary")
         XLSX.writeFile(workbook, `AquaSmart_Dashboard_Data_${new Date().toISOString().split("T")[0]}.xlsx`)
-      } else {
-        console.error("No data available to download")
       }
     } catch (error) {
-      console.error("Error downloading data:", error)
+      logSbError("dashboard:download", error)
     }
   }
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-10">
         <div className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-semibold text-balance">
-                {activeFarm?.name ?? profile?.farm_name ?? "Dashboard"}
+                {farm?.name ?? profile?.farm_name ?? "Dashboard"}
               </h1>
               <p className="text-muted-foreground mt-2">Monitor your farm check-ins and system performance</p>
             </div>
@@ -112,29 +137,67 @@ export default function DashboardPage() {
           />
         </div>
 
-        <KPIOverview stage={selectedStage} timePeriod={timePeriod} batch={selectedBatch} system={selectedSystem} />
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Health Overview</h2>
+            <p className="text-sm text-muted-foreground">
+              Snapshot of system performance, water quality, and feeding efficiency.
+            </p>
+          </div>
+          <KPIOverview
+            stage={selectedStage}
+            timePeriod={timePeriod}
+            batch={selectedBatch}
+            system={selectedSystem}
+            periodParam={periodParam}
+          />
+        </section>
 
-        <PopulationOverview
-          stage={selectedStage === "all" ? null : selectedStage}
-          system={selectedSystem}
-          timePeriod={timePeriod}
-        />
-
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
-          <div className="space-y-6">
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Field Visualization</h2>
+            <p className="text-sm text-muted-foreground">Live system status with a health snapshot.</p>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
             <SystemsTable
-              stage={selectedStage === "all" ? "grow_out" : selectedStage}
+              stage={selectedStage}
               batch={selectedBatch}
               system={selectedSystem}
               timePeriod={timePeriod}
+              periodParam={periodParam}
             />
+            <HealthSummary system={selectedSystem} timePeriod={timePeriod} periodParam={periodParam} />
           </div>
-          <div className="space-y-6">
-            <HealthSummary system={selectedSystem} timePeriod={timePeriod} />
-            <InventorySummary />
-            <RecentActivities batch={selectedBatch} system={selectedSystem} />
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Field Metrics</h2>
+            <p className="text-sm text-muted-foreground">Trends across production, mortality, and efficiency.</p>
           </div>
-        </div>
+          <PopulationOverview
+            stage={selectedStage === "all" ? null : selectedStage}
+            system={selectedSystem}
+            timePeriod={timePeriod}
+            periodParam={periodParam}
+          />
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Advisory Timeline</h2>
+            <p className="text-sm text-muted-foreground">Recent operational changes and farm events.</p>
+          </div>
+          <RecentActivities batch={selectedBatch} system={selectedSystem} title="Advisory Timeline" countLabel="events" />
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Recommended Actions</h2>
+            <p className="text-sm text-muted-foreground">Supply and feed priorities based on recent activity.</p>
+          </div>
+          <RecommendedActions system={selectedSystem} timePeriod={timePeriod} />
+        </section>
       </div>
     </DashboardLayout>
   )

@@ -16,10 +16,10 @@ import { RecentEntriesList } from "./recent-entries-list"
 import type { Tables } from "@/lib/types/database"
 
 interface DataEntryInterfaceProps {
-    systems: Tables<"system">[]
+    systems: Tables<"api_system_options">[]
     suppliers: Tables<"suppliers">[]
-    feeds: Tables<"feed_type">[]
-    batches: Tables<"fingerling_batch">[]
+    feeds: Tables<"api_feed_type_options">[]
+    batches: Tables<"api_fingerling_batch_options">[]
     recentEntries: {
         mortality: any[]
         feeding: any[]

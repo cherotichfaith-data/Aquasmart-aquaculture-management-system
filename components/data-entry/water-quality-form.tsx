@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client"
-import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
+import { useToast } from "@/hooks/use-toast"
+import { refreshMaterializedViews } from "@/lib/api/admin"
+import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -35,12 +36,12 @@ const formSchema = z.object({
 })
 
 interface WaterQualityFormProps {
-    systems: Tables<"system">[]
+    systems: Tables<"api_system_options">[]
 }
 
 export function WaterQualityForm({ systems }: WaterQualityFormProps) {
+    const mutation = useRecordWaterQuality()
     const { toast } = useToast()
-    const supabase = createClient()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -113,14 +114,12 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                 parameter_value: measurement.parameter_value,
             }))
 
-            const { error } = await supabase.from("water_quality_measurement").insert(payload)
+            await mutation.mutateAsync(payload)
+            const refreshResult = await refreshMaterializedViews()
+            if (refreshResult.status === "error") {
+                console.warn("[water-quality] MV refresh failed:", refreshResult.error)
+            }
 
-            if (error) throw error
-
-            toast({
-                title: "Success",
-                description: "Water quality data recorded.",
-            })
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 system_id: values.system_id,
@@ -160,7 +159,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                         <SelectContent>
                                             {systems.map((s) => (
                                                 <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.name ?? `System ${s.id}`}
+                                                    {s.label ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -317,8 +316,8 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                         />
                     </div>
 
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+                        {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
                     </Button>
                 </form>

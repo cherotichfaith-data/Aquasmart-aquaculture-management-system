@@ -1,16 +1,21 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/utils/supabase/client"
+import { isSbPermissionDenied, logSbError } from "@/utils/supabase/log"
 import { useActiveFarm } from "@/hooks/use-active-farm"
-import { useAuth } from "@/components/auth-provider"
+import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Tables } from "@/lib/types/database"
 
 type AlertThresholdRow = Tables<"alert_threshold">
+type AlertThresholdWithFeeding = AlertThresholdRow & {
+  low_feeding_rate_threshold?: number | null
+  high_feeding_rate_threshold?: number | null
+}
 type WaterQualityRow = Tables<"water_quality_measurement">
 type DailyInventoryRow = Tables<"daily_fish_inventory_table">
-type SystemRow = Tables<"system">
 
 type NotificationKind = "water_quality" | "mortality" | "feeding"
 type NotificationSeverity = "warning" | "critical"
@@ -55,16 +60,64 @@ const resolveThreshold = (thresholds: AlertThresholdRow[], systemId?: number | n
 }
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const queryClient = useQueryClient()
   const { farmId } = useActiveFarm()
-  const { profile } = useAuth()
+  const { profile, session } = useAuth()
   const { toast } = useToast()
   const [notifications, setNotifications] = useState<AlertNotification[]>([])
-  const [thresholds, setThresholds] = useState<AlertThresholdRow[]>([])
-  const [systemMap, setSystemMap] = useState<Record<number, string>>({})
   const seenIds = useRef<Set<string>>(new Set())
 
   const notificationsEnabled = profile?.notifications_enabled ?? true
+  const systemsQuery = useQuery({
+    queryKey: ["notifications", "systems", farmId ?? "none"],
+    enabled: Boolean(session) && Boolean(farmId),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("api_system_options")
+        .select("id,label")
+        .eq("farm_id", farmId!)
+
+      if (error) {
+        if (!isSbPermissionDenied(error)) {
+          logSbError("notifications:systems", error)
+        }
+        return [] as Array<{ id: number; label: string | null }>
+      }
+
+      return (data as Array<{ id: number; label: string | null }>) ?? []
+    },
+  })
+  const thresholdsQuery = useQuery({
+    queryKey: ["notifications", "thresholds", farmId ?? "none"],
+    enabled: Boolean(session) && Boolean(farmId),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("alert_threshold")
+        .select("*")
+        .eq("farm_id", farmId!)
+
+      if (error) {
+        if (!isSbPermissionDenied(error)) {
+          logSbError("notifications:thresholds", error)
+        }
+        return [] as AlertThresholdRow[]
+      }
+
+      return (data as AlertThresholdRow[]) ?? []
+    },
+  })
+
+  const thresholds = thresholdsQuery.data ?? []
+  const systemMap = useMemo(() => {
+    const map: Record<number, string> = {}
+    ;(systemsQuery.data ?? []).forEach((row) => {
+      map[row.id] = row.label ?? `System ${row.id}`
+    })
+    return map
+  }, [systemsQuery.data])
 
   const addNotification = useCallback(
     (notification: AlertNotification) => {
@@ -104,47 +157,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications])
 
-  const loadSystems = useCallback(async () => {
-    if (!farmId) return
-    const { data, error } = await supabase
-      .from("system")
-      .select("id,name")
-      .eq("farm_id", farmId)
-
-    if (error) {
-      console.error("[notifications] Failed to load systems:", error)
-      return
-    }
-
-    const map: Record<number, string> = {}
-    ;(data as Pick<SystemRow, "id" | "name">[] | null)?.forEach((row) => {
-      map[row.id] = row.name
-    })
-    setSystemMap(map)
-  }, [farmId, supabase])
-
-  const loadThresholds = useCallback(async () => {
-    if (!farmId) return
-    const { data, error } = await supabase
-      .from("alert_threshold")
-      .select("*")
-      .eq("farm_id", farmId)
-
-    if (error) {
-      console.error("[notifications] Failed to load thresholds:", error)
-      return
-    }
-
-    setThresholds((data as AlertThresholdRow[]) ?? [])
-  }, [farmId, supabase])
+  const systemsLoaded = systemsQuery.isSuccess
+  const thresholdsLoaded = thresholdsQuery.isSuccess
 
   useEffect(() => {
-    void loadSystems()
-    void loadThresholds()
-  }, [loadSystems, loadThresholds])
-
-  useEffect(() => {
-    if (!farmId) return
+    if (!farmId || !session) return
 
     const thresholdChannel = supabase
       .channel(`alerts-thresholds-${farmId}`)
@@ -152,7 +169,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         "postgres_changes",
         { event: "*", schema: "public", table: "alert_threshold", filter: `farm_id=eq.${farmId}` },
         () => {
-          void loadThresholds()
+          void queryClient.invalidateQueries({ queryKey: ["notifications", "thresholds", farmId] })
         },
       )
       .subscribe()
@@ -160,10 +177,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(thresholdChannel)
     }
-  }, [farmId, loadThresholds, supabase])
+  }, [farmId, queryClient, session, supabase])
 
   useEffect(() => {
-    if (!farmId) return
+    if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
 
     const qualityChannel = supabase
       .channel(`alerts-water-quality-${farmId}`)
@@ -173,7 +190,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         (payload) => {
           const row = payload.new as WaterQualityRow
           if (!row?.system_id) return
-          if (Object.keys(systemMap).length && !systemMap[row.system_id]) return
+          if (!systemMap[row.system_id]) return
 
           const threshold = resolveThreshold(thresholds, row.system_id)
           if (!threshold) return
@@ -219,10 +236,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(qualityChannel)
     }
-  }, [addNotification, farmId, supabase, systemMap, thresholds])
+  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, thresholdsLoaded, thresholds])
 
   useEffect(() => {
-    if (!farmId) return
+    if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
 
     const mortalityChannel = supabase
       .channel(`alerts-mortality-${farmId}`)
@@ -232,7 +249,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         (payload) => {
           const row = payload.new as DailyInventoryRow
           if (!row?.system_id) return
-          if (Object.keys(systemMap).length && !systemMap[row.system_id]) return
+          if (!systemMap[row.system_id]) return
 
           const threshold = resolveThreshold(thresholds, row.system_id)
           if (!threshold) return
@@ -256,8 +273,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           }
 
           const feedingRate = row.feeding_rate
-          const lowFeed = threshold.low_feeding_rate_threshold
-          const highFeed = threshold.high_feeding_rate_threshold
+          const typedThreshold = threshold as AlertThresholdWithFeeding
+          const lowFeed = typedThreshold.low_feeding_rate_threshold
+          const highFeed = typedThreshold.high_feeding_rate_threshold
 
           if (typeof feedingRate === "number") {
             if (typeof lowFeed === "number" && feedingRate < lowFeed) {
@@ -296,7 +314,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(mortalityChannel)
     }
-  }, [addNotification, farmId, supabase, systemMap, thresholds])
+  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, thresholdsLoaded, thresholds])
 
   const value = useMemo(
     () => ({ notifications, unreadCount, markAllRead, markRead, clearAll }),

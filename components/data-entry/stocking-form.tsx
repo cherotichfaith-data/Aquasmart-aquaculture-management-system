@@ -15,10 +15,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client"
-import { useToast } from "@/hooks/use-toast"
 import { Tables } from "@/lib/types/database"
-import { useAuth } from "@/components/auth-provider"
+import { refreshMaterializedViews } from "@/lib/api/admin"
+import { useRecordStocking } from "@/lib/hooks/use-stocking"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -31,13 +30,12 @@ const formSchema = z.object({
 })
 
 interface StockingFormProps {
-    systems: Tables<"system">[]
-    batches: Tables<"fingerling_batch">[]
+    systems: Tables<"api_system_options">[]
+    batches: Tables<"api_fingerling_batch_options">[]
 }
 
 export function StockingForm({ systems, batches }: StockingFormProps) {
-    const { toast } = useToast()
-    const supabase = createClient()
+    const mutation = useRecordStocking()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -52,25 +50,15 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
         },
     })
 
-    const { user } = useAuth()
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
-        if (!user) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "You must be logged in to submit data.",
-            })
-            return
-        }
-
         try {
-            const abw = values.average_body_weight_g ?? null
+            const abw = values.average_body_weight_g ?? 0
 
             const systemId = Number(values.system_id)
             const batchId = Number(values.batch_id)
 
-            const { error } = await supabase.from("fish_stocking").insert({
+            await mutation.mutateAsync({
                 system_id: systemId,
                 batch_id: batchId,
                 date: values.stocking_date,
@@ -80,12 +68,11 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
                 type_of_stocking: values.type_of_stocking,
             })
 
-            if (error) throw error
+            const refreshResult = await refreshMaterializedViews()
+            if (refreshResult.status === "error") {
+                console.warn("[stocking] MV refresh failed:", refreshResult.error)
+            }
 
-            toast({
-                title: "Success",
-                description: "Stocking event recorded.",
-            })
             form.reset({
                 stocking_date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
@@ -97,11 +84,6 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
             })
         } catch (error) {
             console.error(error)
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to record stocking event.",
-            })
         }
     }
 
@@ -129,7 +111,7 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
                                         <SelectContent>
                                             {systems.map((s) => (
                                                 <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.name ?? `System ${s.id}`}
+                                                    {s.label ?? `System ${s.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -153,7 +135,7 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
                                         <SelectContent>
                                             {batches.map((batch) => (
                                                 <SelectItem key={batch.id} value={String(batch.id)}>
-                                                    {batch.name || `Batch ${batch.id}`}
+                                                    {batch.label || `Batch ${batch.id}`}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -241,8 +223,8 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
                         )}
                     />
 
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+                        {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
                     </Button>
                 </form>

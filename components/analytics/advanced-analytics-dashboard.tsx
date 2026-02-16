@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import {
   LineChart,
   Line,
@@ -18,33 +18,36 @@ import {
   Scatter,
 } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { fetchDashboardSnapshot, fetchProductionSummary } from "@/lib/supabase-queries"
+import { useDashboardConsolidatedSnapshot } from "@/lib/hooks/use-dashboard"
+import { useProductionSummary } from "@/lib/hooks/use-production"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { sortByDateAsc } from "@/lib/utils"
 
 export default function AdvancedAnalyticsDashboard({ timeRange, metric }: { timeRange: string; metric: string }) {
-  const [summary, setSummary] = useState<any>(null)
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { farmId } = useActiveFarm()
+  const summaryQuery = useDashboardConsolidatedSnapshot({ farmId: farmId ?? null })
+  const productionSummaryQuery = useProductionSummary({ limit: 100, farmId: farmId ?? null })
+  const summary = summaryQuery.data ?? null
+  const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const loading = summaryQuery.isLoading || productionSummaryQuery.isLoading
 
   useEffect(() => {
-    const loadAnalytics = async () => {
-      setLoading(true)
-      const [snapshot, summaryRows] = await Promise.all([fetchDashboardSnapshot(), fetchProductionSummary({ limit: 100 })])
-      setSummary(snapshot)
-      setRows(summaryRows.status === "success" ? summaryRows.data : [])
-      setLoading(false)
-    }
-    loadAnalytics()
-  }, [timeRange, metric])
+    void summaryQuery.refetch()
+    void productionSummaryQuery.refetch()
+  }, [timeRange, metric, summaryQuery, productionSummaryQuery])
 
   const latestBySystem = useMemo(() => {
     const map = new Map<number, any>()
     rows.forEach((row) => {
+      if (row.system_id == null) return
       if (!map.has(row.system_id)) {
         map.set(row.system_id, row)
       }
     })
     return Array.from(map.values())
   }, [rows])
+
+  const chartRows = useMemo(() => sortByDateAsc(rows, (row) => row.date), [rows])
 
   return (
     <div className="space-y-6">
@@ -54,7 +57,7 @@ export default function AdvancedAnalyticsDashboard({ timeRange, metric }: { time
             <CardTitle className="text-sm font-medium">Farm eFCR</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.farm_efcr ?? "N/A"}</div>
+            <div className="text-2xl font-bold">{summary?.efcr_period_consolidated ?? "N/A"}</div>
             <p className="text-xs text-muted-foreground mt-1">Backend consolidated</p>
           </CardContent>
         </Card>
@@ -63,7 +66,7 @@ export default function AdvancedAnalyticsDashboard({ timeRange, metric }: { time
             <CardTitle className="text-sm font-medium">Farm Biomass</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.farm_biomass ?? "N/A"}</div>
+            <div className="text-2xl font-bold">{summary?.average_biomass ?? "N/A"}</div>
             <p className="text-xs text-muted-foreground mt-1">All systems</p>
           </CardContent>
         </Card>
@@ -72,8 +75,8 @@ export default function AdvancedAnalyticsDashboard({ timeRange, metric }: { time
             <CardTitle className="text-sm font-medium">Farm Mortality</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.farm_mortality_count ?? "N/A"}</div>
-            <p className="text-xs text-muted-foreground mt-1">Latest period</p>
+            <div className="text-2xl font-bold">{summary?.mortality_rate ?? "N/A"}</div>
+            <p className="text-xs text-muted-foreground mt-1">Consolidated rate</p>
           </CardContent>
         </Card>
         <Card>
@@ -81,7 +84,7 @@ export default function AdvancedAnalyticsDashboard({ timeRange, metric }: { time
             <CardTitle className="text-sm font-medium">Avg Water Quality</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.farm_avg_water_quality ?? "N/A"}</div>
+            <div className="text-2xl font-bold">{summary?.water_quality_rating_average ?? "N/A"}</div>
             <p className="text-xs text-muted-foreground mt-1">Backend rating</p>
           </CardContent>
         </Card>
@@ -97,7 +100,7 @@ export default function AdvancedAnalyticsDashboard({ timeRange, metric }: { time
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={rows}>
+              <LineChart data={chartRows}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis yAxisId="left" />
@@ -175,7 +178,7 @@ export default function AdvancedAnalyticsDashboard({ timeRange, metric }: { time
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={rows}>
+              <AreaChart data={chartRows}>
                 <defs>
                   <linearGradient id="colorBiomass" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.8} />

@@ -1,8 +1,9 @@
 ﻿"use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { useQuery } from "@tanstack/react-query"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -13,13 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  fetchDailyFishInventory,
-  fetchProductionSummary,
-  fetchSystemsList,
-  fetchTimePeriodBounds,
-  fetchWaterQualityRatings,
-} from "@/lib/supabase-queries"
+import { getDailyFishInventory } from "@/lib/api/inventory"
+import { getProductionSummary } from "@/lib/api/production"
+import { getTimePeriodBounds } from "@/lib/api/dashboard"
+import { getWaterQualityRatings } from "@/lib/api/water-quality"
+import { parseDateToTimePeriod, sortByDateAsc } from "@/lib/utils"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useSystemOptions } from "@/lib/hooks/use-options"
 
 type MetricKey =
   | "efcr_periodic"
@@ -43,7 +44,7 @@ type PeriodKey =
 
 type ChartPoint = { date: string; value: number }
 
-type DataSource = "daily_fish_inventory_table" | "production_summary" | "daily_water_quality_rating"
+type DataSource = "api_daily_fish_inventory" | "api_production_summary" | "api_dashboard"
 
 type MetricConfig = {
   label: string
@@ -69,7 +70,7 @@ const METRIC_REGISTRY: Record<MetricKey, MetricConfig> = {
   biomass_increase: { label: "Biomass increase", unit: "kg" },
   abw: { label: "ABW", unit: "g" },
   water_quality: { label: "Water quality", unit: "" },
-  feeding: { label: "Feeding rate", unit: "%" },
+  feeding: { label: "Feeding rate", unit: "kg/t" },
   density: { label: "Density", unit: "kg/m" },
   fish_health: { label: "Fish health", unit: "", comingSoon: true },
 }
@@ -115,7 +116,7 @@ const getSeriesConfig = (metric: MetricKey): SeriesConfig | null => {
   switch (metric) {
     case "efcr_periodic":
       return {
-        source: "production_summary",
+        source: "api_production_summary",
         getDate: (row) => row.date as string | null,
         getValue: (row) => toNumber(row.efcr_period),
         unit: "",
@@ -123,7 +124,7 @@ const getSeriesConfig = (metric: MetricKey): SeriesConfig | null => {
       }
     case "efcr_aggregated":
       return {
-        source: "production_summary",
+        source: "api_production_summary",
         getDate: (row) => row.date as string | null,
         getValue: (row) => toNumber((row as Record<string, unknown>).efcr_aggregated),
         unit: "",
@@ -131,7 +132,7 @@ const getSeriesConfig = (metric: MetricKey): SeriesConfig | null => {
       }
     case "mortality":
       return {
-        source: "daily_fish_inventory_table",
+        source: "api_daily_fish_inventory",
         getDate: (row) => row.inventory_date as string | null,
         getValue: (row) => toNumber(row.mortality_rate),
         unit: "%",
@@ -140,7 +141,7 @@ const getSeriesConfig = (metric: MetricKey): SeriesConfig | null => {
       }
     case "biomass_increase":
       return {
-        source: "production_summary",
+        source: "api_production_summary",
         getDate: (row) => row.date as string | null,
         getValue: (row) => {
           const direct = toNumber((row as Record<string, unknown>).biomass_increase_period)
@@ -152,7 +153,7 @@ const getSeriesConfig = (metric: MetricKey): SeriesConfig | null => {
       }
     case "abw":
       return {
-        source: "production_summary",
+        source: "api_production_summary",
         getDate: (row) => row.date as string | null,
         getValue: (row) => toNumber(row.average_body_weight),
         unit: "g",
@@ -160,7 +161,7 @@ const getSeriesConfig = (metric: MetricKey): SeriesConfig | null => {
       }
     case "water_quality":
       return {
-        source: "daily_water_quality_rating",
+        source: "api_dashboard",
         getDate: (row) => row.rating_date as string | null,
         getValue: (row) => {
           const numeric = toNumber(row.rating_numeric)
@@ -172,16 +173,16 @@ const getSeriesConfig = (metric: MetricKey): SeriesConfig | null => {
       }
     case "feeding":
       return {
-        source: "daily_fish_inventory_table",
+        source: "api_daily_fish_inventory",
         getDate: (row) => row.inventory_date as string | null,
         getValue: (row) => toNumber(row.feeding_rate),
-        unit: "%",
-        isPercent: true,
+        unit: "kg/t",
+        isPercent: false,
         precision: 2,
       }
     case "density":
       return {
-        source: "daily_fish_inventory_table",
+        source: "api_daily_fish_inventory",
         getDate: (row) => row.inventory_date as string | null,
         getValue: (row) => toNumber(row.biomass_density),
         unit: "kg/m",
@@ -204,6 +205,7 @@ export default function MetricsExplorer({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { farmId } = useActiveFarm()
 
   const metricFromQuery = searchParams.get("filter")
   const metricFromRoute = isMetricKey(initialMetric ?? null) ? (initialMetric as MetricKey) : null
@@ -211,25 +213,29 @@ export default function MetricsExplorer({
   const metricConfig = METRIC_REGISTRY[metricKey]
 
   const periodParam = searchParams.get("period")
-  const periodValue: PeriodKey = isPeriodKey(periodParam) ? periodParam : "month"
+  const parsedPeriod = parseDateToTimePeriod(periodParam)
+  const periodValue: PeriodKey = parsedPeriod.kind === "preset" && isPeriodKey(parsedPeriod.period)
+    ? parsedPeriod.period
+    : "2 weeks"
   const systemValue = searchParams.get("system") ?? "all"
-
-  const [systems, setSystems] = useState<Array<{ id: number; name: string }>>([])
-  const [series, setSeries] = useState<ChartPoint[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   const seriesConfig = useMemo(() => getSeriesConfig(metricKey), [metricKey])
 
-  const periodLabel = useMemo(
-    () => PERIOD_OPTIONS.find((option) => option.value === periodValue)?.label ?? "Month",
-    [periodValue],
+  const periodLabel = useMemo(() => {
+    if (parsedPeriod.kind === "custom") return "Custom"
+    return PERIOD_OPTIONS.find((option) => option.value === periodValue)?.label ?? "2 Weeks"
+  }, [parsedPeriod.kind, periodValue])
+
+  const systemsQuery = useSystemOptions({ farmId })
+  const systems = useMemo(
+    () => (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
+    [systemsQuery.data],
   )
 
   const systemLabel = useMemo(() => {
     if (systemValue === "all") return "All systems"
     const selected = systems.find((system) => String(system.id) === systemValue)
-    return selected?.name ?? `System ${systemValue}`
+    return selected?.label ?? `System ${systemValue}`
   }, [systems, systemValue])
 
   const updateQuery = useCallback(
@@ -254,60 +260,36 @@ export default function MetricsExplorer({
     [searchParams, metricKey, pathname, router, syncMetricToPath],
   )
 
-  useEffect(() => {
-    const loadSystems = async () => {
-      const result = await fetchSystemsList()
-      if (result.status === "success") {
-        setSystems(result.data)
-      }
-    }
-    loadSystems()
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    const loadData = async () => {
-      if (metricConfig.comingSoon || !seriesConfig) {
-        setSeries([])
-        setLoading(false)
-        setError(null)
-        return
-      }
-
-      setLoading(true)
-      setError(null)
-
+  const seriesQuery = useQuery({
+    queryKey: ["metrics-series", metricKey, systemValue, periodParam ?? periodValue],
+    enabled: Boolean(seriesConfig) && !metricConfig.comingSoon,
+    queryFn: async ({ signal }) => {
       const systemId =
         systemValue !== "all" && Number.isFinite(Number(systemValue)) ? Number(systemValue) : undefined
 
-      const bounds = await fetchTimePeriodBounds(periodValue)
+      const bounds = await getTimePeriodBounds(periodParam ?? periodValue, signal, farmId ?? null)
       const dateFrom = bounds.start ?? undefined
       const dateTo = bounds.end ?? undefined
 
       let result
-      if (seriesConfig.source === "daily_fish_inventory_table") {
-        result = await fetchDailyFishInventory({ system_id: systemId, date_from: dateFrom, date_to: dateTo, limit: 2000 })
-      } else if (seriesConfig.source === "production_summary") {
-        result = await fetchProductionSummary({ system_id: systemId, date_from: dateFrom, date_to: dateTo, limit: 2000 })
+      if (seriesConfig?.source === "api_daily_fish_inventory") {
+        result = await getDailyFishInventory({ farmId: farmId ?? null, systemId, dateFrom, dateTo, limit: 2000, signal })
+      } else if (seriesConfig?.source === "api_production_summary") {
+        result = await getProductionSummary({ farmId: farmId ?? null, systemId, dateFrom, dateTo, limit: 2000, signal })
       } else {
-        result = await fetchWaterQualityRatings({ system_id: systemId, date_from: dateFrom, date_to: dateTo, limit: 2000 })
+        result = await getWaterQualityRatings({ farmId: farmId ?? null, systemId, dateFrom, dateTo, limit: 2000, signal })
       }
-
-      if (cancelled) return
 
       if (result.status !== "success") {
-        setSeries([])
-        setError(result.error ?? "Unable to load data")
-        setLoading(false)
-        return
+        return { status: "error", data: [] as ChartPoint[], error: result.error ?? "Unable to load data" }
       }
 
-      const points = result.data
+      const rows = result.data as Record<string, unknown>[]
+      const points = sortByDateAsc(rows, (row) => seriesConfig?.getDate(row) ?? "")
         .map((row) => {
-          const rawDate = seriesConfig.getDate(row as Record<string, unknown>)
-          const value = seriesConfig.getValue(row as Record<string, unknown>)
-          if (!rawDate || value === null) return null
+          const rawDate = seriesConfig?.getDate(row)
+          const value = seriesConfig?.getValue(row)
+          if (!rawDate || value === null || value === undefined) return null
           return {
             date: normalizeDateKey(rawDate),
             value,
@@ -315,16 +297,9 @@ export default function MetricsExplorer({
         })
         .filter(Boolean) as ChartPoint[]
 
-      setSeries(points)
-      setLoading(false)
-    }
-
-    loadData()
-
-    return () => {
-      cancelled = true
-    }
-  }, [metricConfig.comingSoon, periodValue, seriesConfig, systemValue])
+      return { status: "success", data: points as ChartPoint[] }
+    },
+  })
 
   const handleMetricChange = (value: string) => {
     if (!isMetricKey(value)) return
@@ -389,7 +364,7 @@ export default function MetricsExplorer({
                 <SelectItem value="all">All systems</SelectItem>
                 {systems.map((system) => (
                   <SelectItem key={system.id} value={String(system.id)}>
-                    {system.name}
+                    {system.label ?? `System ${system.id}`}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -427,15 +402,17 @@ export default function MetricsExplorer({
             <div className="h-[320px] flex items-center justify-center text-muted-foreground">
               Coming soon.
             </div>
-          ) : loading ? (
+          ) : seriesQuery.isLoading ? (
             <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading...</div>
-          ) : error ? (
-            <div className="h-[320px] flex items-center justify-center text-destructive">{error}</div>
-          ) : series.length === 0 ? (
+          ) : seriesQuery.data?.status === "error" ? (
+            <div className="h-[320px] flex items-center justify-center text-destructive">
+              {seriesQuery.data?.error ?? "Unable to load data"}
+            </div>
+          ) : (seriesQuery.data?.data?.length ?? 0) === 0 ? (
             <div className="h-[320px] flex items-center justify-center text-muted-foreground">No data available.</div>
           ) : (
             <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={series}>
+              <AreaChart data={seriesQuery.data?.data ?? []}>
                 <defs>
                   <linearGradient id="metricFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.8} />

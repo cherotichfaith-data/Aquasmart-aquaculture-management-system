@@ -1,27 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { fetchMortalityData } from "@/lib/supabase-queries"
+import { useMortalityData } from "@/lib/hooks/use-reports"
+import { sortByDateAsc } from "@/lib/utils"
 
 export default function MortalityReport({ dateRange }: { dateRange?: { from: string; to: string } }) {
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      const result = await fetchMortalityData({
-        limit: 100,
-        date_from: dateRange?.from,
-        date_to: dateRange?.to,
-      })
-      setRows(result.status === "success" ? result.data : [])
-      setLoading(false)
-    }
-    loadData()
-  }, [dateRange])
+  const mortalityQuery = useMortalityData({
+    limit: 100,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+  })
+  const rows = mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : []
+  const loading = mortalityQuery.isLoading
+  const chartRows = useMemo(() => sortByDateAsc(rows, (row) => row.date), [rows])
 
   const latest = rows[0]
 
@@ -49,7 +42,7 @@ export default function MortalityReport({ dateRange }: { dateRange?: { from: str
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={rows}>
+              <LineChart data={chartRows}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
