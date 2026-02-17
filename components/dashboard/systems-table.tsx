@@ -28,10 +28,17 @@ const formatWithUnit = (value: number | null | undefined, decimals: number, unit
   return formatted === "--" ? "--" : `${formatted} ${unit}`
 }
 
-const formatPercent = (value: number | null | undefined, decimals = 2) => {
+const formatRate = (value: number | null | undefined, decimals = 4, unit = "rate/day") => {
   if (value === null || value === undefined || Number.isNaN(value)) return "--"
   if (!Number.isFinite(value)) return "--"
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: decimals })} %`
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: decimals })} ${unit}`
+}
+
+const formatAsOfDate = (value: string | null | undefined) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "2-digit" }).format(parsed)
 }
 
 export default function SystemsTable({
@@ -62,6 +69,7 @@ export default function SystemsTable({
   const systemsQuery = useSystemsTable({
     farmId,
     stage,
+    batch,
     system,
     timePeriod,
     periodParam,
@@ -117,16 +125,25 @@ export default function SystemsTable({
                 System
               </TableHead>
               <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right">
+                Fish
+              </TableHead>
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right">
+                Biomass
+              </TableHead>
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right">
+                Feed
+              </TableHead>
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right">
                 eFCR
               </TableHead>
               <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right">
                 ABW
               </TableHead>
               <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right hidden lg:table-cell">
-                Feeding Rate
+                Feeding
               </TableHead>
               <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right hidden lg:table-cell">
-                Mortality Rate
+                Mortality
               </TableHead>
               <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right hidden xl:table-cell">
                 Density
@@ -134,61 +151,93 @@ export default function SystemsTable({
               <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 text-right hidden xl:table-cell">
                 Water Quality
               </TableHead>
+              <TableHead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 hidden 2xl:table-cell">
+                Flags
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pagedSystems.length > 0 ? (
-              pagedSystems.map((system, i) => (
-                <TableRow
-                  key={i}
-                  className="cursor-pointer hover:bg-slate-50/70"
-                  onClick={() => handleRowClick(system.system_id, system.input_start_date || "", system.input_end_date || "")}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault()
-                      handleRowClick(system.system_id, system.input_start_date || "", system.input_end_date || "")
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#4C7DFF]" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{system.system_name || system.system_id}</p>
-                        {system.sampling_end_date ? (
-                          <p className="text-[11px] text-slate-500">{system.sampling_end_date}</p>
-                        ) : null}
+              pagedSystems.map((system, i) => {
+                const asOf = formatAsOfDate(system.as_of_date ?? system.input_end_date)
+                const hasMissingDays = (system.missing_days_count ?? 0) > 0
+                const staleSampling = (system.sample_age_days ?? 0) > 14
+                const criticalWaterQuality =
+                  system.water_quality_rating_average === "critical" || system.water_quality_rating_average === "lethal"
+                const flags = [
+                  hasMissingDays ? `Missing ${system.missing_days_count}d` : null,
+                  staleSampling ? `Sampling ${system.sample_age_days}d old` : null,
+                  criticalWaterQuality ? `WQ ${system.water_quality_rating_average}` : null,
+                ].filter(Boolean) as string[]
+
+                return (
+                  <TableRow
+                    key={i}
+                    className="cursor-pointer hover:bg-slate-50/70"
+                    onClick={() => handleRowClick(system.system_id, system.input_start_date || "", system.input_end_date || "")}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        handleRowClick(system.system_id, system.input_start_date || "", system.input_end_date || "")
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-[#4C7DFF]" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{system.system_name || system.system_id}</p>
+                          <p className="text-[11px] text-slate-500">
+                            As of {asOf ?? "N/A"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-slate-900">{formatNumber(system.efcr, 2)}</TableCell>
-                  <TableCell className="text-right text-sm text-slate-900">{formatWithUnit(system.abw, 1, "g")}</TableCell>
-                  <TableCell className="text-right text-sm text-slate-900 hidden lg:table-cell">
-                    {formatWithUnit(system.feeding_rate, 2, "kg/t")}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-slate-900 hidden lg:table-cell">
-                    {formatPercent(system.mortality_rate, 2)}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-slate-900 hidden xl:table-cell">
-                    {formatNumber(system.biomass_density, 2)}
-                  </TableCell>
-                  <TableCell className="text-right hidden xl:table-cell">
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${
-                      system.water_quality_rating_average === "optimal" ? "bg-emerald-50 text-emerald-600" :
-                      system.water_quality_rating_average === "acceptable" ? "bg-blue-50 text-blue-600" :
-                      system.water_quality_rating_average === "critical" ? "bg-amber-50 text-amber-600" :
-                      "bg-red-50 text-red-600"
-                    }`}>
-                      {system.water_quality_rating_average || "Unknown"}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-slate-900">{formatNumber(system.fish_end, 0)}</TableCell>
+                    <TableCell className="text-right text-sm text-slate-900">{formatWithUnit(system.biomass_end, 1, "kg")}</TableCell>
+                    <TableCell className="text-right text-sm text-slate-900">{formatWithUnit(system.feed_total, 1, "kg")}</TableCell>
+                    <TableCell className="text-right text-sm text-slate-900">{formatNumber(system.efcr, 2)}</TableCell>
+                    <TableCell className="text-right text-sm text-slate-900">{formatWithUnit(system.abw, 1, "g")}</TableCell>
+                    <TableCell className="text-right text-sm text-slate-900 hidden lg:table-cell">
+                      {formatWithUnit(system.feeding_rate, 2, "kg/t")}
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-slate-900 hidden lg:table-cell">
+                      {formatRate(system.mortality_rate, 4, "rate/day")}
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-slate-900 hidden xl:table-cell">
+                      {formatNumber(system.biomass_density, 2)}
+                    </TableCell>
+                    <TableCell className="text-right hidden xl:table-cell">
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${
+                        system.water_quality_rating_average === "optimal" ? "bg-emerald-50 text-emerald-600" :
+                        system.water_quality_rating_average === "acceptable" ? "bg-blue-50 text-blue-600" :
+                        system.water_quality_rating_average === "critical" ? "bg-amber-50 text-amber-600" :
+                        "bg-red-50 text-red-600"
+                      }`}>
+                        {system.water_quality_rating_average || "Unknown"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden 2xl:table-cell">
+                      {flags.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {flags.map((flag) => (
+                            <span key={flag} className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+                              {flag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-500">None</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                   No systems found
                 </TableCell>
               </TableRow>

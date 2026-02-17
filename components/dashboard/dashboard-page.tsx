@@ -166,7 +166,13 @@ export default function DashboardPage() {
               timePeriod={timePeriod}
               periodParam={periodParam}
             />
-            <HealthSummary system={selectedSystem} timePeriod={timePeriod} periodParam={periodParam} />
+            <HealthSummary
+              stage={selectedStage}
+              batch={selectedBatch}
+              system={selectedSystem}
+              timePeriod={timePeriod}
+              periodParam={periodParam}
+            />
           </div>
         </section>
 
@@ -177,6 +183,7 @@ export default function DashboardPage() {
           </div>
           <PopulationOverview
             stage={selectedStage === "all" ? null : selectedStage}
+            batch={selectedBatch}
             system={selectedSystem}
             timePeriod={timePeriod}
             periodParam={periodParam}
@@ -188,7 +195,13 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold">Advisory Timeline</h2>
             <p className="text-sm text-muted-foreground">Recent operational changes and farm events.</p>
           </div>
-          <RecentActivities batch={selectedBatch} system={selectedSystem} title="Advisory Timeline" countLabel="events" />
+          <RecentActivities
+            batch={selectedBatch}
+            stage={selectedStage}
+            system={selectedSystem}
+            title="Advisory Timeline"
+            countLabel="events"
+          />
         </section>
 
         <section className="space-y-4">
@@ -196,7 +209,12 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold">Recommended Actions</h2>
             <p className="text-sm text-muted-foreground">Supply and feed priorities based on recent activity.</p>
           </div>
-          <RecommendedActions system={selectedSystem} timePeriod={timePeriod} />
+          <RecommendedActions
+            stage={selectedStage}
+            batch={selectedBatch}
+            system={selectedSystem}
+            timePeriod={timePeriod}
+          />
         </section>
       </div>
     </DashboardLayout>

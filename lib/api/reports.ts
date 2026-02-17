@@ -1,7 +1,7 @@
 import type { Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
-import { isSbPermissionDenied } from "@/utils/supabase/log"
+import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type FeedIncomingRow = Tables<"feed_incoming">
 type FeedTypeRow = Tables<"api_feed_type_options">
@@ -18,6 +18,14 @@ type FishStockingRow = Tables<"fish_stocking">
 
 export type FeedIncomingWithType = FeedIncomingRow & { feed_type: FeedTypeRow | null }
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
+
+const isAbortLikeError = (err: unknown): boolean => {
+  if (!err) return false
+  const e = err as { name?: string; message?: string }
+  const name = String(e.name ?? "").toLowerCase()
+  const message = String(e.message ?? "").toLowerCase()
+  return name.includes("abort") || name.includes("cancel") || message.includes("abort") || message.includes("cancel")
+}
 
 export async function getFeedIncomingWithType(params?: { limit?: number; signal?: AbortSignal }): Promise<QueryResult<FeedIncomingWithType>> {
   const clientResult = await getClientOrError("getFeedIncomingWithType")
@@ -248,15 +256,20 @@ async function getRecentRows<T>(
   signal?: AbortSignal,
   limit = 5,
 ): Promise<QueryResult<T>> {
-  const clientResult = await getClientOrError(`getRecentRows:${table}`)
-  if ("error" in clientResult) return clientResult.error
+  const clientResult = await getClientOrError(`getRecentRows:${table}`, { requireSession: true })
+  if ("error" in clientResult) {
+    if (clientResult.error.status === "error" && /No active session/i.test(clientResult.error.error ?? "")) {
+      return toQuerySuccess<T>([])
+    }
+    return clientResult.error
+  }
   const { supabase } = clientResult
 
   let query = supabase.from(table).select("*").order(orderColumn, { ascending: false }).limit(limit)
   if (signal) query = query.abortSignal(signal)
   const { data, error } = await query
   if (error) {
-    if (isSbPermissionDenied(error)) {
+    if (signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
       return toQuerySuccess<T>([])
     }
     return toQueryError(`getRecentRows:${table}`, error)
@@ -298,4 +311,29 @@ export async function getRecentEntries(signal?: AbortSignal) {
     stocking,
     systems,
   }
+}
+
+export async function getBatchSystemIds(params: {
+  batchId: number
+  signal?: AbortSignal
+}): Promise<QueryResult<{ system_id: number }>> {
+  const clientResult = await getClientOrError("getBatchSystemIds")
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase
+    .from("fish_stocking")
+    .select("system_id")
+    .eq("batch_id", params.batchId)
+    .not("system_id", "is", null)
+  if (params.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (error) {
+    if (isSbPermissionDenied(error)) return toQuerySuccess<{ system_id: number }>([])
+    return toQueryError("getBatchSystemIds", error)
+  }
+
+  const uniq = Array.from(new Set((data ?? []).map((row) => row.system_id).filter((id): id is number => typeof id === "number")))
+  return toQuerySuccess<{ system_id: number }>(uniq.map((system_id) => ({ system_id })))
 }

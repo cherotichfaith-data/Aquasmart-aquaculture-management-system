@@ -21,15 +21,15 @@ interface DataEntryInterfaceProps {
     feeds: Tables<"api_feed_type_options">[]
     batches: Tables<"api_fingerling_batch_options">[]
     recentEntries: {
-        mortality: any[]
-        feeding: any[]
-        sampling: any[]
-        transfer: any[]
-        harvest: any[]
-        water_quality: any[]
-        incoming_feed: any[]
-        stocking: any[]
-        systems: any[]
+        mortality: Tables<"fish_mortality">[]
+        feeding: Tables<"feeding_record">[]
+        sampling: Tables<"fish_sampling_weight">[]
+        transfer: Tables<"fish_transfer">[]
+        harvest: Tables<"fish_harvest">[]
+        water_quality: Tables<"water_quality_measurement">[]
+        incoming_feed: Tables<"feed_incoming">[]
+        stocking: Tables<"fish_stocking">[]
+        systems: Tables<"system">[]
     }
 }
 
@@ -43,10 +43,10 @@ const sidebarItems = [
     { id: "harvest", label: "Harvest" },
     { id: "water_quality", label: "Water Quality" },
     { id: "incoming_feed", label: "Incoming Feed" },
-]
+] as const
 
 export function DataEntryInterface({ systems, suppliers, feeds, batches, recentEntries }: DataEntryInterfaceProps) {
-    const [activeTab, setActiveTab] = useState("stocking")
+    const [activeTab, setActiveTab] = useState<(typeof sidebarItems)[number]["id"]>("stocking")
 
     return (
         <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-6">

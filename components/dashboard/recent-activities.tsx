@@ -1,23 +1,113 @@
 "use client"
 
 import { Clock, Fish, Droplets, AlertCircle, CornerDownRight } from "lucide-react"
-import { useRecentActivities } from "@/lib/hooks/use-dashboard"
+import { useMemo } from "react"
+import { useRecentEntries } from "@/lib/hooks/use-reports"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useSystemOptions } from "@/lib/hooks/use-options"
+import type { Enums } from "@/lib/types/database"
 
 export default function RecentActivities({
   batch = "all",
+  stage = "all",
   system = "all",
   title = "Activities",
   countLabel = "updates",
 }: {
   batch?: string
+  stage?: "all" | Enums<"system_growth_stage">
   system?: string
   title?: string
   countLabel?: string
 }) {
-  const activitiesQuery = useRecentActivities({ limit: 5 })
+  const { farmId } = useActiveFarm()
+  const entriesQuery = useRecentEntries()
+  const systemsQuery = useSystemOptions({ farmId, activeOnly: true })
+  const loading = entriesQuery.isLoading || systemsQuery.isLoading
 
-  const activities = activitiesQuery.data?.status === "success" ? activitiesQuery.data.data : []
-  const loading = activitiesQuery.isLoading
+  const systemStageMap = useMemo(() => {
+    const map = new Map<number, string | null | undefined>()
+    const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
+    systems.forEach((row) => {
+      if (row.id != null) map.set(row.id, row.growth_stage)
+    })
+    return map
+  }, [systemsQuery.data])
+
+  const activities = useMemo(() => {
+    const data = entriesQuery.data
+    if (!data) return []
+
+    const normalize = <T extends { id: number | string; created_at?: string | null; date?: string | null }>(
+      rows: T[],
+      tableName: string,
+      pick: (row: T) => { system_id?: number | null; batch_id?: number | null },
+    ) =>
+      rows.map((row) => ({
+        id: `${tableName}-${row.id}`,
+        table_name: tableName,
+        change_type: "insert",
+        column_name: null as string | null,
+        change_time: row.created_at ?? row.date ?? "",
+        ...pick(row),
+      }))
+
+    const merged = [
+      ...normalize(data.mortality?.status === "success" ? data.mortality.data : [], "fish_mortality", (row: any) => ({
+        system_id: row.system_id ?? null,
+        batch_id: row.batch_id ?? null,
+      })),
+      ...normalize(data.feeding?.status === "success" ? data.feeding.data : [], "feeding_record", (row: any) => ({
+        system_id: row.system_id ?? null,
+        batch_id: row.batch_id ?? null,
+      })),
+      ...normalize(data.sampling?.status === "success" ? data.sampling.data : [], "fish_sampling_weight", (row: any) => ({
+        system_id: row.system_id ?? null,
+        batch_id: row.batch_id ?? null,
+      })),
+      ...normalize(data.transfer?.status === "success" ? data.transfer.data : [], "fish_transfer", (row: any) => ({
+        system_id: row.origin_system_id ?? null,
+        batch_id: row.batch_id ?? null,
+      })),
+      ...normalize(data.harvest?.status === "success" ? data.harvest.data : [], "fish_harvest", (row: any) => ({
+        system_id: row.system_id ?? null,
+        batch_id: row.batch_id ?? null,
+      })),
+      ...normalize(data.water_quality?.status === "success" ? data.water_quality.data : [], "water_quality_measurement", (row: any) => ({
+        system_id: row.system_id ?? null,
+        batch_id: null,
+      })),
+      ...normalize(data.incoming_feed?.status === "success" ? data.incoming_feed.data : [], "feed_incoming", (_row: any) => ({
+        system_id: null,
+        batch_id: null,
+      })),
+      ...normalize(data.stocking?.status === "success" ? data.stocking.data : [], "fish_stocking", (row: any) => ({
+        system_id: row.system_id ?? null,
+        batch_id: row.batch_id ?? null,
+      })),
+      ...normalize(data.systems?.status === "success" ? data.systems.data : [], "system", (row: any) => ({
+        system_id: row.id ?? null,
+        batch_id: null,
+      })),
+    ]
+
+    return merged
+      .filter((row) => {
+        if (system !== "all") return String(row.system_id ?? "") === system
+        return true
+      })
+      .filter((row) => {
+        if (batch !== "all") return String(row.batch_id ?? "") === batch
+        return true
+      })
+      .filter((row) => {
+        if (stage === "all") return true
+        if (row.system_id == null) return false
+        return systemStageMap.get(row.system_id) === stage
+      })
+      .sort((a, b) => String(b.change_time ?? "").localeCompare(String(a.change_time ?? "")))
+      .slice(0, 5)
+  }, [batch, entriesQuery.data, stage, system, systemStageMap])
 
   const normalizeTableName = (table: string) => {
     switch (table) {
@@ -156,7 +246,7 @@ export default function RecentActivities({
                   <p className="font-medium text-sm text-foreground">{getLabel(activity.table_name)}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {activity.change_type}
-                    {activity.column_name ? ` · ${activity.column_name}` : ""}
+                    {activity.column_name ? ` - ${activity.column_name}` : ""}
                   </p>
                 </div>
                 <span className="text-xs text-muted-foreground">{formatTime(activity.change_time)}</span>
@@ -170,3 +260,4 @@ export default function RecentActivities({
     </div>
   )
 }
+

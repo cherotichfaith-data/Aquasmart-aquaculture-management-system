@@ -63,11 +63,13 @@ function StatCard({
 
 export default function PopulationOverview({
     stage,
+    batch,
     system,
     timePeriod,
     periodParam,
 }: {
     stage: SummaryRow["growth_stage"]
+    batch?: string
     system?: string
     timePeriod: TimePeriod
     periodParam?: string | null
@@ -76,6 +78,7 @@ export default function PopulationOverview({
     const summaryQuery = useProductionTrend({
         farmId,
         stage: stage ?? undefined,
+        batch: batch ?? "all",
         system,
         timePeriod: periodParam ?? timePeriod,
     })

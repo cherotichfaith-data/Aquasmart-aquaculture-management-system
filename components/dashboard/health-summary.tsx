@@ -9,14 +9,6 @@ import { useHealthSummary } from "@/lib/hooks/use-dashboard"
 
 type Tone = "good" | "warn" | "bad"
 
-type HealthState = {
-  title: string
-  status: string
-  tone: Tone
-  progress: number
-  detail?: string
-}
-
 const toneText = {
   good: "text-emerald-600",
   warn: "text-amber-600",
@@ -66,10 +58,14 @@ function StatusCard({
 }
 
 export default function HealthSummary({
+  stage,
+  batch,
   system,
   timePeriod: _timePeriod,
   periodParam,
 }: {
+  stage?: "all" | Enums<"system_growth_stage">
+  batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
@@ -77,6 +73,8 @@ export default function HealthSummary({
   const { farmId } = useActiveFarm()
   const summaryQuery = useHealthSummary({
     farmId,
+    stage: stage ?? "all",
+    batch: batch ?? "all",
     system,
     timePeriod: _timePeriod ?? "2 weeks",
     periodParam,

@@ -20,19 +20,24 @@ import { useToast } from "@/hooks/use-toast"
 import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
 
+const optionalNumber = z.preprocess(
+    (value) => (value === "" || value == null ? undefined : Number(value)),
+    z.number().optional(),
+)
+
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
     date: z.string().min(1, "Date is required"),
     time: z.string().min(1, "Time is required"),
     water_depth: z.coerce.number().min(0, "Depth must be positive"),
-    temperature: z.coerce.number().optional(),
-    dissolved_oxygen: z.coerce.number().optional(),
-    ph: z.coerce.number().optional(),
-    total_ammonia: z.coerce.number().optional(),
-    no2: z.coerce.number().optional(),
-    no3: z.coerce.number().optional(),
-    salinity: z.coerce.number().optional(),
-    secchi_disk: z.coerce.number().optional(),
+    temperature: optionalNumber,
+    dissolved_oxygen: optionalNumber,
+    ph: optionalNumber,
+    total_ammonia: optionalNumber,
+    no2: optionalNumber,
+    no3: optionalNumber,
+    salinity: optionalNumber,
+    secchi_disk: optionalNumber,
 })
 
 interface WaterQualityFormProps {
@@ -50,21 +55,14 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
             system_id: "",
             time: new Date().toISOString().split("T")[1]?.slice(0, 5) ?? "08:00",
             water_depth: 0,
-            // Use empty strings for optional number inputs to avoid "0" default if not desired, 
-            // or 0 if acceptable. For paramters like pH, 0 is invalid/extreme.
-            // We use standard values or undefined->"" via controller if possible, 
-            // but to fix the "uncontrolled" error, we need a defined value.
-            // Let's use undefined, BUT we must ensure the Input field uses value={field.value ?? ""}
-            // However, the error says it changing from undefined to defined.
-            // So we MUST initialize with "".
-            temperature: "" as any,
-            dissolved_oxygen: "" as any,
-            ph: "" as any,
-            total_ammonia: "" as any,
-            no2: "" as any,
-            no3: "" as any,
-            salinity: "" as any,
-            secchi_disk: "" as any,
+            temperature: undefined,
+            dissolved_oxygen: undefined,
+            ph: undefined,
+            total_ammonia: undefined,
+            no2: undefined,
+            no3: undefined,
+            salinity: undefined,
+            secchi_disk: undefined,
         },
     })
 
@@ -125,6 +123,14 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                 system_id: values.system_id,
                 time: values.time,
                 water_depth: values.water_depth,
+                temperature: undefined,
+                dissolved_oxygen: undefined,
+                ph: undefined,
+                total_ammonia: undefined,
+                no2: undefined,
+                no3: undefined,
+                salinity: undefined,
+                secchi_disk: undefined,
             })
         } catch (error) {
             console.error(error)
@@ -215,9 +221,9 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                             name="temperature"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Temperature (°C)</FormLabel>
+                                    <FormLabel>Temperature (deg C)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.1" {...field} />
+                                        <Input type="number" step="0.1" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -230,7 +236,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                 <FormItem>
                                     <FormLabel>DO (mg/L)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
+                                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -243,7 +249,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                 <FormItem>
                                     <FormLabel>pH</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.1" {...field} />
+                                        <Input type="number" step="0.1" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -256,7 +262,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                 <FormItem>
                                     <FormLabel>Ammonia (Total)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
+                                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -269,7 +275,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                 <FormItem>
                                     <FormLabel>NO2 (Nitrite)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
+                                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -282,7 +288,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                 <FormItem>
                                     <FormLabel>NO3 (Nitrate)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
+                                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -295,7 +301,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                 <FormItem>
                                     <FormLabel>Salinity (ppt)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.1" {...field} />
+                                        <Input type="number" step="0.1" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -308,7 +314,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                                 <FormItem>
                                     <FormLabel>Secchi Disk (cm)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="1" {...field} />
+                                        <Input type="number" step="1" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

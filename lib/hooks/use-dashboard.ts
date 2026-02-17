@@ -4,9 +4,9 @@ import { useQuery } from "@tanstack/react-query"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
 import {
+  getDashboardSystems,
   getDashboardConsolidatedSnapshot,
   getDashboardSnapshot,
-  getSystemsDashboard,
   getTimePeriodBounds,
 } from "@/lib/api/dashboard"
 import { parseDateToTimePeriod, sortByDateAsc } from "@/lib/utils"
@@ -14,7 +14,7 @@ import { getDailyFishInventory } from "@/lib/api/inventory"
 import { getWaterQualityRatings } from "@/lib/api/water-quality"
 import { getSystemOptions } from "@/lib/api/options"
 import { getProductionSummary } from "@/lib/api/production"
-import { getRecentActivities, getFeedIncomingWithType } from "@/lib/api/reports"
+import { getBatchSystemIds, getRecentActivities, getFeedIncomingWithType } from "@/lib/api/reports"
 
 const computeMortalityRateFromProduction = (
   rows: Array<{ number_of_fish_inventory: number | null; daily_mortality_count: number | null }>,
@@ -25,11 +25,54 @@ const computeMortalityRateFromProduction = (
     const fish = row.number_of_fish_inventory ?? 0
     const mortality = row.daily_mortality_count ?? 0
     if (fish > 0) {
-      weightedMortality += ((mortality / fish) * 100) * fish
+      weightedMortality += (mortality / fish) * fish
       totalFish += fish
     }
   })
   return totalFish > 0 ? weightedMortality / totalFish : null
+}
+
+async function resolveScopedSystemIds(params: {
+  farmId?: string | null
+  stage?: "all" | Enums<"system_growth_stage">
+  system?: string
+  batch?: string
+  signal?: AbortSignal
+}): Promise<number[] | null> {
+  const farmId = params.farmId ?? null
+  if (!farmId) return null
+
+  const systemsResult = await getSystemOptions({
+    farmId,
+    stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+    activeOnly: true,
+    signal: params.signal,
+  })
+  if (systemsResult.status !== "success") return null
+
+  let scoped = systemsResult.data
+    .map((row) => row.id)
+    .filter((id): id is number => typeof id === "number")
+
+  if (params.system && params.system !== "all") {
+    const parsed = Number(params.system)
+    if (Number.isFinite(parsed)) {
+      scoped = scoped.filter((id) => id === parsed)
+    } else {
+      scoped = []
+    }
+  }
+
+  if (params.batch && params.batch !== "all") {
+    const batchId = Number(params.batch)
+    if (!Number.isFinite(batchId)) return []
+    const batchSystemsResult = await getBatchSystemIds({ batchId, signal: params.signal })
+    if (batchSystemsResult.status !== "success") return []
+    const batchIds = new Set(batchSystemsResult.data.map((row) => row.system_id))
+    scoped = scoped.filter((id) => batchIds.has(id))
+  }
+
+  return scoped
 }
 
 export function useDashboardSnapshot(params?: {
@@ -67,34 +110,6 @@ export function useDashboardConsolidatedSnapshot(params?: { timePeriod?: Enums<"
   })
 }
 
-export function useSystemsDashboard(params?: {
-  systemId?: number
-  stage?: Enums<"system_growth_stage">
-  timePeriod?: Enums<"time_period">
-  dateFrom?: string
-  dateTo?: string
-  limit?: number
-  farmId?: string | null
-}) {
-  const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(params?.farmId)
-  return useQuery({
-    queryKey: [
-      "dashboard",
-      "systems",
-      params?.farmId ?? "all",
-      params?.systemId ?? "all",
-      params?.stage ?? "all",
-      params?.timePeriod ?? "2 weeks",
-      params?.dateFrom ?? "",
-      params?.dateTo ?? "",
-    ],
-    queryFn: ({ signal }) => getSystemsDashboard({ ...params, farmId: params?.farmId ?? null, signal }),
-    enabled,
-    staleTime: 5 * 60_000,
-  })
-}
-
 export function useTimePeriodBounds(timePeriod: Enums<"time_period"> | string, farmId?: string | null) {
   const { session } = useAuth()
   return useQuery({
@@ -112,13 +127,22 @@ export type HealthSummaryState = {
 
 export function useHealthSummary(params: {
   farmId?: string | null
+  stage?: "all" | Enums<"system_growth_stage">
+  batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
 }) {
   const { session } = useAuth()
   return useQuery({
-    queryKey: ["health-summary", params.farmId ?? "all", params.system ?? "all", params.periodParam ?? params.timePeriod ?? "2 weeks"],
+    queryKey: [
+      "health-summary",
+      params.farmId ?? "all",
+      params.stage ?? "all",
+      params.batch ?? "all",
+      params.system ?? "all",
+      params.periodParam ?? params.timePeriod ?? "2 weeks",
+    ],
     queryFn: async ({ signal }) => {
       const ratingToneMap: Record<string, { status: string; tone: "good" | "warn" | "bad"; progress: number }> = {
         optimal: { status: "Good", tone: "good", progress: 0.85 },
@@ -127,8 +151,15 @@ export function useHealthSummary(params: {
         lethal: { status: "Critical", tone: "bad", progress: 0.2 },
       }
 
-      const systemId = params.system && params.system !== "all" ? Number(params.system) : undefined
-      const resolvedSystemId = Number.isFinite(systemId) ? systemId : undefined
+      const scopedSystemIds = await resolveScopedSystemIds({
+        farmId: params.farmId ?? null,
+        stage: params.stage ?? "all",
+        system: params.system,
+        batch: params.batch ?? "all",
+        signal,
+      })
+      const resolvedSystemId =
+        scopedSystemIds && scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
       const parsed = parseDateToTimePeriod(params.periodParam ?? params.timePeriod)
       const bounds = await getTimePeriodBounds(
         params.periodParam ?? params.timePeriod ?? "2 weeks",
@@ -153,12 +184,19 @@ export function useHealthSummary(params: {
         detail: "Latest snapshot from dashboard view",
       }
 
-      if (hasCustomRange) {
+      const forceRangeMode =
+        (params.batch && params.batch !== "all") ||
+        (params.stage && params.stage !== "all")
+
+      if (hasCustomRange || forceRangeMode) {
+        if (!bounds.start || !bounds.end) {
+          return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
+        }
         const wqResult = await getWaterQualityRatings({
           farmId: params.farmId ?? null,
           systemId: resolvedSystemId,
-          dateFrom: bounds.start!,
-          dateTo: bounds.end!,
+          dateFrom: bounds.start,
+          dateTo: bounds.end,
           limit: 2000,
           signal,
         })
@@ -166,15 +204,21 @@ export function useHealthSummary(params: {
         const invResult = await getDailyFishInventory({
           farmId: params.farmId ?? null,
           systemId: resolvedSystemId,
-          dateFrom: bounds.start!,
-          dateTo: bounds.end!,
+          dateFrom: bounds.start,
+          dateTo: bounds.end,
           limit: 2000,
           signal,
         })
 
         if (wqResult.status === "success" && wqResult.data.length) {
+          const filteredWq = scopedSystemIds?.length
+            ? wqResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
+            : wqResult.data
+          if (!filteredWq.length) {
+            return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
+          }
           const avg =
-            wqResult.data.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / wqResult.data.length
+            filteredWq.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / filteredWq.length
           const rounded = Math.round(avg)
           const mapped = ratingToneMap[
             rounded === 0 ? "lethal" : rounded === 1 ? "critical" : rounded === 2 ? "acceptable" : "optimal"
@@ -186,10 +230,13 @@ export function useHealthSummary(params: {
         }
 
         if (invResult.status === "success" && invResult.data.length) {
-          const totalMortality = invResult.data.reduce((sum, row) => sum + (row.number_of_fish_mortality ?? 0), 0)
-          const totalFish = invResult.data.reduce((sum, row) => sum + (row.number_of_fish ?? 0), 0)
+          const filteredInventory = scopedSystemIds?.length
+            ? invResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
+            : invResult.data
+          const totalMortality = filteredInventory.reduce((sum, row) => sum + (row.number_of_fish_mortality ?? 0), 0)
+          const totalFish = filteredInventory.reduce((sum, row) => sum + (row.number_of_fish ?? 0), 0)
           if (totalFish > 0) {
-            fishState.detail = `Mortality rate: ${totalMortality / totalFish}`
+            fishState.detail = `Mortality rate/day: ${(totalMortality / totalFish).toFixed(4)}`
           }
         }
       } else if (resolvedSystemId) {
@@ -209,7 +256,7 @@ export function useHealthSummary(params: {
         }
 
         if (snapshot?.mortality_rate != null) {
-          fishState.detail = `Mortality rate: ${snapshot.mortality_rate}`
+          fishState.detail = `Mortality rate/day: ${snapshot.mortality_rate}`
         }
       } else {
         const snapshot = await getDashboardConsolidatedSnapshot({
@@ -227,7 +274,7 @@ export function useHealthSummary(params: {
         }
 
         if (snapshot?.mortality_rate != null) {
-          fishState.detail = `Mortality rate: ${snapshot.mortality_rate}`
+          fishState.detail = `Mortality rate/day: ${snapshot.mortality_rate}`
         }
       }
 
@@ -248,6 +295,33 @@ export type KPIOverviewMetric = {
   invertTrend: boolean
   tone?: "good" | "warn" | "bad" | "neutral"
   badge?: string
+}
+
+export type DashboardSystemRow = {
+  system_id: number
+  system_name: string | null
+  growth_stage: "nursing" | "grow out" | "grow_out" | string | null
+  input_start_date: string | null
+  input_end_date: string | null
+  as_of_date: string | null
+  sampling_end_date: string | null
+  sample_age_days: number | null
+  efcr: number | null
+  efcr_date: string | null
+  feed_total: number | null
+  abw: number | null
+  feeding_rate: number | null
+  mortality_rate: number | null
+  biomass_density: number | null
+  fish_end: number | null
+  biomass_end: number | null
+  missing_days_count: number | null
+  water_quality_rating_average: "optimal" | "acceptable" | "critical" | "lethal" | string | null
+  water_quality_rating_numeric_average: number | null
+  water_quality_latest_date: string | null
+  worst_parameter: string | null
+  worst_parameter_value: number | null
+  worst_parameter_unit: string | null
 }
 
 export function useKpiOverview(params: {
@@ -279,25 +353,20 @@ export function useKpiOverview(params: {
       const bounds = await getTimePeriodBounds(params.periodParam ?? params.timePeriod, signal, params.farmId ?? null)
 
       const buildRangeMetrics = async (range: { start: string; end: string }) => {
-        const systemId = params.system && params.system !== "all" ? Number(params.system) : undefined
-        let systemIds: number[] | undefined
-
-        if (!Number.isFinite(systemId) && params.stage !== "all") {
-          const systemsResult = await getSystemOptions({
-            farmId: params.farmId ?? null,
-            stage: params.stage,
-            activeOnly: true,
-            signal,
-          })
-          if (systemsResult.status !== "success") {
-            return { metrics: [], dateBounds: range }
-          }
-          systemIds = systemsResult.data.map((row) => row.id as number)
-        }
+        const scopedSystemIds = await resolveScopedSystemIds({
+          farmId: params.farmId ?? null,
+          stage: params.stage,
+          system: params.system,
+          batch: params.batch ?? "all",
+          signal,
+        })
+        if (scopedSystemIds === null) return { metrics: [], dateBounds: range }
+        if (scopedSystemIds.length === 0) return { metrics: [], dateBounds: range }
+        const singleSystemId = scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
 
         const inventoryResult = await getDailyFishInventory({
           farmId: params.farmId ?? null,
-          systemId: Number.isFinite(systemId) ? (systemId as number) : undefined,
+          systemId: singleSystemId,
           dateFrom: range.start,
           dateTo: range.end,
           limit: 5000,
@@ -306,7 +375,7 @@ export function useKpiOverview(params: {
 
         const productionResult = await getProductionSummary({
           farmId: params.farmId ?? null,
-          systemId: Number.isFinite(systemId) ? (systemId as number) : undefined,
+          systemId: singleSystemId,
           stage: params.stage === "all" ? undefined : params.stage,
           dateFrom: range.start,
           dateTo: range.end,
@@ -320,12 +389,12 @@ export function useKpiOverview(params: {
 
         const inventoryRowsRaw = inventoryResult.status === "success" ? inventoryResult.data : []
         const productionRowsRaw = productionResult.status === "success" ? productionResult.data : []
-        const inventoryRows = systemIds
-          ? inventoryRowsRaw.filter((row) => row.system_id != null && systemIds.includes(row.system_id))
-          : inventoryRowsRaw
-        const productionRows = systemIds
-          ? productionRowsRaw.filter((row) => row.system_id != null && systemIds.includes(row.system_id))
-          : productionRowsRaw
+        const inventoryRows = inventoryRowsRaw.filter(
+          (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
+        )
+        const productionRows = productionRowsRaw.filter(
+          (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
+        )
 
         let totalFeed = 0
         let totalBiomass = 0
@@ -369,7 +438,7 @@ export function useKpiOverview(params: {
             const mortalityRateRow =
               typeof row.mortality_rate === "number"
                 ? row.mortality_rate
-                : (mortalityCount / fish) * 100
+                : mortalityCount / fish
             mortalityWeighted += mortalityRateRow * fish
           }
 
@@ -415,7 +484,7 @@ export function useKpiOverview(params: {
 
         const wqResult = await getWaterQualityRatings({
           farmId: params.farmId ?? null,
-          systemId: Number.isFinite(systemId) ? (systemId as number) : undefined,
+          systemId: singleSystemId,
           dateFrom: range.start,
           dateTo: range.end,
           limit: 2000,
@@ -424,9 +493,9 @@ export function useKpiOverview(params: {
         if (wqResult.status !== "success") {
           return { metrics: [], dateBounds: range }
         }
-        const wqRows = systemIds
-          ? wqResult.data.filter((row) => row.system_id != null && systemIds.includes(row.system_id))
-          : wqResult.data
+        const wqRows = wqResult.data.filter(
+          (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
+        )
         const wqAverage =
           wqRows && wqRows.length
             ? wqRows.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / wqRows.length
@@ -456,10 +525,10 @@ export function useKpiOverview(params: {
           },
           {
             key: "mortality",
-            label: "Daily Mortality Rate",
+            label: "Mortality Rate",
             value: mortalityRate,
-            unit: "%",
-            decimals: 2,
+            unit: "rate/day",
+            decimals: 4,
             trend: null,
             invertTrend: true,
           },
@@ -527,327 +596,81 @@ export function useKpiOverview(params: {
 export function useSystemsTable(params: {
   farmId?: string | null
   stage: Enums<"system_growth_stage"> | "all"
+  batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
 }) {
   const { session } = useAuth()
   return useQuery({
-    queryKey: ["systems-table", params.farmId ?? "all", params.stage, params.system ?? "all", params.timePeriod ?? "2 weeks", params.periodParam ?? ""],
+    queryKey: [
+      "systems-table",
+      params.farmId ?? "all",
+      params.stage,
+      params.batch ?? "all",
+      params.system ?? "all",
+      params.timePeriod ?? "2 weeks",
+      params.periodParam ?? "",
+    ],
     queryFn: async ({ signal }) => {
-      try {
-        const systemId = params.system && params.system !== "all" ? Number(params.system) : undefined
-        const stageFilter = params.stage === "all" ? null : params.stage
-        const systemIds: number[] = []
-        if (Number.isFinite(systemId)) {
-          systemIds.push(systemId as number)
-        } else {
-          const systemsResult = await getSystemOptions({
-            farmId: params.farmId ?? null,
-            stage: stageFilter ?? undefined,
-            activeOnly: true,
-            signal,
-          })
-          if (systemsResult.status !== "success") {
-            return {
-              rows: [] as any[],
-              meta: { reason: "System options error", error: systemsResult.error ?? "Unknown", farmId: params.farmId ?? null },
-            }
-          }
-          systemsResult.data.forEach((row) => systemIds.push(row.id as number))
+      const farmId = params.farmId ?? null
+      if (!farmId) {
+        return {
+          rows: [] as DashboardSystemRow[],
+          meta: { reason: "Missing farmId", start: null, end: null },
         }
+      }
 
-        if (!systemIds.length) {
-          return {
-            rows: [] as any[],
-            meta: { reason: "No system IDs resolved", systemIds, farmId: params.farmId ?? null },
-          }
+      const bounds = await getTimePeriodBounds(
+        params.periodParam ?? params.timePeriod ?? "2 weeks",
+        signal,
+        farmId,
+      )
+      const startDate = bounds.start ?? null
+      const endDate = bounds.end ?? null
+
+      const stage = params.stage === "all" ? null : params.stage
+      const parsedSystemId = params.system && params.system !== "all" ? Number(params.system) : null
+      const systemId = Number.isFinite(parsedSystemId) ? (parsedSystemId as number) : null
+      const scopedSystemIds = await resolveScopedSystemIds({
+        farmId,
+        stage: params.stage,
+        batch: params.batch ?? "all",
+        system: params.system,
+        signal,
+      })
+      if (scopedSystemIds === null) {
+        return {
+          rows: [] as DashboardSystemRow[],
+          meta: { reason: "Scoped systems error", start: startDate, end: endDate },
         }
-
-        const bounds = await getTimePeriodBounds(
-          params.periodParam ?? params.timePeriod ?? "2 weeks",
-          signal,
-          params.farmId ?? null,
-        )
-
-        const buildTableForRange = async (range: { start: string; end: string }) => {
-        const inventoryResult = await getDailyFishInventory({
-          farmId: params.farmId ?? null,
-          dateFrom: range.start,
-          dateTo: range.end,
-          limit: 5000,
-          signal,
-        })
-
-        const summaryResult = await getProductionSummary({
-          farmId: params.farmId ?? null,
-          dateFrom: range.start,
-          dateTo: range.end,
-          limit: 5000,
-          signal,
-        })
-
-        const systemsResult = await getSystemOptions({
-          farmId: params.farmId ?? null,
-          stage: stageFilter ?? undefined,
-          signal,
-        })
-
-        const wqResult = await getWaterQualityRatings({
-          farmId: params.farmId ?? null,
-          dateFrom: range.start,
-          dateTo: range.end,
-          limit: 2000,
-          signal,
-        })
-
-        const bySystem: Record<number, any> = {}
-        if (systemsResult.status === "success") {
-          systemsResult.data
-            .filter((row) => row.id != null && systemIds.includes(row.id))
-            .forEach((row) => {
-              const systemId = row.id as number
-              bySystem[systemId] = {
-                system_id: systemId,
-                system_name: row.label,
-                growth_stage: row.growth_stage,
-                input_start_date: range.start,
-                input_end_date: range.end,
-                sampling_end_date: null,
-                abw: null,
-                efcr: null,
-                feeding_rate: null,
-                mortality_rate: null,
-                biomass_density: null,
-                water_quality_rating_average: null,
-              }
-            })
+      }
+      if (scopedSystemIds.length === 0) {
+        return {
+          rows: [] as DashboardSystemRow[],
+          meta: { reason: "No scoped systems", start: startDate, end: endDate },
         }
+      }
 
-        const invAgg: Record<
-          number,
-          {
-            feed: number
-            biomass: number
-            biomassCount: number
-            mortalityCount: number
-            fish: number
-            fishCount: number
-            volume: number
-            volumeCount: number
-            mortalityWeighted: number
-            feedingWeighted: number
-            densityWeighted: number
-            densityCount: number
-          }
-        > = {}
+      const result = await getDashboardSystems({
+        farmId,
+        stage,
+        systemId,
+        dateFrom: startDate,
+        dateTo: endDate,
+        signal,
+      })
 
-        ;((inventoryResult.status === "success" ? inventoryResult.data : []) ?? [])
-          .filter((row) => systemIds.includes(row.system_id as number))
-          .forEach((row) => {
-            const id = row.system_id as number
-            if (!invAgg[id]) {
-              invAgg[id] = {
-                feed: 0,
-                biomass: 0,
-                biomassCount: 0,
-                mortalityCount: 0,
-                fish: 0,
-                fishCount: 0,
-                volume: 0,
-                volumeCount: 0,
-                mortalityWeighted: 0,
-                feedingWeighted: 0,
-                densityWeighted: 0,
-                densityCount: 0,
-              }
-            }
-
-            const feed = row.feeding_amount ?? 0
-            const biomass = row.biomass_last_sampling
-            const fish = row.number_of_fish
-            const mortalityCount = row.number_of_fish_mortality ?? 0
-            const volume = row.system_volume
-
-            invAgg[id].feed += feed
-            invAgg[id].mortalityCount += mortalityCount
-
-            if (typeof biomass === "number") {
-              invAgg[id].biomass += biomass
-              invAgg[id].biomassCount += 1
-            }
-            if (typeof fish === "number") {
-              invAgg[id].fish += fish
-              invAgg[id].fishCount += 1
-            }
-            if (typeof volume === "number") {
-              invAgg[id].volume += volume
-              invAgg[id].volumeCount += 1
-            }
-
-            if (typeof fish === "number" && fish > 0) {
-              const mortalityRateRow =
-                typeof row.mortality_rate === "number"
-                  ? row.mortality_rate
-                  : (mortalityCount / fish) * 100
-              invAgg[id].mortalityWeighted += mortalityRateRow * fish
-            }
-
-            if (typeof biomass === "number" && biomass > 0) {
-              const feedingRateRow =
-                typeof row.feeding_rate === "number"
-                  ? row.feeding_rate
-                  : (feed * 1000) / biomass
-              invAgg[id].feedingWeighted += feedingRateRow * biomass
-            }
-
-            if (typeof row.biomass_density === "number") {
-              invAgg[id].densityWeighted += row.biomass_density
-              invAgg[id].densityCount += 1
-            }
-          })
-
-        const psAgg: Record<
-          number,
-          {
-            feed: number
-            gain: number
-            abw: number | null
-            lastDate: string | null
-            totalBiomass: number
-            biomassCount: number
-            biomassWeightedFeeding: number
-            mortalityWeighted: number
-            totalFish: number
-          }
-        > = {}
-        ;((summaryResult.status === "success" ? summaryResult.data : []) ?? [])
-          .filter((row) => systemIds.includes(row.system_id as number))
-          .forEach((row) => {
-            const id = row.system_id as number
-            if (!psAgg[id]) {
-              psAgg[id] = {
-                feed: 0,
-                gain: 0,
-                abw: null,
-                lastDate: null,
-                totalBiomass: 0,
-                biomassCount: 0,
-                biomassWeightedFeeding: 0,
-                mortalityWeighted: 0,
-                totalFish: 0,
-              }
-            }
-            const gain =
-              (row.biomass_increase_period ?? 0) -
-              (row.total_weight_transfer_out ?? 0) +
-              (row.total_weight_transfer_in ?? 0) +
-              (row.total_weight_harvested ?? 0) -
-              (row.total_weight_stocked ?? 0)
-            psAgg[id].feed += row.total_feed_amount_period ?? 0
-            psAgg[id].gain += gain
-            const biomass = row.total_biomass ?? 0
-            if (biomass > 0) {
-              const feedingRateFromProduction = ((row.total_feed_amount_period ?? 0) * 1000) / biomass
-              psAgg[id].biomassWeightedFeeding += feedingRateFromProduction * biomass
-              psAgg[id].totalBiomass += biomass
-              psAgg[id].biomassCount += 1
-            }
-            const fish = row.number_of_fish_inventory ?? 0
-            const mortality = row.daily_mortality_count ?? 0
-            if (fish > 0) {
-              psAgg[id].mortalityWeighted += ((mortality / fish) * 100) * fish
-              psAgg[id].totalFish += fish
-            }
-            if (row.average_body_weight != null) {
-              if (!psAgg[id].lastDate || String(row.date) >= psAgg[id].lastDate!) {
-                psAgg[id].abw = row.average_body_weight
-                psAgg[id].lastDate = String(row.date)
-              }
-            }
-          })
-
-        const wqAgg: Record<number, { sum: number; count: number }> = {}
-        if (wqResult.status === "success") {
-          wqResult.data.forEach((row) => {
-            if (row.system_id == null) return
-            if (!systemIds.includes(row.system_id)) return
-            const id = row.system_id as number
-            if (!wqAgg[id]) wqAgg[id] = { sum: 0, count: 0 }
-            const numeric = typeof row.rating_numeric === "number" ? row.rating_numeric : null
-            if (numeric != null) {
-              wqAgg[id].sum += numeric
-              wqAgg[id].count += 1
-            }
-          })
+      if (result.status !== "success") {
+        return {
+          rows: [] as DashboardSystemRow[],
+          meta: { reason: "RPC error", error: result.error, start: startDate, end: endDate },
         }
+      }
 
-        Object.keys(bySystem).forEach((key) => {
-          const id = Number(key)
-          const inv = invAgg[id]
-          const ps = psAgg[id]
-          const wq = wqAgg[id]
-
-          const avgBiomassFromInventory = inv && inv.biomassCount > 0 ? inv.biomass / inv.biomassCount : null
-          const avgBiomassFromProduction = ps && ps.biomassCount > 0 ? ps.totalBiomass / ps.biomassCount : null
-          const avgBiomass = avgBiomassFromInventory ?? avgBiomassFromProduction
-          const feedingRateFromInventory =
-            inv && inv.biomass > 0
-              ? inv.feedingWeighted > 0
-                ? inv.feedingWeighted / inv.biomass
-                : (inv.feed * 1000) / inv.biomass
-              : null
-          const feedingRateFromProduction =
-            ps && ps.totalBiomass > 0 ? ps.biomassWeightedFeeding / ps.totalBiomass : null
-          const feedingRate = feedingRateFromInventory ?? feedingRateFromProduction
-          const mortalityRateFromInventory = inv && inv.fish > 0 ? inv.mortalityWeighted / inv.fish : null
-          const mortalityRateFromProduction = ps && ps.totalFish > 0 ? ps.mortalityWeighted / ps.totalFish : null
-          const mortalityRate = mortalityRateFromInventory ?? mortalityRateFromProduction
-          const avgVolume = inv && inv.volumeCount > 0 ? inv.volume / inv.volumeCount : null
-          const biomassDensity =
-            inv && inv.densityCount > 0
-              ? inv.densityWeighted / inv.densityCount
-              : avgVolume && avgVolume > 0 && avgBiomass ? avgBiomass / avgVolume : null
-          const efcr = ps && ps.gain !== 0 ? ps.feed / ps.gain : null
-
-          let wqLabel: string | null = null
-          if (wq && wq.count > 0) {
-            const avg = Math.round((wq.sum / wq.count))
-            if (avg === 0) wqLabel = "lethal"
-            else if (avg === 1) wqLabel = "critical"
-            else if (avg === 2) wqLabel = "acceptable"
-            else if (avg === 3) wqLabel = "optimal"
-          }
-
-          bySystem[id].abw = ps?.abw ?? null
-          bySystem[id].sampling_end_date = ps?.lastDate ?? null
-          bySystem[id].efcr = efcr
-          bySystem[id].feeding_rate = feedingRate
-          bySystem[id].mortality_rate = mortalityRate
-          bySystem[id].biomass_density = biomassDensity
-          bySystem[id].water_quality_rating_average = wqLabel
-        })
-
-        const rows = Object.values(bySystem)
-          .filter((row) => (stageFilter ? row.growth_stage === stageFilter : true))
-          .sort((a, b) => String(a.system_name ?? "").localeCompare(String(b.system_name ?? "")))
-
-          return {
-            rows,
-            meta: { source: "range", systemIds, start: range.start, end: range.end },
-          }
-        }
-
-        if (!bounds.start || !bounds.end) {
-          return {
-            rows: [] as any[],
-            meta: { reason: "Missing period bounds", farmId: params.farmId ?? null },
-          }
-        }
-        return buildTableForRange({ start: bounds.start, end: bounds.end })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        return { rows: [] as any[], meta: { reason: "Unhandled error", error: message } }
+      return {
+        rows: ((result.data ?? []) as DashboardSystemRow[]).filter((row) => scopedSystemIds.includes(row.system_id)),
+        meta: { source: "api_dashboard_systems", start: startDate, end: endDate },
       }
     },
     enabled: Boolean(session) && Boolean(params.farmId),
@@ -858,26 +681,45 @@ export function useSystemsTable(params: {
 export function useProductionTrend(params: {
   farmId?: string | null
   stage?: Enums<"system_growth_stage">
+  batch?: string
   system?: string
   timePeriod: Enums<"time_period"> | string
 }) {
   const { session } = useAuth()
   return useQuery({
-    queryKey: ["production-trend", params.farmId ?? "all", params.stage ?? "all", params.system ?? "all", params.timePeriod],
+    queryKey: [
+      "production-trend",
+      params.farmId ?? "all",
+      params.stage ?? "all",
+      params.batch ?? "all",
+      params.system ?? "all",
+      params.timePeriod,
+    ],
     queryFn: async ({ signal }) => {
-      const systemId = params.system && params.system !== "all" ? Number(params.system) : undefined
+      const scopedSystemIds = await resolveScopedSystemIds({
+        farmId: params.farmId ?? null,
+        stage: (params.stage ?? "all") as "all" | Enums<"system_growth_stage">,
+        batch: params.batch ?? "all",
+        system: params.system,
+        signal,
+      })
+      if (scopedSystemIds === null || scopedSystemIds.length === 0) return []
+      const systemId = scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
       const bounds = await getTimePeriodBounds(params.timePeriod, signal, params.farmId ?? null)
       const summaryResult = await getProductionSummary({
         farmId: params.farmId ?? null,
         stage: params.stage ?? undefined,
-        systemId: Number.isFinite(systemId) ? systemId : undefined,
+        systemId,
         dateFrom: bounds.start ?? undefined,
         dateTo: bounds.end ?? undefined,
         limit: 500,
         signal,
       })
       if (summaryResult.status !== "success") return []
-      return sortByDateAsc(summaryResult.data, (row) => row.date)
+      const filtered = summaryResult.data.filter(
+        (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
+      )
+      return sortByDateAsc(filtered, (row) => row.date)
     },
     enabled: Boolean(session) && Boolean(params.farmId),
     staleTime: 5 * 60_000,
@@ -896,18 +738,42 @@ export function useRecentActivities(params?: { limit?: number }) {
 
 export function useRecommendedActions(params: {
   farmId?: string | null
+  stage?: "all" | Enums<"system_growth_stage">
+  batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
 }) {
   const { session } = useAuth()
   return useQuery({
-    queryKey: ["recommended-actions", params.farmId ?? "all", params.system ?? "all", params.timePeriod ?? "2 weeks"],
+    queryKey: [
+      "recommended-actions",
+      params.farmId ?? "all",
+      params.stage ?? "all",
+      params.batch ?? "all",
+      params.system ?? "all",
+      params.timePeriod ?? "2 weeks",
+    ],
     queryFn: async ({ signal }) => {
-      const systemId = params.system && params.system !== "all" ? Number(params.system) : undefined
+      const scopedSystemIds = await resolveScopedSystemIds({
+        farmId: params.farmId ?? null,
+        stage: params.stage ?? "all",
+        batch: params.batch ?? "all",
+        system: params.system,
+        signal,
+      })
+      if (scopedSystemIds === null || scopedSystemIds.length === 0) {
+        return [] as Array<{
+          title: string
+          description: string
+          priority: "High" | "Medium" | "Info"
+          due: string
+        }>
+      }
+      const systemId = scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
       const bounds = await getTimePeriodBounds(params.timePeriod ?? "2 weeks", signal, params.farmId ?? null)
       const inventoryResult = await getDailyFishInventory({
         farmId: params.farmId ?? null,
-        systemId: Number.isFinite(systemId) ? (systemId as number) : undefined,
+        systemId,
         dateFrom: bounds.start ?? undefined,
         dateTo: bounds.end ?? undefined,
         limit: 1000,
@@ -915,7 +781,7 @@ export function useRecommendedActions(params: {
       })
       const wqResult = await getWaterQualityRatings({
         farmId: params.farmId ?? null,
-        systemId: Number.isFinite(systemId) ? (systemId as number) : undefined,
+        systemId,
         dateFrom: bounds.start ?? undefined,
         dateTo: bounds.end ?? undefined,
         limit: 1000,
@@ -931,8 +797,12 @@ export function useRecommendedActions(params: {
         }>
       }
 
-      const inventoryRows = inventoryResult.data
-      const wqRows = wqResult.data
+      const inventoryRows = inventoryResult.data.filter(
+        (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
+      )
+      const wqRows = wqResult.data.filter(
+        (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
+      )
 
       const latestInventoryDate = inventoryRows
         .map((row) => row.inventory_date)
@@ -1017,17 +887,17 @@ export function useRecommendedActions(params: {
         })
       }
 
-      if (feedingRate !== null && feedingRate > 0.04) {
+      if (feedingRate !== null && feedingRate > 40) {
         nextActions.push({
           title: "Adjust Feeding Plan",
-          description: "Feeding rate is above target. Review feed schedule and check consumption.",
+          description: "Feeding rate (kg/t) is above target. Review feed schedule and check consumption.",
           priority: "Medium",
           due: "Next 3 days",
         })
-      } else if (feedingRate !== null && feedingRate < 0.015) {
+      } else if (feedingRate !== null && feedingRate < 15) {
         nextActions.push({
           title: "Review Feed Intake",
-          description: "Feeding rate is below target. Verify appetite and update feeding logs.",
+          description: "Feeding rate (kg/t) is below target. Verify appetite and update feeding logs.",
           priority: "Info",
           due: "Next 3 days",
         })

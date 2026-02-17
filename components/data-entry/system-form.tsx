@@ -172,7 +172,7 @@ export function SystemForm() {
                             name="volume"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Volume (m³)</FormLabel>
+                                    <FormLabel>Volume (m3)</FormLabel>
                                     <FormControl>
                                         <Input type="number" step="0.1" {...field} />
                                     </FormControl>
@@ -238,3 +238,4 @@ export function SystemForm() {
         </div>
     )
 }
+

@@ -10,10 +10,14 @@ import { useActiveFarm } from "@/hooks/use-active-farm"
 import { createClient } from "@/utils/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/utils/supabase/log"
 import { getSessionUser } from "@/utils/supabase/session"
+import type { Tables } from "@/lib/types/database"
 
 export default function SettingsPage() {
-  const hasActionableSbError = (err: any) =>
-    Boolean(err?.message || err?.details || err?.hint || err?.code || err?.status)
+  const hasActionableSbError = (err: unknown) => {
+    if (!err || typeof err !== "object") return false
+    const maybe = err as { message?: string; details?: string; hint?: string; code?: string; status?: number }
+    return Boolean(maybe.message || maybe.details || maybe.hint || maybe.code || maybe.status)
+  }
 
   const formatError = (err: unknown) => {
     if (!err) return "Unknown error"
@@ -64,7 +68,7 @@ export default function SettingsPage() {
       const sessionUser = await getSessionUser(supabase, "settings:load:getSession")
       if (!sessionUser) {
         return {
-          thresholdRow: null as any,
+          thresholdRow: null as Tables<"alert_threshold"> | null,
           userProfileRow: null as { theme?: string | null } | null,
           nextThresholdDenied: thresholdDenied,
           nextUserProfileDenied: userProfileDenied,
@@ -73,7 +77,7 @@ export default function SettingsPage() {
 
       let nextThresholdDenied = thresholdDenied
       let nextUserProfileDenied = userProfileDenied
-      let thresholdRow: any = null
+      let thresholdRow: Tables<"alert_threshold"> | null = null
       let userProfileRow: { theme?: string | null } | null = null
 
       if (farmId && !thresholdDenied) {

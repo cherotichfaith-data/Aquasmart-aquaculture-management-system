@@ -28,7 +28,7 @@ export default function VerifySuccessPage() {
                         Email Verified
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        You’re signed in. Redirecting you to the dashboard…
+                        You're signed in. Redirecting you to the dashboard...
                     </p>
                 </div>
 
@@ -41,3 +41,4 @@ export default function VerifySuccessPage() {
         </div>
     )
 }
+

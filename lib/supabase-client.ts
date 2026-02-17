@@ -14,16 +14,20 @@ export interface QueryParams {
 
 export type QueryResult<T> = { status: "success"; data: T[] } | { status: "error"; data: null; error: string }
 
-function applyOrder<T>(query: any, order: QueryParams["order"]) {
+type OrderableQuery = {
+  order: (column: string, options: { ascending: boolean }) => OrderableQuery
+}
+
+function applyOrder<TQuery extends OrderableQuery>(query: TQuery, order: QueryParams["order"]): TQuery {
   if (!order) return query
   if (typeof order === "string") {
     const [column, direction] = order.split(".")
-    return query.order(column, { ascending: direction !== "desc" })
+    return query.order(column, { ascending: direction !== "desc" }) as TQuery
   }
-  return query.order(order.column, { ascending: order.ascending })
+  return query.order(order.column, { ascending: order.ascending }) as TQuery
 }
 
-export async function supabaseQuery<T = any>(table: string, params: QueryParams = {}): Promise<QueryResult<T>> {
+export async function supabaseQuery<T = unknown>(table: string, params: QueryParams = {}): Promise<QueryResult<T>> {
   try {
     const supabase = createClient()
     const sessionUser = await getSessionUser(supabase, `supabaseQuery:${table}:getSession`)
@@ -34,26 +38,26 @@ export async function supabaseQuery<T = any>(table: string, params: QueryParams 
 
     if (params.eq) {
       Object.entries(params.eq).forEach(([k, v]) => {
-        query = query.eq(k, v as any)
+        query = query.eq(k, v)
       })
     }
 
     if (params.in) {
       Object.entries(params.in).forEach(([k, values]) => {
         if (!values.length) return
-        query = query.in(k, values as any)
+        query = query.in(k, values)
       })
     }
 
     if (params.gte) {
       Object.entries(params.gte).forEach(([k, v]) => {
-        query = query.gte(k, v as any)
+        query = query.gte(k, v)
       })
     }
 
     if (params.lte) {
       Object.entries(params.lte).forEach(([k, v]) => {
-        query = query.lte(k, v as any)
+        query = query.lte(k, v)
       })
     }
 
@@ -80,7 +84,7 @@ export async function supabaseQuery<T = any>(table: string, params: QueryParams 
   }
 }
 
-export async function supabaseInsert<T = any, InsertPayload extends object = object>(
+export async function supabaseInsert<T = unknown, InsertPayload extends object = object>(
   table: string,
   payload: InsertPayload | InsertPayload[],
 ): Promise<QueryResult<T>> {

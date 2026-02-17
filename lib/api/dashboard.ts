@@ -6,6 +6,32 @@ import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils
 type DashboardRow = Tables<"api_dashboard">
 type DashboardConsolidatedRow = Tables<"api_dashboard_consolidated">
 type DashboardTimeBoundsRow = Pick<DashboardConsolidatedRow, "input_start_date" | "input_end_date" | "time_period">
+export type DashboardSystemRpcRow = {
+  system_id: number
+  system_name: string | null
+  growth_stage: "nursing" | "grow out" | "grow_out" | string | null
+  input_start_date: string | null
+  input_end_date: string | null
+  as_of_date: string | null
+  sampling_end_date: string | null
+  sample_age_days: number | null
+  efcr: number | null
+  efcr_date: string | null
+  feed_total: number | null
+  abw: number | null
+  feeding_rate: number | null
+  mortality_rate: number | null
+  biomass_density: number | null
+  fish_end: number | null
+  biomass_end: number | null
+  missing_days_count: number | null
+  water_quality_rating_average: "optimal" | "acceptable" | "critical" | "lethal" | string | null
+  water_quality_rating_numeric_average: number | null
+  water_quality_latest_date: string | null
+  worst_parameter: string | null
+  worst_parameter_value: number | null
+  worst_parameter_unit: string | null
+}
 
 type DashboardRpcArgs = {
   p_farm_id: string
@@ -53,6 +79,36 @@ const dashboardConsolidatedRpcArgs = (params: {
   p_end_date: params.dateTo ?? null,
   p_time_period: params.timePeriod ?? null,
 })
+
+type DashboardSystemsRpcArgs = {
+  p_farm_id: string
+  p_stage?: Enums<"system_growth_stage"> | null
+  p_system_id?: number | null
+  p_start_date?: string | null
+  p_end_date?: string | null
+}
+
+const dashboardSystemsRpcArgs = (params: {
+  farmId: string
+  stage?: Enums<"system_growth_stage"> | null
+  systemId?: number | null
+  dateFrom?: string | null
+  dateTo?: string | null
+}): DashboardSystemsRpcArgs => ({
+  p_farm_id: params.farmId,
+  p_stage: params.stage ?? null,
+  p_system_id: params.systemId ?? null,
+  p_start_date: params.dateFrom ?? null,
+  p_end_date: params.dateTo ?? null,
+})
+
+const isAbortLikeError = (err: unknown): boolean => {
+  if (!err) return false
+  const e = err as { name?: string; message?: string }
+  const name = String(e.name ?? "").toLowerCase()
+  const message = String(e.message ?? "").toLowerCase()
+  return name.includes("abort") || message.includes("abort") || message.includes("canceled")
+}
 
 export async function getDashboardSnapshot(params?: {
   systemId?: number
@@ -128,44 +184,35 @@ export async function getDashboardConsolidatedSnapshot(params?: {
   return rows[0] ?? null
 }
 
-export async function getSystemsDashboard(params?: {
-  systemId?: number
-  stage?: Enums<"system_growth_stage">
-  timePeriod?: Enums<"time_period">
-  dateFrom?: string
-  dateTo?: string
-  limit?: number
+export async function getDashboardSystems(params?: {
   farmId?: string | null
+  stage?: Enums<"system_growth_stage"> | null
+  systemId?: number | null
+  dateFrom?: string | null
+  dateTo?: string | null
   signal?: AbortSignal
-}): Promise<QueryResult<DashboardRow>> {
+}): Promise<QueryResult<DashboardSystemRpcRow>> {
   if (!params?.farmId) {
-    return toQuerySuccess<DashboardRow>([])
+    return toQuerySuccess<DashboardSystemRpcRow>([])
   }
-  const clientResult = await getClientOrError("getSystemsDashboard", { requireSession: true })
+  const clientResult = await getClientOrError("getDashboardSystems", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase
-    .rpc("api_dashboard", dashboardRpcArgs({
+  let query = supabase.rpc("api_dashboard_systems", dashboardSystemsRpcArgs({
       farmId: params.farmId,
-      systemId: params.systemId,
-      stage: params.stage,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-      timePeriod: params.timePeriod,
+      stage: params.stage ?? null,
+      systemId: params.systemId ?? null,
+      dateFrom: params.dateFrom ?? null,
+      dateTo: params.dateTo ?? null,
     }))
-    .order("input_end_date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getSystemsDashboard", error)
-  const rows = (data ?? []) as DashboardRow[]
-  const sorted = rows
-    .slice()
-    .sort((a, b) => (b.input_end_date ?? "").localeCompare(a.input_end_date ?? ""))
-  const limited = params?.limit ? sorted.slice(0, params.limit) : sorted
-  return toQuerySuccess<DashboardRow>(limited)
+  if (params?.signal?.aborted) return toQuerySuccess<DashboardSystemRpcRow>([])
+  if (error && isAbortLikeError(error)) return toQuerySuccess<DashboardSystemRpcRow>([])
+  if (error) return toQueryError("getDashboardSystems", error)
+  return toQuerySuccess<DashboardSystemRpcRow>((data ?? []) as DashboardSystemRpcRow[])
 }
 
 export async function getTimePeriodBounds(

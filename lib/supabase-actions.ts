@@ -29,7 +29,7 @@ export async function insertData<T extends TableName>(
         }
         const { data: result, error } = await supabase
             .from(table)
-            .insert(data as any) // Type assertion needed for array/single union sometimes, but standard insert handles object or array
+            .insert(data)
             .select()
 
         if (error) {
@@ -64,8 +64,8 @@ export async function updateData<T extends TableName>(
         }
         const { data: result, error } = await supabase
             .from(table)
-            .update(data as any)
-            .match(match as any) // Match expects generic object
+            .update(data)
+            .match(match)
             .select()
 
         if (error) {
@@ -99,7 +99,7 @@ export async function deleteData<T extends TableName>(
         const { data: result, error } = await supabase
             .from(table)
             .delete()
-            .match(match as any)
+            .match(match)
             .select()
 
         if (error) {

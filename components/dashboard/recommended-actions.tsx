@@ -5,13 +5,6 @@ import type { Enums } from "@/lib/types/database"
 import { useRecommendedActions } from "@/lib/hooks/use-dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 
-type ActionItem = {
-  title: string
-  description: string
-  priority: "High" | "Medium" | "Info"
-  due: string
-}
-
 const priorityStyles = {
   High: "bg-rose-50 text-rose-700",
   Medium: "bg-amber-50 text-amber-700",
@@ -19,14 +12,24 @@ const priorityStyles = {
 }
 
 export default function RecommendedActions({
+  stage,
+  batch,
   system,
   timePeriod,
 }: {
+  stage?: "all" | Enums<"system_growth_stage">
+  batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
 }) {
   const { farmId } = useActiveFarm()
-  const actionsQuery = useRecommendedActions({ farmId, system, timePeriod })
+  const actionsQuery = useRecommendedActions({
+    farmId,
+    stage: stage ?? "all",
+    batch: batch ?? "all",
+    system,
+    timePeriod,
+  })
 
   const actions = useMemo(() => actionsQuery.data ?? [], [actionsQuery.data])
   const loading = actionsQuery.isLoading

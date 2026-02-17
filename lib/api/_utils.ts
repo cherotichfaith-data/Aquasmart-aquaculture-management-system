@@ -23,11 +23,15 @@ export async function getClientOrError(
   return { supabase }
 }
 
-export function toQueryError<T>(tag: string, err: any): QueryResult<T> {
+export function toQueryError<T>(tag: string, err: unknown): QueryResult<T> {
   if (!isSbPermissionDenied(err)) {
     logSbError(tag, err)
   }
-  const message = err instanceof Error ? err.message : String(err?.message ?? err ?? "Unknown error")
+  const message = err instanceof Error
+    ? err.message
+    : String((typeof err === "object" && err !== null && "message" in err && typeof err.message === "string")
+      ? err.message
+      : err ?? "Unknown error")
   return { status: "error", data: null, error: message }
 }
 
