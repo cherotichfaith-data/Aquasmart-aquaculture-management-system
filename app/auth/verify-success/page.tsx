@@ -19,12 +19,12 @@ export default function VerifySuccessPage() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-muted/40">
-            <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg dark:bg-zinc-950 border">
+            <div className="w-full max-w-md p-8 space-y-6 bg-card text-card-foreground rounded-lg shadow-lg border border-border">
                 <div className="flex flex-col items-center space-y-2 text-center">
-                    <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/20">
-                        <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
+                    <div className="p-3 rounded-full bg-primary/10">
+                        <CheckCircle2 className="w-8 h-8 text-primary" />
                     </div>
-                    <h1 className="text-2xl font-bold tracking-tight text-green-600 dark:text-green-400">
+                    <h1 className="text-2xl font-bold tracking-tight text-primary">
                         Email Verified
                     </h1>
                     <p className="text-sm text-muted-foreground">
