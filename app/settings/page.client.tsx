@@ -4,50 +4,18 @@ import { useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Save, AlertCircle, Check } from "lucide-react"
+import { AlertCircle, Check } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { createClient } from "@/utils/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/utils/supabase/log"
 import { getSessionUser } from "@/utils/supabase/session"
-import type { Tables } from "@/lib/types/database"
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/types/database"
+import { DEFAULT_SETTINGS, formatError, hasActionableSbError } from "./settings-utils"
+import { AlertThresholdsSection, FarmInformationSection, SaveSettingsButton } from "./settings-sections"
 
 export default function SettingsPage() {
-  const hasActionableSbError = (err: unknown) => {
-    if (!err || typeof err !== "object") return false
-    const maybe = err as { message?: string; details?: string; hint?: string; code?: string; status?: number }
-    return Boolean(maybe.message || maybe.details || maybe.hint || maybe.code || maybe.status)
-  }
-
-  const formatError = (err: unknown) => {
-    if (!err) return "Unknown error"
-    if (typeof err === "string") return err
-    if (err instanceof Error) return err.message
-    const maybe = err as { message?: string; details?: string; hint?: string }
-    if (maybe.message) {
-      const details = maybe.details ? ` (${maybe.details})` : ""
-      const hint = maybe.hint ? ` Hint: ${maybe.hint}` : ""
-      return `${maybe.message}${details}${hint}`
-    }
-    try {
-      return JSON.stringify(err)
-    } catch {
-      return String(err)
-    }
-  }
-  const [settings, setSettings] = useState({
-    farmName: "AquaSmart Farm 1",
-    location: "Lake Zone - Kimbwela",
-    owner: "John Doe",
-    email: "john@aquafarm.com",
-    phone: "+255 123 456 789",
-    role: "farm_manager",
-    lowDoThreshold: 4.0,
-    highAmmoniaThreshold: 0.05,
-    highMortalityThreshold: 2.0,
-    dataBackupFrequency: "daily",
-    theme: "light",
-  })
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
 
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -55,30 +23,25 @@ export default function SettingsPage() {
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
   const [thresholdId, setThresholdId] = useState<string | null>(null)
   const [thresholdDenied, setThresholdDenied] = useState(false)
-  const [userProfileDenied, setUserProfileDenied] = useState(false)
   const { user, profile } = useAuth()
   const { farm, farmId, loading: farmLoading } = useActiveFarm()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
   const settingsLoadQuery = useQuery({
-    queryKey: ["settings", "load", user?.id ?? "anon", farmId ?? "no-farm", thresholdDenied, userProfileDenied],
+    queryKey: ["settings", "load", user?.id ?? "anon", farmId ?? "no-farm", thresholdDenied],
     enabled: Boolean(user?.id) && !farmLoading && !hasLoadedSettings,
     queryFn: async () => {
       const sessionUser = await getSessionUser(supabase, "settings:load:getSession")
       if (!sessionUser) {
         return {
           thresholdRow: null as Tables<"alert_threshold"> | null,
-          userProfileRow: null as { theme?: string | null } | null,
           nextThresholdDenied: thresholdDenied,
-          nextUserProfileDenied: userProfileDenied,
         }
       }
 
       let nextThresholdDenied = thresholdDenied
-      let nextUserProfileDenied = userProfileDenied
       let thresholdRow: Tables<"alert_threshold"> | null = null
-      let userProfileRow: { theme?: string | null } | null = null
 
       if (farmId && !thresholdDenied) {
         const { data, error } = await supabase
@@ -96,26 +59,9 @@ export default function SettingsPage() {
         }
       }
 
-      if (!userProfileDenied) {
-        const { data, error: userProfileError } = await supabase
-          .from("user_profile")
-          .select("*")
-          .eq("user_id", user!.id)
-          .maybeSingle()
-        if (userProfileError && isSbPermissionDenied(userProfileError)) {
-          nextUserProfileDenied = true
-        } else if (userProfileError && hasActionableSbError(userProfileError)) {
-          logSbError("settings:load:userProfile", userProfileError)
-        } else {
-          userProfileRow = (data as { theme?: string | null } | null) ?? null
-        }
-      }
-
       return {
         thresholdRow,
-        userProfileRow,
         nextThresholdDenied,
-        nextUserProfileDenied,
       }
     },
     staleTime: 60_000,
@@ -145,13 +91,10 @@ export default function SettingsPage() {
     const farmRow = farm ?? null
     const {
       thresholdRow,
-      userProfileRow,
       nextThresholdDenied,
-      nextUserProfileDenied,
     } = settingsLoadData
 
     if (nextThresholdDenied) setThresholdDenied(true)
-    if (nextUserProfileDenied) setUserProfileDenied(true)
     setThresholdId(thresholdRow?.id ?? null)
     setSettings((prev) => ({
       ...prev,
@@ -164,7 +107,6 @@ export default function SettingsPage() {
       lowDoThreshold: thresholdRow?.low_do_threshold ?? prev.lowDoThreshold,
       highAmmoniaThreshold: thresholdRow?.high_ammonia_threshold ?? prev.highAmmoniaThreshold,
       highMortalityThreshold: thresholdRow?.high_mortality_threshold ?? prev.highMortalityThreshold,
-      theme: userProfileRow?.theme ?? prev.theme,
     }))
     setHasLoadedSettings(true)
     setLoading(false)
@@ -247,7 +189,7 @@ export default function SettingsPage() {
             return
           }
 
-          const farmPayload = {
+          const farmPayload: TablesUpdate<"farm"> = {
             name: settings.farmName,
             location: settings.location,
             owner: settings.owner,
@@ -272,7 +214,7 @@ export default function SettingsPage() {
             throw farmError
           }
 
-          const thresholdPayload = {
+          const thresholdPayload: TablesInsert<"alert_threshold"> = {
             scope: "farm",
             farm_id: resolvedFarmId,
             low_do_threshold: settings.lowDoThreshold,
@@ -306,35 +248,14 @@ export default function SettingsPage() {
             setThresholdId(insertedThreshold?.id ?? null)
           }
 
-          if (!userProfileDenied) {
-            const userProfilePayload = {
-              user_id: user.id,
-              theme: settings.theme,
-            }
-
-            const { error: profileError } = await supabase
-              .from("user_profile")
-              .upsert(userProfilePayload)
-
-            if (profileError) {
-              if (isSbPermissionDenied(profileError)) {
-                setUserProfileDenied(true)
-              } else {
-                if (hasActionableSbError(profileError)) {
-                  logSbError("settings:save:userProfile", profileError)
-                }
-                throw profileError
-              }
-            }
-          }
-
-          const profilePayload = {
+          const profilePayload: TablesInsert<"profiles"> = {
             id: user.id,
             email: settings.email,
             owner: settings.owner,
             farm_name: settings.farmName,
             location: settings.location,
             phone: settings.phone,
+            role: settings.role,
           }
 
           const { error: mainProfileError } = await supabase
@@ -410,171 +331,9 @@ export default function SettingsPage() {
         )}
 
         <div className="space-y-6">
-          {/* Farm Information */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Farm Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Farm Name</label>
-                <input
-                  type="text"
-                  value={settings.farmName}
-                  onChange={(e) => handleChange("farmName", e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Location</label>
-                <input
-                  type="text"
-                  value={settings.location}
-                  onChange={(e) => handleChange("location", e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Owner Name</label>
-                <input
-                  type="text"
-                  value={settings.owner}
-                  onChange={(e) => handleChange("owner", e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
-                <input
-                  type="email"
-                  value={settings.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Phone</label>
-                <input
-                  type="tel"
-                  value={settings.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Role</label>
-                <select
-                  value={settings.role}
-                  onChange={(e) => handleChange("role", e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="farm_manager">Farm Manager</option>
-                  <option value="system_operator">System Operator</option>
-                  <option value="data_analyst">Data Analyst</option>
-                  <option value="viewer">Viewer</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Alert Thresholds */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertCircle size={20} className="text-primary" />
-              <h2 className="text-xl font-semibold">Alert Thresholds</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">Configure when alerts should trigger</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Low DO Alert (mg/L)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.lowDoThreshold ?? ""}
-                  onChange={(e) => handleChange("lowDoThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">High Ammonia Alert (mg/L)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={settings.highAmmoniaThreshold ?? ""}
-                  onChange={(e) => handleChange("highAmmoniaThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">High Mortality Alert (%/day)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.highMortalityThreshold ?? ""}
-                  onChange={(e) => handleChange("highMortalityThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* System Preferences */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">System Preferences</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Data Backup Frequency</label>
-                <select
-                  value={settings.dataBackupFrequency}
-                  onChange={(e) => handleChange("dataBackupFrequency", e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Theme</label>
-                <select
-                  value={settings.theme}
-                  onChange={(e) => handleChange("theme", e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                  <option value="auto">Auto</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Data Management */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Data Management</h2>
-            <div className="space-y-3">
-              <button className="w-full md:w-auto px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity font-medium">
-                Export All Data (CSV)
-              </button>
-              <button className="w-full md:w-auto px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors font-medium">
-                Backup Supabase
-              </button>
-              <button className="w-full md:w-auto px-4 py-2 border border-destructive text-destructive rounded-lg hover:bg-destructive/10 transition-colors font-medium">
-                Clear Local Cache
-              </button>
-            </div>
-          </div>
-
-          {/* Save Button */}
-          <div className="flex justify-end">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              <Save size={18} />
-              {isSaving ? "Saving..." : "Save Settings"}
-            </button>
-          </div>
+          <FarmInformationSection settings={settings} handleChange={handleChange} />
+          <AlertThresholdsSection settings={settings} handleChange={handleChange} />
+          <SaveSettingsButton isSaving={isSaving} onSave={handleSave} />
         </div>
       </div>
     </DashboardLayout>
