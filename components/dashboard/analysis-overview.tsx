@@ -86,7 +86,68 @@ export default function AnalysisOverview({
     timePeriod: periodParam ?? timePeriod,
   })
 
-  const chartData = useMemo(() => summaryQuery.data ?? [], [summaryQuery.data])
+  const chartData = useMemo(() => {
+    const rows = summaryQuery.data ?? []
+    const byDate = new Map<
+      string,
+      {
+        totalBiomass: number
+        totalFeed: number
+        totalFish: number
+        totalMortality: number
+        weightedEfcr: number
+        efcrWeight: number
+        efcrFallback: number
+        efcrCount: number
+      }
+    >()
+
+    rows.forEach((row) => {
+      if (!row.date) return
+      const current = byDate.get(row.date) ?? {
+        totalBiomass: 0,
+        totalFeed: 0,
+        totalFish: 0,
+        totalMortality: 0,
+        weightedEfcr: 0,
+        efcrWeight: 0,
+        efcrFallback: 0,
+        efcrCount: 0,
+      }
+      current.totalBiomass += row.total_biomass ?? 0
+      current.totalFeed += row.total_feed_amount_period ?? 0
+      current.totalFish += row.number_of_fish_inventory ?? 0
+      current.totalMortality += row.daily_mortality_count ?? 0
+
+      if (typeof row.efcr_period === "number") {
+        const weight = row.total_feed_amount_period ?? 0
+        if (weight > 0) {
+          current.weightedEfcr += row.efcr_period * weight
+          current.efcrWeight += weight
+        } else {
+          current.efcrFallback += row.efcr_period
+          current.efcrCount += 1
+        }
+      }
+      byDate.set(row.date, current)
+    })
+
+    return Array.from(byDate.entries())
+      .map(([date, current]) => ({
+        date,
+        total_biomass: current.totalBiomass,
+        total_feed_amount_period: current.totalFeed,
+        number_of_fish_inventory: current.totalFish,
+        daily_mortality_count: current.totalMortality,
+        efcr_period:
+          current.efcrWeight > 0
+            ? current.weightedEfcr / current.efcrWeight
+            : current.efcrCount > 0
+              ? current.efcrFallback / current.efcrCount
+              : null,
+      }))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+  }, [summaryQuery.data])
 
   const latestTotals = useMemo<Totals | null>(() => {
     if (!chartData.length) return null
@@ -116,7 +177,15 @@ export default function AnalysisOverview({
                 <XAxis dataKey="date" tickFormatter={(value) => formatAxisDate(value)} />
                 <YAxis yAxisId="left" />
                 <YAxis yAxisId="right" orientation="right" />
-                <Tooltip labelFormatter={formatAxisDate} />
+                <Tooltip
+                  labelFormatter={formatAxisDate}
+                  formatter={(value, name) => {
+                    const key = String(name).toLowerCase()
+                    if (key.includes("efcr")) return [formatValue(Number(value), 2), String(name)]
+                    if (key.includes("biomass") || key.includes("feed")) return [formatValue(Number(value), 1, "kg"), String(name)]
+                    return [formatValue(Number(value), 0), String(name)]
+                  }}
+                />
                 <Area
                   yAxisId="left"
                   type="monotone"
@@ -148,7 +217,7 @@ export default function AnalysisOverview({
                   yAxisId="right"
                   type="monotone"
                   dataKey="number_of_fish_inventory"
-                  stroke="#3b82f6"
+                  stroke="var(--color-chart-3)"
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   dot={false}
@@ -167,7 +236,7 @@ export default function AnalysisOverview({
           title="Total Fish"
           value={formatValue(latestTotals?.totalFish)}
           icon={<Fish />}
-          accent="border-blue-500"
+          accent="border-chart-3"
         />
         <StatCard
           title="Total Biomass"
