@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tables } from "@/lib/types/database"
 import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordFeeding } from "@/lib/hooks/use-feeding"
+import { logSbError } from "@/utils/supabase/log"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -77,7 +78,7 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
                 feeding_response: values.feeding_response,
             })
         } catch (error) {
-            console.error(error)
+            logSbError("dataEntry:feeding:submit", error)
         }
     }
 

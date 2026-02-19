@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tables } from "@/lib/types/database"
 import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
+import { logSbError } from "@/utils/supabase/log"
 
 const formSchema = z.object({
     origin_system_id: z.string().min(1, "Origin system is required"),
@@ -83,7 +84,7 @@ export function TransferForm({ systems, batches }: TransferFormProps) {
                 batch_id: values.batch_id,
             })
         } catch (error) {
-            console.error(error)
+            logSbError("dataEntry:transfer:submit", error)
         }
     }
 

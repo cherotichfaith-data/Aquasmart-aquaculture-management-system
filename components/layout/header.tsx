@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, LogOut, Menu, Settings, User as UserIcon } from "lucide-react"
+import { Bell, LogOut, Menu, Settings } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -17,8 +17,13 @@ import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useNotifications } from "@/components/notifications/notifications-provider"
+import { ThemeToggle } from "@/components/theme-toggle"
 
-export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
+export default function Header({
+  onMenuClick,
+}: {
+  onMenuClick: () => void
+}) {
   const { user, role, signOut } = useAuth()
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
@@ -29,8 +34,8 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
     setSigningOut(true)
     try {
       await signOut()
-    } catch (err) {
-      console.error("Sign out failed:", err)
+    } catch {
+      // Ignore and continue redirect flow.
     } finally {
       router.replace("/auth")
       if (typeof window !== "undefined") {
@@ -54,21 +59,29 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
             <Menu size={20} />
           </button>
 
-          {/* Optional: Add Breadcrumbs or Title here for desktop if needed */}
         </div>
 
         <div className="flex items-center gap-3">
           {/* Role Badge */}
           {role && (
-            <Badge variant="outline" className="hidden sm:flex capitalize bg-sidebar-primary">
+            <Badge
+              variant="outline"
+              className="hidden sm:flex capitalize bg-sidebar-primary text-sidebar-primary-foreground border-sidebar-primary/70"
+            >
               {formatRole(role)}
             </Badge>
           )}
 
+          <ThemeToggle />
+
           {/* Notifications Dropdown */}
           <DropdownMenu onOpenChange={(open) => open && markAllRead()}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full cursor-pointer">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative h-9 w-9 rounded-full cursor-pointer bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground border border-border/70"
+              >
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-4 px-1 h-4 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center">
@@ -116,7 +129,10 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
           {/* User Profile Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full cursor-pointer">
+              <Button
+                variant="ghost"
+                className="relative h-9 w-9 rounded-full cursor-pointer bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground border border-border/70"
+              >
                 <Avatar className="h-9 w-9">
                   <AvatarImage src="/avatars/01.png" alt={user?.email || "User"} />
                   <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
@@ -131,12 +147,6 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
                 </div>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild className="cursor-pointer">
-                <Link href="/profile" className="flex items-center">
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </Link>
-              </DropdownMenuItem>
               <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href="/settings" className="flex items-center">
                   <Settings className="mr-2 h-4 w-4" />

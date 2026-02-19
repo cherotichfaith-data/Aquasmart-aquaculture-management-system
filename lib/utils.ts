@@ -1,6 +1,6 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-import type { Enums } from './types/database'
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+import type { Enums } from "./types/database"
 
 const TIME_PERIOD_VALUES = [
   "day",
@@ -61,8 +61,12 @@ export function parseDateToTimePeriod(
  * Calculate date range based on time period
  * Returns start and end dates for the selected period
  */
-export function getDateRangeFromPeriod(period: Enums<"time_period"> | string) {
-  const today = new Date()
+export function getDateRangeFromPeriod(
+  period: Enums<"time_period"> | string,
+  asOfDate?: string | null,
+): { startDate: string; endDate: string } {
+  const anchor = asOfDate ? new Date(`${asOfDate}T00:00:00`) : new Date()
+  const today = Number.isNaN(anchor.getTime()) ? new Date() : anchor
   const endDate = new Date(today)
   endDate.setHours(23, 59, 59, 999)
 
@@ -104,61 +108,9 @@ export function getDateRangeFromPeriod(period: Enums<"time_period"> | string) {
   }
 
   return {
-    startDate: startDate.toISOString().split('T')[0],
-    endDate: endDate.toISOString().split('T')[0],
+    startDate: startDate.toISOString().split("T")[0],
+    endDate: endDate.toISOString().split("T")[0],
   }
-}
-
-/**
- * Calculate date range for either a preset time period or a custom range.
- */
-export function getDateRange(input: string | null | undefined, defaultPeriod: TimePeriodValue = "2 weeks") {
-  const parsed = parseDateToTimePeriod(input, defaultPeriod)
-  if (parsed.kind === "custom") {
-    return {
-      startDate: parsed.startDate,
-      endDate: parsed.endDate,
-      period: parsed.period,
-      isCustom: true,
-    }
-  }
-
-  const range = getDateRangeFromPeriod(parsed.period)
-  return {
-    ...range,
-    period: parsed.period,
-    isCustom: false,
-  }
-}
-
-/**
- * Format date range for display
- */
-export function formatDateRange(startDate: string, endDate: string): string {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-
-  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
-  const startStr = start.toLocaleDateString('en-US', options)
-  const endStr = end.toLocaleDateString('en-US', { ...options, year: 'numeric' })
-
-  return `${startStr} - ${endStr}`
-}
-
-/**
- * Convert time period to API period format
- */
-export function toMetricsPeriod(period: Enums<"time_period"> | string): "7d" | "30d" | "90d" | "180d" | "365d" {
-  const map: Record<string, "7d" | "30d" | "90d" | "180d" | "365d"> = {
-    day: "7d",
-    week: "7d",
-    "2 weeks": "30d",
-    month: "30d",
-    quarter: "90d",
-    "6 months": "180d",
-    year: "365d",
-  }
-  return map[period] ?? "30d"
 }
 
 export function sortByDateAsc<T>(rows: T[], getDate: (row: T) => string | null | undefined): T[] {

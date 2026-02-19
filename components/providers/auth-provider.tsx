@@ -55,7 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setProfile(deriveProfile(currentUser));
             } catch (error) {
                 logSbError("authProvider:getSession:catch", error);
-                console.error("Error fetching session:", error);
             } finally {
                 setIsLoading(false);
             }

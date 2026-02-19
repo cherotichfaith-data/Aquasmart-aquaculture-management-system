@@ -15,6 +15,16 @@ type SystemRow = Tables<"system">
 type WaterQualityMeasurementRow = Tables<"water_quality_measurement">
 type FishTransferRow = Tables<"fish_transfer">
 type FishStockingRow = Tables<"fish_stocking">
+type RecentRowsTable =
+  | "fish_mortality"
+  | "feeding_record"
+  | "fish_sampling_weight"
+  | "fish_transfer"
+  | "fish_harvest"
+  | "water_quality_measurement"
+  | "feed_incoming"
+  | "fish_stocking"
+  | "system"
 
 export type FeedIncomingWithType = FeedIncomingRow & { feed_type: FeedTypeRow | null }
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
@@ -85,6 +95,7 @@ export async function getFeedTypes(params?: { limit?: number; signal?: AbortSign
 
 export async function getFeedingRecords(params?: {
   systemId?: number
+  systemIds?: number[]
   batchId?: number
   dateFrom?: string
   dateTo?: string
@@ -96,7 +107,11 @@ export async function getFeedingRecords(params?: {
   const { supabase } = clientResult
 
   let query = supabase.from("feeding_record").select("*")
-  if (params?.systemId) query = query.eq("system_id", params.systemId)
+  if (params?.systemId) {
+    query = query.eq("system_id", params.systemId)
+  } else if (params?.systemIds && params.systemIds.length > 0) {
+    query = query.in("system_id", params.systemIds)
+  }
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
@@ -169,6 +184,7 @@ export async function getHarvests(params?: {
 
 export async function getSamplingData(params?: {
   systemId?: number
+  systemIds?: number[]
   batchId?: number
   dateFrom?: string
   dateTo?: string
@@ -180,7 +196,11 @@ export async function getSamplingData(params?: {
   const { supabase } = clientResult
 
   let query = supabase.from("fish_sampling_weight").select("*")
-  if (params?.systemId) query = query.eq("system_id", params.systemId)
+  if (params?.systemId) {
+    query = query.eq("system_id", params.systemId)
+  } else if (params?.systemIds && params.systemIds.length > 0) {
+    query = query.in("system_id", params.systemIds)
+  }
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
@@ -195,6 +215,7 @@ export async function getSamplingData(params?: {
 
 export async function getMortalityData(params?: {
   systemId?: number
+  systemIds?: number[]
   batchId?: number
   dateFrom?: string
   dateTo?: string
@@ -206,7 +227,11 @@ export async function getMortalityData(params?: {
   const { supabase } = clientResult
 
   let query = supabase.from("fish_mortality").select("*")
-  if (params?.systemId) query = query.eq("system_id", params.systemId)
+  if (params?.systemId) {
+    query = query.eq("system_id", params.systemId)
+  } else if (params?.systemIds && params.systemIds.length > 0) {
+    query = query.in("system_id", params.systemIds)
+  }
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
@@ -217,6 +242,30 @@ export async function getMortalityData(params?: {
   const { data, error } = await query
   if (error) return toQueryError("getMortalityData", error)
   return toQuerySuccess<FishMortalityRow>(data as FishMortalityRow[])
+}
+
+export async function getTransferData(params?: {
+  batchId?: number
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  signal?: AbortSignal
+}): Promise<QueryResult<FishTransferRow>> {
+  const clientResult = await getClientOrError("getTransferData")
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase.from("fish_transfer").select("*")
+  if (params?.batchId) query = query.eq("batch_id", params.batchId)
+  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
+  if (params?.dateTo) query = query.lte("date", params.dateTo)
+  query = query.order("date", { ascending: false })
+  if (params?.limit) query = query.limit(params.limit)
+  if (params?.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (error) return toQueryError("getTransferData", error)
+  return toQuerySuccess<FishTransferRow>(data as FishTransferRow[])
 }
 
 export async function getRecentActivities(params?: {
@@ -251,7 +300,7 @@ export async function getRecentActivities(params?: {
 }
 
 async function getRecentRows<T>(
-  table: string,
+  table: RecentRowsTable,
   orderColumn: string,
   signal?: AbortSignal,
   limit = 5,

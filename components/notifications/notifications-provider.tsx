@@ -67,6 +67,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const { toast } = useToast()
   const [notifications, setNotifications] = useState<AlertNotification[]>([])
   const seenIds = useRef<Set<string>>(new Set())
+  const storageKey = farmId ? `aqua_alert_history_${farmId}` : "aqua_alert_history"
 
   const notificationsEnabled = profile?.notifications_enabled ?? true
   const systemsQuery = useQuery({
@@ -75,9 +76,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("api_system_options")
-        .select("id,label")
-        .eq("farm_id", farmId!)
+        .rpc("api_dashboard_systems", {
+          p_farm_id: farmId!,
+          p_stage: undefined,
+          p_system_id: undefined,
+          p_start_date: undefined,
+          p_end_date: undefined,
+        })
 
       if (error) {
         if (!isSbPermissionDenied(error)) {
@@ -86,7 +91,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         return [] as Array<{ id: number; label: string | null }>
       }
 
-      return (data as Array<{ id: number; label: string | null }>) ?? []
+      const mapped = ((data ?? []) as Array<{ system_id: number | null; system_name: string | null }>)
+        .filter((row) => typeof row.system_id === "number")
+        .map((row) => ({
+          id: row.system_id as number,
+          label: row.system_name,
+        }))
+      return mapped
     },
   })
   const thresholdsQuery = useQuery({
@@ -159,6 +170,36 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const systemsLoaded = systemsQuery.isSuccess
   const thresholdsLoaded = thresholdsQuery.isSuccess
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) {
+        setNotifications([])
+        seenIds.current.clear()
+        return
+      }
+      const parsed = JSON.parse(raw) as AlertNotification[]
+      if (!Array.isArray(parsed)) return
+      const normalized = parsed
+        .filter((item) => item && typeof item.id === "string")
+        .slice(0, MAX_NOTIFICATIONS)
+      setNotifications(normalized)
+      seenIds.current = new Set(normalized.map((item) => item.id))
+    } catch {
+      // Ignore malformed local history.
+    }
+  }, [storageKey])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(notifications.slice(0, MAX_NOTIFICATIONS)))
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [notifications, storageKey])
 
   useEffect(() => {
     if (!farmId || !session) return

@@ -10,15 +10,15 @@ import { useHealthSummary } from "@/lib/hooks/use-dashboard"
 type Tone = "good" | "warn" | "bad"
 
 const toneText = {
-  good: "text-emerald-600",
-  warn: "text-amber-600",
-  bad: "text-rose-600",
+  good: "text-chart-2",
+  warn: "text-chart-4",
+  bad: "text-destructive",
 }
 
 const toneBar = {
-  good: "bg-emerald-500",
-  warn: "bg-amber-500",
-  bad: "bg-rose-500",
+  good: "bg-chart-2",
+  warn: "bg-chart-4",
+  bad: "bg-destructive",
 }
 
 function StatusCard({

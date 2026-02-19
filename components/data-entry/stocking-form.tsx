@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tables } from "@/lib/types/database"
 import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordStocking } from "@/lib/hooks/use-stocking"
+import { logSbError } from "@/utils/supabase/log"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -83,7 +84,7 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
                 type_of_stocking: values.type_of_stocking,
             })
         } catch (error) {
-            console.error(error)
+            logSbError("dataEntry:stocking:submit", error)
         }
     }
 

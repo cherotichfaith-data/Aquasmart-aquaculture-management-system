@@ -62,7 +62,6 @@ Root
 - `lib/react-query/` Query client configuration
 - `utils/` Supabase client + middleware helpers
 - `public/` static assets
-- `styles/` global styles
 - `supabase/` local Supabase CLI artifacts
 
 Route pattern
@@ -126,7 +125,6 @@ app/
 - `app/data-entry/page.tsx` reads: `api_system_options`, `api_fingerling_batch_options`, `api_feed_type_options`; base reads: `suppliers`, recent base event tables via `fetchRecent*` helpers.
 - `app/feed/page.client.tsx` reads: `api_efcr_trend`, `api_dashboard`, `api_dashboard_consolidated`, `api_feed_type_options`, `feed_incoming` (via `feed_incoming` + `feed_type` join).
 - `app/inventory/page.client.tsx` reads: `api_daily_fish_inventory`, `api_feed_type_options`, `feed_incoming`.
-- `app/metrics/page.client.tsx` reads: via `metrics-explorer` (see components/metrics).
 - `app/mortality/page.client.tsx` reads: `api_system_options`, `api_fingerling_batch_options`, `fish_mortality` (history).
 - `app/production/page.client.tsx` reads: `api_production_summary`, `api_efcr_trend`, `api_dashboard`.
 - `app/reports/page.client.tsx` reads: `api_production_summary`, `api_dashboard`.
@@ -157,9 +155,6 @@ components/inventory/
 - `components/inventory/fish-inventory.tsx` reads: `api_daily_fish_inventory`.
 - `components/inventory/feed-inventory.tsx` reads: `api_feed_type_options`, `feed_incoming`.
 
-components/metrics/
-- `components/metrics/metrics-explorer.tsx` reads: `api_daily_fish_inventory`, `api_production_summary`, `daily_water_quality_rating`.
-
 components/notifications/
 - `components/notifications/notifications-provider.tsx` reads: `api_system_options`, `alert_threshold` (RLS); realtime: `water_quality_measurement` and `daily_fish_inventory_table` inserts.
 
@@ -179,7 +174,6 @@ components/shared/
 components/water-quality/
 - `components/water-quality/water-quality-history.tsx` reads: `water_quality_measurement`.
 - `components/water-quality/water-quality-charts.tsx` reads: `water_quality_measurement`.
-- `components/water-quality/water-quality-form.tsx` reads: `api_system_options`; writes: `water_quality_measurement`.
 
 lib/
 - `lib/supabase-queries.ts` centralizes reads for `api_*` views and base tables.

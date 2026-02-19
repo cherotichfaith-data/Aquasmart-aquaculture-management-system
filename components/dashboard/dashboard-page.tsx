@@ -1,15 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import { Download } from "lucide-react"
+import { Download, RefreshCw } from "lucide-react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import FarmSelector from "@/components/shared/farm-selector"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useSharedFilters } from "@/hooks/use-shared-filters"
 import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
 import KPIOverview from "@/components/dashboard/kpi-overview"
 import PopulationOverview from "@/components/dashboard/population-overview"
@@ -17,24 +18,37 @@ import SystemsTable from "@/components/dashboard/systems-table"
 import RecentActivities from "@/components/dashboard/recent-activities"
 import HealthSummary from "@/components/dashboard/health-summary"
 import RecommendedActions from "@/components/dashboard/recommended-actions"
+import ProductionSummaryMetrics from "@/components/dashboard/production-summary-metrics"
 import * as XLSX from "xlsx"
 import { getProductionSummary } from "@/lib/api/production"
 import { parseDateToTimePeriod } from "@/lib/utils"
 import { logSbError } from "@/utils/supabase/log"
 
 export default function DashboardPage() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const { farm, farmId } = useActiveFarm()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const periodParam = searchParams.get("period")
   const parsedPeriod = parseDateToTimePeriod(periodParam)
-  const [selectedBatch, setSelectedBatch] = useState<string>("all")
-  const [selectedSystem, setSelectedSystem] = useState<string>("all")
-  const [selectedStage, setSelectedStage] = useState<"all" | "nursing" | "grow_out">("all")
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>(
-    parsedPeriod.kind === "preset" ? parsedPeriod.period : "2 weeks",
-  )
+  const {
+    selectedBatch,
+    setSelectedBatch,
+    selectedSystem,
+    setSelectedSystem,
+    selectedStage,
+    setSelectedStage,
+    timePeriod,
+    setTimePeriod,
+  } = useSharedFilters(parsedPeriod.kind === "preset" ? parsedPeriod.period : "2 weeks")
+  const [refreshing, setRefreshing] = useState(false)
+
+  useEffect(() => {
+    if (!periodParam || parsedPeriod.kind !== "preset") return
+    if (parsedPeriod.period !== timePeriod) {
+      setTimePeriod(parsedPeriod.period)
+    }
+  }, [parsedPeriod, periodParam, setTimePeriod, timePeriod])
 
   const handleDownload = async () => {
     try {
@@ -73,75 +87,76 @@ export default function DashboardPage() {
     }
   }
 
+  const handleRefresh = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await queryClient.invalidateQueries()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   return (
     <DashboardLayout>
-      <div className="space-y-10">
-        <div className="space-y-5">
+      <div className="space-y-6">
+        <section className="rounded-lg border border-border bg-card p-4 shadow-sm md:p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-semibold text-balance">
-                {farm?.name ?? profile?.farm_name ?? "Dashboard"}
-              </h1>
-              <p className="text-muted-foreground mt-2">Monitor your farm check-ins and system performance</p>
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold">Dashboard</h1>
+              <p className="text-sm text-muted-foreground">
+                {farm?.name ?? profile?.farm_name ?? "Active farm"} operational intelligence and analytics.
+              </p>
             </div>
-          </div>
-
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="inline-flex rounded-full bg-muted/70 p-1">
-              {[
-                { value: "all", label: "All" },
-                { value: "nursing", label: "Nursing" },
-                { value: "grow_out", label: "Grow out" },
-              ].map((stage) => (
-                <button
-                  key={stage.value}
-                  type="button"
-                  onClick={() => setSelectedStage(stage.value as typeof selectedStage)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition ${selectedStage === stage.value
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  {stage.label}
-                </button>
-              ))}
-            </div>
-
             <div className="flex flex-wrap items-center gap-2">
-              <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} />
-              <Link href="/data-entry">
-                <Button className="h-9 rounded-full px-4 text-xs font-semibold shadow-sm cursor-pointer bg-sidebar-primary hover:bg-sidebar-primary/80">
-                  Add Data
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 gap-2 rounded-md text-xs font-semibold cursor-pointer"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
               <Button
                 size="sm"
                 onClick={handleDownload}
-                className="h-9 rounded-full px-4 text-xs font-semibold shadow-sm cursor-pointer bg-sidebar-primary hover:bg-sidebar-primary/80"
+                className="h-9 gap-2 rounded-md px-4 text-xs font-semibold cursor-pointer bg-sidebar-primary hover:bg-sidebar-primary/85"
               >
-                <Download className="mr-2 h-4 w-4" />
-                Download
+                <Download className="h-4 w-4" />
+                Export
               </Button>
             </div>
           </div>
+        </section>
 
-          <FarmSelector
-            selectedBatch={selectedBatch}
-            selectedSystem={selectedSystem}
-            selectedStage={selectedStage}
-            onBatchChange={setSelectedBatch}
-            onSystemChange={setSelectedSystem}
-            onStageChange={setSelectedStage}
-            showStage={false}
-            variant="compact"
-          />
-        </div>
+        <section className="sticky top-[65px] z-10 rounded-lg border border-border bg-card/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90">
+          <div className="flex flex-wrap items-center gap-2">
+            <FarmSelector
+              selectedBatch={selectedBatch}
+              selectedSystem={selectedSystem}
+              selectedStage={selectedStage}
+              onBatchChange={setSelectedBatch}
+              onSystemChange={setSelectedSystem}
+              onStageChange={setSelectedStage}
+              showStage
+              variant="compact"
+            />
+            <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} variant="compact" />
+            <Link href="/data-entry" className="ml-auto">
+              <Button className="h-9 rounded-md px-4 text-sm font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90">
+                Add Data
+              </Button>
+            </Link>
+          </div>
+        </section>
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Health Overview</h2>
+            <h2 className="text-lg font-semibold">Core Performance Overview</h2>
             <p className="text-sm text-muted-foreground">
-              Snapshot of system performance, water quality, and feeding efficiency.
+              Real-time snapshot of core operational and water quality indicators.
             </p>
           </div>
           <KPIOverview
@@ -155,12 +170,12 @@ export default function DashboardPage() {
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Field Visualization</h2>
-            <p className="text-sm text-muted-foreground">Live system status with a health snapshot.</p>
+            <h2 className="text-lg font-semibold">Feed Efficiency and Mortality Monitoring</h2>
+            <p className="text-sm text-muted-foreground">Trends for production, efficiency, and system health.</p>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
-            <SystemsTable
-              stage={selectedStage}
+            <PopulationOverview
+              stage={selectedStage === "all" ? null : selectedStage}
               batch={selectedBatch}
               system={selectedSystem}
               timePeriod={timePeriod}
@@ -178,11 +193,13 @@ export default function DashboardPage() {
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Field Metrics</h2>
-            <p className="text-sm text-muted-foreground">Trends across production, mortality, and efficiency.</p>
+            <h2 className="text-lg font-semibold">Operations Table</h2>
+            <p className="text-sm text-muted-foreground">
+              Dense system table with row drilldown for exceptions and next actions.
+            </p>
           </div>
-          <PopulationOverview
-            stage={selectedStage === "all" ? null : selectedStage}
+          <SystemsTable
+            stage={selectedStage}
             batch={selectedBatch}
             system={selectedSystem}
             timePeriod={timePeriod}
@@ -192,8 +209,24 @@ export default function DashboardPage() {
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Advisory Timeline</h2>
-            <p className="text-sm text-muted-foreground">Recent operational changes and farm events.</p>
+            <h2 className="text-lg font-semibold">Production Summary Metrics</h2>
+            <p className="text-sm text-muted-foreground">
+              Summary totals for stocked fish, mortalities, transfer adjustments, and harvest output.
+            </p>
+          </div>
+          <ProductionSummaryMetrics
+            stage={selectedStage}
+            batch={selectedBatch}
+            system={selectedSystem}
+            timePeriod={timePeriod}
+            periodParam={periodParam}
+          />
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Recent Activity</h2>
+            <p className="text-sm text-muted-foreground">Latest operational events and advisory timeline.</p>
           </div>
           <RecentActivities
             batch={selectedBatch}

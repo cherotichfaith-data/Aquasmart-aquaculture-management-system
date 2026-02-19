@@ -2,10 +2,12 @@
 import { createClient } from "@/utils/supabase/client"
 import { logSbError } from "@/utils/supabase/log"
 import { getSessionUser } from "@/utils/supabase/session"
-import { Database, Tables, TablesInsert, TablesUpdate } from "@/lib/types/database"
+import { Database } from "@/lib/types/database"
 import { PostgrestError } from "@supabase/supabase-js"
 
 type TableName = keyof Database["public"]["Tables"]
+type TableRow<T extends TableName> = Database["public"]["Tables"][T]["Row"]
+type TableInsert<T extends TableName> = Database["public"]["Tables"][T]["Insert"]
 
 export type MutationResult<T> =
     | { success: true; data: T; error: null }
@@ -19,8 +21,8 @@ export type MutationResult<T> =
  */
 export async function insertData<T extends TableName>(
     table: T,
-    data: TablesInsert<T> | TablesInsert<T>[]
-): Promise<MutationResult<Tables<T>[]>> {
+    data: TableInsert<T> | TableInsert<T>[]
+): Promise<MutationResult<TableRow<T>[]>> {
     const supabase = createClient()
     try {
         const sessionUser = await getSessionUser(supabase, `insertData:${String(table)}:getSession`)
@@ -29,7 +31,7 @@ export async function insertData<T extends TableName>(
         }
         const { data: result, error } = await supabase
             .from(table)
-            .insert(data)
+            .insert(data as never)
             .select()
 
         if (error) {
@@ -37,79 +39,9 @@ export async function insertData<T extends TableName>(
             return { success: false, data: null, error }
         }
 
-        return { success: true, data: result as Tables<T>[], error: null }
+        return { success: true, data: (result ?? []) as unknown as TableRow<T>[], error: null }
     } catch (err) {
         logSbError(`insertData:${String(table)}:catch`, err)
-        return { success: false, data: null, error: err as Error }
-    }
-}
-
-/**
- * Generic helper to update data in a Supabase table.
- * @param table The table name.
- * @param match An object of column-value pairs to match rows to update.
- * @param data The data to update.
- * @returns The updated data or an error.
- */
-export async function updateData<T extends TableName>(
-    table: T,
-    match: Partial<Tables<T>>,
-    data: TablesUpdate<T>
-): Promise<MutationResult<Tables<T>[]>> {
-    const supabase = createClient()
-    try {
-        const sessionUser = await getSessionUser(supabase, `updateData:${String(table)}:getSession`)
-        if (!sessionUser) {
-            return { success: false, data: null, error: new Error("No active session") }
-        }
-        const { data: result, error } = await supabase
-            .from(table)
-            .update(data)
-            .match(match)
-            .select()
-
-        if (error) {
-            logSbError(`updateData:${String(table)}`, error)
-            return { success: false, data: null, error }
-        }
-
-        return { success: true, data: result as Tables<T>[], error: null }
-    } catch (err) {
-        logSbError(`updateData:${String(table)}:catch`, err)
-        return { success: false, data: null, error: err as Error }
-    }
-}
-
-/**
- * Generic helper to delete data from a Supabase table.
- * @param table The table name.
- * @param match An object of column-value pairs to match rows to delete.
- * @returns The deleted data (if selected) or an error.
- */
-export async function deleteData<T extends TableName>(
-    table: T,
-    match: Partial<Tables<T>>
-): Promise<MutationResult<Tables<T>[]>> {
-    const supabase = createClient()
-    try {
-        const sessionUser = await getSessionUser(supabase, `deleteData:${String(table)}:getSession`)
-        if (!sessionUser) {
-            return { success: false, data: null, error: new Error("No active session") }
-        }
-        const { data: result, error } = await supabase
-            .from(table)
-            .delete()
-            .match(match)
-            .select()
-
-        if (error) {
-            logSbError(`deleteData:${String(table)}`, error)
-            return { success: false, data: null, error }
-        }
-
-        return { success: true, data: result as Tables<T>[], error: null }
-    } catch (err) {
-        logSbError(`deleteData:${String(table)}:catch`, err)
         return { success: false, data: null, error: err as Error }
     }
 }

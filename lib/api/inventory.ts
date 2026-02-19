@@ -7,16 +7,16 @@ type DailyFishInventoryConsolidatedRow = Tables<"api_daily_fish_inventory_consol
 
 type DailyInventoryRpcArgs = {
   p_farm_id: string
-  p_system_id?: number | null
-  p_start_date?: string | null
-  p_end_date?: string | null
+  p_system_id?: number
+  p_start_date?: string
+  p_end_date?: string
 }
 
 type DailyInventoryConsolidatedRpcArgs = {
   p_farm_id: string
-  p_system_id?: number | null
-  p_start_date?: string | null
-  p_end_date?: string | null
+  p_system_id?: number
+  p_start_date?: string
+  p_end_date?: string
 }
 
 const dailyInventoryRpcArgs = (params: {
@@ -26,9 +26,9 @@ const dailyInventoryRpcArgs = (params: {
   dateTo?: string
 }): DailyInventoryRpcArgs => ({
   p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? null,
-  p_start_date: params.dateFrom ?? null,
-  p_end_date: params.dateTo ?? null,
+  p_system_id: params.systemId ?? undefined,
+  p_start_date: params.dateFrom ?? undefined,
+  p_end_date: params.dateTo ?? undefined,
 })
 
 const dailyInventoryConsolidatedRpcArgs = (params: {
@@ -38,9 +38,9 @@ const dailyInventoryConsolidatedRpcArgs = (params: {
   dateTo?: string
 }): DailyInventoryConsolidatedRpcArgs => ({
   p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? null,
-  p_start_date: params.dateFrom ?? null,
-  p_end_date: params.dateTo ?? null,
+  p_system_id: params.systemId ?? undefined,
+  p_start_date: params.dateFrom ?? undefined,
+  p_end_date: params.dateTo ?? undefined,
 })
 
 const isAbortLikeError = (err: unknown): boolean => {

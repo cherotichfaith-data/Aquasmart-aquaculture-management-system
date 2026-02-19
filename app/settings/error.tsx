@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle } from "lucide-react"
+import { logSbError } from "@/utils/supabase/log"
 
 export default function PageError({
   error,
@@ -12,7 +13,7 @@ export default function PageError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error("Settings error:", error)
+    logSbError("settings:pageError", error)
   }, [error])
 
   return (

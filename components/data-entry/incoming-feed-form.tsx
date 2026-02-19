@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tables } from "@/lib/types/database"
 import { useRecordIncomingFeed } from "@/lib/hooks/use-incoming-feed"
+import { logSbError } from "@/utils/supabase/log"
 
 const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
@@ -56,7 +57,7 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
                 feed_id: values.feed_id,
             })
         } catch (error) {
-            console.error(error)
+            logSbError("dataEntry:incomingFeed:submit", error)
         }
     }
 
