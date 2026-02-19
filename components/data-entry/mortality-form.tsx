@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tables } from "@/lib/types/database"
 import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordMortality } from "@/lib/hooks/use-mortality"
+import { logSbError } from "@/utils/supabase/log"
 
 // Schema
 const formSchema = z.object({
@@ -74,7 +75,7 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
                 batch_id: values.batch_id,
             })
         } catch (error) {
-            console.error(error)
+            logSbError("dataEntry:mortality:submit", error)
         }
     }
 

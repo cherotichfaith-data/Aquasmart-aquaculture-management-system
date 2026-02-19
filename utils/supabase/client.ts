@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import type { Database } from "@/lib/types/database";
 
 function getProjectRef(url: string | undefined) {
     if (!url) return null;
@@ -16,7 +17,7 @@ export function createClient() {
     const projectRef = getProjectRef(supabaseUrl);
     const cookieName = projectRef ? `sb-${projectRef}-auth-token` : undefined;
 
-    return createBrowserClient(supabaseUrl, supabaseKey, {
+    return createBrowserClient<Database>(supabaseUrl, supabaseKey, {
         cookieOptions: cookieName ? { name: cookieName } : undefined,
         cookieEncoding: "base64url",
         isSingleton: true,

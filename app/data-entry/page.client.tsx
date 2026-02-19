@@ -61,14 +61,14 @@ export default function DataEntryPageClient() {
   return (
     <DashboardLayout>
       <div className="container mx-auto py-8">
-        <div className="flex flex-col gap-2 mb-6">
+        <div className="flex flex-col gap-2 mb-6 rounded-lg border border-border/80 bg-card p-4 shadow-sm">
           <h1 className="text-3xl font-bold tracking-tight">Data Entry</h1>
           <p className="text-muted-foreground">
             Record farm activities and measurements.
           </p>
         </div>
         {loading ? (
-          <div className="min-h-[300px] rounded-lg border border-border bg-muted/30 animate-pulse" />
+          <div className="min-h-[300px] rounded-lg border border-border/80 bg-muted/40 animate-pulse shadow-sm" />
         ) : (
           <DataEntryInterface
             systems={systems}

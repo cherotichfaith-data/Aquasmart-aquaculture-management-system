@@ -12,9 +12,8 @@ import {
 import { parseDateToTimePeriod, sortByDateAsc } from "@/lib/utils"
 import { getDailyFishInventory } from "@/lib/api/inventory"
 import { getWaterQualityRatings } from "@/lib/api/water-quality"
-import { getSystemOptions } from "@/lib/api/options"
 import { getProductionSummary } from "@/lib/api/production"
-import { getBatchSystemIds, getRecentActivities, getFeedIncomingWithType } from "@/lib/api/reports"
+import { getBatchSystemIds, getRecentActivities, getTransferData } from "@/lib/api/reports"
 
 const computeMortalityRateFromProduction = (
   rows: Array<{ number_of_fish_inventory: number | null; daily_mortality_count: number | null }>,
@@ -42,16 +41,21 @@ async function resolveScopedSystemIds(params: {
   const farmId = params.farmId ?? null
   if (!farmId) return null
 
-  const systemsResult = await getSystemOptions({
+  const parsedSystemId =
+    params.system && params.system !== "all" && Number.isFinite(Number(params.system))
+      ? Number(params.system)
+      : undefined
+
+  const systemsResult = await getDashboardSystems({
     farmId,
     stage: params.stage && params.stage !== "all" ? params.stage : undefined,
-    activeOnly: true,
+    systemId: parsedSystemId,
     signal: params.signal,
   })
   if (systemsResult.status !== "success") return null
 
   let scoped = systemsResult.data
-    .map((row) => row.id)
+    .map((row) => row.system_id)
     .filter((id): id is number => typeof id === "number")
 
   if (params.system && params.system !== "all") {
@@ -75,30 +79,6 @@ async function resolveScopedSystemIds(params: {
   return scoped
 }
 
-export function useDashboardSnapshot(params?: {
-  systemId?: number
-  stage?: Enums<"system_growth_stage">
-  timePeriod?: Enums<"time_period">
-  farmId?: string | null
-  enabled?: boolean
-}) {
-  const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
-  return useQuery({
-    queryKey: [
-      "dashboard",
-      "snapshot",
-      params?.farmId ?? "all",
-      params?.systemId ?? "all",
-      params?.stage ?? "all",
-      params?.timePeriod ?? "2 weeks",
-    ],
-    queryFn: ({ signal }) => getDashboardSnapshot({ ...params, farmId: params?.farmId ?? null, signal }),
-    enabled,
-    staleTime: 5 * 60_000,
-  })
-}
-
 export function useDashboardConsolidatedSnapshot(params?: { timePeriod?: Enums<"time_period">; enabled?: boolean; farmId?: string | null }) {
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
@@ -106,16 +86,6 @@ export function useDashboardConsolidatedSnapshot(params?: { timePeriod?: Enums<"
     queryKey: ["dashboard", "snapshot", "consolidated", params?.farmId ?? "all", params?.timePeriod ?? "2 weeks"],
     queryFn: ({ signal }) => getDashboardConsolidatedSnapshot({ ...params, farmId: params?.farmId ?? null, signal }),
     enabled,
-    staleTime: 5 * 60_000,
-  })
-}
-
-export function useTimePeriodBounds(timePeriod: Enums<"time_period"> | string, farmId?: string | null) {
-  const { session } = useAuth()
-  return useQuery({
-    queryKey: ["dashboard", "time-bounds", farmId ?? "all", timePeriod],
-    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
-    enabled: Boolean(session) && Boolean(farmId),
     staleTime: 5 * 60_000,
   })
 }
@@ -297,6 +267,15 @@ export type KPIOverviewMetric = {
   badge?: string
 }
 
+export type ProductionSummaryMetrics = {
+  totalStockedFish: number
+  totalMortalities: number
+  netTransferAdjustments: number
+  totalHarvestedFish: number
+  totalHarvestedKg: number
+  dateBounds: { start: string | null; end: string | null }
+}
+
 export type DashboardSystemRow = {
   system_id: number
   system_name: string | null
@@ -322,6 +301,48 @@ export type DashboardSystemRow = {
   worst_parameter: string | null
   worst_parameter_value: number | null
   worst_parameter_unit: string | null
+}
+
+const hasCompleteSystemMetrics = (row: DashboardSystemRow): boolean => {
+  const requiredNumericMetrics: Array<number | null> = [
+    row.fish_end,
+    row.biomass_end,
+    row.feed_total,
+    row.efcr,
+    row.abw,
+    row.feeding_rate,
+    row.mortality_rate,
+    row.biomass_density,
+  ]
+
+  const hasAllNumericMetrics = requiredNumericMetrics.every(
+    (value) => typeof value === "number" && Number.isFinite(value),
+  )
+  if (!hasAllNumericMetrics) return false
+
+  return typeof row.water_quality_rating_average === "string" && row.water_quality_rating_average.trim().length > 0
+}
+
+const toIsoDate = (value: Date) => value.toISOString().slice(0, 10)
+
+const getPreviousRange = (range: { start: string; end: string }): { start: string; end: string } | null => {
+  const startDate = new Date(`${range.start}T00:00:00`)
+  const endDate = new Date(`${range.end}T00:00:00`)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null
+  if (endDate < startDate) return null
+
+  const spanMs = endDate.getTime() - startDate.getTime()
+  const prevEnd = new Date(startDate.getTime() - 24 * 60 * 60 * 1000)
+  const prevStart = new Date(prevEnd.getTime() - spanMs)
+
+  return { start: toIsoDate(prevStart), end: toIsoDate(prevEnd) }
+}
+
+const computeTrendPercent = (current: number | null, previous: number | null): number | null => {
+  if (current === null || previous === null) return null
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
+  if (previous === 0) return current === 0 ? 0 : null
+  return ((current - previous) / Math.abs(previous)) * 100
 }
 
 export function useKpiOverview(params: {
@@ -586,10 +607,150 @@ export function useKpiOverview(params: {
       if (!bounds.start || !bounds.end) {
         return { metrics: [], dateBounds: bounds }
       }
-      return buildRangeMetrics({ start: bounds.start, end: bounds.end })
+      const current = await buildRangeMetrics({ start: bounds.start, end: bounds.end })
+      const previousRange = getPreviousRange({ start: bounds.start, end: bounds.end })
+      if (!previousRange) return current
+
+      const previous = await buildRangeMetrics(previousRange)
+      const previousByKey = new Map(previous.metrics.map((metric) => [metric.key, metric.value]))
+      const withTrend = current.metrics.map((metric) => ({
+        ...metric,
+        trend: computeTrendPercent(metric.value, previousByKey.get(metric.key) ?? null),
+      }))
+
+      return { ...current, metrics: withTrend }
     },
     enabled: Boolean(session) && Boolean(params.farmId),
     staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: true,
+  })
+}
+
+export function useProductionSummaryMetrics(params: {
+  farmId?: string | null
+  stage: "all" | Enums<"system_growth_stage">
+  batch?: string
+  system?: string
+  timePeriod?: Enums<"time_period">
+  periodParam?: string | null
+}) {
+  const { session } = useAuth()
+  return useQuery({
+    queryKey: [
+      "production-summary-metrics",
+      params.farmId ?? "all",
+      params.stage ?? "all",
+      params.batch ?? "all",
+      params.system ?? "all",
+      params.periodParam ?? params.timePeriod ?? "2 weeks",
+    ],
+    queryFn: async ({ signal }) => {
+      const empty: ProductionSummaryMetrics = {
+        totalStockedFish: 0,
+        totalMortalities: 0,
+        netTransferAdjustments: 0,
+        totalHarvestedFish: 0,
+        totalHarvestedKg: 0,
+        dateBounds: { start: null, end: null },
+      }
+
+      const scopedSystemIds = await resolveScopedSystemIds({
+        farmId: params.farmId ?? null,
+        stage: params.stage ?? "all",
+        system: params.system,
+        batch: params.batch ?? "all",
+        signal,
+      })
+      if (scopedSystemIds === null || scopedSystemIds.length === 0) return empty
+
+      const bounds = await getTimePeriodBounds(
+        params.periodParam ?? params.timePeriod ?? "2 weeks",
+        signal,
+        params.farmId ?? null,
+      )
+      if (!bounds.start || !bounds.end) {
+        return {
+          ...empty,
+          dateBounds: bounds,
+        }
+      }
+
+      const singleSystemId = scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
+      const summaryResult = await getProductionSummary({
+        farmId: params.farmId ?? null,
+        systemId: singleSystemId,
+        stage: params.stage === "all" ? undefined : params.stage,
+        dateFrom: bounds.start,
+        dateTo: bounds.end,
+        limit: 5000,
+        signal,
+      })
+      if (summaryResult.status !== "success") {
+        return {
+          ...empty,
+          dateBounds: bounds,
+        }
+      }
+
+      const batchId =
+        params.batch && params.batch !== "all" && Number.isFinite(Number(params.batch))
+          ? Number(params.batch)
+          : undefined
+      const transferResult = await getTransferData({
+        batchId,
+        dateFrom: bounds.start,
+        dateTo: bounds.end,
+        limit: 5000,
+        signal,
+      })
+      if (transferResult.status !== "success") {
+        return {
+          ...empty,
+          dateBounds: bounds,
+        }
+      }
+
+      const filtered = summaryResult.data.filter(
+        (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
+      )
+      const scopedSet = new Set(scopedSystemIds)
+
+      let totalStockedFish = 0
+      let totalMortalities = 0
+      let totalHarvestedFish = 0
+      let totalHarvestedKg = 0
+
+      filtered.forEach((row) => {
+        totalStockedFish += row.number_of_fish_stocked ?? 0
+        totalMortalities += row.daily_mortality_count ?? 0
+        totalHarvestedFish += row.number_of_fish_harvested ?? 0
+        totalHarvestedKg += row.total_weight_harvested ?? 0
+      })
+
+      const netTransferAdjustments = transferResult.data.reduce((sum, row) => {
+        const count = row.number_of_fish_transfer ?? 0
+        const originInScope = scopedSet.has(row.origin_system_id)
+        const targetInScope = scopedSet.has(row.target_system_id)
+
+        if (targetInScope && !originInScope) return sum + count
+        if (originInScope && !targetInScope) return sum - count
+        return sum
+      }, 0)
+
+      return {
+        totalStockedFish,
+        totalMortalities,
+        netTransferAdjustments,
+        totalHarvestedFish,
+        totalHarvestedKg,
+        dateBounds: bounds,
+      } as ProductionSummaryMetrics
+    },
+    enabled: Boolean(session) && Boolean(params.farmId),
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: true,
   })
 }
 
@@ -669,12 +830,16 @@ export function useSystemsTable(params: {
       }
 
       return {
-        rows: ((result.data ?? []) as DashboardSystemRow[]).filter((row) => scopedSystemIds.includes(row.system_id)),
+        rows: ((result.data ?? []) as DashboardSystemRow[]).filter(
+          (row) => scopedSystemIds.includes(row.system_id) && hasCompleteSystemMetrics(row),
+        ),
         meta: { source: "api_dashboard_systems", start: startDate, end: endDate },
       }
     },
     enabled: Boolean(session) && Boolean(params.farmId),
     staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: true,
   })
 }
 
@@ -726,10 +891,31 @@ export function useProductionTrend(params: {
   })
 }
 
-export function useRecentActivities(params?: { limit?: number }) {
+export function useRecentActivities(params?: {
+  tableName?: string
+  changeType?: Enums<"change_type_enum">
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+}) {
   return useQuery({
-    queryKey: ["recent-activities", params?.limit ?? 5],
-    queryFn: ({ signal }) => getRecentActivities({ limit: params?.limit ?? 5, signal }),
+    queryKey: [
+      "recent-activities",
+      params?.tableName ?? "all",
+      params?.changeType ?? "all",
+      params?.dateFrom ?? "all",
+      params?.dateTo ?? "all",
+      params?.limit ?? 5,
+    ],
+    queryFn: ({ signal }) =>
+      getRecentActivities({
+        tableName: params?.tableName,
+        changeType: params?.changeType,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit ?? 5,
+        signal,
+      }),
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: 5 * 60_000,
@@ -919,11 +1105,4 @@ export function useRecommendedActions(params: {
   })
 }
 
-export function useRecentFeedDeliveries(params?: { limit?: number }) {
-  return useQuery({
-    queryKey: ["inventory-summary", "feed-deliveries", params?.limit ?? 10],
-    queryFn: ({ signal }) => getFeedIncomingWithType({ limit: params?.limit ?? 10, signal }),
-    staleTime: 5 * 60_000,
-  })
-}
 

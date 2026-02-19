@@ -19,6 +19,7 @@ import { Tables } from "@/lib/types/database"
 import { useToast } from "@/hooks/use-toast"
 import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
+import { logSbError } from "@/utils/supabase/log"
 
 const optionalNumber = z.preprocess(
     (value) => (value === "" || value == null ? undefined : Number(value)),
@@ -133,7 +134,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                 secchi_disk: undefined,
             })
         } catch (error) {
-            console.error(error)
+            logSbError("dataEntry:waterQuality:submit", error)
             toast({
                 variant: "destructive",
                 title: "Error",

@@ -6,9 +6,9 @@ import { useRecommendedActions } from "@/lib/hooks/use-dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 
 const priorityStyles = {
-  High: "bg-rose-50 text-rose-700",
-  Medium: "bg-amber-50 text-amber-700",
-  Info: "bg-emerald-50 text-emerald-700",
+  High: "bg-destructive/15 text-destructive",
+  Medium: "bg-chart-4/15 text-chart-4",
+  Info: "bg-chart-2/15 text-chart-2",
 }
 
 export default function RecommendedActions({
@@ -61,7 +61,7 @@ export default function RecommendedActions({
             <p className="text-xs text-muted-foreground mt-3">{action.description}</p>
             <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
               <span>Due: {action.due}</span>
-              <button className="text-sidebar-primary font-semibold">Schedule</button>
+              <button className="cursor-pointer text-primary font-semibold hover:underline">Schedule</button>
             </div>
           </div>
         </div>

@@ -3,16 +3,22 @@
 import { useState } from "react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import FarmSelector from "@/components/shared/farm-selector"
+import { useSharedFilters } from "@/hooks/use-shared-filters"
 import FeedInventory from "@/components/inventory/feed-inventory"
 import FishInventory from "@/components/inventory/fish-inventory"
 import ReconciliationReport from "@/components/inventory/reconciliation-report"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function InventoryPage() {
-  const [activeTab, setActiveTab] = useState("feed")
-  const [selectedBatch, setSelectedBatch] = useState<string>("all")
-  const [selectedSystem, setSelectedSystem] = useState<string>("all")
-  const [selectedStage, setSelectedStage] = useState<"all" | "nursing" | "grow_out">("all")
+  const [activeTab, setActiveTab] = useState("fish")
+  const {
+    selectedBatch,
+    setSelectedBatch,
+    selectedSystem,
+    setSelectedSystem,
+    selectedStage,
+    setSelectedStage,
+  } = useSharedFilters()
 
   return (
     <DashboardLayout>
@@ -34,19 +40,11 @@ export default function InventoryPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
-            <TabsTrigger value="feed">Feed Stock</TabsTrigger>
+          <TabsList className="grid w-full max-w-2xl grid-cols-3">
             <TabsTrigger value="fish">Fish Inventory</TabsTrigger>
-            <TabsTrigger value="harvest">Harvest</TabsTrigger>
+            <TabsTrigger value="feed">Feed Stock</TabsTrigger>
+            <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="feed" className="mt-6">
-            <FeedInventory
-              selectedBatch={selectedBatch}
-              selectedSystem={selectedSystem}
-              selectedStage={selectedStage}
-            />
-          </TabsContent>
 
           <TabsContent value="fish" className="mt-6">
             <FishInventory
@@ -56,7 +54,15 @@ export default function InventoryPage() {
             />
           </TabsContent>
 
-          <TabsContent value="harvest" className="mt-6">
+          <TabsContent value="feed" className="mt-6">
+            <FeedInventory
+              selectedBatch={selectedBatch}
+              selectedSystem={selectedSystem}
+              selectedStage={selectedStage}
+            />
+          </TabsContent>
+
+          <TabsContent value="reconciliation" className="mt-6">
             <ReconciliationReport
               selectedBatch={selectedBatch}
               selectedSystem={selectedSystem}

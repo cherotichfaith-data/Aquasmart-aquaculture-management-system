@@ -8,9 +8,9 @@ type EfcrLastSamplingRow = Tables<"api_efcr_trend">
 
 type ProductionRpcArgs = {
   p_farm_id: string
-  p_system_id?: number | null
-  p_start_date?: string | null
-  p_end_date?: string | null
+  p_system_id?: number
+  p_start_date?: string
+  p_end_date?: string
 }
 
 const productionRpcArgs = (params: {
@@ -20,9 +20,9 @@ const productionRpcArgs = (params: {
   dateTo?: string
 }): ProductionRpcArgs => ({
   p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? null,
-  p_start_date: params.dateFrom ?? null,
-  p_end_date: params.dateTo ?? null,
+  p_system_id: params.systemId ?? undefined,
+  p_start_date: params.dateFrom ?? undefined,
+  p_end_date: params.dateTo ?? undefined,
 })
 
 export async function getProductionSummary(params?: {

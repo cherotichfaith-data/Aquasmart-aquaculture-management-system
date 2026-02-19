@@ -2,10 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query"
 import {
+  getBatchSystemIds,
   getFeedingRecords,
   getFeedIncomingWithType,
   getFeedTypes,
-  getHarvests,
   getMortalityData,
   getRecentEntries,
   getSamplingData,
@@ -31,16 +31,19 @@ export function useFeedTypes() {
 
 export function useFeedingRecords(params?: {
   systemId?: number
+  systemIds?: number[]
   batchId?: number
   dateFrom?: string
   dateTo?: string
   limit?: number
+  enabled?: boolean
 }) {
   return useQuery({
     queryKey: [
       "reports",
       "feeding-records",
       params?.systemId ?? "all",
+      params?.systemIds?.join(",") ?? "all-systems",
       params?.batchId ?? "all",
       params?.dateFrom ?? "",
       params?.dateTo ?? "",
@@ -48,6 +51,7 @@ export function useFeedingRecords(params?: {
     ],
     queryFn: ({ signal }) => getFeedingRecords({ ...params, signal }),
     staleTime: 5 * 60_000,
+    enabled: params?.enabled ?? true,
     placeholderData: (previous) => previous as typeof previous,
   })
 }
@@ -60,20 +64,21 @@ export function useSuppliers() {
   })
 }
 
-export function useHarvests(params?: { systemId?: number; batchId?: number; limit?: number }) {
-  return useQuery({
-    queryKey: ["reports", "harvests", params?.systemId ?? "all", params?.batchId ?? "all", params?.limit ?? 50],
-    queryFn: ({ signal }) => getHarvests({ ...params, signal }),
-    staleTime: 5 * 60_000,
-  })
-}
-
-export function useSamplingData(params?: { systemId?: number; batchId?: number; dateFrom?: string; dateTo?: string; limit?: number }) {
+export function useSamplingData(params?: {
+  systemId?: number
+  systemIds?: number[]
+  batchId?: number
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  enabled?: boolean
+}) {
   return useQuery({
     queryKey: [
       "reports",
       "sampling",
       params?.systemId ?? "all",
+      params?.systemIds?.join(",") ?? "all-systems",
       params?.batchId ?? "all",
       params?.dateFrom ?? "",
       params?.dateTo ?? "",
@@ -81,15 +86,25 @@ export function useSamplingData(params?: { systemId?: number; batchId?: number; 
     ],
     queryFn: ({ signal }) => getSamplingData({ ...params, signal }),
     staleTime: 5 * 60_000,
+    enabled: params?.enabled ?? true,
   })
 }
 
-export function useMortalityData(params?: { systemId?: number; batchId?: number; dateFrom?: string; dateTo?: string; limit?: number }) {
+export function useMortalityData(params?: {
+  systemId?: number
+  systemIds?: number[]
+  batchId?: number
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  enabled?: boolean
+}) {
   return useQuery({
     queryKey: [
       "reports",
       "mortality",
       params?.systemId ?? "all",
+      params?.systemIds?.join(",") ?? "all-systems",
       params?.batchId ?? "all",
       params?.dateFrom ?? "",
       params?.dateTo ?? "",
@@ -97,6 +112,7 @@ export function useMortalityData(params?: { systemId?: number; batchId?: number;
     ],
     queryFn: ({ signal }) => getMortalityData({ ...params, signal }),
     staleTime: 5 * 60_000,
+    enabled: params?.enabled ?? true,
   })
 }
 
@@ -104,6 +120,19 @@ export function useRecentEntries() {
   return useQuery({
     queryKey: ["reports", "recent-entries"],
     queryFn: ({ signal }) => getRecentEntries(signal),
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useBatchSystemIds(params?: { batchId?: number }) {
+  return useQuery({
+    queryKey: ["reports", "batch-system-ids", params?.batchId ?? "all"],
+    queryFn: ({ signal }) => {
+      if (!params?.batchId || !Number.isFinite(params.batchId)) {
+        return Promise.resolve({ status: "success" as const, data: [] as Array<{ system_id: number }> })
+      }
+      return getBatchSystemIds({ batchId: params.batchId, signal })
+    },
     staleTime: 5 * 60_000,
   })
 }

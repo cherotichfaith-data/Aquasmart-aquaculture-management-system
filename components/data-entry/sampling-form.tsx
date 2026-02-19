@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tables } from "@/lib/types/database"
 import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordSampling } from "@/lib/hooks/use-sampling"
+import { logSbError } from "@/utils/supabase/log"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -75,7 +76,7 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
                 batch_id: values.batch_id,
             })
         } catch (error) {
-            console.error(error)
+            logSbError("dataEntry:sampling:submit", error)
         }
     }
 

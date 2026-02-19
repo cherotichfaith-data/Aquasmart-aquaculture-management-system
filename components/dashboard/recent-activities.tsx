@@ -166,23 +166,23 @@ export default function RecentActivities({
   const getColor = (table: string) => {
     switch (normalizeTableName(table)) {
       case "feeding_record":
-        return "bg-sky-500/10 text-sky-600"
+        return "bg-chart-2/15 text-chart-2"
       case "fish_sampling_weight":
-        return "bg-purple-500/10 text-purple-600"
+        return "bg-chart-3/15 text-chart-3"
       case "water_quality_measurement":
-        return "bg-emerald-500/10 text-emerald-600"
+        return "bg-chart-2/15 text-chart-2"
       case "fish_mortality":
-        return "bg-rose-500/10 text-rose-600"
+        return "bg-destructive/15 text-destructive"
       case "fish_transfer":
-        return "bg-amber-500/10 text-amber-600"
+        return "bg-chart-4/15 text-chart-4"
       case "fish_harvest":
-        return "bg-lime-500/10 text-lime-600"
+        return "bg-chart-2/15 text-chart-2"
       case "feed_incoming":
-        return "bg-blue-500/10 text-blue-600"
+        return "bg-chart-3/15 text-chart-3"
       case "fish_stocking":
-        return "bg-indigo-500/10 text-indigo-600"
+        return "bg-chart-2/15 text-chart-2"
       default:
-        return "bg-slate-500/10 text-slate-600"
+        return "bg-muted text-muted-foreground"
     }
   }
 

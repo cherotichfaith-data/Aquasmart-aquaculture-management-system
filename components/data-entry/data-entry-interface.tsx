@@ -50,8 +50,8 @@ export function DataEntryInterface({ systems, suppliers, feeds, batches, recentE
 
     return (
         <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-6">
-            <aside className="w-full md:w-64 bg-card border rounded-lg overflow-hidden shrink-0 h-fit md:h-auto">
-                <div className="p-4 font-semibold border-b bg-muted/40">Data Entry</div>
+            <aside className="w-full md:w-64 bg-card border border-border/80 rounded-lg overflow-hidden shrink-0 h-fit md:h-auto shadow-sm">
+                <div className="p-4 font-semibold border-b border-border/80 bg-muted/60 text-foreground">Data Entry</div>
                 <ScrollArea className="h-[200px] md:h-full">
                     <div className="flex flex-col p-2 gap-1">
                         {sidebarItems.map((item) => (
@@ -60,7 +60,9 @@ export function DataEntryInterface({ systems, suppliers, feeds, batches, recentE
                                 onClick={() => setActiveTab(item.id)}
                                 className={cn(
                                     "text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer",
-                                    activeTab === item.id ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                                    activeTab === item.id
+                                        ? "bg-primary text-primary-foreground shadow-sm"
+                                        : "text-foreground/80 hover:text-foreground"
                                 )}
                             >
                                 {item.label}
@@ -70,7 +72,7 @@ export function DataEntryInterface({ systems, suppliers, feeds, batches, recentE
                 </ScrollArea>
             </aside>
 
-            <main className="flex-1 bg-card border rounded-lg p-6 overflow-y-auto shadow-sm">
+            <main className="flex-1 bg-card border border-border/80 rounded-lg p-6 overflow-y-auto shadow-sm">
                 {activeTab === "mortality" && (
                     <>
                         <MortalityForm systems={systems} batches={batches} />

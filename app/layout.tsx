@@ -1,6 +1,5 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider, ThemeProvider, QueryProvider } from "@/components/providers"
 import { ToastProvider } from "@/components/shared/toast-provider"
 import { InitialSplash } from "@/components/InitialSplash"
@@ -52,7 +51,6 @@ export default function RootLayout({
             </QueryProvider>
           </AuthProvider>
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )

@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tables } from "@/lib/types/database"
 import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
+import { logSbError } from "@/utils/supabase/log"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -76,7 +77,7 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
                 batch_id: values.batch_id,
             })
         } catch (error) {
-            console.error(error)
+            logSbError("dataEntry:harvest:submit", error)
         }
     }
 

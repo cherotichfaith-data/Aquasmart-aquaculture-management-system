@@ -14,8 +14,6 @@ interface KPICardProps {
   neutral?: boolean
   href?: string
   onClick?: () => void
-  tone?: "good" | "warn" | "bad" | "neutral"
-  badge?: string
 }
 
 const trendPaths = {
@@ -52,9 +50,9 @@ function Sparkline({
   }
 
   const stroke =
-    status === "negative" ? "stroke-[#F06474]" : status === "positive" ? "stroke-[#4C7DFF]" : "stroke-slate-300"
+    status === "negative" ? "stroke-destructive" : status === "positive" ? "stroke-chart-2" : "stroke-border"
   const fill =
-    status === "negative" ? "fill-[#FFE9ED]" : status === "positive" ? "fill-[#E9F1FF]" : "fill-slate-50"
+    status === "negative" ? "fill-destructive/15" : status === "positive" ? "fill-chart-2/15" : "fill-muted/50"
   const path = trendPaths[trendDirection]
 
   return (
@@ -74,8 +72,6 @@ function KPICardContent({
   formatUnit,
   invertTrend,
   neutral,
-  tone = "neutral",
-  badge,
 }: KPICardProps) {
   const formattedValue =
     average === null || average === undefined ? "--" : `${average.toFixed(decimals)}${formatUnit ? formatUnit : ""}`
@@ -101,41 +97,19 @@ function KPICardContent({
   }
 
   const toneStyles = {
-    positive: "text-emerald-600",
-    negative: "text-rose-600",
+    positive: "text-chart-2",
+    negative: "text-destructive",
     neutral: "text-muted-foreground",
-  }
-
-  const badgeTone = {
-    good: "bg-emerald-50 text-emerald-700",
-    warn: "bg-amber-50 text-amber-700",
-    bad: "bg-rose-50 text-rose-700",
-    neutral: "bg-slate-50 text-slate-600",
-  }
-
-  const accentTone = {
-    good: "bg-emerald-500",
-    warn: "bg-amber-500",
-    bad: "bg-rose-500",
-    neutral: "bg-slate-300",
   }
 
   const TrendIcon =
     trendDirection === "down" ? ArrowDownRight : trendDirection === "up" ? ArrowUpRight : Minus
 
   return (
-    <div className="cursor-pointer rounded-2xl border border-border bg-card px-4 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.06)] transition-all hover:shadow-[0_6px_16px_rgba(15,23,42,0.12)] text-left w-full">
-      <div className={`h-1.5 w-full rounded-full ${accentTone[tone]}`} />
-      <div className="flex items-center justify-between gap-3 mt-3">
+    <div className="w-full cursor-pointer rounded-2xl border border-border bg-card px-4 py-3 text-left shadow-sm transition-shadow hover:shadow-md">
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-            {badge ? (
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeTone[tone]}`}>
-                {badge}
-              </span>
-            ) : null}
-          </div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
           <p className="text-[20px] font-semibold text-foreground mt-2 leading-tight">{formattedValue}</p>
           {trendText && (
             <p className={`text-[11px] mt-2 inline-flex items-center gap-1 ${toneStyles[status]}`}>
@@ -161,8 +135,6 @@ export default function KPICard({
   formatUnit,
   invertTrend,
   neutral,
-  tone,
-  badge,
   href,
   onClick,
 }: KPICardProps) {
@@ -176,8 +148,6 @@ export default function KPICard({
       formatUnit={formatUnit}
       invertTrend={invertTrend}
       neutral={neutral}
-      tone={tone}
-      badge={badge}
     />
   )
 

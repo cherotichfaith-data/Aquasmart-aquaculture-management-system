@@ -22,7 +22,7 @@ export default function AuthErrorPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-600" />
+            <AlertCircle className="w-5 h-5 text-destructive" />
             <CardTitle>Auth Section Blocked</CardTitle>
           </div>
           <CardDescription>Authentication is temporarily unavailable</CardDescription>

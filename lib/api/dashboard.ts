@@ -1,45 +1,23 @@
-import type { Enums, Tables } from "@/lib/types/database"
+import type { Database, Enums, Tables } from "@/lib/types/database"
 import { parseDateToTimePeriod } from "@/lib/utils"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getDailyFishInventory } from "@/lib/api/inventory"
+import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type DashboardRow = Tables<"api_dashboard">
 type DashboardConsolidatedRow = Tables<"api_dashboard_consolidated">
 type DashboardTimeBoundsRow = Pick<DashboardConsolidatedRow, "input_start_date" | "input_end_date" | "time_period">
-export type DashboardSystemRpcRow = {
-  system_id: number
-  system_name: string | null
-  growth_stage: "nursing" | "grow out" | "grow_out" | string | null
-  input_start_date: string | null
-  input_end_date: string | null
-  as_of_date: string | null
-  sampling_end_date: string | null
-  sample_age_days: number | null
-  efcr: number | null
-  efcr_date: string | null
-  feed_total: number | null
-  abw: number | null
-  feeding_rate: number | null
-  mortality_rate: number | null
-  biomass_density: number | null
-  fish_end: number | null
-  biomass_end: number | null
-  missing_days_count: number | null
-  water_quality_rating_average: "optimal" | "acceptable" | "critical" | "lethal" | string | null
-  water_quality_rating_numeric_average: number | null
-  water_quality_latest_date: string | null
-  worst_parameter: string | null
-  worst_parameter_value: number | null
-  worst_parameter_unit: string | null
-}
+type DailyFishInventoryRow = Tables<"api_daily_fish_inventory">
+export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 
 type DashboardRpcArgs = {
   p_farm_id: string
-  p_system_id?: number | null
-  p_growth_stage?: string | null
-  p_start_date?: string | null
-  p_end_date?: string | null
-  p_time_period?: string | null
+  p_system_id?: number
+  p_growth_stage?: string
+  p_start_date?: string
+  p_end_date?: string
+  p_time_period?: string
 }
 
 const dashboardRpcArgs = (params: {
@@ -51,19 +29,19 @@ const dashboardRpcArgs = (params: {
   timePeriod?: Enums<"time_period"> | string
 }): DashboardRpcArgs => ({
   p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? null,
-  p_growth_stage: params.stage ?? null,
-  p_start_date: params.dateFrom ?? null,
-  p_end_date: params.dateTo ?? null,
-  p_time_period: params.timePeriod ?? null,
+  p_system_id: params.systemId ?? undefined,
+  p_growth_stage: params.stage ?? undefined,
+  p_start_date: params.dateFrom ?? undefined,
+  p_end_date: params.dateTo ?? undefined,
+  p_time_period: params.timePeriod ?? undefined,
 })
 
 type DashboardConsolidatedRpcArgs = {
   p_farm_id: string
-  p_system_id?: number | null
-  p_start_date?: string | null
-  p_end_date?: string | null
-  p_time_period?: string | null
+  p_system_id?: number
+  p_start_date?: string
+  p_end_date?: string
+  p_time_period?: string
 }
 
 const dashboardConsolidatedRpcArgs = (params: {
@@ -74,18 +52,18 @@ const dashboardConsolidatedRpcArgs = (params: {
   timePeriod?: Enums<"time_period"> | string
 }): DashboardConsolidatedRpcArgs => ({
   p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? null,
-  p_start_date: params.dateFrom ?? null,
-  p_end_date: params.dateTo ?? null,
-  p_time_period: params.timePeriod ?? null,
+  p_system_id: params.systemId ?? undefined,
+  p_start_date: params.dateFrom ?? undefined,
+  p_end_date: params.dateTo ?? undefined,
+  p_time_period: params.timePeriod ?? undefined,
 })
 
 type DashboardSystemsRpcArgs = {
   p_farm_id: string
-  p_stage?: Enums<"system_growth_stage"> | null
-  p_system_id?: number | null
-  p_start_date?: string | null
-  p_end_date?: string | null
+  p_stage?: Enums<"system_growth_stage">
+  p_system_id?: number
+  p_start_date?: string
+  p_end_date?: string
 }
 
 const dashboardSystemsRpcArgs = (params: {
@@ -96,10 +74,10 @@ const dashboardSystemsRpcArgs = (params: {
   dateTo?: string | null
 }): DashboardSystemsRpcArgs => ({
   p_farm_id: params.farmId,
-  p_stage: params.stage ?? null,
-  p_system_id: params.systemId ?? null,
-  p_start_date: params.dateFrom ?? null,
-  p_end_date: params.dateTo ?? null,
+  p_stage: params.stage ?? undefined,
+  p_system_id: params.systemId ?? undefined,
+  p_start_date: params.dateFrom ?? undefined,
+  p_end_date: params.dateTo ?? undefined,
 })
 
 const isAbortLikeError = (err: unknown): boolean => {
@@ -108,6 +86,107 @@ const isAbortLikeError = (err: unknown): boolean => {
   const name = String(e.name ?? "").toLowerCase()
   const message = String(e.message ?? "").toLowerCase()
   return name.includes("abort") || message.includes("abort") || message.includes("canceled")
+}
+
+const isQuietDashboardError = (err: unknown): boolean =>
+  isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
+
+const shouldBackfillRate = (value: number | null | undefined): boolean =>
+  value == null || !Number.isFinite(value) || value === 0
+
+const deriveFeedingRate = (row: DailyFishInventoryRow): number | null => {
+  if (typeof row.feeding_rate === "number" && Number.isFinite(row.feeding_rate) && row.feeding_rate > 0) {
+    return row.feeding_rate
+  }
+  if (
+    typeof row.feeding_amount === "number" &&
+    Number.isFinite(row.feeding_amount) &&
+    typeof row.biomass_last_sampling === "number" &&
+    Number.isFinite(row.biomass_last_sampling) &&
+    row.biomass_last_sampling > 0
+  ) {
+    const derived = (row.feeding_amount * 1000) / row.biomass_last_sampling
+    return Number.isFinite(derived) && derived > 0 ? derived : null
+  }
+  return null
+}
+
+const deriveMortalityRate = (row: DailyFishInventoryRow): number | null => {
+  if (typeof row.mortality_rate === "number" && Number.isFinite(row.mortality_rate) && row.mortality_rate > 0) {
+    return row.mortality_rate
+  }
+  if (
+    typeof row.number_of_fish_mortality === "number" &&
+    Number.isFinite(row.number_of_fish_mortality) &&
+    typeof row.number_of_fish === "number" &&
+    Number.isFinite(row.number_of_fish) &&
+    row.number_of_fish > 0
+  ) {
+    const derived = row.number_of_fish_mortality / row.number_of_fish
+    return Number.isFinite(derived) && derived > 0 ? derived : null
+  }
+  return null
+}
+
+const computeAggregateRateFallbacks = (rows: DailyFishInventoryRow[]) => {
+  let feedingWeighted = 0
+  let feedingWeight = 0
+  let mortalityWeighted = 0
+  let mortalityWeight = 0
+
+  rows.forEach((row) => {
+    const feedingRate = deriveFeedingRate(row)
+    const mortalityRate = deriveMortalityRate(row)
+
+    if (feedingRate != null && typeof row.biomass_last_sampling === "number" && row.biomass_last_sampling > 0) {
+      feedingWeighted += feedingRate * row.biomass_last_sampling
+      feedingWeight += row.biomass_last_sampling
+    }
+    if (mortalityRate != null && typeof row.number_of_fish === "number" && row.number_of_fish > 0) {
+      mortalityWeighted += mortalityRate * row.number_of_fish
+      mortalityWeight += row.number_of_fish
+    }
+  })
+
+  return {
+    feedingRate: feedingWeight > 0 ? feedingWeighted / feedingWeight : null,
+    mortalityRate: mortalityWeight > 0 ? mortalityWeighted / mortalityWeight : null,
+  }
+}
+
+const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
+  const map = new Map<number, { feedingWeighted: number; feedingWeight: number; mortalityWeighted: number; mortalityWeight: number }>()
+
+  rows.forEach((row) => {
+    if (typeof row.system_id !== "number" || !Number.isFinite(row.system_id)) return
+    const current = map.get(row.system_id) ?? {
+      feedingWeighted: 0,
+      feedingWeight: 0,
+      mortalityWeighted: 0,
+      mortalityWeight: 0,
+    }
+    const feedingRate = deriveFeedingRate(row)
+    const mortalityRate = deriveMortalityRate(row)
+
+    if (feedingRate != null && typeof row.biomass_last_sampling === "number" && row.biomass_last_sampling > 0) {
+      current.feedingWeighted += feedingRate * row.biomass_last_sampling
+      current.feedingWeight += row.biomass_last_sampling
+    }
+    if (mortalityRate != null && typeof row.number_of_fish === "number" && row.number_of_fish > 0) {
+      current.mortalityWeighted += mortalityRate * row.number_of_fish
+      current.mortalityWeight += row.number_of_fish
+    }
+    map.set(row.system_id, current)
+  })
+
+  const resolved = new Map<number, { feedingRate: number | null; mortalityRate: number | null }>()
+  map.forEach((value, key) => {
+    resolved.set(key, {
+      feedingRate: value.feedingWeight > 0 ? value.feedingWeighted / value.feedingWeight : null,
+      mortalityRate: value.mortalityWeight > 0 ? value.mortalityWeighted / value.mortalityWeight : null,
+    })
+  })
+  return resolved
 }
 
 export async function getDashboardSnapshot(params?: {
@@ -146,7 +225,28 @@ export async function getDashboardSnapshot(params?: {
   }
 
   const rows = (data ?? []) as DashboardRow[]
-  return rows[0] ?? null
+  const row = rows[0] ?? null
+  if (!row) return null
+  if (!shouldBackfillRate(row.feeding_rate) && !shouldBackfillRate(row.mortality_rate)) return row
+
+  const bounds = await getTimePeriodBounds(params?.timePeriod ?? "2 weeks", params?.signal, params?.farmId ?? null)
+  const inventoryResult = await getDailyFishInventory({
+    farmId: params.farmId,
+    systemId: params.systemId,
+    dateFrom: bounds.start ?? undefined,
+    dateTo: bounds.end ?? undefined,
+    limit: 5000,
+    signal: params?.signal,
+  })
+  if (inventoryResult.status !== "success") return row
+  const fallback = computeAggregateRateFallbacks(inventoryResult.data)
+
+  return {
+    ...row,
+    feeding_rate: shouldBackfillRate(row.feeding_rate) && fallback.feedingRate != null ? fallback.feedingRate : row.feeding_rate,
+    mortality_rate:
+      shouldBackfillRate(row.mortality_rate) && fallback.mortalityRate != null ? fallback.mortalityRate : row.mortality_rate,
+  }
 }
 
 export async function getDashboardConsolidatedSnapshot(params?: {
@@ -176,12 +276,35 @@ export async function getDashboardConsolidatedSnapshot(params?: {
 
   const { data, error } = await query
   if (error) {
+    if (isQuietDashboardError(error)) {
+      return null
+    }
     toQueryError("getDashboardConsolidatedSnapshot", error)
     return null
   }
 
   const rows = (data ?? []) as DashboardConsolidatedRow[]
-  return rows[0] ?? null
+  const row = rows[0] ?? null
+  if (!row) return null
+  if (!shouldBackfillRate(row.feeding_rate) && !shouldBackfillRate(row.mortality_rate)) return row
+
+  const bounds = await getTimePeriodBounds(params?.timePeriod ?? "2 weeks", params?.signal, params?.farmId ?? null)
+  const inventoryResult = await getDailyFishInventory({
+    farmId: params.farmId,
+    dateFrom: bounds.start ?? undefined,
+    dateTo: bounds.end ?? undefined,
+    limit: 10000,
+    signal: params?.signal,
+  })
+  if (inventoryResult.status !== "success") return row
+  const fallback = computeAggregateRateFallbacks(inventoryResult.data)
+
+  return {
+    ...row,
+    feeding_rate: shouldBackfillRate(row.feeding_rate) && fallback.feedingRate != null ? fallback.feedingRate : row.feeding_rate,
+    mortality_rate:
+      shouldBackfillRate(row.mortality_rate) && fallback.mortalityRate != null ? fallback.mortalityRate : row.mortality_rate,
+  }
 }
 
 export async function getDashboardSystems(params?: {
@@ -201,10 +324,10 @@ export async function getDashboardSystems(params?: {
 
   let query = supabase.rpc("api_dashboard_systems", dashboardSystemsRpcArgs({
       farmId: params.farmId,
-      stage: params.stage ?? null,
-      systemId: params.systemId ?? null,
-      dateFrom: params.dateFrom ?? null,
-      dateTo: params.dateTo ?? null,
+      stage: params.stage ?? undefined,
+      systemId: params.systemId ?? undefined,
+      dateFrom: params.dateFrom ?? undefined,
+      dateTo: params.dateTo ?? undefined,
     }))
   if (params?.signal) query = query.abortSignal(params.signal)
 
@@ -212,7 +335,35 @@ export async function getDashboardSystems(params?: {
   if (params?.signal?.aborted) return toQuerySuccess<DashboardSystemRpcRow>([])
   if (error && isAbortLikeError(error)) return toQuerySuccess<DashboardSystemRpcRow>([])
   if (error) return toQueryError("getDashboardSystems", error)
-  return toQuerySuccess<DashboardSystemRpcRow>((data ?? []) as DashboardSystemRpcRow[])
+  const rows = (data ?? []) as DashboardSystemRpcRow[]
+  if (!rows.some((row) => shouldBackfillRate(row.feeding_rate) || shouldBackfillRate(row.mortality_rate))) {
+    return toQuerySuccess<DashboardSystemRpcRow>(rows)
+  }
+
+  const inventoryResult = await getDailyFishInventory({
+    farmId: params.farmId,
+    dateFrom: params.dateFrom ?? undefined,
+    dateTo: params.dateTo ?? undefined,
+    limit: 10000,
+    signal: params?.signal,
+  })
+  if (inventoryResult.status !== "success") {
+    return toQuerySuccess<DashboardSystemRpcRow>(rows)
+  }
+  const perSystemFallback = computePerSystemRateFallbacks(inventoryResult.data)
+  const normalized = rows.map((row) => {
+    const fallback = perSystemFallback.get(row.system_id)
+    return {
+      ...row,
+      feeding_rate:
+        shouldBackfillRate(row.feeding_rate) && fallback?.feedingRate != null ? fallback.feedingRate : row.feeding_rate,
+      mortality_rate:
+        shouldBackfillRate(row.mortality_rate) && fallback?.mortalityRate != null
+          ? fallback.mortalityRate
+          : row.mortality_rate,
+    }
+  })
+  return toQuerySuccess<DashboardSystemRpcRow>(normalized)
 }
 
 export async function getTimePeriodBounds(

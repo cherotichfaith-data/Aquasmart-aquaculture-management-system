@@ -1,13 +1,22 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { Suspense, lazy, useEffect, useRef, useState } from "react"
+import { Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
 import { createClient } from "@/utils/supabase/client"
+
+const Dithering = lazy(() =>
+  import("@paper-design/shaders-react").then((mod) => ({ default: mod.Dithering })),
+)
 
 export default function AuthPage() {
   const supabase = createClient()
   const router = useRouter()
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin")
@@ -17,6 +26,7 @@ export default function AuthPage() {
   >([])
   const isLoading = loadingButton !== null
   const toastId = useRef(0)
+  const isDark = mounted && resolvedTheme === "dark"
 
   const addToast = (toast: { title?: string; description?: string; variant?: "success" | "error" | "warning" }) => {
     toastId.current += 1
@@ -130,12 +140,17 @@ export default function AuthPage() {
         description: "Check inbox/spam for the confirmation email.",
         variant: "success",
       })
-    } catch (err: any) {
-      addToast({ title: "Unexpected Error", description: err?.message ?? "Try again.", variant: "error" })
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Try again."
+      addToast({ title: "Unexpected Error", description: errorMessage, variant: "error" })
     } finally {
       setLoadingButton(null)
     }
   }
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -149,7 +164,28 @@ export default function AuthPage() {
   }, [])
 
   return (
-    <div className="auth-page">
+    <div className="auth-page" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+      <button
+        type="button"
+        className="theme-toggle-btn"
+        onClick={() => setTheme(isDark ? "light" : "dark")}
+        aria-label={mounted ? (isDark ? "Switch to light mode" : "Switch to dark mode") : "Toggle theme"}
+      >
+        {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+      <Suspense fallback={<div className="absolute inset-0 bg-muted/20 pointer-events-none" />}>
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-35 dark:opacity-30 mix-blend-multiply dark:mix-blend-screen">
+          <Dithering
+            colorBack="#00000000"
+            colorFront={isDark ? "#34D399" : "#22C55E"}
+            shape="warp"
+            type="4x4"
+            speed={isHovered ? 0.6 : 0.2}
+            className="size-full"
+            minPixelRatio={1}
+          />
+        </div>
+      </Suspense>
       <style jsx global>{`
         @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
@@ -164,21 +200,13 @@ export default function AuthPage() {
           font-family: "Inter", sans-serif;
           min-height: 100vh;
           overflow: hidden;
-          background: #0a1628;
-          color: #f8fafc;
+          background: var(--background);
+          color: var(--foreground);
           position: relative;
         }
 
         .auth-page::before {
-          content: "";
-          position: fixed;
-          inset: 0;
-          background:
-            radial-gradient(ellipse at 20% 30%, rgba(45, 212, 191, 0.15) 0%, transparent 50%),
-            radial-gradient(ellipse at 80% 70%, rgba(14, 165, 233, 0.12) 0%, transparent 50%),
-            radial-gradient(circle at 50% 50%, rgba(26, 58, 82, 0.75) 0%, #0a1628 100%);
-          z-index: -1;
-          animation: waterFlow 18s ease-in-out infinite;
+          display: none;
         }
 
         @keyframes waterFlow {
@@ -197,6 +225,30 @@ export default function AuthPage() {
           display: flex;
           min-height: 100vh;
           width: 100%;
+        }
+
+        .theme-toggle-btn {
+          position: fixed;
+          top: 1rem;
+          right: 1rem;
+          z-index: 1200;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 2.25rem;
+          height: 2.25rem;
+          border-radius: 999px;
+          border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--card) 92%, transparent);
+          color: var(--foreground);
+          cursor: pointer;
+          backdrop-filter: blur(8px);
+          transition: all 0.2s ease;
+        }
+
+        .theme-toggle-btn:hover {
+          background: var(--accent);
+          color: var(--accent-foreground);
         }
 
         .toast-container {
@@ -230,23 +282,23 @@ export default function AuthPage() {
           width: 100%;
           overflow: hidden;
           border-radius: 0.75rem;
-          border: 1px solid rgba(45, 212, 191, 0.25);
-          background: rgba(10, 22, 40, 0.75);
+          border: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
+          background: color-mix(in srgb, var(--primary) 72%, transparent);
           backdrop-filter: blur(12px);
           padding: 1rem 2rem 1rem 1rem;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+          box-shadow: 0 10px 40px color-mix(in srgb, var(--foreground) 25%, transparent);
           animation: slideIn 0.3s ease-out;
           transition: all 0.3s;
         }
 
         .toast.success {
-          border-color: rgba(110, 231, 183, 0.9);
+          border-color: color-mix(in srgb, var(--accent) 90%, transparent);
         }
         .toast.error {
-          border-color: rgba(249, 115, 22, 0.9);
+          border-color: color-mix(in srgb, var(--destructive) 90%, transparent);
         }
         .toast.warning {
-          border-color: rgba(254, 243, 199, 0.9);
+          border-color: color-mix(in srgb, var(--secondary) 90%, transparent);
         }
 
         @keyframes slideIn {
@@ -267,12 +319,12 @@ export default function AuthPage() {
           font-size: 0.875rem;
           font-weight: 700;
           margin-bottom: 0.25rem;
-          color: #f8fafc;
+          color: var(--foreground);
         }
         .toast-description {
           font-size: 0.875rem;
           opacity: 0.9;
-          color: rgba(248, 250, 252, 0.78);
+          color: color-mix(in srgb, var(--foreground) 78%, transparent);
         }
 
         .toast-close {
@@ -286,7 +338,7 @@ export default function AuthPage() {
           opacity: 0;
           transition: opacity 0.2s;
           font-size: 1.25rem;
-          color: #f8fafc;
+          color: var(--foreground);
         }
         .toast:hover .toast-close {
           opacity: 0.7;
@@ -316,11 +368,11 @@ export default function AuthPage() {
         }
 
         .login-card {
-          background: rgba(26, 58, 82, 0.55);
+          background: color-mix(in srgb, var(--card) 55%, transparent);
           border-radius: 18px;
           padding: 3rem 2.5rem;
-          box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
-          border: 1px solid rgba(45, 212, 191, 0.25);
+          box-shadow: 0 18px 60px color-mix(in srgb, var(--foreground) 25%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
           backdrop-filter: blur(12px);
           max-width: 460px;
           width: 100%;
@@ -347,12 +399,12 @@ export default function AuthPage() {
         .logo-icon {
           width: 36px;
           height: 36px;
-          color: #2dd4bf;
+          color: var(--primary);
         }
         .logo-text {
           font-size: 1.6rem;
           font-weight: 800;
-          color: #2dd4bf;
+          color: var(--primary);
           letter-spacing: -0.6px;
         }
 
@@ -364,27 +416,27 @@ export default function AuthPage() {
           border-radius: 999px;
           font-size: 0.8rem;
           font-weight: 700;
-          color: rgba(248, 250, 252, 0.9);
-          border: 1px solid rgba(14, 165, 233, 0.25);
-          background: rgba(14, 165, 233, 0.1);
+          color: color-mix(in srgb, var(--foreground) 90%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
+          background: color-mix(in srgb, var(--primary) 45%, transparent);
           margin-bottom: 1.25rem;
         }
         .pill-dot {
           width: 8px;
           height: 8px;
           border-radius: 999px;
-          background: #6ee7b7;
-          box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.14);
+          background: color-mix(in srgb, var(--primary) 25%, transparent);
+          box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 20%, transparent);
         }
 
         .login-header h2 {
           font-size: 1.1rem;
           font-weight: 800;
           margin-bottom: 0.5rem;
-          color: #f8fafc;
+          color: var(--foreground);
         }
         .login-header p {
-          color: rgba(248, 250, 252, 0.78);
+          color: color-mix(in srgb, var(--foreground) 78%, transparent);
           font-size: 0.95rem;
           margin-bottom: 1.8rem;
           line-height: 1.55;
@@ -397,7 +449,7 @@ export default function AuthPage() {
           display: block;
           font-size: 0.9rem;
           font-weight: 700;
-          color: rgba(248, 250, 252, 0.9);
+          color: color-mix(in srgb, var(--foreground) 90%, transparent);
           margin-bottom: 0.5rem;
         }
 
@@ -405,24 +457,24 @@ export default function AuthPage() {
           width: 100%;
           padding: 0.9rem 1rem;
           font-size: 0.95rem;
-          color: #f8fafc;
-          background: rgba(10, 22, 40, 0.55);
-          border: 1px solid rgba(248, 250, 252, 0.1);
+          color: var(--foreground);
+          background: color-mix(in srgb, var(--background) 55%, transparent);
+          border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
           border-radius: 10px;
           transition: all 0.25s;
           font-family: inherit;
         }
         .form-input::placeholder {
-          color: rgba(248, 250, 252, 0.45);
+          color: color-mix(in srgb, var(--foreground) 45%, transparent);
         }
         .form-input:focus {
           outline: none;
-          background: rgba(10, 22, 40, 0.75);
-          border-color: rgba(45, 212, 191, 0.65);
-          box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.12);
+          background: color-mix(in srgb, var(--background) 75%, transparent);
+          border-color: color-mix(in srgb, var(--primary) 90%, transparent);
+          box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent);
         }
         .form-input:hover:not(:focus) {
-          border-color: rgba(14, 165, 233, 0.55);
+          border-color: color-mix(in srgb, var(--primary) 65%, transparent);
         }
 
         .hint-row {
@@ -435,11 +487,11 @@ export default function AuthPage() {
         }
         .hint {
           font-size: 0.85rem;
-          color: rgba(248, 250, 252, 0.68);
+          color: color-mix(in srgb, var(--foreground) 68%, transparent);
         }
 
         .link {
-          color: #2dd4bf;
+          color: var(--primary);
           text-decoration: none;
           font-size: 0.875rem;
           font-weight: 700;
@@ -455,18 +507,19 @@ export default function AuthPage() {
           padding: 1rem;
           font-size: 1rem;
           font-weight: 800;
-          color: #0a1628;
-          background: linear-gradient(135deg, #2dd4bf, #0ea5e9);
+          color: var(--primary-foreground);
+          background: var(--primary);
           border: none;
           border-radius: 12px;
           cursor: pointer;
           transition: all 0.25s;
           margin-top: 1.1rem;
-          box-shadow: 0 12px 28px rgba(45, 212, 191, 0.22);
+          box-shadow: 0 12px 28px color-mix(in srgb, var(--primary) 40%, transparent);
         }
         .sign-in-btn:hover {
+          background: color-mix(in srgb, var(--primary) 90%, transparent);
           transform: translateY(-2px);
-          box-shadow: 0 18px 36px rgba(14, 165, 233, 0.22);
+          box-shadow: 0 18px 36px color-mix(in srgb, var(--primary) 45%, transparent);
         }
         .sign-in-btn:active {
           transform: translateY(0);
@@ -482,15 +535,15 @@ export default function AuthPage() {
           padding: 0.95rem 1rem;
           font-size: 0.95rem;
           font-weight: 800;
-          color: rgba(248, 250, 252, 0.92);
-          background: rgba(14, 165, 233, 0.12);
-          border: 1px solid rgba(14, 165, 233, 0.25);
+          color: color-mix(in srgb, var(--foreground) 92%, transparent);
+          background: color-mix(in srgb, var(--primary) 25%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary) 60%, transparent);
           border-radius: 12px;
           cursor: pointer;
           transition: all 0.2s;
         }
         .alt-btn:hover {
-          background: rgba(14, 165, 233, 0.18);
+          background: color-mix(in srgb, var(--primary) 35%, transparent);
         }
 
         .divider {
@@ -498,7 +551,7 @@ export default function AuthPage() {
           align-items: center;
           gap: 0.75rem;
           margin: 1.1rem 0 0.9rem;
-          color: rgba(248, 250, 252, 0.55);
+          color: color-mix(in srgb, var(--foreground) 55%, transparent);
           font-size: 0.85rem;
         }
         .divider::before,
@@ -506,7 +559,7 @@ export default function AuthPage() {
           content: "";
           flex: 1;
           height: 1px;
-          background: rgba(248, 250, 252, 0.12);
+          background: color-mix(in srgb, var(--foreground) 12%, transparent);
         }
 
         .btn-loading {
@@ -523,9 +576,9 @@ export default function AuthPage() {
           left: 50%;
           margin-left: -8px;
           margin-top: -8px;
-          border: 2px solid rgba(10, 22, 40, 0.25);
+          border: 2px solid color-mix(in srgb, var(--background) 25%, transparent);
           border-radius: 50%;
-          border-top-color: rgba(10, 22, 40, 0.9);
+          border-top-color: color-mix(in srgb, var(--background) 90%, transparent);
           animation: spinner 0.6s linear infinite;
         }
         @keyframes spinner {
@@ -538,10 +591,10 @@ export default function AuthPage() {
           text-align: center;
           margin-top: 1.25rem;
           font-size: 0.9rem;
-          color: rgba(248, 250, 252, 0.72);
+          color: color-mix(in srgb, var(--foreground) 72%, transparent);
         }
         .signup-link a {
-          color: #2dd4bf;
+          color: color-mix(in srgb, var(--primary) 25%, transparent);
           text-decoration: none;
           font-weight: 800;
         }
@@ -556,10 +609,10 @@ export default function AuthPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(135deg, rgba(26, 58, 82, 0.92), rgba(10, 22, 40, 0.92));
+          background: color-mix(in srgb, var(--primary) 55%, transparent);
           overflow: hidden;
           animation: slideInRight 0.6s ease-out;
-          border-left: 1px solid rgba(45, 212, 191, 0.15);
+          border-left: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
         }
 
         @keyframes slideInRight {
@@ -578,16 +631,18 @@ export default function AuthPage() {
           position: absolute;
           inset: 0;
           background-image:
-            radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
-            radial-gradient(circle at 80% 70%, rgba(14, 165, 233, 0.12) 0%, transparent 50%);
+            radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--foreground) 5%, transparent) 0%, transparent 50%),
+            radial-gradient(circle at 80% 70%, color-mix(in srgb, var(--primary) 35%, transparent) 0%, transparent 50%);
           opacity: 0.9;
         }
         .hero-section::after {
           content: "";
           position: absolute;
           inset: 0;
-          background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' opacity='0.05'><path d='M20 80 C 20 55, 70 55, 90 80 C 70 105, 20 105, 20 80 Z' fill='white'/><path d='M90 80 L 120 62 M90 80 L 120 98' stroke='white' stroke-width='4' fill='none'/><circle cx='42' cy='76' r='5' fill='white'/><path d='M0 170 C 40 150, 80 190, 120 170 S 200 190, 240 170' stroke='white' stroke-width='5' fill='none' stroke-linecap='round'/></svg>");
-          background-size: 220px 220px;
+          background-image:
+            radial-gradient(circle at 10% 20%, color-mix(in srgb, var(--foreground) 3.5%, transparent) 0 3px, transparent 4px),
+            radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--foreground) 3%, transparent) 0 2px, transparent 3px);
+          background-size: 220px 220px, 180px 180px;
           animation: pattern 55s linear infinite;
         }
         @keyframes pattern {
@@ -623,15 +678,12 @@ export default function AuthPage() {
           font-weight: 900;
           margin-bottom: 1.25rem;
           line-height: 1.15;
-          background: linear-gradient(135deg, #2dd4bf, #6ee7b7, #0ea5e9);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          color: color-mix(in srgb, var(--foreground) 95%, transparent);
           letter-spacing: -0.5px;
         }
         .hero-content p {
           font-size: clamp(1rem, 2vw, 1.15rem);
-          color: rgba(248, 250, 252, 0.88);
+          color: color-mix(in srgb, var(--foreground) 88%, transparent);
           line-height: 1.7;
           font-weight: 500;
         }
@@ -643,8 +695,8 @@ export default function AuthPage() {
           gap: 0.8rem;
         }
         .hero-item {
-          background: rgba(248, 250, 252, 0.06);
-          border: 1px solid rgba(248, 250, 252, 0.1);
+          background: color-mix(in srgb, var(--foreground) 6%, transparent);
+          border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
           border-radius: 14px;
           padding: 0.85rem 0.9rem;
           backdrop-filter: blur(8px);
@@ -656,7 +708,7 @@ export default function AuthPage() {
         }
         .hero-item span {
           font-size: 0.85rem;
-          color: rgba(248, 250, 252, 0.82);
+          color: color-mix(in srgb, var(--foreground) 82%, transparent);
         }
 
         @media (max-width: 1024px) {
@@ -846,3 +898,4 @@ export default function AuthPage() {
     </div>
   )
 }
+

@@ -18,11 +18,31 @@ import { useDashboardConsolidatedSnapshot } from "@/lib/hooks/use-dashboard"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
+import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import type { Enums } from "@/lib/types/database"
 
-export default function PerformanceReport({ dateRange }: { dateRange?: { from: string; to: string } }) {
+const formatDateLabel = (value: string | number) => {
+  const parsed = new Date(String(value))
+  if (Number.isNaN(parsed.getTime())) return String(value)
+  return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(parsed)
+}
+
+export default function PerformanceReport({
+  dateRange,
+  systemId,
+  stage,
+  farmName,
+}: {
+  dateRange?: { from: string; to: string }
+  systemId?: number
+  stage?: "all" | Enums<"system_growth_stage">
+  farmName?: string | null
+}) {
   const { farmId } = useActiveFarm()
   const summaryQuery = useDashboardConsolidatedSnapshot({ farmId: farmId ?? null })
   const productionSummaryQuery = useProductionSummary({
+    systemId,
+    stage: stage && stage !== "all" ? stage : undefined,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     farmId: farmId ?? null,
@@ -30,7 +50,70 @@ export default function PerformanceReport({ dateRange }: { dateRange?: { from: s
   const summary = summaryQuery.data ?? null
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const loading = summaryQuery.isLoading || productionSummaryQuery.isLoading
-  const chartRows = useMemo(() => sortByDateAsc(rows, (row) => row.date), [rows])
+  const chartRows = useMemo(() => {
+    const byDate = new Map<string, { totalBiomass: number; weightedEfcr: number; efcrWeight: number; efcrFallback: number; efcrCount: number }>()
+    rows.forEach((row) => {
+      if (!row.date) return
+      const current = byDate.get(row.date) ?? { totalBiomass: 0, weightedEfcr: 0, efcrWeight: 0, efcrFallback: 0, efcrCount: 0 }
+      current.totalBiomass += row.total_biomass ?? 0
+      if (typeof row.efcr_period === "number") {
+        const weight = row.total_feed_amount_period ?? 0
+        if (weight > 0) {
+          current.weightedEfcr += row.efcr_period * weight
+          current.efcrWeight += weight
+        } else {
+          current.efcrFallback += row.efcr_period
+          current.efcrCount += 1
+        }
+      }
+      byDate.set(row.date, current)
+    })
+
+    return sortByDateAsc(
+      Array.from(byDate.entries()).map(([date, current]) => ({
+        date,
+        efcr_period:
+          current.efcrWeight > 0
+            ? current.weightedEfcr / current.efcrWeight
+            : current.efcrCount > 0
+              ? current.efcrFallback / current.efcrCount
+              : null,
+        total_biomass: current.totalBiomass,
+      })),
+      (row) => row.date,
+    )
+  }, [rows])
+  const latestBySystemRows = useMemo(() => {
+    const bySystem = new Map<number, (typeof rows)[number]>()
+    rows.forEach((row) => {
+      if (row.system_id == null || !row.date) return
+      const current = bySystem.get(row.system_id)
+      if (!current || String(row.date) > String(current.date ?? "")) {
+        bySystem.set(row.system_id, row)
+      }
+    })
+    return Array.from(bySystem.values())
+  }, [rows])
+  const efcrBenchmark = 1.5
+  const mortalityBenchmark = 0.02
+
+  const benchmarkRows = useMemo(() => {
+    if (!summary) return []
+    return [
+      {
+        metric: "eFCR",
+        actual: summary.efcr_period_consolidated,
+        benchmark: efcrBenchmark,
+        status: typeof summary.efcr_period_consolidated === "number" && summary.efcr_period_consolidated <= efcrBenchmark ? "On target" : "Needs attention",
+      },
+      {
+        metric: "Mortality Rate",
+        actual: summary.mortality_rate,
+        benchmark: mortalityBenchmark,
+        status: typeof summary.mortality_rate === "number" && summary.mortality_rate <= mortalityBenchmark ? "On target" : "Needs attention",
+      },
+    ]
+  }, [summary])
 
   return (
     <div className="space-y-6">
@@ -82,24 +165,36 @@ export default function PerformanceReport({ dateRange }: { dateRange?: { from: s
           {loading ? (
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartRows}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
-                <Tooltip />
-                <Legend />
-                <Line yAxisId="left" type="monotone" dataKey="efcr_period" stroke="var(--color-chart-1)" name="eFCR" />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="total_biomass"
-                  stroke="var(--color-chart-2)"
-                  name="Biomass (kg)"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartRows}>
+                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
+                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip
+                    labelFormatter={formatDateLabel}
+                    formatter={(value, name) => {
+                      if (String(name).toLowerCase().includes("efcr")) {
+                        return [Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), String(name)]
+                      }
+                      return [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`, String(name)]
+                    }}
+                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
+                  />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="efcr_period" stroke="var(--color-chart-1)" strokeWidth={2.4} name="eFCR" />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="total_biomass"
+                    stroke="var(--color-chart-2)"
+                    strokeWidth={2.4}
+                    name="Biomass (kg)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -113,34 +208,124 @@ export default function PerformanceReport({ dateRange }: { dateRange?: { from: s
           {loading ? (
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={rows}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="system_name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="total_biomass" fill="var(--color-chart-1)" name="Biomass (kg)" />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={latestBySystemRows}>
+                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
+                  <XAxis dataKey="system_name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value, name) => [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`, String(name)]}
+                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
+                  />
+                  <Legend />
+                  <Bar dataKey="total_biomass" fill="var(--color-chart-1)" name="Biomass (kg)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Performance Records</CardTitle>
+          <CardTitle>Benchmarks</CardTitle>
+          <CardDescription>Template benchmark checks for operational reporting.</CardDescription>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-md border border-border/80">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60">
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Metric</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Actual</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Benchmark</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {benchmarkRows.map((row) => (
+                  <tr key={row.metric} className="border-b border-border/70">
+                    <td className="px-4 py-2">{row.metric}</td>
+                    <td className="px-4 py-2">{row.actual ?? "N/A"}</td>
+                    <td className="px-4 py-2">{row.benchmark}</td>
+                    <td className="px-4 py-2">{row.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle>Performance Records</CardTitle>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                onClick={() =>
+                  downloadCsv({
+                    filename: `performance-report-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
+                    headers: ["date", "system_name", "efcr_period", "total_biomass", "daily_mortality_count", "efcr_aggregated"],
+                    rows: rows.map((row) => [
+                      row.date,
+                      row.system_name ?? row.system_id,
+                      row.efcr_period,
+                      row.total_biomass,
+                      row.daily_mortality_count,
+                      row.efcr_aggregated,
+                    ]),
+                  })
+                }
+              >
+                Export CSV
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                onClick={() =>
+                  printBrandedPdf({
+                    title: "Farm Performance Report",
+                    subtitle: "KPI summary, trends, and benchmark review",
+                    farmName,
+                    dateRange,
+                    summaryLines: [
+                      `Farm eFCR: ${summary?.efcr_period_consolidated ?? "N/A"}`,
+                      `Farm Mortality Rate: ${summary?.mortality_rate ?? "N/A"}`,
+                      `Farm Biomass: ${summary?.average_biomass ?? "N/A"}`,
+                    ],
+                    tableHeaders: ["Date", "System", "eFCR", "Biomass", "Mortality", "eFCR (Agg)"],
+                    tableRows: rows.map((row) => [
+                      row.date,
+                      row.system_name ?? row.system_id,
+                      row.efcr_period,
+                      row.total_biomass,
+                      row.daily_mortality_count,
+                      row.efcr_aggregated,
+                    ]),
+                    commentary: "Generated from api_production_summary and api_dashboard_consolidated sources.",
+                  })
+                }
+              >
+                Export PDF
+              </button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border border-border/80">
+            <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-2 text-left font-semibold">Date</th>
-                <th className="px-4 py-2 text-left font-semibold">System</th>
-                <th className="px-4 py-2 text-center font-semibold">eFCR</th>
-                <th className="px-4 py-2 text-center font-semibold">Biomass (kg)</th>
-                <th className="px-4 py-2 text-center font-semibold">Mortality</th>
-                <th className="px-4 py-2 text-center font-semibold">eFCR (Agg)</th>
+              <tr className="border-b border-border bg-muted/60">
+                <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
+                <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
+                <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR</th>
+                <th className="px-4 py-2 text-center font-semibold text-foreground">Biomass (kg)</th>
+                <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality</th>
+                <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR (Agg)</th>
               </tr>
             </thead>
             <tbody>
@@ -152,7 +337,7 @@ export default function PerformanceReport({ dateRange }: { dateRange?: { from: s
                 </tr>
               ) : rows.length > 0 ? (
                 rows.map((row) => (
-                  <tr key={`${row.system_id}-${row.date}`} className="border-b border-border hover:bg-muted/30">
+                  <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
                     <td className="px-4 py-2 font-medium">{row.date}</td>
                     <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
                     <td className="px-4 py-2 text-center">{row.efcr_period ?? "-"}</td>
@@ -169,7 +354,8 @@ export default function PerformanceReport({ dateRange }: { dateRange?: { from: s
                 </tr>
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>

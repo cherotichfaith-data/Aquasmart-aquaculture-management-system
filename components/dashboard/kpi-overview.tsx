@@ -1,10 +1,9 @@
 "use client"
 
-import { useMemo } from "react"
 import KPICard from "./kpi-card"
 import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/hooks/use-active-farm"
-import { useKpiOverview, type KPIOverviewMetric } from "@/lib/hooks/use-dashboard"
+import { useKpiOverview } from "@/lib/hooks/use-dashboard"
 
 interface KPIOverviewProps {
   stage: "all" | Enums<"system_growth_stage">
@@ -33,33 +32,6 @@ export default function KPIOverview({
 
   const metrics = metricsQuery.data?.metrics ?? []
   const dateBounds = metricsQuery.data?.dateBounds ?? { start: null, end: null }
-
-  const withTone = (metrics: KPIOverviewMetric[]): KPIOverviewMetric[] => {
-    return metrics.map((metric): KPIOverviewMetric => {
-      if (metric.tone || metric.badge) {
-        return { ...metric, tone: metric.tone ?? "neutral", badge: metric.badge }
-      }
-      if (metric.value === null || metric.value === undefined) {
-        return { ...metric, tone: "neutral", badge: "No data" }
-      }
-
-      if (metric.trend === null || metric.trend === undefined) {
-        return { ...metric, tone: "neutral", badge: "Monitoring" }
-      }
-
-      if (metric.trend === 0) {
-        return { ...metric, tone: "neutral", badge: "Stable" }
-      }
-
-      const positive =
-        metric.invertTrend ? metric.trend < 0 : metric.trend > 0
-      return {
-        ...metric,
-        tone: positive ? "good" : "warn",
-        badge: positive ? "Good" : "Watch",
-      }
-    })
-  }
 
   if (metricsQuery.isLoading) {
     return (
@@ -91,12 +63,10 @@ export default function KPIOverview({
     )
   }
 
-  const tonedMetrics = withTone(metrics)
-
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {tonedMetrics.map((metric) => {
+        {metrics.map((metric) => {
           return (
             <KPICard
               key={metric.key}
@@ -106,8 +76,6 @@ export default function KPIOverview({
               decimals={metric.decimals}
               formatUnit={metric.unit}
               invertTrend={metric.invertTrend}
-              tone={metric.tone}
-              badge={metric.badge}
               href={`/production?metric=${metric.key}&period=${timePeriod}${dateBounds.start && dateBounds.end ? `&startDate=${dateBounds.start}&endDate=${dateBounds.end}` : ""}${system !== "all" ? `&system=${system}` : ""}`}
             />
           )
