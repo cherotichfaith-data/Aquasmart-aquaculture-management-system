@@ -25,12 +25,21 @@ export const metadata: Metadata = {
     url: "/",
     siteName: "AquaSmart",
     type: "website",
+    images: [
+      {
+        url: "/use this.png",
+        width: 60,
+        height: 60,
+        alt: "AquaSmart logo",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "AquaSmart | Aquaculture Management Software",
     description:
       "Aquaculture management software for KPI monitoring, feed tracking, water quality, inventory, and reporting.",
+    images: ["/use this.png"],
   },
   robots: {
     index: true,
