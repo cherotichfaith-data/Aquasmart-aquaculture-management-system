@@ -81,12 +81,7 @@ export default function SystemsTable({
   })
 
   const systems = systemsQuery.data?.rows ?? []
-  const meta = systemsQuery.data?.meta
   const loading = systemsQuery.isLoading
-  const debugReason =
-    meta && "reason" in meta && typeof meta.reason === "string" ? meta.reason : null
-  const debugError =
-    meta && "error" in meta && typeof meta.error === "string" ? meta.error : null
 
   const totalRows = systems.length
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
@@ -128,11 +123,6 @@ export default function SystemsTable({
       <div className="mb-6">
         <h2 className="text-base font-semibold text-foreground">Production</h2>
         <p className="mt-2 text-xs text-muted-foreground">{systems.length} systems tracked</p>
-        {debugReason ? (
-          <p className="mt-2 text-[11px] text-chart-4">
-            Debug: {debugReason}{debugError ? ` (${debugError})` : ""}
-          </p>
-        ) : null}
       </div>
       <div className="max-h-[60vh] overflow-auto rounded-md border border-border/80">
         <Table>

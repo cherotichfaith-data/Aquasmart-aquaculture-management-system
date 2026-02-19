@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Suspense, lazy, useEffect, useRef, useState } from "react"
 import { Moon, Sun } from "lucide-react"
@@ -553,31 +554,7 @@ export default function AuthPage() {
           <div className="login-card">
             <div className="login-header">
               <div className="logo-header">
-                <svg className="logo-icon" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path
-                    d="M22 64 C 22 44, 56 44, 70 64 C 56 84, 22 84, 22 64 Z"
-                    stroke="currentColor"
-                    fill="none"
-                    strokeWidth="6"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M70 64 L 94 48 M70 64 L 94 80"
-                    stroke="currentColor"
-                    fill="none"
-                    strokeWidth="6"
-                    strokeLinejoin="round"
-                  />
-                  <circle cx="38" cy="60" r="5" fill="currentColor" />
-                  <path
-                    d="M18 96 C 36 86, 54 106, 72 96 S 102 106, 120 96"
-                    stroke="currentColor"
-                    fill="none"
-                    strokeWidth="6"
-                    strokeLinecap="round"
-                    opacity="0.75"
-                  />
-                </svg>
+                <Image src="/use this.png" alt="AquaSmart fish logo" width={36} height={36} className="logo-icon" />
                 <span className="logo-text">AquaSmart</span>
               </div>
 
