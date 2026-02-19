@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { Suspense, lazy, useState } from "react"
 import { ArrowRight, Droplets, Fish, FlaskConical, LineChart, ShieldCheck, Waves } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -96,23 +95,12 @@ export default function LandingPage() {
                   onClick={handlePrimaryAction}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 >
-                  Explore AquaSmart
+                  Sign In
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
           </div>
-        </section>
-
-        <section id="about" aria-label="Aquaculture SEO Intro" className="rounded-2xl border border-border bg-card p-6 shadow-sm md:p-8">
-          <h2 className="text-2xl font-semibold text-foreground md:text-3xl">
-            Fish Farm Management Platform for Daily Aquaculture Workflows
-          </h2>
-          <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">
-            AquaSmart is built for aquaculture operations teams that need reliable fish farm management software.
-            Centralize aquaculture KPI dashboards, feed tracking, water quality monitoring, mortality logging, inventory
-            control, and audit-ready farm reports in one system.
-          </p>
         </section>
 
         <section id="modules" className="space-y-4">
@@ -135,22 +123,6 @@ export default function LandingPage() {
                 </article>
               )
             })}
-          </div>
-        </section>
-
-        <section id="plans" className="rounded-2xl border border-border bg-card p-6 shadow-sm md:p-8">
-          <h2 className="text-2xl font-semibold text-foreground md:text-3xl">Ready to Operate with Confidence?</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            AquaSmart centralizes KPI monitoring, feed control, mortality tracking, and water quality oversight for
-            farm managers and operations teams.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/auth"
-              className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Sign In
-            </Link>
           </div>
         </section>
 

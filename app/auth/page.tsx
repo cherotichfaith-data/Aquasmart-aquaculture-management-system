@@ -58,7 +58,7 @@ export default function AuthPage() {
       return
     }
 
-    if (!validatePassword(trimmedPassword)) {
+    if (authMode === "signup" && !validatePassword(trimmedPassword)) {
       addToast({
         title: "Weak Password",
         description: "Password must be at least 8 characters.",
@@ -100,7 +100,10 @@ export default function AuthPage() {
         return
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin
+      const baseUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ??
+        process.env.NEXT_PUBLIC_APP_URL ??
+        window.location.origin
       const redirectTo = `${baseUrl}/auth/callback?next=/auth/verify-success`
       const { data, error } = await withTimeout(
         supabase.auth.signUp({
@@ -128,7 +131,7 @@ export default function AuthPage() {
       if (identities.length === 0) {
         addToast({
           title: "Account already exists",
-          description: "If this email is already registered, sign in or reset your password.",
+          description: "This email is already registered. Sign in instead.",
           variant: "warning",
         })
         setAuthMode("signin")
@@ -150,17 +153,6 @@ export default function AuthPage() {
 
   useEffect(() => {
     setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      addToast({
-        title: "Welcome to AquaSmart",
-        description: "Enter your email and password to continue.",
-        variant: "success",
-      })
-    }, 450)
-    return () => window.clearTimeout(timer)
   }, [])
 
   return (
@@ -408,27 +400,6 @@ export default function AuthPage() {
           letter-spacing: -0.6px;
         }
 
-        .pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.35rem 0.65rem;
-          border-radius: 999px;
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: color-mix(in srgb, var(--foreground) 90%, transparent);
-          border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
-          background: color-mix(in srgb, var(--primary) 45%, transparent);
-          margin-bottom: 1.25rem;
-        }
-        .pill-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 999px;
-          background: color-mix(in srgb, var(--primary) 25%, transparent);
-          box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 20%, transparent);
-        }
-
         .login-header h2 {
           font-size: 1.1rem;
           font-weight: 800;
@@ -477,31 +448,6 @@ export default function AuthPage() {
           border-color: color-mix(in srgb, var(--primary) 65%, transparent);
         }
 
-        .hint-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-top: 0.5rem;
-          gap: 0.75rem;
-          flex-wrap: wrap;
-        }
-        .hint {
-          font-size: 0.85rem;
-          color: color-mix(in srgb, var(--foreground) 68%, transparent);
-        }
-
-        .link {
-          color: var(--primary);
-          text-decoration: none;
-          font-size: 0.875rem;
-          font-weight: 700;
-          transition: opacity 0.2s;
-        }
-        .link:hover {
-          opacity: 0.85;
-          text-decoration: underline;
-        }
-
         .sign-in-btn {
           width: 100%;
           padding: 1rem;
@@ -530,36 +476,22 @@ export default function AuthPage() {
           transform: none;
         }
 
-        .alt-btn {
-          width: 100%;
-          padding: 0.95rem 1rem;
-          font-size: 0.95rem;
-          font-weight: 800;
-          color: color-mix(in srgb, var(--foreground) 92%, transparent);
-          background: color-mix(in srgb, var(--primary) 25%, transparent);
-          border: 1px solid color-mix(in srgb, var(--primary) 60%, transparent);
-          border-radius: 12px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .alt-btn:hover {
-          background: color-mix(in srgb, var(--primary) 35%, transparent);
+        .helper-row {
+          margin-top: 1rem;
+          text-align: center;
+          font-size: 0.9rem;
+          color: color-mix(in srgb, var(--foreground) 72%, transparent);
         }
 
-        .divider {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          margin: 1.1rem 0 0.9rem;
-          color: color-mix(in srgb, var(--foreground) 55%, transparent);
-          font-size: 0.85rem;
-        }
-        .divider::before,
-        .divider::after {
-          content: "";
-          flex: 1;
-          height: 1px;
-          background: color-mix(in srgb, var(--foreground) 12%, transparent);
+        .link-btn {
+          border: none;
+          background: transparent;
+          color: var(--primary);
+          font: inherit;
+          font-weight: 700;
+          cursor: pointer;
+          text-decoration: underline;
+          text-underline-offset: 2px;
         }
 
         .btn-loading {
@@ -587,138 +519,6 @@ export default function AuthPage() {
           }
         }
 
-        .signup-link {
-          text-align: center;
-          margin-top: 1.25rem;
-          font-size: 0.9rem;
-          color: color-mix(in srgb, var(--foreground) 72%, transparent);
-        }
-        .signup-link a {
-          color: color-mix(in srgb, var(--primary) 25%, transparent);
-          text-decoration: none;
-          font-weight: 800;
-        }
-        .signup-link a:hover {
-          opacity: 0.9;
-          text-decoration: underline;
-        }
-
-        .hero-section {
-          flex: 1;
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: color-mix(in srgb, var(--primary) 55%, transparent);
-          overflow: hidden;
-          animation: slideInRight 0.6s ease-out;
-          border-left: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
-        }
-
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        .hero-section::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image:
-            radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--foreground) 5%, transparent) 0%, transparent 50%),
-            radial-gradient(circle at 80% 70%, color-mix(in srgb, var(--primary) 35%, transparent) 0%, transparent 50%);
-          opacity: 0.9;
-        }
-        .hero-section::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image:
-            radial-gradient(circle at 10% 20%, color-mix(in srgb, var(--foreground) 3.5%, transparent) 0 3px, transparent 4px),
-            radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--foreground) 3%, transparent) 0 2px, transparent 3px);
-          background-size: 220px 220px, 180px 180px;
-          animation: pattern 55s linear infinite;
-        }
-        @keyframes pattern {
-          0% {
-            background-position: 0 0;
-          }
-          100% {
-            background-position: 220px 220px;
-          }
-        }
-
-        .hero-content {
-          position: relative;
-          z-index: 10;
-          text-align: left;
-          padding: 3.25rem;
-          max-width: 620px;
-          animation: fadeInUp 0.8s ease-out 0.3s backwards;
-        }
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(40px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .hero-content h1 {
-          font-size: clamp(2rem, 4vw, 3.1rem);
-          font-weight: 900;
-          margin-bottom: 1.25rem;
-          line-height: 1.15;
-          color: color-mix(in srgb, var(--foreground) 95%, transparent);
-          letter-spacing: -0.5px;
-        }
-        .hero-content p {
-          font-size: clamp(1rem, 2vw, 1.15rem);
-          color: color-mix(in srgb, var(--foreground) 88%, transparent);
-          line-height: 1.7;
-          font-weight: 500;
-        }
-
-        .hero-list {
-          margin-top: 1.35rem;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0.8rem;
-        }
-        .hero-item {
-          background: color-mix(in srgb, var(--foreground) 6%, transparent);
-          border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
-          border-radius: 14px;
-          padding: 0.85rem 0.9rem;
-          backdrop-filter: blur(8px);
-        }
-        .hero-item b {
-          display: block;
-          font-size: 0.92rem;
-          margin-bottom: 0.2rem;
-        }
-        .hero-item span {
-          font-size: 0.85rem;
-          color: color-mix(in srgb, var(--foreground) 82%, transparent);
-        }
-
-        @media (max-width: 1024px) {
-          .hero-section {
-            display: none;
-          }
-          .login-section {
-            flex: 1;
-          }
-        }
         @media (max-width: 640px) {
           .login-card {
             padding: 2rem 1.5rem;
@@ -781,12 +581,7 @@ export default function AuthPage() {
                 <span className="logo-text">AquaSmart</span>
               </div>
 
-              <div className="pill">
-                <span className="pill-dot"></span>
-                <span>Real-time Farm Intelligence</span>
-              </div>
-
-              <h2>Sign in to your dashboard</h2>
+              <h2>{authMode === "signin" ? "Sign in to your dashboard" : "Create your AquaSmart account"}</h2>
             </div>
 
             <form
@@ -809,8 +604,8 @@ export default function AuthPage() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
-                <div className="hint-row">
-                  <Link className="link" href="/">
+                <div style={{ marginTop: "0.5rem" }}>
+                  <Link href="/" style={{ color: "var(--primary)", fontSize: "0.875rem", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: "2px" }}>
                     Back to home
                   </Link>
                 </div>
@@ -831,8 +626,8 @@ export default function AuthPage() {
                   onChange={(event) => setPassword(event.target.value)}
                 />
                 {authMode === "signup" && (
-                  <div className="hint-row">
-                    <span className="hint">Use 8+ characters to create a secure password.</span>
+                  <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "color-mix(in srgb, var(--foreground) 68%, transparent)" }}>
+                    Use at least 8 characters to create a secure password.
                   </div>
                 )}
               </div>
@@ -845,52 +640,22 @@ export default function AuthPage() {
                 {authMode === "signin" ? "Sign In" : "Create Account"}
               </button>
             </form>
-
-            <div className="signup-link">
+            <div className="helper-row">
               {authMode === "signin" ? (
                 <>
                   New to AquaSmart?{" "}
-                  <button type="button" className="link" onClick={() => setAuthMode("signup")}>
+                  <button type="button" className="link-btn" onClick={() => setAuthMode("signup")}>
                     Create your account
                   </button>
                 </>
               ) : (
                 <>
                   Already have an account?{" "}
-                  <button type="button" className="link" onClick={() => setAuthMode("signin")}>
+                  <button type="button" className="link-btn" onClick={() => setAuthMode("signin")}>
                     Sign in instead
                   </button>
                 </>
               )}
-            </div>
-          </div>
-        </div>
-
-        <div className="hero-section">
-          <div className="hero-content">
-            <h1>Operate with clarity.</h1>
-            <p>
-              Track daily operations and monitor the KPIs that matter: eFCR, biomass density, ABW, feeding rate,
-              mortality, and water quality across cages, ponds, or tanks.
-            </p>
-
-            <div className="hero-list">
-              <div className="hero-item">
-                <b>KPI Dashboard</b>
-                <span>System-level + farm-level snapshots.</span>
-              </div>
-              <div className="hero-item">
-                <b>Data Entry</b>
-                <span>Feeding, sampling, harvest, WQ.</span>
-              </div>
-              <div className="hero-item">
-                <b>Alerts</b>
-                <span>Threshold-based health flags.</span>
-              </div>
-              <div className="hero-item">
-                <b>Audit Trail</b>
-                <span>Change log for traceability.</span>
-              </div>
             </div>
           </div>
         </div>
