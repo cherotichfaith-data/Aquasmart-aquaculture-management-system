@@ -61,13 +61,18 @@ export default function FarmSelector({
 
   const selectClass =
     variant === "compact"
-      ? "h-9 rounded-full border border-border bg-card/80 px-4 text-xs font-semibold text-foreground shadow-sm"
+      ? "h-9 min-w-[150px] rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground"
       : "px-3 py-2 rounded-md border border-input bg-background text-sm"
 
   return (
-    <div className={variant === "compact" ? "flex flex-wrap items-center gap-2" : "flex flex-col md:flex-row gap-3"}>
+    <div className={variant === "compact" ? "flex flex-wrap items-center gap-2" : "flex flex-col gap-3 md:flex-row"}>
       {showStage ? (
-        <select value={selectedStage} onChange={(e) => onStageChange(e.target.value as StageFilter)} className={selectClass}>
+        <select
+          value={selectedStage}
+          onChange={(e) => onStageChange(e.target.value as StageFilter)}
+          className={selectClass}
+          aria-label="Filter by stage"
+        >
           {stages.map((stage) => (
             <option key={stage.value} value={stage.value}>
               {stage.label}
@@ -81,6 +86,7 @@ export default function FarmSelector({
         onChange={(e) => onBatchChange(e.target.value)}
         className={selectClass}
         disabled={batchesQuery.isLoading}
+        aria-label="Filter by batch"
       >
         <option value="all">All Batches</option>
         {batchesQuery.isLoading ? <option value="" disabled>Loading batches...</option> : null}
@@ -97,6 +103,7 @@ export default function FarmSelector({
         onChange={(e) => onSystemChange(e.target.value)}
         className={selectClass}
         disabled={systemsQuery.isLoading}
+        aria-label="Filter by system"
       >
         <option value="all">All Systems</option>
         {systemsQuery.isLoading ? <option value="" disabled>Loading systems...</option> : null}
