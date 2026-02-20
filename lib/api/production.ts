@@ -41,16 +41,12 @@ export async function getProductionSummary(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase
-    .rpc("api_production_summary", productionRpcArgs({
-      farmId: params.farmId,
-      systemId: params.systemId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    }))
-    .order("date", { ascending: false })
-  if (params?.stage) query = query.eq("growth_stage", params.stage)
-  if (params?.limit) query = query.limit(params.limit)
+  let query = supabase.rpc("api_production_summary", productionRpcArgs({
+    farmId: params.farmId,
+    systemId: params.systemId,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+  }))
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
@@ -63,7 +59,14 @@ export async function getProductionSummary(params?: {
     }
     return toQueryError("getProductionSummary", error)
   }
-  const rows = (data ?? []) as ProductionSummaryRow[]
+  let rows = (data ?? []) as ProductionSummaryRow[]
+  rows = rows.sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
+  if (params?.stage) {
+    rows = rows.filter((row) => row.growth_stage === params.stage)
+  }
+  if (params?.limit) {
+    rows = rows.slice(0, params.limit)
+  }
   return toQuerySuccess<ProductionSummaryRow>(rows)
 }
 
@@ -82,15 +85,12 @@ export async function getEfcrTrend(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase
-    .rpc("api_efcr_trend", productionRpcArgs({
-      farmId: params.farmId,
-      systemId: params.systemId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    }))
-    .order("inventory_date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
+  let query = supabase.rpc("api_efcr_trend", productionRpcArgs({
+    farmId: params.farmId,
+    systemId: params.systemId,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+  }))
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
@@ -103,6 +103,10 @@ export async function getEfcrTrend(params?: {
     }
     return toQueryError("getEfcrTrend", error)
   }
-  const rows = (data ?? []) as EfcrLastSamplingRow[]
+  let rows = (data ?? []) as EfcrLastSamplingRow[]
+  rows = rows.sort((a, b) => String(b.inventory_date ?? "").localeCompare(String(a.inventory_date ?? "")))
+  if (params?.limit) {
+    rows = rows.slice(0, params.limit)
+  }
   return toQuerySuccess<EfcrLastSamplingRow>(rows)
 }

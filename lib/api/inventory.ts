@@ -68,27 +68,31 @@ export async function getDailyFishInventory(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase
-    .rpc("api_daily_fish_inventory", dailyInventoryRpcArgs({
-      farmId: params.farmId,
-      systemId: params.systemId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    }))
-    .order("inventory_date", { ascending: params?.orderAsc ?? false })
-
-  if (params?.cursorDate) {
-    query = query.gt("inventory_date", params.cursorDate)
-  }
-
-  if (params?.limit) query = query.limit(params.limit)
+  let query = supabase.rpc("api_daily_fish_inventory", dailyInventoryRpcArgs({
+    farmId: params.farmId,
+    systemId: params.systemId,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+  }))
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
   if (params?.signal?.aborted) return toQuerySuccess<DailyFishInventoryRow>([])
   if (error && isAbortLikeError(error)) return toQuerySuccess<DailyFishInventoryRow>([])
   if (error) return toQueryError("getDailyFishInventory", error)
-  const rows = (data ?? []) as DailyFishInventoryRow[]
+  let rows = (data ?? []) as DailyFishInventoryRow[]
+  rows = rows.sort((a, b) => {
+    const av = String(a.inventory_date ?? "")
+    const bv = String(b.inventory_date ?? "")
+    return (params?.orderAsc ?? false) ? av.localeCompare(bv) : bv.localeCompare(av)
+  })
+  if (params?.cursorDate) {
+    const cursorDate = params.cursorDate
+    rows = rows.filter((row) => String(row.inventory_date ?? "") > cursorDate)
+  }
+  if (params?.limit) {
+    rows = rows.slice(0, params.limit)
+  }
   return toQuerySuccess<DailyFishInventoryRow>(rows)
 }
 
@@ -139,19 +143,20 @@ export async function getDailyFishInventoryConsolidated(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase
-    .rpc("api_daily_fish_inventory_consolidated", dailyInventoryConsolidatedRpcArgs({
-      farmId: params.farmId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    }))
-    .order("inventory_date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
+  let query = supabase.rpc("api_daily_fish_inventory_consolidated", dailyInventoryConsolidatedRpcArgs({
+    farmId: params.farmId,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+  }))
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
   if (error) return toQueryError("getDailyFishInventoryConsolidated", error)
-  const rows = (data ?? []) as DailyFishInventoryConsolidatedRow[]
+  let rows = (data ?? []) as DailyFishInventoryConsolidatedRow[]
+  rows = rows.sort((a, b) => String(b.inventory_date ?? "").localeCompare(String(a.inventory_date ?? "")))
+  if (params?.limit) {
+    rows = rows.slice(0, params.limit)
+  }
   return toQuerySuccess<DailyFishInventoryConsolidatedRow>(rows)
 }
 
