@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFeedingRecords } from "@/lib/hooks/use-reports"
@@ -44,6 +44,7 @@ export default function FeedingReport({
   const records = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
   const summaryRows = summaryQuery.data?.status === "success" ? summaryQuery.data.data : []
   const loading = feedingRecordsQuery.isLoading
+  const [showFeedingRecords, setShowFeedingRecords] = useState(false)
   const chartRecords = useMemo(() => {
     const byDate = new Map<string, number>()
     records.forEach((row) => {
@@ -215,6 +216,13 @@ export default function FeedingReport({
               <button
                 type="button"
                 className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                onClick={() => setShowFeedingRecords((prev) => !prev)}
+              >
+                {showFeedingRecords ? "Hide details" : "View details"}
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
                 onClick={() =>
                   downloadCsv({
                     filename: `feed-analysis-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
@@ -268,46 +276,52 @@ export default function FeedingReport({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/60">
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Feed Type</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Amount (kg)</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Response</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
-                    Loading...
-                  </td>
+          {showFeedingRecords ? (
+            <div className="overflow-x-auto rounded-md border border-border/80">
+              <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60">
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Feed Type</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Amount (kg)</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Response</th>
                 </tr>
-              ) : records.length > 0 ? (
-                records.map((row) => (
-                  <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
-                    <td className="px-4 py-2 font-medium">{row.date}</td>
-                    <td className="px-4 py-2">{row.system_id}</td>
-                    <td className="px-4 py-2">{row.batch_id ?? "-"}</td>
-                    <td className="px-4 py-2">{row.feed_type?.feed_line ?? row.feed_type_id}</td>
-                    <td className="px-4 py-2">{row.feeding_amount}</td>
-                    <td className="px-4 py-2">{row.feeding_response}</td>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                      Loading...
+                    </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
-                    No feeding records found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            </table>
-          </div>
+                ) : records.length > 0 ? (
+                  records.map((row) => (
+                    <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
+                      <td className="px-4 py-2 font-medium">{row.date}</td>
+                      <td className="px-4 py-2">{row.system_id}</td>
+                      <td className="px-4 py-2">{row.batch_id ?? "-"}</td>
+                      <td className="px-4 py-2">{row.feed_type?.feed_line ?? row.feed_type_id}</td>
+                      <td className="px-4 py-2">{row.feeding_amount}</td>
+                      <td className="px-4 py-2">{row.feeding_response}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                      No feeding records found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {records.length} rows.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

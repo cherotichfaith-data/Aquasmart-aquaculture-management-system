@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import {
   LineChart,
   Line,
@@ -50,6 +50,7 @@ export default function PerformanceReport({
   const summary = summaryQuery.data ?? null
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const loading = summaryQuery.isLoading || productionSummaryQuery.isLoading
+  const [showPerformanceRecords, setShowPerformanceRecords] = useState(false)
   const chartRows = useMemo(() => {
     const byDate = new Map<string, { totalBiomass: number; weightedEfcr: number; efcrWeight: number; efcrFallback: number; efcrCount: number }>()
     rows.forEach((row) => {
@@ -97,7 +98,7 @@ export default function PerformanceReport({
   const efcrBenchmark = 1.5
   const mortalityBenchmark = 0.02
 
-  const benchmarkRows = useMemo(() => {
+  const benchmarkCards = useMemo(() => {
     if (!summary) return []
     return [
       {
@@ -105,12 +106,20 @@ export default function PerformanceReport({
         actual: summary.efcr_period_consolidated,
         benchmark: efcrBenchmark,
         status: typeof summary.efcr_period_consolidated === "number" && summary.efcr_period_consolidated <= efcrBenchmark ? "On target" : "Needs attention",
+        tone:
+          typeof summary.efcr_period_consolidated === "number" && summary.efcr_period_consolidated <= efcrBenchmark
+            ? "good"
+            : "warn",
       },
       {
         metric: "Mortality Rate",
         actual: summary.mortality_rate,
         benchmark: mortalityBenchmark,
         status: typeof summary.mortality_rate === "number" && summary.mortality_rate <= mortalityBenchmark ? "On target" : "Needs attention",
+        tone:
+          typeof summary.mortality_rate === "number" && summary.mortality_rate <= mortalityBenchmark
+            ? "good"
+            : "warn",
       },
     ]
   }, [summary])
@@ -229,31 +238,40 @@ export default function PerformanceReport({
 
       <Card>
         <CardHeader>
-          <CardTitle>Benchmarks</CardTitle>
-          <CardDescription>Template benchmark checks for operational reporting.</CardDescription>
+          <CardTitle>Benchmark Status</CardTitle>
+          <CardDescription>Quick target checks for the two core risk metrics.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/60">
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Metric</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Actual</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Benchmark</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {benchmarkRows.map((row) => (
-                  <tr key={row.metric} className="border-b border-border/70">
-                    <td className="px-4 py-2">{row.metric}</td>
-                    <td className="px-4 py-2">{row.actual ?? "N/A"}</td>
-                    <td className="px-4 py-2">{row.benchmark}</td>
-                    <td className="px-4 py-2">{row.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {benchmarkCards.map((item) => {
+              const isMortality = item.metric === "Mortality Rate"
+              const actual =
+                typeof item.actual === "number"
+                  ? isMortality
+                    ? `${(item.actual * 100).toFixed(2)}%`
+                    : item.actual.toFixed(2)
+                  : "N/A"
+              const benchmark = isMortality ? `${(item.benchmark * 100).toFixed(2)}%` : item.benchmark.toFixed(2)
+              const toneClass =
+                item.tone === "good"
+                  ? "bg-chart-2/10 border-chart-2/25 text-chart-2"
+                  : "bg-chart-4/10 border-chart-4/25 text-chart-4"
+
+              return (
+                <div key={item.metric} className="rounded-md border border-border/80 bg-muted/20 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">{item.metric}</p>
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${toneClass}`}>
+                      {item.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm">
+                    Actual: <span className="font-semibold">{actual}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">Target: {benchmark}</p>
+                </div>
+              )
+            })}
           </div>
         </CardContent>
       </Card>
@@ -263,6 +281,13 @@ export default function PerformanceReport({
           <div className="flex items-center justify-between gap-2">
             <CardTitle>Performance Records</CardTitle>
             <div className="flex gap-2">
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                onClick={() => setShowPerformanceRecords((prev) => !prev)}
+              >
+                {showPerformanceRecords ? "Hide details" : "View details"}
+              </button>
               <button
                 type="button"
                 className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
@@ -316,46 +341,52 @@ export default function PerformanceReport({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/60">
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
-                <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR</th>
-                <th className="px-4 py-2 text-center font-semibold text-foreground">Biomass (kg)</th>
-                <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality</th>
-                <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR (Agg)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
-                    Loading...
-                  </td>
+          {showPerformanceRecords ? (
+            <div className="overflow-x-auto rounded-md border border-border/80">
+              <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60">
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Biomass (kg)</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR (Agg)</th>
                 </tr>
-              ) : rows.length > 0 ? (
-                rows.map((row) => (
-                  <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
-                    <td className="px-4 py-2 font-medium">{row.date}</td>
-                    <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
-                    <td className="px-4 py-2 text-center">{row.efcr_period ?? "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.total_biomass ?? "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.daily_mortality_count ?? "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.efcr_aggregated ?? "-"}</td>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                      Loading...
+                    </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
-                    No performance records found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            </table>
-          </div>
+                ) : rows.length > 0 ? (
+                  rows.map((row) => (
+                    <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
+                      <td className="px-4 py-2 font-medium">{row.date}</td>
+                      <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
+                      <td className="px-4 py-2 text-center">{row.efcr_period ?? "-"}</td>
+                      <td className="px-4 py-2 text-center">{row.total_biomass ?? "-"}</td>
+                      <td className="px-4 py-2 text-center">{row.daily_mortality_count ?? "-"}</td>
+                      <td className="px-4 py-2 text-center">{row.efcr_aggregated ?? "-"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                      No performance records found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {rows.length} rows.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

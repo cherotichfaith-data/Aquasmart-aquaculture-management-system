@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useMortalityData } from "@/lib/hooks/use-reports"
@@ -54,6 +54,7 @@ export default function MortalityReport({
   const inventoryRows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
   const thresholdRows = thresholdsQuery.data?.status === "success" ? thresholdsQuery.data.data : []
   const loading = mortalityQuery.isLoading
+  const [showMortalityRecords, setShowMortalityRecords] = useState(false)
   const chartRows = useMemo(() => {
     const byDate = new Map<string, number>()
     rows.forEach((row) => {
@@ -214,6 +215,13 @@ export default function MortalityReport({
               <button
                 type="button"
                 className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                onClick={() => setShowMortalityRecords((prev) => !prev)}
+              >
+                {showMortalityRecords ? "Hide details" : "View details"}
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
                 onClick={() =>
                   downloadCsv({
                     filename: `mortality-analysis-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
@@ -264,46 +272,52 @@ export default function MortalityReport({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/60">
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Fish Dead</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">ABW</th>
-                <th className="px-4 py-2 text-left font-semibold text-foreground">Total Weight</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
-                    Loading...
-                  </td>
+          {showMortalityRecords ? (
+            <div className="overflow-x-auto rounded-md border border-border/80">
+              <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60">
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Fish Dead</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">ABW</th>
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">Total Weight</th>
                 </tr>
-              ) : rows.length > 0 ? (
-                rows.map((row) => (
-                  <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
-                    <td className="px-4 py-2 font-medium">{row.date}</td>
-                    <td className="px-4 py-2">{row.system_id}</td>
-                    <td className="px-4 py-2">{row.batch_id ?? "-"}</td>
-                    <td className="px-4 py-2">{row.number_of_fish_mortality}</td>
-                    <td className="px-4 py-2">{row.abw ?? "-"}</td>
-                    <td className="px-4 py-2">{row.total_weight_mortality ?? "-"}</td>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                      Loading...
+                    </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
-                    No mortality records found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            </table>
-          </div>
+                ) : rows.length > 0 ? (
+                  rows.map((row) => (
+                    <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
+                      <td className="px-4 py-2 font-medium">{row.date}</td>
+                      <td className="px-4 py-2">{row.system_id}</td>
+                      <td className="px-4 py-2">{row.batch_id ?? "-"}</td>
+                      <td className="px-4 py-2">{row.number_of_fish_mortality}</td>
+                      <td className="px-4 py-2">{row.abw ?? "-"}</td>
+                      <td className="px-4 py-2">{row.total_weight_mortality ?? "-"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                      No mortality records found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {rows.length} rows.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

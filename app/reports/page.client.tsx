@@ -211,6 +211,20 @@ export default function ReportsPage() {
               stage={selectedStage}
               farmName={farm?.name ?? null}
             />
+            <section className="space-y-4 mt-6">
+              <div>
+                <h2 className="text-xl font-semibold">Operations Drilldown</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Production trend and system-level performance for the selected report window.
+                </p>
+              </div>
+              <AnalysisOverview
+                stage={selectedStage === "all" ? null : selectedStage}
+                system={selectedSystem}
+                timePeriod="month"
+                periodParam={operationsPeriodParam}
+              />
+            </section>
           </TabsContent>
 
           <TabsContent value="feeding" className="mt-6">
@@ -248,21 +262,6 @@ export default function ReportsPage() {
             />
           </TabsContent>
         </Tabs>
-
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold">Operations Drilldown</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Production trend and system-level performance for the selected report window.
-            </p>
-          </div>
-          <AnalysisOverview
-            stage={selectedStage === "all" ? null : selectedStage}
-            system={selectedSystem}
-            timePeriod="month"
-            periodParam={operationsPeriodParam}
-          />
-        </section>
       </div>
     </DashboardLayout>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useProductionSummary } from "@/lib/hooks/use-production"
@@ -37,6 +37,7 @@ export default function GrowthReport({
   })
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const loading = productionSummaryQuery.isLoading
+  const [showGrowthRecords, setShowGrowthRecords] = useState(false)
 
   const chartRows = useMemo(() => {
     const byDate = new Map<
@@ -213,6 +214,13 @@ export default function GrowthReport({
               <button
                 type="button"
                 className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                onClick={() => setShowGrowthRecords((prev) => !prev)}
+              >
+                {showGrowthRecords ? "Hide details" : "View details"}
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
                 onClick={() =>
                   downloadCsv({
                     filename: `growth-report-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
@@ -262,44 +270,50 @@ export default function GrowthReport({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/60">
-                <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
-                <th className="px-4 py-2 text-center font-semibold text-foreground">ABW</th>
-                <th className="px-4 py-2 text-center font-semibold text-foreground">Biomass</th>
-                <th className="px-4 py-2 text-center font-semibold text-foreground">Fish Count</th>
-                <th className="px-4 py-2 text-center font-semibold text-foreground">Daily Gain</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">
-                    Loading...
-                  </td>
+          {showGrowthRecords ? (
+            <div className="overflow-x-auto rounded-md border border-border/80">
+              <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60">
+                  <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">ABW</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Biomass</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Fish Count</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Daily Gain</th>
                 </tr>
-              ) : rows.length > 0 ? (
-                rows.map((row) => (
-                  <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
-                    <td className="px-4 py-2 font-medium">{row.system_name ?? row.system_id}</td>
-                    <td className="px-4 py-2 text-center">{row.average_body_weight ?? "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.total_biomass ?? "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.number_of_fish_inventory ?? "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.biomass_increase_period ?? "-"}</td>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">
+                      Loading...
+                    </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">
-                    No growth records found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            </table>
-          </div>
+                ) : rows.length > 0 ? (
+                  rows.map((row) => (
+                    <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
+                      <td className="px-4 py-2 font-medium">{row.system_name ?? row.system_id}</td>
+                      <td className="px-4 py-2 text-center">{row.average_body_weight ?? "-"}</td>
+                      <td className="px-4 py-2 text-center">{row.total_biomass ?? "-"}</td>
+                      <td className="px-4 py-2 text-center">{row.number_of_fish_inventory ?? "-"}</td>
+                      <td className="px-4 py-2 text-center">{row.biomass_increase_period ?? "-"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">
+                      No growth records found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {rows.length} rows.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
