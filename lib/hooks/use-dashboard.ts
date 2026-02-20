@@ -761,6 +761,7 @@ export function useSystemsTable(params: {
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
+  includeIncomplete?: boolean
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -772,6 +773,7 @@ export function useSystemsTable(params: {
       params.system ?? "all",
       params.timePeriod ?? "2 weeks",
       params.periodParam ?? "",
+      params.includeIncomplete ?? false,
     ],
     queryFn: async ({ signal }) => {
       const farmId = params.farmId ?? null
@@ -830,9 +832,11 @@ export function useSystemsTable(params: {
       }
 
       return {
-        rows: ((result.data ?? []) as DashboardSystemRow[]).filter(
-          (row) => scopedSystemIds.includes(row.system_id) && hasCompleteSystemMetrics(row),
-        ),
+        rows: ((result.data ?? []) as DashboardSystemRow[]).filter((row) => {
+          if (!scopedSystemIds.includes(row.system_id)) return false
+          if (params.includeIncomplete) return true
+          return hasCompleteSystemMetrics(row)
+        }),
         meta: { source: "api_dashboard_systems", start: startDate, end: endDate },
       }
     },

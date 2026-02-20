@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { Enums } from "@/lib/types/database"
 import { TriangleAlert } from "lucide-react"
@@ -26,6 +26,40 @@ interface SystemsTableProps {
 }
 
 const PAGE_SIZE = 8
+type SystemFilterMode = "all" | "top5" | "bottom5" | "missing"
+
+const isFiniteNumber = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value)
+
+const hasMissingData = (row: {
+  fish_end: number | null
+  biomass_end: number | null
+  feed_total: number | null
+  efcr: number | null
+  abw: number | null
+  feeding_rate: number | null
+  mortality_rate: number | null
+  biomass_density: number | null
+  water_quality_rating_average: string | null
+  missing_days_count: number | null
+}) => {
+  const hasRequiredMetricGap = ![
+    row.fish_end,
+    row.biomass_end,
+    row.feed_total,
+    row.efcr,
+    row.abw,
+    row.feeding_rate,
+    row.mortality_rate,
+    row.biomass_density,
+  ].every((value) => isFiniteNumber(value))
+
+  const hasMissingWaterQuality =
+    typeof row.water_quality_rating_average !== "string" ||
+    row.water_quality_rating_average.trim().length === 0
+
+  return hasRequiredMetricGap || hasMissingWaterQuality
+}
 
 const formatNumber = (value: number | null | undefined, decimals = 0) => {
   if (value === null || value === undefined || Number.isNaN(value)) return "--"
@@ -61,15 +95,12 @@ export default function SystemsTable({
   const { farmId } = useActiveFarm()
   const [pageIndex, setPageIndex] = useState(0)
   const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null)
+  const [filterMode, setFilterMode] = useState<SystemFilterMode>("all")
 
   const handleRowClick = (systemId: number) => {
     if (!Number.isFinite(systemId)) return
     setSelectedSystemId(systemId)
   }
-
-  useEffect(() => {
-    setPageIndex(0)
-  }, [batch, farmId, stage, system, timePeriod, periodParam])
 
   const systemsQuery = useSystemsTable({
     farmId,
@@ -78,19 +109,37 @@ export default function SystemsTable({
     system,
     timePeriod,
     periodParam,
+    includeIncomplete: true,
   })
 
   const systems = systemsQuery.data?.rows ?? []
+  const filteredSystems = useMemo(() => {
+    if (filterMode === "all") return systems
+
+    if (filterMode === "missing") {
+      return systems.filter((row) => hasMissingData(row))
+    }
+
+    const ranked = systems
+      .filter((row) => isFiniteNumber(row.efcr))
+      .sort((a, b) => (a.efcr as number) - (b.efcr as number))
+
+    if (filterMode === "top5") {
+      return ranked.filter((row) => (row.efcr as number) < 2).slice(0, 5)
+    }
+
+    return ranked.filter((row) => (row.efcr as number) > 2).slice(-5)
+  }, [filterMode, systems])
   const loading = systemsQuery.isLoading
 
-  const totalRows = systems.length
+  const totalRows = filteredSystems.length
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
   const currentPage = Math.min(pageIndex, totalPages - 1)
   const startIndex = currentPage * PAGE_SIZE
   const endIndex = Math.min(startIndex + PAGE_SIZE, totalRows)
-  const pagedSystems = systems.slice(startIndex, endIndex)
+  const pagedSystems = filteredSystems.slice(startIndex, endIndex)
   const showPagination = totalRows > PAGE_SIZE
-  const selectedSystem = systems.find((system) => system.system_id === selectedSystemId) ?? null
+  const selectedSystem = filteredSystems.find((system) => system.system_id === selectedSystemId) ?? null
   const selectedAsOf = formatAsOfDate(selectedSystem?.as_of_date ?? selectedSystem?.input_end_date)
   const selectedFlags = selectedSystem
     ? [
@@ -102,6 +151,17 @@ export default function SystemsTable({
           : null,
       ].filter(Boolean)
     : []
+
+  useEffect(() => {
+    setPageIndex(0)
+  }, [batch, farmId, stage, system, timePeriod, periodParam, filterMode])
+
+  useEffect(() => {
+    if (selectedSystemId === null) return
+    if (!filteredSystems.some((row) => row.system_id === selectedSystemId)) {
+      setSelectedSystemId(null)
+    }
+  }, [filteredSystems, selectedSystemId])
 
   if (loading) {
     return (
@@ -122,7 +182,20 @@ export default function SystemsTable({
     <div className="rounded-lg border border-border/90 bg-card p-6 shadow-sm">
       <div className="mb-6">
         <h2 className="text-base font-semibold text-foreground">Production</h2>
-        <p className="mt-2 text-xs text-muted-foreground">{systems.length} systems tracked</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">{totalRows} systems shown</p>
+          <select
+            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            value={filterMode}
+            onChange={(event) => setFilterMode(event.target.value as SystemFilterMode)}
+            aria-label="System performance filter"
+          >
+            <option value="all">All systems</option>
+            <option value="top5">Top 5 (best eFCR)</option>
+            <option value="bottom5">Bottom 5 (worst eFCR)</option>
+            <option value="missing">Missing data</option>
+          </select>
+        </div>
       </div>
       <div className="max-h-[60vh] overflow-auto rounded-md border border-border/80">
         <Table>
