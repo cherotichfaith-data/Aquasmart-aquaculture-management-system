@@ -33,9 +33,11 @@ interface FeedingFormProps {
     systems: Tables<"api_system_options">[]
     feeds: Tables<"api_feed_type_options">[]
     batches: Tables<"api_fingerling_batch_options">[]
+    defaultSystemId?: number | null
+    defaultBatchId?: number | null
 }
 
-export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
+export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, defaultBatchId = null }: FeedingFormProps) {
     const mutation = useRecordFeeding()
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -43,10 +45,10 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             amount_kg: 0,
-            system_id: "",
+            system_id: defaultSystemId ? String(defaultSystemId) : "",
             feed_id: "",
             feeding_response: "good",
-            batch_id: "none",
+            batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
 
@@ -90,7 +92,7 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
             </div>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="system_id"
@@ -180,7 +182,7 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
                         )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="amount_kg"
@@ -226,3 +228,4 @@ export function FeedingForm({ systems, feeds, batches }: FeedingFormProps) {
         </div>
     )
 }
+

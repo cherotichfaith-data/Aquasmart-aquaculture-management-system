@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MortalityForm } from "./mortality-form"
@@ -17,7 +17,7 @@ import type { Tables } from "@/lib/types/database"
 
 interface DataEntryInterfaceProps {
     systems: Tables<"api_system_options">[]
-    suppliers: Tables<"suppliers">[]
+    suppliers: Tables<"feed_supplier">[]
     feeds: Tables<"api_feed_type_options">[]
     batches: Tables<"api_fingerling_batch_options">[]
     recentEntries: {
@@ -31,6 +31,9 @@ interface DataEntryInterfaceProps {
         stocking: Tables<"fish_stocking">[]
         systems: Tables<"system">[]
     }
+    defaultTab?: (typeof sidebarItems)[number]["id"]
+    defaultSystemId?: number | null
+    defaultBatchId?: number | null
 }
 
 const sidebarItems = [
@@ -45,8 +48,21 @@ const sidebarItems = [
     { id: "incoming_feed", label: "Incoming Feed" },
 ] as const
 
-export function DataEntryInterface({ systems, suppliers, feeds, batches, recentEntries }: DataEntryInterfaceProps) {
-    const [activeTab, setActiveTab] = useState<(typeof sidebarItems)[number]["id"]>("stocking")
+export function DataEntryInterface({
+    systems,
+    suppliers,
+    feeds,
+    batches,
+    recentEntries,
+    defaultTab = "stocking",
+    defaultSystemId = null,
+    defaultBatchId = null,
+}: DataEntryInterfaceProps) {
+    const [activeTab, setActiveTab] = useState<(typeof sidebarItems)[number]["id"]>(defaultTab)
+
+    useEffect(() => {
+        setActiveTab(defaultTab)
+    }, [defaultTab])
 
     return (
         <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-6">
@@ -75,37 +91,37 @@ export function DataEntryInterface({ systems, suppliers, feeds, batches, recentE
             <main className="flex-1 bg-card border border-border/80 rounded-lg p-6 overflow-y-auto shadow-sm">
                 {activeTab === "mortality" && (
                     <>
-                        <MortalityForm systems={systems} batches={batches} />
+                        <MortalityForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
                         <RecentEntriesList data={recentEntries.mortality} type="mortality" />
                     </>
                 )}
                 {activeTab === "feeding" && (
                     <>
-                        <FeedingForm systems={systems} feeds={feeds} batches={batches} />
+                        <FeedingForm systems={systems} feeds={feeds} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
                         <RecentEntriesList data={recentEntries.feeding} type="feeding" />
                     </>
                 )}
                 {activeTab === "sampling" && (
                     <>
-                        <SamplingForm systems={systems} batches={batches} />
+                        <SamplingForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
                         <RecentEntriesList data={recentEntries.sampling} type="sampling" />
                     </>
                 )}
                 {activeTab === "transfer" && (
                     <>
-                        <TransferForm systems={systems} batches={batches} />
+                        <TransferForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
                         <RecentEntriesList data={recentEntries.transfer} type="transfer" />
                     </>
                 )}
                 {activeTab === "harvest" && (
                     <>
-                        <HarvestForm systems={systems} batches={batches} />
+                        <HarvestForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
                         <RecentEntriesList data={recentEntries.harvest} type="harvest" />
                     </>
                 )}
                 {activeTab === "water_quality" && (
                     <>
-                        <WaterQualityForm systems={systems} />
+                        <WaterQualityForm systems={systems} defaultSystemId={defaultSystemId} />
                         <RecentEntriesList data={recentEntries.water_quality} type="water_quality" />
                     </>
                 )}
@@ -117,7 +133,7 @@ export function DataEntryInterface({ systems, suppliers, feeds, batches, recentE
                 )}
                 {activeTab === "stocking" && (
                     <>
-                        <StockingForm systems={systems} batches={batches} />
+                        <StockingForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
                         <RecentEntriesList data={recentEntries.stocking} type="stocking" />
                     </>
                 )}

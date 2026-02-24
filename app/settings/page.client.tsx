@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
@@ -13,6 +13,8 @@ import { getSessionUser } from "@/utils/supabase/session"
 import type { Tables, TablesInsert, TablesUpdate } from "@/lib/types/database"
 import { DEFAULT_SETTINGS, formatError, hasActionableSbError } from "./settings-utils"
 import { AlertThresholdsSection, FarmInformationSection, SaveSettingsButton } from "./settings-sections"
+import { DataErrorState } from "@/components/shared/data-states"
+import { getErrorMessage } from "@/lib/utils/query-result"
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
@@ -27,7 +29,7 @@ export default function SettingsPage() {
   const { farm, farmId, loading: farmLoading } = useActiveFarm()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const settingsLoadQuery = useQuery({
     queryKey: ["settings", "load", user?.id ?? "anon", farmId ?? "no-farm", thresholdDenied],
     enabled: Boolean(user?.id) && !farmLoading && !hasLoadedSettings,
@@ -70,6 +72,18 @@ export default function SettingsPage() {
   const settingsLoadLoading = settingsLoadQuery.isLoading
   const settingsLoadSuccess = settingsLoadQuery.isSuccess
   const settingsLoadFetched = settingsLoadQuery.isFetched
+  const settingsLoadError = getErrorMessage(settingsLoadQuery.error)
+
+  useEffect(() => {
+    if (!user?.id) return
+    setHasLoadedSettings(false)
+    setThresholdDenied(false)
+    setThresholdId(null)
+    setSaved(false)
+    setErrorMsg(null)
+    setSettings(DEFAULT_SETTINGS)
+    setLoading(true)
+  }, [farmId, user?.id])
 
   useEffect(() => {
     if (!user?.id) return
@@ -277,9 +291,6 @@ export default function SettingsPage() {
           setSaved(true)
           setTimeout(() => setSaved(false), 3000)
           router.replace("/")
-          if (typeof window !== "undefined") {
-            window.location.href = "/"
-          }
         } else {
           localStorage.setItem("aqua_settings", JSON.stringify(settings))
           setSaved(true)
@@ -331,6 +342,13 @@ export default function SettingsPage() {
         )}
 
         <div className="space-y-6">
+          {settingsLoadQuery.isError ? (
+            <DataErrorState
+              title="Unable to load settings"
+              description={settingsLoadError ?? "Please retry or check your connection."}
+              onRetry={() => settingsLoadQuery.refetch()}
+            />
+          ) : null}
           <FarmInformationSection settings={settings} handleChange={handleChange} />
           <AlertThresholdsSection settings={settings} handleChange={handleChange} />
           <SaveSettingsButton isSaving={isSaving} onSave={handleSave} />

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useRef, useState } from "react"
 import { EVENT_LABEL, formatTime, getColor, getIcon, type ActivityType, type ConsolidatedActivity, type OperatorSummary } from "./transactions-utils"
 
 type SummaryProps = {
@@ -42,13 +43,45 @@ type ActivityFeedProps = {
 }
 
 export function ConsolidatedActivityFeedTable({ loading, filteredActivities, systemLabelById }: ActivityFeedProps) {
+  const ROW_HEIGHT = 64
+  const OVERSCAN = 6
+  const VIEWPORT_HEIGHT = 520
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const totalRows = filteredActivities.length
+  const isVirtualized = totalRows > 80
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    containerRef.current.scrollTop = 0
+    setScrollTop(0)
+  }, [filteredActivities])
+
+  const windowed = useMemo(() => {
+    if (!isVirtualized) {
+      return { rows: filteredActivities, paddingTop: 0, paddingBottom: 0 }
+    }
+    const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
+    const visibleCount = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + OVERSCAN * 2
+    const endIndex = Math.min(totalRows, startIndex + visibleCount)
+    return {
+      rows: filteredActivities.slice(startIndex, endIndex),
+      paddingTop: startIndex * ROW_HEIGHT,
+      paddingBottom: (totalRows - endIndex) * ROW_HEIGHT,
+    }
+  }, [filteredActivities, isVirtualized, scrollTop, totalRows])
+
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
       <div className="px-6 py-4 border-b border-border">
         <h2 className="font-semibold">Consolidated Activity Feed</h2>
         <p className="text-sm text-muted-foreground">Single timeline view across feeding, mortality, sampling, transfers, stocking, and harvest activity.</p>
       </div>
-      <div className="overflow-x-auto">
+      <div
+        className="max-h-[520px] overflow-auto"
+        ref={containerRef}
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      >
         <table className="w-full">
           <thead className="bg-muted/50 border-b border-border">
             <tr>
@@ -65,13 +98,19 @@ export function ConsolidatedActivityFeedTable({ loading, filteredActivities, sys
                 <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Loading activities...</td>
               </tr>
             ) : filteredActivities.length > 0 ? (
-              filteredActivities.map((activity) => {
+              <>
+                {isVirtualized && windowed.paddingTop > 0 ? (
+                  <tr aria-hidden="true">
+                    <td colSpan={5} className="p-0" style={{ height: windowed.paddingTop }} />
+                  </tr>
+                ) : null}
+                {windowed.rows.map((activity) => {
                 const systemLabel = activity.systemIds.length
                   ? activity.systemIds.map((id) => systemLabelById.get(id) ?? `System ${id}`).join(" -> ")
                   : "Farm level"
 
                 return (
-                  <tr key={activity.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={activity.id} className="h-16 hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg w-fit ${getColor(activity.normalizedType)}`}>{getIcon(activity.normalizedType)}</div>
@@ -84,7 +123,13 @@ export function ConsolidatedActivityFeedTable({ loading, filteredActivities, sys
                     <td className="px-6 py-4 text-sm">{formatTime(activity.changeTime)}</td>
                   </tr>
                 )
-              })
+                })}
+                {isVirtualized && windowed.paddingBottom > 0 ? (
+                  <tr aria-hidden="true">
+                    <td colSpan={5} className="p-0" style={{ height: windowed.paddingBottom }} />
+                  </tr>
+                ) : null}
+              </>
             ) : (
               <tr>
                 <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No activities found for selected filters.</td>

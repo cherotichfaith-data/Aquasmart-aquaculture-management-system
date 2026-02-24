@@ -1,10 +1,9 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import { Download, RefreshCw } from "lucide-react"
+import { Download, RefreshCw, PlusCircle, Fish, FlaskConical, Droplets } from "lucide-react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import FarmSelector from "@/components/shared/farm-selector"
@@ -23,11 +22,21 @@ import * as XLSX from "xlsx"
 import { getProductionSummary } from "@/lib/api/production"
 import { parseDateToTimePeriod } from "@/lib/utils"
 import { logSbError } from "@/utils/supabase/log"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useRouter } from "next/navigation"
 
 export default function DashboardPage() {
-  const { profile, user } = useAuth()
+  const { profile } = useAuth()
   const { farm, farmId } = useActiveFarm()
   const queryClient = useQueryClient()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const periodParam = searchParams.get("period")
   const parsedPeriod = parseDateToTimePeriod(periodParam)
@@ -42,6 +51,8 @@ export default function DashboardPage() {
     setTimePeriod,
   } = useSharedFilters(parsedPeriod.kind === "preset" ? parsedPeriod.period : "2 weeks")
   const [refreshing, setRefreshing] = useState(false)
+  const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
+  const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
 
   useEffect(() => {
     if (!periodParam || parsedPeriod.kind !== "preset") return
@@ -144,11 +155,42 @@ export default function DashboardPage() {
               variant="compact"
             />
             <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} variant="compact" />
-            <Link href="/data-entry" className="ml-auto">
-              <Button className="h-9 rounded-md px-4 text-sm font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90">
-                Add Data
-              </Button>
-            </Link>
+            <div className="ml-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="h-9 rounded-md px-4 text-sm font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90">
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Add Data
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Quick Entry</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => router.push(`/data-entry?type=feeding${systemParam}${batchParam}`)}
+                  >
+                    <Fish className="mr-2 h-4 w-4" />
+                    Record Feeding
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => router.push(`/data-entry?type=sampling${systemParam}${batchParam}`)}
+                  >
+                    <FlaskConical className="mr-2 h-4 w-4" />
+                    Record Sampling
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => router.push(`/data-entry?type=water_quality${systemParam}`)}
+                  >
+                    <Droplets className="mr-2 h-4 w-4" />
+                    Record Water Quality
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/data-entry")}>
+                    View All Entry Types
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </section>
 

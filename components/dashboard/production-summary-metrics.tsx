@@ -4,6 +4,8 @@ import { useMemo } from "react"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useProductionSummaryMetrics } from "@/lib/hooks/use-dashboard"
 import type { Enums } from "@/lib/types/database"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage } from "@/lib/utils/query-result"
 
 const formatNumber = (value: number) => Intl.NumberFormat().format(Math.round(value))
 const formatKg = (value: number) => `${Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value)} kg`
@@ -33,6 +35,7 @@ export default function ProductionSummaryMetrics({
     timePeriod,
     periodParam,
   })
+  const errorMessage = getErrorMessage(metricsQuery.error)
 
   const metrics = useMemo(() => {
     const data = metricsQuery.data
@@ -55,6 +58,16 @@ export default function ProductionSummaryMetrics({
     ]
   }, [metricsQuery.data])
 
+  if (metricsQuery.isError) {
+    return (
+      <DataErrorState
+        title="Unable to load production summary"
+        description={errorMessage ?? "Please retry or check your connection."}
+        onRetry={() => metricsQuery.refetch()}
+      />
+    )
+  }
+
   if (metricsQuery.isLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -67,6 +80,10 @@ export default function ProductionSummaryMetrics({
 
   return (
     <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <DataUpdatedAt updatedAt={metricsQuery.dataUpdatedAt} />
+        <DataFetchingBadge isFetching={metricsQuery.isFetching} isLoading={metricsQuery.isLoading} />
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {metrics.map((metric) => (
           <div key={metric.label} className={metricCardClass}>
@@ -75,9 +92,6 @@ export default function ProductionSummaryMetrics({
           </div>
         ))}
       </div>
-      {metricsQuery.isError ? (
-        <p className="text-xs text-muted-foreground">Unable to load summary metrics for the selected filters.</p>
-      ) : null}
     </div>
   )
 }

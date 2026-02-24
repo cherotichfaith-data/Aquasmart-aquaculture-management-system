@@ -8,22 +8,26 @@ import {
 } from "@/components/ui/table"
 import type { Tables } from "@/lib/types/database"
 import { format } from "date-fns"
+import { Loader2 } from "lucide-react"
 
 type RecentEntriesListProps =
-    | { type: "mortality"; data: Tables<"fish_mortality">[] }
-    | { type: "feeding"; data: Tables<"feeding_record">[] }
-    | { type: "sampling"; data: Tables<"fish_sampling_weight">[] }
-    | { type: "transfer"; data: Tables<"fish_transfer">[] }
-    | { type: "harvest"; data: Tables<"fish_harvest">[] }
-    | { type: "water_quality"; data: Tables<"water_quality_measurement">[] }
-    | { type: "incoming_feed"; data: Tables<"feed_incoming">[] }
-    | { type: "stocking"; data: Tables<"fish_stocking">[] }
-    | { type: "system"; data: Tables<"system">[] }
+    | { type: "mortality"; data: Array<Tables<"fish_mortality"> & { status?: "pending" }> }
+    | { type: "feeding"; data: Array<Tables<"feeding_record"> & { status?: "pending" }> }
+    | { type: "sampling"; data: Array<Tables<"fish_sampling_weight"> & { status?: "pending" }> }
+    | { type: "transfer"; data: Array<Tables<"fish_transfer"> & { status?: "pending" }> }
+    | { type: "harvest"; data: Array<Tables<"fish_harvest"> & { status?: "pending" }> }
+    | { type: "water_quality"; data: Array<Tables<"water_quality_measurement"> & { status?: "pending" }> }
+    | { type: "incoming_feed"; data: Array<Tables<"feed_incoming"> & { status?: "pending" }> }
+    | { type: "stocking"; data: Array<Tables<"fish_stocking"> & { status?: "pending" }> }
+    | { type: "system"; data: Array<Tables<"system"> & { status?: "pending" }> }
 
 const formatCreatedAt = (createdAt: string | null) =>
     createdAt ? format(new Date(createdAt), "MMM d, HH:mm") : "-"
 
 const formatDate = (date: string | null) => date ?? "N/A"
+
+const PendingIcon = ({ pending }: { pending?: boolean }) =>
+    pending ? <Loader2 className="mr-2 h-3 w-3 animate-spin text-muted-foreground" /> : null
 
 export function RecentEntriesList(props: RecentEntriesListProps) {
     const { data, type } = props
@@ -47,8 +51,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableHeader>
                     <TableBody>
                         {data.map((row, index) => (
-                            <TableRow key={row.id ?? index}>
-                                <TableCell>{formatDate(row.date)}</TableCell>
+                            <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                                <TableCell className="flex items-center">
+                                    <PendingIcon pending={row.status === "pending"} />
+                                    {formatDate(row.date)}
+                                </TableCell>
                                 <TableCell>{row.system_id}</TableCell>
                                 <TableCell>{row.number_of_fish_mortality}</TableCell>
                                 <TableCell className="text-right text-muted-foreground text-xs">{formatCreatedAt(row.created_at)}</TableCell>
@@ -76,8 +83,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableHeader>
                     <TableBody>
                         {data.map((row, index) => (
-                            <TableRow key={row.id ?? index}>
-                                <TableCell>{formatDate(row.date)}</TableCell>
+                            <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                                <TableCell className="flex items-center">
+                                    <PendingIcon pending={row.status === "pending"} />
+                                    {formatDate(row.date)}
+                                </TableCell>
                                 <TableCell>{row.system_id}</TableCell>
                                 <TableCell>{row.feed_type_id}</TableCell>
                                 <TableCell>{row.feeding_amount}</TableCell>
@@ -106,8 +116,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableHeader>
                     <TableBody>
                         {data.map((row, index) => (
-                            <TableRow key={row.id ?? index}>
-                                <TableCell>{formatDate(row.date)}</TableCell>
+                            <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                                <TableCell className="flex items-center">
+                                    <PendingIcon pending={row.status === "pending"} />
+                                    {formatDate(row.date)}
+                                </TableCell>
                                 <TableCell>{row.system_id}</TableCell>
                                 <TableCell>{row.number_of_fish_sampling}</TableCell>
                                 <TableCell>{row.abw}</TableCell>
@@ -136,8 +149,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableHeader>
                     <TableBody>
                         {data.map((row, index) => (
-                            <TableRow key={row.id ?? index}>
-                                <TableCell>{formatDate(row.date)}</TableCell>
+                            <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                                <TableCell className="flex items-center">
+                                    <PendingIcon pending={row.status === "pending"} />
+                                    {formatDate(row.date)}
+                                </TableCell>
                                 <TableCell>{row.origin_system_id}</TableCell>
                                 <TableCell>{row.target_system_id}</TableCell>
                                 <TableCell>{row.number_of_fish_transfer}</TableCell>
@@ -166,8 +182,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableHeader>
                     <TableBody>
                         {data.map((row, index) => (
-                            <TableRow key={row.id ?? index}>
-                                <TableCell>{formatDate(row.date)}</TableCell>
+                            <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                                <TableCell className="flex items-center">
+                                    <PendingIcon pending={row.status === "pending"} />
+                                    {formatDate(row.date)}
+                                </TableCell>
                                 <TableCell>{row.system_id}</TableCell>
                                 <TableCell>{row.type_of_harvest}</TableCell>
                                 <TableCell>{row.total_weight_harvest}</TableCell>
@@ -196,8 +215,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableHeader>
                     <TableBody>
                         {data.map((row, index) => (
-                            <TableRow key={row.id ?? index}>
-                                <TableCell>{formatDate(row.date)}</TableCell>
+                            <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                                <TableCell className="flex items-center">
+                                    <PendingIcon pending={row.status === "pending"} />
+                                    {formatDate(row.date)}
+                                </TableCell>
                                 <TableCell>{row.system_id}</TableCell>
                                 <TableCell>{row.parameter_name}</TableCell>
                                 <TableCell>{row.parameter_value}</TableCell>
@@ -225,8 +247,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableHeader>
                     <TableBody>
                         {data.map((row, index) => (
-                            <TableRow key={row.id ?? index}>
-                                <TableCell>{formatDate(row.date)}</TableCell>
+                            <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                                <TableCell className="flex items-center">
+                                    <PendingIcon pending={row.status === "pending"} />
+                                    {formatDate(row.date)}
+                                </TableCell>
                                 <TableCell>{row.feed_type_id}</TableCell>
                                 <TableCell>{row.feed_amount}</TableCell>
                                 <TableCell className="text-right text-muted-foreground text-xs">{formatCreatedAt(row.created_at)}</TableCell>
@@ -254,8 +279,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableHeader>
                     <TableBody>
                         {data.map((row, index) => (
-                            <TableRow key={row.id ?? index}>
-                                <TableCell>{formatDate(row.date)}</TableCell>
+                            <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                                <TableCell className="flex items-center">
+                                    <PendingIcon pending={row.status === "pending"} />
+                                    {formatDate(row.date)}
+                                </TableCell>
                                 <TableCell>{row.system_id}</TableCell>
                                 <TableCell>{row.number_of_fish_stocking}</TableCell>
                                 <TableCell>{row.type_of_stocking}</TableCell>
@@ -282,14 +310,17 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {data.map((row, index) => (
-                        <TableRow key={row.id ?? index}>
-                            <TableCell>N/A</TableCell>
-                            <TableCell>{row.name}</TableCell>
-                            <TableCell>{row.type}</TableCell>
-                            <TableCell>{row.growth_stage}</TableCell>
-                            <TableCell className="text-right text-muted-foreground text-xs">{formatCreatedAt(row.created_at)}</TableCell>
-                        </TableRow>
+                {data.map((row, index) => (
+                    <TableRow key={row.id ?? index} className={row.status === "pending" ? "opacity-60" : ""}>
+                        <TableCell className="flex items-center">
+                            <PendingIcon pending={row.status === "pending"} />
+                            N/A
+                        </TableCell>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell>{row.type}</TableCell>
+                        <TableCell>{row.growth_stage}</TableCell>
+                        <TableCell className="text-right text-muted-foreground text-xs">{formatCreatedAt(row.created_at)}</TableCell>
+                    </TableRow>
                     ))}
                 </TableBody>
             </Table>

@@ -33,9 +33,11 @@ const formSchema = z.object({
 interface StockingFormProps {
     systems: Tables<"api_system_options">[]
     batches: Tables<"api_fingerling_batch_options">[]
+    defaultSystemId?: number | null
+    defaultBatchId?: number | null
 }
 
-export function StockingForm({ systems, batches }: StockingFormProps) {
+export function StockingForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: StockingFormProps) {
     const mutation = useRecordStocking()
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -45,8 +47,8 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
             number_of_fish: 0,
             total_weight_kg: 0,
             average_body_weight_g: 0,
-            system_id: "",
-            batch_id: "",
+            system_id: defaultSystemId ? String(defaultSystemId) : "",
+            batch_id: defaultBatchId ? String(defaultBatchId) : "",
             type_of_stocking: "empty",
         },
     })
@@ -96,7 +98,7 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
             </div>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="system_id"
@@ -233,3 +235,4 @@ export function StockingForm({ systems, batches }: StockingFormProps) {
         </div>
     )
 }
+

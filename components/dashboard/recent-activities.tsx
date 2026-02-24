@@ -6,6 +6,8 @@ import { useRecentEntries } from "@/lib/hooks/use-reports"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import type { Enums } from "@/lib/types/database"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 export default function RecentActivities({
   batch = "all",
@@ -24,6 +26,26 @@ export default function RecentActivities({
   const entriesQuery = useRecentEntries()
   const systemsQuery = useSystemOptions({ farmId, activeOnly: true })
   const loading = entriesQuery.isLoading || systemsQuery.isLoading
+  const entryErrors = useMemo(() => {
+    const data = entriesQuery.data
+    if (!data) return []
+    return [
+      getQueryResultError(data.mortality),
+      getQueryResultError(data.feeding),
+      getQueryResultError(data.sampling),
+      getQueryResultError(data.transfer),
+      getQueryResultError(data.harvest),
+      getQueryResultError(data.water_quality),
+      getQueryResultError(data.incoming_feed),
+      getQueryResultError(data.stocking),
+      getQueryResultError(data.systems),
+    ].filter(Boolean) as string[]
+  }, [entriesQuery.data])
+  const errorMessages = [
+    getErrorMessage(entriesQuery.error),
+    getErrorMessage(systemsQuery.error),
+    ...entryErrors,
+  ].filter(Boolean) as string[]
 
   const systemStageMap = useMemo(() => {
     const map = new Map<number, string | null | undefined>()
@@ -215,6 +237,19 @@ export default function RecentActivities({
     return new Intl.DateTimeFormat(undefined, { month: "short", day: "2-digit" }).format(parsed)
   }
 
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load recent activities"
+        description={errorMessages[0]}
+        onRetry={() => {
+          entriesQuery.refetch()
+          systemsQuery.refetch()
+        }}
+      />
+    )
+  }
+
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
@@ -229,10 +264,16 @@ export default function RecentActivities({
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
       <div className="p-4 border-b border-border flex items-center justify-between">
-        <h2 className="font-semibold text-sm">{title}</h2>
-        <span className="text-xs text-muted-foreground">
-          {activities.length} {countLabel}
-        </span>
+        <div>
+          <h2 className="font-semibold text-sm">{title}</h2>
+          <DataUpdatedAt updatedAt={entriesQuery.dataUpdatedAt} />
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>
+            {activities.length} {countLabel}
+          </span>
+          <DataFetchingBadge isFetching={entriesQuery.isFetching} isLoading={entriesQuery.isLoading} />
+        </div>
       </div>
       <div className="divide-y divide-border">
         {activities.length > 0 ? (

@@ -7,6 +7,8 @@ import { isSbPermissionDenied, logSbError } from "@/utils/supabase/log"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/hooks/use-toast"
+import { ToastAction } from "@/components/ui/toast"
+import { useRouter } from "next/navigation"
 import type { Tables } from "@/lib/types/database"
 
 type AlertThresholdRow = Tables<"alert_threshold">
@@ -29,6 +31,8 @@ export type AlertNotification = {
   kind: NotificationKind
   severity: NotificationSeverity
   read: boolean
+  href?: string
+  actionLabel?: string
 }
 
 type NotificationsContextValue = {
@@ -62,6 +66,7 @@ const resolveThreshold = (thresholds: AlertThresholdRow[], systemId?: number | n
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), [])
   const queryClient = useQueryClient()
+  const router = useRouter()
   const { farmId } = useActiveFarm()
   const { profile, session } = useAuth()
   const { toast } = useToast()
@@ -145,10 +150,15 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           title: notification.title,
           description: notification.description,
           variant: notification.severity === "critical" ? "destructive" : "default",
+          action: notification.href ? (
+            <ToastAction altText={notification.actionLabel ?? "View details"} onClick={() => router.push(notification.href!)}>
+              {notification.actionLabel ?? "View"}
+            </ToastAction>
+          ) : undefined,
         })
       }
     },
-    [notificationsEnabled, toast],
+    [notificationsEnabled, router, toast],
   )
 
   const markAllRead = useCallback(() => {
@@ -250,6 +260,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 kind: "water_quality",
                 severity: "critical",
                 read: false,
+                href: `/water-quality?system=${row.system_id}`,
+                actionLabel: "View water quality",
               })
             }
           }
@@ -267,6 +279,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 kind: "water_quality",
                 severity: "critical",
                 read: false,
+                href: `/water-quality?system=${row.system_id}`,
+                actionLabel: "View water quality",
               })
             }
           }
@@ -309,6 +323,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 kind: "mortality",
                 severity: "critical",
                 read: false,
+                href: `/reports?tab=mortality&system=${row.system_id}`,
+                actionLabel: "View mortality",
               })
             }
           }
@@ -331,6 +347,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 kind: "feeding",
                 severity: "warning",
                 read: false,
+                href: `/feed?system=${row.system_id}`,
+                actionLabel: "Review feeding",
               })
             }
             if (typeof highFeed === "number" && feedingRate > highFeed) {
@@ -345,6 +363,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 kind: "feeding",
                 severity: "warning",
                 read: false,
+                href: `/feed?system=${row.system_id}`,
+                actionLabel: "Review feeding",
               })
             }
           }

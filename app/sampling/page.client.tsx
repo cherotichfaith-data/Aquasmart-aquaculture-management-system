@@ -10,6 +10,9 @@ import { getDateRangeFromPeriod, sortByDateAsc } from "@/lib/utils"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { LazyRender } from "@/components/shared/lazy-render"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 const formatDayLabel = (value: string) => {
   const parsed = new Date(`${value}T00:00:00`)
@@ -38,6 +41,8 @@ export default function SamplingPage() {
   const [targetHarvestWeight, setTargetHarvestWeight] = useState<string>("350")
   const [manualDailyGain, setManualDailyGain] = useState<string>("")
   const [sampleWeightsText, setSampleWeightsText] = useState("")
+  const [showSamplingRecords, setShowSamplingRecords] = useState(false)
+  const [tableLimit, setTableLimit] = useState("50")
 
   const {
     selectedSystemId: systemId,
@@ -81,13 +86,45 @@ export default function SamplingPage() {
     limit: 2000,
     enabled: samplingQueryEnabled,
   })
+  const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 50
+  const tableQueryEnabled =
+    showSamplingRecords &&
+    samplingQueryEnabled &&
+    (selectedSystem !== "all" || selectedBatch !== "all" || selectedStage !== "all")
+  const samplingTableQuery = useSamplingData({
+    systemId: hasSystem ? (systemId as number) : undefined,
+    systemIds: !hasSystem ? scopedSystemIdList : undefined,
+    batchId: Number.isFinite(batchId) ? batchId : undefined,
+    dateFrom,
+    dateTo,
+    limit: tableLimitValue,
+    enabled: tableQueryEnabled,
+  })
 
   const rows = samplingQuery.data?.status === "success" ? samplingQuery.data.data : []
+  const tableRows = samplingTableQuery.data?.status === "success" ? samplingTableQuery.data.data : []
   const loading = samplingQuery.isLoading || systemsQuery.isLoading || batchSystemsQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(samplingQuery.error),
+    getQueryResultError(samplingQuery.data),
+    getErrorMessage(systemsQuery.error),
+    getQueryResultError(systemsQuery.data),
+    getErrorMessage(batchSystemsQuery.error),
+    getQueryResultError(batchSystemsQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    samplingQuery.dataUpdatedAt ?? 0,
+    systemsQuery.dataUpdatedAt ?? 0,
+    batchSystemsQuery.dataUpdatedAt ?? 0,
+  )
 
   const filteredRows = useMemo(
     () => rows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
     [rows, scopedSystemIds],
+  )
+  const tableFilteredRows = useMemo(
+    () => tableRows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
+    [tableRows, scopedSystemIds],
   )
 
   const chartRows = useMemo(() => {
@@ -210,9 +247,15 @@ export default function SamplingPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 rounded-lg border border-border/80 bg-card p-4 shadow-sm">
-          <div>
-            <h1 className="text-3xl font-bold">Sampling & Growth</h1>
-            <p className="text-muted-foreground mt-1">ABW trends, growth projection, sample-quality checks, and planning readiness</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-3xl font-bold">Sampling & Growth</h1>
+              <p className="text-muted-foreground mt-1">ABW trends, growth projection, sample-quality checks, and planning readiness</p>
+            </div>
+            <div className="flex flex-col items-end gap-1 text-xs">
+              <DataUpdatedAt updatedAt={latestUpdatedAt} />
+              <DataFetchingBadge isFetching={samplingQuery.isFetching} isLoading={loading} />
+            </div>
           </div>
         </div>
 
@@ -247,6 +290,17 @@ export default function SamplingPage() {
           </div>
         </section>
 
+        {errorMessages.length > 0 ? (
+          <DataErrorState
+            title="Unable to load sampling data"
+            description={errorMessages[0]}
+            onRetry={() => {
+              samplingQuery.refetch()
+              systemsQuery.refetch()
+              batchSystemsQuery.refetch()
+            }}
+          />
+        ) : null}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-xs text-muted-foreground">Total Samples</p>
@@ -282,8 +336,9 @@ export default function SamplingPage() {
             <div className="h-80 flex items-center justify-center text-muted-foreground">Loading chart...</div>
           ) : chartRows.length > 0 ? (
             <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartRows}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartRows}>
                   <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
                   <XAxis dataKey="label" />
                   <YAxis />
@@ -298,8 +353,9 @@ export default function SamplingPage() {
                   {Number.isFinite(target) ? <ReferenceLine y={target} stroke="hsl(var(--chart-4))" strokeDasharray="4 4" label="Target ABW" /> : null}
                   <Line type="monotone" dataKey="abw" stroke="hsl(var(--chart-1))" strokeWidth={2.5} name="Observed ABW (g)" />
                   <Line type="monotone" dataKey="expectedAbw" stroke="hsl(var(--chart-2))" strokeDasharray="5 5" name="Expected ABW (g)" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+                  </LineChart>
+                </ResponsiveContainer>
+              </LazyRender>
             </div>
           ) : (
             <div className="h-80 flex items-center justify-center text-muted-foreground">No sampling data available</div>
@@ -319,7 +375,7 @@ export default function SamplingPage() {
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             placeholder="Example: 120, 123, 119, 125, ..."
           />
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mt-4">
             <div className="rounded-md border border-border bg-muted/20 p-3">
               <p className="text-xs text-muted-foreground">Sample Count</p>
               <p className="text-lg font-semibold">{sampleStats.count}</p>
@@ -347,52 +403,90 @@ export default function SamplingPage() {
 
         <div className="bg-card border border-border rounded-lg overflow-hidden">
           <div className="p-4 border-b border-border">
-            <h2 className="font-semibold">Sampling Records</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Sampling Records</h2>
+                <p className="text-xs text-muted-foreground">Drilldown table filtered by the selected stage/system/batch.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs text-muted-foreground">Rows</label>
+                <select
+                  value={tableLimit}
+                  onChange={(event) => setTableLimit(event.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                </select>
+                <button
+                  type="button"
+                  className="h-9 rounded-md border border-input px-3 text-sm hover:bg-muted/40"
+                  onClick={() => setShowSamplingRecords((prev) => !prev)}
+                >
+                  {showSamplingRecords ? "Hide details" : "View details"}
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted/60 border-b border-border">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">System</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Batch</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Fish Sampled</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Total Weight</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">ABW (g)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : filteredRows.length > 0 ? (
-                  filteredRows.map((record) => (
-                    <tr key={record.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 text-sm">{record.date}</td>
-                      <td className="px-4 py-3 text-sm">{record.system_id}</td>
-                      <td className="px-4 py-3 text-sm">{record.batch_id ?? "-"}</td>
-                      <td className={`px-4 py-3 text-sm ${record.number_of_fish_sampling >= 10 ? "text-chart-2" : "text-chart-4"}`}>
-                        {record.number_of_fish_sampling}
-                      </td>
-                      <td className="px-4 py-3 text-sm">{record.total_weight_sampling}</td>
-                      <td className="px-4 py-3 text-sm font-semibold">{record.abw}</td>
+          {showSamplingRecords ? (
+            tableQueryEnabled ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/60 border-b border-border">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">System</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Batch</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Fish Sampled</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Weight</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">ABW (g)</th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                      No sampling data found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {samplingTableQuery.isLoading ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : tableFilteredRows.length > 0 ? (
+                      tableFilteredRows.map((record) => (
+                        <tr key={record.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 text-sm">{record.date}</td>
+                          <td className="px-4 py-3 text-sm">{record.system_id}</td>
+                          <td className="px-4 py-3 text-sm">{record.batch_id ?? "-"}</td>
+                          <td className={`px-4 py-3 text-sm ${record.number_of_fish_sampling >= 10 ? "text-chart-2" : "text-chart-4"}`}>
+                            {record.number_of_fish_sampling}
+                          </td>
+                          <td className="px-4 py-3 text-sm">{record.total_weight_sampling}</td>
+                          <td className="px-4 py-3 text-sm font-semibold">{record.abw}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                          No sampling data found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="px-4 py-6 text-sm text-muted-foreground">
+                Select a stage, batch, or system to drill down into sampling records.
+              </div>
+            )
+          ) : (
+            <div className="px-4 py-6 text-sm text-muted-foreground">
+              Detailed records are hidden. Choose a stage/system/batch and click <span className="text-foreground font-medium">View details</span>.
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
   )
 }
+

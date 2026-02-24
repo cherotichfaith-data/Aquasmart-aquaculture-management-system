@@ -1,7 +1,7 @@
 import type { Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
-import { isSbPermissionDenied } from "@/utils/supabase/log"
+import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type ProductionSummaryRow = Tables<"api_production_summary">
 type EfcrLastSamplingRow = Tables<"api_efcr_trend">
@@ -41,7 +41,7 @@ export async function getProductionSummary(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.rpc("api_production_summary", productionRpcArgs({
+  let query = queryKpiRpc(supabase, "api_production_summary", productionRpcArgs({
     farmId: params.farmId,
     systemId: params.systemId,
     dateFrom: params.dateFrom,
@@ -51,7 +51,7 @@ export async function getProductionSummary(params?: {
 
   const { data, error } = await query
   if (error) {
-    if (isSbPermissionDenied(error)) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error)) {
       return toQuerySuccess<ProductionSummaryRow>([])
     }
     if (String(error?.name ?? "") === "AbortError") {
@@ -85,7 +85,7 @@ export async function getEfcrTrend(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.rpc("api_efcr_trend", productionRpcArgs({
+  let query = queryKpiRpc(supabase, "api_efcr_trend", productionRpcArgs({
     farmId: params.farmId,
     systemId: params.systemId,
     dateFrom: params.dateFrom,
@@ -95,7 +95,7 @@ export async function getEfcrTrend(params?: {
 
   const { data, error } = await query
   if (error) {
-    if (isSbPermissionDenied(error)) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error)) {
       return toQuerySuccess<EfcrLastSamplingRow>([])
     }
     if (String(error?.name ?? "") === "AbortError") {

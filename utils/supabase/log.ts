@@ -4,16 +4,64 @@ type SbErrorLike = {
   hint?: string
   code?: string
   status?: number
+  name?: string
 }
 
 function asSbErrorLike(err: unknown): SbErrorLike {
-  if (!err || typeof err !== "object") return {}
-  return err as SbErrorLike
+  if (!err) return {}
+  if (typeof err === "string") return { message: err }
+  if (err instanceof Error) {
+    const typed = err as Error & {
+      details?: string
+      hint?: string
+      code?: string
+      status?: number
+      name?: string
+    }
+    return {
+      message: typed.message,
+      details: typed.details,
+      hint: typed.hint,
+      code: typed.code,
+      status: typed.status,
+      name: typed.name,
+    }
+  }
+  if (typeof err === "object") {
+    const obj = err as {
+      message?: string
+      details?: string
+      hint?: string
+      code?: string
+      status?: number
+      name?: string
+      error?: string
+    }
+    return {
+      message: obj.message ?? obj.error,
+      details: obj.details,
+      hint: obj.hint,
+      code: obj.code,
+      status: obj.status,
+      name: obj.name,
+    }
+  }
+  return { message: String(err) }
 }
 
 export function logSbError(tag: string, err: unknown) {
   if (!err) return
   const safeErr = asSbErrorLike(err)
+  if (
+    !safeErr.message &&
+    !safeErr.details &&
+    !safeErr.hint &&
+    !safeErr.code &&
+    !safeErr.status &&
+    !safeErr.name
+  ) {
+    return
+  }
   console.error(tag, {
     message: safeErr.message,
     details: safeErr.details,
@@ -31,5 +79,11 @@ export function isSbPermissionDenied(err: unknown) {
 
 export function isSbAuthMissing(err: unknown) {
   const safeErr = asSbErrorLike(err)
-  return safeErr.status === 401 || /auth session missing/i.test(safeErr.message ?? "")
+  return (
+    safeErr.status === 401 ||
+    safeErr.code === "401" ||
+    /auth session missing/i.test(safeErr.message ?? "") ||
+    /session missing/i.test(safeErr.message ?? "") ||
+    safeErr.name === "AuthSessionMissingError"
+  )
 }

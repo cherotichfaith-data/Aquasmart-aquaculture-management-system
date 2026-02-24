@@ -8,6 +8,9 @@ import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { LazyRender } from "@/components/shared/lazy-render"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 const formatDateLabel = (value: string | number) => {
   const parsed = new Date(String(value))
@@ -27,10 +30,13 @@ export default function FeedingReport({
   farmName?: string | null
 }) {
   const { farmId } = useActiveFarm()
+  const chartLimit = 2000
+  const [tableLimit, setTableLimit] = useState("100")
+  const [showFeedingRecords, setShowFeedingRecords] = useState(false)
   const feedingRecordsQuery = useFeedingRecords({
     systemId,
     batchId,
-    limit: 5000,
+    limit: chartLimit,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
   })
@@ -39,12 +45,35 @@ export default function FeedingReport({
     systemId,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
-    limit: 5000,
+    limit: chartLimit,
+  })
+  const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
+  const feedingTableQuery = useFeedingRecords({
+    systemId,
+    batchId,
+    limit: tableLimitValue,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    enabled: showFeedingRecords,
   })
   const records = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
+  const tableRecords = feedingTableQuery.data?.status === "success" ? feedingTableQuery.data.data : []
   const summaryRows = summaryQuery.data?.status === "success" ? summaryQuery.data.data : []
   const loading = feedingRecordsQuery.isLoading
-  const [showFeedingRecords, setShowFeedingRecords] = useState(false)
+  const tableLoading = feedingTableQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(feedingRecordsQuery.error),
+    getQueryResultError(feedingRecordsQuery.data),
+    getErrorMessage(summaryQuery.error),
+    getQueryResultError(summaryQuery.data),
+    getErrorMessage(feedingTableQuery.error),
+    getQueryResultError(feedingTableQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    feedingRecordsQuery.dataUpdatedAt ?? 0,
+    summaryQuery.dataUpdatedAt ?? 0,
+    feedingTableQuery.dataUpdatedAt ?? 0,
+  )
   const chartRecords = useMemo(() => {
     const byDate = new Map<string, number>()
     records.forEach((row) => {
@@ -86,7 +115,6 @@ export default function FeedingReport({
     )
   }, [summaryRows])
 
-  const latest = records[0]
   const totalKgFed = useMemo(() => records.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0), [records])
   const avgProtein = useMemo(() => {
     const weighted = records.reduce(
@@ -113,8 +141,25 @@ export default function FeedingReport({
   }, [summaryRows])
   const costPerKgGainDisplay = "N/A"
 
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load feeding report"
+        description={errorMessages[0]}
+        onRetry={() => {
+          feedingRecordsQuery.refetch()
+          summaryQuery.refetch()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between text-xs">
+        <DataUpdatedAt updatedAt={latestUpdatedAt} />
+        <DataFetchingBadge isFetching={feedingRecordsQuery.isFetching || summaryQuery.isFetching || feedingTableQuery.isFetching} isLoading={loading} />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -164,8 +209,9 @@ export default function FeedingReport({
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartRecords}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartRecords}>
                   <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
                   <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -176,8 +222,9 @@ export default function FeedingReport({
                   />
                   <Legend />
                   <Line type="monotone" dataKey="feeding_amount" stroke="var(--color-chart-1)" strokeWidth={2.4} name="Feed (kg)" />
-                </LineChart>
-              </ResponsiveContainer>
+                  </LineChart>
+                </ResponsiveContainer>
+              </LazyRender>
             </div>
           )}
         </CardContent>
@@ -190,8 +237,9 @@ export default function FeedingReport({
         </CardHeader>
         <CardContent>
           <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={efficiencyTrendRows}>
+            <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={efficiencyTrendRows}>
                 <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
                 <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                 <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -202,8 +250,9 @@ export default function FeedingReport({
                 />
                 <Legend />
                 <Line type="monotone" dataKey="efcr_period" stroke="var(--color-chart-3)" strokeWidth={2.4} name="eFCR" />
-              </LineChart>
-            </ResponsiveContainer>
+                </LineChart>
+              </ResponsiveContainer>
+            </LazyRender>
           </div>
         </CardContent>
       </Card>
@@ -213,6 +262,16 @@ export default function FeedingReport({
           <div className="flex items-center justify-between gap-2">
             <CardTitle>Feeding Records</CardTitle>
             <div className="flex gap-2">
+              <select
+                value={tableLimit}
+                onChange={(event) => setTableLimit(event.target.value)}
+                className="px-3 py-2 rounded-md border border-input text-sm"
+                aria-label="Rows to display"
+              >
+                <option value="50">50 rows</option>
+                <option value="100">100 rows</option>
+                <option value="250">250 rows</option>
+              </select>
               <button
                 type="button"
                 className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
@@ -227,7 +286,7 @@ export default function FeedingReport({
                   downloadCsv({
                     filename: `feed-analysis-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
                     headers: ["date", "system_id", "batch_id", "feed_type", "feeding_amount", "feeding_response", "crude_protein_percentage"],
-                    rows: records.map((row) => [
+                    rows: (showFeedingRecords ? tableRecords : records.slice(0, tableLimitValue)).map((row) => [
                       row.date,
                       row.system_id,
                       row.batch_id,
@@ -257,7 +316,7 @@ export default function FeedingReport({
                       `Biomass gain (kg): ${biomassGain.toFixed(2)}`,
                     ],
                     tableHeaders: ["Date", "System", "Batch", "Feed Type", "Amount (kg)", "Response", "Protein (%)"],
-                    tableRows: records.map((row) => [
+                    tableRows: (showFeedingRecords ? tableRecords : records.slice(0, tableLimitValue)).map((row) => [
                       row.date,
                       row.system_id,
                       row.batch_id ?? "-",
@@ -290,14 +349,14 @@ export default function FeedingReport({
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {tableLoading ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
                       Loading...
                     </td>
                   </tr>
-                ) : records.length > 0 ? (
-                  records.map((row) => (
+                ) : tableRecords.length > 0 ? (
+                  tableRecords.map((row) => (
                     <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
                       <td className="px-4 py-2 font-medium">{row.date}</td>
                       <td className="px-4 py-2">{row.system_id}</td>
@@ -319,7 +378,7 @@ export default function FeedingReport({
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {records.length} rows.
+              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show up to {tableLimitValue} rows.
             </div>
           )}
         </CardContent>

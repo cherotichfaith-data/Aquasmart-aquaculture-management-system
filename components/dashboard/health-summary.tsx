@@ -6,6 +6,8 @@ import { Droplets, HeartPulse } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useHealthSummary } from "@/lib/hooks/use-dashboard"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage } from "@/lib/utils/query-result"
 
 type Tone = "good" | "warn" | "bad"
 
@@ -83,6 +85,18 @@ export default function HealthSummary({
   const waterQuality = useMemo(() => summaryQuery.data?.waterQuality ?? null, [summaryQuery.data])
   const fishHealth = useMemo(() => summaryQuery.data?.fishHealth ?? null, [summaryQuery.data])
 
+  const errorMessage = getErrorMessage(summaryQuery.error)
+
+  if (summaryQuery.isError) {
+    return (
+      <DataErrorState
+        title="Unable to load health summary"
+        description={errorMessage ?? "Please retry or check your connection."}
+        onRetry={() => summaryQuery.refetch()}
+      />
+    )
+  }
+
   if (summaryQuery.isLoading || !waterQuality || !fishHealth) {
     return (
       <div className="grid gap-4">
@@ -93,23 +107,29 @@ export default function HealthSummary({
   }
 
   return (
-    <div className="grid gap-4">
-      <StatusCard
-        icon={<Droplets size={18} />}
-        title={waterQuality.title}
-        status={waterQuality.status}
-        tone={waterQuality.tone}
-        progress={waterQuality.progress}
-        detail={waterQuality.detail}
-      />
-      <StatusCard
-        icon={<HeartPulse size={18} />}
-        title={fishHealth.title}
-        status={fishHealth.status}
-        tone={fishHealth.tone}
-        progress={fishHealth.progress}
-        detail={fishHealth.detail}
-      />
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
+        <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
+      </div>
+      <div className="grid gap-4">
+        <StatusCard
+          icon={<Droplets size={18} />}
+          title={waterQuality.title}
+          status={waterQuality.status}
+          tone={waterQuality.tone}
+          progress={waterQuality.progress}
+          detail={waterQuality.detail}
+        />
+        <StatusCard
+          icon={<HeartPulse size={18} />}
+          title={fishHealth.title}
+          status={fishHealth.status}
+          tone={fishHealth.tone}
+          progress={fishHealth.progress}
+          detail={fishHealth.detail}
+        />
+      </div>
     </div>
   )
 }

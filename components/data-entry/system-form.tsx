@@ -105,7 +105,7 @@ export function SystemForm() {
                         )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="type"
@@ -153,7 +153,7 @@ export function SystemForm() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="depth"
@@ -183,7 +183,7 @@ export function SystemForm() {
                     </div>
 
                     {(type === "rectangular_cage" || type === "pond" || type === "tank") && (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="length"
@@ -238,4 +238,5 @@ export function SystemForm() {
         </div>
     )
 }
+
 

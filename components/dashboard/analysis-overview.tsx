@@ -19,6 +19,9 @@ import type { TimePeriod } from "@/components/shared/time-period-selector"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useProductionTrend } from "@/lib/hooks/use-dashboard"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
+import { LazyRender } from "@/components/shared/lazy-render"
+import { getErrorMessage } from "@/lib/utils/query-result"
 
 type SummaryRow = Tables<"api_production_summary">
 
@@ -85,6 +88,7 @@ export default function AnalysisOverview({
     system,
     timePeriod: periodParam ?? timePeriod,
   })
+  const errorMessage = getErrorMessage(summaryQuery.error)
 
   const chartData = useMemo(() => {
     const rows = summaryQuery.data ?? []
@@ -161,18 +165,33 @@ export default function AnalysisOverview({
     }
   }, [chartData])
 
+  if (summaryQuery.isError) {
+    return (
+      <DataErrorState
+        title="Unable to load production trend"
+        description={errorMessage ?? "Please retry or check your connection."}
+        onRetry={() => summaryQuery.refetch()}
+      />
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <Card className="xl:col-span-2">
         <CardHeader className="border-b border-border">
-          <CardTitle>Production Trend</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Production Trend</CardTitle>
+            <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
+          </div>
+          <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
         </CardHeader>
         <CardContent className="pt-4">
           {summaryQuery.isLoading ? (
             <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
           ) : chartData.length ? (
-            <ResponsiveContainer width="100%" height={320}>
-              <ComposedChart data={chartData}>
+            <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tickFormatter={(value) => formatAxisDate(value)} />
                 <YAxis yAxisId="left" />
@@ -223,10 +242,11 @@ export default function AnalysisOverview({
                   dot={false}
                   name="Population"
                 />
-              </ComposedChart>
-            </ResponsiveContainer>
+                </ComposedChart>
+              </ResponsiveContainer>
+            </LazyRender>
           ) : (
-            <div className="h-[320px] flex items-center justify-center text-muted-foreground">No data available.</div>
+            <EmptyState title="No production data" description="No production metrics available for the selected range." />
           )}
         </CardContent>
       </Card>

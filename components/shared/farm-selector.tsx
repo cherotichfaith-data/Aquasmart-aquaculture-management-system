@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
@@ -29,12 +29,7 @@ export default function FarmSelector({
   variant = "default",
 }: FarmSelectorProps) {
   const { farmId } = useActiveFarm()
-  const stages = [
-    { value: "all", label: "All Stages" },
-    { value: "nursing", label: "Nursing Stage" },
-    { value: "grow_out", label: "Grow-out Stage" },
-  ] as const
-  
+
   const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
   const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
 
@@ -44,6 +39,29 @@ export default function FarmSelector({
   const systems = (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []).filter(
     (system) => system.id != null,
   )
+  const systemCount = systems.length
+  const batchCount = batches.length
+  const formatStage = (value: StageFilter | string | null | undefined) => {
+    if (value === "nursing") return "Nursing"
+    if (value === "grow_out") return "Grow-out"
+    return "Unspecified"
+  }
+  const stages = useMemo(() => {
+    const stageSet = new Set<Enums<"system_growth_stage">>()
+    systems.forEach((system) => {
+      if (system.growth_stage === "nursing" || system.growth_stage === "grow_out") {
+        stageSet.add(system.growth_stage)
+      }
+    })
+    if (selectedStage !== "all") {
+      stageSet.add(selectedStage as Enums<"system_growth_stage">)
+    }
+    const ordered = Array.from(stageSet).sort((a, b) => formatStage(a).localeCompare(formatStage(b)))
+    return [
+      { value: "all", label: "All Stages" },
+      ...ordered.map((value) => ({ value, label: formatStage(value) })),
+    ]
+  }, [selectedStage, systems])
 
   useEffect(() => {
     if (batchesQuery.isLoading || selectedBatch === "all") return
@@ -65,7 +83,7 @@ export default function FarmSelector({
       : "px-3 py-2 rounded-md border border-input bg-background text-sm"
 
   return (
-    <div className={variant === "compact" ? "flex flex-wrap items-center gap-2" : "flex flex-col gap-3 md:flex-row"}>
+    <div className={variant === "compact" ? "flex flex-wrap items-center gap-2" : "flex flex-col gap-2 md:flex-row md:items-end"}>
       {showStage ? (
         <select
           value={selectedStage}
@@ -114,6 +132,9 @@ export default function FarmSelector({
           </option>
         ))}
       </select>
+      <span className="text-xs text-muted-foreground">
+        Systems: {systemCount} | Batches: {batchCount}
+      </span>
     </div>
   )
 }

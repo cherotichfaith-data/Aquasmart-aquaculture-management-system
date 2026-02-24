@@ -7,6 +7,8 @@ import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { useSystemOptions } from "@/lib/hooks/use-options"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 export default function ReconciliationReport({
   selectedBatch,
@@ -76,6 +78,19 @@ export default function ReconciliationReport({
 
   const rows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
   const loading = inventoryQuery.isLoading || systemsQuery.isLoading || batchSystemIdsQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(inventoryQuery.error),
+    getQueryResultError(inventoryQuery.data),
+    getErrorMessage(systemsQuery.error),
+    getQueryResultError(systemsQuery.data),
+    getErrorMessage(batchSystemIdsQuery.error),
+    getQueryResultError(batchSystemIdsQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    inventoryQuery.dataUpdatedAt ?? 0,
+    systemsQuery.dataUpdatedAt ?? 0,
+    batchSystemIdsQuery.dataUpdatedAt ?? 0,
+  )
 
   const latestBySystem = useMemo(() => {
     const map = new Map<number, (typeof rows)[number]>()
@@ -132,8 +147,26 @@ export default function ReconciliationReport({
     URL.revokeObjectURL(url)
   }
 
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load reconciliation data"
+        description={errorMessages[0]}
+        onRetry={() => {
+          inventoryQuery.refetch()
+          systemsQuery.refetch()
+          batchSystemIdsQuery.refetch()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <DataUpdatedAt updatedAt={latestUpdatedAt} />
+        <DataFetchingBadge isFetching={inventoryQuery.isFetching} isLoading={loading} />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Systems Reconciled</p>

@@ -8,6 +8,9 @@ import { useActiveFarm } from "@/hooks/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
 import type { Enums } from "@/lib/types/database"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { LazyRender } from "@/components/shared/lazy-render"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 const formatDateLabel = (value: string | number) => {
   const parsed = new Date(String(value))
@@ -37,6 +40,11 @@ export default function GrowthReport({
   })
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const loading = productionSummaryQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(productionSummaryQuery.error),
+    getQueryResultError(productionSummaryQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = productionSummaryQuery.dataUpdatedAt ?? 0
   const [showGrowthRecords, setShowGrowthRecords] = useState(false)
 
   const chartRows = useMemo(() => {
@@ -97,8 +105,22 @@ export default function GrowthReport({
   }, [rows])
   const latest = chartRows[chartRows.length - 1]
 
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load growth report"
+        description={errorMessages[0]}
+        onRetry={() => productionSummaryQuery.refetch()}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between text-xs">
+        <DataUpdatedAt updatedAt={latestUpdatedAt} />
+        <DataFetchingBadge isFetching={productionSummaryQuery.isFetching} isLoading={loading} />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -148,8 +170,9 @@ export default function GrowthReport({
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartRows}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartRows}>
                   <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
                   <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -167,8 +190,9 @@ export default function GrowthReport({
                     strokeWidth={2.4}
                     name="ABW"
                   />
-                </AreaChart>
-              </ResponsiveContainer>
+                  </AreaChart>
+                </ResponsiveContainer>
+              </LazyRender>
             </div>
           )}
         </CardContent>
@@ -184,8 +208,9 @@ export default function GrowthReport({
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartRows}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartRows}>
                   <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
                   <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -196,8 +221,9 @@ export default function GrowthReport({
                   />
                   <Legend />
                   <Line type="monotone" dataKey="total_biomass" stroke="var(--color-chart-2)" strokeWidth={2.4} name="Biomass (kg)" />
-                </LineChart>
-              </ResponsiveContainer>
+                  </LineChart>
+                </ResponsiveContainer>
+              </LazyRender>
             </div>
           )}
         </CardContent>

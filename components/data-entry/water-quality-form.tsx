@@ -43,9 +43,10 @@ const formSchema = z.object({
 
 interface WaterQualityFormProps {
     systems: Tables<"api_system_options">[]
+    defaultSystemId?: number | null
 }
 
-export function WaterQualityForm({ systems }: WaterQualityFormProps) {
+export function WaterQualityForm({ systems, defaultSystemId = null }: WaterQualityFormProps) {
     const mutation = useRecordWaterQuality()
     const { toast } = useToast()
 
@@ -53,7 +54,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
         resolver: zodResolver(formSchema),
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
-            system_id: "",
+            system_id: defaultSystemId ? String(defaultSystemId) : "",
             time: new Date().toISOString().split("T")[1]?.slice(0, 5) ?? "08:00",
             water_depth: 0,
             temperature: undefined,
@@ -150,7 +151,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
             </div>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="system_id"
@@ -216,7 +217,7 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <FormField
                             control={form.control}
                             name="temperature"
@@ -332,3 +333,4 @@ export function WaterQualityForm({ systems }: WaterQualityFormProps) {
         </div>
     )
 }
+

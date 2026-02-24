@@ -27,7 +27,7 @@ const formSchema = z.object({
 
 interface IncomingFeedFormProps {
     feeds: Tables<"api_feed_type_options">[]
-    suppliers: Tables<"suppliers">[]
+    suppliers: Tables<"feed_supplier">[]
 }
 
 export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
@@ -83,7 +83,7 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
                         )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="feed_id"
@@ -110,7 +110,7 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="quantity"
@@ -135,3 +135,4 @@ export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
         </div>
     )
 }
+

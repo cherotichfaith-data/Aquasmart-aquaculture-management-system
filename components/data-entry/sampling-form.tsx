@@ -32,9 +32,11 @@ const formSchema = z.object({
 interface SamplingFormProps {
     systems: Tables<"api_system_options">[]
     batches: Tables<"api_fingerling_batch_options">[]
+    defaultSystemId?: number | null
+    defaultBatchId?: number | null
 }
 
-export function SamplingForm({ systems, batches }: SamplingFormProps) {
+export function SamplingForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: SamplingFormProps) {
     const mutation = useRecordSampling()
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -43,9 +45,9 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
             date: new Date().toISOString().split("T")[0],
             number_of_fish: 0,
             total_weight_kg: 0,
-            system_id: "",
+            system_id: defaultSystemId ? String(defaultSystemId) : "",
             average_body_weight_g: 0,
-            batch_id: "none",
+            batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
 
@@ -88,7 +90,7 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
             </div>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="system_id"
@@ -203,3 +205,4 @@ export function SamplingForm({ systems, batches }: SamplingFormProps) {
         </div>
     )
 }
+

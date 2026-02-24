@@ -12,9 +12,10 @@ export function useDailyFishInventory(params?: {
   cursorDate?: string
   farmId?: string | null
   orderAsc?: boolean
+  enabled?: boolean
 }) {
   const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(params?.farmId)
+  const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
   return useQuery({
     queryKey: [
       "inventory",

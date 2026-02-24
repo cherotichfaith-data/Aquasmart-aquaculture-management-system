@@ -20,6 +20,8 @@ import {
   FeedIncomingInventoryTable,
   FeedNutritionSection,
 } from "./feed-sections"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 export default function FeedManagementPage() {
   const { farmId } = useActiveFarm()
@@ -34,6 +36,7 @@ export default function FeedManagementPage() {
     setTimePeriod,
   } = useSharedFilters("quarter")
   const [efcrTarget, setEfcrTarget] = useState<string>("1.4")
+  const chartLimit = 2000
   const {
     selectedSystemId: systemId,
     hasSystem,
@@ -76,7 +79,7 @@ export default function FeedManagementPage() {
     batchId: Number.isFinite(batchId) ? (batchId as number) : undefined,
     dateFrom,
     dateTo,
-    limit: 5000,
+    limit: chartLimit,
     enabled: feedingQueryEnabled,
   })
   const efcrTrendQuery = useEfcrTrend({
@@ -84,7 +87,7 @@ export default function FeedManagementPage() {
     systemId: hasSystem ? (systemId as number) : undefined,
     dateFrom,
     dateTo,
-    limit: 5000,
+    limit: chartLimit,
     enabled: true,
   })
 
@@ -94,6 +97,28 @@ export default function FeedManagementPage() {
   const feedingRecords = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
   const efcrTrend = efcrTrendQuery.data?.status === "success" ? efcrTrendQuery.data.data : []
   const loading = feedIncomingQuery.isLoading || feedTypesQuery.isLoading || feedingRecordsQuery.isLoading || efcrTrendQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(feedIncomingQuery.error),
+    getQueryResultError(feedIncomingQuery.data),
+    getErrorMessage(feedTypesQuery.error),
+    getQueryResultError(feedTypesQuery.data),
+    getErrorMessage(feedingRecordsQuery.error),
+    getQueryResultError(feedingRecordsQuery.data),
+    getErrorMessage(efcrTrendQuery.error),
+    getQueryResultError(efcrTrendQuery.data),
+    getErrorMessage(systemsQuery.error),
+    getQueryResultError(systemsQuery.data),
+    getErrorMessage(batchSystemsQuery.error),
+    getQueryResultError(batchSystemsQuery.data),
+    getErrorMessage(batchesQuery.error),
+    getQueryResultError(batchesQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    feedIncomingQuery.dataUpdatedAt ?? 0,
+    feedingRecordsQuery.dataUpdatedAt ?? 0,
+    efcrTrendQuery.dataUpdatedAt ?? 0,
+    systemsQuery.dataUpdatedAt ?? 0,
+  )
 
   const systemNameById = useMemo(() => {
     const map = new Map<number, string>()
@@ -258,9 +283,15 @@ export default function FeedManagementPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 rounded-lg border border-border/80 bg-card p-4 shadow-sm">
-          <div>
-            <h1 className="text-3xl font-bold">Feed Management</h1>
-            <p className="text-muted-foreground mt-1">Daily feed logging, eFCR efficiency, nutrition analysis, and anomaly detection</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-3xl font-bold">Feed Management</h1>
+              <p className="text-muted-foreground mt-1">Daily feed logging, eFCR efficiency, nutrition analysis, and anomaly detection</p>
+            </div>
+            <div className="flex flex-col items-end gap-1 text-xs">
+              <DataUpdatedAt updatedAt={latestUpdatedAt} />
+              <DataFetchingBadge isFetching={feedIncomingQuery.isFetching} isLoading={loading} />
+            </div>
           </div>
 
           <FarmSelector
@@ -273,6 +304,21 @@ export default function FeedManagementPage() {
           />
         </div>
 
+        {errorMessages.length > 0 ? (
+          <DataErrorState
+            title="Unable to load feed analytics"
+            description={errorMessages[0]}
+            onRetry={() => {
+              feedIncomingQuery.refetch()
+              feedTypesQuery.refetch()
+              feedingRecordsQuery.refetch()
+              efcrTrendQuery.refetch()
+              systemsQuery.refetch()
+              batchSystemsQuery.refetch()
+              batchesQuery.refetch()
+            }}
+          />
+        ) : null}
         <div className="rounded-lg border border-border/80 bg-card p-4 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>

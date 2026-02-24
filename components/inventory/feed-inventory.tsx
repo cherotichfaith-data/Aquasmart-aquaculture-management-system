@@ -8,6 +8,8 @@ import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { useSystemOptions } from "@/lib/hooks/use-options"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 type PurchaseOrderStatus = "Pending" | "Received" | "Confirmed"
 type PurchaseOrder = {
@@ -39,6 +41,25 @@ export default function FeedInventory({
   const feedTypes = feedTypesQuery.data?.status === "success" ? feedTypesQuery.data.data : []
   const loading =
     feedIncomingQuery.isLoading || feedTypesQuery.isLoading || inventoryQuery.isLoading || systemsQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(feedIncomingQuery.error),
+    getQueryResultError(feedIncomingQuery.data),
+    getErrorMessage(feedTypesQuery.error),
+    getQueryResultError(feedTypesQuery.data),
+    getErrorMessage(inventoryQuery.error),
+    getQueryResultError(inventoryQuery.data),
+    getErrorMessage(systemsQuery.error),
+    getQueryResultError(systemsQuery.data),
+    getErrorMessage(batchSystemIdsQuery.error),
+    getQueryResultError(batchSystemIdsQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    feedIncomingQuery.dataUpdatedAt ?? 0,
+    feedTypesQuery.dataUpdatedAt ?? 0,
+    inventoryQuery.dataUpdatedAt ?? 0,
+    systemsQuery.dataUpdatedAt ?? 0,
+    batchSystemIdsQuery.dataUpdatedAt ?? 0,
+  )
 
   const stageSystemIds = useMemo(
     () =>
@@ -133,8 +154,28 @@ export default function FeedInventory({
     setPurchaseOrders((prev) => prev.map((po) => (po.id === id ? { ...po, status } : po)))
   }
 
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load feed inventory"
+        description={errorMessages[0]}
+        onRetry={() => {
+          feedIncomingQuery.refetch()
+          feedTypesQuery.refetch()
+          inventoryQuery.refetch()
+          systemsQuery.refetch()
+          batchSystemIdsQuery.refetch()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <DataUpdatedAt updatedAt={latestUpdatedAt} />
+        <DataFetchingBadge isFetching={feedIncomingQuery.isFetching} isLoading={loading} />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Feed Types</p>

@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import FarmSelector from "@/components/shared/farm-selector"
 import FeedingReport from "@/components/reports/feeding-report"
@@ -38,6 +39,9 @@ export default function ReportsPage() {
     from: shiftDays(today, -30),
     to: today,
   })
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
+  const [activeTab, setActiveTab] = useState<string>("performance")
   const {
     selectedBatch,
     setSelectedBatch,
@@ -48,6 +52,15 @@ export default function ReportsPage() {
   } = useSharedFilters()
   const [template, setTemplate] = useState<"weekly" | "monthly" | "seasonal">("monthly")
 
+  useEffect(() => {
+    if (!tabParam) return
+    const normalized = tabParam.toLowerCase()
+    const allowed = ["performance", "feeding", "mortality", "growth", "water-quality"]
+    if (allowed.includes(normalized)) {
+      setActiveTab(normalized)
+    }
+  }, [tabParam])
+
   const selectedSystemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
   const selectedBatchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
   const operationsPeriodParam = `custom_${dateRange.from}_${dateRange.to}`
@@ -57,12 +70,12 @@ export default function ReportsPage() {
     systemId: selectedSystemId,
     dateFrom: dateRange.from,
     dateTo: dateRange.to,
-    limit: 5000,
+    limit: 2000,
   })
   const activityQuery = useRecentActivities({
     dateFrom: `${dateRange.from}T00:00:00`,
     dateTo: `${dateRange.to}T23:59:59`,
-    limit: 5000,
+    limit: 2000,
   })
   const kpiQuery = useProductionSummary({
     farmId,
@@ -70,7 +83,7 @@ export default function ReportsPage() {
     stage: selectedStage === "all" ? undefined : selectedStage,
     dateFrom: dateRange.from,
     dateTo: dateRange.to,
-    limit: 5000,
+    limit: 2000,
   })
 
   const inventoryRows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
@@ -195,7 +208,7 @@ export default function ReportsPage() {
           <p className="mt-2 text-xs text-muted-foreground">{templateCommentary}</p>
         </section>
 
-        <Tabs defaultValue="performance" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-4xl grid-cols-5 border border-border/80 bg-muted/60">
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="feeding">Feeding</TabsTrigger>

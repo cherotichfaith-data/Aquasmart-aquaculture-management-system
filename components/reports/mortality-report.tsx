@@ -9,6 +9,9 @@ import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { LazyRender } from "@/components/shared/lazy-render"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 const formatDateLabel = (value: string | number) => {
   const parsed = new Date(String(value))
@@ -28,10 +31,13 @@ export default function MortalityReport({
   farmName?: string | null
 }) {
   const { farmId } = useActiveFarm()
+  const chartLimit = 2000
+  const [tableLimit, setTableLimit] = useState("100")
+  const [showMortalityRecords, setShowMortalityRecords] = useState(false)
   const mortalityQuery = useMortalityData({
     systemId,
     batchId,
-    limit: 5000,
+    limit: chartLimit,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
   })
@@ -40,6 +46,7 @@ export default function MortalityReport({
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     requireSystem: Boolean(systemId),
+    limit: chartLimit,
   })
   const thresholdsQuery = useAlertThresholds()
   const inventoryQuery = useDailyFishInventory({
@@ -47,14 +54,43 @@ export default function MortalityReport({
     systemId,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
-    limit: 5000,
+    limit: chartLimit,
+  })
+  const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
+  const mortalityTableQuery = useMortalityData({
+    systemId,
+    batchId,
+    limit: tableLimitValue,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    enabled: showMortalityRecords,
   })
   const rows = mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : []
+  const tableRows = mortalityTableQuery.data?.status === "success" ? mortalityTableQuery.data.data : []
   const measurements = measurementsQuery.data?.status === "success" ? measurementsQuery.data.data : []
   const inventoryRows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
   const thresholdRows = thresholdsQuery.data?.status === "success" ? thresholdsQuery.data.data : []
   const loading = mortalityQuery.isLoading
-  const [showMortalityRecords, setShowMortalityRecords] = useState(false)
+  const tableLoading = mortalityTableQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(mortalityQuery.error),
+    getQueryResultError(mortalityQuery.data),
+    getErrorMessage(measurementsQuery.error),
+    getQueryResultError(measurementsQuery.data),
+    getErrorMessage(inventoryQuery.error),
+    getQueryResultError(inventoryQuery.data),
+    getErrorMessage(thresholdsQuery.error),
+    getQueryResultError(thresholdsQuery.data),
+    getErrorMessage(mortalityTableQuery.error),
+    getQueryResultError(mortalityTableQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    mortalityQuery.dataUpdatedAt ?? 0,
+    measurementsQuery.dataUpdatedAt ?? 0,
+    inventoryQuery.dataUpdatedAt ?? 0,
+    thresholdsQuery.dataUpdatedAt ?? 0,
+    mortalityTableQuery.dataUpdatedAt ?? 0,
+  )
   const chartRows = useMemo(() => {
     const byDate = new Map<string, number>()
     rows.forEach((row) => {
@@ -118,8 +154,30 @@ export default function MortalityReport({
     return Object.entries(acc).map(([cause, count]) => ({ cause, count }))
   }, [measurements, rows, thresholds.highAmmonia, thresholds.lowDo])
 
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load mortality report"
+        description={errorMessages[0]}
+        onRetry={() => {
+          mortalityQuery.refetch()
+          measurementsQuery.refetch()
+          inventoryQuery.refetch()
+          thresholdsQuery.refetch()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between text-xs">
+        <DataUpdatedAt updatedAt={latestUpdatedAt} />
+        <DataFetchingBadge
+          isFetching={mortalityQuery.isFetching || measurementsQuery.isFetching || inventoryQuery.isFetching || mortalityTableQuery.isFetching}
+          isLoading={loading}
+        />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -160,8 +218,9 @@ export default function MortalityReport({
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartRows}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartRows}>
                   <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
                   <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -172,8 +231,9 @@ export default function MortalityReport({
                   />
                   <Legend />
                   <Line type="monotone" dataKey="number_of_fish_mortality" stroke="var(--color-destructive)" strokeWidth={2.4} name="Mortality Count" />
-                </LineChart>
-              </ResponsiveContainer>
+                  </LineChart>
+                </ResponsiveContainer>
+              </LazyRender>
             </div>
           )}
         </CardContent>
@@ -212,6 +272,16 @@ export default function MortalityReport({
           <div className="flex items-center justify-between gap-2">
             <CardTitle>Mortality Records</CardTitle>
             <div className="flex gap-2">
+              <select
+                value={tableLimit}
+                onChange={(event) => setTableLimit(event.target.value)}
+                className="px-3 py-2 rounded-md border border-input text-sm"
+                aria-label="Rows to display"
+              >
+                <option value="50">50 rows</option>
+                <option value="100">100 rows</option>
+                <option value="250">250 rows</option>
+              </select>
               <button
                 type="button"
                 className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
@@ -226,7 +296,7 @@ export default function MortalityReport({
                   downloadCsv({
                     filename: `mortality-analysis-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
                     headers: ["date", "system_id", "batch_id", "number_of_fish_mortality", "abw", "total_weight_mortality"],
-                    rows: rows.map((row) => [
+                    rows: (showMortalityRecords ? tableRows : rows.slice(0, tableLimitValue)).map((row) => [
                       row.date,
                       row.system_id,
                       row.batch_id,
@@ -254,7 +324,7 @@ export default function MortalityReport({
                       ...causeBreakdown.map((row) => `${row.cause}: ${row.count}`),
                     ],
                     tableHeaders: ["Date", "System", "Batch", "Fish Dead", "ABW", "Total Weight"],
-                    tableRows: rows.map((row) => [
+                    tableRows: (showMortalityRecords ? tableRows : rows.slice(0, tableLimitValue)).map((row) => [
                       row.date,
                       row.system_id,
                       row.batch_id ?? "-",
@@ -286,14 +356,14 @@ export default function MortalityReport({
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {tableLoading ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
                       Loading...
                     </td>
                   </tr>
-                ) : rows.length > 0 ? (
-                  rows.map((row) => (
+                ) : tableRows.length > 0 ? (
+                  tableRows.map((row) => (
                     <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
                       <td className="px-4 py-2 font-medium">{row.date}</td>
                       <td className="px-4 py-2">{row.system_id}</td>
@@ -315,7 +385,7 @@ export default function MortalityReport({
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {rows.length} rows.
+              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show up to {tableLimitValue} rows.
             </div>
           )}
         </CardContent>

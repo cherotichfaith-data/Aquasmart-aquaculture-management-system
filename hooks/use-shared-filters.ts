@@ -46,6 +46,18 @@ export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
     } catch {
       setTimePeriod(defaultTimePeriod)
     } finally {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search)
+        const paramSystem = params.get("system")
+        const paramBatch = params.get("batch")
+        const paramStage = params.get("stage")
+        const paramPeriod = params.get("period")
+
+        if (paramSystem) setSelectedSystem(paramSystem)
+        if (paramBatch) setSelectedBatch(paramBatch)
+        if (isStage(paramStage)) setSelectedStage(paramStage)
+        if (isTimePeriod(paramPeriod)) setTimePeriod(paramPeriod)
+      }
       setHydrated(true)
     }
   }, [defaultTimePeriod])

@@ -20,6 +20,9 @@ import { useActiveFarm } from "@/hooks/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import type { Enums } from "@/lib/types/database"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { LazyRender } from "@/components/shared/lazy-render"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 const formatDateLabel = (value: string | number) => {
   const parsed = new Date(String(value))
@@ -39,6 +42,9 @@ export default function PerformanceReport({
   farmName?: string | null
 }) {
   const { farmId } = useActiveFarm()
+  const chartLimit = 2000
+  const [tableLimit, setTableLimit] = useState("100")
+  const [showPerformanceRecords, setShowPerformanceRecords] = useState(false)
   const summaryQuery = useDashboardConsolidatedSnapshot({ farmId: farmId ?? null })
   const productionSummaryQuery = useProductionSummary({
     systemId,
@@ -46,11 +52,35 @@ export default function PerformanceReport({
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     farmId: farmId ?? null,
+    limit: chartLimit,
+  })
+  const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
+  const performanceTableQuery = useProductionSummary({
+    systemId,
+    stage: stage && stage !== "all" ? stage : undefined,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    farmId: farmId ?? null,
+    limit: tableLimitValue,
+    enabled: showPerformanceRecords,
   })
   const summary = summaryQuery.data ?? null
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const tableRows = performanceTableQuery.data?.status === "success" ? performanceTableQuery.data.data : []
   const loading = summaryQuery.isLoading || productionSummaryQuery.isLoading
-  const [showPerformanceRecords, setShowPerformanceRecords] = useState(false)
+  const tableLoading = performanceTableQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(summaryQuery.error),
+    getErrorMessage(productionSummaryQuery.error),
+    getQueryResultError(productionSummaryQuery.data),
+    getErrorMessage(performanceTableQuery.error),
+    getQueryResultError(performanceTableQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    summaryQuery.dataUpdatedAt ?? 0,
+    productionSummaryQuery.dataUpdatedAt ?? 0,
+    performanceTableQuery.dataUpdatedAt ?? 0,
+  )
   const chartRows = useMemo(() => {
     const byDate = new Map<string, { totalBiomass: number; weightedEfcr: number; efcrWeight: number; efcrFallback: number; efcrCount: number }>()
     rows.forEach((row) => {
@@ -124,8 +154,25 @@ export default function PerformanceReport({
     ]
   }, [summary])
 
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load performance report"
+        description={errorMessages[0]}
+        onRetry={() => {
+          summaryQuery.refetch()
+          productionSummaryQuery.refetch()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between text-xs">
+        <DataUpdatedAt updatedAt={latestUpdatedAt} />
+        <DataFetchingBadge isFetching={summaryQuery.isFetching || productionSummaryQuery.isFetching || performanceTableQuery.isFetching} isLoading={loading} />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -175,8 +222,9 @@ export default function PerformanceReport({
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartRows}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartRows}>
                   <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
                   <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -201,8 +249,9 @@ export default function PerformanceReport({
                     strokeWidth={2.4}
                     name="Biomass (kg)"
                   />
-                </LineChart>
-              </ResponsiveContainer>
+                  </LineChart>
+                </ResponsiveContainer>
+              </LazyRender>
             </div>
           )}
         </CardContent>
@@ -218,8 +267,9 @@ export default function PerformanceReport({
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
             <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={latestBySystemRows}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={latestBySystemRows}>
                   <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
                   <XAxis dataKey="system_name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -229,8 +279,9 @@ export default function PerformanceReport({
                   />
                   <Legend />
                   <Bar dataKey="total_biomass" fill="var(--color-chart-1)" name="Biomass (kg)" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+                  </BarChart>
+                </ResponsiveContainer>
+              </LazyRender>
             </div>
           )}
         </CardContent>
@@ -281,6 +332,16 @@ export default function PerformanceReport({
           <div className="flex items-center justify-between gap-2">
             <CardTitle>Performance Records</CardTitle>
             <div className="flex gap-2">
+              <select
+                value={tableLimit}
+                onChange={(event) => setTableLimit(event.target.value)}
+                className="px-3 py-2 rounded-md border border-input text-sm"
+                aria-label="Rows to display"
+              >
+                <option value="50">50 rows</option>
+                <option value="100">100 rows</option>
+                <option value="250">250 rows</option>
+              </select>
               <button
                 type="button"
                 className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
@@ -295,7 +356,7 @@ export default function PerformanceReport({
                   downloadCsv({
                     filename: `performance-report-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
                     headers: ["date", "system_name", "efcr_period", "total_biomass", "daily_mortality_count", "efcr_aggregated"],
-                    rows: rows.map((row) => [
+                    rows: (showPerformanceRecords ? tableRows : rows.slice(0, tableLimitValue)).map((row) => [
                       row.date,
                       row.system_name ?? row.system_id,
                       row.efcr_period,
@@ -323,7 +384,7 @@ export default function PerformanceReport({
                       `Farm Biomass: ${summary?.average_biomass ?? "N/A"}`,
                     ],
                     tableHeaders: ["Date", "System", "eFCR", "Biomass", "Mortality", "eFCR (Agg)"],
-                    tableRows: rows.map((row) => [
+                    tableRows: (showPerformanceRecords ? tableRows : rows.slice(0, tableLimitValue)).map((row) => [
                       row.date,
                       row.system_name ?? row.system_id,
                       row.efcr_period,
@@ -355,14 +416,14 @@ export default function PerformanceReport({
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {tableLoading ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
                       Loading...
                     </td>
                   </tr>
-                ) : rows.length > 0 ? (
-                  rows.map((row) => (
+                ) : tableRows.length > 0 ? (
+                  tableRows.map((row) => (
                     <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
                       <td className="px-4 py-2 font-medium">{row.date}</td>
                       <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
@@ -384,7 +445,7 @@ export default function PerformanceReport({
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {rows.length} rows.
+              Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show up to {tableLimitValue} rows.
             </div>
           )}
         </CardContent>

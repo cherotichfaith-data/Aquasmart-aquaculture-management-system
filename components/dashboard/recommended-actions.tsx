@@ -4,6 +4,8 @@ import { useMemo } from "react"
 import type { Enums } from "@/lib/types/database"
 import { useRecommendedActions } from "@/lib/hooks/use-dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
+import { getErrorMessage } from "@/lib/utils/query-result"
 
 const priorityStyles = {
   High: "bg-destructive/15 text-destructive",
@@ -33,6 +35,17 @@ export default function RecommendedActions({
 
   const actions = useMemo(() => actionsQuery.data ?? [], [actionsQuery.data])
   const loading = actionsQuery.isLoading
+  const errorMessage = getErrorMessage(actionsQuery.error)
+
+  if (actionsQuery.isError) {
+    return (
+      <DataErrorState
+        title="Unable to load recommended actions"
+        description={errorMessage ?? "Please retry or check your connection."}
+        onRetry={() => actionsQuery.refetch()}
+      />
+    )
+  }
 
   if (loading) {
     return (
@@ -47,7 +60,15 @@ export default function RecommendedActions({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <DataUpdatedAt updatedAt={actionsQuery.dataUpdatedAt} />
+        <DataFetchingBadge isFetching={actionsQuery.isFetching} isLoading={actionsQuery.isLoading} />
+      </div>
+      {actions.length === 0 ? (
+        <EmptyState title="No recommended actions" description="All systems are within target ranges." />
+      ) : null}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {actions.map((action) => (
         <div key={action.title} className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
           <div className="h-2 bg-sidebar-primary" />
@@ -66,6 +87,7 @@ export default function RecommendedActions({
           </div>
         </div>
       ))}
+      </div>
     </div>
   )
 }

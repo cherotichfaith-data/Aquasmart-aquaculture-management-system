@@ -3,9 +3,13 @@
 import { useMemo, useState } from "react"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { useSystemOptions } from "@/lib/hooks/use-options"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { LazyRender } from "@/components/shared/lazy-render"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 export default function FishInventory({
   selectedBatch,
@@ -44,6 +48,7 @@ export default function FishInventory({
   const [trendMetric, setTrendMetric] = useState<"fish" | "mortality" | "biomass">("fish")
   const [trendWindowDays, setTrendWindowDays] = useState<30 | 90 | 180>(90)
   const [tableSearch, setTableSearch] = useState("")
+  const debouncedTableSearch = useDebouncedValue(tableSearch, 300)
   const [tableFilter, setTableFilter] = useState<"all" | "with_mortality" | "with_biomass">("all")
   const [tableSort, setTableSort] = useState<"newest" | "oldest">("newest")
   const [tablePage, setTablePage] = useState(1)
@@ -73,6 +78,19 @@ export default function FishInventory({
 
   const rows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
   const loading = inventoryQuery.isLoading || systemsQuery.isLoading || batchSystemIdsQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(inventoryQuery.error),
+    getQueryResultError(inventoryQuery.data),
+    getErrorMessage(systemsQuery.error),
+    getQueryResultError(systemsQuery.data),
+    getErrorMessage(batchSystemIdsQuery.error),
+    getQueryResultError(batchSystemIdsQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    inventoryQuery.dataUpdatedAt ?? 0,
+    systemsQuery.dataUpdatedAt ?? 0,
+    batchSystemIdsQuery.dataUpdatedAt ?? 0,
+  )
 
   const scopedSystemIds = useMemo(() => {
     const fromStage =
@@ -121,7 +139,7 @@ export default function FishInventory({
   )
 
   const filteredDailyTrend = useMemo(() => {
-    const search = tableSearch.trim().toLowerCase()
+    const search = debouncedTableSearch.trim().toLowerCase()
     const rows = dailyTrend.filter((row) => {
       if (tableFilter === "with_mortality" && row.mortality <= 0) return false
       if (tableFilter === "with_biomass" && row.biomass <= 0) return false
@@ -130,7 +148,7 @@ export default function FishInventory({
     })
 
     return [...rows].sort((a, b) => (tableSort === "newest" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)))
-  }, [dailyTrend, tableFilter, tableSearch, tableSort])
+  }, [dailyTrend, debouncedTableSearch, tableFilter, tableSort])
 
   const tableTotalPages = Math.max(1, Math.ceil(filteredDailyTrend.length / tablePageSize))
   const currentTablePage = Math.min(tablePage, tableTotalPages)
@@ -199,8 +217,26 @@ export default function FishInventory({
   const forecastHarvest30d = Math.max(0, Math.round(currentPopulation * (1 - avgMortalityRate * 30)))
   const latestBiomass = latestBySystem.reduce((sum, row) => sum + (row.biomass_last_sampling ?? 0), 0)
 
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load fish inventory"
+        description={errorMessages[0]}
+        onRetry={() => {
+          inventoryQuery.refetch()
+          systemsQuery.refetch()
+          batchSystemIdsQuery.refetch()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <DataUpdatedAt updatedAt={latestUpdatedAt} />
+        <DataFetchingBadge isFetching={inventoryQuery.isFetching} isLoading={loading} />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Current Stocking Count</p>
@@ -262,7 +298,7 @@ export default function FishInventory({
           </div>
         </div>
         {!loading && chartRows.length > 0 ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
             <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
               <p className="text-[11px] text-muted-foreground">Latest</p>
               <p className="text-sm font-semibold">
@@ -295,68 +331,70 @@ export default function FishInventory({
           </div>
         ) : chartRows.length > 0 ? (
           <div className="h-[260px] sm:h-[320px] lg:h-[380px] rounded-md border border-border/70 bg-gradient-to-b from-background to-muted/20 px-1">
-            <ResponsiveContainer width="100%" height="100%">
-              {trendMetric === "mortality" ? (
-                <BarChart data={chartRows} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" opacity={0.35} />
-                  <XAxis dataKey="label" minTickGap={24} interval="preserveStartEnd" />
-                  <YAxis width={56} tickFormatter={(value) => formatCompactNumber(Number(value))} />
-                  <Tooltip
-                    formatter={(value) => [Number(value).toLocaleString(), trendConfig.label]}
-                    labelFormatter={(_, payload) => formatDateLabel(String(payload?.[0]?.payload?.date ?? ""))}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      borderColor: "hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Bar
-                    dataKey="mortality"
-                    fill={trendConfig.color}
-                    radius={[6, 6, 0, 0]}
-                    barSize={chartRows.length > 45 ? 8 : 14}
-                  />
-                </BarChart>
-              ) : (
-                <AreaChart data={chartRows} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
-                  <defs>
-                    <linearGradient id="fishTrendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.45} />
-                      <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.05} />
-                    </linearGradient>
-                    <linearGradient id="biomassTrendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.45} />
-                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" opacity={0.35} />
-                  <XAxis dataKey="label" minTickGap={24} interval="preserveStartEnd" />
-                  <YAxis width={56} tickFormatter={(value) => formatCompactNumber(Number(value))} />
-                  <Tooltip
-                    formatter={(value) => [
-                      Number(value).toLocaleString(undefined, {
-                        maximumFractionDigits: trendConfig.decimals,
-                      }),
-                      trendConfig.label,
-                    ]}
-                    labelFormatter={(_, payload) => formatDateLabel(String(payload?.[0]?.payload?.date ?? ""))}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      borderColor: "hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey={trendMetric === "biomass" ? "biomass" : "fish"}
-                    stroke={trendMetric === "biomass" ? "hsl(var(--chart-2))" : "hsl(var(--chart-1))"}
-                    fill={trendMetric === "biomass" ? "url(#biomassTrendFill)" : "url(#fishTrendFill)"}
-                    strokeWidth={2.8}
-                    activeDot={{ r: 4 }}
-                  />
-                </AreaChart>
-              )}
-            </ResponsiveContainer>
+            <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+              <ResponsiveContainer width="100%" height="100%">
+                {trendMetric === "mortality" ? (
+                  <BarChart data={chartRows} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+                    <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" opacity={0.35} />
+                    <XAxis dataKey="label" minTickGap={24} interval="preserveStartEnd" />
+                    <YAxis width={56} tickFormatter={(value) => formatCompactNumber(Number(value))} />
+                    <Tooltip
+                      formatter={(value) => [Number(value).toLocaleString(), trendConfig.label]}
+                      labelFormatter={(_, payload) => formatDateLabel(String(payload?.[0]?.payload?.date ?? ""))}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        borderColor: "hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Bar
+                      dataKey="mortality"
+                      fill={trendConfig.color}
+                      radius={[6, 6, 0, 0]}
+                      barSize={chartRows.length > 45 ? 8 : 14}
+                    />
+                  </BarChart>
+                ) : (
+                  <AreaChart data={chartRows} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+                    <defs>
+                      <linearGradient id="fishTrendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="biomassTrendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" opacity={0.35} />
+                    <XAxis dataKey="label" minTickGap={24} interval="preserveStartEnd" />
+                    <YAxis width={56} tickFormatter={(value) => formatCompactNumber(Number(value))} />
+                    <Tooltip
+                      formatter={(value) => [
+                        Number(value).toLocaleString(undefined, {
+                          maximumFractionDigits: trendConfig.decimals,
+                        }),
+                        trendConfig.label,
+                      ]}
+                      labelFormatter={(_, payload) => formatDateLabel(String(payload?.[0]?.payload?.date ?? ""))}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        borderColor: "hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey={trendMetric === "biomass" ? "biomass" : "fish"}
+                      stroke={trendMetric === "biomass" ? "hsl(var(--chart-2))" : "hsl(var(--chart-1))"}
+                      fill={trendMetric === "biomass" ? "url(#biomassTrendFill)" : "url(#fishTrendFill)"}
+                      strokeWidth={2.8}
+                      activeDot={{ r: 4 }}
+                    />
+                  </AreaChart>
+                )}
+              </ResponsiveContainer>
+            </LazyRender>
           </div>
         ) : (
           <div className="h-[280px] sm:h-[320px] lg:h-[380px] flex items-center justify-center text-muted-foreground">
@@ -484,3 +522,4 @@ export default function FishInventory({
     </div>
   )
 }
+

@@ -32,9 +32,11 @@ const formSchema = z.object({
 interface HarvestFormProps {
     systems: Tables<"api_system_options">[]
     batches: Tables<"api_fingerling_batch_options">[]
+    defaultSystemId?: number | null
+    defaultBatchId?: number | null
 }
 
-export function HarvestForm({ systems, batches }: HarvestFormProps) {
+export function HarvestForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: HarvestFormProps) {
     const mutation = useRecordHarvest()
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -44,8 +46,8 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
             number_of_fish: 0,
             amount_kg: 0,
             type_of_harvest: "partial",
-            system_id: "",
-            batch_id: "none",
+            system_id: defaultSystemId ? String(defaultSystemId) : "",
+            batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
 
@@ -88,7 +90,7 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
             </div>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="system_id"
@@ -153,7 +155,7 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="number_of_fish"
@@ -212,3 +214,4 @@ export function HarvestForm({ systems, batches }: HarvestFormProps) {
         </div>
     )
 }
+

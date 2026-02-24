@@ -16,10 +16,12 @@ import {
 import { insertData } from "@/lib/supabase-actions"
 import {
   addOptimisticActivity,
+  addOptimisticRecentEntry,
   invalidateDashboardQueries,
   invalidateRecentActivityQueries,
   invalidateRecentEntriesQueries,
   invalidateWaterQualityQueries,
+  restoreRecentEntries,
 } from "@/lib/hooks/use-mutation-invalidation"
 import { useToast } from "@/hooks/use-toast"
 import type { TablesInsert } from "@/lib/types/database"
@@ -105,6 +107,7 @@ export function useDailyWaterQualityRating(params: {
   dateFrom?: string
   dateTo?: string
   requireSystem?: boolean
+  limit?: number
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
@@ -112,7 +115,7 @@ export function useDailyWaterQualityRating(params: {
   const enabledSystem = enabledBase && Boolean(params.systemId)
   const enabled = params.requireSystem ? enabledSystem : enabledBase
   return useQuery({
-    queryKey: ["wq", "daily_rating", farmId, params.systemId ?? null, params.dateFrom ?? null, params.dateTo ?? null],
+    queryKey: ["wq", "daily_rating", farmId, params.systemId ?? null, params.dateFrom ?? null, params.dateTo ?? null, params.limit ?? null],
     enabled,
     queryFn: ({ signal }) =>
       getDailyWaterQualityRating({
@@ -120,6 +123,7 @@ export function useDailyWaterQualityRating(params: {
         systemId: params.systemId,
         dateFrom: params.dateFrom,
         dateTo: params.dateTo,
+        limit: params.limit,
         signal,
       }),
     staleTime: 60_000,
@@ -188,8 +192,25 @@ export function useRecordWaterQuality() {
       if (!result.success) throw result.error
       return result.data
     },
-    onMutate: () => {
+    onMutate: (payload) => {
       addOptimisticActivity(queryClient, { tableName: "water_quality_measurement" })
+      const entry = Array.isArray(payload) ? payload[0] : payload
+      if (entry) {
+        const optimistic = {
+          id: `optimistic-${Date.now()}`,
+          date: entry.date,
+          time: entry.time ?? null,
+          system_id: entry.system_id,
+          parameter_name: entry.parameter_name ?? null,
+          parameter_value: entry.parameter_value ?? null,
+          water_depth: entry.water_depth ?? null,
+          created_at: new Date().toISOString(),
+          status: "pending",
+        }
+        const previous = addOptimisticRecentEntry(queryClient, { key: "water_quality", entry: optimistic })
+        return { previous }
+      }
+      return {}
     },
     onSuccess: () => {
       invalidateDashboardQueries(queryClient)
@@ -198,7 +219,8 @@ export function useRecordWaterQuality() {
       invalidateRecentEntriesQueries(queryClient)
       toast({ title: "Success", description: "Water quality data recorded." })
     },
-    onError: (error: any) => {
+    onError: (error: any, _payload, context) => {
+      restoreRecentEntries(queryClient, context?.previous)
       const message = error?.message ?? "Failed to record water quality data."
       toast({ variant: "destructive", title: "Error", description: message })
     },

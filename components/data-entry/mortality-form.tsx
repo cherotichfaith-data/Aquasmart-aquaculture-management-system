@@ -33,9 +33,11 @@ const formSchema = z.object({
 interface MortalityFormProps {
     systems: Tables<"api_system_options">[]
     batches: Tables<"api_fingerling_batch_options">[]
+    defaultSystemId?: number | null
+    defaultBatchId?: number | null
 }
 
-export function MortalityForm({ systems, batches }: MortalityFormProps) {
+export function MortalityForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: MortalityFormProps) {
     const mutation = useRecordMortality()
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -45,8 +47,8 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
             number_of_fish: 0,
             total_weight: 0,
             average_body_weight: 0,
-            system_id: "",
-            batch_id: "none",
+            system_id: defaultSystemId ? String(defaultSystemId) : "",
+            batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
 
@@ -88,7 +90,7 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="system_id"
@@ -168,7 +170,7 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
                         )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="total_weight"
@@ -207,3 +209,4 @@ export function MortalityForm({ systems, batches }: MortalityFormProps) {
         </div>
     )
 }
+

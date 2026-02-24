@@ -16,6 +16,9 @@ import {
 } from "@/components/ui/sheet"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage } from "@/lib/utils/query-result"
+import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 
 interface SystemsTableProps {
   stage: Enums<"system_growth_stage"> | "all"
@@ -131,6 +134,7 @@ export default function SystemsTable({
     return ranked.filter((row) => (row.efcr as number) > 2).slice(-5)
   }, [filterMode, systems])
   const loading = systemsQuery.isLoading
+  const errorMessage = getErrorMessage(systemsQuery.error)
 
   const totalRows = filteredSystems.length
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
@@ -151,6 +155,17 @@ export default function SystemsTable({
           : null,
       ].filter(Boolean)
     : []
+  const selectedInventoryQuery = useDailyFishInventory({
+    farmId,
+    systemId: selectedSystemId ?? undefined,
+    limit: 1,
+    orderAsc: false,
+    enabled: selectedSystemId != null,
+  })
+  const selectedInventoryRow =
+    selectedInventoryQuery.data?.status === "success"
+      ? selectedInventoryQuery.data.data[0] ?? null
+      : null
 
   useEffect(() => {
     setPageIndex(0)
@@ -162,6 +177,16 @@ export default function SystemsTable({
       setSelectedSystemId(null)
     }
   }, [filteredSystems, selectedSystemId])
+
+  if (systemsQuery.isError) {
+    return (
+      <DataErrorState
+        title="Unable to load system table"
+        description={errorMessage ?? "Please retry or check your connection."}
+        onRetry={() => systemsQuery.refetch()}
+      />
+    )
+  }
 
   if (loading) {
     return (
@@ -181,7 +206,13 @@ export default function SystemsTable({
   return (
     <div className="rounded-lg border border-border/90 bg-card p-6 shadow-sm">
       <div className="mb-6">
-        <h2 className="text-base font-semibold text-foreground">Production</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-foreground">Production</h2>
+          <div className="flex items-center gap-3">
+            <DataUpdatedAt updatedAt={systemsQuery.dataUpdatedAt} />
+            <DataFetchingBadge isFetching={systemsQuery.isFetching} isLoading={systemsQuery.isLoading} />
+          </div>
+        </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <p className="text-xs text-muted-foreground">{totalRows} systems shown</p>
           <select
@@ -363,7 +394,7 @@ export default function SystemsTable({
           <div className="space-y-4 py-4">
             <div className="rounded-md border border-border bg-muted/20 p-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Summary</h3>
-              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <dl className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <div>
                   <dt className="text-muted-foreground">Biomass</dt>
                   <dd className="font-semibold">{formatWithUnit(selectedSystem?.biomass_end, 1, "kg")}</dd>
@@ -384,6 +415,34 @@ export default function SystemsTable({
             </div>
 
             <div className="rounded-md border border-border bg-muted/20 p-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Live Inventory</h3>
+              {selectedInventoryQuery.isLoading ? (
+                <p className="mt-3 text-sm text-muted-foreground">Loading latest inventory...</p>
+              ) : selectedInventoryRow ? (
+                <dl className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">Fish Count</dt>
+                    <dd className="font-semibold">{formatNumber(selectedInventoryRow.number_of_fish, 0)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Biomass</dt>
+                    <dd className="font-semibold">{formatWithUnit(selectedInventoryRow.biomass_last_sampling, 1, "kg")}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">ABW</dt>
+                    <dd className="font-semibold">{formatWithUnit(selectedInventoryRow.abw_last_sampling, 1, "g")}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Feeding</dt>
+                    <dd className="font-semibold">{formatWithUnit(selectedInventoryRow.feeding_amount, 1, "kg")}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">No inventory snapshot found.</p>
+              )}
+            </div>
+
+            <div className="rounded-md border border-border bg-muted/20 p-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Flags / Exceptions</h3>
               {selectedFlags.length > 0 ? (
                 <ul className="mt-3 space-y-2">
@@ -397,6 +456,22 @@ export default function SystemsTable({
               ) : (
                 <p className="mt-3 text-sm text-muted-foreground">No current exceptions.</p>
               )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                className="cursor-pointer"
+                onClick={() => router.push(`/data-entry?type=feeding&system=${selectedSystemId ?? ""}`)}
+              >
+                Record Feeding
+              </Button>
+              <Button
+                variant="outline"
+                className="cursor-pointer"
+                onClick={() => router.push(`/data-entry?type=sampling&system=${selectedSystemId ?? ""}`)}
+              >
+                Record Sampling
+              </Button>
             </div>
           </div>
           <SheetFooter className="gap-2">
@@ -412,3 +487,4 @@ export default function SystemsTable({
     </div>
   )
 }
+

@@ -26,6 +26,8 @@ import {
   SystemPerformanceByActivityTable,
   TransactionsSummaryCards,
 } from "./transactions-sections"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 export default function TransactionsPage() {
   const { farmId } = useActiveFarm()
@@ -285,6 +287,18 @@ export default function TransactionsPage() {
   }
 
   const loading = activitiesQuery.isLoading || systemsQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(activitiesQuery.error),
+    getQueryResultError(activitiesQuery.data),
+    getErrorMessage(systemsQuery.error),
+    getQueryResultError(systemsQuery.data),
+    getErrorMessage(systemsTableQuery.error),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    activitiesQuery.dataUpdatedAt ?? 0,
+    systemsQuery.dataUpdatedAt ?? 0,
+    systemsTableQuery.dataUpdatedAt ?? 0,
+  )
 
   return (
     <DashboardLayout>
@@ -293,6 +307,10 @@ export default function TransactionsPage() {
           <div>
             <h1 className="text-3xl font-bold">Transactions and Activity Log</h1>
             <p className="text-muted-foreground mt-1">Chronological farm activity feed with operator and system analysis.</p>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <DataUpdatedAt updatedAt={latestUpdatedAt} />
+            <DataFetchingBadge isFetching={activitiesQuery.isFetching} isLoading={loading} />
           </div>
 
           <FarmSelector
@@ -347,6 +365,18 @@ export default function TransactionsPage() {
             </button>
           </div>
         </div>
+
+        {errorMessages.length > 0 ? (
+          <DataErrorState
+            title="Unable to load activity log"
+            description={errorMessages[0]}
+            onRetry={() => {
+              activitiesQuery.refetch()
+              systemsQuery.refetch()
+              systemsTableQuery.refetch()
+            }}
+          />
+        ) : null}
 
         <TransactionsSummaryCards summary={summary} setSelectedEventType={setSelectedEventType} />
 

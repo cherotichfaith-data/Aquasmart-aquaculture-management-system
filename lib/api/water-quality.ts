@@ -1,6 +1,7 @@
 import type { Database, Enums, Tables, TablesInsert } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, queryOptionsView, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type AsOfRow = Database["public"]["Functions"]["api_water_quality_as_of"]["Returns"][number]
 type WqStatusRow = Database["public"]["Functions"]["api_water_quality_status"]["Returns"][number]
@@ -24,7 +25,12 @@ export async function getWaterQualityAsOf(params: {
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
-  if (error) return toQueryError("getWaterQualityAsOf", error)
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
+      return toQuerySuccess<AsOfRow | null>([null])
+    }
+    return toQueryError("getWaterQualityAsOf", error)
+  }
 
   return toQuerySuccess<AsOfRow | null>([(data?.[0] as AsOfRow) ?? null])
 }
@@ -45,7 +51,12 @@ export async function getWaterQualityStatus(params: {
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
-  if (error) return toQueryError("getWaterQualityStatus", error)
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
+      return toQuerySuccess<WqStatusRow>([])
+    }
+    return toQueryError("getWaterQualityStatus", error)
+  }
 
   return toQuerySuccess<WqStatusRow>((data ?? []) as WqStatusRow[])
 }
@@ -63,8 +74,7 @@ export async function getWaterQualityMeasurements(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let q = supabase
-    .from("api_water_quality_measurements")
+  let q = queryOptionsView(supabase, "api_water_quality_measurements")
     .select("*")
     .eq("farm_id", params.farmId)
     .order("date", { ascending: true })
@@ -78,7 +88,12 @@ export async function getWaterQualityMeasurements(params: {
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
-  if (error) return toQueryError("getWaterQualityMeasurements", error)
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
+      return toQuerySuccess<MeasurementRow>([])
+    }
+    return toQueryError("getWaterQualityMeasurements", error)
+  }
 
   return toQuerySuccess<MeasurementRow>((data ?? []) as MeasurementRow[])
 }
@@ -95,8 +110,7 @@ export async function getDailyWaterQualityRating(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let q = supabase
-    .from("api_daily_water_quality_rating")
+  let q = queryOptionsView(supabase, "api_daily_water_quality_rating")
     .select("*")
     .eq("farm_id", params.farmId)
     .order("rating_date", { ascending: true })
@@ -108,7 +122,12 @@ export async function getDailyWaterQualityRating(params: {
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
-  if (error) return toQueryError("getDailyWaterQualityRating", error)
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
+      return toQuerySuccess<DailyRatingRow>([])
+    }
+    return toQueryError("getDailyWaterQualityRating", error)
+  }
 
   return toQuerySuccess<DailyRatingRow>((data ?? []) as DailyRatingRow[])
 }
@@ -122,8 +141,7 @@ export async function getLatestWaterQualityRating(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let q = supabase
-    .from("api_latest_water_quality_rating")
+  let q = queryOptionsView(supabase, "api_latest_water_quality_rating")
     .select("*")
     .eq("farm_id", params.farmId)
 
@@ -131,7 +149,12 @@ export async function getLatestWaterQualityRating(params: {
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
-  if (error) return toQueryError("getLatestWaterQualityRating", error)
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
+      return toQuerySuccess<LatestRatingRow>([])
+    }
+    return toQueryError("getLatestWaterQualityRating", error)
+  }
 
   return toQuerySuccess<LatestRatingRow>((data ?? []) as LatestRatingRow[])
 }
@@ -144,11 +167,16 @@ export async function getAlertThresholds(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let q = supabase.from("api_alert_thresholds").select("*").eq("farm_id", params.farmId)
+  let q = queryOptionsView(supabase, "api_alert_thresholds").select("*").eq("farm_id", params.farmId)
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
-  if (error) return toQueryError("getAlertThresholds", error)
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
+      return toQuerySuccess<ThresholdRow>([])
+    }
+    return toQueryError("getAlertThresholds", error)
+  }
   return toQuerySuccess<ThresholdRow>((data ?? []) as ThresholdRow[])
 }
 
@@ -200,7 +228,12 @@ export async function getDailyOverlay(params: {
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
-  if (error) return toQueryError("getDailyOverlay", error)
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
+      return toQuerySuccess<OverlayRow>([])
+    }
+    return toQueryError("getDailyOverlay", error)
+  }
 
   return toQuerySuccess<OverlayRow>((data ?? []) as OverlayRow[])
 }

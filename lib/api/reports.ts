@@ -1,6 +1,6 @@
 import type { Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, queryOptionsView, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type FeedIncomingRow = Tables<"feed_incoming">
@@ -10,7 +10,7 @@ type FishHarvestRow = Tables<"fish_harvest">
 type FishSamplingWeightRow = Tables<"fish_sampling_weight">
 type FishMortalityRow = Tables<"fish_mortality">
 type ChangeLogRow = Tables<"change_log">
-type SuppliersRow = Tables<"suppliers">
+type SuppliersRow = Tables<"feed_supplier">
 type SystemRow = Tables<"system">
 type WaterQualityMeasurementRow = Tables<"water_quality_measurement">
 type FishTransferRow = Tables<"fish_transfer">
@@ -37,6 +37,14 @@ const isAbortLikeError = (err: unknown): boolean => {
   return name.includes("abort") || name.includes("cancel") || message.includes("abort") || message.includes("cancel")
 }
 
+const isMissingRelationError = (err: unknown): boolean => {
+  if (!err || typeof err !== "object") return false
+  const e = err as { code?: string; message?: string }
+  if (e.code === "42P01" || e.code === "42883") return true
+  const message = String(e.message ?? "")
+  return /does not exist/i.test(message) || /schema cache/i.test(message)
+}
+
 export async function getFeedIncomingWithType(params?: { limit?: number; signal?: AbortSignal }): Promise<QueryResult<FeedIncomingWithType>> {
   const clientResult = await getClientOrError("getFeedIncomingWithType")
   if ("error" in clientResult) return clientResult.error
@@ -48,6 +56,9 @@ export async function getFeedIncomingWithType(params?: { limit?: number; signal?
 
   const { data, error } = await query
   if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) {
+      return toQuerySuccess<FeedIncomingWithType>([])
+    }
     if (isSbPermissionDenied(error)) {
       return toQuerySuccess<FeedIncomingWithType>([])
     }
@@ -61,10 +72,15 @@ export async function getFeedIncomingWithType(params?: { limit?: number; signal?
 
   let feedTypeMap = new Map<number, FeedTypeRow>()
   if (feedTypeIds.length > 0) {
-    let feedQuery = supabase.from("api_feed_type_options").select("*").in("id", feedTypeIds)
+    let feedQuery = queryOptionsView(supabase, "api_feed_type_options").select("*").in("id", feedTypeIds)
     if (params?.signal) feedQuery = feedQuery.abortSignal(params.signal)
     const { data: feedData, error: feedError } = await feedQuery
-    if (feedError) return toQueryError("getFeedIncomingWithType:feedTypes", feedError)
+    if (feedError) {
+      if (params?.signal?.aborted || isAbortLikeError(feedError) || isSbPermissionDenied(feedError)) {
+        return toQuerySuccess<FeedIncomingWithType>([])
+      }
+      return toQueryError("getFeedIncomingWithType:feedTypes", feedError)
+    }
     ;(feedData ?? []).forEach((row) => {
       if (row.id == null) return
       feedTypeMap.set(row.id, row as FeedTypeRow)
@@ -84,12 +100,17 @@ export async function getFeedTypes(params?: { limit?: number; signal?: AbortSign
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.from("api_feed_type_options").select("*").order("label", { ascending: true })
+  let query = queryOptionsView(supabase, "api_feed_type_options").select("*").order("label", { ascending: true })
   if (params?.limit) query = query.limit(params.limit)
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getFeedTypes", error)
+  if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error)) {
+      return toQuerySuccess<FeedTypeRow>([])
+    }
+    return toQueryError("getFeedTypes", error)
+  }
   return toQuerySuccess<FeedTypeRow>(data as FeedTypeRow[])
 }
 
@@ -120,7 +141,12 @@ export async function getFeedingRecords(params?: {
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getFeedingRecords", error)
+  if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
+      return toQuerySuccess<FeedingRecordWithType>([])
+    }
+    return toQueryError("getFeedingRecords", error)
+  }
 
   const rows = (data ?? []) as FeedingRecordRow[]
   const feedTypeIds = Array.from(
@@ -129,10 +155,20 @@ export async function getFeedingRecords(params?: {
 
   let feedTypeMap = new Map<number, FeedTypeRow>()
   if (feedTypeIds.length > 0) {
-    let feedQuery = supabase.from("api_feed_type_options").select("*").in("id", feedTypeIds)
+    let feedQuery = queryOptionsView(supabase, "api_feed_type_options").select("*").in("id", feedTypeIds)
     if (params?.signal) feedQuery = feedQuery.abortSignal(params.signal)
     const { data: feedData, error: feedError } = await feedQuery
-    if (feedError) return toQueryError("getFeedingRecords:feedTypes", feedError)
+    if (feedError) {
+      if (
+        params?.signal?.aborted ||
+        isAbortLikeError(feedError) ||
+        isSbPermissionDenied(feedError) ||
+        isSbAuthMissing(feedError)
+      ) {
+        return toQuerySuccess<FeedingRecordWithType>([])
+      }
+      return toQueryError("getFeedingRecords:feedTypes", feedError)
+    }
     ;(feedData ?? []).forEach((row) => {
       if (row.id == null) return
       feedTypeMap.set(row.id, row as FeedTypeRow)
@@ -152,11 +188,16 @@ export async function getSuppliers(params?: { signal?: AbortSignal }): Promise<Q
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.from("suppliers").select("*").order("name", { ascending: true })
+  let query = supabase.from("feed_supplier").select("*").order("company_name", { ascending: true })
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getSuppliers", error)
+  if (error) {
+    if (isMissingRelationError(error) || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
+      return toQuerySuccess<SuppliersRow>([])
+    }
+    return toQueryError("getSuppliers", error)
+  }
   return toQuerySuccess<SuppliersRow>(data as SuppliersRow[])
 }
 
@@ -178,7 +219,12 @@ export async function getHarvests(params?: {
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getHarvests", error)
+  if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
+      return toQuerySuccess<FishHarvestRow>([])
+    }
+    return toQueryError("getHarvests", error)
+  }
   return toQuerySuccess<FishHarvestRow>(data as FishHarvestRow[])
 }
 
@@ -209,7 +255,12 @@ export async function getSamplingData(params?: {
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getSamplingData", error)
+  if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
+      return toQuerySuccess<FishSamplingWeightRow>([])
+    }
+    return toQueryError("getSamplingData", error)
+  }
   return toQuerySuccess<FishSamplingWeightRow>(data as FishSamplingWeightRow[])
 }
 
@@ -240,7 +291,12 @@ export async function getMortalityData(params?: {
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getMortalityData", error)
+  if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
+      return toQuerySuccess<FishMortalityRow>([])
+    }
+    return toQueryError("getMortalityData", error)
+  }
   return toQuerySuccess<FishMortalityRow>(data as FishMortalityRow[])
 }
 
@@ -264,7 +320,12 @@ export async function getTransferData(params?: {
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getTransferData", error)
+  if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
+      return toQuerySuccess<FishTransferRow>([])
+    }
+    return toQueryError("getTransferData", error)
+  }
   return toQuerySuccess<FishTransferRow>(data as FishTransferRow[])
 }
 
@@ -379,7 +440,14 @@ export async function getBatchSystemIds(params: {
 
   const { data, error } = await query
   if (error) {
-    if (isSbPermissionDenied(error)) return toQuerySuccess<{ system_id: number }>([])
+    if (
+      params.signal?.aborted ||
+      isAbortLikeError(error) ||
+      isSbPermissionDenied(error) ||
+      isSbAuthMissing(error)
+    ) {
+      return toQuerySuccess<{ system_id: number }>([])
+    }
     return toQueryError("getBatchSystemIds", error)
   }
 

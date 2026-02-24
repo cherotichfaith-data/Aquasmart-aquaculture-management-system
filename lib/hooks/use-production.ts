@@ -12,9 +12,10 @@ export function useProductionSummary(params?: {
   dateTo?: string
   limit?: number
   farmId?: string | null
+  enabled?: boolean
 }) {
   const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(params?.farmId)
+  const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
   return useQuery({
     queryKey: [
       "production",

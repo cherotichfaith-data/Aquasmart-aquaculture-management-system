@@ -60,6 +60,7 @@ Root
 - `lib/api/` Supabase read APIs (views and base table reads)
 - `lib/hooks/` React Query hooks for pages and features
 - `lib/react-query/` Query client configuration
+- `docs/frontend-endpoint-calling-cheatsheet.md` canonical frontend endpoint calling pattern (`rpc` vs `from`)
 - `utils/` Supabase client + middleware helpers
 - `public/` static assets
 - `supabase/` local Supabase CLI artifacts

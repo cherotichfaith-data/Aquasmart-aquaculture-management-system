@@ -1,7 +1,7 @@
 import type { Database, Enums, Tables } from "@/lib/types/database"
 import { parseDateToTimePeriod } from "@/lib/utils"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { getDailyFishInventory } from "@/lib/api/inventory"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
@@ -211,7 +211,7 @@ export async function getDashboardSnapshot(params?: {
     timePeriod: params.timePeriod,
   })
 
-  let query = supabase.rpc("api_dashboard", {
+  let query = queryKpiRpc(supabase, "api_dashboard", {
     ...baseArgs,
     p_limit: 1,
     p_order_desc: true,
@@ -220,6 +220,9 @@ export async function getDashboardSnapshot(params?: {
 
   const { data, error } = await query
   if (error) {
+    if (isQuietDashboardError(error)) {
+      return null
+    }
     toQueryError("getDashboardSnapshot", error)
     return null
   }
@@ -267,7 +270,7 @@ export async function getDashboardConsolidatedSnapshot(params?: {
     timePeriod: params.timePeriod,
   })
 
-  let query = supabase.rpc("api_dashboard_consolidated", {
+  let query = queryKpiRpc(supabase, "api_dashboard_consolidated", {
     ...baseArgs,
     p_limit: 1,
     p_order_desc: true,
@@ -322,7 +325,7 @@ export async function getDashboardSystems(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.rpc("api_dashboard_systems", dashboardSystemsRpcArgs({
+  let query = queryKpiRpc(supabase, "api_dashboard_systems", dashboardSystemsRpcArgs({
       farmId: params.farmId,
       stage: params.stage ?? undefined,
       systemId: params.systemId ?? undefined,
@@ -334,6 +337,7 @@ export async function getDashboardSystems(params?: {
   const { data, error } = await query
   if (params?.signal?.aborted) return toQuerySuccess<DashboardSystemRpcRow>([])
   if (error && isAbortLikeError(error)) return toQuerySuccess<DashboardSystemRpcRow>([])
+  if (error && isQuietDashboardError(error)) return toQuerySuccess<DashboardSystemRpcRow>([])
   if (error) return toQueryError("getDashboardSystems", error)
   const rows = (data ?? []) as DashboardSystemRpcRow[]
   if (!rows.some((row) => shouldBackfillRate(row.feeding_rate) || shouldBackfillRate(row.mortality_rate))) {
@@ -394,7 +398,7 @@ export async function getTimePeriodBounds(
     dateTo: parsed.kind === "custom" ? parsed.endDate : undefined,
   })
 
-  let consolidatedQuery = supabase.rpc("api_dashboard_consolidated", {
+  let consolidatedQuery = queryKpiRpc(supabase, "api_dashboard_consolidated", {
     ...consolidatedArgs,
     p_limit: 1,
     p_order_desc: true,
@@ -417,7 +421,7 @@ export async function getTimePeriodBounds(
     dateTo: parsed.kind === "custom" ? parsed.endDate : undefined,
   })
 
-  let dashboardQuery = supabase.rpc("api_dashboard", {
+  let dashboardQuery = queryKpiRpc(supabase, "api_dashboard", {
     ...dashboardArgs,
     p_limit: 1,
     p_order_desc: true,

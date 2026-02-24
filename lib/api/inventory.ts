@@ -1,6 +1,7 @@
 import type { Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type DailyFishInventoryRow = Tables<"api_daily_fish_inventory">
 type DailyFishInventoryConsolidatedRow = Tables<"api_daily_fish_inventory_consolidated">
@@ -68,7 +69,7 @@ export async function getDailyFishInventory(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.rpc("api_daily_fish_inventory", dailyInventoryRpcArgs({
+  let query = queryKpiRpc(supabase, "api_daily_fish_inventory", dailyInventoryRpcArgs({
     farmId: params.farmId,
     systemId: params.systemId,
     dateFrom: params.dateFrom,
@@ -79,6 +80,9 @@ export async function getDailyFishInventory(params?: {
   const { data, error } = await query
   if (params?.signal?.aborted) return toQuerySuccess<DailyFishInventoryRow>([])
   if (error && isAbortLikeError(error)) return toQuerySuccess<DailyFishInventoryRow>([])
+  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
+    return toQuerySuccess<DailyFishInventoryRow>([])
+  }
   if (error) return toQueryError("getDailyFishInventory", error)
   let rows = (data ?? []) as DailyFishInventoryRow[]
   rows = rows.sort((a, b) => {
@@ -116,7 +120,7 @@ export async function getDailyFishInventoryCount(params?: {
   }
   const { supabase } = clientResult
 
-  let query = supabase.rpc("api_daily_fish_inventory_count", dailyInventoryRpcArgs({
+  let query = queryKpiRpc(supabase, "api_daily_fish_inventory_count", dailyInventoryRpcArgs({
     farmId: params.farmId,
     systemId: params.systemId,
     dateFrom: params.dateFrom,
@@ -125,7 +129,12 @@ export async function getDailyFishInventoryCount(params?: {
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return { status: "error", data: null, error: error.message }
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || isAbortLikeError(error)) {
+      return { status: "success", data: 0 }
+    }
+    return { status: "error", data: null, error: error.message }
+  }
   return { status: "success", data: data ?? 0 }
 }
 
@@ -143,7 +152,7 @@ export async function getDailyFishInventoryConsolidated(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.rpc("api_daily_fish_inventory_consolidated", dailyInventoryConsolidatedRpcArgs({
+  let query = queryKpiRpc(supabase, "api_daily_fish_inventory_consolidated", dailyInventoryConsolidatedRpcArgs({
     farmId: params.farmId,
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
@@ -151,7 +160,12 @@ export async function getDailyFishInventoryConsolidated(params?: {
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
-  if (error) return toQueryError("getDailyFishInventoryConsolidated", error)
+  if (error) {
+    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || isAbortLikeError(error)) {
+      return toQuerySuccess<DailyFishInventoryConsolidatedRow>([])
+    }
+    return toQueryError("getDailyFishInventoryConsolidated", error)
+  }
   let rows = (data ?? []) as DailyFishInventoryConsolidatedRow[]
   rows = rows.sort((a, b) => String(b.inventory_date ?? "").localeCompare(String(a.inventory_date ?? "")))
   if (params?.limit) {

@@ -44,6 +44,8 @@ import {
   type StatusTone,
   type WqParameter,
 } from "./water-quality-utils"
+import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { LazyRender } from "@/components/shared/lazy-render"
 
 export default function WaterQualityPage() {
   const { toast } = useToast()
@@ -64,7 +66,8 @@ export default function WaterQualityPage() {
   const [showFeedingOverlay, setShowFeedingOverlay] = useState(true)
   const [showMortalityOverlay, setShowMortalityOverlay] = useState(true)
   const [lowDoThreshold, setLowDoThreshold] = useState(4)
-const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
+  const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
+  const chartLimit = 2000
 
   const {
     selectedSystemId,
@@ -101,12 +104,14 @@ const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
     dateFrom,
     dateTo,
     requireSystem: false,
+    limit: chartLimit,
   })
   const measurementsQuery = useWaterQualityMeasurements({
     systemId: selectedSystemId,
     dateFrom,
     dateTo,
     requireSystem: false,
+    limit: chartLimit,
   })
   const overlayQuery = useWaterQualityOverlay({
     systemId: selectedSystemId,
@@ -118,11 +123,17 @@ const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
     tableName: "water_quality_measurement",
     dateFrom: `${dateFrom}T00:00:00`,
     dateTo: `${dateTo}T23:59:59`,
-    limit: 5000,
+    limit: 1500,
   })
   const thresholdsQuery = useAlertThresholds()
   const upsertFarmThresholdMutation = useUpsertFarmThreshold()
   const scopedSystemIds = scopedSystemIdList
+  const latestUpdatedAt = Math.max(
+    measurementsQuery.dataUpdatedAt ?? 0,
+    ratingsQuery.dataUpdatedAt ?? 0,
+    statusQuery.dataUpdatedAt ?? 0,
+    overlayQuery.dataUpdatedAt ?? 0,
+  )
 
   const thresholdRow = useMemo(() => {
     const rows = getResultRows(thresholdsQuery.data)
@@ -522,6 +533,10 @@ const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
             <h1 className="text-3xl font-bold">Water Quality Monitoring</h1>
             <p className="text-muted-foreground mt-1">Measurements, thresholds, trends, compliance reporting, and predictive alerts.</p>
           </div>
+          <div className="flex items-center justify-between text-xs">
+            <DataUpdatedAt updatedAt={latestUpdatedAt} />
+            <DataFetchingBadge isFetching={measurementsQuery.isFetching || ratingsQuery.isFetching} isLoading={loading} />
+          </div>
 
           <FarmSelector
             selectedBatch={selectedBatch}
@@ -611,7 +626,7 @@ const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
                 {saveThresholdMutation.isPending ? "Saving..." : "Save Thresholds"}
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className={`rounded-md p-3 ${statusClass(doTone)}`}>
                 <p className="text-xs">DO status</p>
                 <p className="font-semibold">{latestEvent?.dissolved_oxygen != null ? `${latestEvent.dissolved_oxygen.toFixed(2)} mg/L` : "No data"}</p>
@@ -644,8 +659,9 @@ const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
           ) : trendData.length === 0 ? (
             <div className="h-[320px] flex items-center justify-center text-muted-foreground">No trend data for selected range.</div>
           ) : (
-            <ResponsiveContainer width="100%" height={320}>
-              <ComposedChart data={trendData}>
+            <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis yAxisId="wq" />
@@ -673,8 +689,9 @@ const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
                 <Line yAxisId="wq" type="monotone" dataKey="parameter" name={parameterLabels[selectedParameter]} stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
                 {showFeedingOverlay ? <Line yAxisId="overlay" type="monotone" dataKey="feeding" name="Feeding amount" stroke="var(--color-chart-3)" dot={false} /> : null}
                 {showMortalityOverlay ? <Line yAxisId="overlay" type="monotone" dataKey="mortality" name="Mortality count" stroke="var(--color-chart-4)" dot={false} /> : null}
-              </ComposedChart>
-            </ResponsiveContainer>
+                </ComposedChart>
+              </ResponsiveContainer>
+            </LazyRender>
           )}
         </div>
 
@@ -754,3 +771,4 @@ const [highAmmoniaThreshold, setHighAmmoniaThreshold] = useState(0.5)
     </DashboardLayout>
   )
 }
+

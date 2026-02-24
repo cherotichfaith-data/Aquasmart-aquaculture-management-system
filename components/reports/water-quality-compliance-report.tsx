@@ -4,6 +4,8 @@ import { useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 type Props = {
   dateRange?: { from: string; to: string }
@@ -17,13 +19,23 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     requireSystem: false,
-    limit: 10000,
+    limit: 2000,
   })
   const thresholdsQuery = useAlertThresholds()
 
   const rows = measurementsQuery.data?.status === "success" ? measurementsQuery.data.data : []
   const thresholdRows = thresholdsQuery.data?.status === "success" ? thresholdsQuery.data.data : []
   const loading = measurementsQuery.isLoading || thresholdsQuery.isLoading
+  const errorMessages = [
+    getErrorMessage(measurementsQuery.error),
+    getQueryResultError(measurementsQuery.data),
+    getErrorMessage(thresholdsQuery.error),
+    getQueryResultError(thresholdsQuery.data),
+  ].filter(Boolean) as string[]
+  const latestUpdatedAt = Math.max(
+    measurementsQuery.dataUpdatedAt ?? 0,
+    thresholdsQuery.dataUpdatedAt ?? 0,
+  )
 
   const farmThreshold = useMemo(
     () => thresholdRows.find((row) => row.scope === "farm" && row.system_id == null) ?? null,
@@ -46,9 +58,34 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
   }, [farmThreshold?.high_ammonia_threshold, farmThreshold?.low_do_threshold, rows])
 
   const excursionCount = useMemo(() => enrichedRows.filter((row) => row.excursion).length, [enrichedRows])
+  const attentionRows = useMemo(() => {
+    const sorted = [...enrichedRows].sort((a, b) => {
+      const left = `${a.date ?? ""} ${a.time ?? ""}`.trim()
+      const right = `${b.date ?? ""} ${b.time ?? ""}`.trim()
+      return right.localeCompare(left)
+    })
+    return sorted.filter((row) => row.excursion).slice(0, 200)
+  }, [enrichedRows])
+
+  if (errorMessages.length > 0) {
+    return (
+      <DataErrorState
+        title="Unable to load compliance report"
+        description={errorMessages[0]}
+        onRetry={() => {
+          measurementsQuery.refetch()
+          thresholdsQuery.refetch()
+        }}
+      />
+    )
+  }
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between text-xs">
+        <DataUpdatedAt updatedAt={latestUpdatedAt} />
+        <DataFetchingBadge isFetching={measurementsQuery.isFetching || thresholdsQuery.isFetching} isLoading={loading} />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Compliance Summary</CardTitle>
@@ -82,7 +119,7 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
             <div>
               <CardTitle>Water-Quality Compliance Records</CardTitle>
               <CardDescription>
-                Source: api_water_quality_measurements. Includes parameter, reading, timestamp, system, and threshold flag.
+                Showing the most recent excursion records (attention needed).
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -93,7 +130,7 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
                   downloadCsv({
                     filename: `water-quality-compliance-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
                     headers: ["date", "time", "system_name", "parameter_name", "parameter_value", "unit", "water_depth", "created_at", "operator", "excursion"],
-                    rows: enrichedRows.map((row) => [
+                    rows: attentionRows.map((row) => [
                       row.date,
                       row.time,
                       row.system_name ?? row.system_id,
@@ -120,14 +157,15 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
                     farmName,
                     dateRange,
                     summaryLines: [
-                      `Total readings: ${enrichedRows.length}`,
-                      `Excursions: ${excursionCount}`,
+                      `Total readings (loaded): ${enrichedRows.length}`,
+                      `Excursions flagged (loaded): ${excursionCount}`,
                       `DO threshold: ${farmThreshold?.low_do_threshold ?? "N/A"}`,
                       `Ammonia threshold: ${farmThreshold?.high_ammonia_threshold ?? "N/A"}`,
+                      `Showing ${attentionRows.length} most recent excursions.`,
                       "Certification: Generated from audited AquaSmart view datasets.",
                     ],
                     tableHeaders: ["Date", "Time", "System", "Parameter", "Reading", "Unit", "Excursion"],
-                    tableRows: enrichedRows.map((row) => [
+                    tableRows: attentionRows.map((row) => [
                       row.date,
                       row.time,
                       row.system_name ?? row.system_id,
@@ -163,8 +201,8 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
                   <tr>
                     <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">Loading...</td>
                   </tr>
-                ) : enrichedRows.length ? (
-                  enrichedRows.map((row) => (
+                ) : attentionRows.length ? (
+                  attentionRows.map((row) => (
                     <tr key={row.id ?? `${row.system_id}-${row.date}-${row.time}-${row.parameter_name}`} className="border-b border-border/70 hover:bg-muted/35">
                       <td className="px-4 py-2">{row.date} {row.time ?? "00:00"}</td>
                       <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
@@ -176,7 +214,7 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">No measurements found</td>
+                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">No excursions flagged</td>
                   </tr>
                 )}
               </tbody>

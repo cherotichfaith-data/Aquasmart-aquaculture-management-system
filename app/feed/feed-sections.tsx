@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts"
 import type { FeedIncomingWithType, FeedingRecordWithType } from "@/lib/api/reports"
+import { LazyRender } from "@/components/shared/lazy-render"
 import { formatDateTime } from "./feed-utils"
 
 type EfcrRow = { date: string; label: string; efcr: number }
@@ -44,8 +45,9 @@ export function FeedEfcrSection({
             <div className="rounded-md border border-border bg-muted/20 p-3"><p className="text-xs text-muted-foreground">Target</p><p className="text-lg font-semibold">{efcrStats.target != null ? efcrStats.target.toFixed(2) : "N/A"}</p></div>
           </div>
           <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={efcrChartData}>
+            <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={efcrChartData}>
                 <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.4} />
                 <XAxis dataKey="label" />
                 <YAxis />
@@ -56,8 +58,9 @@ export function FeedEfcrSection({
                 <Legend />
                 {efcrStats.target != null ? (<ReferenceLine y={efcrStats.target} stroke="hsl(var(--chart-4))" strokeDasharray="4 4" label="Target" />) : null}
                 <Line type="monotone" dataKey="efcr" stroke="hsl(var(--chart-1))" strokeWidth={2.5} dot={false} name="eFCR" />
-              </LineChart>
-            </ResponsiveContainer>
+                </LineChart>
+              </ResponsiveContainer>
+            </LazyRender>
           </div>
         </div>
       ) : (<div className="h-80 flex items-center justify-center text-muted-foreground">No eFCR data available</div>)}
@@ -77,8 +80,9 @@ export function FeedNutritionSection({
       <h2 className="text-lg font-semibold mb-4">Feed Protein & Nutritional Analysis</h2>
       {loading ? (<div className="h-80 flex items-center justify-center text-muted-foreground">Loading nutritional analysis...</div>) : proteinChartData.length > 0 ? (
         <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={proteinChartData}>
+          <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={proteinChartData}>
               <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.4} />
               <XAxis dataKey="feedType" />
               <YAxis />
@@ -89,8 +93,9 @@ export function FeedNutritionSection({
               <Legend />
               <Bar dataKey="proteinContent" fill="hsl(var(--chart-2))" name="Protein %" />
               <Bar dataKey="crudeFat" fill="hsl(var(--chart-3))" name="Crude Fat %" />
-            </BarChart>
-          </ResponsiveContainer>
+              </BarChart>
+            </ResponsiveContainer>
+          </LazyRender>
         </div>
       ) : (<div className="h-80 flex items-center justify-center text-muted-foreground">No nutrition data available</div>)}
     </div>
@@ -117,8 +122,9 @@ export function FeedAnomaliesSection({
       {loading ? (<div className="h-80 flex items-center justify-center text-muted-foreground">Loading feeding trends...</div>) : dailyFeedingTrend.length > 0 ? (
         <div className="space-y-4">
           <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dailyFeedingTrend}>
+            <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={dailyFeedingTrend}>
                 <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.4} />
                 <XAxis dataKey="label" />
                 <YAxis />
@@ -129,8 +135,9 @@ export function FeedAnomaliesSection({
                 <Legend />
                 <Line type="monotone" dataKey="feeding" stroke="hsl(var(--chart-1))" strokeWidth={2.5} name="Actual feed (kg)" />
                 <Line type="monotone" dataKey="expected" stroke="hsl(var(--chart-4))" strokeDasharray="4 4" name="Expected feed (kg)" />
-              </LineChart>
-            </ResponsiveContainer>
+                </LineChart>
+              </ResponsiveContainer>
+            </LazyRender>
           </div>
           <div className="rounded-md border border-border overflow-x-auto">
             <table className="w-full text-sm">
