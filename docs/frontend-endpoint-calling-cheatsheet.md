@@ -33,18 +33,8 @@ const { data, error } = await supabase.rpc("api_dashboard", {
 })
 ```
 
-### 2) `api_dashboard_consolidated`
-```ts
-const { data, error } = await supabase.rpc("api_dashboard_consolidated", {
-  p_farm_id: farmId,
-  p_system_id: systemId ?? null,
-  p_start_date: dateFrom ?? null,
-  p_end_date: dateTo ?? null,
-  p_time_period: timePeriod ?? null,
-  p_limit: 1,
-  p_order_desc: true,
-})
-```
+### 2) `api_dashboard_consolidated` (removed)
+This RPC is no longer available. Use `api_dashboard` and derive farm-level aggregates in JS if needed.
 
 ### 3) `api_daily_fish_inventory`
 ```ts
@@ -57,15 +47,8 @@ const { data, error } = await supabase.rpc("api_daily_fish_inventory", {
 // sort/limit in JS OR add p_limit/p_order_desc to function
 ```
 
-### 4) `api_daily_fish_inventory_consolidated`
-```ts
-const { data, error } = await supabase.rpc("api_daily_fish_inventory_consolidated", {
-  p_farm_id: farmId,
-  p_system_id: systemId ?? null,
-  p_start_date: dateFrom ?? null,
-  p_end_date: dateTo ?? null,
-})
-```
+### 4) `api_daily_fish_inventory_consolidated` (removed)
+This RPC is no longer available. Use `api_daily_fish_inventory` and consolidate in JS if needed.
 
 ### 5) `api_efcr_trend`
 ```ts

@@ -16,7 +16,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tables } from "@/lib/types/database"
-import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordSampling } from "@/lib/hooks/use-sampling"
 import { logSbError } from "@/utils/supabase/log"
 
@@ -64,11 +63,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
                 total_weight_sampling: values.total_weight_kg,
                 abw: values.average_body_weight_g || 0,
             })
-            const refreshResult = await refreshMaterializedViews()
-            if (refreshResult.status === "error") {
-                console.warn("[sampling] MV refresh failed:", refreshResult.error)
-            }
-
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,

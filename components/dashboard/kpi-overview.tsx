@@ -7,6 +7,15 @@ import { useKpiOverview } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 
+const kpiFilterMap: Record<string, string> = {
+  efcr: "efcr_periodic",
+  mortality: "mortality",
+  abw: "abw",
+  biomass: "abw",
+  biomass_density: "density",
+  feeding: "feeding",
+}
+
 interface KPIOverviewProps {
   stage: "all" | Enums<"system_growth_stage">
   timePeriod?: Enums<"time_period">
@@ -72,6 +81,16 @@ export default function KPIOverview({
       ) : null}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => {
+          const filter = kpiFilterMap[metric.key]
+          const periodValue = periodParam ?? timePeriod
+          const range =
+            dateBounds.start && dateBounds.end
+              ? `&startDate=${dateBounds.start}&endDate=${dateBounds.end}`
+              : ""
+          const systemParam = system !== "all" ? `&system=${system}` : ""
+          const batchParam = batch !== "all" ? `&batch=${batch}` : ""
+          const stageParam = stage !== "all" ? `&stage=${stage}` : ""
+          const filterParam = filter ? `filter=${filter}&` : ""
           return (
             <KPICard
               key={metric.key}
@@ -81,7 +100,7 @@ export default function KPIOverview({
               decimals={metric.decimals}
               formatUnit={metric.unit}
               invertTrend={metric.invertTrend}
-              href={`/production?metric=${metric.key}&period=${timePeriod}${dateBounds.start && dateBounds.end ? `&startDate=${dateBounds.start}&endDate=${dateBounds.end}` : ""}${system !== "all" ? `&system=${system}` : ""}`}
+              href={`/production?${filterParam}metric=${metric.key}&period=${periodValue}${range}${systemParam}${batchParam}${stageParam}`}
             />
           )
         })}

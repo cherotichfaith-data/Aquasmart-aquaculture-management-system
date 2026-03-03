@@ -16,7 +16,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tables } from "@/lib/types/database"
-import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordStocking } from "@/lib/hooks/use-stocking"
 import { logSbError } from "@/utils/supabase/log"
 
@@ -70,11 +69,6 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
                 abw,
                 type_of_stocking: values.type_of_stocking,
             })
-
-            const refreshResult = await refreshMaterializedViews()
-            if (refreshResult.status === "error") {
-                console.warn("[stocking] MV refresh failed:", refreshResult.error)
-            }
 
             form.reset({
                 stocking_date: new Date().toISOString().split("T")[0],

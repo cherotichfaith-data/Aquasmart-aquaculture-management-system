@@ -1,14 +1,13 @@
-import type { Database, Enums, Tables } from "@/lib/types/database"
+import type { Database, Enums } from "@/lib/types/database"
 import { parseDateToTimePeriod } from "@/lib/utils"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { getDailyFishInventory } from "@/lib/api/inventory"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
-type DashboardRow = Tables<"api_dashboard">
-type DashboardConsolidatedRow = Tables<"api_dashboard_consolidated">
-type DashboardTimeBoundsRow = Pick<DashboardConsolidatedRow, "input_start_date" | "input_end_date" | "time_period">
-type DailyFishInventoryRow = Tables<"api_daily_fish_inventory">
+type DashboardRow = Database["public"]["Functions"]["api_dashboard"]["Returns"][number]
+type DashboardTimeBoundsRow = Pick<DashboardRow, "input_start_date" | "input_end_date" | "time_period">
+type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory"]["Returns"][number]
 export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 
 type DashboardRpcArgs = {
@@ -31,28 +30,6 @@ const dashboardRpcArgs = (params: {
   p_farm_id: params.farmId,
   p_system_id: params.systemId ?? undefined,
   p_growth_stage: params.stage ?? undefined,
-  p_start_date: params.dateFrom ?? undefined,
-  p_end_date: params.dateTo ?? undefined,
-  p_time_period: params.timePeriod ?? undefined,
-})
-
-type DashboardConsolidatedRpcArgs = {
-  p_farm_id: string
-  p_system_id?: number
-  p_start_date?: string
-  p_end_date?: string
-  p_time_period?: string
-}
-
-const dashboardConsolidatedRpcArgs = (params: {
-  farmId: string
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-  timePeriod?: Enums<"time_period"> | string
-}): DashboardConsolidatedRpcArgs => ({
-  p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? undefined,
   p_start_date: params.dateFrom ?? undefined,
   p_end_date: params.dateTo ?? undefined,
   p_time_period: params.timePeriod ?? undefined,
@@ -252,64 +229,6 @@ export async function getDashboardSnapshot(params?: {
   }
 }
 
-export async function getDashboardConsolidatedSnapshot(params?: {
-  timePeriod?: Enums<"time_period">
-  allowFallback?: boolean
-  farmId?: string | null
-  signal?: AbortSignal
-}) {
-  if (!params?.farmId) {
-    return null
-  }
-  const clientResult = await getClientOrError("getDashboardConsolidatedSnapshot", { requireSession: true })
-  if ("error" in clientResult) return null
-  const { supabase } = clientResult
-
-  const baseArgs = dashboardConsolidatedRpcArgs({
-    farmId: params.farmId,
-    timePeriod: params.timePeriod,
-  })
-
-  let query = queryKpiRpc(supabase, "api_dashboard_consolidated", {
-    ...baseArgs,
-    p_limit: 1,
-    p_order_desc: true,
-  })
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (isQuietDashboardError(error)) {
-      return null
-    }
-    toQueryError("getDashboardConsolidatedSnapshot", error)
-    return null
-  }
-
-  const rows = (data ?? []) as DashboardConsolidatedRow[]
-  const row = rows[0] ?? null
-  if (!row) return null
-  if (!shouldBackfillRate(row.feeding_rate) && !shouldBackfillRate(row.mortality_rate)) return row
-
-  const bounds = await getTimePeriodBounds(params?.timePeriod ?? "2 weeks", params?.signal, params?.farmId ?? null)
-  const inventoryResult = await getDailyFishInventory({
-    farmId: params.farmId,
-    dateFrom: bounds.start ?? undefined,
-    dateTo: bounds.end ?? undefined,
-    limit: 10000,
-    signal: params?.signal,
-  })
-  if (inventoryResult.status !== "success") return row
-  const fallback = computeAggregateRateFallbacks(inventoryResult.data)
-
-  return {
-    ...row,
-    feeding_rate: shouldBackfillRate(row.feeding_rate) && fallback.feedingRate != null ? fallback.feedingRate : row.feeding_rate,
-    mortality_rate:
-      shouldBackfillRate(row.mortality_rate) && fallback.mortalityRate != null ? fallback.mortalityRate : row.mortality_rate,
-  }
-}
-
 export async function getDashboardSystems(params?: {
   farmId?: string | null
   stage?: Enums<"system_growth_stage"> | null
@@ -378,47 +297,18 @@ export async function getTimePeriodBounds(
   const parsed = parseDateToTimePeriod(timePeriod)
 
   if (!farmId) {
-    return parsed.kind === "custom"
-      ? { start: parsed.startDate, end: parsed.endDate }
-      : { start: null, end: null }
+    return { start: null, end: null }
   }
 
   const clientResult = await getClientOrError("getTimePeriodBounds", { requireSession: true })
   if ("error" in clientResult) {
-    return parsed.kind === "custom"
-      ? { start: parsed.startDate, end: parsed.endDate }
-      : { start: null, end: null }
+    return { start: null, end: null }
   }
   const { supabase } = clientResult
 
-  const consolidatedArgs = dashboardConsolidatedRpcArgs({
-    farmId,
-    timePeriod: parsed.kind === "preset" ? parsed.period : undefined,
-    dateFrom: parsed.kind === "custom" ? parsed.startDate : undefined,
-    dateTo: parsed.kind === "custom" ? parsed.endDate : undefined,
-  })
-
-  let consolidatedQuery = queryKpiRpc(supabase, "api_dashboard_consolidated", {
-    ...consolidatedArgs,
-    p_limit: 1,
-    p_order_desc: true,
-  })
-  if (signal) consolidatedQuery = consolidatedQuery.abortSignal(signal)
-
-  const { data: consolidatedData, error: consolidatedError } = await consolidatedQuery
-  if (!consolidatedError) {
-    const rows = (consolidatedData ?? []) as DashboardTimeBoundsRow[]
-    const row = rows[0]
-    if (row?.input_start_date || row?.input_end_date) {
-      return { start: row?.input_start_date ?? null, end: row?.input_end_date ?? null }
-    }
-  }
-
   const dashboardArgs = dashboardRpcArgs({
     farmId,
-    timePeriod: parsed.kind === "preset" ? parsed.period : undefined,
-    dateFrom: parsed.kind === "custom" ? parsed.startDate : undefined,
-    dateTo: parsed.kind === "custom" ? parsed.endDate : undefined,
+    timePeriod: parsed.period,
   })
 
   let dashboardQuery = queryKpiRpc(supabase, "api_dashboard", {
@@ -432,10 +322,10 @@ export async function getTimePeriodBounds(
   if (!dashboardError) {
     const rows = (dashboardData ?? []) as DashboardTimeBoundsRow[]
     const row = rows[0]
-    return { start: row?.input_start_date ?? null, end: row?.input_end_date ?? null }
+    if (row?.input_start_date || row?.input_end_date) {
+      return { start: row?.input_start_date ?? null, end: row?.input_end_date ?? null }
+    }
   }
 
-  return parsed.kind === "custom"
-    ? { start: parsed.startDate, end: parsed.endDate }
-    : { start: null, end: null }
+  return { start: null, end: null }
 }

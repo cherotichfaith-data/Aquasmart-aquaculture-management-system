@@ -14,7 +14,6 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useDashboardConsolidatedSnapshot } from "@/lib/hooks/use-dashboard"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
@@ -45,7 +44,6 @@ export default function PerformanceReport({
   const chartLimit = 2000
   const [tableLimit, setTableLimit] = useState("100")
   const [showPerformanceRecords, setShowPerformanceRecords] = useState(false)
-  const summaryQuery = useDashboardConsolidatedSnapshot({ farmId: farmId ?? null })
   const productionSummaryQuery = useProductionSummary({
     systemId,
     stage: stage && stage !== "all" ? stage : undefined,
@@ -64,20 +62,17 @@ export default function PerformanceReport({
     limit: tableLimitValue,
     enabled: showPerformanceRecords,
   })
-  const summary = summaryQuery.data ?? null
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const tableRows = performanceTableQuery.data?.status === "success" ? performanceTableQuery.data.data : []
-  const loading = summaryQuery.isLoading || productionSummaryQuery.isLoading
+  const loading = productionSummaryQuery.isLoading
   const tableLoading = performanceTableQuery.isLoading
   const errorMessages = [
-    getErrorMessage(summaryQuery.error),
     getErrorMessage(productionSummaryQuery.error),
     getQueryResultError(productionSummaryQuery.data),
     getErrorMessage(performanceTableQuery.error),
     getQueryResultError(performanceTableQuery.data),
   ].filter(Boolean) as string[]
   const latestUpdatedAt = Math.max(
-    summaryQuery.dataUpdatedAt ?? 0,
     productionSummaryQuery.dataUpdatedAt ?? 0,
     performanceTableQuery.dataUpdatedAt ?? 0,
   )
@@ -125,6 +120,59 @@ export default function PerformanceReport({
     })
     return Array.from(bySystem.values())
   }, [rows])
+
+  const summary = useMemo(() => {
+    if (!latestBySystemRows.length) return null
+    const totals = latestBySystemRows.reduce(
+      (acc, row) => {
+        acc.totalBiomass += row.total_biomass ?? 0
+        acc.totalFeed += row.total_feed_amount_period ?? 0
+        acc.totalFish += row.number_of_fish_inventory ?? 0
+        acc.totalMortality += row.daily_mortality_count ?? 0
+        if (typeof row.efcr_period === "number") {
+          const weight = row.total_feed_amount_period ?? 0
+          if (weight > 0) {
+            acc.efcrWeighted += row.efcr_period * weight
+            acc.efcrWeight += weight
+          } else {
+            acc.efcrFallback += row.efcr_period
+            acc.efcrFallbackCount += 1
+          }
+        }
+        return acc
+      },
+      {
+        totalBiomass: 0,
+        totalFeed: 0,
+        totalFish: 0,
+        totalMortality: 0,
+        efcrWeighted: 0,
+        efcrWeight: 0,
+        efcrFallback: 0,
+        efcrFallbackCount: 0,
+      },
+    )
+
+    const efcr =
+      totals.efcrWeight > 0
+        ? totals.efcrWeighted / totals.efcrWeight
+        : totals.efcrFallbackCount > 0
+          ? totals.efcrFallback / totals.efcrFallbackCount
+          : null
+    const feedingRate =
+      totals.totalBiomass > 0 && totals.totalFeed > 0
+        ? (totals.totalFeed * 1000) / totals.totalBiomass
+        : null
+    const mortalityRate =
+      totals.totalFish > 0 ? totals.totalMortality / totals.totalFish : null
+
+    return {
+      efcr_period_consolidated: efcr,
+      feeding_rate: feedingRate,
+      average_biomass: totals.totalBiomass,
+      mortality_rate: mortalityRate,
+    }
+  }, [latestBySystemRows])
   const efcrBenchmark = 1.5
   const mortalityBenchmark = 0.02
 
@@ -160,7 +208,6 @@ export default function PerformanceReport({
         title="Unable to load performance report"
         description={errorMessages[0]}
         onRetry={() => {
-          summaryQuery.refetch()
           productionSummaryQuery.refetch()
         }}
       />
@@ -171,7 +218,7 @@ export default function PerformanceReport({
     <div className="space-y-6">
       <div className="flex items-center justify-between text-xs">
         <DataUpdatedAt updatedAt={latestUpdatedAt} />
-        <DataFetchingBadge isFetching={summaryQuery.isFetching || productionSummaryQuery.isFetching || performanceTableQuery.isFetching} isLoading={loading} />
+        <DataFetchingBadge isFetching={productionSummaryQuery.isFetching || performanceTableQuery.isFetching} isLoading={loading} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -180,7 +227,7 @@ export default function PerformanceReport({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summary?.efcr_period_consolidated ?? "N/A"}</div>
-            <p className="text-xs text-muted-foreground mt-1">Backend consolidated</p>
+            <p className="text-xs text-muted-foreground mt-1">Derived from production summary</p>
           </CardContent>
         </Card>
         <Card>
@@ -392,7 +439,7 @@ export default function PerformanceReport({
                       row.daily_mortality_count,
                       row.efcr_aggregated,
                     ]),
-                    commentary: "Generated from api_production_summary and api_dashboard_consolidated sources.",
+                    commentary: "Generated from api_production_summary sources.",
                   })
                 }
               >

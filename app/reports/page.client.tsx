@@ -9,7 +9,6 @@ import PerformanceReport from "@/components/reports/performance-report"
 import MortalityReport from "@/components/reports/mortality-report"
 import GrowthReport from "@/components/reports/growth-report"
 import WaterQualityComplianceReport from "@/components/reports/water-quality-compliance-report"
-import AnalysisOverview from "@/components/dashboard/analysis-overview"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import {
@@ -63,8 +62,6 @@ export default function ReportsPage() {
 
   const selectedSystemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
   const selectedBatchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
-  const operationsPeriodParam = `custom_${dateRange.from}_${dateRange.to}`
-
   const inventoryQuery = useDailyFishInventory({
     farmId,
     systemId: selectedSystemId,
@@ -224,20 +221,6 @@ export default function ReportsPage() {
               stage={selectedStage}
               farmName={farm?.name ?? null}
             />
-            <section className="space-y-4 mt-6">
-              <div>
-                <h2 className="text-xl font-semibold">Operations Drilldown</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Production trend and system-level performance for the selected report window.
-                </p>
-              </div>
-              <AnalysisOverview
-                stage={selectedStage === "all" ? null : selectedStage}
-                system={selectedSystem}
-                timePeriod="month"
-                periodParam={operationsPeriodParam}
-              />
-            </section>
           </TabsContent>
 
           <TabsContent value="feeding" className="mt-6">

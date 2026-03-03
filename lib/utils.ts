@@ -14,25 +14,10 @@ const TIME_PERIOD_VALUES = [
 
 type TimePeriodValue = Enums<"time_period">
 type ParsedTimePeriod =
-  | { kind: "preset"; period: TimePeriodValue }
-  | { kind: "custom"; period: "custom"; startDate: string; endDate: string }
+  { kind: "preset"; period: TimePeriodValue }
 
 const isTimePeriodValue = (value: string | null | undefined): value is TimePeriodValue =>
   Boolean(value && (TIME_PERIOD_VALUES as readonly string[]).includes(value))
-
-const parseCustomRange = (value: string): { startDate: string; endDate: string } | null => {
-  const match = /^custom_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(value)
-  if (!match) return null
-
-  const [, startDate, endDate] = match
-  const start = new Date(`${startDate}T00:00:00`)
-  const end = new Date(`${endDate}T00:00:00`)
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
-  if (start > end) return null
-
-  return { startDate, endDate }
-}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -45,13 +30,6 @@ export function parseDateToTimePeriod(
   const trimmed = input?.trim()
   if (isTimePeriodValue(trimmed)) {
     return { kind: "preset", period: trimmed }
-  }
-
-  if (trimmed) {
-    const custom = parseCustomRange(trimmed)
-    if (custom) {
-      return { kind: "custom", period: "custom", ...custom }
-    }
   }
 
   return { kind: "preset", period: defaultPeriod }

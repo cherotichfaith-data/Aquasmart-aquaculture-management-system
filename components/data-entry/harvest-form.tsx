@@ -16,7 +16,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tables } from "@/lib/types/database"
-import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
 import { logSbError } from "@/utils/supabase/log"
 
@@ -64,11 +63,6 @@ export function HarvestForm({ systems, batches, defaultSystemId = null, defaultB
                 type_of_harvest: values.type_of_harvest,
                 abw: values.number_of_fish > 0 ? (values.amount_kg * 1000) / values.number_of_fish : 0,
             })
-
-            const refreshResult = await refreshMaterializedViews()
-            if (refreshResult.status === "error") {
-                console.warn("[harvest] MV refresh failed:", refreshResult.error)
-            }
 
             form.reset({
                 date: new Date().toISOString().split("T")[0],

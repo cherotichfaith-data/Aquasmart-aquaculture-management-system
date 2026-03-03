@@ -1,19 +1,11 @@
-import type { Tables } from "@/lib/types/database"
+import type { Database } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
-type DailyFishInventoryRow = Tables<"api_daily_fish_inventory">
-type DailyFishInventoryConsolidatedRow = Tables<"api_daily_fish_inventory_consolidated">
+type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory"]["Returns"][number]
 
 type DailyInventoryRpcArgs = {
-  p_farm_id: string
-  p_system_id?: number
-  p_start_date?: string
-  p_end_date?: string
-}
-
-type DailyInventoryConsolidatedRpcArgs = {
   p_farm_id: string
   p_system_id?: number
   p_start_date?: string
@@ -26,18 +18,6 @@ const dailyInventoryRpcArgs = (params: {
   dateFrom?: string
   dateTo?: string
 }): DailyInventoryRpcArgs => ({
-  p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? undefined,
-  p_start_date: params.dateFrom ?? undefined,
-  p_end_date: params.dateTo ?? undefined,
-})
-
-const dailyInventoryConsolidatedRpcArgs = (params: {
-  farmId: string
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-}): DailyInventoryConsolidatedRpcArgs => ({
   p_farm_id: params.farmId,
   p_system_id: params.systemId ?? undefined,
   p_start_date: params.dateFrom ?? undefined,
@@ -100,86 +80,4 @@ export async function getDailyFishInventory(params?: {
   return toQuerySuccess<DailyFishInventoryRow>(rows)
 }
 
-export async function getDailyFishInventoryCount(params?: {
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-  farmId?: string | null
-  signal?: AbortSignal
-}): Promise<{ status: "success"; data: number } | { status: "error"; data: null; error: string }> {
-  if (!params?.farmId) {
-    return { status: "success", data: 0 }
-  }
-
-  const clientResult = await getClientOrError("getDailyFishInventoryCount", { requireSession: true })
-  if ("error" in clientResult) {
-    if (clientResult.error.status === "error") {
-      return { status: "error", data: null, error: clientResult.error.error }
-    }
-    return { status: "error", data: null, error: "Failed to initialize Supabase client" }
-  }
-  const { supabase } = clientResult
-
-  let query = queryKpiRpc(supabase, "api_daily_fish_inventory_count", dailyInventoryRpcArgs({
-    farmId: params.farmId,
-    systemId: params.systemId,
-    dateFrom: params.dateFrom,
-    dateTo: params.dateTo,
-  }))
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || isAbortLikeError(error)) {
-      return { status: "success", data: 0 }
-    }
-    return { status: "error", data: null, error: error.message }
-  }
-  return { status: "success", data: data ?? 0 }
-}
-
-export async function getDailyFishInventoryConsolidated(params?: {
-  limit?: number
-  dateFrom?: string
-  dateTo?: string
-  farmId?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<DailyFishInventoryConsolidatedRow>> {
-  if (!params?.farmId) {
-    return toQuerySuccess<DailyFishInventoryConsolidatedRow>([])
-  }
-  const clientResult = await getClientOrError("getDailyFishInventoryConsolidated", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryKpiRpc(supabase, "api_daily_fish_inventory_consolidated", dailyInventoryConsolidatedRpcArgs({
-    farmId: params.farmId,
-    dateFrom: params.dateFrom,
-    dateTo: params.dateTo,
-  }))
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || isAbortLikeError(error)) {
-      return toQuerySuccess<DailyFishInventoryConsolidatedRow>([])
-    }
-    return toQueryError("getDailyFishInventoryConsolidated", error)
-  }
-  let rows = (data ?? []) as DailyFishInventoryConsolidatedRow[]
-  rows = rows.sort((a, b) => String(b.inventory_date ?? "").localeCompare(String(a.inventory_date ?? "")))
-  if (params?.limit) {
-    rows = rows.slice(0, params.limit)
-  }
-  return toQuerySuccess<DailyFishInventoryConsolidatedRow>(rows)
-}
-
-export async function getLatestInventory(params?: { systemId?: number; farmId?: string | null; signal?: AbortSignal }) {
-  return getDailyFishInventory({
-    systemId: params?.systemId,
-    farmId: params?.farmId ?? null,
-    limit: 1,
-    orderAsc: false,
-    signal: params?.signal,
-  })
-}
+// Intentionally limited to the canonical inventory RPC to avoid stale/legacy helpers.

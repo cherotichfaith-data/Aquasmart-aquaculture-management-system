@@ -1,10 +1,10 @@
-import type { Enums, Tables } from "@/lib/types/database"
+import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
-type ProductionSummaryRow = Tables<"api_production_summary">
-type EfcrLastSamplingRow = Tables<"api_efcr_trend">
+type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+type EfcrLastSamplingRow = Database["public"]["Functions"]["api_efcr_trend"]["Returns"][number]
 
 type ProductionRpcArgs = {
   p_farm_id: string

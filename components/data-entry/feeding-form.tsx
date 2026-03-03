@@ -16,7 +16,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tables } from "@/lib/types/database"
-import { refreshMaterializedViews } from "@/lib/api/admin"
 import { useRecordFeeding } from "@/lib/hooks/use-feeding"
 import { logSbError } from "@/utils/supabase/log"
 
@@ -66,11 +65,6 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                 feeding_amount: values.amount_kg,
                 feeding_response: values.feeding_response,
             })
-            const refreshResult = await refreshMaterializedViews()
-            if (refreshResult.status === "error") {
-                console.warn("[feeding] MV refresh failed:", refreshResult.error)
-            }
-
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 amount_kg: 0,

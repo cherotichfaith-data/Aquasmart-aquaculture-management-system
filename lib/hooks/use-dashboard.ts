@@ -5,11 +5,10 @@ import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
 import {
   getDashboardSystems,
-  getDashboardConsolidatedSnapshot,
   getDashboardSnapshot,
   getTimePeriodBounds,
 } from "@/lib/api/dashboard"
-import { parseDateToTimePeriod, sortByDateAsc } from "@/lib/utils"
+import { sortByDateAsc } from "@/lib/utils"
 import { getDailyFishInventory } from "@/lib/api/inventory"
 import { getWaterQualityRatings } from "@/lib/api/water-quality"
 import { getProductionSummary } from "@/lib/api/production"
@@ -79,17 +78,6 @@ async function resolveScopedSystemIds(params: {
   return scoped
 }
 
-export function useDashboardConsolidatedSnapshot(params?: { timePeriod?: Enums<"time_period">; enabled?: boolean; farmId?: string | null }) {
-  const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
-  return useQuery({
-    queryKey: ["dashboard", "snapshot", "consolidated", params?.farmId ?? "all", params?.timePeriod ?? "2 weeks"],
-    queryFn: ({ signal }) => getDashboardConsolidatedSnapshot({ ...params, farmId: params?.farmId ?? null, signal }),
-    enabled,
-    staleTime: 5 * 60_000,
-  })
-}
-
 export type HealthSummaryState = {
   waterQuality: { title: string; status: string; tone: "good" | "warn" | "bad"; progress: number; detail?: string } | null
   fishHealth: { title: string; status: string; tone: "good" | "warn" | "bad"; progress: number; detail?: string } | null
@@ -130,13 +118,11 @@ export function useHealthSummary(params: {
       })
       const resolvedSystemId =
         scopedSystemIds && scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
-      const parsed = parseDateToTimePeriod(params.periodParam ?? params.timePeriod)
       const bounds = await getTimePeriodBounds(
         params.periodParam ?? params.timePeriod ?? "2 weeks",
         signal,
         params.farmId ?? null,
       )
-      const hasCustomRange = parsed.kind === "custom" && bounds.start && bounds.end
 
       const waterQualityState: NonNullable<HealthSummaryState["waterQuality"]> = {
         title: "Water quality",
@@ -157,8 +143,9 @@ export function useHealthSummary(params: {
       const forceRangeMode =
         (params.batch && params.batch !== "all") ||
         (params.stage && params.stage !== "all")
+      const useRangeMode = forceRangeMode || !resolvedSystemId
 
-      if (hasCustomRange || forceRangeMode) {
+      if (useRangeMode) {
         if (!bounds.start || !bounds.end) {
           return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
         }
@@ -213,24 +200,6 @@ export function useHealthSummary(params: {
         const snapshot = await getDashboardSnapshot({
           farmId: params.farmId ?? null,
           systemId: resolvedSystemId,
-          timePeriod: params.timePeriod ?? "2 weeks",
-          signal,
-        })
-
-        if (snapshot?.water_quality_rating_average) {
-          const mapped = ratingToneMap[snapshot.water_quality_rating_average] ?? ratingToneMap.optimal
-          waterQualityState.tone = mapped.tone
-          waterQualityState.status = mapped.status
-          waterQualityState.progress = mapped.progress
-          waterQualityState.detail = `Rating: ${snapshot.water_quality_rating_average}`
-        }
-
-        if (snapshot?.mortality_rate != null) {
-          fishState.detail = `Mortality rate/day: ${snapshot.mortality_rate}`
-        }
-      } else {
-        const snapshot = await getDashboardConsolidatedSnapshot({
-          farmId: params.farmId ?? null,
           timePeriod: params.timePeriod ?? "2 weeks",
           signal,
         })

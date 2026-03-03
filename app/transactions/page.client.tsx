@@ -65,8 +65,7 @@ export default function TransactionsPage() {
     stage: selectedStage,
     batch: selectedBatch,
     system: selectedSystem,
-    timePeriod: "2 weeks",
-    periodParam: dateFrom && dateTo ? `custom_${dateFrom}_${dateTo}` : undefined,
+    timePeriod,
   })
 
   const systemOptions = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []

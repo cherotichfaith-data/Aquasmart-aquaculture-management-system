@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, usePathname } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { Download, RefreshCw, PlusCircle, Fish, FlaskConical, Droplets } from "lucide-react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const { farm, farmId } = useActiveFarm()
   const queryClient = useQueryClient()
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const periodParam = searchParams.get("period")
   const parsedPeriod = parseDateToTimePeriod(periodParam)
@@ -49,17 +50,32 @@ export default function DashboardPage() {
     setSelectedStage,
     timePeriod,
     setTimePeriod,
-  } = useSharedFilters(parsedPeriod.kind === "preset" ? parsedPeriod.period : "2 weeks")
+  } = useSharedFilters(parsedPeriod.period)
   const [refreshing, setRefreshing] = useState(false)
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
   const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
 
   useEffect(() => {
-    if (!periodParam || parsedPeriod.kind !== "preset") return
+    if (!periodParam) return
     if (parsedPeriod.period !== timePeriod) {
       setTimePeriod(parsedPeriod.period)
     }
   }, [parsedPeriod, periodParam, setTimePeriod, timePeriod])
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (params.get("period") === timePeriod) return
+    params.set("period", timePeriod)
+    router.replace(`${pathname}?${params.toString()}`)
+  }, [pathname, router, searchParams, timePeriod])
+
+  const handlePeriodChange = (period: TimePeriod) => {
+    setTimePeriod(period)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("period", period)
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
 
   const handleDownload = async () => {
     try {
@@ -154,7 +170,11 @@ export default function DashboardPage() {
               showStage
               variant="compact"
             />
-            <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} variant="compact" />
+            <TimePeriodSelector
+              selectedPeriod={timePeriod}
+              onPeriodChange={handlePeriodChange}
+              variant="compact"
+            />
             <div className="ml-auto">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

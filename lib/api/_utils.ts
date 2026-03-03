@@ -9,11 +9,8 @@ type PublicFunctions = Database["public"]["Functions"]
 
 export type KpiRpcName =
   | "api_dashboard"
-  | "api_dashboard_consolidated"
   | "api_dashboard_systems"
   | "api_daily_fish_inventory"
-  | "api_daily_fish_inventory_consolidated"
-  | "api_daily_fish_inventory_count"
   | "api_efcr_trend"
   | "api_production_summary"
 
