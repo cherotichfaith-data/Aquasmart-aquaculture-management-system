@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { Enums } from "@/lib/types/database"
 
 type StageFilter = "all" | Enums<"system_growth_stage">
@@ -24,14 +24,16 @@ const isStage = (value: unknown): value is StageFilter =>
   typeof value === "string" && STAGES.includes(value as StageFilter)
 
 export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
+  const initialDefaultPeriod = useRef(defaultTimePeriod)
   const [selectedBatch, setSelectedBatch] = useState<string>("all")
   const [selectedSystem, setSelectedSystem] = useState<string>("all")
   const [selectedStage, setSelectedStage] = useState<StageFilter>("all")
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>(defaultTimePeriod)
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialDefaultPeriod.current)
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    const fallbackPeriod = initialDefaultPeriod.current
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
       if (raw) {
@@ -39,12 +41,12 @@ export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
         setSelectedBatch(typeof parsed.selectedBatch === "string" ? parsed.selectedBatch : "all")
         setSelectedSystem(typeof parsed.selectedSystem === "string" ? parsed.selectedSystem : "all")
         setSelectedStage(isStage(parsed.selectedStage) ? parsed.selectedStage : "all")
-        setTimePeriod(isTimePeriod(parsed.timePeriod) ? parsed.timePeriod : defaultTimePeriod)
+        setTimePeriod(isTimePeriod(parsed.timePeriod) ? parsed.timePeriod : fallbackPeriod)
       } else {
-        setTimePeriod(defaultTimePeriod)
+        setTimePeriod(fallbackPeriod)
       }
     } catch {
-      setTimePeriod(defaultTimePeriod)
+      setTimePeriod(fallbackPeriod)
     } finally {
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search)
@@ -60,7 +62,7 @@ export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
       }
       setHydrated(true)
     }
-  }, [defaultTimePeriod])
+  }, [])
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return

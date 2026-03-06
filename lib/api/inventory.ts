@@ -10,6 +10,10 @@ type DailyInventoryRpcArgs = {
   p_system_id?: number
   p_start_date?: string
   p_end_date?: string
+  // NEW (server-side paging/order)
+  p_cursor_date?: string
+  p_order_asc?: boolean
+  p_limit?: number
 }
 
 const dailyInventoryRpcArgs = (params: {
@@ -17,11 +21,17 @@ const dailyInventoryRpcArgs = (params: {
   systemId?: number
   dateFrom?: string
   dateTo?: string
+  cursorDate?: string
+  orderAsc?: boolean
+  limit?: number
 }): DailyInventoryRpcArgs => ({
   p_farm_id: params.farmId,
   p_system_id: params.systemId ?? undefined,
   p_start_date: params.dateFrom ?? undefined,
   p_end_date: params.dateTo ?? undefined,
+  p_cursor_date: params.cursorDate ?? undefined,
+  p_order_asc: params.orderAsc ?? false,
+  p_limit: params.limit ?? 5000,
 })
 
 const isAbortLikeError = (err: unknown): boolean => {
@@ -29,7 +39,7 @@ const isAbortLikeError = (err: unknown): boolean => {
   const e = err as { name?: string; message?: string }
   const name = String(e.name ?? "").toLowerCase()
   const message = String(e.message ?? "").toLowerCase()
-  return name.includes("abort") || message.includes("abort")
+  return name.includes("abort") || message.includes("abort") || message.includes("canceled")
 }
 
 export async function getDailyFishInventory(params?: {
@@ -45,16 +55,24 @@ export async function getDailyFishInventory(params?: {
   if (!params?.farmId) {
     return toQuerySuccess<DailyFishInventoryRow>([])
   }
+
   const clientResult = await getClientOrError("getDailyFishInventory", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = queryKpiRpc(supabase, "api_daily_fish_inventory", dailyInventoryRpcArgs({
-    farmId: params.farmId,
-    systemId: params.systemId,
-    dateFrom: params.dateFrom,
-    dateTo: params.dateTo,
-  }))
+  let query = queryKpiRpc(
+    supabase,
+    "api_daily_fish_inventory",
+    dailyInventoryRpcArgs({
+      farmId: params.farmId,
+      systemId: params.systemId,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+      cursorDate: params.cursorDate,
+      orderAsc: params.orderAsc,
+      limit: params.limit,
+    }),
+  )
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
@@ -64,20 +82,9 @@ export async function getDailyFishInventory(params?: {
     return toQuerySuccess<DailyFishInventoryRow>([])
   }
   if (error) return toQueryError("getDailyFishInventory", error)
-  let rows = (data ?? []) as DailyFishInventoryRow[]
-  rows = rows.sort((a, b) => {
-    const av = String(a.inventory_date ?? "")
-    const bv = String(b.inventory_date ?? "")
-    return (params?.orderAsc ?? false) ? av.localeCompare(bv) : bv.localeCompare(av)
-  })
-  if (params?.cursorDate) {
-    const cursorDate = params.cursorDate
-    rows = rows.filter((row) => String(row.inventory_date ?? "") > cursorDate)
-  }
-  if (params?.limit) {
-    rows = rows.slice(0, params.limit)
-  }
-  return toQuerySuccess<DailyFishInventoryRow>(rows)
+
+  // No client-side sort/paging needed: backend already applied cursor/order/limit.
+  return toQuerySuccess<DailyFishInventoryRow>((data ?? []) as DailyFishInventoryRow[])
 }
 
 // Intentionally limited to the canonical inventory RPC to avoid stale/legacy helpers.

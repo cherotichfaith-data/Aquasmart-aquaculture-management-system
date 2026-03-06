@@ -1,16 +1,15 @@
-import type { Enums, Tables } from "@/lib/types/database"
+import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryOptionsView, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, queryOptionsRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type FeedIncomingRow = Tables<"feed_incoming">
-type FeedTypeRow = Tables<"api_feed_type_options">
+type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type FeedingRecordRow = Tables<"feeding_record">
 type FishHarvestRow = Tables<"fish_harvest">
 type FishSamplingWeightRow = Tables<"fish_sampling_weight">
 type FishMortalityRow = Tables<"fish_mortality">
 type ChangeLogRow = Tables<"change_log">
-type SuppliersRow = Tables<"feed_supplier">
 type SystemRow = Tables<"system">
 type WaterQualityMeasurementRow = Tables<"water_quality_measurement">
 type FishTransferRow = Tables<"fish_transfer">
@@ -37,16 +36,8 @@ const isAbortLikeError = (err: unknown): boolean => {
   return name.includes("abort") || name.includes("cancel") || message.includes("abort") || message.includes("cancel")
 }
 
-const isMissingRelationError = (err: unknown): boolean => {
-  if (!err || typeof err !== "object") return false
-  const e = err as { code?: string; message?: string }
-  if (e.code === "42P01" || e.code === "42883") return true
-  const message = String(e.message ?? "")
-  return /does not exist/i.test(message) || /schema cache/i.test(message)
-}
-
 export async function getFeedIncomingWithType(params?: { limit?: number; signal?: AbortSignal }): Promise<QueryResult<FeedIncomingWithType>> {
-  const clientResult = await getClientOrError("getFeedIncomingWithType")
+  const clientResult = await getClientOrError("getFeedIncomingWithType", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -72,7 +63,7 @@ export async function getFeedIncomingWithType(params?: { limit?: number; signal?
 
   let feedTypeMap = new Map<number, FeedTypeRow>()
   if (feedTypeIds.length > 0) {
-    let feedQuery = queryOptionsView(supabase, "api_feed_type_options").select("*").in("id", feedTypeIds)
+    let feedQuery = queryOptionsRpc(supabase, "api_feed_type_options_rpc")
     if (params?.signal) feedQuery = feedQuery.abortSignal(params.signal)
     const { data: feedData, error: feedError } = await feedQuery
     if (feedError) {
@@ -81,7 +72,10 @@ export async function getFeedIncomingWithType(params?: { limit?: number; signal?
       }
       return toQueryError("getFeedIncomingWithType:feedTypes", feedError)
     }
-    ;(feedData ?? []).forEach((row) => {
+    const feedIdSet = new Set(feedTypeIds)
+    const feedRows = (feedData ?? []) as FeedTypeRow[]
+    feedRows.forEach((row) => {
+      if (!feedIdSet.has(row.id)) return
       if (row.id == null) return
       feedTypeMap.set(row.id, row as FeedTypeRow)
     })
@@ -96,12 +90,11 @@ export async function getFeedIncomingWithType(params?: { limit?: number; signal?
 }
 
 export async function getFeedTypes(params?: { limit?: number; signal?: AbortSignal }): Promise<QueryResult<FeedTypeRow>> {
-  const clientResult = await getClientOrError("getFeedTypes")
+  const clientResult = await getClientOrError("getFeedTypes", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = queryOptionsView(supabase, "api_feed_type_options").select("*").order("label", { ascending: true })
-  if (params?.limit) query = query.limit(params.limit)
+  let query = queryOptionsRpc(supabase, "api_feed_type_options_rpc")
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
@@ -111,7 +104,10 @@ export async function getFeedTypes(params?: { limit?: number; signal?: AbortSign
     }
     return toQueryError("getFeedTypes", error)
   }
-  return toQuerySuccess<FeedTypeRow>(data as FeedTypeRow[])
+  const rows = (data ?? []) as FeedTypeRow[]
+  rows.sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
+  const limited = params?.limit ? rows.slice(0, params.limit) : rows
+  return toQuerySuccess<FeedTypeRow>(limited)
 }
 
 export async function getFeedingRecords(params?: {
@@ -123,7 +119,7 @@ export async function getFeedingRecords(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FeedingRecordWithType>> {
-  const clientResult = await getClientOrError("getFeedingRecords")
+  const clientResult = await getClientOrError("getFeedingRecords", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -155,7 +151,7 @@ export async function getFeedingRecords(params?: {
 
   let feedTypeMap = new Map<number, FeedTypeRow>()
   if (feedTypeIds.length > 0) {
-    let feedQuery = queryOptionsView(supabase, "api_feed_type_options").select("*").in("id", feedTypeIds)
+    let feedQuery = queryOptionsRpc(supabase, "api_feed_type_options_rpc")
     if (params?.signal) feedQuery = feedQuery.abortSignal(params.signal)
     const { data: feedData, error: feedError } = await feedQuery
     if (feedError) {
@@ -169,7 +165,10 @@ export async function getFeedingRecords(params?: {
       }
       return toQueryError("getFeedingRecords:feedTypes", feedError)
     }
-    ;(feedData ?? []).forEach((row) => {
+    const feedIdSet = new Set(feedTypeIds)
+    const feedRows = (feedData ?? []) as FeedTypeRow[]
+    feedRows.forEach((row) => {
+      if (!feedIdSet.has(row.id)) return
       if (row.id == null) return
       feedTypeMap.set(row.id, row as FeedTypeRow)
     })
@@ -183,31 +182,13 @@ export async function getFeedingRecords(params?: {
   return toQuerySuccess<FeedingRecordWithType>(mapped)
 }
 
-export async function getSuppliers(params?: { signal?: AbortSignal }): Promise<QueryResult<SuppliersRow>> {
-  const clientResult = await getClientOrError("getSuppliers")
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("feed_supplier").select("*").order("company_name", { ascending: true })
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (isMissingRelationError(error) || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return toQuerySuccess<SuppliersRow>([])
-    }
-    return toQueryError("getSuppliers", error)
-  }
-  return toQuerySuccess<SuppliersRow>(data as SuppliersRow[])
-}
-
 export async function getHarvests(params?: {
   systemId?: number
   batchId?: number
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishHarvestRow>> {
-  const clientResult = await getClientOrError("getHarvests")
+  const clientResult = await getClientOrError("getHarvests", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -237,7 +218,7 @@ export async function getSamplingData(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishSamplingWeightRow>> {
-  const clientResult = await getClientOrError("getSamplingData")
+  const clientResult = await getClientOrError("getSamplingData", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -273,7 +254,7 @@ export async function getMortalityData(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishMortalityRow>> {
-  const clientResult = await getClientOrError("getMortalityData")
+  const clientResult = await getClientOrError("getMortalityData", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -307,7 +288,7 @@ export async function getTransferData(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishTransferRow>> {
-  const clientResult = await getClientOrError("getTransferData")
+  const clientResult = await getClientOrError("getTransferData", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -337,7 +318,7 @@ export async function getRecentActivities(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<ChangeLogRow>> {
-  const clientResult = await getClientOrError("getRecentActivities")
+  const clientResult = await getClientOrError("getRecentActivities", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -427,7 +408,7 @@ export async function getBatchSystemIds(params: {
   batchId: number
   signal?: AbortSignal
 }): Promise<QueryResult<{ system_id: number }>> {
-  const clientResult = await getClientOrError("getBatchSystemIds")
+  const clientResult = await getClientOrError("getBatchSystemIds", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 

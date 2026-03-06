@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tables } from "@/lib/types/database"
+import type { Database } from "@/lib/types/database"
 import { useToast } from "@/hooks/use-toast"
 import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
 import { logSbError } from "@/utils/supabase/log"
@@ -40,8 +40,11 @@ const formSchema = z.object({
     secchi_disk: optionalNumber,
 })
 
+type MeasurementParameter =
+    Database["public"]["Tables"]["water_quality_measurement"]["Row"]["parameter_name"]
+
 interface WaterQualityFormProps {
-    systems: Tables<"api_system_options">[]
+    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
     defaultSystemId?: number | null
 }
 
@@ -71,7 +74,7 @@ export function WaterQualityForm({ systems, defaultSystemId = null }: WaterQuali
         try {
             const systemId = Number(values.system_id)
             const measurements: Array<{
-                parameter_name: Tables<"water_quality_measurement">["parameter_name"]
+                parameter_name: MeasurementParameter
                 parameter_value: number
             }> = []
 

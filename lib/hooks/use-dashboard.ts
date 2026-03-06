@@ -6,6 +6,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import {
   getDashboardSystems,
   getDashboardSnapshot,
+  getDashboardConsolidated,
   getTimePeriodBounds,
 } from "@/lib/api/dashboard"
 import { sortByDateAsc } from "@/lib/utils"
@@ -28,6 +29,13 @@ const computeMortalityRateFromProduction = (
     }
   })
   return totalFish > 0 ? weightedMortality / totalFish : null
+}
+
+const toTrendPercent = (current: number | null | undefined, delta: number | null | undefined): number | null => {
+  if (typeof current !== "number" || typeof delta !== "number") return null
+  const prev = current - delta
+  if (!Number.isFinite(prev) || prev === 0) return null
+  return (delta / prev) * 100
 }
 
 async function resolveScopedSystemIds(params: {
@@ -292,27 +300,6 @@ const hasCompleteSystemMetrics = (row: DashboardSystemRow): boolean => {
   return typeof row.water_quality_rating_average === "string" && row.water_quality_rating_average.trim().length > 0
 }
 
-const toIsoDate = (value: Date) => value.toISOString().slice(0, 10)
-
-const getPreviousRange = (range: { start: string; end: string }): { start: string; end: string } | null => {
-  const startDate = new Date(`${range.start}T00:00:00`)
-  const endDate = new Date(`${range.end}T00:00:00`)
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null
-  if (endDate < startDate) return null
-
-  const spanMs = endDate.getTime() - startDate.getTime()
-  const prevEnd = new Date(startDate.getTime() - 24 * 60 * 60 * 1000)
-  const prevStart = new Date(prevEnd.getTime() - spanMs)
-
-  return { start: toIsoDate(prevStart), end: toIsoDate(prevEnd) }
-}
-
-const computeTrendPercent = (current: number | null, previous: number | null): number | null => {
-  if (current === null || previous === null) return null
-  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
-  if (previous === 0) return current === 0 ? 0 : null
-  return ((current - previous) / Math.abs(previous)) * 100
-}
 
 export function useKpiOverview(params: {
   farmId?: string | null
@@ -442,7 +429,6 @@ export function useKpiOverview(params: {
         })
 
         const avgBiomass = biomassCount > 0 ? totalBiomass / biomassCount : null
-        const avgFish = fishCount > 0 ? totalFish / fishCount : null
         const avgAbw = abwCount > 0 ? totalAbw / abwCount : null
         const avgBiomassDensity = biomassDensityCount > 0 ? totalBiomassDensity / biomassDensityCount : null
         const feedRate =
@@ -486,11 +472,30 @@ export function useKpiOverview(params: {
         const wqRows = wqResult.data.filter(
           (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
         )
-        const wqAverage =
-          wqRows && wqRows.length
+        const consolidatedResult = await getDashboardConsolidated({
+          farmId: params.farmId ?? null,
+          systemId: singleSystemId,
+          dateFrom: range.start,
+          dateTo: range.end,
+          timePeriod: params.periodParam ?? params.timePeriod,
+          signal,
+        })
+        const consolidatedRow =
+          consolidatedResult.status === "success" ? consolidatedResult.data[0] ?? null : null
+
+        const resolvedEfcr = consolidatedRow?.efcr_period_consolidated ?? efcr
+        const resolvedMortalityRate = consolidatedRow?.mortality_rate ?? mortalityRate
+        const resolvedAvgBiomass = consolidatedRow?.average_biomass ?? avgBiomass
+        const resolvedBiomassDensity = consolidatedRow?.biomass_density ?? avgBiomassDensity
+        const resolvedFeedingRate = consolidatedRow?.feeding_rate ?? feedRate
+        const resolvedAbw = consolidatedRow?.abw_asof_end ?? avgAbw
+        const resolvedWqAverage =
+          consolidatedRow?.water_quality_rating_numeric_average ??
+          (wqRows && wqRows.length
             ? wqRows.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / wqRows.length
-            : null
-        const wqRounded = wqAverage === null ? null : Math.round(wqAverage)
+            : null)
+
+        const wqRounded = resolvedWqAverage === null ? null : Math.round(resolvedWqAverage)
         const wqLabel =
           wqRounded === null
             ? null
@@ -504,66 +509,81 @@ export function useKpiOverview(params: {
         const wqTone = wqLabel ? ratingToneMap[wqLabel]?.tone ?? "neutral" : "neutral"
         const wqBadge = wqLabel ? ratingToneMap[wqLabel]?.badge ?? "Monitoring" : "Monitoring"
 
+        const trendByKey: Record<string, number | null> = consolidatedRow
+          ? {
+              efcr: toTrendPercent(resolvedEfcr, consolidatedRow.efcr_period_consolidated_delta),
+              mortality: toTrendPercent(resolvedMortalityRate, consolidatedRow.mortality_rate_delta),
+              biomass: toTrendPercent(resolvedAvgBiomass, consolidatedRow.average_biomass_delta),
+              biomass_density: toTrendPercent(resolvedBiomassDensity, consolidatedRow.biomass_density_delta),
+              feeding: toTrendPercent(resolvedFeedingRate, consolidatedRow.feeding_rate_delta),
+              abw: toTrendPercent(resolvedAbw, consolidatedRow.abw_asof_end_delta),
+              water_quality: toTrendPercent(
+                resolvedWqAverage,
+                consolidatedRow.water_quality_rating_numeric_delta,
+              ),
+            }
+          : {}
+
         const nextMetrics: KPIOverviewMetric[] = [
           {
             key: "efcr",
             label: "eFCR",
-            value: efcr,
+            value: resolvedEfcr,
             decimals: 2,
-            trend: null,
+            trend: trendByKey.efcr ?? null,
             invertTrend: true,
           },
           {
             key: "mortality",
             label: "Mortality Rate",
-            value: mortalityRate,
+            value: resolvedMortalityRate,
             unit: "rate/day",
             decimals: 4,
-            trend: null,
+            trend: trendByKey.mortality ?? null,
             invertTrend: true,
           },
           {
             key: "abw",
             label: "Avg Body Weight",
-            value: avgAbw,
+            value: resolvedAbw,
             unit: "g",
             decimals: 1,
-            trend: null,
+            trend: trendByKey.abw ?? null,
             invertTrend: false,
           },
           {
             key: "biomass",
             label: "Avg Biomass",
-            value: avgBiomass,
+            value: resolvedAvgBiomass,
             unit: "kg",
             decimals: 1,
-            trend: null,
+            trend: trendByKey.biomass ?? null,
             invertTrend: false,
           },
           {
             key: "biomass_density",
             label: "Biomass Density",
-            value: avgBiomassDensity,
+            value: resolvedBiomassDensity,
             unit: "kg/m3",
             decimals: 2,
-            trend: null,
+            trend: trendByKey.biomass_density ?? null,
             invertTrend: false,
           },
           {
             key: "feeding",
             label: "Feeding Rate",
-            value: feedRate,
+            value: resolvedFeedingRate,
             unit: "kg/t",
             decimals: 2,
-            trend: null,
+            trend: trendByKey.feeding ?? null,
             invertTrend: false,
           },
           {
             key: "water_quality",
             label: "Water Quality",
-            value: wqAverage,
+            value: resolvedWqAverage,
             decimals: 1,
-            trend: null,
+            trend: trendByKey.water_quality ?? null,
             invertTrend: false,
             tone: wqTone,
             badge: wqBadge,
@@ -576,18 +596,7 @@ export function useKpiOverview(params: {
       if (!bounds.start || !bounds.end) {
         return { metrics: [], dateBounds: bounds }
       }
-      const current = await buildRangeMetrics({ start: bounds.start, end: bounds.end })
-      const previousRange = getPreviousRange({ start: bounds.start, end: bounds.end })
-      if (!previousRange) return current
-
-      const previous = await buildRangeMetrics(previousRange)
-      const previousByKey = new Map(previous.metrics.map((metric) => [metric.key, metric.value]))
-      const withTrend = current.metrics.map((metric) => ({
-        ...metric,
-        trend: computeTrendPercent(metric.value, previousByKey.get(metric.key) ?? null),
-      }))
-
-      return { ...current, metrics: withTrend }
+      return buildRangeMetrics({ start: bounds.start, end: bounds.end })
     },
     enabled: Boolean(session) && Boolean(params.farmId),
     staleTime: 5 * 60_000,
@@ -870,6 +879,7 @@ export function useRecentActivities(params?: {
   dateFrom?: string
   dateTo?: string
   limit?: number
+  enabled?: boolean
 }) {
   return useQuery({
     queryKey: [
@@ -889,6 +899,7 @@ export function useRecentActivities(params?: {
         limit: params?.limit ?? 5,
         signal,
       }),
+    enabled: params?.enabled ?? true,
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: 5 * 60_000,

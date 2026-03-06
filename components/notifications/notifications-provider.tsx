@@ -49,6 +49,14 @@ const MAX_NOTIFICATIONS = 50
 
 const formatNumber = (value: number, decimals = 2) => Number(value.toFixed(decimals))
 
+const isAbortLikeError = (err: unknown): boolean => {
+  if (!err) return false
+  const e = err as { name?: string; message?: string }
+  const name = String(e.name ?? "").toLowerCase()
+  const message = String(e.message ?? "").toLowerCase()
+  return name.includes("abort") || name.includes("cancel") || message.includes("abort") || message.includes("cancel")
+}
+
 const buildSystemLabel = (systemMap: Record<number, string>, systemId?: number) => {
   if (!systemId) return "System"
   return systemMap[systemId] ?? `System ${systemId}`
@@ -79,8 +87,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     queryKey: ["notifications", "systems", farmId ?? "none"],
     enabled: Boolean(session) && Boolean(farmId),
     staleTime: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      let query = supabase
         .rpc("api_dashboard_systems", {
           p_farm_id: farmId!,
           p_stage: undefined,
@@ -88,9 +96,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           p_start_date: undefined,
           p_end_date: undefined,
         })
+      if (signal) query = query.abortSignal(signal)
+      const { data, error } = await query
 
       if (error) {
-        if (!isSbPermissionDenied(error)) {
+        if (!signal?.aborted && !isAbortLikeError(error) && !isSbPermissionDenied(error)) {
           logSbError("notifications:systems", error)
         }
         return [] as Array<{ id: number; label: string | null }>
@@ -109,14 +119,16 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     queryKey: ["notifications", "thresholds", farmId ?? "none"],
     enabled: Boolean(session) && Boolean(farmId),
     staleTime: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      let query = supabase
         .from("alert_threshold")
         .select("*")
         .eq("farm_id", farmId!)
+      if (signal) query = query.abortSignal(signal)
+      const { data, error } = await query
 
       if (error) {
-        if (!isSbPermissionDenied(error)) {
+        if (!signal?.aborted && !isAbortLikeError(error) && !isSbPermissionDenied(error)) {
           logSbError("notifications:thresholds", error)
         }
         return [] as AlertThresholdRow[]

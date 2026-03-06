@@ -293,20 +293,18 @@ export default function MortalityReport({
                 type="button"
                 className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
                 onClick={() =>
-                  downloadCsv({
-                    filename: `mortality-analysis-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
-                    headers: ["date", "system_id", "batch_id", "number_of_fish_mortality", "abw", "total_weight_mortality"],
-                    rows: (showMortalityRecords ? tableRows : rows.slice(0, tableLimitValue)).map((row) => [
-                      row.date,
-                      row.system_id,
-                      row.batch_id,
-                      row.number_of_fish_mortality,
-                      row.abw,
-                      row.total_weight_mortality,
-                    ]),
-                  })
-                }
-              >
+                    downloadCsv({
+                      filename: `mortality-analysis-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
+                      headers: ["date", "system_id", "batch_id", "number_of_fish_mortality"],
+                      rows: (showMortalityRecords ? tableRows : rows.slice(0, tableLimitValue)).map((row) => [
+                        row.date,
+                        row.system_id,
+                        row.batch_id,
+                        row.number_of_fish_mortality,
+                      ]),
+                    })
+                  }
+                >
                 Export CSV
               </button>
               <button
@@ -323,14 +321,12 @@ export default function MortalityReport({
                       `Mortality percentage: ${mortalityPercent != null ? `${mortalityPercent.toFixed(2)}%` : "N/A"}`,
                       ...causeBreakdown.map((row) => `${row.cause}: ${row.count}`),
                     ],
-                    tableHeaders: ["Date", "System", "Batch", "Fish Dead", "ABW", "Total Weight"],
+                    tableHeaders: ["Date", "System", "Batch", "Fish Dead"],
                     tableRows: (showMortalityRecords ? tableRows : rows.slice(0, tableLimitValue)).map((row) => [
                       row.date,
                       row.system_id,
                       row.batch_id ?? "-",
                       row.number_of_fish_mortality,
-                      row.abw ?? "-",
-                      row.total_weight_mortality ?? "-",
                     ]),
                     commentary: "Cause breakdown is inferred from water-quality thresholds due to missing explicit cause field in fish_mortality.",
                   })
@@ -351,14 +347,12 @@ export default function MortalityReport({
                   <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
                   <th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th>
                   <th className="px-4 py-2 text-left font-semibold text-foreground">Fish Dead</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">ABW</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Total Weight</th>
                 </tr>
               </thead>
               <tbody>
                 {tableLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                    <td colSpan={4} className="px-4 py-4 text-center text-muted-foreground">
                       Loading...
                     </td>
                   </tr>
@@ -369,13 +363,11 @@ export default function MortalityReport({
                       <td className="px-4 py-2">{row.system_id}</td>
                       <td className="px-4 py-2">{row.batch_id ?? "-"}</td>
                       <td className="px-4 py-2">{row.number_of_fish_mortality}</td>
-                      <td className="px-4 py-2">{row.abw ?? "-"}</td>
-                      <td className="px-4 py-2">{row.total_weight_mortality ?? "-"}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                    <td colSpan={4} className="px-4 py-4 text-center text-muted-foreground">
                       No mortality records found
                     </td>
                   </tr>

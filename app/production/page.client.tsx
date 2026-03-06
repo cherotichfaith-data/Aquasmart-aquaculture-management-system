@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useEffect, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useSearchParams, useRouter } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import FarmSelector from "@/components/shared/farm-selector"
@@ -9,7 +10,7 @@ import type { Enums } from "@/lib/types/database"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import { getDateRangeFromPeriod, parseDateToTimePeriod, sortByDateAsc } from "@/lib/utils"
+import { parseDateToTimePeriod, sortByDateAsc } from "@/lib/utils"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useProductionSummary } from "@/lib/hooks/use-production"
@@ -17,6 +18,7 @@ import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
+import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import ProductionMetricFilter from "@/components/production/metrics-filter"
 import ProductionChart from "@/components/production/production-chart"
 import ProductionTable from "@/components/production/production-table"
@@ -118,12 +120,23 @@ function ProductionContent() {
   const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
   const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
 
+  const boundsQuery = useQuery({
+    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
+    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
+    enabled: Boolean(farmId),
+    staleTime: 5 * 60_000,
+  })
+  const hasBounds = Boolean(boundsQuery.data?.start && boundsQuery.data?.end)
   const dateRange = useMemo(() => {
     if (startDateParam && endDateParam) {
       return { startDate: startDateParam, endDate: endDateParam }
     }
-    return getDateRangeFromPeriod(parsedPeriod.period)
-  }, [endDateParam, parsedPeriod, startDateParam])
+    if (hasBounds) {
+      return { startDate: boundsQuery.data?.start ?? "", endDate: boundsQuery.data?.end ?? "" }
+    }
+    return { startDate: "", endDate: "" }
+  }, [endDateParam, hasBounds, startDateParam, boundsQuery.data])
+  const rangeEnabled = Boolean(startDateParam && endDateParam) || hasBounds
 
   const systemOptionsQuery = useSystemOptions({
     farmId,
@@ -138,20 +151,21 @@ function ProductionContent() {
     farmId,
     systemId: Number.isFinite(systemId) ? systemId : undefined,
     stage: selectedStage !== "all" ? selectedStage : undefined,
-    dateFrom: dateRange.startDate,
-    dateTo: dateRange.endDate,
+    dateFrom: dateRange.startDate || undefined,
+    dateTo: dateRange.endDate || undefined,
     limit: 2500,
+    enabled: rangeEnabled,
   })
 
   const inventoryEnabled = metricMeta.source === "inventory"
   const inventoryQuery = useDailyFishInventory({
     farmId,
     systemId: Number.isFinite(systemId) ? systemId : undefined,
-    dateFrom: dateRange.startDate,
-    dateTo: dateRange.endDate,
+    dateFrom: dateRange.startDate || undefined,
+    dateTo: dateRange.endDate || undefined,
     limit: 5000,
     orderAsc: true,
-    enabled: inventoryEnabled,
+    enabled: inventoryEnabled && rangeEnabled,
   })
 
   const stageSystemIds = useMemo(() => {

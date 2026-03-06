@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tables } from "@/lib/types/database"
+import type { Database } from "@/lib/types/database"
 import { useRecordIncomingFeed } from "@/lib/hooks/use-incoming-feed"
 import { logSbError } from "@/utils/supabase/log"
 
@@ -26,11 +26,10 @@ const formSchema = z.object({
 })
 
 interface IncomingFeedFormProps {
-    feeds: Tables<"api_feed_type_options">[]
-    suppliers: Tables<"feed_supplier">[]
+    feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
 }
 
-export function IncomingFeedForm({ feeds, suppliers }: IncomingFeedFormProps) {
+export function IncomingFeedForm({ feeds }: IncomingFeedFormProps) {
     const mutation = useRecordIncomingFeed()
 
     const form = useForm<z.infer<typeof formSchema>>({

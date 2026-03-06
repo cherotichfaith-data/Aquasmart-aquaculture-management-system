@@ -70,6 +70,7 @@ export function useWaterQualityMeasurements(params: {
   parameter?: string
   limit?: number
   requireSystem?: boolean
+  enabled?: boolean
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
@@ -108,12 +109,13 @@ export function useDailyWaterQualityRating(params: {
   dateTo?: string
   requireSystem?: boolean
   limit?: number
+  enabled?: boolean
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
   const enabledBase = Boolean(session) && Boolean(farmId)
   const enabledSystem = enabledBase && Boolean(params.systemId)
-  const enabled = params.requireSystem ? enabledSystem : enabledBase
+  const enabled = Boolean(params.enabled ?? true) && (params.requireSystem ? enabledSystem : enabledBase)
   return useQuery({
     queryKey: ["wq", "daily_rating", farmId, params.systemId ?? null, params.dateFrom ?? null, params.dateTo ?? null, params.limit ?? null],
     enabled,
@@ -135,12 +137,13 @@ export function useWaterQualityOverlay(params: {
   dateFrom?: string
   dateTo?: string
   requireSystem?: boolean
+  enabled?: boolean
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
   const enabledBase = Boolean(session) && Boolean(farmId)
   const enabledSystem = enabledBase && Boolean(params.systemId)
-  const enabled = params.requireSystem ? enabledSystem : enabledBase
+  const enabled = Boolean(params.enabled ?? true) && (params.requireSystem ? enabledSystem : enabledBase)
   return useQuery({
     queryKey: ["wq", "overlay", farmId, params.systemId ?? null, params.dateFrom ?? null, params.dateTo ?? null],
     enabled,

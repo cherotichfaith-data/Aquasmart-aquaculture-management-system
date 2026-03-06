@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import FarmSelector from "@/components/shared/farm-selector"
 import { type FeedIncomingWithType } from "@/lib/api/reports"
@@ -10,7 +11,7 @@ import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useBatchOptions } from "@/lib/hooks/use-options"
 import TimePeriodSelector from "@/components/shared/time-period-selector"
-import { getDateRangeFromPeriod } from "@/lib/utils"
+import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { formatDayLabel, isAttentionResponse, toIsoDate, toNumber } from "./feed-utils"
 import {
@@ -58,21 +59,15 @@ export default function FeedManagementPage() {
 
   const feedingQueryEnabled = hasSystem || scopedSystemIdList.length > 0
 
-  const asOfFeedingQuery = useFeedingRecords({
-    systemId: hasSystem ? (systemId as number) : undefined,
-    systemIds: !hasSystem ? scopedSystemIdList : undefined,
-    batchId: Number.isFinite(batchId) ? (batchId as number) : undefined,
-    limit: 1,
-    enabled: feedingQueryEnabled,
+  const boundsQuery = useQuery({
+    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
+    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
+    enabled: Boolean(farmId),
+    staleTime: 5 * 60_000,
   })
-  const asOfDate = useMemo(() => {
-    const rows = asOfFeedingQuery.data?.status === "success" ? asOfFeedingQuery.data.data : []
-    return rows[0]?.date ?? null
-  }, [asOfFeedingQuery.data])
-  const { startDate: dateFrom, endDate: dateTo } = useMemo(
-    () => getDateRangeFromPeriod(timePeriod, asOfDate),
-    [asOfDate, timePeriod],
-  )
+  const hasBounds = Boolean(boundsQuery.data?.start && boundsQuery.data?.end)
+  const dateFrom = boundsQuery.data?.start ?? undefined
+  const dateTo = boundsQuery.data?.end ?? undefined
   const feedingRecordsQuery = useFeedingRecords({
     systemId: hasSystem ? (systemId as number) : undefined,
     systemIds: !hasSystem ? scopedSystemIdList : undefined,
@@ -80,7 +75,7 @@ export default function FeedManagementPage() {
     dateFrom,
     dateTo,
     limit: chartLimit,
-    enabled: feedingQueryEnabled,
+    enabled: feedingQueryEnabled && hasBounds,
   })
   const efcrTrendQuery = useEfcrTrend({
     farmId,
@@ -88,7 +83,7 @@ export default function FeedManagementPage() {
     dateFrom,
     dateTo,
     limit: chartLimit,
-    enabled: true,
+    enabled: Boolean(farmId) && hasBounds,
   })
 
   const feedData = (feedIncomingQuery.data?.status === "success" ? feedIncomingQuery.data.data : []) as FeedIncomingWithType[]
@@ -145,10 +140,10 @@ export default function FeedManagementPage() {
     if (saved) setEfcrTarget(saved)
   }, [farmId, selectedBatch, selectedSystem])
 
-  const filteredIncoming = useMemo(
-    () => feedData.filter((row) => (!dateFrom || row.date >= dateFrom) && (!dateTo || row.date <= dateTo)),
-    [dateFrom, dateTo, feedData],
-  )
+  const filteredIncoming = useMemo(() => {
+    if (!hasBounds) return []
+    return feedData.filter((row) => (!dateFrom || row.date >= dateFrom) && (!dateTo || row.date <= dateTo))
+  }, [dateFrom, dateTo, feedData, hasBounds])
 
   const proteinChartData = useMemo(() => {
     const byType = new Map<string, { protein: number; fat: number; amount: number; label: string }>()

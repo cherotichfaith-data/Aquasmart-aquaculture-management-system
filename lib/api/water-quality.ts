@@ -1,40 +1,58 @@
 import type { Database, Enums, Tables, TablesInsert } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryOptionsView, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, queryKpiRpc, queryOptionsView, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type AsOfRow = Database["public"]["Functions"]["api_water_quality_as_of"]["Returns"][number]
 type WqStatusRow = Database["public"]["Functions"]["api_water_quality_status"]["Returns"][number]
+type OverlayRow = Database["public"]["Functions"]["api_daily_overlay"]["Returns"][number]
 
 type MeasurementRow = Tables<"api_water_quality_measurements">
 type DailyRatingRow = Tables<"api_daily_water_quality_rating">
 type LatestRatingRow = Tables<"api_latest_water_quality_rating">
 type ThresholdRow = Tables<"api_alert_thresholds">
 
-type OverlayRow = Database["public"]["Functions"]["api_daily_overlay"]["Returns"][number]
+const isAbortLikeError = (err: unknown): boolean => {
+  if (!err) return false
+  const e = err as { name?: string; message?: string }
+  const name = String(e.name ?? "").toLowerCase()
+  const message = String(e.message ?? "").toLowerCase()
+  return (
+    name.includes("abort") ||
+    name.includes("cancel") ||
+    message.includes("abort") ||
+    message.includes("cancel") ||
+    message.includes("canceled")
+  )
+}
 
+const isQuietError = (err: unknown): boolean =>
+  isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
+
+const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
+
+/** KPI RPC: latest water-quality anchor dates */
 export async function getWaterQualityAsOf(params: {
   farmId: string
   signal?: AbortSignal
-}): Promise<QueryResult<AsOfRow | null>> {
+}): Promise<QueryResult<AsOfRow>> {
   const clientResult = await getClientOrError("getWaterQualityAsOf", { requireSession: true })
-  if ("error" in clientResult) return toQuerySuccess<AsOfRow | null>([null])
+  if ("error" in clientResult) return empty<AsOfRow>()
   const { supabase } = clientResult
 
-  let q = supabase.rpc("api_water_quality_as_of", { p_farm_id: params.farmId })
+  let q = queryKpiRpc(supabase, "api_water_quality_as_of", { p_farm_id: params.farmId })
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
   if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
-      return toQuerySuccess<AsOfRow | null>([null])
-    }
+    if (params.signal?.aborted || isQuietError(error)) return empty<AsOfRow>()
     return toQueryError("getWaterQualityAsOf", error)
   }
 
-  return toQuerySuccess<AsOfRow | null>([(data?.[0] as AsOfRow) ?? null])
+  return toQuerySuccess<AsOfRow>((data ?? []) as AsOfRow[])
 }
 
+/** KPI RPC: status per system (thresholds + latest rating) */
 export async function getWaterQualityStatus(params: {
   farmId: string
   systemId?: number
@@ -44,7 +62,7 @@ export async function getWaterQualityStatus(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let q = supabase.rpc("api_water_quality_status", {
+  let q = queryKpiRpc(supabase, "api_water_quality_status", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId ?? undefined,
   })
@@ -52,21 +70,20 @@ export async function getWaterQualityStatus(params: {
 
   const { data, error } = await q
   if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
-      return toQuerySuccess<WqStatusRow>([])
-    }
+    if (params.signal?.aborted || isQuietError(error)) return empty<WqStatusRow>()
     return toQueryError("getWaterQualityStatus", error)
   }
 
   return toQuerySuccess<WqStatusRow>((data ?? []) as WqStatusRow[])
 }
 
+/** PostgREST view: raw measurements */
 export async function getWaterQualityMeasurements(params: {
   farmId: string
   systemId?: number
   dateFrom?: string
   dateTo?: string
-  parameterName?: string
+  parameterName?: Enums<"water_quality_parameters"> | string
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<MeasurementRow>> {
@@ -89,15 +106,14 @@ export async function getWaterQualityMeasurements(params: {
 
   const { data, error } = await q
   if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
-      return toQuerySuccess<MeasurementRow>([])
-    }
+    if (params.signal?.aborted || isQuietError(error)) return empty<MeasurementRow>()
     return toQueryError("getWaterQualityMeasurements", error)
   }
 
   return toQuerySuccess<MeasurementRow>((data ?? []) as MeasurementRow[])
 }
 
+/** PostgREST view: daily rating history */
 export async function getDailyWaterQualityRating(params: {
   farmId: string
   systemId?: number
@@ -123,15 +139,14 @@ export async function getDailyWaterQualityRating(params: {
 
   const { data, error } = await q
   if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
-      return toQuerySuccess<DailyRatingRow>([])
-    }
+    if (params.signal?.aborted || isQuietError(error)) return empty<DailyRatingRow>()
     return toQueryError("getDailyWaterQualityRating", error)
   }
 
   return toQuerySuccess<DailyRatingRow>((data ?? []) as DailyRatingRow[])
 }
 
+/** PostgREST view: latest rating per system */
 export async function getLatestWaterQualityRating(params: {
   farmId: string
   systemId?: number
@@ -150,15 +165,14 @@ export async function getLatestWaterQualityRating(params: {
 
   const { data, error } = await q
   if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
-      return toQuerySuccess<LatestRatingRow>([])
-    }
+    if (params.signal?.aborted || isQuietError(error)) return empty<LatestRatingRow>()
     return toQueryError("getLatestWaterQualityRating", error)
   }
 
   return toQuerySuccess<LatestRatingRow>((data ?? []) as LatestRatingRow[])
 }
 
+/** PostgREST view: thresholds (system/farm/default resolved) */
 export async function getAlertThresholds(params: {
   farmId: string
   signal?: AbortSignal
@@ -172,14 +186,14 @@ export async function getAlertThresholds(params: {
 
   const { data, error } = await q
   if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
-      return toQuerySuccess<ThresholdRow>([])
-    }
+    if (params.signal?.aborted || isQuietError(error)) return empty<ThresholdRow>()
     return toQueryError("getAlertThresholds", error)
   }
+
   return toQuerySuccess<ThresholdRow>((data ?? []) as ThresholdRow[])
 }
 
+/** Write: upsert farm-level threshold values */
 export async function upsertFarmThreshold(params: {
   farmId: string
   low_do_threshold?: number | null
@@ -204,10 +218,15 @@ export async function upsertFarmThreshold(params: {
     .select("*")
     .single()
 
-  if (error) return toQueryError("upsertFarmThreshold", error)
+  if (error) {
+    if (isQuietError(error)) return empty<Tables<"alert_threshold">>()
+    return toQueryError("upsertFarmThreshold", error)
+  }
+
   return toQuerySuccess<Tables<"alert_threshold">>([data as Tables<"alert_threshold">])
 }
 
+/** KPI RPC: daily overlay (feed + mortality series) */
 export async function getDailyOverlay(params: {
   farmId: string
   systemId?: number
@@ -219,7 +238,7 @@ export async function getDailyOverlay(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let q = supabase.rpc("api_daily_overlay", {
+  let q = queryKpiRpc(supabase, "api_daily_overlay", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId ?? undefined,
     p_start_date: params.dateFrom ?? undefined,
@@ -229,16 +248,14 @@ export async function getDailyOverlay(params: {
 
   const { data, error } = await q
   if (error) {
-    if (isSbPermissionDenied(error) || isSbAuthMissing(error) || String(error?.name ?? "") === "AbortError") {
-      return toQuerySuccess<OverlayRow>([])
-    }
+    if (params.signal?.aborted || isQuietError(error)) return empty<OverlayRow>()
     return toQueryError("getDailyOverlay", error)
   }
 
   return toQuerySuccess<OverlayRow>((data ?? []) as OverlayRow[])
 }
 
-// Backward-compatible aliases used in existing modules.
+// Backward-compatible alias used in existing modules.
 export async function getWaterQualityRatings(params: {
   farmId?: string | null
   systemId?: number
@@ -247,7 +264,7 @@ export async function getWaterQualityRatings(params: {
   limit?: number
   signal?: AbortSignal
 }) {
-  if (!params.farmId) return toQuerySuccess<DailyRatingRow>([])
+  if (!params.farmId) return empty<DailyRatingRow>()
   return getDailyWaterQualityRating({
     farmId: params.farmId,
     systemId: params.systemId,

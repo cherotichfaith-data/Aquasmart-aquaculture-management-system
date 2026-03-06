@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from "react"
-import type React from "react"
 import {
     Area,
     CartesianGrid,
@@ -12,7 +11,7 @@ import {
     YAxis,
 } from "recharts"
 import { format } from "date-fns"
-import type { Tables } from "@/lib/types/database"
+import type { Database } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useActiveFarm } from "@/hooks/use-active-farm"
@@ -21,7 +20,7 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/
 import { LazyRender } from "@/components/shared/lazy-render"
 import { getErrorMessage } from "@/lib/utils/query-result"
 
-type SummaryRow = Tables<"api_production_summary"> & {
+type SummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number] & {
     efcr_aggregated?: number | null
 }
 

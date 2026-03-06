@@ -6,9 +6,12 @@ import { getDailyFishInventory } from "@/lib/api/inventory"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type DashboardRow = Database["public"]["Functions"]["api_dashboard"]["Returns"][number]
-type DashboardTimeBoundsRow = Pick<DashboardRow, "input_start_date" | "input_end_date" | "time_period">
 type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory"]["Returns"][number]
 export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
+type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
+type TimePeriodBoundsRow = Database["public"]["Functions"]["api_time_period_bounds"]["Returns"][number]
+
+type TimeBounds = { start: string | null; end: string | null }
 
 type DashboardRpcArgs = {
   p_farm_id: string
@@ -16,7 +19,7 @@ type DashboardRpcArgs = {
   p_growth_stage?: string
   p_start_date?: string
   p_end_date?: string
-  p_time_period?: string
+  p_time_period?: Enums<"time_period">
 }
 
 const dashboardRpcArgs = (params: {
@@ -26,15 +29,42 @@ const dashboardRpcArgs = (params: {
   dateFrom?: string
   dateTo?: string
   timePeriod?: Enums<"time_period"> | string
-}): DashboardRpcArgs => ({
-  p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? undefined,
-  p_growth_stage: params.stage ?? undefined,
-  p_start_date: params.dateFrom ?? undefined,
-  p_end_date: params.dateTo ?? undefined,
-  p_time_period: params.timePeriod ?? undefined,
-})
+}): DashboardRpcArgs => {
+  const parsed = params.timePeriod ? parseDateToTimePeriod(params.timePeriod) : null
+  return {
+    p_farm_id: params.farmId,
+    p_system_id: params.systemId ?? undefined,
+    p_growth_stage: params.stage ?? undefined,
+    p_start_date: params.dateFrom ?? undefined,
+    p_end_date: params.dateTo ?? undefined,
+    p_time_period: parsed?.period ?? undefined,
+  }
+}
 
+type DashboardConsolidatedRpcArgs = {
+  p_farm_id: string
+  p_system_id?: number
+  p_start_date?: string
+  p_end_date?: string
+  p_time_period?: Enums<"time_period">
+}
+
+const dashboardConsolidatedRpcArgs = (params: {
+  farmId: string
+  systemId?: number
+  dateFrom?: string
+  dateTo?: string
+  timePeriod?: Enums<"time_period"> | string
+}): DashboardConsolidatedRpcArgs => {
+  const parsed = params.timePeriod ? parseDateToTimePeriod(params.timePeriod) : null
+  return {
+    p_farm_id: params.farmId,
+    p_system_id: params.systemId ?? undefined,
+    p_start_date: params.dateFrom ?? undefined,
+    p_end_date: params.dateTo ?? undefined,
+    p_time_period: parsed?.period ?? undefined,
+  }
+}
 type DashboardSystemsRpcArgs = {
   p_farm_id: string
   p_stage?: Enums<"system_growth_stage">
@@ -62,10 +92,18 @@ const isAbortLikeError = (err: unknown): boolean => {
   const e = err as { name?: string; message?: string }
   const name = String(e.name ?? "").toLowerCase()
   const message = String(e.message ?? "").toLowerCase()
-  return name.includes("abort") || message.includes("abort") || message.includes("canceled")
+  return name.includes("abort") || message.includes("abort") || message.includes("canceled") || message.includes("cancel")
 }
 
-const isQuietDashboardError = (err: unknown): boolean =>
+const isMissingRpcError = (err: unknown): boolean => {
+  if (!err || typeof err !== "object") return false
+  const e = err as { code?: string; message?: string }
+  if (e.code === "42P01" || e.code === "42883") return true
+  const message = String(e.message ?? "").toLowerCase()
+  return message.includes("does not exist") || message.includes("schema cache")
+}
+
+const isQuietError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
 
 const shouldBackfillRate = (value: number | null | undefined): boolean =>
@@ -89,9 +127,11 @@ const deriveFeedingRate = (row: DailyFishInventoryRow): number | null => {
 }
 
 const deriveMortalityRate = (row: DailyFishInventoryRow): number | null => {
+  // Prefer backend-computed start-of-day mortality_rate
   if (typeof row.mortality_rate === "number" && Number.isFinite(row.mortality_rate) && row.mortality_rate > 0) {
     return row.mortality_rate
   }
+  // Fallback: daily deaths / end-of-day fish (less correct than backend)
   if (
     typeof row.number_of_fish_mortality === "number" &&
     Number.isFinite(row.number_of_fish_mortality) &&
@@ -132,7 +172,10 @@ const computeAggregateRateFallbacks = (rows: DailyFishInventoryRow[]) => {
 }
 
 const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
-  const map = new Map<number, { feedingWeighted: number; feedingWeight: number; mortalityWeighted: number; mortalityWeight: number }>()
+  const map = new Map<
+    number,
+    { feedingWeighted: number; feedingWeight: number; mortalityWeighted: number; mortalityWeight: number }
+  >()
 
   rows.forEach((row) => {
     if (typeof row.system_id !== "number" || !Number.isFinite(row.system_id)) return
@@ -142,6 +185,7 @@ const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
       mortalityWeighted: 0,
       mortalityWeight: 0,
     }
+
     const feedingRate = deriveFeedingRate(row)
     const mortalityRate = deriveMortalityRate(row)
 
@@ -157,10 +201,10 @@ const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
   })
 
   const resolved = new Map<number, { feedingRate: number | null; mortalityRate: number | null }>()
-  map.forEach((value, key) => {
-    resolved.set(key, {
-      feedingRate: value.feedingWeight > 0 ? value.feedingWeighted / value.feedingWeight : null,
-      mortalityRate: value.mortalityWeight > 0 ? value.mortalityWeighted / value.mortalityWeight : null,
+  map.forEach((v, k) => {
+    resolved.set(k, {
+      feedingRate: v.feedingWeight > 0 ? v.feedingWeighted / v.feedingWeight : null,
+      mortalityRate: v.mortalityWeight > 0 ? v.mortalityWeighted / v.mortalityWeight : null,
     })
   })
   return resolved
@@ -168,15 +212,14 @@ const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
 
 export async function getDashboardSnapshot(params?: {
   systemId?: number
-  timePeriod?: Enums<"time_period">
+  timePeriod?: Enums<"time_period"> | string
   stage?: Enums<"system_growth_stage">
   allowFallback?: boolean
   farmId?: string | null
   signal?: AbortSignal
 }) {
-  if (!params?.farmId) {
-    return null
-  }
+  if (!params?.farmId) return null
+
   const clientResult = await getClientOrError("getDashboardSnapshot", { requireSession: true })
   if ("error" in clientResult) return null
   const { supabase } = clientResult
@@ -197,28 +240,33 @@ export async function getDashboardSnapshot(params?: {
 
   const { data, error } = await query
   if (error) {
-    if (isQuietDashboardError(error)) {
-      return null
-    }
+    if (isQuietError(error)) return null
     toQueryError("getDashboardSnapshot", error)
     return null
   }
 
-  const rows = (data ?? []) as DashboardRow[]
-  const row = rows[0] ?? null
+  const row = ((data ?? []) as DashboardRow[])[0] ?? null
   if (!row) return null
+
+  const allowFallback = params.allowFallback ?? true
+  if (!allowFallback) return row
+
   if (!shouldBackfillRate(row.feeding_rate) && !shouldBackfillRate(row.mortality_rate)) return row
 
-  const bounds = await getTimePeriodBounds(params?.timePeriod ?? "2 weeks", params?.signal, params?.farmId ?? null)
+  const bounds = await getTimePeriodBounds(params?.timePeriod ?? "2 weeks", params?.signal, params.farmId)
+
   const inventoryResult = await getDailyFishInventory({
     farmId: params.farmId,
     systemId: params.systemId,
     dateFrom: bounds.start ?? undefined,
     dateTo: bounds.end ?? undefined,
     limit: 5000,
+    orderAsc: true,
     signal: params?.signal,
   })
+
   if (inventoryResult.status !== "success") return row
+
   const fallback = computeAggregateRateFallbacks(inventoryResult.data)
 
   return {
@@ -235,31 +283,39 @@ export async function getDashboardSystems(params?: {
   systemId?: number | null
   dateFrom?: string | null
   dateTo?: string | null
+  allowFallback?: boolean
   signal?: AbortSignal
 }): Promise<QueryResult<DashboardSystemRpcRow>> {
-  if (!params?.farmId) {
-    return toQuerySuccess<DashboardSystemRpcRow>([])
-  }
+  if (!params?.farmId) return toQuerySuccess<DashboardSystemRpcRow>([])
+
   const clientResult = await getClientOrError("getDashboardSystems", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = queryKpiRpc(supabase, "api_dashboard_systems", dashboardSystemsRpcArgs({
+  let query = queryKpiRpc(
+    supabase,
+    "api_dashboard_systems",
+    dashboardSystemsRpcArgs({
       farmId: params.farmId,
       stage: params.stage ?? undefined,
       systemId: params.systemId ?? undefined,
       dateFrom: params.dateFrom ?? undefined,
       dateTo: params.dateTo ?? undefined,
-    }))
+    }),
+  )
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
   if (params?.signal?.aborted) return toQuerySuccess<DashboardSystemRpcRow>([])
-  if (error && isAbortLikeError(error)) return toQuerySuccess<DashboardSystemRpcRow>([])
-  if (error && isQuietDashboardError(error)) return toQuerySuccess<DashboardSystemRpcRow>([])
+  if (error && isQuietError(error)) return toQuerySuccess<DashboardSystemRpcRow>([])
   if (error) return toQueryError("getDashboardSystems", error)
+
   const rows = (data ?? []) as DashboardSystemRpcRow[]
-  if (!rows.some((row) => shouldBackfillRate(row.feeding_rate) || shouldBackfillRate(row.mortality_rate))) {
+
+  const allowFallback = params?.allowFallback ?? true
+  if (!allowFallback) return toQuerySuccess<DashboardSystemRpcRow>(rows)
+
+  if (!rows.some((r) => shouldBackfillRate(r.feeding_rate) || shouldBackfillRate(r.mortality_rate))) {
     return toQuerySuccess<DashboardSystemRpcRow>(rows)
   }
 
@@ -268,64 +324,97 @@ export async function getDashboardSystems(params?: {
     dateFrom: params.dateFrom ?? undefined,
     dateTo: params.dateTo ?? undefined,
     limit: 10000,
+    orderAsc: true,
     signal: params?.signal,
   })
-  if (inventoryResult.status !== "success") {
-    return toQuerySuccess<DashboardSystemRpcRow>(rows)
-  }
+
+  if (inventoryResult.status !== "success") return toQuerySuccess<DashboardSystemRpcRow>(rows)
+
   const perSystemFallback = computePerSystemRateFallbacks(inventoryResult.data)
   const normalized = rows.map((row) => {
-    const fallback = perSystemFallback.get(row.system_id)
+    const fb = perSystemFallback.get(row.system_id)
     return {
       ...row,
-      feeding_rate:
-        shouldBackfillRate(row.feeding_rate) && fallback?.feedingRate != null ? fallback.feedingRate : row.feeding_rate,
-      mortality_rate:
-        shouldBackfillRate(row.mortality_rate) && fallback?.mortalityRate != null
-          ? fallback.mortalityRate
-          : row.mortality_rate,
+      feeding_rate: shouldBackfillRate(row.feeding_rate) && fb?.feedingRate != null ? fb.feedingRate : row.feeding_rate,
+      mortality_rate: shouldBackfillRate(row.mortality_rate) && fb?.mortalityRate != null ? fb.mortalityRate : row.mortality_rate,
     }
   })
+
   return toQuerySuccess<DashboardSystemRpcRow>(normalized)
+}
+
+export async function getDashboardConsolidated(params?: {
+  farmId?: string | null
+  systemId?: number | null
+  dateFrom?: string | null
+  dateTo?: string | null
+  timePeriod?: Enums<"time_period"> | string
+  signal?: AbortSignal
+}): Promise<QueryResult<DashboardConsolidatedRow>> {
+  if (!params?.farmId) return toQuerySuccess<DashboardConsolidatedRow>([])
+
+  const clientResult = await getClientOrError("getDashboardConsolidated", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = queryKpiRpc(
+    supabase,
+    "api_dashboard_consolidated",
+    dashboardConsolidatedRpcArgs({
+      farmId: params.farmId,
+      systemId: params.systemId ?? undefined,
+      dateFrom: params.dateFrom ?? undefined,
+      dateTo: params.dateTo ?? undefined,
+      timePeriod: params.timePeriod ?? undefined,
+    }),
+  )
+  if (params?.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (error) {
+    if (params?.signal?.aborted || isQuietError(error) || isMissingRpcError(error)) {
+      return toQuerySuccess<DashboardConsolidatedRow>([])
+    }
+    // Treat unknown RPC errors as quiet to avoid spamming the console.
+    return toQuerySuccess<DashboardConsolidatedRow>([])
+  }
+
+  return toQuerySuccess<DashboardConsolidatedRow>((data ?? []) as DashboardConsolidatedRow[])
 }
 
 export async function getTimePeriodBounds(
   timePeriod: Enums<"time_period"> | string,
   signal?: AbortSignal,
   farmId?: string | null,
-) {
+): Promise<TimeBounds> {
   const parsed = parseDateToTimePeriod(timePeriod)
-
-  if (!farmId) {
-    return { start: null, end: null }
-  }
+  if (!farmId) return { start: null, end: null }
 
   const clientResult = await getClientOrError("getTimePeriodBounds", { requireSession: true })
-  if ("error" in clientResult) {
-    return { start: null, end: null }
-  }
+  if ("error" in clientResult) return { start: null, end: null }
   const { supabase } = clientResult
 
-  const dashboardArgs = dashboardRpcArgs({
-    farmId,
-    timePeriod: parsed.period,
-  })
+  let q = supabase
+    .rpc("api_time_period_bounds", {
+      p_farm_id: farmId,
+      p_time_period: parsed.period,
+    })
+    .maybeSingle()
 
-  let dashboardQuery = queryKpiRpc(supabase, "api_dashboard", {
-    ...dashboardArgs,
-    p_limit: 1,
-    p_order_desc: true,
-  })
-  if (signal) dashboardQuery = dashboardQuery.abortSignal(signal)
-
-  const { data: dashboardData, error: dashboardError } = await dashboardQuery
-  if (!dashboardError) {
-    const rows = (dashboardData ?? []) as DashboardTimeBoundsRow[]
-    const row = rows[0]
-    if (row?.input_start_date || row?.input_end_date) {
-      return { start: row?.input_start_date ?? null, end: row?.input_end_date ?? null }
-    }
+  if (signal) {
+    const withSignal = (q as any).abortSignal?.(signal)
+    if (withSignal) q = withSignal
   }
 
-  return { start: null, end: null }
+  const { data, error } = await q
+  if (error) {
+    if (signal?.aborted || isQuietError(error)) return { start: null, end: null }
+    return { start: null, end: null }
+  }
+
+  const row = data as TimePeriodBoundsRow | null
+  return {
+    start: row?.input_start_date ?? null,
+    end: row?.input_end_date ?? null,
+  }
 }

@@ -51,6 +51,7 @@ export function useEfcrTrend(params?: {
       params?.systemId ?? "all",
       params?.dateFrom ?? "",
       params?.dateTo ?? "",
+      params?.limit ?? 50,
     ],
     queryFn: ({ signal }) => getEfcrTrend({ ...params, signal }),
     enabled,

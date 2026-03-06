@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import FarmSelector from "@/components/shared/farm-selector"
 import { useActiveFarm } from "@/hooks/use-active-farm"
@@ -30,7 +30,7 @@ import { useNotifications } from "@/components/notifications/notifications-provi
 import { useToast } from "@/hooks/use-toast"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import TimePeriodSelector from "@/components/shared/time-period-selector"
-import { getDateRangeFromPeriod } from "@/lib/utils"
+import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import {
   formatTimestamp,
@@ -81,22 +81,16 @@ export default function WaterQualityPage() {
     selectedSystem,
   })
 
+  const boundsQuery = useQuery({
+    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
+    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
+    enabled: Boolean(farmId),
+    staleTime: 5 * 60_000,
+  })
+  const dateFrom = boundsQuery.data?.start ?? undefined
+  const dateTo = boundsQuery.data?.end ?? undefined
+  const boundsReady = Boolean(dateFrom && dateTo)
   const asOfQuery = useWaterQualityAsOf()
-  const asOfDate = useMemo(() => {
-    const rows = getResultRows(asOfQuery.data)
-    const latest = rows[0]
-    if (!latest) return null
-    const measurementDate = latest.latest_measurement_ts?.slice(0, 10) ?? null
-    const ratingDate = latest.latest_rating_date?.slice(0, 10) ?? null
-    if (measurementDate && ratingDate) {
-      return measurementDate > ratingDate ? measurementDate : ratingDate
-    }
-    return measurementDate ?? ratingDate ?? null
-  }, [asOfQuery.data])
-  const { startDate: dateFrom, endDate: dateTo } = useMemo(
-    () => getDateRangeFromPeriod(timePeriod, asOfDate),
-    [asOfDate, timePeriod],
-  )
   const statusQuery = useWaterQualityStatus(selectedSystemId)
   const latestRatingQuery = useLatestWaterQualityRating(selectedSystemId)
   const ratingsQuery = useDailyWaterQualityRating({
@@ -105,6 +99,7 @@ export default function WaterQualityPage() {
     dateTo,
     requireSystem: false,
     limit: chartLimit,
+    enabled: boundsReady,
   })
   const measurementsQuery = useWaterQualityMeasurements({
     systemId: selectedSystemId,
@@ -112,18 +107,21 @@ export default function WaterQualityPage() {
     dateTo,
     requireSystem: false,
     limit: chartLimit,
+    enabled: boundsReady,
   })
   const overlayQuery = useWaterQualityOverlay({
     systemId: selectedSystemId,
     dateFrom,
     dateTo,
     requireSystem: false,
+    enabled: boundsReady,
   })
   const activitiesQuery = useRecentActivities({
     tableName: "water_quality_measurement",
-    dateFrom: `${dateFrom}T00:00:00`,
-    dateTo: `${dateTo}T23:59:59`,
+    dateFrom: dateFrom ? `${dateFrom}T00:00:00` : undefined,
+    dateTo: dateTo ? `${dateTo}T23:59:59` : undefined,
     limit: 1500,
+    enabled: boundsReady,
   })
   const thresholdsQuery = useAlertThresholds()
   const upsertFarmThresholdMutation = useUpsertFarmThreshold()
@@ -184,30 +182,6 @@ export default function WaterQualityPage() {
     })
     return map
   }, [activitiesQuery.data])
-
-  const ratingEvents = useMemo<MeasurementEvent[]>(() => {
-    const rows = getResultRows(ratingsQuery.data).filter(
-      (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
-    )
-    return rows
-      .filter((row) => row.rating_date)
-      .map((row) => ({
-        key: `rating-${row.system_id}-${row.rating_date}`,
-        systemId: row.system_id as number,
-        systemLabel: systemLabelById.get(row.system_id as number) ?? `System ${row.system_id}`,
-        date: row.rating_date ?? "",
-        time: "00:00",
-        timestamp: `${row.rating_date ?? ""}T00:00`,
-        waterDepth: 0,
-        dissolved_oxygen: row.worst_parameter === "dissolved_oxygen" ? row.worst_parameter_value ?? null : null,
-        pH: row.worst_parameter === "pH" ? row.worst_parameter_value ?? null : null,
-        temperature: row.worst_parameter === "temperature" ? row.worst_parameter_value ?? null : null,
-        ammonia_ammonium: row.worst_parameter === "ammonia_ammonium" ? row.worst_parameter_value ?? null : null,
-        operator: "Derived from daily rating",
-        source: "rating" as const,
-      }))
-      .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
-  }, [ratingsQuery.data, scopedSystemIds, systemLabelById])
 
   const measurementEvents = useMemo<MeasurementEvent[]>(() => {
     const rows = getResultRows(measurementsQuery.data).filter(
@@ -410,6 +384,7 @@ export default function WaterQualityPage() {
   }, [highAmmoniaThreshold, lowDoThreshold, selectedParameter, trendData])
 
   const waterAlertFeed = useMemo(() => {
+    if (!dateFrom || !dateTo) return []
     return notifications
       .filter((item) => item.kind === "water_quality")
       .filter((item) => {
@@ -463,6 +438,8 @@ export default function WaterQualityPage() {
   const exportCsv = () => {
     const header = ["parameter_name", "reading", "timestamp", "system", "operator"]
     const rows: string[] = []
+    const exportStart = dateFrom ?? "start"
+    const exportEnd = dateTo ?? "end"
     measurementEvents.forEach((event) => {
       const timestamp = `${event.date} ${event.time}`
       const entries: Array<[string, number | null]> = [
@@ -486,12 +463,14 @@ export default function WaterQualityPage() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = `water-quality-compliance-${dateFrom}-to-${dateTo}.csv`
+    link.download = `water-quality-compliance-${exportStart}-to-${exportEnd}.csv`
     link.click()
     URL.revokeObjectURL(url)
   }
 
   const exportPdf = () => {
+    const exportStart = dateFrom ?? "start"
+    const exportEnd = dateTo ?? "end"
     const rows = measurementEvents
       .slice(0, 500)
       .map(
@@ -506,7 +485,7 @@ export default function WaterQualityPage() {
       <html><head><title>Water Quality Compliance Report</title></head>
       <body>
         <h1>Water Quality Compliance Report</h1>
-        <p>Period: ${dateFrom} to ${dateTo}</p>
+        <p>Period: ${exportStart} to ${exportEnd}</p>
         <table border="1" cellspacing="0" cellpadding="6">
           <thead><tr><th>System</th><th>Timestamp</th><th>DO</th><th>pH</th><th>Temp</th><th>Ammonia</th><th>Operator</th></tr></thead>
           <tbody>${rows}</tbody>

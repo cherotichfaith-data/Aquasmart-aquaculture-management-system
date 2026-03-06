@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import FarmSelector from "@/components/shared/farm-selector"
 import { useRecentActivities, useSystemsTable } from "@/lib/hooks/use-dashboard"
@@ -8,7 +9,7 @@ import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import TimePeriodSelector from "@/components/shared/time-period-selector"
-import { getDateRangeFromPeriod } from "@/lib/utils"
+import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import {
   EVENT_LABEL,
   normalizeTableName,
@@ -43,20 +44,21 @@ export default function TransactionsPage() {
   } = useSharedFilters("month")
   const [selectedEventType, setSelectedEventType] = useState<ActivityType>("all")
   const [selectedOperator, setSelectedOperator] = useState<string>("all")
-  const asOfActivityQuery = useRecentActivities({ limit: 1 })
-  const asOfDate = useMemo(() => {
-    const rows = asOfActivityQuery.data?.status === "success" ? asOfActivityQuery.data.data : []
-    return rows[0]?.change_time?.slice(0, 10) ?? null
-  }, [asOfActivityQuery.data])
-  const { startDate: dateFrom, endDate: dateTo } = useMemo(
-    () => getDateRangeFromPeriod(timePeriod, asOfDate),
-    [asOfDate, timePeriod],
-  )
+  const boundsQuery = useQuery({
+    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
+    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
+    enabled: Boolean(farmId),
+    staleTime: 5 * 60_000,
+  })
+  const dateFrom = boundsQuery.data?.start ?? null
+  const dateTo = boundsQuery.data?.end ?? null
+  const boundsReady = Boolean(dateFrom && dateTo)
 
   const activitiesQuery = useRecentActivities({
     dateFrom: dateFrom ? `${dateFrom}T00:00:00` : undefined,
     dateTo: dateTo ? `${dateTo}T23:59:59` : undefined,
     limit: 2000,
+    enabled: boundsReady,
   })
 
   const systemsQuery = useSystemOptions({ farmId, stage: selectedStage, activeOnly: true })

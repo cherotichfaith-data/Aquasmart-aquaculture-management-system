@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSearchParams, usePathname } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { Download, RefreshCw, PlusCircle, Fish, FlaskConical, Droplets } from "lucide-react"
@@ -52,15 +52,18 @@ export default function DashboardPage() {
     setTimePeriod,
   } = useSharedFilters(parsedPeriod.period)
   const [refreshing, setRefreshing] = useState(false)
+  const lastPeriodParam = useRef<string | null>(periodParam)
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
   const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
 
   useEffect(() => {
+    if (lastPeriodParam.current === periodParam) return
+    lastPeriodParam.current = periodParam
     if (!periodParam) return
     if (parsedPeriod.period !== timePeriod) {
       setTimePeriod(parsedPeriod.period)
     }
-  }, [parsedPeriod, periodParam, setTimePeriod, timePeriod])
+  }, [periodParam, parsedPeriod.period, setTimePeriod, timePeriod])
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())

@@ -16,6 +16,14 @@ import { AlertThresholdsSection, FarmInformationSection, SaveSettingsButton } fr
 import { DataErrorState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 
+const isAbortLikeError = (err: unknown): boolean => {
+  if (!err) return false
+  const e = err as { name?: string; message?: string }
+  const name = String(e.name ?? "").toLowerCase()
+  const message = String(e.message ?? "").toLowerCase()
+  return name.includes("abort") || message.includes("abort") || name.includes("cancel") || message.includes("cancel")
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
 
@@ -33,7 +41,7 @@ export default function SettingsPage() {
   const settingsLoadQuery = useQuery({
     queryKey: ["settings", "load", user?.id ?? "anon", farmId ?? "no-farm", thresholdDenied],
     enabled: Boolean(user?.id) && !farmLoading && !hasLoadedSettings,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const sessionUser = await getSessionUser(supabase, "settings:load:getSession")
       if (!sessionUser) {
         return {
@@ -46,15 +54,20 @@ export default function SettingsPage() {
       let thresholdRow: Tables<"alert_threshold"> | null = null
 
       if (farmId && !thresholdDenied) {
-        const { data, error } = await supabase
+        let query = supabase
           .from("alert_threshold")
           .select("*")
           .eq("scope", "farm")
           .eq("farm_id", farmId)
           .maybeSingle()
+        if (signal) {
+          const withSignal = (query as any).abortSignal?.(signal)
+          if (withSignal) query = withSignal
+        }
+        const { data, error } = await query
         if (error && isSbPermissionDenied(error)) {
           nextThresholdDenied = true
-        } else if (error && hasActionableSbError(error)) {
+        } else if (error && !isAbortLikeError(error) && hasActionableSbError(error)) {
           logSbError("settings:load:threshold", error)
         } else {
           thresholdRow = data ?? null

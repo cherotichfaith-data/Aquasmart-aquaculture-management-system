@@ -6,7 +6,7 @@ import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataEntryInterface } from "@/components/data-entry/data-entry-interface"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useBatchOptions, useFeedTypeOptions, useSystemOptions } from "@/lib/hooks/use-options"
-import { useRecentEntries, useSuppliers } from "@/lib/hooks/use-reports"
+import { useRecentEntries } from "@/lib/hooks/use-reports"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
@@ -16,7 +16,6 @@ export default function DataEntryPageClient() {
   const systemsQuery = useSystemOptions({ farmId })
   const batchesQuery = useBatchOptions({ farmId })
   const feedsQuery = useFeedTypeOptions()
-  const suppliersQuery = useSuppliers()
   const recentEntriesQuery = useRecentEntries()
   const searchParams = useSearchParams()
   const typeParam = searchParams.get("type")
@@ -50,7 +49,6 @@ export default function DataEntryPageClient() {
     systemsQuery.isLoading ||
     batchesQuery.isLoading ||
     feedsQuery.isLoading ||
-    suppliersQuery.isLoading ||
     recentEntriesQuery.isLoading
 
   const entryErrors = useMemo(() => {
@@ -75,8 +73,6 @@ export default function DataEntryPageClient() {
     getQueryResultError(batchesQuery.data),
     getErrorMessage(feedsQuery.error),
     getQueryResultError(feedsQuery.data),
-    getErrorMessage(suppliersQuery.error),
-    getQueryResultError(suppliersQuery.data),
     getErrorMessage(recentEntriesQuery.error),
     ...entryErrors,
   ].filter(Boolean) as string[]
@@ -84,13 +80,11 @@ export default function DataEntryPageClient() {
     systemsQuery.dataUpdatedAt ?? 0,
     batchesQuery.dataUpdatedAt ?? 0,
     feedsQuery.dataUpdatedAt ?? 0,
-    suppliersQuery.dataUpdatedAt ?? 0,
     recentEntriesQuery.dataUpdatedAt ?? 0,
   )
   const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
   const batches = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
   const feeds = feedsQuery.data?.status === "success" ? feedsQuery.data.data : []
-  const suppliers = suppliersQuery.data?.status === "success" ? suppliersQuery.data.data : []
 
   const recentEntries = useMemo(
     () => ({
@@ -147,7 +141,6 @@ export default function DataEntryPageClient() {
               systemsQuery.refetch()
               batchesQuery.refetch()
               feedsQuery.refetch()
-              suppliersQuery.refetch()
               recentEntriesQuery.refetch()
             }}
           />
@@ -156,7 +149,6 @@ export default function DataEntryPageClient() {
         ) : (
           <DataEntryInterface
             systems={systems}
-            suppliers={suppliers}
             feeds={feeds}
             batches={batches}
             recentEntries={recentEntries}

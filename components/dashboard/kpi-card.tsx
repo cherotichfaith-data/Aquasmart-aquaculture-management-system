@@ -7,7 +7,6 @@ interface KPICardProps {
   title: string
   average: number | null | undefined
   trend?: number | null
-  data?: Array<{ id: number; data: number }>
   decimals?: number
   formatUnit?: string
   invertTrend?: boolean
@@ -23,12 +22,10 @@ const trendPaths = {
 }
 
 function Sparkline({
-  data,
   trend,
   invertTrend,
   neutral,
 }: {
-  data?: Array<{ id: number; data: number }>
   trend?: number | null
   invertTrend?: boolean
   neutral?: boolean
@@ -67,7 +64,6 @@ function KPICardContent({
   title,
   average,
   trend,
-  data,
   decimals = 1,
   formatUnit,
   invertTrend,
@@ -119,7 +115,7 @@ function KPICardContent({
           )}
         </div>
         <div className="rounded-md bg-muted/40 p-1.5">
-          <Sparkline data={data} trend={trend} invertTrend={invertTrend} neutral={neutral} />
+          <Sparkline trend={trend} invertTrend={invertTrend} neutral={neutral} />
         </div>
       </div>
     </div>
@@ -130,7 +126,6 @@ export default function KPICard({
   title,
   average,
   trend,
-  data,
   decimals,
   formatUnit,
   invertTrend,
@@ -143,7 +138,6 @@ export default function KPICard({
       title={title}
       average={average}
       trend={trend}
-      data={data}
       decimals={decimals}
       formatUnit={formatUnit}
       invertTrend={invertTrend}

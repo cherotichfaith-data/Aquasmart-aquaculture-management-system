@@ -32,8 +32,6 @@ export function useRecordMortality() {
         system_id: payload.system_id,
         batch_id: payload.batch_id ?? null,
         number_of_fish_mortality: payload.number_of_fish_mortality ?? null,
-        total_weight_mortality: payload.total_weight_mortality ?? null,
-        abw: payload.abw ?? null,
         created_at: new Date().toISOString(),
         status: "pending",
       }

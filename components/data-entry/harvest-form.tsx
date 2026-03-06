@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tables } from "@/lib/types/database"
+import type { Database } from "@/lib/types/database"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
 import { logSbError } from "@/utils/supabase/log"
 
@@ -29,8 +29,8 @@ const formSchema = z.object({
 })
 
 interface HarvestFormProps {
-    systems: Tables<"api_system_options">[]
-    batches: Tables<"api_fingerling_batch_options">[]
+    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     defaultSystemId?: number | null
     defaultBatchId?: number | null
 }

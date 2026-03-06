@@ -1,12 +1,14 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import FarmSelector from "@/components/shared/farm-selector"
 import TimePeriodSelector from "@/components/shared/time-period-selector"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts"
 import { useSamplingData } from "@/lib/hooks/use-reports"
-import { getDateRangeFromPeriod, sortByDateAsc } from "@/lib/utils"
+import { sortByDateAsc } from "@/lib/utils"
+import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
@@ -61,21 +63,15 @@ export default function SamplingPage() {
 
   const samplingQueryEnabled = hasSystem || scopedSystemIdList.length > 0
 
-  const asOfSamplingQuery = useSamplingData({
-    systemId: hasSystem ? (systemId as number) : undefined,
-    systemIds: !hasSystem ? scopedSystemIdList : undefined,
-    batchId: Number.isFinite(batchId) ? batchId : undefined,
-    limit: 1,
-    enabled: samplingQueryEnabled,
+  const boundsQuery = useQuery({
+    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
+    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
+    enabled: Boolean(farmId),
+    staleTime: 5 * 60_000,
   })
-  const asOfDate = useMemo(() => {
-    const rows = asOfSamplingQuery.data?.status === "success" ? asOfSamplingQuery.data.data : []
-    return rows[0]?.date ?? null
-  }, [asOfSamplingQuery.data])
-  const { startDate: dateFrom, endDate: dateTo } = useMemo(
-    () => getDateRangeFromPeriod(timePeriod, asOfDate),
-    [asOfDate, timePeriod],
-  )
+  const hasBounds = Boolean(boundsQuery.data?.start && boundsQuery.data?.end)
+  const dateFrom = boundsQuery.data?.start ?? undefined
+  const dateTo = boundsQuery.data?.end ?? undefined
 
   const samplingQuery = useSamplingData({
     systemId: hasSystem ? (systemId as number) : undefined,
@@ -84,13 +80,14 @@ export default function SamplingPage() {
     dateFrom,
     dateTo,
     limit: 2000,
-    enabled: samplingQueryEnabled,
+    enabled: samplingQueryEnabled && hasBounds,
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 50
   const tableQueryEnabled =
     showSamplingRecords &&
     samplingQueryEnabled &&
-    (selectedSystem !== "all" || selectedBatch !== "all" || selectedStage !== "all")
+    (selectedSystem !== "all" || selectedBatch !== "all" || selectedStage !== "all") &&
+    hasBounds
   const samplingTableQuery = useSamplingData({
     systemId: hasSystem ? (systemId as number) : undefined,
     systemIds: !hasSystem ? scopedSystemIdList : undefined,

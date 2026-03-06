@@ -13,13 +13,12 @@ import { IncomingFeedForm } from "./incoming-feed-form"
 import { StockingForm } from "./stocking-form"
 import { SystemForm } from "./system-form"
 import { RecentEntriesList } from "./recent-entries-list"
-import type { Tables } from "@/lib/types/database"
+import type { Database, Tables } from "@/lib/types/database"
 
 interface DataEntryInterfaceProps {
-    systems: Tables<"api_system_options">[]
-    suppliers: Tables<"feed_supplier">[]
-    feeds: Tables<"api_feed_type_options">[]
-    batches: Tables<"api_fingerling_batch_options">[]
+    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
+    batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     recentEntries: {
         mortality: Tables<"fish_mortality">[]
         feeding: Tables<"feeding_record">[]
@@ -50,7 +49,6 @@ const sidebarItems = [
 
 export function DataEntryInterface({
     systems,
-    suppliers,
     feeds,
     batches,
     recentEntries,
@@ -127,7 +125,7 @@ export function DataEntryInterface({
                 )}
                 {activeTab === "incoming_feed" && (
                     <>
-                        <IncomingFeedForm feeds={feeds} suppliers={suppliers} />
+                        <IncomingFeedForm feeds={feeds} />
                         <RecentEntriesList data={recentEntries.incoming_feed} type="incoming_feed" />
                     </>
                 )}
