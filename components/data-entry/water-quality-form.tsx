@@ -111,6 +111,7 @@ export function WaterQualityForm({ systems, defaultSystemId = null }: WaterQuali
                 system_id: systemId,
                 date: values.date,
                 time: values.time,
+                measured_at: `${values.date}T${values.time}:00`,
                 water_depth: values.water_depth,
                 parameter_name: measurement.parameter_name,
                 parameter_value: measurement.parameter_value,

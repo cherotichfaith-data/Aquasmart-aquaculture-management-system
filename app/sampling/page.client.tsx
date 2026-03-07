@@ -607,8 +607,8 @@ export default function SamplingPage() {
       rows.push({
         date: projectedDateString,
         abw: null,
-        fishSampled: null,
-        totalWeight: null,
+        fishSampled: 0,
+        totalWeight: 0,
         targetAbw: resolveTargetAbw(daySinceStart, targetCurvePoints),
         projectionAbw: projection.targetWeight,
         label: formatDayLabel(projectedDateString),

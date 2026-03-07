@@ -1202,7 +1202,9 @@ export default function WaterQualityPage() {
                             stroke="var(--color-chart-1)"
                             strokeWidth={2}
                             dot={({ cx, cy, payload }) => {
-                              if (cx == null || cy == null) return null
+                              if (cx == null || cy == null) {
+                                return <circle cx={0} cy={0} r={0} fill="none" />
+                              }
                               const color = worstParamColor(payload?.worstParameter)
                               const key = payload?.date ? `dot-${payload.date}` : `dot-${cx}-${cy}`
                               return (

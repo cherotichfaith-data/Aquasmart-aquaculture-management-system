@@ -19,8 +19,8 @@ export type KpiRpcName =
   | "api_daily_fish_inventory"
   | "api_efcr_trend"
   | "api_production_summary"
-  | "api_water_quality_as_of"
-  | "api_water_quality_status"
+  | "api_latest_water_quality_status"
+  | "api_water_quality_sync_status"
   | "api_time_period_bounds"
   | "api_time_period_options"
 
@@ -40,7 +40,6 @@ export type OptionsRpcName =
 export type OptionsViewName =
   | "api_alert_thresholds"
   | "api_water_quality_measurements"
-  | "api_latest_water_quality_rating"
   | "api_daily_water_quality_rating"
 
 /**
