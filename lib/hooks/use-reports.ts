@@ -11,6 +11,7 @@ import {
   getMortalityData,
   getRecentEntries,
   getSamplingData,
+  getTransferData,
 } from "@/lib/api/reports"
 
 export function useFeedIncoming(params?: { limit?: number }) {
@@ -89,6 +90,31 @@ export function useSamplingData(params?: {
       params?.limit ?? 100,
     ],
     queryFn: ({ signal }) => getSamplingData({ ...params, signal }),
+    staleTime: 5 * 60_000,
+    enabled: Boolean(session) && (params?.enabled ?? true),
+  })
+}
+
+export function useTransferData(params?: {
+  batchId?: number
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  enabled?: boolean
+}) {
+  const { session } = useAuth()
+  const { farmId } = useActiveFarm()
+  return useQuery({
+    queryKey: [
+      "reports",
+      "transfer",
+      farmId ?? "all",
+      params?.batchId ?? "all",
+      params?.dateFrom ?? "",
+      params?.dateTo ?? "",
+      params?.limit ?? 100,
+    ],
+    queryFn: ({ signal }) => getTransferData({ ...params, signal }),
     staleTime: 5 * 60_000,
     enabled: Boolean(session) && (params?.enabled ?? true),
   })

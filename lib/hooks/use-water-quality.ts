@@ -7,11 +7,9 @@ import {
   getAlertThresholds,
   getDailyOverlay,
   getDailyWaterQualityRating,
-  getLatestWaterQualityRating,
-  getWaterQualityAsOf,
+  getLatestWaterQualityStatus,
+  getWaterQualitySyncStatus,
   getWaterQualityMeasurements,
-  getWaterQualityStatus,
-  upsertFarmThreshold,
 } from "@/lib/api/water-quality"
 import { insertData } from "@/lib/supabase-actions"
 import {
@@ -26,38 +24,26 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import type { TablesInsert } from "@/lib/types/database"
 
-export function useWaterQualityAsOf() {
+export function useLatestWaterQualityStatus(systemId?: number) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(farmId)
   return useQuery({
-    queryKey: ["wq", "as_of", farmId],
+    queryKey: ["wq", "latest_status", farmId, systemId ?? null],
     enabled,
-    queryFn: ({ signal }) => getWaterQualityAsOf({ farmId: farmId!, signal }),
-    staleTime: 60_000,
-  })
-}
-
-export function useWaterQualityStatus(systemId?: number) {
-  const { farmId } = useActiveFarm()
-  const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(farmId)
-  return useQuery({
-    queryKey: ["wq", "status", farmId, systemId ?? null],
-    enabled,
-    queryFn: ({ signal }) => getWaterQualityStatus({ farmId: farmId!, systemId, signal }),
+    queryFn: ({ signal }) => getLatestWaterQualityStatus({ farmId: farmId!, systemId, signal }),
     staleTime: 30_000,
   })
 }
 
-export function useLatestWaterQualityRating(systemId?: number) {
+export function useWaterQualitySyncStatus() {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(farmId)
   return useQuery({
-    queryKey: ["wq", "latest_rating", farmId, systemId ?? null],
+    queryKey: ["wq", "sync_status", farmId],
     enabled,
-    queryFn: ({ signal }) => getLatestWaterQualityRating({ farmId: farmId!, systemId, signal }),
+    queryFn: ({ signal }) => getWaterQualitySyncStatus({ farmId: farmId!, signal }),
     staleTime: 30_000,
   })
 }
@@ -168,20 +154,6 @@ export function useAlertThresholds() {
     enabled,
     queryFn: ({ signal }) => getAlertThresholds({ farmId: farmId!, signal }),
     staleTime: 60_000,
-  })
-}
-
-export function useUpsertFarmThreshold() {
-  const qc = useQueryClient()
-  const { farmId } = useActiveFarm()
-
-  return useMutation({
-    mutationFn: (input: { low_do_threshold?: number | null; high_ammonia_threshold?: number | null; high_mortality_threshold?: number | null }) =>
-      upsertFarmThreshold({ farmId: farmId!, ...input }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["wq", "thresholds", farmId] })
-      qc.invalidateQueries({ queryKey: ["wq", "status", farmId] })
-    },
   })
 }
 

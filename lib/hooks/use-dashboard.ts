@@ -5,7 +5,6 @@ import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
 import {
   getDashboardSystems,
-  getDashboardSnapshot,
   getDashboardConsolidated,
   getTimePeriodBounds,
 } from "@/lib/api/dashboard"
@@ -148,80 +147,53 @@ export function useHealthSummary(params: {
         detail: "Latest snapshot from dashboard view",
       }
 
-      const forceRangeMode =
-        (params.batch && params.batch !== "all") ||
-        (params.stage && params.stage !== "all")
-      const useRangeMode = forceRangeMode || !resolvedSystemId
+      if (!bounds.start || !bounds.end) {
+        return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
+      }
+      const wqResult = await getWaterQualityRatings({
+        farmId: params.farmId ?? null,
+        systemId: resolvedSystemId,
+        dateFrom: bounds.start,
+        dateTo: bounds.end,
+        limit: 2000,
+        signal,
+      })
 
-      if (useRangeMode) {
-        if (!bounds.start || !bounds.end) {
+      const invResult = await getDailyFishInventory({
+        farmId: params.farmId ?? null,
+        systemId: resolvedSystemId,
+        dateFrom: bounds.start,
+        dateTo: bounds.end,
+        limit: 2000,
+        signal,
+      })
+
+      if (wqResult.status === "success" && wqResult.data.length) {
+        const filteredWq = scopedSystemIds?.length
+          ? wqResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
+          : wqResult.data
+        if (!filteredWq.length) {
           return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
         }
-        const wqResult = await getWaterQualityRatings({
-          farmId: params.farmId ?? null,
-          systemId: resolvedSystemId,
-          dateFrom: bounds.start,
-          dateTo: bounds.end,
-          limit: 2000,
-          signal,
-        })
+        const avg = filteredWq.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / filteredWq.length
+        const rounded = Math.round(avg)
+        const mapped = ratingToneMap[
+          rounded === 0 ? "lethal" : rounded === 1 ? "critical" : rounded === 2 ? "acceptable" : "optimal"
+        ] ?? ratingToneMap.optimal
+        waterQualityState.tone = mapped.tone
+        waterQualityState.status = mapped.status
+        waterQualityState.progress = mapped.progress
+        waterQualityState.detail = `Rating: ${rounded}`
+      }
 
-        const invResult = await getDailyFishInventory({
-          farmId: params.farmId ?? null,
-          systemId: resolvedSystemId,
-          dateFrom: bounds.start,
-          dateTo: bounds.end,
-          limit: 2000,
-          signal,
-        })
-
-        if (wqResult.status === "success" && wqResult.data.length) {
-          const filteredWq = scopedSystemIds?.length
-            ? wqResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
-            : wqResult.data
-          if (!filteredWq.length) {
-            return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
-          }
-          const avg =
-            filteredWq.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / filteredWq.length
-          const rounded = Math.round(avg)
-          const mapped = ratingToneMap[
-            rounded === 0 ? "lethal" : rounded === 1 ? "critical" : rounded === 2 ? "acceptable" : "optimal"
-          ] ?? ratingToneMap.optimal
-          waterQualityState.tone = mapped.tone
-          waterQualityState.status = mapped.status
-          waterQualityState.progress = mapped.progress
-          waterQualityState.detail = `Rating: ${rounded}`
-        }
-
-        if (invResult.status === "success" && invResult.data.length) {
-          const filteredInventory = scopedSystemIds?.length
-            ? invResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
-            : invResult.data
-          const totalMortality = filteredInventory.reduce((sum, row) => sum + (row.number_of_fish_mortality ?? 0), 0)
-          const totalFish = filteredInventory.reduce((sum, row) => sum + (row.number_of_fish ?? 0), 0)
-          if (totalFish > 0) {
-            fishState.detail = `Mortality rate/day: ${(totalMortality / totalFish).toFixed(4)}`
-          }
-        }
-      } else if (resolvedSystemId) {
-        const snapshot = await getDashboardSnapshot({
-          farmId: params.farmId ?? null,
-          systemId: resolvedSystemId,
-          timePeriod: params.timePeriod ?? "2 weeks",
-          signal,
-        })
-
-        if (snapshot?.water_quality_rating_average) {
-          const mapped = ratingToneMap[snapshot.water_quality_rating_average] ?? ratingToneMap.optimal
-          waterQualityState.tone = mapped.tone
-          waterQualityState.status = mapped.status
-          waterQualityState.progress = mapped.progress
-          waterQualityState.detail = `Rating: ${snapshot.water_quality_rating_average}`
-        }
-
-        if (snapshot?.mortality_rate != null) {
-          fishState.detail = `Mortality rate/day: ${snapshot.mortality_rate}`
+      if (invResult.status === "success" && invResult.data.length) {
+        const filteredInventory = scopedSystemIds?.length
+          ? invResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
+          : invResult.data
+        const totalMortality = filteredInventory.reduce((sum, row) => sum + (row.number_of_fish_mortality ?? 0), 0)
+        const totalFish = filteredInventory.reduce((sum, row) => sum + (row.number_of_fish ?? 0), 0)
+        if (totalFish > 0) {
+          fishState.detail = `Mortality rate/day: ${(totalMortality / totalFish).toFixed(4)}`
         }
       }
 
@@ -490,10 +462,9 @@ export function useKpiOverview(params: {
         const resolvedFeedingRate = consolidatedRow?.feeding_rate ?? feedRate
         const resolvedAbw = consolidatedRow?.abw_asof_end ?? avgAbw
         const resolvedWqAverage =
-          consolidatedRow?.water_quality_rating_numeric_average ??
-          (wqRows && wqRows.length
+          wqRows && wqRows.length
             ? wqRows.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / wqRows.length
-            : null)
+            : null
 
         const wqRounded = resolvedWqAverage === null ? null : Math.round(resolvedWqAverage)
         const wqLabel =
@@ -517,10 +488,7 @@ export function useKpiOverview(params: {
               biomass_density: toTrendPercent(resolvedBiomassDensity, consolidatedRow.biomass_density_delta),
               feeding: toTrendPercent(resolvedFeedingRate, consolidatedRow.feeding_rate_delta),
               abw: toTrendPercent(resolvedAbw, consolidatedRow.abw_asof_end_delta),
-              water_quality: toTrendPercent(
-                resolvedWqAverage,
-                consolidatedRow.water_quality_rating_numeric_delta,
-              ),
+              water_quality: null,
             }
           : {}
 

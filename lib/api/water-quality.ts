@@ -1,15 +1,14 @@
-import type { Database, Enums, Tables, TablesInsert } from "@/lib/types/database"
+import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, queryKpiRpc, queryOptionsView, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
-type AsOfRow = Database["public"]["Functions"]["api_water_quality_as_of"]["Returns"][number]
-type WqStatusRow = Database["public"]["Functions"]["api_water_quality_status"]["Returns"][number]
 type OverlayRow = Database["public"]["Functions"]["api_daily_overlay"]["Returns"][number]
+type LatestStatusRow = Database["public"]["Functions"]["api_latest_water_quality_status"]["Returns"][number]
+type SyncStatusRow = Database["public"]["Functions"]["api_water_quality_sync_status"]["Returns"][number]
 
 type MeasurementRow = Tables<"api_water_quality_measurements">
 type DailyRatingRow = Tables<"api_daily_water_quality_rating">
-type LatestRatingRow = Tables<"api_latest_water_quality_rating">
 type ThresholdRow = Tables<"api_alert_thresholds">
 
 const isAbortLikeError = (err: unknown): boolean => {
@@ -31,38 +30,17 @@ const isQuietError = (err: unknown): boolean =>
 
 const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
 
-/** KPI RPC: latest water-quality anchor dates */
-export async function getWaterQualityAsOf(params: {
-  farmId: string
-  signal?: AbortSignal
-}): Promise<QueryResult<AsOfRow>> {
-  const clientResult = await getClientOrError("getWaterQualityAsOf", { requireSession: true })
-  if ("error" in clientResult) return empty<AsOfRow>()
-  const { supabase } = clientResult
-
-  let q = queryKpiRpc(supabase, "api_water_quality_as_of", { p_farm_id: params.farmId })
-  if (params.signal) q = q.abortSignal(params.signal)
-
-  const { data, error } = await q
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<AsOfRow>()
-    return toQueryError("getWaterQualityAsOf", error)
-  }
-
-  return toQuerySuccess<AsOfRow>((data ?? []) as AsOfRow[])
-}
-
-/** KPI RPC: status per system (thresholds + latest rating) */
-export async function getWaterQualityStatus(params: {
+/** KPI RPC: latest system status snapshot (thresholds + rating + worst parameter) */
+export async function getLatestWaterQualityStatus(params: {
   farmId: string
   systemId?: number
   signal?: AbortSignal
-}): Promise<QueryResult<WqStatusRow>> {
-  const clientResult = await getClientOrError("getWaterQualityStatus", { requireSession: true })
+}): Promise<QueryResult<LatestStatusRow>> {
+  const clientResult = await getClientOrError("getLatestWaterQualityStatus", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let q = queryKpiRpc(supabase, "api_water_quality_status", {
+  let q = queryKpiRpc(supabase, "api_latest_water_quality_status", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId ?? undefined,
   })
@@ -70,11 +48,32 @@ export async function getWaterQualityStatus(params: {
 
   const { data, error } = await q
   if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<WqStatusRow>()
-    return toQueryError("getWaterQualityStatus", error)
+    if (params.signal?.aborted || isQuietError(error)) return empty<LatestStatusRow>()
+    return toQueryError("getLatestWaterQualityStatus", error)
   }
 
-  return toQuerySuccess<WqStatusRow>((data ?? []) as WqStatusRow[])
+  return toQuerySuccess<LatestStatusRow>((data ?? []) as LatestStatusRow[])
+}
+
+/** KPI RPC: sync status for latest measurement vs rating date */
+export async function getWaterQualitySyncStatus(params: {
+  farmId: string
+  signal?: AbortSignal
+}): Promise<QueryResult<SyncStatusRow>> {
+  const clientResult = await getClientOrError("getWaterQualitySyncStatus", { requireSession: true })
+  if ("error" in clientResult) return empty<SyncStatusRow>()
+  const { supabase } = clientResult
+
+  let q = queryKpiRpc(supabase, "api_water_quality_sync_status", { p_farm_id: params.farmId })
+  if (params.signal) q = q.abortSignal(params.signal)
+
+  const { data, error } = await q
+  if (error) {
+    if (params.signal?.aborted || isQuietError(error)) return empty<SyncStatusRow>()
+    return toQueryError("getWaterQualitySyncStatus", error)
+  }
+
+  return toQuerySuccess<SyncStatusRow>((data ?? []) as SyncStatusRow[])
 }
 
 /** PostgREST view: raw measurements */
@@ -146,32 +145,6 @@ export async function getDailyWaterQualityRating(params: {
   return toQuerySuccess<DailyRatingRow>((data ?? []) as DailyRatingRow[])
 }
 
-/** PostgREST view: latest rating per system */
-export async function getLatestWaterQualityRating(params: {
-  farmId: string
-  systemId?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<LatestRatingRow>> {
-  const clientResult = await getClientOrError("getLatestWaterQualityRating", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let q = queryOptionsView(supabase, "api_latest_water_quality_rating")
-    .select("*")
-    .eq("farm_id", params.farmId)
-
-  if (params.systemId) q = q.eq("system_id", params.systemId)
-  if (params.signal) q = q.abortSignal(params.signal)
-
-  const { data, error } = await q
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<LatestRatingRow>()
-    return toQueryError("getLatestWaterQualityRating", error)
-  }
-
-  return toQuerySuccess<LatestRatingRow>((data ?? []) as LatestRatingRow[])
-}
-
 /** PostgREST view: thresholds (system/farm/default resolved) */
 export async function getAlertThresholds(params: {
   farmId: string
@@ -191,39 +164,6 @@ export async function getAlertThresholds(params: {
   }
 
   return toQuerySuccess<ThresholdRow>((data ?? []) as ThresholdRow[])
-}
-
-/** Write: upsert farm-level threshold values */
-export async function upsertFarmThreshold(params: {
-  farmId: string
-  low_do_threshold?: number | null
-  high_ammonia_threshold?: number | null
-  high_mortality_threshold?: number | null
-}): Promise<QueryResult<Tables<"alert_threshold">>> {
-  const clientResult = await getClientOrError("upsertFarmThreshold", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  const payload: TablesInsert<"alert_threshold"> = {
-    scope: "farm",
-    farm_id: params.farmId,
-    low_do_threshold: params.low_do_threshold ?? null,
-    high_ammonia_threshold: params.high_ammonia_threshold ?? null,
-    high_mortality_threshold: params.high_mortality_threshold ?? null,
-  }
-
-  const { data, error } = await supabase
-    .from("alert_threshold")
-    .upsert(payload, { onConflict: "scope,farm_id" })
-    .select("*")
-    .single()
-
-  if (error) {
-    if (isQuietError(error)) return empty<Tables<"alert_threshold">>()
-    return toQueryError("upsertFarmThreshold", error)
-  }
-
-  return toQuerySuccess<Tables<"alert_threshold">>([data as Tables<"alert_threshold">])
 }
 
 /** KPI RPC: daily overlay (feed + mortality series) */

@@ -7,6 +7,8 @@ import {
   getBatchOptions,
   getFarmOptions,
   getFeedTypeOptions,
+  getAppConfig,
+  getSystemVolumes,
   getSystemOptions,
 } from "@/lib/api/options"
 
@@ -50,6 +52,38 @@ export function useFarmOptions(params?: { enabled?: boolean }) {
     queryKey: ["options", "farms"],
     queryFn: ({ signal }) => getFarmOptions({ signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useSystemVolumes(params?: {
+  farmId?: string | null
+  stage?: Enums<"system_growth_stage"> | "all"
+  activeOnly?: boolean
+}) {
+  const { session } = useAuth()
+  const enabled = Boolean(session) && Boolean(params?.farmId)
+  return useQuery({
+    queryKey: [
+      "options",
+      "system-volumes",
+      params?.farmId ?? "all",
+      params?.stage ?? "all",
+      params?.activeOnly ?? true,
+    ],
+    queryFn: ({ signal }) => getSystemVolumes({ ...params, signal }),
+    enabled,
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useAppConfig(params?: { keys?: string[]; enabled?: boolean }) {
+  const { session } = useAuth()
+  const keys = params?.keys ?? []
+  return useQuery({
+    queryKey: ["app-config", keys.join(",") || "none"],
+    queryFn: ({ signal }) => getAppConfig({ keys, signal }),
+    enabled: Boolean(session) && keys.length > 0 && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
   })
 }

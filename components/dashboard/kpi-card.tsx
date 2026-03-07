@@ -69,18 +69,16 @@ function KPICardContent({
   invertTrend,
   neutral,
 }: KPICardProps) {
+  const hasTrend = trend !== undefined && trend !== null
   const formattedValue =
     average === null || average === undefined ? "--" : `${average.toFixed(decimals)}${formatUnit ? formatUnit : ""}`
 
-  const trendText =
-    trend !== undefined && trend !== null
-      ? `${trend > 0 ? "+" : ""}${trend.toFixed(1)}%`
-      : null
+  const trendText = hasTrend ? `${trend > 0 ? "+" : ""}${trend.toFixed(1)}%` : null
 
   let trendDirection: "up" | "down" | "flat" = "flat"
   let status: "positive" | "negative" | "neutral" = "neutral"
 
-  if (trend !== undefined && trend !== null) {
+  if (hasTrend) {
     trendDirection = trend > 0 ? "up" : trend < 0 ? "down" : "flat"
 
     if (neutral) {
@@ -114,9 +112,11 @@ function KPICardContent({
             </p>
           )}
         </div>
-        <div className="rounded-md bg-muted/40 p-1.5">
-          <Sparkline trend={trend} invertTrend={invertTrend} neutral={neutral} />
-        </div>
+        {hasTrend && (
+          <div className="rounded-md bg-muted/40 p-1.5">
+            <Sparkline trend={trend} invertTrend={invertTrend} neutral={neutral} />
+          </div>
+        )}
       </div>
     </div>
   )

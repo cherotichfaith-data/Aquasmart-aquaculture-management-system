@@ -7,6 +7,8 @@ type SystemListItem = Database["public"]["Functions"]["api_system_options_rpc"][
 type BatchListItem = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type FarmOptionRow = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
+type SystemRow = Database["public"]["Tables"]["system"]["Row"]
+type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 
 const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
 
@@ -25,6 +27,9 @@ const isAbortLikeError = (err: unknown): boolean => {
 }
 
 const isQuietOptionsError = (err: unknown): boolean =>
+  isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
+
+const isQuietTableError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
 
 /**
@@ -125,4 +130,61 @@ export async function getFarmOptions(params?: {
 
   const rows = res.data.slice().sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
   return toQuerySuccess<FarmOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
+}
+
+export async function getSystemVolumes(params?: {
+  farmId?: string | null
+  stage?: Enums<"system_growth_stage"> | "all"
+  activeOnly?: boolean
+  signal?: AbortSignal
+}): Promise<QueryResult<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>> {
+  if (!params?.farmId) return empty<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>()
+  const clientResult = await getClientOrError("getSystemVolumes", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase
+    .from("system")
+    .select("id, name, volume, growth_stage, is_active, farm_id")
+    .eq("farm_id", params.farmId)
+
+  if (params.stage && params.stage !== "all") {
+    query = query.eq("growth_stage", params.stage)
+  }
+  if (params.activeOnly ?? true) {
+    query = query.eq("is_active", true)
+  }
+  if (params.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (error) {
+    if (params.signal?.aborted || isQuietTableError(error)) {
+      return empty<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>()
+    }
+    return toQueryError("getSystemVolumes", error)
+  }
+
+  return toQuerySuccess<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>(
+    (data ?? []) as Array<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>,
+  )
+}
+
+export async function getAppConfig(params: {
+  keys: string[]
+  signal?: AbortSignal
+}): Promise<QueryResult<AppConfigRow>> {
+  if (!params.keys.length) return empty<AppConfigRow>()
+  const clientResult = await getClientOrError("getAppConfig", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase.from("app_config").select("key, value").in("key", params.keys)
+  if (params.signal) query = query.abortSignal(params.signal)
+  const { data, error } = await query
+  if (error) {
+    if (params.signal?.aborted || isQuietTableError(error)) return empty<AppConfigRow>()
+    return toQueryError("getAppConfig", error)
+  }
+
+  return toQuerySuccess<AppConfigRow>((data ?? []) as AppConfigRow[])
 }
