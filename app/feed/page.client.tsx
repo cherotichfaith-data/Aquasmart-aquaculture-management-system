@@ -3,14 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import FarmSelector from "@/components/shared/farm-selector"
 import { type FeedIncomingWithType } from "@/lib/api/reports"
 import { useFeedIncoming, useFeedingRecords, useFeedTypes } from "@/lib/hooks/use-reports"
 import { useEfcrTrend } from "@/lib/hooks/use-production"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useBatchOptions } from "@/lib/hooks/use-options"
-import TimePeriodSelector from "@/components/shared/time-period-selector"
 import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { formatDayLabel, isAttentionResponse, toIsoDate, toNumber } from "./feed-utils"
@@ -28,13 +26,9 @@ export default function FeedManagementPage() {
   const { farmId } = useActiveFarm()
   const {
     selectedBatch,
-    setSelectedBatch,
     selectedSystem,
-    setSelectedSystem,
     selectedStage,
-    setSelectedStage,
     timePeriod,
-    setTimePeriod,
   } = useSharedFilters("quarter")
   const [efcrTarget, setEfcrTarget] = useState<string>("1.4")
   const chartLimit = 2000
@@ -289,14 +283,6 @@ export default function FeedManagementPage() {
             </div>
           </div>
 
-          <FarmSelector
-            selectedBatch={selectedBatch}
-            selectedSystem={selectedSystem}
-            selectedStage={selectedStage}
-            onBatchChange={setSelectedBatch}
-            onSystemChange={setSelectedSystem}
-            onStageChange={setSelectedStage}
-          />
         </div>
 
         {errorMessages.length > 0 ? (
@@ -315,11 +301,7 @@ export default function FeedManagementPage() {
           />
         ) : null}
         <div className="rounded-lg border border-border/80 bg-card p-4 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1">Period</label>
-              <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-muted-foreground mb-1">Target eFCR</label>
               <input type="number" step="0.01" value={efcrTarget} onChange={(event) => setEfcrTarget(event.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" />

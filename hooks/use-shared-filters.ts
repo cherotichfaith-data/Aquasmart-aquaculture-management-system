@@ -14,6 +14,7 @@ type SharedFiltersState = {
 }
 
 const STORAGE_KEY = "aquasmart:shared-filters:v1"
+const EVENT_NAME = "aquasmart:shared-filters"
 const TIME_PERIODS: TimePeriod[] = ["day", "week", "2 weeks", "month", "quarter", "6 months", "year"]
 const STAGES: StageFilter[] = ["all", "nursing", "grow_out"]
 
@@ -25,6 +26,8 @@ const isStage = (value: unknown): value is StageFilter =>
 
 export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
   const initialDefaultPeriod = useRef(defaultTimePeriod)
+  const instanceId = useRef(`shared-filters-${Math.random().toString(36).slice(2)}`)
+  const suppressEmit = useRef(false)
   const [selectedBatch, setSelectedBatch] = useState<string>("all")
   const [selectedSystem, setSelectedSystem] = useState<string>("all")
   const [selectedStage, setSelectedStage] = useState<StageFilter>("all")
@@ -73,7 +76,29 @@ export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
       timePeriod,
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+    if (suppressEmit.current) {
+      suppressEmit.current = false
+      return
+    }
+    window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { sourceId: instanceId.current, state: payload } }))
   }, [hydrated, selectedBatch, selectedStage, selectedSystem, timePeriod])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ sourceId: string; state: SharedFiltersState }>).detail
+      if (!detail || detail.sourceId === instanceId.current) return
+      const next = detail.state
+      suppressEmit.current = true
+      setSelectedBatch(next.selectedBatch)
+      setSelectedSystem(next.selectedSystem)
+      setSelectedStage(next.selectedStage)
+      setTimePeriod(next.timePeriod)
+      setHydrated(true)
+    }
+    window.addEventListener(EVENT_NAME, handler as EventListener)
+    return () => window.removeEventListener(EVENT_NAME, handler as EventListener)
+  }, [])
 
   return {
     selectedBatch,

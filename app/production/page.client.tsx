@@ -4,13 +4,12 @@ import { Suspense, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams, useRouter } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import FarmSelector from "@/components/shared/farm-selector"
-import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
 import type { Enums } from "@/lib/types/database"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { parseDateToTimePeriod, sortByDateAsc } from "@/lib/utils"
+import type { TimePeriod } from "@/components/shared/time-period-selector"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useProductionSummary } from "@/lib/hooks/use-production"
@@ -104,16 +103,6 @@ function ProductionContent() {
     endDateParam,
     filterParam,
   ])
-
-  const handlePeriodChange = (period: TimePeriod) => {
-    setTimePeriod(period)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("period", period)
-    params.delete("startDate")
-    params.delete("endDate")
-    router.replace(`/production?${params.toString()}`)
-  }
-
 
   const metricFilter = parseProductionMetric(filterParam)
   const metricMeta = PRODUCTION_METRICS[metricFilter]
@@ -367,21 +356,8 @@ function ProductionContent() {
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <FarmSelector
-            selectedBatch={selectedBatch}
-            selectedSystem={selectedSystem}
-            selectedStage={selectedStage}
-            onBatchChange={setSelectedBatch}
-            onSystemChange={setSelectedSystem}
-            onStageChange={setSelectedStage}
-            showStage={true}
-            variant="default"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={handlePeriodChange} />
-            <ProductionMetricFilter />
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <ProductionMetricFilter />
         </div>
       </div>
 

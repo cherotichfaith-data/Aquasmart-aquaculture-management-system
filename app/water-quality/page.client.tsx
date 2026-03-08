@@ -1,26 +1,40 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Bar,
   BarChart,
+  Cell,
   CartesianGrid,
   ComposedChart,
   Legend,
   Line,
   LineChart,
   ReferenceLine,
-  ReferenceArea,
   ResponsiveContainer,
-  Scatter,
-  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts"
 import { useQuery } from "@tanstack/react-query"
+import {
+  AlertTriangle,
+  Bell,
+  CheckCircle,
+  Clock,
+  Droplets,
+  FlaskConical,
+  Gauge,
+  Layers,
+  Leaf,
+  Radio,
+  Thermometer,
+  Wifi,
+  WifiOff,
+  XCircle,
+} from "lucide-react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import FarmSelector from "@/components/shared/farm-selector"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import {
   useAlertThresholds,
@@ -32,7 +46,6 @@ import {
 } from "@/lib/hooks/use-water-quality"
 import { useRecentActivities } from "@/lib/hooks/use-dashboard"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
-import TimePeriodSelector from "@/components/shared/time-period-selector"
 import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import {
@@ -47,7 +60,10 @@ import {
 } from "./water-quality-utils"
 import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const formatDateLabel = (value: string) => {
   const parsed = new Date(`${value}T00:00:00`)
@@ -55,32 +71,184 @@ const formatDateLabel = (value: string) => {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(parsed)
 }
 
-const formatRatingLabel = (value: number) => {
-  if (value === 1) return "Lethal"
-  if (value === 2) return "Critical"
-  if (value === 3) return "Acceptable"
-  if (value === 4) return "Optimal"
-  return String(value)
+const WATER_QUALITY_TABS = new Set([
+  "overview",
+  "alerts",
+  "sensors",
+  "parameter",
+  "environment",
+  "depth",
+])
+
+const CHART_TABS = new Set(["parameter", "environment", "depth"])
+
+type DepthProfileRow = {
+  depth: number
+  dissolvedOxygen: number | null
+  temperature: number | null
+  pH: number | null
+}
+
+const DepthProfileTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: Array<{ name?: string; value?: number; color?: string }>
+  label?: number | string
+}) => {
+  if (!active || !payload || payload.length === 0) return null
+  const depthLabel = typeof label === "number" ? label.toFixed(1) : String(label ?? "")
+  return (
+    <div className="rounded-md border border-border bg-card p-3 shadow-md">
+      <p className="mb-2 text-xs text-muted-foreground">Depth: {depthLabel} m</p>
+      {payload.map((entry, i) => (
+        <div key={i} className="flex items-center gap-2 text-sm">
+          <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color ?? "currentColor" }} />
+          <span className="text-muted-foreground">{entry.name ?? "Value"}:</span>
+          <span className="font-semibold text-foreground">
+            {typeof entry.value === "number" ? entry.value.toFixed(2) : "--"}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const getDoColor = (value: number) => {
+  if (value < 3) return "#EF4444"
+  if (value < 5) return "#F59E0B"
+  return "#10B981"
+}
+
+type EnvParameter =
+  | "dissolved_oxygen"
+  | "temperature"
+  | "pH"
+  | "ammonia_ammonium"
+  | "nitrite"
+  | "nitrate"
+  | "salinity"
+  | "secchi_disk_depth"
+
+type CurrentReadings = Partial<Record<EnvParameter, number>>
+
+const ENV_PARAMETERS = new Set<EnvParameter>([
+  "dissolved_oxygen",
+  "temperature",
+  "pH",
+  "ammonia_ammonium",
+  "nitrite",
+  "nitrate",
+  "salinity",
+  "secchi_disk_depth",
+])
+
+const getWqiLabel = (value: number | null) => {
+  if (value == null) return { label: "No data", color: "hsl(var(--muted-foreground))" }
+  if (value >= 70) return { label: "Good", color: "#10B981" }
+  if (value >= 50) return { label: "Moderate", color: "#F59E0B" }
+  return { label: "Poor", color: "#EF4444" }
+}
+
+const scoreDissolvedOxygen = (value: number | null, lowDoThreshold: number) => {
+  if (value == null) return null
+  if (value >= lowDoThreshold * 1.2) return 90
+  if (value >= lowDoThreshold) return 60
+  if (value >= lowDoThreshold * 0.8) return 30
+  return 0
+}
+
+const scoreTemperature = (value: number | null, tempMean: number | null, tempStd: number | null) => {
+  if (value == null || tempMean == null || tempStd == null || tempStd === 0) return null
+  const delta = Math.abs(value - tempMean)
+  if (delta <= tempStd) return 90
+  if (delta <= tempStd * 2) return 60
+  if (delta <= tempStd * 3) return 30
+  return 0
+}
+
+const calculateWqi = (
+  doValue: number | null,
+  tempValue: number | null,
+  lowDoThreshold: number,
+  tempMean: number | null,
+  tempStd: number | null,
+) => {
+  const doScore = scoreDissolvedOxygen(doValue, lowDoThreshold)
+  const tempScore = scoreTemperature(tempValue, tempMean, tempStd)
+  if (doScore == null || tempScore == null) return null
+  return (doScore + tempScore) / 2
+}
+
+const CircularGauge = ({
+  value,
+  max,
+  color,
+  label,
+  size = 160,
+}: {
+  value: number
+  max: number
+  color: string
+  label: string
+  size?: number
+}) => {
+  const radius = (size - 20) / 2
+  const circumference = 2 * Math.PI * radius
+  const progress = max > 0 ? Math.min(value / max, 1) : 0
+  const strokeDashoffset = circumference * (1 - progress)
+  const center = size / 2
+
+  return (
+    <div className="relative flex flex-col items-center">
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={center} cy={center} r={radius} fill="none" stroke="hsl(var(--border))" strokeWidth="10" />
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="10"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-bold text-foreground">{Math.round(value)}</span>
+        <span className="mt-0.5 text-xs text-muted-foreground">{label}</span>
+      </div>
+    </div>
+  )
 }
 
 export default function WaterQualityPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { farmId } = useActiveFarm()
 
   const {
     selectedBatch,
-    setSelectedBatch,
     selectedSystem,
     setSelectedSystem,
     selectedStage,
-    setSelectedStage,
     timePeriod,
-    setTimePeriod,
   } = useSharedFilters("month")
+  const selectedSystemValue = selectedSystem
+  const isAllSystemsSelected = selectedSystem === "all"
   const [selectedParameter, setSelectedParameter] = useState<WqParameter>("dissolved_oxygen")
   const [showFeedingOverlay, setShowFeedingOverlay] = useState(true)
   const [showMortalityOverlay, setShowMortalityOverlay] = useState(true)
-  const [doProfileDate, setDoProfileDate] = useState<string | null>(null)
-  const [tempProfileDate, setTempProfileDate] = useState<string | null>(null)
+  const [depthProfileDate, setDepthProfileDate] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get("tab")
+    return tab && WATER_QUALITY_TABS.has(tab) ? tab : "overview"
+  })
   const chartLimit = 2000
 
   const {
@@ -145,7 +313,17 @@ export default function WaterQualityPage() {
     latestStatusQuery.dataUpdatedAt ?? 0,
     syncStatusQuery.dataUpdatedAt ?? 0,
   )
-
+  const systemsRows = useMemo(
+    () => getResultRows(systemsQuery.data).filter((system) => system.id != null),
+    [systemsQuery.data],
+  )
+  const scopedMeasurementRows = useMemo(
+    () =>
+      getResultRows(measurementsQuery.data).filter(
+        (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
+      ),
+    [measurementsQuery.data, scopedSystemIds],
+  )
   const thresholdRow = useMemo(() => {
     const rows = getResultRows(thresholdsQuery.data)
     return rows.find((row) => row.scope === "farm" && row.system_id == null) ?? rows[0] ?? null
@@ -163,24 +341,21 @@ export default function WaterQualityPage() {
 
   const systemLabelById = useMemo(() => {
     const map = new Map<number, string>()
-    const systems = getResultRows(systemsQuery.data)
-    systems.forEach((system) => {
+    systemsRows.forEach((system) => {
       if (system.id != null) map.set(system.id, system.label ?? `System ${system.id}`)
     })
     return map
-  }, [systemsQuery.data])
+  }, [systemsRows])
 
-  const syncRow = useMemo(() => getResultRows(syncStatusQuery.data)[0] ?? null, [syncStatusQuery.data])
-  const latestMeasurementTs = syncRow?.latest_measurement_ts ?? null
-  const latestRatingDate = syncRow?.latest_rating_date ?? null
-  const freshnessLagDays = useMemo(() => {
-    if (!latestMeasurementTs || !latestRatingDate) return null
-    const measurementDate = new Date(latestMeasurementTs)
-    const ratingDate = new Date(`${latestRatingDate}T00:00:00`)
-    if (Number.isNaN(measurementDate.getTime()) || Number.isNaN(ratingDate.getTime())) return null
-    return Math.floor((measurementDate.getTime() - ratingDate.getTime()) / 86_400_000)
-  }, [latestMeasurementTs, latestRatingDate])
-  const ratingsStale = freshnessLagDays != null && freshnessLagDays > 1
+  const systemOptions = useMemo(() => {
+    return systemsRows
+      .map((system) => ({
+        id: system.id as number,
+        label: system.label ?? `System ${system.id}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [systemsRows])
+
 
   const ratingRows = useMemo(
     () =>
@@ -189,42 +364,6 @@ export default function WaterQualityPage() {
       ),
     [ratingsQuery.data, scopedSystemIds],
   )
-
-  const ratingDistribution = useMemo(() => {
-    const dist = { optimal: 0, acceptable: 0, critical: 0, lethal: 0 }
-    ratingRows.forEach((row) => {
-      const rating = String(row.rating ?? "").toLowerCase()
-      if (rating === "optimal") dist.optimal += 1
-      else if (rating === "acceptable") dist.acceptable += 1
-      else if (rating === "critical") dist.critical += 1
-      else if (rating === "lethal") dist.lethal += 1
-    })
-    return dist
-  }, [ratingRows])
-
-  const worstParameterMix = useMemo(() => {
-    const counts = new Map<string, number>()
-    latestStatusRows.forEach((row) => {
-      const key = String(row.worst_parameter ?? "unknown")
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    })
-    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
-  }, [latestStatusRows])
-
-  const summaryMetrics = useMemo(() => {
-    const systemsMonitored = latestStatusRows.length
-    const nonOptimal = latestStatusRows.filter((row) => String(row.rating ?? "").toLowerCase() !== "optimal").length
-    const breaches = latestStatusRows.filter((row) => row.do_exceeded || row.ammonia_exceeded).length
-    return { systemsMonitored, nonOptimal, breaches }
-  }, [latestStatusRows])
-
-  const worstMixLabel = useMemo(() => {
-    if (!worstParameterMix.length) return "No data"
-    return worstParameterMix
-      .slice(0, 3)
-      .map(([key, count]) => `${parameterLabels[key as WqParameter] ?? key}: ${count}`)
-      .join(" | ")
-  }, [worstParameterMix])
 
   const ratingTrendBySystemId = useMemo(() => {
     const map = new Map<number, number>()
@@ -255,13 +394,29 @@ export default function WaterQualityPage() {
     return map
   }, [activitiesQuery.data])
 
+  const latestReadingsBySystem = useMemo(() => {
+    const map = new Map<number, { readings: CurrentReadings; timestamps: Partial<Record<EnvParameter, string>> }>()
+    scopedMeasurementRows.forEach((row) => {
+      if (!row.system_id || row.parameter_value == null || !row.date) return
+      const parameter = row.parameter_name as EnvParameter
+      if (!ENV_PARAMETERS.has(parameter)) return
+      const timestamp = `${row.date}T${row.time ?? "00:00"}`
+      const entry = map.get(row.system_id) ?? { readings: {}, timestamps: {} }
+      const prevTimestamp = entry.timestamps[parameter]
+      if (!prevTimestamp || timestamp > prevTimestamp) {
+        entry.timestamps[parameter] = timestamp
+        entry.readings[parameter] = row.parameter_value
+      }
+      map.set(row.system_id, entry)
+    })
+
+    return map
+  }, [scopedMeasurementRows])
+
   const measurementEvents = useMemo<MeasurementEvent[]>(() => {
-    const rows = getResultRows(measurementsQuery.data).filter(
-      (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
-    )
     const grouped = new Map<string, MeasurementEvent>()
 
-    rows.forEach((row) => {
+    scopedMeasurementRows.forEach((row) => {
       if (row.system_id == null) return
       const date = row.date ?? ""
       const time = row.time ?? "00:00"
@@ -296,7 +451,7 @@ export default function WaterQualityPage() {
     })
 
     return Array.from(grouped.values()).sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
-  }, [measurementsQuery.data, operatorByRecordId, scopedSystemIds, systemLabelById])
+  }, [operatorByRecordId, scopedMeasurementRows, systemLabelById])
 
   const lastMeasurementBySystemId = useMemo(() => {
     const map = new Map<number, string>()
@@ -307,6 +462,139 @@ export default function WaterQualityPage() {
     })
     return map
   }, [measurementEvents])
+
+  const formatSensorLag = (timestamp: string | null) => {
+    if (!timestamp) return "No data"
+    const last = new Date(timestamp)
+    if (Number.isNaN(last.getTime())) return "No data"
+    const diffMs = Date.now() - last.getTime()
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+    if (diffHours > 24) return `${Math.floor(diffHours / 24)}d ${diffHours % 24}h ago`
+    if (diffHours > 0) return `${diffHours}h ${diffMins}m ago`
+    return `${diffMins}m ago`
+  }
+
+  const sensorStatusBySystem = useMemo(() => {
+    const now = Date.now()
+    const map = new Map<number, { status: "online" | "warning" | "offline"; lastSeen: string | null; minutesSince: number | null }>()
+    systemOptions.forEach((system) => {
+      const lastTimestamp = lastMeasurementBySystemId.get(system.id) ?? null
+      if (!lastTimestamp) {
+        map.set(system.id, { status: "offline", lastSeen: null, minutesSince: null })
+        return
+      }
+      const parsed = new Date(lastTimestamp)
+      if (Number.isNaN(parsed.getTime())) {
+        map.set(system.id, { status: "offline", lastSeen: lastTimestamp, minutesSince: null })
+        return
+      }
+      const diffMinutes = Math.floor((now - parsed.getTime()) / (1000 * 60))
+      const status = diffMinutes <= 360 ? "online" : diffMinutes <= 1440 ? "warning" : "offline"
+      map.set(system.id, { status, lastSeen: lastTimestamp, minutesSince: diffMinutes })
+    })
+    return map
+  }, [lastMeasurementBySystemId, systemOptions])
+
+  const sensorCounts = useMemo(() => {
+    const counts = { online: 0, warning: 0, offline: 0 }
+    sensorStatusBySystem.forEach((value) => {
+      counts[value.status] += 1
+    })
+    return counts
+  }, [sensorStatusBySystem])
+
+  const aggregatedReadings = useMemo(() => {
+    const totals = new Map<EnvParameter, { sum: number; count: number }>()
+    latestReadingsBySystem.forEach((entry) => {
+      Object.entries(entry.readings).forEach(([key, value]) => {
+        if (value == null || !Number.isFinite(value)) return
+        const param = key as EnvParameter
+        const current = totals.get(param) ?? { sum: 0, count: 0 }
+        current.sum += value
+        current.count += 1
+        totals.set(param, current)
+      })
+    })
+    const aggregate: CurrentReadings = {}
+    totals.forEach((value, key) => {
+      aggregate[key] = value.count > 0 ? value.sum / value.count : undefined
+    })
+    return aggregate
+  }, [latestReadingsBySystem])
+  const selectedReadings =
+    selectedSystemId != null ? latestReadingsBySystem.get(selectedSystemId)?.readings ?? {} : aggregatedReadings
+
+  const temperatureStats = useMemo(() => {
+    const values = scopedMeasurementRows
+      .filter((row) => row.parameter_name === "temperature")
+      .map((row) => row.parameter_value)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+
+    if (!values.length) return { mean: null, std: null }
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+    const variance =
+      values.length > 1 ? values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length : 0
+    return { mean, std: Math.sqrt(variance) }
+  }, [scopedMeasurementRows])
+
+  const wqiValue = calculateWqi(
+    selectedReadings.dissolved_oxygen ?? null,
+    selectedReadings.temperature ?? null,
+    lowDoThreshold,
+    temperatureStats.mean,
+    temperatureStats.std,
+  )
+  const wqiLabel = getWqiLabel(wqiValue)
+
+  const nutrientLoad = useMemo(() => {
+    const nitrate = selectedReadings.nitrate
+    const nitrite = selectedReadings.nitrite
+    const ammonia = selectedReadings.ammonia_ammonium
+    const hasData = nitrate != null || nitrite != null || ammonia != null
+    const value = hasData ? (nitrate ?? 0) + (nitrite ?? 0) + (ammonia ?? 0) : 0
+    if (!hasData) return { value: 0, level: "No data", color: "hsl(var(--muted-foreground))" }
+    if (value >= 2) return { value, level: "High", color: "#EF4444" }
+    if (value >= 1) return { value, level: "Moderate", color: "#F59E0B" }
+    return { value, level: "Low", color: "#10B981" }
+  }, [selectedReadings])
+
+  const algalActivity = useMemo(() => {
+    const secchi = selectedReadings.secchi_disk_depth
+    if (secchi == null || !Number.isFinite(secchi)) {
+      return { value: 0, level: "No data", color: "hsl(var(--muted-foreground))", source: null as number | null }
+    }
+    const value = Math.max(0, Math.min(50, 50 - secchi * 10))
+    if (value >= 30) return { value, level: "High", color: "#EF4444", source: secchi }
+    if (value >= 10) return { value, level: "Moderate", color: "#10B981", source: secchi }
+    return { value, level: "Low", color: "#3B82F6", source: secchi }
+  }, [selectedReadings])
+
+  const allSystemsWqi = useMemo(() => {
+    return systemOptions.map((system) => {
+      const readings = latestReadingsBySystem.get(system.id)?.readings ?? {}
+      const value = calculateWqi(
+        readings.dissolved_oxygen ?? null,
+        readings.temperature ?? null,
+        lowDoThreshold,
+        temperatureStats.mean,
+        temperatureStats.std,
+      )
+      return {
+        ...system,
+        wqi: value,
+        wqiLabel: getWqiLabel(value),
+      }
+    })
+  }, [latestReadingsBySystem, lowDoThreshold, systemOptions, temperatureStats])
+
+  const averageWqi = useMemo(() => {
+    const values = allSystemsWqi.map((system) => system.wqi).filter((value): value is number => typeof value === "number")
+    if (!values.length) return null
+    return values.reduce((sum, value) => sum + value, 0) / values.length
+  }, [allSystemsWqi])
+
+  const averageWqiLabel = getWqiLabel(averageWqi)
 
   const systemRiskRows = useMemo(() => {
     const severityRank = (rating: string | null) => {
@@ -356,6 +644,7 @@ export default function WaterQualityPage() {
       })
   }, [lastMeasurementBySystemId, latestStatusRows, ratingTrendBySystemId, systemLabelById])
 
+
   const criticalRiskRows = useMemo(
     () =>
       systemRiskRows.filter((row) => {
@@ -363,6 +652,29 @@ export default function WaterQualityPage() {
         return rating === "critical" || rating === "lethal" || row.thresholdBreached
       }),
     [systemRiskRows],
+  )
+
+  const alertItems = useMemo(() => {
+    return criticalRiskRows.slice(0, 6).map((row) => {
+      const priority = row.severity >= 3 || row.thresholdBreached ? "high" : "medium"
+      const worstParam = row.worstParameter ? parameterLabels[row.worstParameter as WqParameter] ?? row.worstParameter : "Risk"
+      const value =
+        row.worstValue != null
+          ? `${row.worstValue.toFixed(2)}${row.worstUnit ? ` ${row.worstUnit}` : ""}`
+          : row.thresholdBreached
+            ? "Threshold breach"
+            : "Rating decline"
+      return {
+        id: `${row.systemId}-${row.ratingDate ?? "latest"}`,
+        message: `${row.systemName}: ${worstParam} ${value}`,
+        priority,
+      }
+    })
+  }, [criticalRiskRows])
+
+  const highAlertCount = useMemo(
+    () => alertItems.filter((alert) => alert.priority === "high").length,
+    [alertItems],
   )
 
   const overlayByDate = useMemo(() => {
@@ -401,20 +713,16 @@ export default function WaterQualityPage() {
   }, [overlayByDate, ratingRows])
 
   const parameterTrendData = useMemo(() => {
-    const byDate = new Map<string, { sum: number; count: number; min: number; max: number }>()
-    const measurementRows = getResultRows(measurementsQuery.data).filter(
-      (row) => row.system_id != null && scopedSystemIds.includes(row.system_id) && row.parameter_name === selectedParameter,
-    )
-
-    measurementRows.forEach((row) => {
+    const byDate = new Map<string, { sum: number; count: number }>()
+    scopedMeasurementRows
+      .filter((row) => row.parameter_name === selectedParameter)
+      .forEach((row) => {
       if (!row.date) return
       const value = row.parameter_value ?? null
       if (value == null) return
-      const current = byDate.get(row.date) ?? { sum: 0, count: 0, min: value, max: value }
+      const current = byDate.get(row.date) ?? { sum: 0, count: 0 }
       current.sum += value
       current.count += 1
-      current.min = Math.min(current.min, value)
-      current.max = Math.max(current.max, value)
       byDate.set(row.date, current)
     })
 
@@ -422,8 +730,6 @@ export default function WaterQualityPage() {
       .map(([date, agg]) => ({
         date,
         mean: agg.count > 0 ? agg.sum / agg.count : null,
-        min: agg.min,
-        max: agg.max,
         count: agg.count,
         feeding: overlayByDate.get(date)?.feeding ?? null,
         mortality: overlayByDate.get(date)?.mortality ?? null,
@@ -437,15 +743,13 @@ export default function WaterQualityPage() {
     })
 
     return rolling
-  }, [measurementsQuery.data, overlayByDate, scopedSystemIds, selectedParameter])
+  }, [overlayByDate, scopedMeasurementRows, selectedParameter])
 
   const dailyDoVariation = useMemo(() => {
     const byDate = new Map<string, { min: number; max: number }>()
-    const measurementRows = getResultRows(measurementsQuery.data).filter(
-      (row) => row.system_id != null && scopedSystemIds.includes(row.system_id) && row.parameter_name === "dissolved_oxygen",
-    )
-
-    measurementRows.forEach((row) => {
+    scopedMeasurementRows
+      .filter((row) => row.parameter_name === "dissolved_oxygen")
+      .forEach((row) => {
       if (!row.date || row.parameter_value == null) return
       const current = byDate.get(row.date)
       if (!current) {
@@ -464,15 +768,13 @@ export default function WaterQualityPage() {
         max: agg.max,
       }))
       .sort((a, b) => a.date.localeCompare(b.date))
-  }, [measurementsQuery.data, scopedSystemIds])
+  }, [scopedMeasurementRows])
 
   const dailyTempAverage = useMemo(() => {
     const byDate = new Map<string, { sum: number; count: number }>()
-    const measurementRows = getResultRows(measurementsQuery.data).filter(
-      (row) => row.system_id != null && scopedSystemIds.includes(row.system_id) && row.parameter_name === "temperature",
-    )
-
-    measurementRows.forEach((row) => {
+    scopedMeasurementRows
+      .filter((row) => row.parameter_name === "temperature")
+      .forEach((row) => {
       if (!row.date || row.parameter_value == null) return
       const current = byDate.get(row.date) ?? { sum: 0, count: 0 }
       current.sum += row.parameter_value
@@ -487,197 +789,121 @@ export default function WaterQualityPage() {
       }))
       .filter((row) => row.average != null)
       .sort((a, b) => a.date.localeCompare(b.date))
-  }, [measurementsQuery.data, scopedSystemIds])
+  }, [scopedMeasurementRows])
 
-  const wqiSummary = useMemo(() => {
-    const measurementRows = getResultRows(measurementsQuery.data).filter(
-      (row) =>
-        row.system_id != null &&
-        scopedSystemIds.includes(row.system_id) &&
-        (row.parameter_name === "dissolved_oxygen" || row.parameter_name === "temperature") &&
-        row.water_depth != null,
-    )
-
-    const tempValues = measurementRows
-      .filter((row) => row.parameter_name === "temperature" && row.parameter_value != null)
-      .map((row) => row.parameter_value as number)
-
-    const tempMean = tempValues.length ? tempValues.reduce((sum, v) => sum + v, 0) / tempValues.length : null
-    const tempVariance =
-      tempValues.length > 1 && tempMean != null
-        ? tempValues.reduce((sum, v) => sum + (v - tempMean) ** 2, 0) / tempValues.length
-        : null
-    const tempStd = tempVariance != null ? Math.sqrt(tempVariance) : null
-
-    const scoreDo = (value: number | null) => {
-      if (value == null) return null
-      if (value >= lowDoThreshold * 1.2) return 90
-      if (value >= lowDoThreshold) return 60
-      if (value >= lowDoThreshold * 0.8) return 30
-      return 0
+  const depthProfileScopeIds = selectedSystemId != null ? [selectedSystemId] : []
+  const depthProfiles = useMemo(() => {
+    if (!depthProfileScopeIds.length) {
+      return { dates: [], dataByDate: new Map<string, DepthProfileRow[]>() }
     }
-
-    const scoreTemp = (value: number | null) => {
-      if (value == null || tempMean == null || tempStd == null || tempStd === 0) return null
-      const delta = Math.abs(value - tempMean)
-      if (delta <= tempStd) return 90
-      if (delta <= tempStd * 2) return 60
-      if (delta <= tempStd * 3) return 30
-      return 0
-    }
-
-    const byKey = new Map<string, { date: string; systemId: number; depth: number; doValues: number[]; tempValues: number[] }>()
-    measurementRows.forEach((row) => {
-      if (!row.date || row.system_id == null || row.parameter_value == null || row.water_depth == null) return
-      const key = `${row.date}|${row.system_id}|${row.water_depth}`
-      const current =
-        byKey.get(key) ?? {
-          date: row.date,
-          systemId: row.system_id,
-          depth: row.water_depth,
-          doValues: [],
-          tempValues: [],
-        }
-      if (row.parameter_name === "dissolved_oxygen") current.doValues.push(row.parameter_value)
-      if (row.parameter_name === "temperature") current.tempValues.push(row.parameter_value)
-      byKey.set(key, current)
-    })
-
-    const wqiValues: number[] = []
-    byKey.forEach((row) => {
-      const doAvg = row.doValues.length ? row.doValues.reduce((sum, v) => sum + v, 0) / row.doValues.length : null
-      const tempAvg = row.tempValues.length
-        ? row.tempValues.reduce((sum, v) => sum + v, 0) / row.tempValues.length
-        : null
-      const doScore = scoreDo(doAvg)
-      const tempScore = scoreTemp(tempAvg)
-      if (doScore == null || tempScore == null) return
-      wqiValues.push((doScore + tempScore) / 2)
-    })
-
-    const bucketCounts = { poor: 0, moderate: 0, good: 0 }
-    wqiValues.forEach((value) => {
-      if (value < 50) bucketCounts.poor += 1
-      else if (value < 70) bucketCounts.moderate += 1
-      else bucketCounts.good += 1
-    })
-
-    const avg = wqiValues.length ? wqiValues.reduce((sum, v) => sum + v, 0) / wqiValues.length : null
-    const min = wqiValues.length ? Math.min(...wqiValues) : null
-    const max = wqiValues.length ? Math.max(...wqiValues) : null
-
-    return {
-      buckets: [
-        { label: "Poor (0-50)", count: bucketCounts.poor },
-        { label: "Moderate (50-70)", count: bucketCounts.moderate },
-        { label: "Good (70-100)", count: bucketCounts.good },
-      ],
-      stats: { avg, min, max, total: wqiValues.length },
-      hasData: wqiValues.length > 0,
-    }
-  }, [measurementsQuery.data, scopedSystemIds, lowDoThreshold])
-
-  const doDepthProfiles = useMemo(() => {
-    const byDate = new Map<string, Map<number, { sum: number; count: number }>>()
-    const measurementRows = getResultRows(measurementsQuery.data).filter(
-      (row) =>
-        row.system_id != null &&
-        scopedSystemIds.includes(row.system_id) &&
-        row.parameter_name === "dissolved_oxygen" &&
-        row.water_depth != null,
-    )
-
-    measurementRows.forEach((row) => {
+    const byDate = new Map<
+      string,
+      Map<number, { doSum: number; doCount: number; tempSum: number; tempCount: number; phSum: number; phCount: number }>
+    >()
+    scopedMeasurementRows
+      .filter(
+        (row) =>
+          depthProfileScopeIds.includes(row.system_id as number) &&
+          row.water_depth != null &&
+          (row.parameter_name === "dissolved_oxygen" || row.parameter_name === "temperature" || row.parameter_name === "pH"),
+      )
+      .forEach((row) => {
       if (!row.date || row.parameter_value == null || row.water_depth == null) return
       const depth = Number(row.water_depth)
       if (!Number.isFinite(depth)) return
       const dateMap = byDate.get(row.date) ?? new Map()
-      const current = dateMap.get(depth) ?? { sum: 0, count: 0 }
-      current.sum += row.parameter_value
-      current.count += 1
+      const current = dateMap.get(depth) ?? { doSum: 0, doCount: 0, tempSum: 0, tempCount: 0, phSum: 0, phCount: 0 }
+      if (row.parameter_name === "dissolved_oxygen") {
+        current.doSum += row.parameter_value
+        current.doCount += 1
+      }
+      if (row.parameter_name === "temperature") {
+        current.tempSum += row.parameter_value
+        current.tempCount += 1
+      }
+      if (row.parameter_name === "pH") {
+        current.phSum += row.parameter_value
+        current.phCount += 1
+      }
       dateMap.set(depth, current)
       byDate.set(row.date, dateMap)
     })
 
     const dates = Array.from(byDate.keys()).sort()
-    const dataByDate = new Map<string, Array<{ depth: number; avg: number }>>()
+    const dataByDate = new Map<string, DepthProfileRow[]>()
     dates.forEach((date) => {
       const depthMap = byDate.get(date)
       if (!depthMap) return
       const rows = Array.from(depthMap.entries())
-        .map(([depth, agg]) => ({ depth, avg: agg.count > 0 ? agg.sum / agg.count : null }))
-        .filter((row): row is { depth: number; avg: number } => row.avg != null)
+        .map(([depth, row]) => ({
+          depth,
+          dissolvedOxygen: row.doCount > 0 ? row.doSum / row.doCount : null,
+          temperature: row.tempCount > 0 ? row.tempSum / row.tempCount : null,
+          pH: row.phCount > 0 ? row.phSum / row.phCount : null,
+        }))
+        .filter((row) => row.dissolvedOxygen != null || row.temperature != null || row.pH != null)
         .sort((a, b) => a.depth - b.depth)
       dataByDate.set(date, rows)
     })
 
     return { dates, dataByDate }
-  }, [measurementsQuery.data, scopedSystemIds])
+  }, [depthProfileScopeIds, scopedMeasurementRows])
 
-  const tempDepthProfiles = useMemo(() => {
-    const byDate = new Map<string, Map<number, { sum: number; count: number }>>()
-    const measurementRows = getResultRows(measurementsQuery.data).filter(
-      (row) =>
-        row.system_id != null &&
-        scopedSystemIds.includes(row.system_id) &&
-        row.parameter_name === "temperature" &&
-        row.water_depth != null,
-    )
-
-    measurementRows.forEach((row) => {
-      if (!row.date || row.parameter_value == null || row.water_depth == null) return
-      const depth = Number(row.water_depth)
-      if (!Number.isFinite(depth)) return
-      const dateMap = byDate.get(row.date) ?? new Map()
-      const current = dateMap.get(depth) ?? { sum: 0, count: 0 }
-      current.sum += row.parameter_value
-      current.count += 1
-      dateMap.set(depth, current)
-      byDate.set(row.date, dateMap)
-    })
-
-    const dates = Array.from(byDate.keys()).sort()
-    const dataByDate = new Map<string, Array<{ depth: number; avg: number }>>()
-    dates.forEach((date) => {
-      const depthMap = byDate.get(date)
-      if (!depthMap) return
-      const rows = Array.from(depthMap.entries())
-        .map(([depth, agg]) => ({ depth, avg: agg.count > 0 ? agg.sum / agg.count : null }))
-        .filter((row): row is { depth: number; avg: number } => row.avg != null)
-        .sort((a, b) => a.depth - b.depth)
-      dataByDate.set(date, rows)
-    })
-
-    return { dates, dataByDate }
-  }, [measurementsQuery.data, scopedSystemIds])
-
-  const selectedDoProfileDate = doProfileDate && doDepthProfiles.dataByDate.has(doProfileDate) ? doProfileDate : null
-  const selectedTempProfileDate =
-    tempProfileDate && tempDepthProfiles.dataByDate.has(tempProfileDate) ? tempProfileDate : null
-  const doDepthData = selectedDoProfileDate ? doDepthProfiles.dataByDate.get(selectedDoProfileDate) ?? [] : []
-  const tempDepthData = selectedTempProfileDate ? tempDepthProfiles.dataByDate.get(selectedTempProfileDate) ?? [] : []
+  const selectedDepthProfileDate =
+    depthProfileDate && depthProfiles.dataByDate.has(depthProfileDate) ? depthProfileDate : null
+  const depthProfileData = selectedDepthProfileDate
+    ? depthProfiles.dataByDate.get(selectedDepthProfileDate) ?? []
+    : []
 
   useEffect(() => {
-    if (!doDepthProfiles.dates.length) {
-      if (doProfileDate !== null) setDoProfileDate(null)
+    if (!depthProfiles.dates.length) {
+      if (depthProfileDate !== null) setDepthProfileDate(null)
       return
     }
-    const latest = doDepthProfiles.dates[doDepthProfiles.dates.length - 1]
-    if (doProfileDate !== latest) {
-      setDoProfileDate(latest)
-    }
-  }, [doDepthProfiles, doProfileDate])
+    if (depthProfileDate && depthProfiles.dataByDate.has(depthProfileDate)) return
+    const latest = depthProfiles.dates[depthProfiles.dates.length - 1]
+    if (depthProfileDate !== latest) setDepthProfileDate(latest)
+  }, [depthProfiles, depthProfileDate])
 
   useEffect(() => {
-    if (!tempDepthProfiles.dates.length) {
-      if (tempProfileDate !== null) setTempProfileDate(null)
-      return
+    const tab = searchParams.get("tab")
+    setActiveTab(tab && WATER_QUALITY_TABS.has(tab) ? tab : "overview")
+  }, [searchParams])
+
+  const handleTabChange = (value: string) => {
+    if (!WATER_QUALITY_TABS.has(value)) return
+    setActiveTab(value)
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === "overview") {
+      params.delete("tab")
+    } else {
+      params.set("tab", value)
     }
-    const latest = tempDepthProfiles.dates[tempDepthProfiles.dates.length - 1]
-    if (tempProfileDate !== latest) {
-      setTempProfileDate(latest)
-    }
-  }, [tempDepthProfiles, tempProfileDate])
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname)
+  }
+
+  const depthProfileDoData = useMemo(
+    () => depthProfileData.filter((row): row is DepthProfileRow & { dissolvedOxygen: number } => row.dissolvedOxygen != null),
+    [depthProfileData],
+  )
+  const depthProfileTempData = useMemo(
+    () => depthProfileData.filter((row): row is DepthProfileRow & { temperature: number } => row.temperature != null),
+    [depthProfileData],
+  )
+
+  const doProfileSeries = useMemo(() => [...depthProfileDoData].sort((a, b) => a.depth - b.depth), [depthProfileDoData])
+  const tempProfileSeries = useMemo(() => [...depthProfileTempData].sort((a, b) => a.depth - b.depth), [depthProfileTempData])
+
+  const surfaceDo = doProfileSeries[0]?.dissolvedOxygen ?? null
+  const bottomDo = doProfileSeries.length ? doProfileSeries[doProfileSeries.length - 1].dissolvedOxygen : null
+  const doGradient = surfaceDo != null && bottomDo != null ? surfaceDo - bottomDo : null
+  const isStratified = surfaceDo != null && bottomDo != null && bottomDo < 3 && surfaceDo > 5
+  const hasGradient = doGradient != null && doGradient > 2
+
+  const surfaceTemp = tempProfileSeries[0]?.temperature ?? null
+  const bottomTemp = tempProfileSeries.length ? tempProfileSeries[tempProfileSeries.length - 1].temperature : null
+  const tempGradient = surfaceTemp != null && bottomTemp != null ? surfaceTemp - bottomTemp : null
 
   const selectedParameterUnit = useMemo(() => {
     if (selectedParameter === "dissolved_oxygen" || selectedParameter === "ammonia_ammonium") return "mg/L"
@@ -712,10 +938,7 @@ export default function WaterQualityPage() {
 
   const dailyParameterByDate = useMemo(() => {
     const map = new Map<string, { doValue?: number; ammoniaValue?: number; tempValue?: number }>()
-    const measurementRows = getResultRows(measurementsQuery.data).filter(
-      (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
-    )
-    measurementRows.forEach((row) => {
+    scopedMeasurementRows.forEach((row) => {
       if (!row.date || row.parameter_value == null) return
       const current = map.get(row.date) ?? {}
       if (row.parameter_name === "dissolved_oxygen") current.doValue = row.parameter_value
@@ -724,33 +947,7 @@ export default function WaterQualityPage() {
       map.set(row.date, current)
     })
     return map
-  }, [measurementsQuery.data, scopedSystemIds])
-
-  const relationshipScatterData = useMemo(() => {
-    const doMortality: Array<{ x: number; y: number }> = []
-    const ammoniaFeeding: Array<{ x: number; y: number }> = []
-    const tempRating: Array<{ x: number; y: number }> = []
-
-    dailyRiskTrend.forEach((row) => {
-      const overlay = overlayByDate.get(row.date)
-      const params = dailyParameterByDate.get(row.date)
-      if (params?.doValue != null && overlay?.mortality != null) {
-        doMortality.push({ x: params.doValue, y: overlay.mortality })
-      }
-      if (params?.ammoniaValue != null && overlay?.feeding != null) {
-        ammoniaFeeding.push({ x: params.ammoniaValue, y: overlay.feeding })
-      }
-      if (params?.tempValue != null && typeof row.rating === "number") {
-        tempRating.push({ x: params.tempValue, y: row.rating })
-      }
-    })
-
-    return {
-      doMortality,
-      ammoniaFeeding,
-      tempRating,
-    }
-  }, [dailyParameterByDate, dailyRiskTrend, overlayByDate])
+  }, [scopedMeasurementRows])
 
   const currentAlerts = useMemo(() => {
     const alerts: string[] = []
@@ -852,68 +1049,6 @@ export default function WaterQualityPage() {
     thresholdsQuery.data,
   ])
 
-  const exportCsv = () => {
-    const header = ["parameter_name", "reading", "timestamp", "system", "operator"]
-    const rows: string[] = []
-    const exportStart = dateFrom ?? "start"
-    const exportEnd = dateTo ?? "end"
-    measurementEvents.forEach((event) => {
-      const timestamp = `${event.date} ${event.time}`
-      const entries: Array<[string, number | null]> = [
-        ["dissolved_oxygen", event.dissolved_oxygen],
-        ["pH", event.pH],
-        ["temperature", event.temperature],
-        ["ammonia_ammonium", event.ammonia_ammonium],
-      ]
-      entries.forEach(([name, value]) => {
-        if (value == null) return
-        rows.push(
-          [name, String(value), timestamp, event.systemLabel, event.operator]
-            .map((cell) => `"${cell.replaceAll('"', '""')}"`)
-            .join(","),
-        )
-      })
-    })
-
-    const csv = [header.join(","), ...rows].join("\n")
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `water-quality-compliance-${exportStart}-to-${exportEnd}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const exportPdf = () => {
-    const exportStart = dateFrom ?? "start"
-    const exportEnd = dateTo ?? "end"
-    const rows = measurementEvents
-      .slice(0, 500)
-      .map(
-        (event) =>
-          `<tr><td>${event.systemLabel}</td><td>${event.date} ${event.time}</td><td>${event.dissolved_oxygen ?? ""}</td><td>${event.pH ?? ""}</td><td>${event.temperature ?? ""}</td><td>${event.ammonia_ammonium ?? ""}</td><td>${event.operator}</td></tr>`,
-      )
-      .join("")
-
-    const popup = window.open("", "_blank")
-    if (!popup) return
-    popup.document.write(`
-      <html><head><title>Water Quality Compliance Report</title></head>
-      <body>
-        <h1>Water Quality Compliance Report</h1>
-        <p>Period: ${exportStart} to ${exportEnd}</p>
-        <table border="1" cellspacing="0" cellpadding="6">
-          <thead><tr><th>System</th><th>Timestamp</th><th>DO</th><th>pH</th><th>Temp</th><th>Ammonia</th><th>Operator</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </body></html>
-    `)
-    popup.document.close()
-    popup.focus()
-    popup.print()
-  }
-
   const loading =
     measurementsQuery.isLoading ||
     ratingsQuery.isLoading ||
@@ -921,103 +1056,324 @@ export default function WaterQualityPage() {
     systemsQuery.isLoading ||
     latestStatusQuery.isLoading ||
     syncStatusQuery.isLoading
+  const parameterTabContent = loading ? (
+    <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading parameter analysis...</div>
+  ) : parameterTrendData.length === 0 ? (
+    <div className="h-[320px] flex items-center justify-center text-muted-foreground">No parameter measurements in this range.</div>
+  ) : (
+    <div className="space-y-4">
+      <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
+        <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={parameterTrendData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" tickFormatter={formatDateLabel} />
+              <YAxis yAxisId="param" />
+              <YAxis yAxisId="overlay" orientation="right" />
+              <Tooltip
+                labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
+                formatter={(value, name) => {
+                  const numeric = Number(value)
+                  const field = String(name).toLowerCase()
+                  if (field.includes("feeding")) {
+                    return [`${numeric.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`, String(name)]
+                  }
+                  if (field.includes("mortality")) {
+                    return [numeric.toLocaleString(undefined, { maximumFractionDigits: 0 }), String(name)]
+                  }
+                  if (selectedParameter === "pH") {
+                    return [numeric.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), String(name)]
+                  }
+                  return [
+                    `${numeric.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${selectedParameterUnit ? ` ${selectedParameterUnit}` : ""}`,
+                    String(name),
+                  ]
+                }}
+              />
+              <Legend />
+              <Line yAxisId="param" type="monotone" dataKey="mean" name="Daily mean" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
+              <Line yAxisId="param" type="monotone" dataKey="rolling" name="7-day mean" stroke="var(--color-chart-2)" strokeDasharray="4 4" dot={false} />
+              {selectedParameter === "dissolved_oxygen" ? (
+                <ReferenceLine yAxisId="param" y={lowDoThreshold} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label="Low DO threshold" />
+              ) : null}
+              {selectedParameter === "ammonia_ammonium" ? (
+                <ReferenceLine yAxisId="param" y={highAmmoniaThreshold} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label="High ammonia threshold" />
+              ) : null}
+              {showFeedingOverlay ? (
+                <Line yAxisId="overlay" type="monotone" dataKey="feeding" name="Feeding amount" stroke="var(--color-chart-3)" dot={false} />
+              ) : null}
+              {showMortalityOverlay ? (
+                <Line yAxisId="overlay" type="monotone" dataKey="mortality" name="Mortality count" stroke="var(--color-chart-4)" dot={false} />
+              ) : null}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </LazyRender>
+      </div>
+
+      <div className="rounded-md border border-border/80 bg-muted/20 p-3">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div>
+            <p className="text-sm font-semibold">Daily Dissolved Oxygen Variation</p>
+            <p className="text-xs text-muted-foreground">Max minus min DO per day across the selected scope.</p>
+          </div>
+          <span className="text-xs text-muted-foreground">Units: mg/L</span>
+        </div>
+        {dailyDoVariation.length === 0 ? (
+          <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
+            No dissolved oxygen measurements in this range.
+          </div>
+        ) : (
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dailyDoVariation}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tickFormatter={formatDateLabel} />
+                <YAxis />
+                <Tooltip
+                  labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
+                  formatter={(value) => [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mg/L`, "Daily DO variation"]}
+                />
+                <Line type="monotone" dataKey="variation" stroke="var(--color-chart-2)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-md border border-border/80 bg-muted/20 p-3">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div>
+            <p className="text-sm font-semibold">Daily Average Temperature</p>
+            <p className="text-xs text-muted-foreground">Mean temperature per day across the selected scope.</p>
+          </div>
+          <span className="text-xs text-muted-foreground">Units: deg C</span>
+        </div>
+        {dailyTempAverage.length === 0 ? (
+          <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
+            No temperature measurements in this range.
+          </div>
+        ) : (
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dailyTempAverage}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tickFormatter={formatDateLabel} />
+                <YAxis />
+                <Tooltip
+                  labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
+                  formatter={(value) => [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} deg C`, "Average temperature"]}
+                />
+                <Line type="monotone" dataKey="average" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Water Quality Monitoring</h1>
-            <p className="text-muted-foreground mt-1">Live system risk, daily ratings, and parameter trends for the selected scope.</p>
-            <div className="mt-2 text-xs text-muted-foreground">
-              <span>Latest measurement: {latestMeasurementTs ? formatTimestamp(latestMeasurementTs) : "N/A"}</span>
-              <span className="mx-2">|</span>
-              <span>Latest daily rating: {latestRatingDate ? formatTimestamp(`${latestRatingDate}T00:00:00`) : "N/A"}</span>
-              {ratingsStale ? (
-                <span className="ml-2 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                  Ratings may be stale
-                </span>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <DataUpdatedAt updatedAt={latestUpdatedAt} />
-            <DataFetchingBadge isFetching={measurementsQuery.isFetching || ratingsQuery.isFetching} isLoading={loading} />
-          </div>
-
-          <FarmSelector
-            selectedBatch={selectedBatch}
-            selectedSystem={selectedSystem}
-            selectedStage={selectedStage}
-            onBatchChange={setSelectedBatch}
-            onSystemChange={setSelectedSystem}
-            onStageChange={setSelectedStage}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="flex items-center">
-              <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} />
-            </div>
-            <select value={selectedParameter} onChange={(e) => setSelectedParameter(e.target.value as WqParameter)} className="px-3 py-2 rounded-md border border-input bg-background text-sm">
+      <div className={`space-y-6 ${activeTab === "depth" || activeTab === "parameter" ? "-mt-6 md:-mt-8" : ""}`}>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Select value={selectedParameter} onValueChange={(value) => setSelectedParameter(value as WqParameter)}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Select parameter" />
+            </SelectTrigger>
+            <SelectContent>
               {Object.entries(parameterLabels).map(([key, label]) => (
-                <option key={key} value={key}>
+                <SelectItem key={key} value={key}>
                   {label}
-                </option>
+                </SelectItem>
               ))}
-            </select>
-            <div className="flex gap-2 md:col-span-2">
-              <button type="button" onClick={exportCsv} className="px-3 py-2 rounded-md border border-border text-sm hover:bg-muted/40">Export CSV</button>
-              <button type="button" onClick={exportPdf} className="px-3 py-2 rounded-md border border-border text-sm hover:bg-muted/40">Export PDF</button>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-slate-950 via-slate-900 to-slate-900 p-6">
+              <div className="absolute inset-0 opacity-30 [background:radial-gradient(circle_at_top_left,rgba(56,189,248,0.25),transparent_55%)]" />
+              <div className="relative space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-500/20">
+                    <Droplets className="h-5 w-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground">Water Quality Command Center</h2>
+                    <p className="text-sm text-muted-foreground">Live health scoring and system-level risk insights.</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span>{sensorCounts.online}/{systemOptions.length} systems online</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Bell className="h-3 w-3 text-red-500" />
+                    <span>{highAlertCount} critical alerts</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card
+                className="bg-card border border-border cursor-pointer hover:border-cyan-500/40 transition-all"
+                onClick={() => handleTabChange("environment")}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Gauge className="h-5 w-5 text-cyan-400" />
+                    <span className="text-xs text-muted-foreground">Avg WQI</span>
+                  </div>
+                  <p className="text-3xl font-bold" style={{ color: averageWqiLabel.color }}>
+                    {averageWqi != null ? Math.round(averageWqi) : "--"}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: averageWqiLabel.color }}>
+                    {averageWqiLabel.label}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card
+                className="bg-card border border-border cursor-pointer hover:border-red-500/40 transition-all"
+                onClick={() => handleTabChange("alerts")}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Bell className="h-5 w-5 text-red-400" />
+                    <span className="text-xs text-muted-foreground">Active Alerts</span>
+                  </div>
+                  <p className="text-3xl font-bold text-foreground">{alertItems.length}</p>
+                  <p className="text-xs text-red-400 mt-1">{highAlertCount} high priority</p>
+                </CardContent>
+              </Card>
+              <Card
+                className="bg-card border border-border cursor-pointer hover:border-emerald-500/40 transition-all"
+                onClick={() => handleTabChange("sensors")}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Radio className="h-5 w-5 text-emerald-400" />
+                    <span className="text-xs text-muted-foreground">Sensors</span>
+                  </div>
+                  <p className="text-3xl font-bold text-emerald-400">{sensorCounts.online}</p>
+                  <p className="text-xs text-muted-foreground mt-1">of {systemOptions.length} online</p>
+                </CardContent>
+              </Card>
+              <Card
+                className="bg-card border border-border cursor-pointer hover:border-slate-500/40 transition-all"
+                onClick={() => handleTabChange("parameter")}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Thermometer className="h-5 w-5 text-amber-400" />
+                    <span className="text-xs text-muted-foreground">Parameters</span>
+                  </div>
+                  <p className="text-3xl font-bold text-foreground">{Object.keys(parameterLabels).length}</p>
+                  <p className="text-xs text-muted-foreground mt-1">monitored</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-foreground">System Status Overview</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {systemRiskRows.map((row) => (
+                  <Card
+                    key={row.systemId}
+                    className="bg-card border border-border hover:border-slate-500/40 transition-all cursor-pointer"
+                    onClick={() => {
+                      setSelectedSystem(String(row.systemId))
+                      handleTabChange("parameter")
+                    }}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-semibold">{row.systemName}</CardTitle>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ratingBadgeClass(row.rating)}`}>
+                          {row.rating ?? "Unknown"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Last rating {row.ratingDate ? formatTimestamp(`${row.ratingDate}T00:00:00`) : "--"}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Worst parameter</span>
+                        <span className="font-medium text-foreground">
+                          {row.worstParameter ? parameterLabels[row.worstParameter as WqParameter] ?? row.worstParameter : "--"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Latest measurement</span>
+                        <span className="text-foreground">
+                          {row.latestMeasurement ? formatTimestamp(row.latestMeasurement) : "--"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Action</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${actionBadgeClass(row.action)}`}>
+                          {row.action}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-foreground">Recent Alerts</h3>
+                <button onClick={() => handleTabChange("alerts")} className="text-xs text-cyan-500 hover:text-cyan-400">
+                  View all
+                </button>
+              </div>
+              <div className="space-y-2">
+                {alertItems.length ? (
+                  alertItems.slice(0, 5).map((alert) => (
+                    <Card
+                      key={alert.id}
+                      className={`border ${
+                        alert.priority === "high" ? "bg-red-500/5 border-red-500/20" : "bg-amber-500/5 border-amber-500/20"
+                      }`}
+                    >
+                      <CardContent className="flex items-center gap-3 p-3">
+                        {alert.priority === "high" ? (
+                          <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                        )}
+                        <p className="text-xs text-foreground flex-1">{alert.message}</p>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] px-2 py-0 flex-shrink-0 ${
+                            alert.priority === "high"
+                              ? "bg-red-500/20 text-red-600 border-red-500/30"
+                              : "bg-amber-500/20 text-amber-600 border-amber-500/30"
+                          }`}
+                        >
+                          {alert.priority.toUpperCase()}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <Card className="border border-border bg-muted/30">
+                    <CardContent className="p-3 text-sm text-muted-foreground">No alerts for the selected scope.</CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {dataIssues.length ? (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-            <p className="font-medium mb-1">Some water-quality data sources failed to load:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              {dataIssues.map((issue) => (
-                <li key={issue}>{issue}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Systems monitored</p>
-            <p className="text-2xl font-bold mt-1">{summaryMetrics.systemsMonitored}</p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Latest non-optimal</p>
-            <p className="text-2xl font-bold mt-1">{summaryMetrics.nonOptimal}</p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Threshold breaches</p>
-            <p className="text-2xl font-bold mt-1">{summaryMetrics.breaches}</p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Worst parameter mix</p>
-            <p className="text-sm font-semibold mt-2">{worstMixLabel}</p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Freshness lag</p>
-            <p className="text-2xl font-bold mt-1">
-              {freshnessLagDays != null ? `${freshnessLagDays} day${freshnessLagDays === 1 ? "" : "s"}` : "N/A"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Latest measurement: {latestMeasurementTs ? formatTimestamp(latestMeasurementTs) : "N/A"}
-            </p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Rating distribution (days)</p>
-            <p className="text-sm font-semibold mt-2">
-              Optimal {ratingDistribution.optimal} | Acceptable {ratingDistribution.acceptable} | Critical {ratingDistribution.critical} | Lethal {ratingDistribution.lethal}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+        {activeTab === "alerts" && (
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
           <div className="bg-card border border-border rounded-lg p-5 space-y-4">
             <div>
               <h2 className="font-semibold">System Risk Table</h2>
@@ -1134,14 +1490,121 @@ export default function WaterQualityPage() {
             </div>
           </div>
         </div>
+        )}
 
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-semibold">Analytics</h2>
-              <p className="text-sm text-muted-foreground">Daily risk, parameter behavior, and relationships.</p>
+        {activeTab === "sensors" && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 border border-indigo-500/20">
+                <Radio className="h-5 w-5 text-indigo-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Sensor Activity</h2>
+                <p className="text-sm text-muted-foreground">System connectivity and data freshness tracking.</p>
+              </div>
             </div>
-            <div className="flex gap-3 text-xs">
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card className="bg-emerald-500/10 border-emerald-500/20">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <Wifi className="h-6 w-6 text-emerald-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-emerald-500">{sensorCounts.online}</p>
+                    <p className="text-xs text-emerald-600/80">Online</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-amber-500/10 border-amber-500/20">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <AlertTriangle className="h-6 w-6 text-amber-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-amber-500">{sensorCounts.warning}</p>
+                    <p className="text-xs text-amber-600/80">Delayed</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-red-500/10 border-red-500/20">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <WifiOff className="h-6 w-6 text-red-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-red-500">{sensorCounts.offline}</p>
+                    <p className="text-xs text-red-600/80">Offline</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {systemOptions.map((system) => {
+                const status = sensorStatusBySystem.get(system.id)
+                const isOffline = status?.status === "offline"
+                const isWarning = status?.status === "warning"
+                return (
+                  <Card
+                    key={system.id}
+                    className={`border transition-all ${
+                      isOffline
+                        ? "bg-red-500/5 border-red-500/20"
+                        : isWarning
+                          ? "bg-amber-500/5 border-amber-500/20"
+                          : "bg-card border-border"
+                    }`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`h-2.5 w-2.5 rounded-full ${
+                              isOffline ? "bg-red-500 animate-pulse" : isWarning ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
+                            }`}
+                          />
+                          <span className="text-sm font-semibold text-foreground">{system.label}</span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] px-2 py-0 ${
+                            isOffline
+                              ? "bg-red-500/20 text-red-600 border-red-500/30"
+                              : isWarning
+                                ? "bg-amber-500/20 text-amber-600 border-amber-500/30"
+                                : "bg-emerald-500/20 text-emerald-600 border-emerald-500/30"
+                          }`}
+                        >
+                          {(status?.status ?? "offline").toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">System ID</span>
+                          <span className="text-foreground font-mono">{system.id}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Last Reading</span>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <span className={isOffline ? "text-red-500" : isWarning ? "text-amber-500" : "text-foreground"}>
+                              {formatSensorLag(status?.lastSeen ?? null)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {isOffline ? (
+                        <div className="mt-3 rounded bg-red-500/10 border border-red-500/20 p-2">
+                          <p className="text-[10px] text-red-600">No data received for more than 24 hours.</p>
+                        </div>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {CHART_TABS.has(activeTab) && (
+        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
+          {activeTab === "parameter" && (
+            <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
               <label className="inline-flex items-center gap-2">
                 <input type="checkbox" checked={showFeedingOverlay} onChange={(e) => setShowFeedingOverlay(e.target.checked)} />
                 Overlay feeding
@@ -1151,473 +1614,482 @@ export default function WaterQualityPage() {
                 Overlay mortality
               </label>
             </div>
-          </div>
+          )}
 
-          <Tabs defaultValue="daily">
-            <TabsList className="mb-4">
-              <TabsTrigger value="daily">Daily risk trend</TabsTrigger>
-              <TabsTrigger value="parameter">Parameter trend</TabsTrigger>
-              <TabsTrigger value="relationship">Relationships</TabsTrigger>
-            </TabsList>
+          <Tabs value={activeTab}>
+            <TabsContent value="environment">
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/20">
+                      <Gauge className="h-5 w-5 text-emerald-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground">Environmental Indicators</h2>
+                      <p className="text-sm text-muted-foreground">Composite water quality scores and environmental indices.</p>
+                    </div>
+                  </div>
+                </div>
 
-            <TabsContent value="daily">
-              {loading ? (
-                <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading daily risk trend...</div>
-              ) : dailyRiskTrend.length === 0 ? (
-                <div className="h-[320px] flex items-center justify-center text-muted-foreground">No daily ratings in this range.</div>
-              ) : (
-                <>
-                  <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
-                    <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={dailyRiskTrend}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" tickFormatter={formatDateLabel} />
-                          <YAxis yAxisId="rating" domain={[1, 4]} ticks={[1, 2, 3, 4]} tickFormatter={formatRatingLabel} />
-                          <YAxis yAxisId="overlay" orientation="right" />
-                          <ReferenceArea y1={3.5} y2={4.5} fill="hsl(var(--chart-2))" fillOpacity={0.08} />
-                          <ReferenceArea y1={2.5} y2={3.5} fill="hsl(var(--chart-3))" fillOpacity={0.08} />
-                          <ReferenceArea y1={1.5} y2={2.5} fill="hsl(var(--chart-4))" fillOpacity={0.12} />
-                          <ReferenceArea y1={0.5} y2={1.5} fill="hsl(var(--destructive))" fillOpacity={0.12} />
-                          <Tooltip
-                            labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
-                            formatter={(value, name) => {
-                              const numeric = Number(value)
-                              const field = String(name).toLowerCase()
-                              if (field.includes("feeding")) {
-                                return [`${numeric.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`, String(name)]
-                              }
-                              if (field.includes("mortality")) {
-                                return [numeric.toLocaleString(undefined, { maximumFractionDigits: 0 }), String(name)]
-                              }
-                              return [numeric.toLocaleString(undefined, { maximumFractionDigits: 2 }), String(name)]
-                            }}
-                          />
-                          <Legend />
-                          <Line
-                            yAxisId="rating"
-                            type="monotone"
-                            dataKey="rating"
-                            name="Daily rating"
-                            stroke="var(--color-chart-1)"
-                            strokeWidth={2}
-                            dot={({ cx, cy, payload }) => {
-                              if (cx == null || cy == null) {
-                                return <circle cx={0} cy={0} r={0} fill="none" />
-                              }
-                              const color = worstParamColor(payload?.worstParameter)
-                              const key = payload?.date ? `dot-${payload.date}` : `dot-${cx}-${cy}`
-                              return (
-                                <circle
-                                  key={key}
-                                  cx={cx}
-                                  cy={cy}
-                                  r={4}
-                                  fill={color}
-                                  stroke="#ffffff"
-                                  strokeWidth={1}
-                                />
-                              )
-                            }}
-                          />
-                          {showFeedingOverlay ? (
-                            <Line yAxisId="overlay" type="monotone" dataKey="feeding" name="Feeding amount" stroke="var(--color-chart-3)" dot={false} />
-                          ) : null}
-                          {showMortalityOverlay ? (
-                            <Line yAxisId="overlay" type="monotone" dataKey="mortality" name="Mortality count" stroke="var(--color-chart-4)" dot={false} />
-                          ) : null}
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </LazyRender>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="bg-card border border-border">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Gauge className="h-4 w-4 text-cyan-400" />
+                        Water Quality Index
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center py-4">
+                      <div className="relative">
+                        <CircularGauge value={wqiValue ?? 0} max={100} color={wqiLabel.color} label="WQI" />
+                      </div>
+                      <div className="mt-4 text-center">
+                        <span className="text-lg font-bold" style={{ color: wqiLabel.color }}>
+                          {wqiLabel.label}
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {wqiValue == null
+                            ? "Insufficient data for WQI scoring."
+                            : wqiValue >= 70
+                              ? "Optimal conditions for aquaculture."
+                              : wqiValue >= 50
+                                ? "Some parameters need attention."
+                                : "Immediate intervention recommended."}
+                        </p>
+                      </div>
+                      <div className="w-full mt-4 space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Poor (0-50)</span>
+                          <span>Moderate (50-70)</span>
+                          <span>Good (70-100)</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden flex">
+                          <div className="h-full bg-red-500" style={{ width: "50%" }} />
+                          <div className="h-full bg-amber-500" style={{ width: "20%" }} />
+                          <div className="h-full bg-emerald-500" style={{ width: "30%" }} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card border border-border">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <FlaskConical className="h-4 w-4 text-orange-400" />
+                        Nutrient Load Indicator
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center py-4">
+                      <div className="relative">
+                        <CircularGauge value={nutrientLoad.value} max={4} color={nutrientLoad.color} label="mg/L" />
+                      </div>
+                      <div className="mt-4 text-center">
+                        <span className="text-lg font-bold" style={{ color: nutrientLoad.color }}>
+                          {nutrientLoad.level}
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Nitrate + Nitrite + Ammonia = {nutrientLoad.level === "No data" ? "--" : nutrientLoad.value.toFixed(2)} mg/L
+                        </p>
+                      </div>
+                      <div className="w-full mt-4 p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
+                        {nutrientLoad.level === "High"
+                          ? "High nutrient load. Consider reducing nutrient input."
+                          : nutrientLoad.level === "Moderate"
+                            ? "Moderate nutrient levels. Monitor for rising trends."
+                            : nutrientLoad.level === "Low"
+                              ? "Nutrient levels within acceptable range."
+                              : "No nutrient data available."}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card border border-border">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Leaf className="h-4 w-4 text-green-400" />
+                        Algal Activity Indicator
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center py-4">
+                      <div className="relative">
+                        <CircularGauge value={algalActivity.value} max={50} color={algalActivity.color} label="index" />
+                      </div>
+                      <div className="mt-4 text-center">
+                        <span className="text-lg font-bold" style={{ color: algalActivity.color }}>
+                          {algalActivity.level}
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Secchi depth: {algalActivity.source != null ? `${algalActivity.source.toFixed(1)} m` : "--"}
+                        </p>
+                      </div>
+                      <div className="w-full mt-4 space-y-1.5 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-blue-500" />
+                          <span>Low activity</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-emerald-500" />
+                          <span>Moderate activity</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-red-500" />
+                          <span>Bloom risk</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="bg-card border border-border">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">All Systems Water Quality Index</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {allSystemsWqi.map((system) => (
+                        <div
+                          key={system.id}
+                          className={`p-4 rounded-lg border text-center transition-all cursor-pointer hover:scale-[1.02] ${
+                            String(system.id) === selectedSystemValue ? "border-cyan-500/50 bg-cyan-500/10" : "border-border bg-muted/30"
+                          }`}
+                          onClick={() => setSelectedSystem(String(system.id))}
+                        >
+                          <p className="text-xs text-muted-foreground mb-1">{system.label}</p>
+                          <p className="text-2xl font-bold" style={{ color: system.wqiLabel.color }}>
+                            {system.wqi != null ? Math.round(system.wqi) : "--"}
+                          </p>
+                          <p className="text-xs mt-1" style={{ color: system.wqiLabel.color }}>
+                            {system.wqiLabel.label}
+                          </p>
+                          <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${system.wqi != null ? Math.min(system.wqi, 100) : 0}%`,
+                                backgroundColor: system.wqiLabel.color,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="depth">
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 border border-purple-500/20">
+                      <Layers className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground">Stratification Analysis</h2>
+                      <p className="text-sm text-muted-foreground">Vertical water quality stratification analysis.</p>
+                    </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: worstParamColor("dissolved_oxygen") }} />
-                      DO
-                    </span>
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: worstParamColor("ammonia_ammonium") }} />
-                      Ammonia
-                    </span>
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: worstParamColor("temperature") }} />
-                      Temperature
-                    </span>
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: worstParamColor("pH") }} />
-                      pH
-                    </span>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Select value={selectedDepthProfileDate ?? ""} onValueChange={setDepthProfileDate}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {depthProfiles.dates.map((date) => (
+                          <SelectItem key={date} value={date}>
+                            {formatTimestamp(`${date}T00:00:00`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </>
-              )}
+                </div>
+
+                {isAllSystemsSelected ? (
+                  <Card className="border-dashed">
+                    <CardContent className="p-4 text-sm text-muted-foreground">
+                      Select a system to view stratification analysis.
+                    </CardContent>
+                  </Card>
+                ) : depthProfileData.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="p-4 text-sm text-muted-foreground">
+                      No stratification profile measurements found in the selected time period.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    {depthProfileDoData.length < 2 ? (
+                      <Card className="bg-muted/30">
+                        <CardContent className="p-4 text-sm text-muted-foreground">
+                          Not enough dissolved oxygen depth readings to assess stratification.
+                        </CardContent>
+                      </Card>
+                    ) : isStratified || hasGradient ? (
+                      <Card className="border-red-500/30 bg-red-500/10">
+                        <CardContent className="flex items-start gap-3 p-4">
+                          <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600" />
+                          <div>
+                            <p className="text-sm font-semibold text-red-600">Stratification Risk Detected</p>
+                            <p className="mt-1 text-xs text-red-600/80">
+                              {isStratified && surfaceDo != null && bottomDo != null
+                                ? `Bottom oxygen (${bottomDo.toFixed(1)} mg/L) is critically low while surface oxygen (${surfaceDo.toFixed(1)} mg/L) remains normal. `
+                                : doGradient != null
+                                  ? `Significant DO gradient of ${doGradient.toFixed(1)} mg/L detected between surface and bottom. `
+                                  : ""}
+                              Recommended: Increase aeration, improve water mixing, reduce feeding.
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <Card className="border-emerald-500/30 bg-emerald-500/10">
+                        <CardContent className="flex items-start gap-3 p-4">
+                          <CheckCircle className="mt-0.5 h-5 w-5 text-emerald-600" />
+                          <div>
+                            <p className="text-sm font-semibold text-emerald-700">No Stratification Detected</p>
+                            <p className="mt-1 text-xs text-emerald-700/80">
+                              Water column appears well-mixed. DO gradient: {doGradient != null ? doGradient.toFixed(1) : "--"} mg/L.
+                              Temperature gradient: {tempGradient != null ? tempGradient.toFixed(1) : "--"} deg C.
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <Card className="bg-card">
+                        <CardHeader>
+                          <CardTitle className="text-sm font-medium flex items-center justify-between">
+                            Dissolved Oxygen by Depth
+                            <Badge
+                              variant="outline"
+                              className={
+                                depthProfileDoData.length === 0
+                                  ? "border-border text-muted-foreground"
+                                  : isStratified || hasGradient
+                                    ? "bg-red-500/10 text-red-600 border-red-500/30"
+                                    : "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                              }
+                            >
+                              {depthProfileDoData.length === 0 ? "NO DATA" : isStratified || hasGradient ? "STRATIFIED" : "MIXED"}
+                            </Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {depthProfileDoData.length === 0 ? (
+                            <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                              No dissolved oxygen depth measurements.
+                            </div>
+                          ) : (
+                            <div className="h-[300px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={depthProfileDoData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                                  <XAxis
+                                    type="number"
+                                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                    label={{ value: "DO (mg/L)", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                  />
+                                  <YAxis
+                                    dataKey="depth"
+                                    type="number"
+                                    reversed
+                                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                    label={{ value: "Depth (m)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                  />
+                                  <Tooltip content={<DepthProfileTooltip />} />
+                                  <ReferenceLine x={3} stroke="#EF4444" strokeDasharray="4 4" />
+                                  <ReferenceLine x={5} stroke="#F59E0B" strokeDasharray="4 4" />
+                                  <Bar dataKey="dissolvedOxygen" name="DO (mg/L)" radius={[0, 4, 4, 0]} barSize={20}>
+                                    {depthProfileDoData.map((entry, index) => (
+                                      <Cell key={`do-cell-${index}`} fill={getDoColor(entry.dissolvedOxygen)} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-card">
+                        <CardHeader>
+                          <CardTitle className="text-sm font-medium flex items-center justify-between">
+                            Temperature by Depth
+                            <span className="text-xs text-muted-foreground">
+                              Gradient: {tempGradient != null ? tempGradient.toFixed(1) : "--"} deg C
+                            </span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {depthProfileTempData.length === 0 ? (
+                            <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                              No temperature depth measurements.
+                            </div>
+                          ) : (
+                            <div className="h-[300px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={depthProfileTempData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                                  <XAxis
+                                    type="number"
+                                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                    domain={["dataMin - 1", "dataMax + 1"]}
+                                    label={{ value: "Temp (deg C)", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                  />
+                                  <YAxis
+                                    dataKey="depth"
+                                    type="number"
+                                    reversed
+                                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                    label={{ value: "Depth (m)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                  />
+                                  <Tooltip content={<DepthProfileTooltip />} />
+                                  <Bar dataKey="temperature" name="Temp (deg C)" fill="#F59E0B" radius={[0, 4, 4, 0]} barSize={20} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <Card className="bg-card">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">Depth Measurement Data</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {depthProfileData.length === 0 ? (
+                          <div className="p-4 text-sm text-muted-foreground">No stratification profile data for the selected date.</div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="border-b border-border/70">
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Depth (m)</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">DO (mg/L)</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Temp (deg C)</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">pH</th>
+                                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">DO Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {depthProfileData.map((row, i) => {
+                                  const doValue = row.dissolvedOxygen
+                                  const status =
+                                    doValue == null ? "N/A" : doValue < 3 ? "CRITICAL" : doValue < 5 ? "WARNING" : "NORMAL"
+                                  const statusClass =
+                                    doValue == null
+                                      ? "border-border text-muted-foreground"
+                                      : doValue < 3
+                                        ? "bg-red-500/10 text-red-600 border-red-500/30"
+                                        : doValue < 5
+                                          ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                                          : "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                                  return (
+                                    <tr key={`${row.depth}-${i}`} className={i % 2 === 0 ? "bg-muted/30" : ""}>
+                                      <td className="px-4 py-2.5 text-sm text-foreground">{row.depth.toFixed(1)}</td>
+                                      <td className="px-4 py-2.5 text-right text-sm font-mono font-semibold" style={{ color: doValue != null ? getDoColor(doValue) : undefined }}>
+                                        {doValue != null ? doValue.toFixed(2) : "--"}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right text-sm font-mono text-foreground">
+                                        {row.temperature != null ? row.temperature.toFixed(1) : "--"}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right text-sm font-mono text-foreground">
+                                        {row.pH != null ? row.pH.toFixed(2) : "--"}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-center">
+                                        <Badge variant="outline" className={`text-[10px] px-2 py-0 ${statusClass}`}>
+                                          {status}
+                                        </Badge>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="parameter">
-              {loading ? (
-                <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading parameter trend...</div>
-              ) : parameterTrendData.length === 0 ? (
-                <div className="h-[320px] flex items-center justify-center text-muted-foreground">No parameter measurements in this range.</div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
-                    <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={parameterTrendData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" tickFormatter={formatDateLabel} />
-                          <YAxis yAxisId="param" />
-                          <YAxis yAxisId="overlay" orientation="right" />
-                          <Tooltip
-                            labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
-                            formatter={(value, name) => {
-                              const numeric = Number(value)
-                              const field = String(name).toLowerCase()
-                              if (field.includes("feeding")) {
-                                return [`${numeric.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`, String(name)]
-                              }
-                              if (field.includes("mortality")) {
-                                return [numeric.toLocaleString(undefined, { maximumFractionDigits: 0 }), String(name)]
-                              }
-                              if (selectedParameter === "pH") {
-                                return [numeric.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), String(name)]
-                              }
-                              return [
-                                `${numeric.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${selectedParameterUnit ? ` ${selectedParameterUnit}` : ""}`,
-                                String(name),
-                              ]
-                            }}
-                          />
-                          <Legend />
-                          <Line yAxisId="param" type="monotone" dataKey="mean" name="Daily mean" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
-                          <Line yAxisId="param" type="monotone" dataKey="rolling" name="7-day mean" stroke="var(--color-chart-2)" strokeDasharray="4 4" dot={false} />
-                          <Line yAxisId="param" type="monotone" dataKey="min" name="Daily min" stroke="var(--color-chart-3)" strokeDasharray="2 2" dot={false} />
-                          <Line yAxisId="param" type="monotone" dataKey="max" name="Daily max" stroke="var(--color-chart-4)" strokeDasharray="2 2" dot={false} />
-                          {selectedParameter === "dissolved_oxygen" ? (
-                            <ReferenceLine yAxisId="param" y={lowDoThreshold} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label="Low DO threshold" />
-                          ) : null}
-                          {selectedParameter === "ammonia_ammonium" ? (
-                            <ReferenceLine yAxisId="param" y={highAmmoniaThreshold} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label="High ammonia threshold" />
-                          ) : null}
-                          {showFeedingOverlay ? (
-                            <Line yAxisId="overlay" type="monotone" dataKey="feeding" name="Feeding amount" stroke="var(--color-chart-3)" dot={false} />
-                          ) : null}
-                          {showMortalityOverlay ? (
-                            <Line yAxisId="overlay" type="monotone" dataKey="mortality" name="Mortality count" stroke="var(--color-chart-4)" dot={false} />
-                          ) : null}
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </LazyRender>
-                  </div>
-
-                  <div className="rounded-md border border-border/80 bg-muted/20 p-3">
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div>
-                        <p className="text-sm font-semibold">Daily Dissolved Oxygen Variation</p>
-                        <p className="text-xs text-muted-foreground">Max minus min DO per day across the selected scope.</p>
-                      </div>
-                      <span className="text-xs text-muted-foreground">Units: mg/L</span>
-                    </div>
-                    {dailyDoVariation.length === 0 ? (
-                      <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                        No dissolved oxygen measurements in this range.
-                      </div>
-                    ) : (
-                      <div className="h-[220px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={dailyDoVariation}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" tickFormatter={formatDateLabel} />
-                            <YAxis />
-                            <Tooltip
-                              labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
-                              formatter={(value) => [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mg/L`, "Daily DO variation"]}
-                            />
-                            <Line type="monotone" dataKey="variation" stroke="var(--color-chart-2)" strokeWidth={2} dot={false} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-md border border-border/80 bg-muted/20 p-3">
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div>
-                        <p className="text-sm font-semibold">Daily Average Temperature</p>
-                        <p className="text-xs text-muted-foreground">Mean temperature per day across the selected scope.</p>
-                      </div>
-                      <span className="text-xs text-muted-foreground">Units: deg C</span>
-                    </div>
-                    {dailyTempAverage.length === 0 ? (
-                      <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                        No temperature measurements in this range.
-                      </div>
-                    ) : (
-                      <div className="h-[220px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={dailyTempAverage}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" tickFormatter={formatDateLabel} />
-                            <YAxis />
-                            <Tooltip
-                              labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
-                              formatter={(value) => [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} deg C`, "Average temperature"]}
-                            />
-                            <Line type="monotone" dataKey="average" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="rounded-md border border-border/80 bg-muted/20 p-3">
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <div>
-                          <p className="text-sm font-semibold">DO Depth Profile</p>
-                          <p className="text-xs text-muted-foreground">Average DO by depth for the selected date.</p>
-                        </div>
-                        {doDepthProfiles.dates.length ? (
-                          <select
-                            value={selectedDoProfileDate ?? ""}
-                            onChange={(event) => setDoProfileDate(event.target.value)}
-                            className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                          >
-                            {doDepthProfiles.dates.map((date) => (
-                              <option key={date} value={date}>
-                                {formatDateLabel(date)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : null}
-                      </div>
-                      {doDepthData.length === 0 ? (
-                        <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                          No depth profile data for dissolved oxygen.
-                        </div>
-                      ) : (
-                        <div className="h-[220px]">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={doDepthData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis type="number" dataKey="avg" />
-                              <YAxis type="number" dataKey="depth" reversed />
-                              <Tooltip
-                                labelFormatter={(label) => `Avg DO: ${Number(label).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mg/L`}
-                                formatter={(value) => [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`, "Depth"]}
-                              />
-                              <Line type="monotone" dataKey="depth" stroke="var(--color-chart-2)" strokeWidth={2} dot />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-md border border-border/80 bg-muted/20 p-3">
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <div>
-                          <p className="text-sm font-semibold">Temperature Depth Profile</p>
-                          <p className="text-xs text-muted-foreground">Average temperature by depth for the selected date.</p>
-                        </div>
-                        {tempDepthProfiles.dates.length ? (
-                          <select
-                            value={selectedTempProfileDate ?? ""}
-                            onChange={(event) => setTempProfileDate(event.target.value)}
-                            className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                          >
-                            {tempDepthProfiles.dates.map((date) => (
-                              <option key={date} value={date}>
-                                {formatDateLabel(date)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : null}
-                      </div>
-                      {tempDepthData.length === 0 ? (
-                        <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                          No depth profile data for temperature.
-                        </div>
-                      ) : (
-                        <div className="h-[220px]">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={tempDepthData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis type="number" dataKey="avg" />
-                              <YAxis type="number" dataKey="depth" reversed />
-                              <Tooltip
-                                labelFormatter={(label) => `Avg Temp: ${Number(label).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} deg C`}
-                                formatter={(value) => [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`, "Depth"]}
-                              />
-                              <Line type="monotone" dataKey="depth" stroke="var(--color-chart-1)" strokeWidth={2} dot />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="relationship">
               <div className="space-y-4">
-                <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">Water Quality Index (WQI)</p>
-                      <p className="text-xs text-muted-foreground">
-                        Based on dissolved oxygen and temperature using existing measurements and farm thresholds.
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted-foreground">Buckets: Poor 0-50, Moderate 50-70, Good 70-100</span>
-                  </div>
-                  {wqiSummary.hasData ? (
-                    <div className="mt-3 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_220px] gap-4">
-                      <div className="h-[200px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={wqiSummary.buckets}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="label" />
-                            <YAxis allowDecimals={false} />
-                            <Tooltip formatter={(value) => [Number(value).toLocaleString(), "Count"]} />
-                            <Bar dataKey="count" fill="var(--color-chart-3)" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 text-sm">
-                        <div className="rounded-md border border-border/80 bg-background px-3 py-2">
-                          <p className="text-xs text-muted-foreground">Samples</p>
-                          <p className="font-semibold">{wqiSummary.stats.total}</p>
-                        </div>
-                        <div className="rounded-md border border-border/80 bg-background px-3 py-2">
-                          <p className="text-xs text-muted-foreground">Average</p>
-                          <p className="font-semibold">{wqiSummary.stats.avg != null ? wqiSummary.stats.avg.toFixed(1) : "N/A"}</p>
-                        </div>
-                        <div className="rounded-md border border-border/80 bg-background px-3 py-2">
-                          <p className="text-xs text-muted-foreground">Min / Max</p>
-                          <p className="font-semibold">
-                            {wqiSummary.stats.min != null ? wqiSummary.stats.min.toFixed(0) : "N/A"} /{" "}
-                            {wqiSummary.stats.max != null ? wqiSummary.stats.max.toFixed(0) : "N/A"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-3 rounded-md border border-border/80 bg-background p-3 text-sm text-muted-foreground">
-                      Not enough DO and temperature measurements (with depth) to compute WQI.
-                    </div>
-                  )}
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-foreground">Parameter Analysis</h2>
                 </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="rounded-lg border border-border bg-muted/20 p-4">
-                    <p className="text-xs text-muted-foreground">DO vs Mortality</p>
-                    <div className="h-[220px] mt-3">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ScatterChart>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="x" name="DO" unit="mg/L" />
-                          <YAxis dataKey="y" name="Mortality" />
-                          <Tooltip
-                            cursor={{ strokeDasharray: "3 3" }}
-                            formatter={(value, name) => {
-                              if (name === "x") return [`${Number(value).toLocaleString()} mg/L`, "DO"]
-                              if (name === "y") return [`${Number(value).toLocaleString()} fish`, "Mortality"]
-                              return [Number(value).toLocaleString(), String(name)]
-                            }}
-                          />
-                          <Scatter data={relationshipScatterData.doMortality} fill="var(--color-chart-1)" />
-                        </ScatterChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-border bg-muted/20 p-4">
-                    <p className="text-xs text-muted-foreground">Ammonia vs Feeding</p>
-                    <div className="h-[220px] mt-3">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ScatterChart>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="x" name="Ammonia" unit="mg/L" />
-                          <YAxis dataKey="y" name="Feeding" />
-                          <Tooltip
-                            cursor={{ strokeDasharray: "3 3" }}
-                            formatter={(value, name) => {
-                              if (name === "x") return [`${Number(value).toLocaleString()} mg/L`, "Ammonia"]
-                              if (name === "y") return [`${Number(value).toLocaleString()} kg`, "Feeding"]
-                              return [Number(value).toLocaleString(), String(name)]
-                            }}
-                          />
-                          <Scatter data={relationshipScatterData.ammoniaFeeding} fill="var(--color-chart-3)" />
-                        </ScatterChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-border bg-muted/20 p-4">
-                    <p className="text-xs text-muted-foreground">Temperature vs Rating</p>
-                    <div className="h-[220px] mt-3">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ScatterChart>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="x" name="Temperature" unit="deg C" />
-                          <YAxis dataKey="y" name="Rating" domain={[1, 4]} ticks={[1, 2, 3, 4]} tickFormatter={formatRatingLabel} />
-                          <Tooltip
-                            cursor={{ strokeDasharray: "3 3" }}
-                            formatter={(value, name) => {
-                              if (String(name).toLowerCase().includes("rating")) {
-                                return [formatRatingLabel(Number(value)), String(name)]
-                              }
-                              if (name === "x") return [`${Number(value).toLocaleString()} deg C`, "Temperature"]
-                              if (name === "y") return [formatRatingLabel(Number(value)), "Rating"]
-                              return [Number(value).toLocaleString(), String(name)]
-                            }}
-                          />
-                          <Scatter data={relationshipScatterData.tempRating} fill="var(--color-chart-2)" />
-                        </ScatterChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
+                <div className="flex items-center justify-between text-xs">
+                  <DataUpdatedAt updatedAt={latestUpdatedAt} />
+                  <DataFetchingBadge isFetching={measurementsQuery.isFetching || ratingsQuery.isFetching} isLoading={loading} />
                 </div>
+                {dataIssues.length ? (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+                    <p className="font-medium mb-1">Some water-quality data sources failed to load:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {dataIssues.map((issue) => (
+                        <li key={issue}>{issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {parameterTabContent}
               </div>
             </TabsContent>
+
           </Tabs>
         </div>
+        )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="bg-card border border-border rounded-lg p-5 space-y-3">
-            <h3 className="font-semibold">Alert Intelligence</h3>
-            <p className="text-sm text-muted-foreground">Current conditions that require attention.</p>
-            {currentAlerts.length ? (
-              <div className="space-y-2">
-                {currentAlerts.map((alert) => (
-                  <div key={alert} className="rounded-md border border-border/80 bg-muted/20 p-3 text-sm">
-                    {alert}
+        {activeTab === "alerts" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-foreground">Alerts</h2>
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="bg-card border border-border rounded-lg p-5 space-y-3">
+                <h3 className="font-semibold">Alert Intelligence</h3>
+                <p className="text-sm text-muted-foreground">Current conditions that require attention.</p>
+                {currentAlerts.length ? (
+                  <div className="space-y-2">
+                    {currentAlerts.map((alert) => (
+                      <div key={alert} className="rounded-md border border-border/80 bg-muted/20 p-3 text-sm">
+                        {alert}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                    No current alerts in the selected scope.
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                No current alerts in the selected scope.
-              </div>
-            )}
-          </div>
 
-          <div className="bg-card border border-border rounded-lg p-5 space-y-3">
-            <h3 className="font-semibold">Emerging Risks</h3>
-            <p className="text-sm text-muted-foreground">Trend-based signals and volatility checks.</p>
-            {emergingRisks.length ? (
-              <div className="space-y-2">
-                {emergingRisks.map((alert) => (
-                  <div key={alert} className="rounded-md border border-orange-300/50 bg-orange-500/10 text-orange-700 p-3 text-sm">
-                    {alert}
+              <div className="bg-card border border-border rounded-lg p-5 space-y-3">
+                <h3 className="font-semibold">Emerging Risks</h3>
+                <p className="text-sm text-muted-foreground">Trend-based signals and volatility checks.</p>
+                {emergingRisks.length ? (
+                  <div className="space-y-2">
+                    {emergingRisks.map((alert) => (
+                      <div key={alert} className="rounded-md border border-orange-300/50 bg-orange-500/10 text-orange-700 p-3 text-sm">
+                        {alert}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                    No emerging risks detected in the last two weeks.
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                No emerging risks detected in the last two weeks.
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
     </DashboardLayout>

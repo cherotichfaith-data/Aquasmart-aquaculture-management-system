@@ -3,7 +3,6 @@
 import { useMemo, useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import FarmSelector from "@/components/shared/farm-selector"
 import FeedingReport from "@/components/reports/feeding-report"
 import PerformanceReport from "@/components/reports/performance-report"
 import MortalityReport from "@/components/reports/mortality-report"
@@ -43,11 +42,8 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<string>("performance")
   const {
     selectedBatch,
-    setSelectedBatch,
     selectedSystem,
-    setSelectedSystem,
     selectedStage,
-    setSelectedStage,
   } = useSharedFilters()
   const [template, setTemplate] = useState<"weekly" | "monthly" | "seasonal">("monthly")
 
@@ -155,15 +151,6 @@ export default function ReportsPage() {
 
         <section className="sticky top-[65px] z-10 rounded-lg border border-border bg-card/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90">
           <div className="flex flex-wrap items-center gap-2">
-            <FarmSelector
-              selectedBatch={selectedBatch}
-              selectedSystem={selectedSystem}
-              selectedStage={selectedStage}
-              onBatchChange={setSelectedBatch}
-              onSystemChange={setSelectedSystem}
-              onStageChange={setSelectedStage}
-              variant="compact"
-            />
             <select
               value={template}
               onChange={(event) => applyTemplate(event.target.value as "weekly" | "monthly" | "seasonal")}

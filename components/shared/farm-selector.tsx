@@ -15,6 +15,7 @@ interface FarmSelectorProps {
   onSystemChange: (system: string) => void
   onStageChange: (stage: StageFilter) => void
   showStage?: boolean
+  showCounts?: boolean
   variant?: "default" | "compact"
 }
 
@@ -26,6 +27,7 @@ export default function FarmSelector({
   onSystemChange,
   onStageChange,
   showStage = true,
+  showCounts = true,
   variant = "default",
 }: FarmSelectorProps) {
   const { farmId } = useActiveFarm()
@@ -132,9 +134,11 @@ export default function FarmSelector({
           </option>
         ))}
       </select>
-      <span className="text-xs text-muted-foreground">
-        Systems: {systemCount} | Batches: {batchCount}
-      </span>
+      {showCounts ? (
+        <span className="text-xs text-muted-foreground">
+          Systems: {systemCount} | Batches: {batchCount}
+        </span>
+      ) : null}
     </div>
   )
 }

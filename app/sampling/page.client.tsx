@@ -3,8 +3,6 @@
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import FarmSelector from "@/components/shared/farm-selector"
-import TimePeriodSelector from "@/components/shared/time-period-selector"
 import {
   CartesianGrid,
   Legend,
@@ -90,13 +88,9 @@ export default function SamplingPage() {
   const { farmId } = useActiveFarm()
   const {
     selectedBatch,
-    setSelectedBatch,
     selectedSystem,
-    setSelectedSystem,
     selectedStage,
-    setSelectedStage,
     timePeriod,
-    setTimePeriod,
   } = useSharedFilters("quarter")
 
   const {
@@ -656,21 +650,6 @@ export default function SamplingPage() {
             </div>
           </div>
         </div>
-
-        <section className="sticky top-[65px] z-10 rounded-lg border border-border bg-card/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90">
-          <div className="flex flex-wrap items-center gap-2">
-            <FarmSelector
-              selectedBatch={selectedBatch}
-              selectedSystem={selectedSystem}
-              selectedStage={selectedStage}
-              onBatchChange={setSelectedBatch}
-              onSystemChange={setSelectedSystem}
-              onStageChange={setSelectedStage}
-              variant="compact"
-            />
-            <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} variant="compact" />
-          </div>
-        </section>
 
         {errorMessages.length > 0 ? (
           <DataErrorState

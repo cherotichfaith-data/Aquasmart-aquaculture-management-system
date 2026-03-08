@@ -3,12 +3,10 @@
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import FarmSelector from "@/components/shared/farm-selector"
 import { useRecentActivities, useSystemsTable } from "@/lib/hooks/use-dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useSystemOptions } from "@/lib/hooks/use-options"
-import TimePeriodSelector from "@/components/shared/time-period-selector"
 import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import {
   EVENT_LABEL,
@@ -34,13 +32,9 @@ export default function TransactionsPage() {
   const { farmId } = useActiveFarm()
   const {
     selectedBatch,
-    setSelectedBatch,
     selectedSystem,
-    setSelectedSystem,
     selectedStage,
-    setSelectedStage,
     timePeriod,
-    setTimePeriod,
   } = useSharedFilters("month")
   const [selectedEventType, setSelectedEventType] = useState<ActivityType>("all")
   const [selectedOperator, setSelectedOperator] = useState<string>("all")
@@ -314,16 +308,7 @@ export default function TransactionsPage() {
             <DataFetchingBadge isFetching={activitiesQuery.isFetching} isLoading={loading} />
           </div>
 
-          <FarmSelector
-            selectedBatch={selectedBatch}
-            selectedSystem={selectedSystem}
-            selectedStage={selectedStage}
-            onBatchChange={setSelectedBatch}
-            onSystemChange={setSelectedSystem}
-            onStageChange={setSelectedStage}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <select
               className="px-3 py-2 rounded-md border border-input bg-background text-sm"
               value={selectedEventType}
@@ -350,15 +335,11 @@ export default function TransactionsPage() {
               ))}
             </select>
 
-            <div className="md:col-span-2 flex items-center">
-              <TimePeriodSelector selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} />
-            </div>
             <button
               className="px-3 py-2 rounded-md border border-border text-sm hover:bg-muted/40"
               onClick={() => {
                 setSelectedEventType("all")
                 setSelectedOperator("all")
-                setTimePeriod("month")
               }}
               type="button"
             >

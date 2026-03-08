@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
 import {
   Activity,
@@ -18,6 +18,7 @@ import {
   PlusCircle,
   ChevronsLeft,
   ChevronsRight,
+  ChevronDown,
 } from "lucide-react"
 
 const navigation = [
@@ -44,9 +45,24 @@ export default function Sidebar({
   onCollapseToggle: () => void
 }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const { signOut } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
+  const [waterQualityOpen, setWaterQualityOpen] = useState(pathname.startsWith("/water-quality"))
+
+  const waterQualityActive = pathname === "/water-quality"
+  const tabParam = searchParams.get("tab")
+  const overviewActive = waterQualityActive && (!tabParam || tabParam === "overview")
+  const parameterActive = waterQualityActive && tabParam === "parameter"
+  const alertsActive = waterQualityActive && tabParam === "alerts"
+  const sensorsActive = waterQualityActive && tabParam === "sensors"
+  const environmentActive = waterQualityActive && tabParam === "environment"
+  const depthProfileActive = waterQualityActive && tabParam === "depth"
+
+  useEffect(() => {
+    if (waterQualityActive) setWaterQualityOpen(true)
+  }, [waterQualityActive])
 
   return (
     <>
@@ -84,6 +100,111 @@ export default function Sidebar({
         </div>
         <nav className="p-4 space-y-2 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           {navigation.map((item) => {
+            if (item.href === "/water-quality") {
+              const Icon = item.icon
+              if (collapsed) {
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center px-3 py-2.5 rounded-sm transition-colors justify-center ${waterQualityActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      }`}
+                    title={item.name}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </Link>
+                )
+              }
+
+              return (
+                <div key={item.href}>
+                  <div
+                    className={`flex items-center px-3 py-2.5 rounded-sm transition-colors gap-3 ${waterQualityActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      }`}
+                  >
+                    <Link href={item.href} className="flex items-center gap-3 flex-1">
+                      <Icon className="h-4 w-4" />
+                      <span className="text-sm font-medium">{item.name}</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setWaterQualityOpen((prev) => !prev)
+                      }}
+                      className="rounded-sm p-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${waterQualityOpen ? "rotate-180" : ""}`} />
+                    </button>
+                  </div>
+                  {waterQualityOpen && (
+                    <div className="ml-7 mt-1 space-y-1">
+                      <Link
+                        href="/water-quality"
+                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${overviewActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          }`}
+                      >
+                        Overview
+                      </Link>
+                      <Link
+                        href="/water-quality?tab=parameter"
+                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${parameterActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          }`}
+                      >
+                        Parameter Analysis
+                      </Link>
+                      <Link
+                        href="/water-quality?tab=environment"
+                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${environmentActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          }`}
+                      >
+                        Environmental Indicators
+                      </Link>
+                      <Link
+                        href="/water-quality?tab=depth"
+                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${depthProfileActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          }`}
+                      >
+                        Stratification Analysis
+                      </Link>
+                      <Link
+                        href="/water-quality?tab=alerts"
+                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${alertsActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          }`}
+                      >
+                        Alerts
+                      </Link>
+                      <Link
+                        href="/water-quality?tab=sensors"
+                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${sensorsActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          }`}
+                      >
+                        Sensor Activity
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
             const isActive = pathname === item.href
             const Icon = item.icon
             return (

@@ -1,35 +1,25 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { useSearchParams, usePathname } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import { Download, RefreshCw, PlusCircle, Fish, FlaskConical, Droplets } from "lucide-react"
+import { Download } from "lucide-react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
-import FarmSelector from "@/components/shared/farm-selector"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
-import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
 import KPIOverview from "@/components/dashboard/kpi-overview"
 import PopulationOverview from "@/components/dashboard/population-overview"
 import SystemsTable from "@/components/dashboard/systems-table"
 import RecentActivities from "@/components/dashboard/recent-activities"
-import HealthSummary from "@/components/dashboard/health-summary"
+import WaterQualityIndex from "@/components/dashboard/water-quality-index"
 import RecommendedActions from "@/components/dashboard/recommended-actions"
 import ProductionSummaryMetrics from "@/components/dashboard/production-summary-metrics"
 import * as XLSX from "xlsx"
 import { getProductionSummary } from "@/lib/api/production"
 import { parseDateToTimePeriod } from "@/lib/utils"
 import { logSbError } from "@/utils/supabase/log"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
 
 export default function DashboardPage() {
@@ -43,18 +33,12 @@ export default function DashboardPage() {
   const parsedPeriod = parseDateToTimePeriod(periodParam)
   const {
     selectedBatch,
-    setSelectedBatch,
     selectedSystem,
-    setSelectedSystem,
     selectedStage,
-    setSelectedStage,
     timePeriod,
     setTimePeriod,
   } = useSharedFilters(parsedPeriod.period)
-  const [refreshing, setRefreshing] = useState(false)
   const lastPeriodParam = useRef<string | null>(periodParam)
-  const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
-  const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
 
   useEffect(() => {
     if (lastPeriodParam.current === periodParam) return
@@ -71,14 +55,6 @@ export default function DashboardPage() {
     params.set("period", timePeriod)
     router.replace(`${pathname}?${params.toString()}`)
   }, [pathname, router, searchParams, timePeriod])
-
-  const handlePeriodChange = (period: TimePeriod) => {
-    setTimePeriod(period)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("period", period)
-    router.replace(`${pathname}?${params.toString()}`)
-  }
-
 
   const handleDownload = async () => {
     try {
@@ -117,112 +93,22 @@ export default function DashboardPage() {
     }
   }
 
-  const handleRefresh = async () => {
-    if (refreshing) return
-    setRefreshing(true)
-    try {
-      await queryClient.invalidateQueries()
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <section className="rounded-lg border border-border bg-card p-4 shadow-sm md:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-semibold">Dashboard</h1>
-              <p className="text-sm text-muted-foreground">
-                {farm?.name ?? profile?.farm_name ?? "Active farm"} operational intelligence and analytics.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-9 gap-2 rounded-md text-xs font-semibold cursor-pointer"
-                onClick={handleRefresh}
-                disabled={refreshing}
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                Refresh
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleDownload}
-                className="h-9 gap-2 rounded-md px-4 text-xs font-semibold cursor-pointer bg-sidebar-primary hover:bg-sidebar-primary/85"
-              >
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        <section className="sticky top-[65px] z-10 rounded-lg border border-border bg-card/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90">
-          <div className="flex flex-wrap items-center gap-2">
-            <FarmSelector
-              selectedBatch={selectedBatch}
-              selectedSystem={selectedSystem}
-              selectedStage={selectedStage}
-              onBatchChange={setSelectedBatch}
-              onSystemChange={setSelectedSystem}
-              onStageChange={setSelectedStage}
-              showStage
-              variant="compact"
-            />
-            <TimePeriodSelector
-              selectedPeriod={timePeriod}
-              onPeriodChange={handlePeriodChange}
-              variant="compact"
-            />
-            <div className="ml-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button className="h-9 rounded-md px-4 text-sm font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90">
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Add Data
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Quick Entry</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => router.push(`/data-entry?type=feeding${systemParam}${batchParam}`)}
-                  >
-                    <Fish className="mr-2 h-4 w-4" />
-                    Record Feeding
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => router.push(`/data-entry?type=sampling${systemParam}${batchParam}`)}
-                  >
-                    <FlaskConical className="mr-2 h-4 w-4" />
-                    Record Sampling
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => router.push(`/data-entry?type=water_quality${systemParam}`)}
-                  >
-                    <Droplets className="mr-2 h-4 w-4" />
-                    Record Water Quality
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push("/data-entry")}>
-                    View All Entry Types
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </section>
-
         <section className="space-y-4">
-          <div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-baseline gap-2">
             <h2 className="text-lg font-semibold">Core Performance Overview</h2>
-            <p className="text-sm text-muted-foreground">
-              Real-time snapshot of core operational and water quality indicators.
-            </p>
+          </div>
+            <Button
+              size="sm"
+              onClick={handleDownload}
+              className="mt-1 h-9 gap-2 rounded-md px-4 text-xs font-semibold cursor-pointer bg-sidebar-primary hover:bg-sidebar-primary/85"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
           </div>
           <KPIOverview
             stage={selectedStage}
@@ -235,8 +121,8 @@ export default function DashboardPage() {
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Feed Efficiency and Mortality Monitoring</h2>
-            <p className="text-sm text-muted-foreground">Trends for production, efficiency, and system health.</p>
+            <h2 className="text-lg font-semibold">Feed Efficiency and Water Quality Monitoring</h2>
+            <p className="text-sm text-muted-foreground">Trends for production, efficiency, and water quality health.</p>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
             <PopulationOverview
@@ -246,7 +132,7 @@ export default function DashboardPage() {
               timePeriod={timePeriod}
               periodParam={periodParam}
             />
-            <HealthSummary
+            <WaterQualityIndex
               stage={selectedStage}
               batch={selectedBatch}
               system={selectedSystem}

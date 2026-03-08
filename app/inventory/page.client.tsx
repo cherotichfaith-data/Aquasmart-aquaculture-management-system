@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import FarmSelector from "@/components/shared/farm-selector"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import FeedInventory from "@/components/inventory/feed-inventory"
 import FishInventory from "@/components/inventory/fish-inventory"
@@ -13,11 +12,8 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState("fish")
   const {
     selectedBatch,
-    setSelectedBatch,
     selectedSystem,
-    setSelectedSystem,
     selectedStage,
-    setSelectedStage,
   } = useSharedFilters()
 
   return (
@@ -29,14 +25,6 @@ export default function InventoryPage() {
             <p className="text-muted-foreground mt-1">Track feed stock and fish inventory</p>
           </div>
 
-          <FarmSelector
-            selectedBatch={selectedBatch}
-            selectedSystem={selectedSystem}
-            selectedStage={selectedStage}
-            onBatchChange={setSelectedBatch}
-            onSystemChange={setSelectedSystem}
-            onStageChange={setSelectedStage}
-          />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
