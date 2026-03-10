@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
+import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
 import KPIOverview from "@/components/dashboard/kpi-overview"
 import PopulationOverview from "@/components/dashboard/population-overview"
 import SystemsTable from "@/components/dashboard/systems-table"
@@ -38,6 +39,9 @@ export default function DashboardPage() {
     timePeriod,
     setTimePeriod,
   } = useSharedFilters(parsedPeriod.period)
+  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
+  const dateFrom = boundsQuery.start ?? undefined
+  const dateTo = boundsQuery.end ?? undefined
   const lastPeriodParam = useRef<string | null>(periodParam)
 
   useEffect(() => {
@@ -78,6 +82,8 @@ export default function DashboardPage() {
             stage,
             systemId: resolvedSystemId,
             limit: 1000,
+            dateFrom,
+            dateTo,
             farmId: farmId ?? null,
           }),
       })
@@ -113,6 +119,8 @@ export default function DashboardPage() {
           <KPIOverview
             stage={selectedStage}
             timePeriod={timePeriod}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
             batch={selectedBatch}
             system={selectedSystem}
             periodParam={periodParam}
@@ -130,6 +138,8 @@ export default function DashboardPage() {
               batch={selectedBatch}
               system={selectedSystem}
               timePeriod={timePeriod}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
               periodParam={periodParam}
             />
             <WaterQualityIndex
@@ -137,6 +147,8 @@ export default function DashboardPage() {
               batch={selectedBatch}
               system={selectedSystem}
               timePeriod={timePeriod}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
               periodParam={periodParam}
             />
           </div>
@@ -154,6 +166,8 @@ export default function DashboardPage() {
             batch={selectedBatch}
             system={selectedSystem}
             timePeriod={timePeriod}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
             periodParam={periodParam}
           />
         </section>
@@ -170,6 +184,8 @@ export default function DashboardPage() {
             batch={selectedBatch}
             system={selectedSystem}
             timePeriod={timePeriod}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
             periodParam={periodParam}
           />
         </section>
@@ -198,6 +214,8 @@ export default function DashboardPage() {
             batch={selectedBatch}
             system={selectedSystem}
             timePeriod={timePeriod}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
           />
         </section>
       </div>

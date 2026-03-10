@@ -26,6 +26,8 @@ interface SystemsTableProps {
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
+  dateFrom?: string
+  dateTo?: string
 }
 
 const PAGE_SIZE = 8
@@ -93,6 +95,8 @@ export default function SystemsTable({
   system = "all",
   timePeriod = "2 weeks",
   periodParam,
+  dateFrom,
+  dateTo,
 }: SystemsTableProps) {
   const router = useRouter()
   const { farmId } = useActiveFarm()
@@ -112,6 +116,8 @@ export default function SystemsTable({
     system,
     timePeriod,
     periodParam,
+    dateFrom: dateFrom ?? null,
+    dateTo: dateTo ?? null,
     includeIncomplete: true,
   })
 
@@ -158,9 +164,11 @@ export default function SystemsTable({
   const selectedInventoryQuery = useDailyFishInventory({
     farmId,
     systemId: selectedSystemId ?? undefined,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
     limit: 1,
     orderAsc: false,
-    enabled: selectedSystemId != null,
+    enabled: selectedSystemId != null && Boolean(dateFrom && dateTo),
   })
   const selectedInventoryRow =
     selectedInventoryQuery.data?.status === "success"

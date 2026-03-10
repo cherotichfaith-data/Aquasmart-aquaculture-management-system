@@ -44,6 +44,7 @@ export default function PerformanceReport({
   const chartLimit = 2000
   const [tableLimit, setTableLimit] = useState("100")
   const [showPerformanceRecords, setShowPerformanceRecords] = useState(false)
+  const boundsReady = Boolean(dateRange?.from && dateRange?.to)
   const productionSummaryQuery = useProductionSummary({
     systemId,
     stage: stage && stage !== "all" ? stage : undefined,
@@ -51,6 +52,7 @@ export default function PerformanceReport({
     dateTo: dateRange?.to,
     farmId: farmId ?? null,
     limit: chartLimit,
+    enabled: boundsReady,
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
   const performanceTableQuery = useProductionSummary({
@@ -60,7 +62,7 @@ export default function PerformanceReport({
     dateTo: dateRange?.to,
     farmId: farmId ?? null,
     limit: tableLimitValue,
-    enabled: showPerformanceRecords,
+    enabled: boundsReady && showPerformanceRecords,
   })
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const tableRows = performanceTableQuery.data?.status === "success" ? performanceTableQuery.data.data : []

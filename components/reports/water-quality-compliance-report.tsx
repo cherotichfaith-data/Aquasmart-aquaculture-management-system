@@ -14,12 +14,14 @@ type Props = {
 }
 
 export default function WaterQualityComplianceReport({ dateRange, systemId, farmName }: Props) {
+  const boundsReady = Boolean(dateRange?.from && dateRange?.to)
   const measurementsQuery = useWaterQualityMeasurements({
     systemId,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     requireSystem: false,
     limit: 2000,
+    enabled: boundsReady,
   })
   const thresholdsQuery = useAlertThresholds()
 

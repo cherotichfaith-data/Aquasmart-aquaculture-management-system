@@ -18,11 +18,15 @@ export default function RecommendedActions({
   batch,
   system,
   timePeriod,
+  dateFrom,
+  dateTo,
 }: {
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
+  dateFrom?: string
+  dateTo?: string
 }) {
   const { farmId } = useActiveFarm()
   const actionsQuery = useRecommendedActions({
@@ -31,6 +35,8 @@ export default function RecommendedActions({
     batch: batch ?? "all",
     system,
     timePeriod,
+    dateFrom: dateFrom ?? null,
+    dateTo: dateTo ?? null,
   })
 
   const actions = useMemo(() => actionsQuery.data ?? [], [actionsQuery.data])

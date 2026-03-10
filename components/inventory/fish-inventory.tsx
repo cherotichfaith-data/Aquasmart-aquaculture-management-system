@@ -15,22 +15,22 @@ export default function FishInventory({
   selectedBatch,
   selectedSystem,
   selectedStage,
+  dateFrom,
+  dateTo,
+  boundsReady = true,
 }: {
   selectedBatch: string
   selectedSystem: string
   selectedStage: "all" | "nursing" | "grow_out"
+  dateFrom?: string
+  dateTo?: string
+  boundsReady?: boolean
 }) {
   const toIsoDate = (date: Date) => {
     const year = date.getFullYear()
     const month = `${date.getMonth() + 1}`.padStart(2, "0")
     const day = `${date.getDate()}`.padStart(2, "0")
     return `${year}-${month}-${day}`
-  }
-
-  const daysAgoIso = (days: number) => {
-    const date = new Date()
-    date.setDate(date.getDate() - days)
-    return toIsoDate(date)
   }
 
   const formatCompactNumber = (value: number) =>
@@ -55,16 +55,24 @@ export default function FishInventory({
   const [tablePageSize, setTablePageSize] = useState<10 | 20 | 30>(20)
   const { farmId } = useActiveFarm()
   const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
-  const dateFrom = useMemo(() => daysAgoIso(trendWindowDays), [trendWindowDays])
-  const dateTo = useMemo(() => toIsoDate(new Date()), [])
+  const windowStart = useMemo(() => {
+    if (!dateTo) return dateFrom ?? null
+    const endDate = new Date(`${dateTo}T00:00:00`)
+    if (Number.isNaN(endDate.getTime())) return dateFrom ?? null
+    endDate.setDate(endDate.getDate() - trendWindowDays)
+    const shifted = toIsoDate(endDate)
+    if (!dateFrom) return shifted
+    return shifted < dateFrom ? dateFrom : shifted
+  }, [dateFrom, dateTo, trendWindowDays])
 
   const inventoryQuery = useDailyFishInventory({
     farmId,
     systemId: Number.isFinite(systemId) ? systemId : undefined,
-    dateFrom,
-    dateTo,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
     limit: 2500,
     orderAsc: true,
+    enabled: boundsReady,
   })
   const systemsQuery = useSystemOptions({
     farmId,
@@ -106,10 +114,16 @@ export default function FishInventory({
     return new Set(fromBatch.filter((id) => stageSet.has(id)))
   }, [batchSystemIdsQuery.data, selectedBatch, systemsQuery.data])
 
-  const filteredRows = useMemo(
-    () => rows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
-    [rows, scopedSystemIds],
-  )
+  const filteredRows = useMemo(() => {
+    const scoped = rows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id))
+    if (!windowStart && !dateTo) return scoped
+    return scoped.filter((row) => {
+      if (!row.inventory_date) return false
+      if (windowStart && row.inventory_date < windowStart) return false
+      if (dateTo && row.inventory_date > dateTo) return false
+      return true
+    })
+  }, [rows, scopedSystemIds, windowStart, dateTo])
 
   const dailyTrend = useMemo(() => {
     const byDate = new Map<string, { fish: number; mortality: number; biomass: number }>()

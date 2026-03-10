@@ -1,13 +1,11 @@
 "use client"
 
 import { useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { Gauge } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
-import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 
@@ -110,22 +108,18 @@ export default function WaterQualityIndex({
   system,
   timePeriod,
   periodParam,
+  dateFrom,
+  dateTo,
 }: {
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
+  dateFrom?: string
+  dateTo?: string
 }) {
   const { farmId } = useActiveFarm()
-  const boundsQuery = useQuery({
-    queryKey: ["dashboard-wqi-bounds", farmId ?? "all", periodParam ?? timePeriod ?? "2 weeks"],
-    queryFn: ({ signal }) => getTimePeriodBounds(periodParam ?? timePeriod ?? "2 weeks", signal, farmId ?? null),
-    enabled: Boolean(farmId),
-    staleTime: 5 * 60_000,
-  })
-  const dateFrom = boundsQuery.data?.start ?? undefined
-  const dateTo = boundsQuery.data?.end ?? undefined
   const boundsReady = Boolean(dateFrom && dateTo)
 
   const { selectedSystemId, scopedSystemIdList } = useScopedSystemIds({
@@ -137,8 +131,8 @@ export default function WaterQualityIndex({
 
   const measurementsQuery = useWaterQualityMeasurements({
     systemId: selectedSystemId,
-    dateFrom,
-    dateTo,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
     requireSystem: false,
     limit: 2000,
     enabled: boundsReady,

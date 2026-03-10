@@ -3,6 +3,8 @@
 import { useState } from "react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
+import { useActiveFarm } from "@/hooks/use-active-farm"
+import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
 import FeedInventory from "@/components/inventory/feed-inventory"
 import FishInventory from "@/components/inventory/fish-inventory"
 import ReconciliationReport from "@/components/inventory/reconciliation-report"
@@ -10,11 +12,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState("fish")
+  const { farmId } = useActiveFarm()
   const {
     selectedBatch,
     selectedSystem,
     selectedStage,
+    timePeriod,
   } = useSharedFilters()
+  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
+  const dateFrom = boundsQuery.start ?? undefined
+  const dateTo = boundsQuery.end ?? undefined
+  const boundsReady = boundsQuery.hasBounds
 
   return (
     <DashboardLayout>
@@ -39,6 +47,9 @@ export default function InventoryPage() {
               selectedBatch={selectedBatch}
               selectedSystem={selectedSystem}
               selectedStage={selectedStage}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              boundsReady={boundsReady}
             />
           </TabsContent>
 
@@ -47,6 +58,9 @@ export default function InventoryPage() {
               selectedBatch={selectedBatch}
               selectedSystem={selectedSystem}
               selectedStage={selectedStage}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              boundsReady={boundsReady}
             />
           </TabsContent>
 
@@ -55,6 +69,9 @@ export default function InventoryPage() {
               selectedBatch={selectedBatch}
               selectedSystem={selectedSystem}
               selectedStage={selectedStage}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              boundsReady={boundsReady}
             />
           </TabsContent>
         </Tabs>

@@ -1,13 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { useRecentActivities, useSystemsTable } from "@/lib/hooks/use-dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
+import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
 import { useSystemOptions } from "@/lib/hooks/use-options"
-import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import {
   EVENT_LABEL,
   normalizeTableName,
@@ -38,15 +37,10 @@ export default function TransactionsPage() {
   } = useSharedFilters("month")
   const [selectedEventType, setSelectedEventType] = useState<ActivityType>("all")
   const [selectedOperator, setSelectedOperator] = useState<string>("all")
-  const boundsQuery = useQuery({
-    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
-    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
-    enabled: Boolean(farmId),
-    staleTime: 5 * 60_000,
-  })
-  const dateFrom = boundsQuery.data?.start ?? null
-  const dateTo = boundsQuery.data?.end ?? null
-  const boundsReady = Boolean(dateFrom && dateTo)
+  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
+  const dateFrom = boundsQuery.start ?? null
+  const dateTo = boundsQuery.end ?? null
+  const boundsReady = boundsQuery.hasBounds
 
   const activitiesQuery = useRecentActivities({
     dateFrom: dateFrom ? `${dateFrom}T00:00:00` : undefined,
@@ -62,6 +56,8 @@ export default function TransactionsPage() {
     batch: selectedBatch,
     system: selectedSystem,
     timePeriod,
+    dateFrom,
+    dateTo,
   })
 
   const systemOptions = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []

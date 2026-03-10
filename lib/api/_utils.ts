@@ -17,6 +17,7 @@ export type KpiRpcName =
   | "api_dashboard_systems"
   | "api_daily_overlay"
   | "api_daily_fish_inventory"
+  | "api_daily_fish_inventory_rpc"
   | "api_efcr_trend"
   | "api_production_summary"
   | "api_latest_water_quality_status"

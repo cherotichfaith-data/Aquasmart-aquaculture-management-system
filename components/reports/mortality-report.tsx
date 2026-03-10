@@ -34,12 +34,14 @@ export default function MortalityReport({
   const chartLimit = 2000
   const [tableLimit, setTableLimit] = useState("100")
   const [showMortalityRecords, setShowMortalityRecords] = useState(false)
+  const boundsReady = Boolean(dateRange?.from && dateRange?.to)
   const mortalityQuery = useMortalityData({
     systemId,
     batchId,
     limit: chartLimit,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
+    enabled: boundsReady,
   })
   const measurementsQuery = useWaterQualityMeasurements({
     systemId,
@@ -47,6 +49,7 @@ export default function MortalityReport({
     dateTo: dateRange?.to,
     requireSystem: Boolean(systemId),
     limit: chartLimit,
+    enabled: boundsReady,
   })
   const thresholdsQuery = useAlertThresholds()
   const inventoryQuery = useDailyFishInventory({
@@ -55,6 +58,7 @@ export default function MortalityReport({
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     limit: chartLimit,
+    enabled: boundsReady,
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
   const mortalityTableQuery = useMortalityData({
@@ -63,7 +67,7 @@ export default function MortalityReport({
     limit: tableLimitValue,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
-    enabled: showMortalityRecords,
+    enabled: boundsReady && showMortalityRecords,
   })
   const rows = mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : []
   const tableRows = mortalityTableQuery.data?.status === "success" ? mortalityTableQuery.data.data : []

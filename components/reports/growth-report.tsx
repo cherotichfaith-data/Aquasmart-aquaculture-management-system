@@ -30,6 +30,7 @@ export default function GrowthReport({
   farmName?: string | null
 }) {
   const { farmId } = useActiveFarm()
+  const boundsReady = Boolean(dateRange?.from && dateRange?.to)
   const productionSummaryQuery = useProductionSummary({
     systemId,
     stage: stage && stage !== "all" ? stage : undefined,
@@ -37,6 +38,7 @@ export default function GrowthReport({
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     farmId: farmId ?? null,
+    enabled: boundsReady,
   })
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const loading = productionSummaryQuery.isLoading

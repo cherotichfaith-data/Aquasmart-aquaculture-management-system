@@ -342,15 +342,15 @@ export default function SettingsPage() {
 
         {/* Notification */}
         {saved && (
-          <div className="bg-green-500/10 border border-green-500 rounded-lg p-4 flex items-center gap-3">
-            <Check className="text-green-600" size={20} />
-            <p className="text-green-700 font-medium">Settings saved successfully</p>
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 flex items-center gap-3">
+            <Check className="text-emerald-600 dark:text-emerald-300" size={20} />
+            <p className="text-emerald-700 dark:text-emerald-300 font-medium">Settings saved successfully</p>
           </div>
         )}
         {errorMsg && (
-          <div className="bg-red-500/10 border border-red-500 rounded-lg p-4 flex items-center gap-3">
-            <AlertCircle className="text-red-600" size={20} />
-            <p className="text-red-700 font-medium">{errorMsg}</p>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center gap-3">
+            <AlertCircle className="text-red-600 dark:text-red-300" size={20} />
+            <p className="text-red-700 dark:text-red-300 font-medium">{errorMsg}</p>
           </div>
         )}
 

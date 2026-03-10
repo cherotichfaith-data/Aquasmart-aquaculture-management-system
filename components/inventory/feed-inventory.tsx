@@ -23,15 +23,28 @@ export default function FeedInventory({
   selectedBatch,
   selectedSystem,
   selectedStage,
+  dateFrom,
+  dateTo,
+  boundsReady = true,
 }: {
   selectedBatch: string
   selectedSystem: string
   selectedStage: "all" | "nursing" | "grow_out"
+  dateFrom?: string
+  dateTo?: string
+  boundsReady?: boolean
 }) {
   const { farmId } = useActiveFarm()
-  const feedIncomingQuery = useFeedIncoming()
+  const feedIncomingQuery = useFeedIncoming({ dateFrom, dateTo, enabled: boundsReady })
   const feedTypesQuery = useFeedTypes()
-  const inventoryQuery = useDailyFishInventory({ farmId, limit: 5000, orderAsc: true })
+  const inventoryQuery = useDailyFishInventory({
+    farmId,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
+    limit: 5000,
+    orderAsc: true,
+    enabled: boundsReady,
+  })
   const systemsQuery = useSystemOptions({ farmId, stage: selectedStage, activeOnly: true })
   const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
   const batchSystemIdsQuery = useBatchSystemIds({ batchId: Number.isFinite(batchId) ? batchId : undefined })

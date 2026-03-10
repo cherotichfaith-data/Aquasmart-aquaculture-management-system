@@ -14,13 +14,22 @@ import {
   getTransferData,
 } from "@/lib/api/reports"
 
-export function useFeedIncoming(params?: { limit?: number }) {
+export function useFeedIncoming(params?: { dateFrom?: string; dateTo?: string; limit?: number; enabled?: boolean }) {
   const { session } = useAuth()
   const { farmId } = useActiveFarm()
+  const enabled = Boolean(session) && (params?.enabled ?? true)
   return useQuery({
-    queryKey: ["reports", "feed-incoming", farmId ?? "all", params?.limit ?? 50],
-    queryFn: ({ signal }) => getFeedIncomingWithType({ limit: params?.limit, signal }),
-    enabled: Boolean(session),
+    queryKey: [
+      "reports",
+      "feed-incoming",
+      farmId ?? "all",
+      params?.dateFrom ?? "",
+      params?.dateTo ?? "",
+      params?.limit ?? 50,
+    ],
+    queryFn: ({ signal }) =>
+      getFeedIncomingWithType({ dateFrom: params?.dateFrom, dateTo: params?.dateTo, limit: params?.limit, signal }),
+    enabled,
     staleTime: 5 * 60_000,
   })
 }

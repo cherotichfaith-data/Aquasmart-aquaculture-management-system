@@ -33,12 +33,14 @@ export default function FeedingReport({
   const chartLimit = 2000
   const [tableLimit, setTableLimit] = useState("100")
   const [showFeedingRecords, setShowFeedingRecords] = useState(false)
+  const boundsReady = Boolean(dateRange?.from && dateRange?.to)
   const feedingRecordsQuery = useFeedingRecords({
     systemId,
     batchId,
     limit: chartLimit,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
+    enabled: boundsReady,
   })
   const summaryQuery = useProductionSummary({
     farmId,
@@ -46,6 +48,7 @@ export default function FeedingReport({
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     limit: chartLimit,
+    enabled: boundsReady,
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
   const feedingTableQuery = useFeedingRecords({
@@ -54,7 +57,7 @@ export default function FeedingReport({
     limit: tableLimitValue,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
-    enabled: showFeedingRecords,
+    enabled: boundsReady && showFeedingRecords,
   })
   const records = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
   const tableRecords = feedingTableQuery.data?.status === "success" ? feedingTableQuery.data.data : []

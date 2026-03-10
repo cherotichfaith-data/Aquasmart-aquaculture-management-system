@@ -14,10 +14,16 @@ export default function ReconciliationReport({
   selectedBatch,
   selectedSystem,
   selectedStage,
+  dateFrom,
+  dateTo,
+  boundsReady = true,
 }: {
   selectedBatch: string
   selectedSystem: string
   selectedStage: "all" | "nursing" | "grow_out"
+  dateFrom?: string
+  dateTo?: string
+  boundsReady?: boolean
 }) {
   const { farmId } = useActiveFarm()
   const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
@@ -28,8 +34,11 @@ export default function ReconciliationReport({
   const inventoryQuery = useDailyFishInventory({
     farmId,
     systemId: Number.isFinite(systemId) ? systemId : undefined,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
     limit: 5000,
     orderAsc: true,
+    enabled: boundsReady,
   })
   const systemsQuery = useSystemOptions({
     farmId,

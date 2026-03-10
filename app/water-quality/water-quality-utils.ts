@@ -43,9 +43,9 @@ export const parseJsonish = (value: string | null | undefined): string | null =>
 }
 
 export const statusClass = (tone: StatusTone) => {
-  if (tone === "green") return "bg-green-500/10 text-green-600"
-  if (tone === "yellow") return "bg-yellow-500/10 text-yellow-600"
-  return "bg-red-500/10 text-red-600"
+  if (tone === "green") return "bg-green-500/10 text-green-600 dark:text-green-300"
+  if (tone === "yellow") return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-300"
+  return "bg-red-500/10 text-red-600 dark:text-red-300"
 }
 
 export const formatTimestamp = (value: string) => {

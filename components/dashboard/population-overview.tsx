@@ -40,12 +40,16 @@ export default function PopulationOverview({
     system,
     timePeriod,
     periodParam,
+    dateFrom,
+    dateTo,
 }: {
     stage: SummaryRow["growth_stage"]
     batch?: string
     system?: string
     timePeriod: TimePeriod
     periodParam?: string | null
+    dateFrom?: string
+    dateTo?: string
 }) {
     const { farmId } = useActiveFarm()
     const summaryQuery = useProductionTrend({
@@ -54,6 +58,8 @@ export default function PopulationOverview({
         batch: batch ?? "all",
         system,
         timePeriod: periodParam ?? timePeriod,
+        dateFrom: dateFrom ?? null,
+        dateTo: dateTo ?? null,
     })
 
     const chartData = useMemo(() => {

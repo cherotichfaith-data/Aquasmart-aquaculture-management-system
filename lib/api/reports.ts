@@ -36,12 +36,19 @@ const isAbortLikeError = (err: unknown): boolean => {
   return name.includes("abort") || name.includes("cancel") || message.includes("abort") || message.includes("cancel")
 }
 
-export async function getFeedIncomingWithType(params?: { limit?: number; signal?: AbortSignal }): Promise<QueryResult<FeedIncomingWithType>> {
+export async function getFeedIncomingWithType(params?: {
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  signal?: AbortSignal
+}): Promise<QueryResult<FeedIncomingWithType>> {
   const clientResult = await getClientOrError("getFeedIncomingWithType", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
   let query = supabase.from("feed_incoming").select("*").order("date", { ascending: false })
+  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
+  if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
   if (params?.signal) query = query.abortSignal(params.signal)
 

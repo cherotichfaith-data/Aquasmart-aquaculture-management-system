@@ -1,7 +1,6 @@
 "use client"
 
 import { Suspense, useEffect, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { useSearchParams, useRouter } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import type { Enums } from "@/lib/types/database"
@@ -17,7 +16,7 @@ import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
-import { getTimePeriodBounds } from "@/lib/api/dashboard"
+import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
 import ProductionMetricFilter from "@/components/production/metrics-filter"
 import ProductionChart from "@/components/production/production-chart"
 import ProductionTable from "@/components/production/production-table"
@@ -41,8 +40,6 @@ function ProductionContent() {
 
   const metricParam = searchParams.get("metric")
   const filterParam = searchParams.get("filter")
-  const startDateParam = searchParams.get("startDate")
-  const endDateParam = searchParams.get("endDate")
   const paramSystem = searchParams.get("system") ?? "all"
   const paramStage = parseStageParam(searchParams.get("stage"))
   const periodParam = searchParams.get("period")
@@ -88,8 +85,6 @@ function ProductionContent() {
     if (selectedBatch !== "all") params.set("batch", selectedBatch)
     if (filterParam) params.set("filter", filterParam)
     if (metricParam) params.set("metric", metricParam)
-    if (startDateParam) params.set("startDate", startDateParam)
-    if (endDateParam) params.set("endDate", endDateParam)
 
     router.replace(`/production?${params.toString()}`)
   }, [
@@ -99,8 +94,6 @@ function ProductionContent() {
     selectedBatch,
     router,
     metricParam,
-    startDateParam,
-    endDateParam,
     filterParam,
   ])
 
@@ -109,23 +102,15 @@ function ProductionContent() {
   const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
   const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
 
-  const boundsQuery = useQuery({
-    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
-    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
-    enabled: Boolean(farmId),
-    staleTime: 5 * 60_000,
-  })
-  const hasBounds = Boolean(boundsQuery.data?.start && boundsQuery.data?.end)
+  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
+  const hasBounds = boundsQuery.hasBounds
   const dateRange = useMemo(() => {
-    if (startDateParam && endDateParam) {
-      return { startDate: startDateParam, endDate: endDateParam }
-    }
     if (hasBounds) {
-      return { startDate: boundsQuery.data?.start ?? "", endDate: boundsQuery.data?.end ?? "" }
+      return { startDate: boundsQuery.start ?? "", endDate: boundsQuery.end ?? "" }
     }
     return { startDate: "", endDate: "" }
-  }, [endDateParam, hasBounds, startDateParam, boundsQuery.data])
-  const rangeEnabled = Boolean(startDateParam && endDateParam) || hasBounds
+  }, [hasBounds, boundsQuery.start, boundsQuery.end])
+  const rangeEnabled = hasBounds
 
   const systemOptionsQuery = useSystemOptions({
     farmId,

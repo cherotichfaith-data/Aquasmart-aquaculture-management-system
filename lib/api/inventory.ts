@@ -3,7 +3,7 @@ import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
-type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory"]["Returns"][number]
+type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 
 type DailyInventoryRpcArgs = {
   p_farm_id: string
@@ -12,6 +12,7 @@ type DailyInventoryRpcArgs = {
   p_end_date?: string
   // NEW (server-side paging/order)
   p_cursor_date?: string
+  p_cursor_system_id?: number
   p_order_asc?: boolean
   p_limit?: number
 }
@@ -60,19 +61,18 @@ export async function getDailyFishInventory(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = queryKpiRpc(
-    supabase,
-    "api_daily_fish_inventory",
-    dailyInventoryRpcArgs({
-      farmId: params.farmId,
-      systemId: params.systemId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-      cursorDate: params.cursorDate,
-      orderAsc: params.orderAsc,
-      limit: params.limit,
-    }),
-  )
+  const args = dailyInventoryRpcArgs({
+    farmId: params.farmId,
+    systemId: params.systemId,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+    cursorDate: params.cursorDate,
+    orderAsc: params.orderAsc,
+    limit: params.limit,
+  })
+
+  // api_daily_fish_inventory_rpc is the canonical RPC for frontend reads.
+  let query = queryKpiRpc(supabase, "api_daily_fish_inventory_rpc", args)
   if (params?.signal) query = query.abortSignal(params.signal)
 
   const { data, error } = await query
@@ -86,5 +86,3 @@ export async function getDailyFishInventory(params?: {
   // No client-side sort/paging needed: backend already applied cursor/order/limit.
   return toQuerySuccess<DailyFishInventoryRow>((data ?? []) as DailyFishInventoryRow[])
 }
-
-// Intentionally limited to the canonical inventory RPC to avoid stale/legacy helpers.

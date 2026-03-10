@@ -19,12 +19,16 @@ export default function ProductionSummaryMetrics({
   system,
   timePeriod = "2 weeks",
   periodParam,
+  dateFrom,
+  dateTo,
 }: {
   stage: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
+  dateFrom?: string
+  dateTo?: string
 }) {
   const { farmId } = useActiveFarm()
   const metricsQuery = useProductionSummaryMetrics({
@@ -34,6 +38,8 @@ export default function ProductionSummaryMetrics({
     system,
     timePeriod,
     periodParam,
+    dateFrom: dateFrom ?? null,
+    dateTo: dateTo ?? null,
   })
   const errorMessage = getErrorMessage(metricsQuery.error)
 

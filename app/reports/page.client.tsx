@@ -18,25 +18,15 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
+import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useRecentActivities } from "@/lib/hooks/use-dashboard"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { downloadCsv } from "@/lib/utils/report-export"
 import { Download } from "lucide-react"
 
-const shiftDays = (base: string, days: number) => {
-  const d = new Date(`${base}T00:00:00`)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
 export default function ReportsPage() {
   const { farmId, farm } = useActiveFarm()
-  const today = new Date().toISOString().slice(0, 10)
-  const [dateRange, setDateRange] = useState({
-    from: shiftDays(today, -30),
-    to: today,
-  })
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
   const [activeTab, setActiveTab] = useState<string>("performance")
@@ -44,8 +34,13 @@ export default function ReportsPage() {
     selectedBatch,
     selectedSystem,
     selectedStage,
+    timePeriod,
   } = useSharedFilters()
-  const [template, setTemplate] = useState<"weekly" | "monthly" | "seasonal">("monthly")
+  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
+  const hasBounds = boundsQuery.hasBounds
+  const dateFrom = boundsQuery.start ?? ""
+  const dateTo = boundsQuery.end ?? ""
+  const dateRange = useMemo(() => ({ from: dateFrom, to: dateTo }), [dateFrom, dateTo])
 
   useEffect(() => {
     if (!tabParam) return
@@ -61,44 +56,34 @@ export default function ReportsPage() {
   const inventoryQuery = useDailyFishInventory({
     farmId,
     systemId: selectedSystemId,
-    dateFrom: dateRange.from,
-    dateTo: dateRange.to,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
     limit: 2000,
+    enabled: hasBounds,
   })
   const activityQuery = useRecentActivities({
-    dateFrom: `${dateRange.from}T00:00:00`,
-    dateTo: `${dateRange.to}T23:59:59`,
+    dateFrom: dateFrom ? `${dateFrom}T00:00:00` : undefined,
+    dateTo: dateTo ? `${dateTo}T23:59:59` : undefined,
     limit: 2000,
+    enabled: hasBounds,
   })
   const kpiQuery = useProductionSummary({
     farmId,
     systemId: selectedSystemId,
     stage: selectedStage === "all" ? undefined : selectedStage,
-    dateFrom: dateRange.from,
-    dateTo: dateRange.to,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
     limit: 2000,
+    enabled: hasBounds,
   })
 
   const inventoryRows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
   const activityRows = activityQuery.data?.status === "success" ? activityQuery.data.data : []
   const kpiRows = kpiQuery.data?.status === "success" ? kpiQuery.data.data : []
 
-  const templateCommentary = useMemo(() => {
-    if (template === "weekly") return "Weekly template for operational review."
-    if (template === "seasonal") return "Seasonal template for strategic benchmarking."
-    return "Monthly template for stakeholder performance review."
-  }, [template])
-
-  const applyTemplate = (next: "weekly" | "monthly" | "seasonal") => {
-    setTemplate(next)
-    const end = dateRange.to
-    const span = next === "weekly" ? -7 : next === "monthly" ? -30 : -90
-    setDateRange({ from: shiftDays(end, span), to: end })
-  }
-
   const exportInventoryCsv = () =>
     downloadCsv({
-      filename: `inventory-${dateRange.from}-to-${dateRange.to}.csv`,
+      filename: `inventory-${dateRange.from || "start"}-to-${dateRange.to || "end"}.csv`,
       headers: ["inventory_date", "system_id", "system_name", "number_of_fish", "feeding_amount", "mortality_rate"],
       rows: inventoryRows.map((row) => [
         row.inventory_date,
@@ -112,7 +97,7 @@ export default function ReportsPage() {
 
   const exportTransactionsCsv = () =>
     downloadCsv({
-      filename: `transactions-${dateRange.from}-to-${dateRange.to}.csv`,
+      filename: `transactions-${dateRange.from || "start"}-to-${dateRange.to || "end"}.csv`,
       headers: ["change_time", "table_name", "record_id", "column_name", "change_type", "old_value", "new_value"],
       rows: activityRows.map((row) => [
         row.change_time,
@@ -127,7 +112,7 @@ export default function ReportsPage() {
 
   const exportKpisCsv = () =>
     downloadCsv({
-      filename: `kpis-${dateRange.from}-to-${dateRange.to}.csv`,
+      filename: `kpis-${dateRange.from || "start"}-to-${dateRange.to || "end"}.csv`,
       headers: ["date", "system_name", "efcr_period", "total_biomass", "total_feed_amount_period", "daily_mortality_count"],
       rows: kpiRows.map((row) => [
         row.date,
@@ -151,30 +136,6 @@ export default function ReportsPage() {
 
         <section className="sticky top-[65px] z-10 rounded-lg border border-border bg-card/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90">
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={template}
-              onChange={(event) => applyTemplate(event.target.value as "weekly" | "monthly" | "seasonal")}
-              className="h-9 min-w-[130px] rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground"
-              aria-label="Report template"
-            >
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="seasonal">Seasonal</option>
-            </select>
-            <input
-              type="date"
-              value={dateRange.from}
-              onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              aria-label="From date"
-            />
-            <input
-              type="date"
-              value={dateRange.to}
-              onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              aria-label="To date"
-            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-9 gap-2 ml-auto">
@@ -189,7 +150,6 @@ export default function ReportsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">{templateCommentary}</p>
         </section>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

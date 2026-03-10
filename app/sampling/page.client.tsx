@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import {
   CartesianGrid,
@@ -16,9 +15,9 @@ import {
 } from "recharts"
 import { useSamplingData, useTransferData } from "@/lib/hooks/use-reports"
 import { sortByDateAsc } from "@/lib/utils"
-import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
+import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
@@ -108,12 +107,19 @@ export default function SamplingPage() {
     selectedSystem,
   })
 
+  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
+  const hasBounds = boundsQuery.hasBounds
+  const dateFrom = boundsQuery.start ?? undefined
+  const dateTo = boundsQuery.end ?? undefined
+
   const systemsTableQuery = useSystemsTable({
     farmId,
     stage: selectedStage,
     batch: selectedBatch,
     system: selectedSystem,
     timePeriod,
+    dateFrom,
+    dateTo,
     includeIncomplete: true,
   })
 
@@ -133,16 +139,6 @@ export default function SamplingPage() {
   })
 
   const samplingQueryEnabled = hasSystem || scopedSystemIdList.length > 0
-
-  const boundsQuery = useQuery({
-    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
-    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
-    enabled: Boolean(farmId),
-    staleTime: 5 * 60_000,
-  })
-  const hasBounds = Boolean(boundsQuery.data?.start && boundsQuery.data?.end)
-  const dateFrom = boundsQuery.data?.start ?? undefined
-  const dateTo = boundsQuery.data?.end ?? undefined
 
   const samplingQuery = useSamplingData({
     systemId: hasSystem ? (systemId as number) : undefined,

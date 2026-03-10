@@ -65,12 +65,16 @@ export default function HealthSummary({
   system,
   timePeriod: _timePeriod,
   periodParam,
+  dateFrom,
+  dateTo,
 }: {
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
+  dateFrom?: string
+  dateTo?: string
 }) {
   const { farmId } = useActiveFarm()
   const summaryQuery = useHealthSummary({
@@ -80,6 +84,8 @@ export default function HealthSummary({
     system,
     timePeriod: _timePeriod ?? "2 weeks",
     periodParam,
+    dateFrom: dateFrom ?? null,
+    dateTo: dateTo ?? null,
   })
 
   const waterQuality = useMemo(() => summaryQuery.data?.waterQuality ?? null, [summaryQuery.data])

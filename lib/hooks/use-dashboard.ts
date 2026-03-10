@@ -6,7 +6,6 @@ import { useAuth } from "@/components/providers/auth-provider"
 import {
   getDashboardSystems,
   getDashboardConsolidated,
-  getTimePeriodBounds,
 } from "@/lib/api/dashboard"
 import { sortByDateAsc } from "@/lib/utils"
 import { getDailyFishInventory } from "@/lib/api/inventory"
@@ -42,6 +41,8 @@ async function resolveScopedSystemIds(params: {
   stage?: "all" | Enums<"system_growth_stage">
   system?: string
   batch?: string
+  dateFrom?: string | null
+  dateTo?: string | null
   signal?: AbortSignal
 }): Promise<number[] | null> {
   const farmId = params.farmId ?? null
@@ -56,6 +57,8 @@ async function resolveScopedSystemIds(params: {
     farmId,
     stage: params.stage && params.stage !== "all" ? params.stage : undefined,
     systemId: parsedSystemId,
+    dateFrom: params.dateFrom ?? undefined,
+    dateTo: params.dateTo ?? undefined,
     signal: params.signal,
   })
   if (systemsResult.status !== "success") return null
@@ -97,6 +100,8 @@ export function useHealthSummary(params: {
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
+  dateFrom?: string | null
+  dateTo?: string | null
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -107,6 +112,8 @@ export function useHealthSummary(params: {
       params.batch ?? "all",
       params.system ?? "all",
       params.periodParam ?? params.timePeriod ?? "2 weeks",
+      params.dateFrom ?? "",
+      params.dateTo ?? "",
     ],
     queryFn: async ({ signal }) => {
       const ratingToneMap: Record<string, { status: string; tone: "good" | "warn" | "bad"; progress: number }> = {
@@ -116,20 +123,13 @@ export function useHealthSummary(params: {
         lethal: { status: "Critical", tone: "bad", progress: 0.2 },
       }
 
-      const scopedSystemIds = await resolveScopedSystemIds({
-        farmId: params.farmId ?? null,
-        stage: params.stage ?? "all",
-        system: params.system,
-        batch: params.batch ?? "all",
-        signal,
-      })
+      const dateFrom = params.dateFrom ?? null
+      const dateTo = params.dateTo ?? null
+
       const resolvedSystemId =
-        scopedSystemIds && scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
-      const bounds = await getTimePeriodBounds(
-        params.periodParam ?? params.timePeriod ?? "2 weeks",
-        signal,
-        params.farmId ?? null,
-      )
+        params.system && params.system !== "all" && Number.isFinite(Number(params.system))
+          ? Number(params.system)
+          : undefined
 
       const waterQualityState: NonNullable<HealthSummaryState["waterQuality"]> = {
         title: "Water quality",
@@ -147,23 +147,36 @@ export function useHealthSummary(params: {
         detail: "Latest snapshot from dashboard view",
       }
 
-      if (!bounds.start || !bounds.end) {
+      if (!dateFrom || !dateTo) {
         return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
       }
+
+      const scopedSystemIds = await resolveScopedSystemIds({
+        farmId: params.farmId ?? null,
+        stage: params.stage ?? "all",
+        system: params.system,
+        batch: params.batch ?? "all",
+        dateFrom,
+        dateTo,
+        signal,
+      })
+      const scopedResolvedSystemId =
+        scopedSystemIds && scopedSystemIds.length === 1 ? scopedSystemIds[0] : resolvedSystemId
+
       const wqResult = await getWaterQualityRatings({
         farmId: params.farmId ?? null,
-        systemId: resolvedSystemId,
-        dateFrom: bounds.start,
-        dateTo: bounds.end,
+        systemId: scopedResolvedSystemId,
+        dateFrom,
+        dateTo,
         limit: 2000,
         signal,
       })
 
       const invResult = await getDailyFishInventory({
         farmId: params.farmId ?? null,
-        systemId: resolvedSystemId,
-        dateFrom: bounds.start,
-        dateTo: bounds.end,
+        systemId: scopedResolvedSystemId,
+        dateFrom,
+        dateTo,
         limit: 2000,
         signal,
       })
@@ -280,6 +293,8 @@ export function useKpiOverview(params: {
   batch?: string
   system?: string
   periodParam?: string | null
+  dateFrom?: string | null
+  dateTo?: string | null
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -291,6 +306,8 @@ export function useKpiOverview(params: {
       params.batch ?? "all",
       params.system ?? "all",
       params.periodParam ?? "",
+      params.dateFrom ?? "",
+      params.dateTo ?? "",
     ],
     queryFn: async ({ signal }) => {
       const ratingToneMap: Record<string, { tone: KPIOverviewMetric["tone"]; badge: string }> = {
@@ -299,7 +316,8 @@ export function useKpiOverview(params: {
         critical: { tone: "bad", badge: "Critical" },
         lethal: { tone: "bad", badge: "Lethal" },
       }
-      const bounds = await getTimePeriodBounds(params.periodParam ?? params.timePeriod, signal, params.farmId ?? null)
+      const dateFrom = params.dateFrom ?? null
+      const dateTo = params.dateTo ?? null
 
       const buildRangeMetrics = async (range: { start: string; end: string }) => {
         const scopedSystemIds = await resolveScopedSystemIds({
@@ -307,6 +325,8 @@ export function useKpiOverview(params: {
           stage: params.stage,
           system: params.system,
           batch: params.batch ?? "all",
+          dateFrom: range.start,
+          dateTo: range.end,
           signal,
         })
         if (scopedSystemIds === null) return { metrics: [], dateBounds: range }
@@ -449,7 +469,6 @@ export function useKpiOverview(params: {
           systemId: singleSystemId,
           dateFrom: range.start,
           dateTo: range.end,
-          timePeriod: params.periodParam ?? params.timePeriod,
           signal,
         })
         const consolidatedRow =
@@ -561,10 +580,10 @@ export function useKpiOverview(params: {
         return { metrics: nextMetrics, dateBounds: range }
       }
 
-      if (!bounds.start || !bounds.end) {
-        return { metrics: [], dateBounds: bounds }
+      if (!dateFrom || !dateTo) {
+        return { metrics: [], dateBounds: { start: dateFrom, end: dateTo } }
       }
-      return buildRangeMetrics({ start: bounds.start, end: bounds.end })
+      return buildRangeMetrics({ start: dateFrom, end: dateTo })
     },
     enabled: Boolean(session) && Boolean(params.farmId),
     staleTime: 5 * 60_000,
@@ -580,6 +599,8 @@ export function useProductionSummaryMetrics(params: {
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
+  dateFrom?: string | null
+  dateTo?: string | null
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -590,6 +611,8 @@ export function useProductionSummaryMetrics(params: {
       params.batch ?? "all",
       params.system ?? "all",
       params.periodParam ?? params.timePeriod ?? "2 weeks",
+      params.dateFrom ?? "",
+      params.dateTo ?? "",
     ],
     queryFn: async ({ signal }) => {
       const empty: ProductionSummaryMetrics = {
@@ -601,41 +624,41 @@ export function useProductionSummaryMetrics(params: {
         dateBounds: { start: null, end: null },
       }
 
+      const dateFrom = params.dateFrom ?? null
+      const dateTo = params.dateTo ?? null
+
+      if (!dateFrom || !dateTo) {
+        return {
+          ...empty,
+          dateBounds: { start: dateFrom, end: dateTo },
+        }
+      }
+
       const scopedSystemIds = await resolveScopedSystemIds({
         farmId: params.farmId ?? null,
         stage: params.stage ?? "all",
         system: params.system,
         batch: params.batch ?? "all",
+        dateFrom,
+        dateTo,
         signal,
       })
       if (scopedSystemIds === null || scopedSystemIds.length === 0) return empty
-
-      const bounds = await getTimePeriodBounds(
-        params.periodParam ?? params.timePeriod ?? "2 weeks",
-        signal,
-        params.farmId ?? null,
-      )
-      if (!bounds.start || !bounds.end) {
-        return {
-          ...empty,
-          dateBounds: bounds,
-        }
-      }
 
       const singleSystemId = scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
       const summaryResult = await getProductionSummary({
         farmId: params.farmId ?? null,
         systemId: singleSystemId,
         stage: params.stage === "all" ? undefined : params.stage,
-        dateFrom: bounds.start,
-        dateTo: bounds.end,
+        dateFrom,
+        dateTo,
         limit: 5000,
         signal,
       })
       if (summaryResult.status !== "success") {
         return {
           ...empty,
-          dateBounds: bounds,
+          dateBounds: { start: dateFrom, end: dateTo },
         }
       }
 
@@ -645,15 +668,15 @@ export function useProductionSummaryMetrics(params: {
           : undefined
       const transferResult = await getTransferData({
         batchId,
-        dateFrom: bounds.start,
-        dateTo: bounds.end,
+        dateFrom,
+        dateTo,
         limit: 5000,
         signal,
       })
       if (transferResult.status !== "success") {
         return {
           ...empty,
-          dateBounds: bounds,
+          dateBounds: { start: dateFrom, end: dateTo },
         }
       }
 
@@ -690,7 +713,7 @@ export function useProductionSummaryMetrics(params: {
         netTransferAdjustments,
         totalHarvestedFish,
         totalHarvestedKg,
-        dateBounds: bounds,
+        dateBounds: { start: dateFrom, end: dateTo },
       } as ProductionSummaryMetrics
     },
     enabled: Boolean(session) && Boolean(params.farmId),
@@ -707,6 +730,8 @@ export function useSystemsTable(params: {
   system?: string
   timePeriod?: Enums<"time_period">
   periodParam?: string | null
+  dateFrom?: string | null
+  dateTo?: string | null
   includeIncomplete?: boolean
 }) {
   const { session } = useAuth()
@@ -719,6 +744,8 @@ export function useSystemsTable(params: {
       params.system ?? "all",
       params.timePeriod ?? "2 weeks",
       params.periodParam ?? "",
+      params.dateFrom ?? "",
+      params.dateTo ?? "",
       params.includeIncomplete ?? false,
     ],
     queryFn: async ({ signal }) => {
@@ -730,13 +757,15 @@ export function useSystemsTable(params: {
         }
       }
 
-      const bounds = await getTimePeriodBounds(
-        params.periodParam ?? params.timePeriod ?? "2 weeks",
-        signal,
-        farmId,
-      )
-      const startDate = bounds.start ?? null
-      const endDate = bounds.end ?? null
+      const startDate = params.dateFrom ?? null
+      const endDate = params.dateTo ?? null
+
+      if (!startDate || !endDate) {
+        return {
+          rows: [] as DashboardSystemRow[],
+          meta: { reason: "Missing time bounds", start: startDate, end: endDate },
+        }
+      }
 
       const stage = params.stage === "all" ? null : params.stage
       const parsedSystemId = params.system && params.system !== "all" ? Number(params.system) : null
@@ -746,6 +775,8 @@ export function useSystemsTable(params: {
         stage: params.stage,
         batch: params.batch ?? "all",
         system: params.system,
+        dateFrom: startDate,
+        dateTo: endDate,
         signal,
       })
       if (scopedSystemIds === null) {
@@ -799,6 +830,8 @@ export function useProductionTrend(params: {
   batch?: string
   system?: string
   timePeriod: Enums<"time_period"> | string
+  dateFrom?: string | null
+  dateTo?: string | null
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -809,24 +842,30 @@ export function useProductionTrend(params: {
       params.batch ?? "all",
       params.system ?? "all",
       params.timePeriod,
+      params.dateFrom ?? "",
+      params.dateTo ?? "",
     ],
     queryFn: async ({ signal }) => {
+      const dateFrom = params.dateFrom ?? null
+      const dateTo = params.dateTo ?? null
+      if (!dateFrom || !dateTo) return []
       const scopedSystemIds = await resolveScopedSystemIds({
         farmId: params.farmId ?? null,
         stage: (params.stage ?? "all") as "all" | Enums<"system_growth_stage">,
         batch: params.batch ?? "all",
         system: params.system,
+        dateFrom,
+        dateTo,
         signal,
       })
       if (scopedSystemIds === null || scopedSystemIds.length === 0) return []
       const systemId = scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
-      const bounds = await getTimePeriodBounds(params.timePeriod, signal, params.farmId ?? null)
       const summaryResult = await getProductionSummary({
         farmId: params.farmId ?? null,
         stage: params.stage ?? undefined,
         systemId,
-        dateFrom: bounds.start ?? undefined,
-        dateTo: bounds.end ?? undefined,
+        dateFrom,
+        dateTo,
         limit: 500,
         signal,
       })
@@ -880,6 +919,8 @@ export function useRecommendedActions(params: {
   batch?: string
   system?: string
   timePeriod?: Enums<"time_period">
+  dateFrom?: string | null
+  dateTo?: string | null
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -890,13 +931,27 @@ export function useRecommendedActions(params: {
       params.batch ?? "all",
       params.system ?? "all",
       params.timePeriod ?? "2 weeks",
+      params.dateFrom ?? "",
+      params.dateTo ?? "",
     ],
     queryFn: async ({ signal }) => {
+      const dateFrom = params.dateFrom ?? null
+      const dateTo = params.dateTo ?? null
+      if (!dateFrom || !dateTo) {
+        return [] as Array<{
+          title: string
+          description: string
+          priority: "High" | "Medium" | "Info"
+          due: string
+        }>
+      }
       const scopedSystemIds = await resolveScopedSystemIds({
         farmId: params.farmId ?? null,
         stage: params.stage ?? "all",
         batch: params.batch ?? "all",
         system: params.system,
+        dateFrom,
+        dateTo,
         signal,
       })
       if (scopedSystemIds === null || scopedSystemIds.length === 0) {
@@ -908,20 +963,19 @@ export function useRecommendedActions(params: {
         }>
       }
       const systemId = scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
-      const bounds = await getTimePeriodBounds(params.timePeriod ?? "2 weeks", signal, params.farmId ?? null)
       const inventoryResult = await getDailyFishInventory({
         farmId: params.farmId ?? null,
         systemId,
-        dateFrom: bounds.start ?? undefined,
-        dateTo: bounds.end ?? undefined,
+        dateFrom,
+        dateTo,
         limit: 1000,
         signal,
       })
       const wqResult = await getWaterQualityRatings({
         farmId: params.farmId ?? null,
         systemId,
-        dateFrom: bounds.start ?? undefined,
-        dateTo: bounds.end ?? undefined,
+        dateFrom,
+        dateTo,
         limit: 1000,
         signal,
       })

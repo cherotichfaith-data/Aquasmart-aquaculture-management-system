@@ -139,23 +139,23 @@ export const getIcon = (type: ActivityType) => {
 export const getColor = (type: ActivityType) => {
   switch (type) {
     case "feeding_record":
-      return "bg-blue-500/10 text-blue-600"
+      return "bg-blue-500/10 text-blue-600 dark:text-blue-300"
     case "fish_sampling_weight":
-      return "bg-purple-500/10 text-purple-600"
+      return "bg-purple-500/10 text-purple-600 dark:text-purple-300"
     case "water_quality_measurement":
-      return "bg-green-500/10 text-green-600"
+      return "bg-green-500/10 text-green-600 dark:text-green-300"
     case "fish_mortality":
-      return "bg-red-500/10 text-red-600"
+      return "bg-red-500/10 text-red-600 dark:text-red-300"
     case "fish_transfer":
-      return "bg-orange-500/10 text-orange-600"
+      return "bg-orange-500/10 text-orange-600 dark:text-orange-300"
     case "fish_harvest":
-      return "bg-lime-500/10 text-lime-600"
+      return "bg-lime-500/10 text-lime-600 dark:text-lime-300"
     case "feed_incoming":
-      return "bg-sky-500/10 text-sky-600"
+      return "bg-sky-500/10 text-sky-600 dark:text-sky-300"
     case "fish_stocking":
-      return "bg-indigo-500/10 text-indigo-600"
+      return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
     default:
-      return "bg-gray-500/10 text-gray-600"
+      return "bg-muted/60 text-muted-foreground"
   }
 }
 

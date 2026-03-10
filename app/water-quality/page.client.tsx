@@ -17,7 +17,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { useQuery } from "@tanstack/react-query"
 import {
   AlertTriangle,
   Bell,
@@ -46,7 +45,7 @@ import {
 } from "@/lib/hooks/use-water-quality"
 import { useRecentActivities } from "@/lib/hooks/use-dashboard"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
-import { getTimePeriodBounds } from "@/lib/api/dashboard"
+import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import {
   formatTimestamp,
@@ -263,15 +262,10 @@ export default function WaterQualityPage() {
     selectedSystem,
   })
 
-  const boundsQuery = useQuery({
-    queryKey: ["time-period-bounds", farmId ?? "all", timePeriod],
-    queryFn: ({ signal }) => getTimePeriodBounds(timePeriod, signal, farmId ?? null),
-    enabled: Boolean(farmId),
-    staleTime: 5 * 60_000,
-  })
-  const dateFrom = boundsQuery.data?.start ?? undefined
-  const dateTo = boundsQuery.data?.end ?? undefined
-  const boundsReady = Boolean(dateFrom && dateTo)
+  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
+  const dateFrom = boundsQuery.start ?? undefined
+  const dateTo = boundsQuery.end ?? undefined
+  const boundsReady = boundsQuery.hasBounds
   const syncStatusQuery = useWaterQualitySyncStatus()
   const latestStatusQuery = useLatestWaterQualityStatus(selectedSystemId)
   const ratingsQuery = useDailyWaterQualityRating({
@@ -745,6 +739,7 @@ export default function WaterQualityPage() {
     return rolling
   }, [overlayByDate, scopedMeasurementRows, selectedParameter])
 
+
   const dailyDoVariation = useMemo(() => {
     const byDate = new Map<string, { min: number; max: number }>()
     scopedMeasurementRows
@@ -922,18 +917,18 @@ export default function WaterQualityPage() {
 
   const ratingBadgeClass = (rating: string | null | undefined) => {
     const key = String(rating ?? "").toLowerCase()
-    if (key === "optimal") return "bg-emerald-500/10 text-emerald-600"
-    if (key === "acceptable") return "bg-yellow-500/10 text-yellow-700"
-    if (key === "critical") return "bg-orange-500/10 text-orange-700"
-    if (key === "lethal") return "bg-red-500/10 text-red-600"
+    if (key === "optimal") return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+    if (key === "acceptable") return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-300"
+    if (key === "critical") return "bg-orange-500/10 text-orange-700 dark:text-orange-300"
+    if (key === "lethal") return "bg-red-500/10 text-red-600 dark:text-red-300"
     return "bg-muted/50 text-muted-foreground"
   }
 
   const actionBadgeClass = (action: string) => {
-    if (action === "Escalate") return "bg-red-500/10 text-red-600"
-    if (action === "Investigate") return "bg-orange-500/10 text-orange-700"
-    if (action === "Watch") return "bg-yellow-500/10 text-yellow-700"
-    return "bg-emerald-500/10 text-emerald-600"
+    if (action === "Escalate") return "bg-red-500/10 text-red-600 dark:text-red-300"
+    if (action === "Investigate") return "bg-orange-500/10 text-orange-700 dark:text-orange-300"
+    if (action === "Watch") return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-300"
+    return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
   }
 
   const dailyParameterByDate = useMemo(() => {
@@ -1175,7 +1170,11 @@ export default function WaterQualityPage() {
   return (
     <DashboardLayout>
       <div className={`space-y-6 ${activeTab === "depth" || activeTab === "parameter" ? "-mt-6 md:-mt-8" : ""}`}>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div
+          className={`flex flex-wrap items-center justify-end gap-2 ${
+            activeTab === "depth" || activeTab === "parameter" ? "mt-8 md:mt-10" : "mt-4 md:mt-6"
+          }`}
+        >
           <Select value={selectedParameter} onValueChange={(value) => setSelectedParameter(value as WqParameter)}>
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Select parameter" />
@@ -1192,27 +1191,13 @@ export default function WaterQualityPage() {
 
         {activeTab === "overview" && (
           <div className="space-y-6">
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-slate-950 via-slate-900 to-slate-900 p-6">
-              <div className="absolute inset-0 opacity-30 [background:radial-gradient(circle_at_top_left,rgba(56,189,248,0.25),transparent_55%)]" />
-              <div className="relative space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-500/20">
-                    <Droplets className="h-5 w-5 text-cyan-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">Water Quality Command Center</h2>
-                    <p className="text-sm text-muted-foreground">Live health scoring and system-level risk insights.</p>
-                  </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-500/20">
+                  <Droplets className="h-5 w-5 text-cyan-400" />
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    <span>{sensorCounts.online}/{systemOptions.length} systems online</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Bell className="h-3 w-3 text-red-500" />
-                    <span>{highAlertCount} critical alerts</span>
-                  </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">Water Quality Overview</h2>
                 </div>
               </div>
             </div>
@@ -1353,8 +1338,8 @@ export default function WaterQualityPage() {
                           variant="outline"
                           className={`text-[10px] px-2 py-0 flex-shrink-0 ${
                             alert.priority === "high"
-                              ? "bg-red-500/20 text-red-600 border-red-500/30"
-                              : "bg-amber-500/20 text-amber-600 border-amber-500/30"
+                              ? "bg-red-500/20 text-red-600 dark:text-red-300 border-red-500/30"
+                              : "bg-amber-500/20 text-amber-600 dark:text-amber-300 border-amber-500/30"
                           }`}
                         >
                           {alert.priority.toUpperCase()}
@@ -1427,7 +1412,7 @@ export default function WaterQualityPage() {
                               row.trendLabel === "Worsening"
                                 ? "text-destructive"
                                 : row.trendLabel === "Improving"
-                                  ? "text-emerald-600"
+                                  ? "text-emerald-600 dark:text-emerald-300"
                                   : "text-muted-foreground"
                             }`}
                           >
@@ -1510,7 +1495,7 @@ export default function WaterQualityPage() {
                   <Wifi className="h-6 w-6 text-emerald-500" />
                   <div>
                     <p className="text-2xl font-bold text-emerald-500">{sensorCounts.online}</p>
-                    <p className="text-xs text-emerald-600/80">Online</p>
+                    <p className="text-xs text-emerald-600/80 dark:text-emerald-300/80">Online</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1519,7 +1504,7 @@ export default function WaterQualityPage() {
                   <AlertTriangle className="h-6 w-6 text-amber-500" />
                   <div>
                     <p className="text-2xl font-bold text-amber-500">{sensorCounts.warning}</p>
-                    <p className="text-xs text-amber-600/80">Delayed</p>
+                    <p className="text-xs text-amber-600/80 dark:text-amber-300/80">Delayed</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1528,7 +1513,7 @@ export default function WaterQualityPage() {
                   <WifiOff className="h-6 w-6 text-red-500" />
                   <div>
                     <p className="text-2xl font-bold text-red-500">{sensorCounts.offline}</p>
-                    <p className="text-xs text-red-600/80">Offline</p>
+                    <p className="text-xs text-red-600/80 dark:text-red-300/80">Offline</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1564,10 +1549,10 @@ export default function WaterQualityPage() {
                           variant="outline"
                           className={`text-[10px] px-2 py-0 ${
                             isOffline
-                              ? "bg-red-500/20 text-red-600 border-red-500/30"
+                              ? "bg-red-500/20 text-red-600 dark:text-red-300 border-red-500/30"
                               : isWarning
-                                ? "bg-amber-500/20 text-amber-600 border-amber-500/30"
-                                : "bg-emerald-500/20 text-emerald-600 border-emerald-500/30"
+                                ? "bg-amber-500/20 text-amber-600 dark:text-amber-300 border-amber-500/30"
+                                : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/30"
                           }`}
                         >
                           {(status?.status ?? "offline").toUpperCase()}
@@ -1590,7 +1575,7 @@ export default function WaterQualityPage() {
                       </div>
                       {isOffline ? (
                         <div className="mt-3 rounded bg-red-500/10 border border-red-500/20 p-2">
-                          <p className="text-[10px] text-red-600">No data received for more than 24 hours.</p>
+                          <p className="text-[10px] text-red-600 dark:text-red-300">No data received for more than 24 hours.</p>
                         </div>
                       ) : null}
                     </CardContent>
@@ -1829,10 +1814,10 @@ export default function WaterQualityPage() {
                     ) : isStratified || hasGradient ? (
                       <Card className="border-red-500/30 bg-red-500/10">
                         <CardContent className="flex items-start gap-3 p-4">
-                          <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600" />
+                          <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600 dark:text-red-300" />
                           <div>
-                            <p className="text-sm font-semibold text-red-600">Stratification Risk Detected</p>
-                            <p className="mt-1 text-xs text-red-600/80">
+                            <p className="text-sm font-semibold text-red-600 dark:text-red-300">Stratification Risk Detected</p>
+                            <p className="mt-1 text-xs text-red-600/80 dark:text-red-300/80">
                               {isStratified && surfaceDo != null && bottomDo != null
                                 ? `Bottom oxygen (${bottomDo.toFixed(1)} mg/L) is critically low while surface oxygen (${surfaceDo.toFixed(1)} mg/L) remains normal. `
                                 : doGradient != null
@@ -1846,10 +1831,10 @@ export default function WaterQualityPage() {
                     ) : (
                       <Card className="border-emerald-500/30 bg-emerald-500/10">
                         <CardContent className="flex items-start gap-3 p-4">
-                          <CheckCircle className="mt-0.5 h-5 w-5 text-emerald-600" />
+                          <CheckCircle className="mt-0.5 h-5 w-5 text-emerald-600 dark:text-emerald-300" />
                           <div>
-                            <p className="text-sm font-semibold text-emerald-700">No Stratification Detected</p>
-                            <p className="mt-1 text-xs text-emerald-700/80">
+                            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">No Stratification Detected</p>
+                            <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-300/80">
                               Water column appears well-mixed. DO gradient: {doGradient != null ? doGradient.toFixed(1) : "--"} mg/L.
                               Temperature gradient: {tempGradient != null ? tempGradient.toFixed(1) : "--"} deg C.
                             </p>
@@ -1869,8 +1854,8 @@ export default function WaterQualityPage() {
                                 depthProfileDoData.length === 0
                                   ? "border-border text-muted-foreground"
                                   : isStratified || hasGradient
-                                    ? "bg-red-500/10 text-red-600 border-red-500/30"
-                                    : "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                                    ? "bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/30"
+                                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
                               }
                             >
                               {depthProfileDoData.length === 0 ? "NO DATA" : isStratified || hasGradient ? "STRATIFIED" : "MIXED"}
@@ -1984,10 +1969,10 @@ export default function WaterQualityPage() {
                                     doValue == null
                                       ? "border-border text-muted-foreground"
                                       : doValue < 3
-                                        ? "bg-red-500/10 text-red-600 border-red-500/30"
+                                        ? "bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/30"
                                         : doValue < 5
-                                          ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
-                                          : "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30"
+                                          : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
                                   return (
                                     <tr key={`${row.depth}-${i}`} className={i % 2 === 0 ? "bg-muted/30" : ""}>
                                       <td className="px-4 py-2.5 text-sm text-foreground">{row.depth.toFixed(1)}</td>
@@ -2076,7 +2061,7 @@ export default function WaterQualityPage() {
                 {emergingRisks.length ? (
                   <div className="space-y-2">
                     {emergingRisks.map((alert) => (
-                      <div key={alert} className="rounded-md border border-orange-300/50 bg-orange-500/10 text-orange-700 p-3 text-sm">
+                      <div key={alert} className="rounded-md border border-orange-300/50 bg-orange-500/10 text-orange-700 dark:text-orange-300 p-3 text-sm">
                         {alert}
                       </div>
                     ))}
@@ -2095,5 +2080,6 @@ export default function WaterQualityPage() {
     </DashboardLayout>
   )
 }
+
 
 

@@ -22,6 +22,8 @@ interface KPIOverviewProps {
   batch?: string
   system?: string
   periodParam?: string | null
+  dateFrom?: string
+  dateTo?: string
 }
 
 export default function KPIOverview({
@@ -30,6 +32,8 @@ export default function KPIOverview({
   batch = "all",
   system = "all",
   periodParam,
+  dateFrom,
+  dateTo,
 }: KPIOverviewProps) {
   const { farmId } = useActiveFarm()
   const metricsQuery = useKpiOverview({
@@ -39,6 +43,8 @@ export default function KPIOverview({
     batch,
     system,
     periodParam,
+    dateFrom: dateFrom ?? null,
+    dateTo: dateTo ?? null,
   })
 
   const metrics = metricsQuery.data?.metrics ?? []
@@ -83,10 +89,6 @@ export default function KPIOverview({
         {metrics.map((metric) => {
           const filter = kpiFilterMap[metric.key]
           const periodValue = periodParam ?? timePeriod
-          const range =
-            dateBounds.start && dateBounds.end
-              ? `&startDate=${dateBounds.start}&endDate=${dateBounds.end}`
-              : ""
           const systemParam = system !== "all" ? `&system=${system}` : ""
           const batchParam = batch !== "all" ? `&batch=${batch}` : ""
           const stageParam = stage !== "all" ? `&stage=${stage}` : ""
@@ -100,7 +102,7 @@ export default function KPIOverview({
               decimals={metric.decimals}
               formatUnit={metric.unit}
               invertTrend={metric.invertTrend}
-              href={`/production?${filterParam}metric=${metric.key}&period=${periodValue}${range}${systemParam}${batchParam}${stageParam}`}
+              href={`/production?${filterParam}metric=${metric.key}&period=${periodValue}${systemParam}${batchParam}${stageParam}`}
             />
           )
         })}
