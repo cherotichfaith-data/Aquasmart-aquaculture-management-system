@@ -1,10 +1,14 @@
 import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryOptionsRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type FeedIncomingRow = Tables<"feed_incoming">
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
+type FarmKpisTodayRow = Database["public"]["Functions"]["get_farm_kpis_today"]["Returns"][number]
+type FcrTrendRow = Database["public"]["Functions"]["get_fcr_trend"]["Returns"][number]
+type GrowthTrendRow = Database["public"]["Functions"]["get_growth_trend"]["Returns"][number]
+type RunningStockRow = Database["public"]["Functions"]["get_running_stock"]["Returns"][number]
 type FeedingRecordRow = Tables<"feeding_record">
 type FishHarvestRow = Tables<"fish_harvest">
 type FishSamplingWeightRow = Tables<"fish_sampling_weight">
@@ -27,6 +31,72 @@ type RecentRowsTable =
 
 export type FeedIncomingWithType = FeedIncomingRow & { feed_type: FeedTypeRow | null }
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
+export type FeedFarmKpisToday = FarmKpisTodayRow
+export type FeedFcrTrendRow = FcrTrendRow
+export type FeedGrowthTrendRow = GrowthTrendRow
+export type FeedRunningStockRow = RunningStockRow
+
+type FeedIncomingEnrichedRow = {
+  id: number | null
+  created_at: string | null
+  date: string | null
+  feed_amount: number | null
+  feed_type_id: number | null
+  feed_label: string | null
+  feed_line: string | null
+  crude_protein_percentage: number | null
+  crude_fat_percentage: number | null
+  feed_category: string | null
+  feed_pellet_size: string | null
+}
+
+type FeedTypeProjection = {
+  feed_type_id: number | null
+  feed_label: string | null
+  feed_line: string | null
+  crude_protein_percentage: number | null
+  crude_fat_percentage: number | null
+  feed_category: string | null
+  feed_pellet_size: string | null
+}
+
+type FeedingRecordJoinedRow = {
+  id: number | null
+  created_at: string | null
+  date: string | null
+  batch_id: number | null
+  feed_type_id: number | null
+  feeding_amount: number | null
+  feeding_response: FeedingRecordRow["feeding_response"] | null
+  system_id: number | null
+  feed_type: Array<{
+    id: number | null
+    feed_line: string | null
+    crude_protein_percentage: number | null
+    crude_fat_percentage: number | null
+    feed_category: string | null
+    feed_pellet_size: string | null
+  }> | null
+}
+
+const projectionFrom = (
+  supabase: ReturnType<typeof import("@/utils/supabase/client").createClient>,
+  relation: "report_feed_incoming_enriched",
+) => (supabase as unknown as { from: (name: string) => any }).from(relation)
+
+const projectFeedType = (row: FeedTypeProjection | null | undefined): FeedTypeRow | null => {
+  if (!row || typeof row.feed_type_id !== "number") return null
+
+  return {
+    id: row.feed_type_id,
+    label: row.feed_label ?? row.feed_line ?? `Feed ${row.feed_type_id}`,
+    feed_line: row.feed_line ?? row.feed_label ?? `Feed ${row.feed_type_id}`,
+    crude_protein_percentage: row.crude_protein_percentage ?? 0,
+    crude_fat_percentage: row.crude_fat_percentage ?? 0,
+    feed_category: String(row.feed_category ?? ""),
+    feed_pellet_size: String(row.feed_pellet_size ?? ""),
+  }
+}
 
 const isAbortLikeError = (err: unknown): boolean => {
   if (!err) return false
@@ -46,7 +116,7 @@ export async function getFeedIncomingWithType(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.from("feed_incoming").select("*").order("date", { ascending: false })
+  let query = projectionFrom(supabase, "report_feed_incoming_enriched").select("*").order("date", { ascending: false })
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
@@ -63,58 +133,16 @@ export async function getFeedIncomingWithType(params?: {
     return toQueryError("getFeedIncomingWithType", error)
   }
 
-  const rows = (data ?? []) as FeedIncomingRow[]
-  const feedTypeIds = Array.from(
-    new Set(rows.map((row) => row.feed_type_id).filter((id): id is number => typeof id === "number")),
-  )
-
-  let feedTypeMap = new Map<number, FeedTypeRow>()
-  if (feedTypeIds.length > 0) {
-    let feedQuery = queryOptionsRpc(supabase, "api_feed_type_options_rpc")
-    if (params?.signal) feedQuery = feedQuery.abortSignal(params.signal)
-    const { data: feedData, error: feedError } = await feedQuery
-    if (feedError) {
-      if (params?.signal?.aborted || isAbortLikeError(feedError) || isSbPermissionDenied(feedError)) {
-        return toQuerySuccess<FeedIncomingWithType>([])
-      }
-      return toQueryError("getFeedIncomingWithType:feedTypes", feedError)
-    }
-    const feedIdSet = new Set(feedTypeIds)
-    const feedRows = (feedData ?? []) as FeedTypeRow[]
-    feedRows.forEach((row) => {
-      if (!feedIdSet.has(row.id)) return
-      if (row.id == null) return
-      feedTypeMap.set(row.id, row as FeedTypeRow)
-    })
-  }
-
-  const mapped = rows.map((row) => ({
-    ...row,
-    feed_type: row.feed_type_id ? feedTypeMap.get(row.feed_type_id) ?? null : null,
+  const mapped = ((data ?? []) as FeedIncomingEnrichedRow[]).map((row) => ({
+    id: row.id,
+    created_at: row.created_at,
+    date: row.date,
+    feed_amount: row.feed_amount,
+    feed_type_id: row.feed_type_id,
+    feed_type: projectFeedType(row),
   })) as FeedIncomingWithType[]
 
   return toQuerySuccess<FeedIncomingWithType>(mapped)
-}
-
-export async function getFeedTypes(params?: { limit?: number; signal?: AbortSignal }): Promise<QueryResult<FeedTypeRow>> {
-  const clientResult = await getClientOrError("getFeedTypes", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryOptionsRpc(supabase, "api_feed_type_options_rpc")
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error)) {
-      return toQuerySuccess<FeedTypeRow>([])
-    }
-    return toQueryError("getFeedTypes", error)
-  }
-  const rows = (data ?? []) as FeedTypeRow[]
-  rows.sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
-  const limited = params?.limit ? rows.slice(0, params.limit) : rows
-  return toQuerySuccess<FeedTypeRow>(limited)
 }
 
 export async function getFeedingRecords(params?: {
@@ -130,7 +158,24 @@ export async function getFeedingRecords(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.from("feeding_record").select("*")
+  let query = supabase.from("feeding_record").select(`
+      id,
+      created_at,
+      date,
+      batch_id,
+      feed_type_id,
+      feeding_amount,
+      feeding_response,
+      system_id,
+      feed_type:feed_type_id (
+        id,
+        feed_line,
+        crude_protein_percentage,
+        crude_fat_percentage,
+        feed_category,
+        feed_pellet_size
+      )
+    `)
   if (params?.systemId) {
     query = query.eq("system_id", params.systemId)
   } else if (params?.systemIds && params.systemIds.length > 0) {
@@ -151,42 +196,141 @@ export async function getFeedingRecords(params?: {
     return toQueryError("getFeedingRecords", error)
   }
 
-  const rows = (data ?? []) as FeedingRecordRow[]
-  const feedTypeIds = Array.from(
-    new Set(rows.map((row) => row.feed_type_id).filter((id): id is number => typeof id === "number")),
-  )
-
-  let feedTypeMap = new Map<number, FeedTypeRow>()
-  if (feedTypeIds.length > 0) {
-    let feedQuery = queryOptionsRpc(supabase, "api_feed_type_options_rpc")
-    if (params?.signal) feedQuery = feedQuery.abortSignal(params.signal)
-    const { data: feedData, error: feedError } = await feedQuery
-    if (feedError) {
-      if (
-        params?.signal?.aborted ||
-        isAbortLikeError(feedError) ||
-        isSbPermissionDenied(feedError) ||
-        isSbAuthMissing(feedError)
-      ) {
-        return toQuerySuccess<FeedingRecordWithType>([])
-      }
-      return toQueryError("getFeedingRecords:feedTypes", feedError)
-    }
-    const feedIdSet = new Set(feedTypeIds)
-    const feedRows = (feedData ?? []) as FeedTypeRow[]
-    feedRows.forEach((row) => {
-      if (!feedIdSet.has(row.id)) return
-      if (row.id == null) return
-      feedTypeMap.set(row.id, row as FeedTypeRow)
-    })
-  }
-
-  const mapped = rows.map((row) => ({
-    ...row,
-    feed_type: row.feed_type_id ? feedTypeMap.get(row.feed_type_id) ?? null : null,
+  const mapped = ((data ?? []) as unknown as FeedingRecordJoinedRow[]).map((row) => ({
+    id: row.id,
+    created_at: row.created_at,
+    date: row.date,
+    batch_id: row.batch_id,
+    feed_type_id: row.feed_type_id,
+    feeding_amount: row.feeding_amount,
+    feeding_response: row.feeding_response,
+    system_id: row.system_id,
+    feed_type: projectFeedType(
+      row.feed_type?.[0]
+        ? {
+            feed_type_id: row.feed_type[0].id,
+            feed_label: row.feed_type[0].feed_line,
+            feed_line: row.feed_type[0].feed_line,
+            crude_protein_percentage: row.feed_type[0].crude_protein_percentage,
+            crude_fat_percentage: row.feed_type[0].crude_fat_percentage,
+            feed_category: row.feed_type[0].feed_category,
+            feed_pellet_size: row.feed_type[0].feed_pellet_size,
+          }
+        : null,
+    ),
   })) as FeedingRecordWithType[]
 
   return toQuerySuccess<FeedingRecordWithType>(mapped)
+}
+
+export async function getFarmKpisToday(params: {
+  farmId?: string | null
+  signal?: AbortSignal
+}): Promise<QueryResult<FeedFarmKpisToday>> {
+  if (!params.farmId) {
+    return toQuerySuccess<FeedFarmKpisToday>([])
+  }
+
+  const clientResult = await getClientOrError("getFarmKpisToday", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = queryKpiRpc(supabase, "get_farm_kpis_today", { p_farm_id: params.farmId })
+  if (params.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedFarmKpisToday>([])
+  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
+    return toQuerySuccess<FeedFarmKpisToday>([])
+  }
+  if (error) return toQueryError("getFarmKpisToday", error)
+
+  return toQuerySuccess<FeedFarmKpisToday>((data ?? []) as FeedFarmKpisToday[])
+}
+
+export async function getRunningStock(params: {
+  farmId?: string | null
+  signal?: AbortSignal
+}): Promise<QueryResult<FeedRunningStockRow>> {
+  if (!params.farmId) {
+    return toQuerySuccess<FeedRunningStockRow>([])
+  }
+
+  const clientResult = await getClientOrError("getRunningStock", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = queryKpiRpc(supabase, "get_running_stock", { p_farm_id: params.farmId })
+  if (params.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedRunningStockRow>([])
+  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
+    return toQuerySuccess<FeedRunningStockRow>([])
+  }
+  if (error) return toQueryError("getRunningStock", error)
+
+  return toQuerySuccess<FeedRunningStockRow>((data ?? []) as FeedRunningStockRow[])
+}
+
+export async function getFcrTrend(params: {
+  farmId?: string | null
+  systemId?: number
+  days?: number
+  signal?: AbortSignal
+}): Promise<QueryResult<FeedFcrTrendRow>> {
+  if (!params.farmId || !params.systemId) {
+    return toQuerySuccess<FeedFcrTrendRow>([])
+  }
+
+  const clientResult = await getClientOrError("getFcrTrend", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = queryKpiRpc(supabase, "get_fcr_trend", {
+    p_farm_id: params.farmId,
+    p_system_id: params.systemId,
+    p_days: params.days,
+  })
+  if (params.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedFcrTrendRow>([])
+  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
+    return toQuerySuccess<FeedFcrTrendRow>([])
+  }
+  if (error) return toQueryError("getFcrTrend", error)
+
+  return toQuerySuccess<FeedFcrTrendRow>((data ?? []) as FeedFcrTrendRow[])
+}
+
+export async function getGrowthTrend(params: {
+  systemId?: number
+  days?: number
+  signal?: AbortSignal
+}): Promise<QueryResult<FeedGrowthTrendRow>> {
+  if (!params.systemId) {
+    return toQuerySuccess<FeedGrowthTrendRow>([])
+  }
+
+  const clientResult = await getClientOrError("getGrowthTrend", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = queryKpiRpc(supabase, "get_growth_trend", {
+    p_system_id: params.systemId,
+    p_days: params.days,
+  })
+  if (params.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedGrowthTrendRow>([])
+  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
+    return toQuerySuccess<FeedGrowthTrendRow>([])
+  }
+  if (error) return toQueryError("getGrowthTrend", error)
+
+  return toQuerySuccess<FeedGrowthTrendRow>((data ?? []) as FeedGrowthTrendRow[])
 }
 
 export async function getHarvests(params?: {

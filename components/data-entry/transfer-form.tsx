@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
@@ -18,16 +19,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Database } from "@/lib/types/database"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/utils/supabase/log"
+import { DependencyBlocker } from "./dependency-blocker"
 
 const formSchema = z.object({
     origin_system_id: z.string().min(1, "Origin system is required"),
     target_system_id: z.string().min(1, "Destination system is required"),
+    transfer_type: z.enum(["transfer", "grading", "density_thinning", "broodstock", "count_check"]),
     batch_id: z.string().optional(),
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(1, "Count must be positive"),
     total_weight_kg: z.coerce.number().min(0, "Weight must be positive"),
     average_body_weight_g: z.coerce.number().min(0).optional(),
 })
+
+const TRANSFER_TYPE_OPTIONS = [
+    { value: "transfer", label: "Transfer" },
+    { value: "grading", label: "Grading" },
+    { value: "density_thinning", label: "Density thinning" },
+    { value: "broodstock", label: "Broodstock move" },
+    { value: "count_check", label: "Count check" },
+] as const
 
 interface TransferFormProps {
     systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
@@ -38,6 +49,7 @@ interface TransferFormProps {
 
 export function TransferForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: TransferFormProps) {
     const mutation = useRecordTransfer()
+    const router = useRouter()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -46,13 +58,15 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
             number_of_fish: 0,
             origin_system_id: defaultSystemId ? String(defaultSystemId) : "",
             target_system_id: "",
+            transfer_type: "transfer",
             batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            if (values.origin_system_id === values.target_system_id) {
+            const isCountCheck = values.transfer_type === "count_check"
+            if (!isCountCheck && values.origin_system_id === values.target_system_id) {
                 form.setError("target_system_id", { message: "Origin and destination cannot be the same" })
                 return
             }
@@ -61,27 +75,41 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
             const targetId = Number(values.target_system_id)
             const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
 
-            await mutation.mutateAsync({
+            const payload = {
                 origin_system_id: originId,
                 target_system_id: targetId,
+                transfer_type: values.transfer_type,
                 batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
                 number_of_fish_transfer: values.number_of_fish,
                 total_weight_transfer: values.total_weight_kg,
                 abw: values.average_body_weight_g ?? null,
-            })
+            }
+
+            await mutation.mutateAsync(payload)
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
                 total_weight_kg: 0,
                 average_body_weight_g: 0,
                 origin_system_id: values.origin_system_id,
-                target_system_id: "",
+                target_system_id: values.transfer_type === "count_check" ? values.origin_system_id : "",
+                transfer_type: values.transfer_type,
                 batch_id: values.batch_id,
             })
         } catch (error) {
             logSbError("dataEntry:transfer:submit", error)
         }
+    }
+
+    if (systems.length < 2) {
+        return (
+            <DependencyBlocker
+                title="Add another system to record transfers."
+                actionLabel="Add system"
+                onAction={() => router.push("/data-entry?type=system")}
+            />
+        )
     }
 
     return (
@@ -117,6 +145,43 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
                                 </FormItem>
                             )}
                         />
+                        <FormField
+                            control={form.control}
+                            name="transfer_type"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Transfer Type</FormLabel>
+                                    <Select
+                                        onValueChange={(value) => {
+                                            field.onChange(value)
+                                            if (value === "count_check") {
+                                                const origin = form.getValues("origin_system_id")
+                                                if (origin) {
+                                                    form.setValue("target_system_id", origin, { shouldValidate: true })
+                                                }
+                                            }
+                                        }}
+                                        value={field.value}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select transfer type" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {TRANSFER_TYPE_OPTIONS.map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="target_system_id"

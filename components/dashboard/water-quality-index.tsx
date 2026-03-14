@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { Gauge } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
+import type { DashboardPageInitialData } from "@/features/dashboard/types"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
@@ -106,20 +107,27 @@ export default function WaterQualityIndex({
   stage,
   batch,
   system,
-  timePeriod,
-  periodParam,
   dateFrom,
   dateTo,
+  farmId: initialFarmId,
+  initialSystemsData,
+  initialBatchSystemsData,
+  initialMeasurements,
+  initialThresholds,
 }: {
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
-  timePeriod?: Enums<"time_period">
-  periodParam?: string | null
   dateFrom?: string
   dateTo?: string
+  farmId?: string | null
+  initialSystemsData?: DashboardPageInitialData["systemOptions"]
+  initialBatchSystemsData?: DashboardPageInitialData["batchSystems"]
+  initialMeasurements?: DashboardPageInitialData["waterQualityMeasurements"]
+  initialThresholds?: DashboardPageInitialData["alertThresholds"]
 }) {
-  const { farmId } = useActiveFarm()
+  const { farmId: activeFarmId } = useActiveFarm()
+  const farmId = activeFarmId ?? initialFarmId
   const boundsReady = Boolean(dateFrom && dateTo)
 
   const { selectedSystemId, scopedSystemIdList } = useScopedSystemIds({
@@ -127,18 +135,22 @@ export default function WaterQualityIndex({
     selectedStage: stage ?? "all",
     selectedBatch: batch ?? "all",
     selectedSystem: system ?? "all",
+    initialSystemsData,
+    initialBatchSystemsData,
   })
 
   const measurementsQuery = useWaterQualityMeasurements({
+    farmId,
     systemId: selectedSystemId,
     dateFrom: dateFrom ?? undefined,
     dateTo: dateTo ?? undefined,
     requireSystem: false,
     limit: 2000,
     enabled: boundsReady,
+    initialData: initialMeasurements,
   })
 
-  const thresholdsQuery = useAlertThresholds()
+  const thresholdsQuery = useAlertThresholds({ farmId, initialData: initialThresholds })
   const thresholdRow = useMemo(() => {
     const rows = getRows(thresholdsQuery.data)
     return rows.find((row: any) => row.scope === "farm" && row.system_id == null) ?? rows[0] ?? null

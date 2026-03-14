@@ -88,3 +88,16 @@ export function isSbAuthMissing(err: unknown) {
     safeErr.name === "AuthSessionMissingError"
   )
 }
+
+export function isSbNetworkError(err: unknown) {
+  const safeErr = asSbErrorLike(err)
+  const message = String(safeErr.message ?? "")
+  return (
+    /fetch failed/i.test(message) ||
+    /getaddrinfo/i.test(message) ||
+    /enotfound/i.test(message) ||
+    /connect timeout/i.test(message) ||
+    /und_err_connect_timeout/i.test(message) ||
+    safeErr.name === "AuthRetryableFetchError"
+  )
+}

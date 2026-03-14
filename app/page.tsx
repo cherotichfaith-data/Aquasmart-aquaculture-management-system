@@ -1,5 +1,9 @@
 import type { Metadata } from "next"
 import RootPageClient from "./page.client"
+import { createClient } from "@/utils/supabase/server"
+import { resolveInitialFarmId } from "@/features/farm/queries.server"
+import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
+import { isSbNetworkError, logSbError } from "@/utils/supabase/log"
 
 export const metadata: Metadata = {
   title: "AquaSmart | Aquaculture Management Software",
@@ -47,6 +51,44 @@ export const metadata: Metadata = {
   },
 }
 
-export default function Page() {
-  return <RootPageClient />
+type SearchParams = Record<string, string | string[] | undefined>
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>
+}) {
+  const supabase = await createClient()
+  let user = null
+
+  try {
+    const result = await supabase.auth.getUser()
+    user = result.data.user
+  } catch (error) {
+    if (!isSbNetworkError(error)) {
+      logSbError("app:page:getUser", error)
+    }
+  }
+
+  if (!user) {
+    return <RootPageClient initialView="landing" />
+  }
+
+  const resolvedSearchParams = (await searchParams) ?? {}
+  const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
+  const initialFilters = parseDashboardPageFilters(resolvedSearchParams)
+  const { farmId } = await resolveInitialFarmId(searchFarmId)
+  const initialData = await getDashboardPageInitialData({
+    farmId,
+    filters: initialFilters,
+  })
+
+  return (
+    <RootPageClient
+      initialView="dashboard"
+      initialFarmId={farmId}
+      initialFilters={initialFilters}
+      initialData={initialData}
+    />
+  )
 }

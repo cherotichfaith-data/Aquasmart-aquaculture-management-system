@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import type { Enums } from "@/lib/types/database"
+import type { DashboardPageInitialData } from "@/features/dashboard/types"
 import { useRecommendedActions } from "@/lib/hooks/use-dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
@@ -20,6 +21,8 @@ export default function RecommendedActions({
   timePeriod,
   dateFrom,
   dateTo,
+  farmId: initialFarmId,
+  initialData,
 }: {
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
@@ -27,8 +30,11 @@ export default function RecommendedActions({
   timePeriod?: Enums<"time_period">
   dateFrom?: string
   dateTo?: string
+  farmId?: string | null
+  initialData?: DashboardPageInitialData["recommendedActions"]
 }) {
-  const { farmId } = useActiveFarm()
+  const { farmId: activeFarmId } = useActiveFarm()
+  const farmId = activeFarmId ?? initialFarmId
   const actionsQuery = useRecommendedActions({
     farmId,
     stage: stage ?? "all",
@@ -37,6 +43,7 @@ export default function RecommendedActions({
     timePeriod,
     dateFrom: dateFrom ?? null,
     dateTo: dateTo ?? null,
+    initialData,
   })
 
   const actions = useMemo(() => actionsQuery.data ?? [], [actionsQuery.data])

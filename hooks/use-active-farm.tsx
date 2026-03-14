@@ -20,9 +20,9 @@ type ActiveFarm = {
 }
 
 const getStorageKey = (userId: string) => `aquasmart:${userId}:activeFarmId`
-export function useActiveFarm() {
+export function useActiveFarm(params?: { initialFarmId?: string | null }) {
   const { user, session, isLoading } = useAuth()
-  const [activeFarmId, setActiveFarmId] = useState<string | null>(null)
+  const [activeFarmId, setActiveFarmId] = useState<string | null>(params?.initialFarmId ?? null)
 
   const farmsQuery = useFarmOptions({ enabled: Boolean(session) })
 

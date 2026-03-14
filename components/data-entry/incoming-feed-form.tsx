@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -18,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Database } from "@/lib/types/database"
 import { useRecordIncomingFeed } from "@/lib/hooks/use-incoming-feed"
 import { logSbError } from "@/utils/supabase/log"
+import { DependencyBlocker } from "./dependency-blocker"
+import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 
 const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
@@ -27,10 +30,12 @@ const formSchema = z.object({
 
 interface IncomingFeedFormProps {
     feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
+    farmId: string | null
 }
 
-export function IncomingFeedForm({ feeds }: IncomingFeedFormProps) {
+export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
     const mutation = useRecordIncomingFeed()
+    const [showQuickCreate, setShowQuickCreate] = useState(false)
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -44,10 +49,14 @@ export function IncomingFeedForm({ feeds }: IncomingFeedFormProps) {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
             const feedTypeId = Number(values.feed_id)
+            if (!farmId) {
+                throw new Error("No active farm selected")
+            }
 
             await mutation.mutateAsync({
                 date: values.date,
                 feed_amount: values.quantity,
+                farm_id: farmId,
                 feed_type_id: feedTypeId,
             })
             form.reset({
@@ -58,6 +67,19 @@ export function IncomingFeedForm({ feeds }: IncomingFeedFormProps) {
         } catch (error) {
             logSbError("dataEntry:incomingFeed:submit", error)
         }
+    }
+
+    if (feeds.length === 0) {
+        return (
+            <DependencyBlocker
+                title="No feed types found."
+                description="Add a feed type to continue."
+                actionLabel={showQuickCreate ? "Hide feed type form" : "Add feed type"}
+                onAction={() => setShowQuickCreate((current) => !current)}
+            >
+                {showQuickCreate ? <FeedTypeQuickCreate onCreated={() => setShowQuickCreate(false)} /> : null}
+            </DependencyBlocker>
+        )
     }
 
     return (

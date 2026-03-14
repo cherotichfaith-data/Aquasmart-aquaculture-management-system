@@ -52,7 +52,7 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
       if (row.parameter_name === "dissolved_oxygen" && typeof row.parameter_value === "number") {
         excursion = row.parameter_value < lowDo
       }
-      if (row.parameter_name === "ammonia_ammonium" && typeof row.parameter_value === "number") {
+      if (row.parameter_name === "ammonia" && typeof row.parameter_value === "number") {
         excursion = row.parameter_value > highAmmonia
       }
       return { ...row, excursion }

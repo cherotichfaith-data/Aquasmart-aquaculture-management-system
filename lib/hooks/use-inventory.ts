@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { getDailyFishInventory } from "@/lib/api/inventory"
 import { useAuth } from "@/components/providers/auth-provider"
+import type { Database } from "@/lib/types/database"
+import type { QueryResult } from "@/lib/supabase-client"
 
 export function useDailyFishInventory(params?: {
   systemId?: number
@@ -13,6 +15,7 @@ export function useDailyFishInventory(params?: {
   farmId?: string | null
   orderAsc?: boolean
   enabled?: boolean
+  initialData?: QueryResult<Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]>
 }) {
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
@@ -31,5 +34,7 @@ export function useDailyFishInventory(params?: {
     queryFn: ({ signal }) => getDailyFishInventory({ ...params, signal }),
     enabled,
     staleTime: 5 * 60_000,
+    initialData: params?.initialData,
+    initialDataUpdatedAt: params?.initialData ? 0 : undefined,
   })
 }

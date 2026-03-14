@@ -1,34 +1,16 @@
 "use client"
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useToast } from "@/hooks/use-toast"
-import { insertData } from "@/lib/supabase-actions"
-import {
-  addOptimisticActivity,
-  addOptimisticRecentEntry,
-  invalidateDashboardQueries,
-  invalidateInventoryQueries,
-  invalidateRecentActivityQueries,
-  invalidateRecentEntriesQueries,
-  restoreRecentEntries,
-} from "@/lib/hooks/use-mutation-invalidation"
-import type { TablesInsert } from "@/lib/types/database"
+import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
 
 export function useRecordStocking() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-
-  return useMutation({
-    mutationFn: async (payload: TablesInsert<"fish_stocking"> | TablesInsert<"fish_stocking">[]) => {
-      const result = await insertData("fish_stocking", payload)
-      if (!result.success) throw result.error
-      return result.data
-    },
-    onMutate: (payload) => {
-      addOptimisticActivity(queryClient, { tableName: "fish_stocking" })
+  return useInsertMutation({
+    table: "fish_stocking",
+    activityTableName: "fish_stocking",
+    recentEntryKey: "stocking",
+    buildOptimisticEntry: (payload) => {
       const entry = Array.isArray(payload) ? payload[0] : payload
       if (entry) {
-        const optimistic = {
+        return {
           id: `optimistic-${Date.now()}`,
           date: entry.date,
           system_id: entry.system_id,
@@ -40,22 +22,11 @@ export function useRecordStocking() {
           created_at: new Date().toISOString(),
           status: "pending",
         }
-        const previous = addOptimisticRecentEntry(queryClient, { key: "stocking", entry: optimistic })
-        return { previous }
       }
-      return {}
+      return null
     },
-    onSuccess: () => {
-      invalidateDashboardQueries(queryClient)
-      invalidateInventoryQueries(queryClient)
-      invalidateRecentActivityQueries(queryClient)
-      invalidateRecentEntriesQueries(queryClient)
-      toast({ title: "Success", description: "Stocking recorded." })
-    },
-    onError: (error: any, _payload, context) => {
-      restoreRecentEntries(queryClient, context?.previous)
-      const message = error?.message ?? "Failed to record stocking."
-      toast({ variant: "destructive", title: "Error", description: message })
-    },
+    invalidate: ["dashboard", "inventory", "recent-activity", "recent-entries"],
+    successMessage: "Stocking recorded.",
+    errorMessage: "Failed to record stocking.",
   })
 }

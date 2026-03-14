@@ -1,8 +1,22 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import type { Enums } from "@/lib/types/database"
+import type { Database, Enums } from "@/lib/types/database"
+import type { QueryResult } from "@/lib/supabase-client"
 import { useAuth } from "@/components/providers/auth-provider"
+import type {
+  DashboardSystemRow,
+  KPIOverviewMetric,
+  ProductionSummaryMetrics,
+  ProductionTrendRow,
+  RecommendedAction,
+  SystemsTableData,
+} from "@/features/dashboard/types"
+import {
+  buildRecommendedActionsFromAnalytics,
+  computeMortalityRateFromProduction,
+  toTrendPercent,
+} from "@/features/dashboard/analytics-shared"
 import {
   getDashboardSystems,
   getDashboardConsolidated,
@@ -12,29 +26,6 @@ import { getDailyFishInventory } from "@/lib/api/inventory"
 import { getWaterQualityRatings } from "@/lib/api/water-quality"
 import { getProductionSummary } from "@/lib/api/production"
 import { getBatchSystemIds, getRecentActivities, getTransferData } from "@/lib/api/reports"
-
-const computeMortalityRateFromProduction = (
-  rows: Array<{ number_of_fish_inventory: number | null; daily_mortality_count: number | null }>,
-): number | null => {
-  let weightedMortality = 0
-  let totalFish = 0
-  rows.forEach((row) => {
-    const fish = row.number_of_fish_inventory ?? 0
-    const mortality = row.daily_mortality_count ?? 0
-    if (fish > 0) {
-      weightedMortality += (mortality / fish) * fish
-      totalFish += fish
-    }
-  })
-  return totalFish > 0 ? weightedMortality / totalFish : null
-}
-
-const toTrendPercent = (current: number | null | undefined, delta: number | null | undefined): number | null => {
-  if (typeof current !== "number" || typeof delta !== "number") return null
-  const prev = current - delta
-  if (!Number.isFinite(prev) || prev === 0) return null
-  return (delta / prev) * 100
-}
 
 async function resolveScopedSystemIds(params: {
   farmId?: string | null
@@ -88,183 +79,6 @@ async function resolveScopedSystemIds(params: {
   return scoped
 }
 
-export type HealthSummaryState = {
-  waterQuality: { title: string; status: string; tone: "good" | "warn" | "bad"; progress: number; detail?: string } | null
-  fishHealth: { title: string; status: string; tone: "good" | "warn" | "bad"; progress: number; detail?: string } | null
-}
-
-export function useHealthSummary(params: {
-  farmId?: string | null
-  stage?: "all" | Enums<"system_growth_stage">
-  batch?: string
-  system?: string
-  timePeriod?: Enums<"time_period">
-  periodParam?: string | null
-  dateFrom?: string | null
-  dateTo?: string | null
-}) {
-  const { session } = useAuth()
-  return useQuery({
-    queryKey: [
-      "health-summary",
-      params.farmId ?? "all",
-      params.stage ?? "all",
-      params.batch ?? "all",
-      params.system ?? "all",
-      params.periodParam ?? params.timePeriod ?? "2 weeks",
-      params.dateFrom ?? "",
-      params.dateTo ?? "",
-    ],
-    queryFn: async ({ signal }) => {
-      const ratingToneMap: Record<string, { status: string; tone: "good" | "warn" | "bad"; progress: number }> = {
-        optimal: { status: "Good", tone: "good", progress: 0.85 },
-        acceptable: { status: "Fair", tone: "warn", progress: 0.6 },
-        critical: { status: "Poor", tone: "bad", progress: 0.35 },
-        lethal: { status: "Critical", tone: "bad", progress: 0.2 },
-      }
-
-      const dateFrom = params.dateFrom ?? null
-      const dateTo = params.dateTo ?? null
-
-      const resolvedSystemId =
-        params.system && params.system !== "all" && Number.isFinite(Number(params.system))
-          ? Number(params.system)
-          : undefined
-
-      const waterQualityState: NonNullable<HealthSummaryState["waterQuality"]> = {
-        title: "Water quality",
-        status: "Monitoring",
-        tone: "good",
-        progress: 0.8,
-        detail: resolvedSystemId ? "Latest system rating" : "Latest farm rating",
-      }
-
-      const fishState: NonNullable<HealthSummaryState["fishHealth"]> = {
-        title: "Fish health",
-        status: "Monitoring",
-        tone: "warn",
-        progress: 0.6,
-        detail: "Latest snapshot from dashboard view",
-      }
-
-      if (!dateFrom || !dateTo) {
-        return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
-      }
-
-      const scopedSystemIds = await resolveScopedSystemIds({
-        farmId: params.farmId ?? null,
-        stage: params.stage ?? "all",
-        system: params.system,
-        batch: params.batch ?? "all",
-        dateFrom,
-        dateTo,
-        signal,
-      })
-      const scopedResolvedSystemId =
-        scopedSystemIds && scopedSystemIds.length === 1 ? scopedSystemIds[0] : resolvedSystemId
-
-      const wqResult = await getWaterQualityRatings({
-        farmId: params.farmId ?? null,
-        systemId: scopedResolvedSystemId,
-        dateFrom,
-        dateTo,
-        limit: 2000,
-        signal,
-      })
-
-      const invResult = await getDailyFishInventory({
-        farmId: params.farmId ?? null,
-        systemId: scopedResolvedSystemId,
-        dateFrom,
-        dateTo,
-        limit: 2000,
-        signal,
-      })
-
-      if (wqResult.status === "success" && wqResult.data.length) {
-        const filteredWq = scopedSystemIds?.length
-          ? wqResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
-          : wqResult.data
-        if (!filteredWq.length) {
-          return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
-        }
-        const avg = filteredWq.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / filteredWq.length
-        const rounded = Math.round(avg)
-        const mapped = ratingToneMap[
-          rounded === 0 ? "lethal" : rounded === 1 ? "critical" : rounded === 2 ? "acceptable" : "optimal"
-        ] ?? ratingToneMap.optimal
-        waterQualityState.tone = mapped.tone
-        waterQualityState.status = mapped.status
-        waterQualityState.progress = mapped.progress
-        waterQualityState.detail = `Rating: ${rounded}`
-      }
-
-      if (invResult.status === "success" && invResult.data.length) {
-        const filteredInventory = scopedSystemIds?.length
-          ? invResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
-          : invResult.data
-        const totalMortality = filteredInventory.reduce((sum, row) => sum + (row.number_of_fish_mortality ?? 0), 0)
-        const totalFish = filteredInventory.reduce((sum, row) => sum + (row.number_of_fish ?? 0), 0)
-        if (totalFish > 0) {
-          fishState.detail = `Mortality rate/day: ${(totalMortality / totalFish).toFixed(4)}`
-        }
-      }
-
-      return { waterQuality: waterQualityState, fishHealth: fishState } as HealthSummaryState
-    },
-    enabled: Boolean(session) && Boolean(params.farmId),
-    staleTime: 5 * 60_000,
-  })
-}
-
-export type KPIOverviewMetric = {
-  key: string
-  label: string
-  value: number | null
-  unit?: string
-  decimals?: number
-  trend: number | null
-  invertTrend: boolean
-  tone?: "good" | "warn" | "bad" | "neutral"
-  badge?: string
-}
-
-export type ProductionSummaryMetrics = {
-  totalStockedFish: number
-  totalMortalities: number
-  netTransferAdjustments: number
-  totalHarvestedFish: number
-  totalHarvestedKg: number
-  dateBounds: { start: string | null; end: string | null }
-}
-
-export type DashboardSystemRow = {
-  system_id: number
-  system_name: string | null
-  growth_stage: "nursing" | "grow out" | "grow_out" | string | null
-  input_start_date: string | null
-  input_end_date: string | null
-  as_of_date: string | null
-  sampling_end_date: string | null
-  sample_age_days: number | null
-  efcr: number | null
-  efcr_date: string | null
-  feed_total: number | null
-  abw: number | null
-  feeding_rate: number | null
-  mortality_rate: number | null
-  biomass_density: number | null
-  fish_end: number | null
-  biomass_end: number | null
-  missing_days_count: number | null
-  water_quality_rating_average: "optimal" | "acceptable" | "critical" | "lethal" | string | null
-  water_quality_rating_numeric_average: number | null
-  water_quality_latest_date: string | null
-  worst_parameter: string | null
-  worst_parameter_value: number | null
-  worst_parameter_unit: string | null
-}
-
 const hasCompleteSystemMetrics = (row: DashboardSystemRow): boolean => {
   const requiredNumericMetrics: Array<number | null> = [
     row.fish_end,
@@ -295,6 +109,7 @@ export function useKpiOverview(params: {
   periodParam?: string | null
   dateFrom?: string | null
   dateTo?: string | null
+  initialData?: { metrics: KPIOverviewMetric[]; dateBounds: { start: string | null; end: string | null } }
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -589,6 +404,8 @@ export function useKpiOverview(params: {
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: true,
+    initialData: params.initialData,
+    initialDataUpdatedAt: params.initialData ? 0 : undefined,
   })
 }
 
@@ -601,6 +418,7 @@ export function useProductionSummaryMetrics(params: {
   periodParam?: string | null
   dateFrom?: string | null
   dateTo?: string | null
+  initialData?: ProductionSummaryMetrics
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -720,6 +538,8 @@ export function useProductionSummaryMetrics(params: {
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: true,
+    initialData: params.initialData,
+    initialDataUpdatedAt: params.initialData ? 0 : undefined,
   })
 }
 
@@ -733,6 +553,7 @@ export function useSystemsTable(params: {
   dateFrom?: string | null
   dateTo?: string | null
   includeIncomplete?: boolean
+  initialData?: SystemsTableData
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -821,6 +642,8 @@ export function useSystemsTable(params: {
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: true,
+    initialData: params.initialData,
+    initialDataUpdatedAt: params.initialData ? 0 : undefined,
   })
 }
 
@@ -832,6 +655,7 @@ export function useProductionTrend(params: {
   timePeriod: Enums<"time_period"> | string
   dateFrom?: string | null
   dateTo?: string | null
+  initialData?: ProductionTrendRow[]
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -877,6 +701,8 @@ export function useProductionTrend(params: {
     },
     enabled: Boolean(session) && Boolean(params.farmId),
     staleTime: 5 * 60_000,
+    initialData: params.initialData,
+    initialDataUpdatedAt: params.initialData ? 0 : undefined,
   })
 }
 
@@ -887,6 +713,7 @@ export function useRecentActivities(params?: {
   dateTo?: string
   limit?: number
   enabled?: boolean
+  initialData?: QueryResult<Database["public"]["Tables"]["change_log"]["Row"]>
 }) {
   return useQuery({
     queryKey: [
@@ -910,6 +737,8 @@ export function useRecentActivities(params?: {
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: 5 * 60_000,
+    initialData: params?.initialData,
+    initialDataUpdatedAt: params?.initialData ? 0 : undefined,
   })
 }
 
@@ -921,6 +750,7 @@ export function useRecommendedActions(params: {
   timePeriod?: Enums<"time_period">
   dateFrom?: string | null
   dateTo?: string | null
+  initialData?: RecommendedAction[]
 }) {
   const { session } = useAuth()
   return useQuery({
@@ -989,125 +819,16 @@ export function useRecommendedActions(params: {
         }>
       }
 
-      const inventoryRows = inventoryResult.data.filter(
-        (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
-      )
-      const wqRows = wqResult.data.filter(
-        (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
-      )
-
-      const latestInventoryDate = inventoryRows
-        .map((row) => row.inventory_date)
-        .filter(Boolean)
-        .sort()
-        .pop() as string | undefined
-
-      const latestInventory = latestInventoryDate
-        ? inventoryRows.filter((row) => row.inventory_date === latestInventoryDate)
-        : []
-
-      const mortalityRate =
-        latestInventory.length > 0
-          ? latestInventory.reduce((sum, row) => {
-              if (typeof row.mortality_rate === "number") return sum + row.mortality_rate
-              const fish = row.number_of_fish ?? 0
-              const mortality = row.number_of_fish_mortality ?? 0
-              return fish > 0 ? sum + (mortality / fish) * 100 : sum
-            }, 0) / latestInventory.length
-          : null
-
-      const feedingRate =
-        latestInventory.length > 0
-          ? latestInventory.reduce((sum, row) => {
-              if (typeof row.feeding_rate === "number") return sum + row.feeding_rate
-              const feed = row.feeding_amount ?? 0
-              const biomass = row.biomass_last_sampling ?? 0
-              return biomass > 0 ? sum + (feed * 1000) / biomass : sum
-            }, 0) / latestInventory.length
-          : null
-
-      const latestWqDate = wqRows
-        .map((row) => row.rating_date)
-        .filter(Boolean)
-        .sort()
-        .pop() as string | undefined
-
-      const latestWq = latestWqDate ? wqRows.filter((row) => row.rating_date === latestWqDate) : []
-      const waterQuality =
-        latestWq.length > 0
-          ? Math.round(
-              latestWq.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / latestWq.length,
-            )
-          : null
-
-      const nextActions: Array<{
-        title: string
-        description: string
-        priority: "High" | "Medium" | "Info"
-        due: string
-      }> = []
-
-      if (waterQuality !== null && waterQuality <= 1) {
-        nextActions.push({
-          title: "Water Quality Check",
-          description: "Critical water quality detected. Run a full parameter test and correct immediately.",
-          priority: "High",
-          due: "Today",
-        })
-      } else if (waterQuality !== null && waterQuality === 2) {
-        nextActions.push({
-          title: "Stabilize Water Quality",
-          description: "Water quality rating is below optimal. Inspect aeration and filtration.",
-          priority: "Medium",
-          due: "This week",
-        })
-      }
-
-      if (mortalityRate !== null && mortalityRate > 0.02) {
-        nextActions.push({
-          title: "Mortality Investigation",
-          description: "Mortality rate is elevated. Review recent handling, feeding, and water quality logs.",
-          priority: "High",
-          due: "This week",
-        })
-      } else if (mortalityRate !== null && mortalityRate > 0.01) {
-        nextActions.push({
-          title: "Monitor Mortality",
-          description: "Mortality rate is trending up. Add an extra health inspection.",
-          priority: "Medium",
-          due: "This week",
-        })
-      }
-
-      if (feedingRate !== null && feedingRate > 40) {
-        nextActions.push({
-          title: "Adjust Feeding Plan",
-          description: "Feeding rate (kg/t) is above target. Review feed schedule and check consumption.",
-          priority: "Medium",
-          due: "Next 3 days",
-        })
-      } else if (feedingRate !== null && feedingRate < 15) {
-        nextActions.push({
-          title: "Review Feed Intake",
-          description: "Feeding rate (kg/t) is below target. Verify appetite and update feeding logs.",
-          priority: "Info",
-          due: "Next 3 days",
-        })
-      }
-
-      if (!nextActions.length) {
-        nextActions.push({
-          title: "Routine System Review",
-          description: "No critical issues detected. Continue routine checks for water and feeding.",
-          priority: "Info",
-          due: "This week",
-        })
-      }
-
-      return nextActions.slice(0, 3)
+      return buildRecommendedActionsFromAnalytics({
+        scopedSystemIds,
+        inventoryRows: inventoryResult.data,
+        waterQualityRows: wqResult.data,
+      })
     },
     enabled: Boolean(session) && Boolean(params.farmId),
     staleTime: 5 * 60_000,
+    initialData: params.initialData,
+    initialDataUpdatedAt: params.initialData ? 0 : undefined,
   })
 }
 

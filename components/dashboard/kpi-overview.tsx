@@ -1,19 +1,20 @@
 "use client"
 
 import KPICard from "./kpi-card"
+import type { DashboardPageInitialData } from "@/features/dashboard/types"
 import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useKpiOverview } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 
-const kpiFilterMap: Record<string, string> = {
-  efcr: "efcr_periodic",
-  mortality: "mortality",
-  abw: "abw",
-  biomass: "abw",
-  biomass_density: "density",
-  feeding: "feeding",
+const kpiHrefMap: Record<string, string> = {
+  efcr: "/feed",
+  mortality: "/mortality",
+  abw: "/sampling",
+  biomass: "/sampling",
+  biomass_density: "/sampling",
+  feeding: "/feed",
 }
 
 interface KPIOverviewProps {
@@ -24,6 +25,8 @@ interface KPIOverviewProps {
   periodParam?: string | null
   dateFrom?: string
   dateTo?: string
+  farmId?: string | null
+  initialData?: DashboardPageInitialData["kpiOverview"]
 }
 
 export default function KPIOverview({
@@ -34,8 +37,11 @@ export default function KPIOverview({
   periodParam,
   dateFrom,
   dateTo,
+  farmId: initialFarmId,
+  initialData,
 }: KPIOverviewProps) {
-  const { farmId } = useActiveFarm()
+  const { farmId: activeFarmId } = useActiveFarm()
+  const farmId = initialFarmId ?? activeFarmId
   const metricsQuery = useKpiOverview({
     farmId,
     stage,
@@ -45,10 +51,10 @@ export default function KPIOverview({
     periodParam,
     dateFrom: dateFrom ?? null,
     dateTo: dateTo ?? null,
+    initialData,
   })
 
   const metrics = metricsQuery.data?.metrics ?? []
-  const dateBounds = metricsQuery.data?.dateBounds ?? { start: null, end: null }
   const errorMessage = getErrorMessage(metricsQuery.error)
 
   if (metricsQuery.isError) {
@@ -87,12 +93,7 @@ export default function KPIOverview({
       ) : null}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => {
-          const filter = kpiFilterMap[metric.key]
-          const periodValue = periodParam ?? timePeriod
-          const systemParam = system !== "all" ? `&system=${system}` : ""
-          const batchParam = batch !== "all" ? `&batch=${batch}` : ""
-          const stageParam = stage !== "all" ? `&stage=${stage}` : ""
-          const filterParam = filter ? `filter=${filter}&` : ""
+          const href = kpiHrefMap[metric.key] ?? "/reports"
           return (
             <KPICard
               key={metric.key}
@@ -102,7 +103,7 @@ export default function KPIOverview({
               decimals={metric.decimals}
               formatUnit={metric.unit}
               invertTrend={metric.invertTrend}
-              href={`/production?${filterParam}metric=${metric.key}&period=${periodValue}${systemParam}${batchParam}${stageParam}`}
+              href={href}
             />
           )
         })}

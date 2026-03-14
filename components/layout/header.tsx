@@ -40,8 +40,7 @@ export default function Header({
   const showDashboardTitle = pathname === "/"
   const defaultPeriod: TimePeriod = (() => {
     if (pathname.startsWith("/feed") || pathname.startsWith("/sampling")) return "quarter"
-    if (pathname.startsWith("/water-quality") || pathname.startsWith("/transactions")) return "month"
-    if (pathname.startsWith("/production")) return "month"
+    if (pathname.startsWith("/water-quality")) return "month"
     return "2 weeks"
   })()
   const {

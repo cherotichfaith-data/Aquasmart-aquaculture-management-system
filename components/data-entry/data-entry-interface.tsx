@@ -16,6 +16,7 @@ import { RecentEntriesList } from "./recent-entries-list"
 import type { Database, Tables } from "@/lib/types/database"
 
 interface DataEntryInterfaceProps {
+    farmId: string | null
     systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
     feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
@@ -48,6 +49,7 @@ const sidebarItems = [
 ] as const
 
 export function DataEntryInterface({
+    farmId,
     systems,
     feeds,
     batches,
@@ -65,7 +67,7 @@ export function DataEntryInterface({
     return (
         <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-6">
             <aside className="w-full md:w-64 bg-card border border-border/80 rounded-lg overflow-hidden shrink-0 h-fit md:h-auto shadow-sm">
-                <div className="p-4 font-semibold border-b border-border/80 bg-muted/60 text-foreground">Data Entry</div>
+                <div className="p-4 font-semibold border-b border-border/80 bg-muted/60 text-foreground">Data Capture</div>
                 <ScrollArea className="h-[200px] md:h-full">
                     <div className="flex flex-col p-2 gap-1">
                         {sidebarItems.map((item) => (
@@ -89,7 +91,13 @@ export function DataEntryInterface({
             <main className="flex-1 bg-card border border-border/80 rounded-lg p-6 overflow-y-auto shadow-sm">
                 {activeTab === "mortality" && (
                     <>
-                        <MortalityForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
+                        <MortalityForm
+                            farmId={farmId}
+                            systems={systems}
+                            batches={batches}
+                            defaultSystemId={defaultSystemId}
+                            defaultBatchId={defaultBatchId}
+                        />
                         <RecentEntriesList data={recentEntries.mortality} type="mortality" />
                     </>
                 )}
@@ -125,7 +133,7 @@ export function DataEntryInterface({
                 )}
                 {activeTab === "incoming_feed" && (
                     <>
-                        <IncomingFeedForm feeds={feeds} />
+                        <IncomingFeedForm feeds={feeds} farmId={farmId} />
                         <RecentEntriesList data={recentEntries.incoming_feed} type="incoming_feed" />
                     </>
                 )}

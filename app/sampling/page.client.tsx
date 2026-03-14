@@ -1,7 +1,9 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
+import SystemHistorySheet from "@/components/systems/system-history-sheet"
+import { useAnalyticsPageBootstrap } from "@/hooks/use-analytics-page-bootstrap"
 import {
   CartesianGrid,
   Legend,
@@ -15,9 +17,6 @@ import {
 } from "recharts"
 import { useSamplingData, useTransferData } from "@/lib/hooks/use-reports"
 import { sortByDateAsc } from "@/lib/utils"
-import { useActiveFarm } from "@/hooks/use-active-farm"
-import { useSharedFilters } from "@/hooks/use-shared-filters"
-import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
@@ -84,13 +83,19 @@ const resolveTargetAbw = (daySinceStart: number, curve: Array<{ day: number; abw
 
 
 export default function SamplingPage() {
-  const { farmId } = useActiveFarm()
+  const [selectedHistorySystemId, setSelectedHistorySystemId] = useState<number | null>(null)
   const {
+    farmId,
     selectedBatch,
     selectedSystem,
     selectedStage,
     timePeriod,
-  } = useSharedFilters("quarter")
+    dateFrom,
+    dateTo,
+    boundsReady: hasBounds,
+  } = useAnalyticsPageBootstrap({
+    defaultTimePeriod: "quarter",
+  })
 
   const {
     selectedSystemId: systemId,
@@ -106,11 +111,6 @@ export default function SamplingPage() {
     selectedBatch,
     selectedSystem,
   })
-
-  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
-  const hasBounds = boundsQuery.hasBounds
-  const dateFrom = boundsQuery.start ?? undefined
-  const dateTo = boundsQuery.end ?? undefined
 
   const systemsTableQuery = useSystemsTable({
     farmId,
@@ -637,8 +637,8 @@ export default function SamplingPage() {
         <div className="flex flex-col gap-4 rounded-lg border border-border/80 bg-card p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold">Sampling & Growth</h1>
-              <p className="text-muted-foreground mt-1">ABW trends, growth projection, and planning readiness</p>
+              <h1 className="text-3xl font-bold">Growth</h1>
+              <p className="text-muted-foreground mt-1">ABW trends, projection, and movement or harvest readiness</p>
             </div>
             <div className="flex flex-col items-end gap-1 text-xs">
               <DataUpdatedAt updatedAt={latestUpdatedAt} />
@@ -874,7 +874,11 @@ export default function SamplingPage() {
                   </TableHeader>
                   <TableBody>
                     {growthRows.map((row) => (
-                      <TableRow key={`${row.systemId}-${row.date ?? "latest"}`}>
+                      <TableRow
+                        key={`${row.systemId}-${row.date ?? "latest"}`}
+                        className="cursor-pointer hover:bg-muted/35"
+                        onClick={() => setSelectedHistorySystemId(row.systemId)}
+                      >
                         <TableCell className="font-medium">{row.date ?? "--"}</TableCell>
                         <TableCell>{row.systemName}</TableCell>
                         <TableCell>{row.batchId ?? "-"}</TableCell>
@@ -910,6 +914,16 @@ export default function SamplingPage() {
             )}
           </CardContent>
         </Card>
+        <SystemHistorySheet
+          open={selectedHistorySystemId !== null}
+          onOpenChange={(open) => !open && setSelectedHistorySystemId(null)}
+          farmId={farmId}
+          systemId={selectedHistorySystemId}
+          systemLabel={selectedHistorySystemId != null ? (systemNameById.get(selectedHistorySystemId) ?? null) : null}
+          dateFrom={dateFrom ?? undefined}
+          dateTo={dateTo ?? undefined}
+          summaryRow={selectedHistorySystemId != null ? (dashboardRowBySystemId.get(selectedHistorySystemId) ?? null) : null}
+        />
       </div>
     </DashboardLayout>
   )

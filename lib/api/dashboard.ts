@@ -3,15 +3,14 @@ import { parseDateToTimePeriod } from "@/lib/utils"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { getDailyFishInventory } from "@/lib/api/inventory"
+import { fetchTimePeriodBounds, type AnalyticsTimeScope, type TimeBounds } from "@/lib/time-period-bounds"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
 
 type DashboardRow = Database["public"]["Functions"]["api_dashboard"]["Returns"][number]
 type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
+export type { TimeBounds } from "@/lib/time-period-bounds"
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
-type TimePeriodBoundsRow = Database["public"]["Functions"]["api_time_period_bounds"]["Returns"][number]
-
-type TimeBounds = { start: string | null; end: string | null }
 
 type DashboardRpcArgs = {
   p_farm_id: string
@@ -394,35 +393,19 @@ export async function getTimePeriodBounds(
   timePeriod: Enums<"time_period"> | string,
   signal?: AbortSignal,
   farmId?: string | null,
+  scope: AnalyticsTimeScope = "dashboard",
 ): Promise<TimeBounds> {
-  const parsed = parseDateToTimePeriod(timePeriod)
   if (!farmId) return { start: null, end: null }
 
   const clientResult = await getClientOrError("getTimePeriodBounds", { requireSession: true })
   if ("error" in clientResult) return { start: null, end: null }
   const { supabase } = clientResult
 
-  let q = supabase
-    .rpc("api_time_period_bounds", {
-      p_farm_id: farmId,
-      p_time_period: parsed.period,
-    })
-    .maybeSingle()
-
-  if (signal) {
-    const withSignal = (q as any).abortSignal?.(signal)
-    if (withSignal) q = withSignal
-  }
-
-  const { data, error } = await q
-  if (error) {
-    if (signal?.aborted || isQuietError(error)) return { start: null, end: null }
-    return { start: null, end: null }
-  }
-
-  const row = data as TimePeriodBoundsRow | null
-  return {
-    start: row?.input_start_date ?? null,
-    end: row?.input_end_date ?? null,
-  }
+  const bounds = await fetchTimePeriodBounds(supabase as never, {
+    farmId,
+    timePeriod,
+    scope,
+    signal,
+  })
+  return signal?.aborted ? { start: null, end: null } : bounds
 }
