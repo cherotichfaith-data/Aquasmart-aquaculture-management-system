@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react"
 import type { Enums } from "@/lib/types/database"
 
-type StageFilter = "all" | Enums<"system_growth_stage">
-type TimePeriod = Enums<"time_period">
+export type StageFilter = "all" | Enums<"system_growth_stage">
+export type TimePeriod = Enums<"time_period">
 
-type SharedFiltersState = {
+export type SharedFiltersState = {
   selectedBatch: string
   selectedSystem: string
   selectedStage: StageFilter
@@ -24,14 +24,22 @@ const isTimePeriod = (value: unknown): value is TimePeriod =>
 const isStage = (value: unknown): value is StageFilter =>
   typeof value === "string" && STAGES.includes(value as StageFilter)
 
-export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
+export function useSharedFilters(
+  defaultTimePeriod: TimePeriod = "2 weeks",
+  initialValues?: Partial<SharedFiltersState>,
+) {
+  const hasInitialValues = Boolean(initialValues)
+  const initialBatch = initialValues?.selectedBatch ?? "all"
+  const initialSystem = initialValues?.selectedSystem ?? "all"
+  const initialStage = initialValues?.selectedStage ?? "all"
+  const initialPeriod = initialValues?.timePeriod ?? defaultTimePeriod
   const initialDefaultPeriod = useRef(defaultTimePeriod)
   const instanceId = useRef(`shared-filters-${Math.random().toString(36).slice(2)}`)
   const suppressEmit = useRef(false)
-  const [selectedBatch, setSelectedBatch] = useState<string>("all")
-  const [selectedSystem, setSelectedSystem] = useState<string>("all")
-  const [selectedStage, setSelectedStage] = useState<StageFilter>("all")
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialDefaultPeriod.current)
+  const [selectedBatch, setSelectedBatch] = useState<string>(initialBatch)
+  const [selectedSystem, setSelectedSystem] = useState<string>(initialSystem)
+  const [selectedStage, setSelectedStage] = useState<StageFilter>(initialStage)
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialPeriod)
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
@@ -39,19 +47,21 @@ export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
     const fallbackPeriod = initialDefaultPeriod.current
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
-      if (raw) {
+      if (raw && !hasInitialValues) {
         const parsed = JSON.parse(raw) as Partial<SharedFiltersState>
         setSelectedBatch(typeof parsed.selectedBatch === "string" ? parsed.selectedBatch : "all")
         setSelectedSystem(typeof parsed.selectedSystem === "string" ? parsed.selectedSystem : "all")
         setSelectedStage(isStage(parsed.selectedStage) ? parsed.selectedStage : "all")
         setTimePeriod(isTimePeriod(parsed.timePeriod) ? parsed.timePeriod : fallbackPeriod)
-      } else {
+      } else if (!hasInitialValues) {
         setTimePeriod(fallbackPeriod)
       }
     } catch {
-      setTimePeriod(fallbackPeriod)
+      if (!hasInitialValues) {
+        setTimePeriod(fallbackPeriod)
+      }
     } finally {
-      if (typeof window !== "undefined") {
+      if (!hasInitialValues && typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search)
         const paramSystem = params.get("system")
         const paramBatch = params.get("batch")
@@ -65,7 +75,17 @@ export function useSharedFilters(defaultTimePeriod: TimePeriod = "2 weeks") {
       }
       setHydrated(true)
     }
-  }, [])
+  }, [hasInitialValues])
+
+  useEffect(() => {
+    if (!hasInitialValues) return
+    suppressEmit.current = true
+    setSelectedBatch(initialBatch)
+    setSelectedSystem(initialSystem)
+    setSelectedStage(initialStage)
+    setTimePeriod(initialPeriod)
+    setHydrated(true)
+  }, [hasInitialValues, initialBatch, initialPeriod, initialStage, initialSystem])
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return

@@ -6,14 +6,13 @@ import { useEffect, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
 import {
   Activity,
-  ClipboardList,
+  AlertTriangle,
   Droplets,
   Fish,
   LayoutDashboard,
   LogOut,
   Settings,
   TestTube,
-  Warehouse,
   X,
   PlusCircle,
   ChevronsLeft,
@@ -21,16 +20,29 @@ import {
   ChevronDown,
 } from "lucide-react"
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Data Entry", href: "/data-entry", icon: PlusCircle },
-  { name: "Inventory (Fish and Feed)", href: "/inventory", icon: Warehouse },
-  { name: "Feed Management", href: "/feed", icon: Fish },
-  { name: "Sampling and Mortality", href: "/sampling", icon: TestTube },
-  { name: "Water-Quality Monitoring", href: "/water-quality", icon: Droplets },
-  { name: "Transactions and Activity Log", href: "/transactions", icon: ClipboardList },
-  { name: "Reports and Analytics", href: "/reports", icon: Activity },
-  { name: "Settings", href: "/settings", icon: Settings },
+const navigationSections = [
+  {
+    title: "Operate",
+    items: [
+      { name: "Dashboard", href: "/", icon: LayoutDashboard },
+      { name: "Feed", href: "/feed", icon: Fish },
+      { name: "Growth", href: "/sampling", icon: TestTube },
+      { name: "Mortality", href: "/mortality", icon: AlertTriangle },
+      { name: "Water Quality", href: "/water-quality", icon: Droplets },
+    ],
+  },
+  {
+    title: "Analyze",
+    items: [{ name: "Reports", href: "/reports", icon: Activity }],
+  },
+  {
+    title: "Capture",
+    items: [{ name: "Data Capture", href: "/data-entry", icon: PlusCircle }],
+  },
+  {
+    title: "Configure",
+    items: [{ name: "Settings", href: "/settings", icon: Settings }],
+  },
 ]
 
 export default function Sidebar({
@@ -98,8 +110,16 @@ export default function Sidebar({
             {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
           </button>
         </div>
-        <nav className="p-4 space-y-2 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          {navigation.map((item) => {
+        <nav className="p-4 space-y-5 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+          {navigationSections.map((section) => (
+            <div key={section.title} className="space-y-2">
+              {!collapsed ? (
+                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55">
+                  {section.title}
+                </p>
+              ) : null}
+              <div className="space-y-2">
+                {section.items.map((item) => {
             if (item.href === "/water-quality") {
               const Icon = item.icon
               if (collapsed) {
@@ -221,7 +241,10 @@ export default function Sidebar({
                 {!collapsed && <span className="text-sm font-medium">{item.name}</span>}
               </Link>
             )
-          })}
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="p-4 border-t border-sidebar-border">

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -18,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Database } from "@/lib/types/database"
 import { useRecordStocking } from "@/lib/hooks/use-stocking"
 import { logSbError } from "@/utils/supabase/log"
+import { BatchQuickCreate } from "./batch-quick-create"
+import { DependencyBlocker } from "./dependency-blocker"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -38,6 +41,7 @@ interface StockingFormProps {
 
 export function StockingForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: StockingFormProps) {
     const mutation = useRecordStocking()
+    const [showBatchCreate, setShowBatchCreate] = useState(false)
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -82,6 +86,19 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
         } catch (error) {
             logSbError("dataEntry:stocking:submit", error)
         }
+    }
+
+    if (batches.length === 0) {
+        return (
+            <DependencyBlocker
+                title="No batches found."
+                description="Create a batch to continue stocking."
+                actionLabel={showBatchCreate ? "Hide batch form" : "Create batch"}
+                onAction={() => setShowBatchCreate((current) => !current)}
+            >
+                {showBatchCreate ? <BatchQuickCreate onCreated={() => setShowBatchCreate(false)} /> : null}
+            </DependencyBlocker>
+        )
     }
 
     return (

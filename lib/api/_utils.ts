@@ -24,6 +24,11 @@ export type KpiRpcName =
   | "api_water_quality_sync_status"
   | "api_time_period_bounds"
   | "api_time_period_options"
+  | "get_farm_kpis_today"
+  | "get_fcr_trend"
+  | "get_growth_trend"
+  | "get_running_stock"
+  | "get_survival_trend"
 
 /**
  * Option RPCs (replacing PostgREST option views where possible).

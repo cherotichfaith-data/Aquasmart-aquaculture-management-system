@@ -5,6 +5,7 @@ import { useMemo } from "react"
 import { useRecentEntries } from "@/lib/hooks/use-reports"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSystemOptions } from "@/lib/hooks/use-options"
+import type { DashboardPageInitialData } from "@/features/dashboard/types"
 import type { Enums } from "@/lib/types/database"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
@@ -15,16 +16,23 @@ export default function RecentActivities({
   system = "all",
   title = "Activities",
   countLabel = "updates",
+  farmId: initialFarmId,
+  initialEntries,
+  initialSystems,
 }: {
   batch?: string
   stage?: "all" | Enums<"system_growth_stage">
   system?: string
   title?: string
   countLabel?: string
+  farmId?: string | null
+  initialEntries?: DashboardPageInitialData["recentEntries"]
+  initialSystems?: DashboardPageInitialData["systemOptions"]
 }) {
-  const { farmId } = useActiveFarm()
-  const entriesQuery = useRecentEntries()
-  const systemsQuery = useSystemOptions({ farmId, activeOnly: true })
+  const { farmId: activeFarmId } = useActiveFarm()
+  const farmId = initialFarmId ?? activeFarmId
+  const entriesQuery = useRecentEntries({ farmId, initialData: initialEntries })
+  const systemsQuery = useSystemOptions({ farmId, activeOnly: true, initialData: initialSystems })
   const loading = entriesQuery.isLoading || systemsQuery.isLoading
   const entryErrors = useMemo(() => {
     const data = entriesQuery.data
@@ -143,6 +151,7 @@ export default function RecentActivities({
       case "water_quality_measurement":
         return "water_quality_measurement"
       case "mortality_events":
+      case "fish_mortality_events":
       case "fish_mortality":
         return "fish_mortality"
       case "transfer_events":

@@ -7,7 +7,6 @@ const RECENT_ENTRIES_KEY = ["reports", "recent-entries"]
 export function invalidateDashboardQueries(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ["dashboard"] })
   queryClient.invalidateQueries({ queryKey: ["kpi-overview"] })
-  queryClient.invalidateQueries({ queryKey: ["health-summary"] })
   queryClient.invalidateQueries({ queryKey: ["systems-table"] })
   queryClient.invalidateQueries({ queryKey: ["production-summary-metrics"] })
   queryClient.invalidateQueries({ queryKey: ["recommended-actions"] })
@@ -62,7 +61,7 @@ export function addOptimisticActivity(
   })
 }
 
-type RecentEntriesKey =
+export type RecentEntriesKey =
   | "mortality"
   | "feeding"
   | "sampling"

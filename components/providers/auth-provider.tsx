@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
-import { logSbError } from "@/utils/supabase/log";
+import { isSbNetworkError, logSbError } from "@/utils/supabase/log";
 
 type UserRole = "admin" | "farm_manager" | "system_operator" | "data_analyst" | "viewer" | null;
 
@@ -45,7 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
                 const { data, error } = await supabase.auth.getSession();
                 if (error) {
-                    logSbError("authProvider:getSession", error);
+                    if (!isSbNetworkError(error)) {
+                        logSbError("authProvider:getSession", error);
+                    }
                 }
                 const currentSession = data?.session ?? null;
                 const currentUser = currentSession?.user ?? null;
@@ -54,7 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setRole(deriveRole(currentUser));
                 setProfile(deriveProfile(currentUser));
             } catch (error) {
-                logSbError("authProvider:getSession:catch", error);
+                if (!isSbNetworkError(error)) {
+                    logSbError("authProvider:getSession:catch", error);
+                }
             } finally {
                 setIsLoading(false);
             }

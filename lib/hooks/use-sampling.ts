@@ -1,33 +1,15 @@
 "use client"
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useToast } from "@/hooks/use-toast"
-import { insertData } from "@/lib/supabase-actions"
-import {
-  addOptimisticActivity,
-  addOptimisticRecentEntry,
-  invalidateDashboardQueries,
-  invalidateInventoryQueries,
-  invalidateProductionQueries,
-  invalidateRecentActivityQueries,
-  invalidateRecentEntriesQueries,
-  restoreRecentEntries,
-} from "@/lib/hooks/use-mutation-invalidation"
-import type { TablesInsert } from "@/lib/types/database"
+import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
 
 export function useRecordSampling() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-
-  return useMutation({
-    mutationFn: async (payload: TablesInsert<"fish_sampling_weight">) => {
-      const result = await insertData("fish_sampling_weight", payload)
-      if (!result.success) throw result.error
-      return result.data
-    },
-    onMutate: (payload) => {
-      addOptimisticActivity(queryClient, { tableName: "fish_sampling_weight" })
-      const optimistic = {
+  return useInsertMutation({
+    table: "fish_sampling_weight",
+    activityTableName: "fish_sampling_weight",
+    recentEntryKey: "sampling",
+    buildOptimisticEntry: (payload) => {
+      if (Array.isArray(payload)) return null
+      return {
         id: `optimistic-${Date.now()}`,
         date: payload.date,
         system_id: payload.system_id,
@@ -38,21 +20,9 @@ export function useRecordSampling() {
         created_at: new Date().toISOString(),
         status: "pending",
       }
-      const previous = addOptimisticRecentEntry(queryClient, { key: "sampling", entry: optimistic })
-      return { previous }
     },
-    onSuccess: () => {
-      invalidateDashboardQueries(queryClient)
-      invalidateInventoryQueries(queryClient)
-      invalidateProductionQueries(queryClient)
-      invalidateRecentActivityQueries(queryClient)
-      invalidateRecentEntriesQueries(queryClient)
-      toast({ title: "Success", description: "Sampling event recorded." })
-    },
-    onError: (error: any, _payload, context) => {
-      restoreRecentEntries(queryClient, context?.previous)
-      const message = error?.message ?? "Failed to record sampling."
-      toast({ variant: "destructive", title: "Error", description: message })
-    },
+    invalidate: ["dashboard", "inventory", "production", "recent-activity", "recent-entries"],
+    successMessage: "Sampling event recorded.",
+    errorMessage: "Failed to record sampling.",
   })
 }

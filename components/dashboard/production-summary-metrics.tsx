@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useProductionSummaryMetrics } from "@/lib/hooks/use-dashboard"
+import type { DashboardPageInitialData } from "@/features/dashboard/types"
 import type { Enums } from "@/lib/types/database"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
@@ -21,6 +22,8 @@ export default function ProductionSummaryMetrics({
   periodParam,
   dateFrom,
   dateTo,
+  farmId: initialFarmId,
+  initialData,
 }: {
   stage: "all" | Enums<"system_growth_stage">
   batch?: string
@@ -29,8 +32,11 @@ export default function ProductionSummaryMetrics({
   periodParam?: string | null
   dateFrom?: string
   dateTo?: string
+  farmId?: string | null
+  initialData?: DashboardPageInitialData["productionSummaryMetrics"]
 }) {
-  const { farmId } = useActiveFarm()
+  const { farmId: activeFarmId } = useActiveFarm()
+  const farmId = activeFarmId ?? initialFarmId
   const metricsQuery = useProductionSummaryMetrics({
     farmId,
     stage,
@@ -40,6 +46,7 @@ export default function ProductionSummaryMetrics({
     periodParam,
     dateFrom: dateFrom ?? null,
     dateTo: dateTo ?? null,
+    initialData,
   })
   const errorMessage = getErrorMessage(metricsQuery.error)
 

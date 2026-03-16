@@ -14,7 +14,7 @@ export type MeasurementEvent = {
   dissolved_oxygen: number | null
   pH: number | null
   temperature: number | null
-  ammonia_ammonium: number | null
+  ammonia: number | null
   operator: string
   source: "measurement" | "rating"
 }
@@ -23,7 +23,7 @@ export const parameterLabels: Record<WqParameter, string> = {
   dissolved_oxygen: "Dissolved Oxygen (mg/L)",
   pH: "pH",
   temperature: "Temperature (deg C)",
-  ammonia_ammonium: "Ammonia (mg/L)",
+  ammonia: "Ammonia (mg/L)",
   nitrite: "Nitrite (mg/L)",
   nitrate: "Nitrate (mg/L)",
   salinity: "Salinity (ppt)",

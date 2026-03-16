@@ -88,7 +88,7 @@ export function WaterQualityForm({ systems, defaultSystemId = null }: WaterQuali
                 measurements.push({ parameter_name: "pH", parameter_value: values.ph })
             }
             if (typeof values.total_ammonia === "number") {
-                measurements.push({ parameter_name: "ammonia_ammonium", parameter_value: values.total_ammonia })
+                measurements.push({ parameter_name: "ammonia", parameter_value: values.total_ammonia })
             }
             if (typeof values.no2 === "number") {
                 measurements.push({ parameter_name: "nitrite", parameter_value: values.no2 })

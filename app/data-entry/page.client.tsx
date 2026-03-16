@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataEntryInterface } from "@/components/data-entry/data-entry-interface"
+import { SystemForm } from "@/components/data-entry/system-form"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useBatchOptions, useFeedTypeOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { useRecentEntries } from "@/lib/hooks/use-reports"
@@ -45,11 +46,8 @@ export default function DataEntryPageClient() {
     return Number.isFinite(parsed) ? parsed : null
   }, [batchParam])
 
-  const loading =
-    systemsQuery.isLoading ||
-    batchesQuery.isLoading ||
-    feedsQuery.isLoading ||
-    recentEntriesQuery.isLoading
+  const systemsLoading = systemsQuery.isLoading
+  const loading = batchesQuery.isLoading || feedsQuery.isLoading || recentEntriesQuery.isLoading
 
   const entryErrors = useMemo(() => {
     const data = recentEntriesQuery.data
@@ -66,9 +64,11 @@ export default function DataEntryPageClient() {
       getQueryResultError(data.systems),
     ].filter(Boolean) as string[]
   }, [recentEntriesQuery.data])
-  const errorMessages = [
+  const systemsErrorMessages = [
     getErrorMessage(systemsQuery.error),
     getQueryResultError(systemsQuery.data),
+  ].filter(Boolean) as string[]
+  const errorMessages = [
     getErrorMessage(batchesQuery.error),
     getQueryResultError(batchesQuery.data),
     getErrorMessage(feedsQuery.error),
@@ -85,6 +85,7 @@ export default function DataEntryPageClient() {
   const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
   const batches = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
   const feeds = feedsQuery.data?.status === "success" ? feedsQuery.data.data : []
+  const hasSystems = systems.length > 0
 
   const recentEntries = useMemo(
     () => ({
@@ -122,9 +123,9 @@ export default function DataEntryPageClient() {
         <div className="flex flex-col gap-2 mb-6 rounded-lg border border-border/80 bg-card p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Data Entry</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Data Capture</h1>
               <p className="text-muted-foreground">
-                Record farm activities and measurements.
+                Record farm operations and measurements.
               </p>
             </div>
             <div className="flex flex-col items-end gap-1 text-xs">
@@ -133,7 +134,29 @@ export default function DataEntryPageClient() {
             </div>
           </div>
         </div>
-        {errorMessages.length > 0 ? (
+        {systemsErrorMessages.length > 0 ? (
+          <DataErrorState
+            title="Unable to load systems"
+            description={systemsErrorMessages[0]}
+            onRetry={() => {
+              systemsQuery.refetch()
+            }}
+          />
+        ) : systemsLoading ? (
+          <div className="min-h-[300px] rounded-lg border border-border/80 bg-muted/40 animate-pulse shadow-sm" />
+        ) : !hasSystems ? (
+          <div className="space-y-6">
+            <div className="rounded-lg border border-dashed border-border/80 bg-muted/30 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold tracking-tight">Set up your first system</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Add at least one system before recording farm operations.
+              </p>
+            </div>
+            <div className="rounded-lg border border-border/80 bg-card p-6 shadow-sm">
+              <SystemForm />
+            </div>
+          </div>
+        ) : errorMessages.length > 0 ? (
           <DataErrorState
             title="Unable to load data-entry options"
             description={errorMessages[0]}
@@ -148,6 +171,7 @@ export default function DataEntryPageClient() {
           <div className="min-h-[300px] rounded-lg border border-border/80 bg-muted/40 animate-pulse shadow-sm" />
         ) : (
           <DataEntryInterface
+            farmId={farmId}
             systems={systems}
             feeds={feeds}
             batches={batches}

@@ -278,7 +278,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             }
           }
 
-          if (row.parameter_name === "ammonia_ammonium" && threshold.high_ammonia_threshold != null) {
+          if (row.parameter_name === "ammonia" && threshold.high_ammonia_threshold != null) {
             if (row.parameter_value > threshold.high_ammonia_threshold) {
               addNotification({
                 id: `wq-ammonia-${row.id}`,

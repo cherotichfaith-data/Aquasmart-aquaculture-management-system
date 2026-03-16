@@ -1,24 +1,15 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
 import type { Enums } from "@/lib/types/database"
-import { TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+import type { DashboardPageInitialData } from "@/features/dashboard/types"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
-import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
+import SystemHistorySheet from "@/components/systems/system-history-sheet"
 
 interface SystemsTableProps {
   stage: Enums<"system_growth_stage"> | "all"
@@ -28,6 +19,8 @@ interface SystemsTableProps {
   periodParam?: string | null
   dateFrom?: string
   dateTo?: string
+  farmId?: string | null
+  initialData?: DashboardPageInitialData["systemsTable"]
 }
 
 const PAGE_SIZE = 8
@@ -97,9 +90,11 @@ export default function SystemsTable({
   periodParam,
   dateFrom,
   dateTo,
+  farmId: initialFarmId,
+  initialData,
 }: SystemsTableProps) {
-  const router = useRouter()
-  const { farmId } = useActiveFarm()
+  const { farmId: activeFarmId } = useActiveFarm()
+  const farmId = initialFarmId ?? activeFarmId
   const [pageIndex, setPageIndex] = useState(0)
   const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null)
   const [filterMode, setFilterMode] = useState<SystemFilterMode>("all")
@@ -119,6 +114,7 @@ export default function SystemsTable({
     dateFrom: dateFrom ?? null,
     dateTo: dateTo ?? null,
     includeIncomplete: true,
+    initialData,
   })
 
   const systems = systemsQuery.data?.rows ?? []
@@ -150,30 +146,6 @@ export default function SystemsTable({
   const pagedSystems = filteredSystems.slice(startIndex, endIndex)
   const showPagination = totalRows > PAGE_SIZE
   const selectedSystem = filteredSystems.find((system) => system.system_id === selectedSystemId) ?? null
-  const selectedAsOf = formatAsOfDate(selectedSystem?.as_of_date ?? selectedSystem?.input_end_date)
-  const selectedFlags = selectedSystem
-    ? [
-        (selectedSystem.missing_days_count ?? 0) > 0 ? `Missing ${selectedSystem.missing_days_count} day(s)` : null,
-        (selectedSystem.sample_age_days ?? 0) > 14 ? `Sampling ${selectedSystem.sample_age_days} day(s) old` : null,
-        selectedSystem.water_quality_rating_average === "critical" ||
-        selectedSystem.water_quality_rating_average === "lethal"
-          ? `Water quality ${selectedSystem.water_quality_rating_average}`
-          : null,
-      ].filter(Boolean)
-    : []
-  const selectedInventoryQuery = useDailyFishInventory({
-    farmId,
-    systemId: selectedSystemId ?? undefined,
-    dateFrom: dateFrom ?? undefined,
-    dateTo: dateTo ?? undefined,
-    limit: 1,
-    orderAsc: false,
-    enabled: selectedSystemId != null && Boolean(dateFrom && dateTo),
-  })
-  const selectedInventoryRow =
-    selectedInventoryQuery.data?.status === "success"
-      ? selectedInventoryQuery.data.data[0] ?? null
-      : null
 
   useEffect(() => {
     setPageIndex(0)
@@ -215,7 +187,7 @@ export default function SystemsTable({
     <div className="rounded-lg border border-border/90 bg-card p-6 shadow-sm">
       <div className="mb-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">Production</h2>
+          <h2 className="text-base font-semibold text-foreground">System Status</h2>
           <div className="flex items-center gap-3">
             <DataUpdatedAt updatedAt={systemsQuery.dataUpdatedAt} />
             <DataFetchingBadge isFetching={systemsQuery.isFetching} isLoading={systemsQuery.isLoading} />
@@ -391,107 +363,16 @@ export default function SystemsTable({
           </div>
         </div>
       ) : null}
-      <Sheet open={selectedSystemId !== null} onOpenChange={(open) => !open && setSelectedSystemId(null)}>
-        <SheetContent className="w-full sm:max-w-[420px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{selectedSystem?.system_name || `System ${selectedSystem?.system_id ?? ""}`}</SheetTitle>
-            <SheetDescription>
-              {selectedAsOf ? `As of ${selectedAsOf}` : "Operational detail and suggested next actions."}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="space-y-4 py-4">
-            <div className="rounded-md border border-border bg-muted/20 p-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Summary</h3>
-              <dl className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div>
-                  <dt className="text-muted-foreground">Biomass</dt>
-                  <dd className="font-semibold">{formatWithUnit(selectedSystem?.biomass_end, 1, "kg")}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">eFCR</dt>
-                  <dd className="font-semibold">{formatNumber(selectedSystem?.efcr, 2)}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">ABW</dt>
-                  <dd className="font-semibold">{formatWithUnit(selectedSystem?.abw, 1, "g")}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Mortality</dt>
-                  <dd className="font-semibold">{formatRate(selectedSystem?.mortality_rate, 4, "rate/day")}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="rounded-md border border-border bg-muted/20 p-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Live Inventory</h3>
-              {selectedInventoryQuery.isLoading ? (
-                <p className="mt-3 text-sm text-muted-foreground">Loading latest inventory...</p>
-              ) : selectedInventoryRow ? (
-                <dl className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <dt className="text-muted-foreground">Fish Count</dt>
-                    <dd className="font-semibold">{formatNumber(selectedInventoryRow.number_of_fish, 0)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Biomass</dt>
-                    <dd className="font-semibold">{formatWithUnit(selectedInventoryRow.biomass_last_sampling, 1, "kg")}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">ABW</dt>
-                    <dd className="font-semibold">{formatWithUnit(selectedInventoryRow.abw_last_sampling, 1, "g")}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Feeding</dt>
-                    <dd className="font-semibold">{formatWithUnit(selectedInventoryRow.feeding_amount, 1, "kg")}</dd>
-                  </div>
-                </dl>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">No inventory snapshot found.</p>
-              )}
-            </div>
-
-            <div className="rounded-md border border-border bg-muted/20 p-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Flags / Exceptions</h3>
-              {selectedFlags.length > 0 ? (
-                <ul className="mt-3 space-y-2">
-                  {selectedFlags.map((flag) => (
-                    <li key={String(flag)} className="flex items-start gap-2 text-sm">
-                      <TriangleAlert className="mt-0.5 h-4 w-4 text-chart-4" />
-                      <span>{flag}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">No current exceptions.</p>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                className="cursor-pointer"
-                onClick={() => router.push(`/data-entry?type=feeding&system=${selectedSystemId ?? ""}`)}
-              >
-                Record Feeding
-              </Button>
-              <Button
-                variant="outline"
-                className="cursor-pointer"
-                onClick={() => router.push(`/data-entry?type=sampling&system=${selectedSystemId ?? ""}`)}
-              >
-                Record Sampling
-              </Button>
-            </div>
-          </div>
-          <SheetFooter className="gap-2">
-            <Button variant="outline" className="cursor-pointer" onClick={() => setSelectedSystemId(null)}>
-              Acknowledge
-            </Button>
-            <Button className="cursor-pointer" onClick={() => router.push("/data-entry")}>
-              Add Record
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      <SystemHistorySheet
+        open={selectedSystemId !== null}
+        onOpenChange={(open) => !open && setSelectedSystemId(null)}
+        farmId={farmId}
+        systemId={selectedSystemId}
+        systemLabel={selectedSystem?.system_name ?? null}
+        dateFrom={dateFrom ?? undefined}
+        dateTo={dateTo ?? undefined}
+        summaryRow={selectedSystem}
+      />
     </div>
   )
 }

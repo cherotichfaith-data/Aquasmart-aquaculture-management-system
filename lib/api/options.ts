@@ -7,6 +7,8 @@ type SystemListItem = Database["public"]["Functions"]["api_system_options_rpc"][
 type BatchListItem = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type FarmOptionRow = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
+type FeedSupplierRow = Database["public"]["Tables"]["feed_supplier"]["Row"]
+type FingerlingSupplierRow = Database["public"]["Tables"]["fingerling_supplier"]["Row"]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 
@@ -115,6 +117,48 @@ export async function getFeedTypeOptions(params?: {
 
   const rows = res.data.slice().sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
   return toQuerySuccess<FeedTypeOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
+}
+
+export async function getFeedSupplierOptions(params?: {
+  signal?: AbortSignal
+}): Promise<QueryResult<FeedSupplierRow>> {
+  const clientResult = await getClientOrError("getFeedSupplierOptions", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase.from("feed_supplier").select("*").order("company_name", { ascending: true })
+  if (params?.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (error) {
+    if (params?.signal?.aborted || isQuietTableError(error)) {
+      return empty<FeedSupplierRow>()
+    }
+    return toQueryError("getFeedSupplierOptions", error)
+  }
+
+  return toQuerySuccess<FeedSupplierRow>((data ?? []) as FeedSupplierRow[])
+}
+
+export async function getFingerlingSupplierOptions(params?: {
+  signal?: AbortSignal
+}): Promise<QueryResult<FingerlingSupplierRow>> {
+  const clientResult = await getClientOrError("getFingerlingSupplierOptions", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase.from("fingerling_supplier").select("*").order("company_name", { ascending: true })
+  if (params?.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (error) {
+    if (params?.signal?.aborted || isQuietTableError(error)) {
+      return empty<FingerlingSupplierRow>()
+    }
+    return toQueryError("getFingerlingSupplierOptions", error)
+  }
+
+  return toQuerySuccess<FingerlingSupplierRow>((data ?? []) as FingerlingSupplierRow[])
 }
 
 export async function getFarmOptions(params?: {

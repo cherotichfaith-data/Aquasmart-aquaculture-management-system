@@ -1,33 +1,15 @@
 "use client"
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useToast } from "@/hooks/use-toast"
-import { insertData } from "@/lib/supabase-actions"
-import {
-  addOptimisticActivity,
-  addOptimisticRecentEntry,
-  invalidateDashboardQueries,
-  invalidateInventoryQueries,
-  invalidateProductionQueries,
-  invalidateRecentActivityQueries,
-  invalidateRecentEntriesQueries,
-  restoreRecentEntries,
-} from "@/lib/hooks/use-mutation-invalidation"
-import type { TablesInsert } from "@/lib/types/database"
+import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
 
 export function useRecordHarvest() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-
-  return useMutation({
-    mutationFn: async (payload: TablesInsert<"fish_harvest">) => {
-      const result = await insertData("fish_harvest", payload)
-      if (!result.success) throw result.error
-      return result.data
-    },
-    onMutate: (payload) => {
-      addOptimisticActivity(queryClient, { tableName: "fish_harvest" })
-      const optimistic = {
+  return useInsertMutation({
+    table: "fish_harvest",
+    activityTableName: "fish_harvest",
+    recentEntryKey: "harvest",
+    buildOptimisticEntry: (payload) => {
+      if (Array.isArray(payload)) return null
+      return {
         id: `optimistic-${Date.now()}`,
         date: payload.date,
         system_id: payload.system_id,
@@ -39,21 +21,9 @@ export function useRecordHarvest() {
         created_at: new Date().toISOString(),
         status: "pending",
       }
-      const previous = addOptimisticRecentEntry(queryClient, { key: "harvest", entry: optimistic })
-      return { previous }
     },
-    onSuccess: () => {
-      invalidateDashboardQueries(queryClient)
-      invalidateInventoryQueries(queryClient)
-      invalidateProductionQueries(queryClient)
-      invalidateRecentActivityQueries(queryClient)
-      invalidateRecentEntriesQueries(queryClient)
-      toast({ title: "Success", description: "Harvest recorded." })
-    },
-    onError: (error: any, _payload, context) => {
-      restoreRecentEntries(queryClient, context?.previous)
-      const message = error?.message ?? "Failed to record harvest."
-      toast({ variant: "destructive", title: "Error", description: message })
-    },
+    invalidate: ["dashboard", "inventory", "production", "recent-activity", "recent-entries"],
+    successMessage: "Harvest recorded.",
+    errorMessage: "Failed to record harvest.",
   })
 }

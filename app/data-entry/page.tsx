@@ -1,9 +1,10 @@
+import { Suspense } from "react"
 import DataEntryPageClient from "@/app/data-entry/page.client"
 import { Metadata } from "next"
 import { requireUser } from "@/utils/supabase/require-user"
 
 export const metadata: Metadata = {
-    title: "Data Entry - AquaSmart",
+    title: "Data Capture - AquaSmart",
     description: "Record daily farm events",
 }
 
@@ -11,6 +12,8 @@ export default async function DataEntryPage() {
     await requireUser()
 
     return (
-        <DataEntryPageClient />
+        <Suspense fallback={null}>
+            <DataEntryPageClient />
+        </Suspense>
     )
 }

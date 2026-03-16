@@ -4,9 +4,9 @@ import { useEffect, useRef } from "react"
 import { useSearchParams, usePathname } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { Download } from "lucide-react"
+import type { DashboardPageInitialData, DashboardPageInitialFilters } from "@/features/dashboard/types"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
-import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useTimePeriodBounds } from "@/hooks/use-time-period-bounds"
@@ -23,9 +23,17 @@ import { parseDateToTimePeriod } from "@/lib/utils"
 import { logSbError } from "@/utils/supabase/log"
 import { useRouter } from "next/navigation"
 
-export default function DashboardPage() {
-  const { profile } = useAuth()
-  const { farm, farmId } = useActiveFarm()
+export default function DashboardPage({
+  initialFarmId,
+  initialFilters,
+  initialData,
+}: {
+  initialFarmId?: string | null
+  initialFilters?: DashboardPageInitialFilters
+  initialData?: DashboardPageInitialData
+}) {
+  const { farmId: activeFarmId } = useActiveFarm({ initialFarmId })
+  const farmId = activeFarmId ?? initialFarmId ?? null
   const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
@@ -38,8 +46,8 @@ export default function DashboardPage() {
     selectedStage,
     timePeriod,
     setTimePeriod,
-  } = useSharedFilters(parsedPeriod.period)
-  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
+  } = useSharedFilters(parsedPeriod.period, initialFilters)
+  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod, initialData: initialData?.bounds })
   const dateFrom = boundsQuery.start ?? undefined
   const dateTo = boundsQuery.end ?? undefined
   const lastPeriodParam = useRef<string | null>(periodParam)
@@ -117,6 +125,7 @@ export default function DashboardPage() {
             </Button>
           </div>
           <KPIOverview
+            farmId={farmId}
             stage={selectedStage}
             timePeriod={timePeriod}
             dateFrom={dateFrom}
@@ -124,6 +133,7 @@ export default function DashboardPage() {
             batch={selectedBatch}
             system={selectedSystem}
             periodParam={periodParam}
+            initialData={initialData?.kpiOverview}
           />
         </section>
 
@@ -134,6 +144,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
             <PopulationOverview
+              farmId={farmId}
               stage={selectedStage === "all" ? null : selectedStage}
               batch={selectedBatch}
               system={selectedSystem}
@@ -141,27 +152,32 @@ export default function DashboardPage() {
               dateFrom={dateFrom}
               dateTo={dateTo}
               periodParam={periodParam}
+              initialData={initialData?.productionTrend}
             />
             <WaterQualityIndex
+              farmId={farmId}
               stage={selectedStage}
               batch={selectedBatch}
               system={selectedSystem}
-              timePeriod={timePeriod}
               dateFrom={dateFrom}
               dateTo={dateTo}
-              periodParam={periodParam}
+              initialSystemsData={initialData?.systemOptions}
+              initialBatchSystemsData={initialData?.batchSystems}
+              initialMeasurements={initialData?.waterQualityMeasurements}
+              initialThresholds={initialData?.alertThresholds}
             />
           </div>
         </section>
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Operations Table</h2>
+            <h2 className="text-lg font-semibold">System Status</h2>
             <p className="text-sm text-muted-foreground">
-              Dense system table with row drilldown for exceptions and next actions.
+              Dense system table with row drilldown into unit history, exceptions, and next actions.
             </p>
           </div>
           <SystemsTable
+            farmId={farmId}
             stage={selectedStage}
             batch={selectedBatch}
             system={selectedSystem}
@@ -169,6 +185,7 @@ export default function DashboardPage() {
             dateFrom={dateFrom}
             dateTo={dateTo}
             periodParam={periodParam}
+            initialData={initialData?.systemsTable}
           />
         </section>
 
@@ -180,6 +197,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <ProductionSummaryMetrics
+            farmId={farmId}
             stage={selectedStage}
             batch={selectedBatch}
             system={selectedSystem}
@@ -187,6 +205,7 @@ export default function DashboardPage() {
             dateFrom={dateFrom}
             dateTo={dateTo}
             periodParam={periodParam}
+            initialData={initialData?.productionSummaryMetrics}
           />
         </section>
 
@@ -196,11 +215,14 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">Latest operational events and advisory timeline.</p>
           </div>
           <RecentActivities
+            farmId={farmId}
             batch={selectedBatch}
             stage={selectedStage}
             system={selectedSystem}
             title="Advisory Timeline"
             countLabel="events"
+            initialEntries={initialData?.recentEntries}
+            initialSystems={initialData?.systemOptions}
           />
         </section>
 
@@ -210,12 +232,14 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">Supply and feed priorities based on recent activity.</p>
           </div>
           <RecommendedActions
+            farmId={farmId}
             stage={selectedStage}
             batch={selectedBatch}
             system={selectedSystem}
             timePeriod={timePeriod}
             dateFrom={dateFrom}
             dateTo={dateTo}
+            initialData={initialData?.recommendedActions}
           />
         </section>
       </div>

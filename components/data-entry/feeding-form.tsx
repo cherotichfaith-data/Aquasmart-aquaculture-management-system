@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -17,7 +18,13 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Database } from "@/lib/types/database"
 import { useRecordFeeding } from "@/lib/hooks/use-feeding"
+import { useFeedingRecords } from "@/lib/hooks/use-reports"
+import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
+import { useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { logSbError } from "@/utils/supabase/log"
+import { DependencyBlocker } from "./dependency-blocker"
+import { FeedTypeQuickCreate } from "./feed-type-quick-create"
+import { cn } from "@/lib/utils"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -38,6 +45,8 @@ interface FeedingFormProps {
 
 export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, defaultBatchId = null }: FeedingFormProps) {
     const mutation = useRecordFeeding()
+    const [showQuickCreate, setShowQuickCreate] = useState(false)
+    const [submissionSummary, setSubmissionSummary] = useState<string | null>(null)
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -50,12 +59,75 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
             batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
+    const selectedSystemId = Number(form.watch("system_id"))
+    const selectedDate = form.watch("date")
+    const selectedFeedId = Number(form.watch("feed_id"))
+    const selectedResponse = form.watch("feeding_response")
+    const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
+    const selectedFeed = feeds.find((feed) => feed.id === selectedFeedId) ?? null
+
+    const duplicateQuery = useFeedingRecords({
+        systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
+        dateFrom: selectedDate || undefined,
+        dateTo: selectedDate || undefined,
+        limit: 20,
+        enabled: Boolean(selectedDate) && Number.isFinite(selectedSystemId),
+    })
+    const inventoryQuery = useDailyFishInventory({
+        systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
+        dateFrom: selectedDate || undefined,
+        dateTo: selectedDate || undefined,
+        limit: 7,
+        orderAsc: false,
+        enabled: Boolean(selectedDate) && Number.isFinite(selectedSystemId),
+    })
+    const doQuery = useWaterQualityMeasurements({
+        systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
+        parameterName: "dissolved_oxygen",
+        limit: 20,
+        requireSystem: true,
+        enabled: Number.isFinite(selectedSystemId),
+    })
+
+    const existingDailyRecords =
+        duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []
+    const latestInventoryRow =
+        inventoryQuery.data?.status === "success" ? inventoryQuery.data.data[0] ?? null : null
+    const latestDoReading = useMemo(() => {
+        const rows = doQuery.data?.status === "success" ? doQuery.data.data : []
+        return rows
+            .slice()
+            .sort((a, b) =>
+                `${b.date ?? ""}T${b.time ?? "00:00"}`.localeCompare(`${a.date ?? ""}T${a.time ?? "00:00"}`)
+            )[0] ?? null
+    }, [doQuery.data])
+    const doValue = latestDoReading?.parameter_value ?? null
+    const doBadgeClass =
+        doValue == null
+            ? "border-border bg-muted/20 text-muted-foreground"
+            : doValue < 4
+                ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300"
+                : doValue < 5
+                    ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+    const doBadgeLabel =
+        doValue == null
+            ? "DO unavailable"
+            : doValue < 4
+                ? `Low DO ${doValue.toFixed(1)} mg/L - consider reducing feed.`
+                : doValue < 5
+                    ? `DO ${doValue.toFixed(1)} mg/L - caution.`
+                    : `DO ${doValue.toFixed(1)} mg/L`
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
             const systemId = Number(values.system_id)
             const feedTypeId = Number(values.feed_id)
             const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+            const existingTotal = existingDailyRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
+            const dailyTotal = existingTotal + values.amount_kg
+            const biomassKg = latestInventoryRow?.biomass_last_sampling ?? null
+            const feedRatePct = biomassKg && biomassKg > 0 ? (dailyTotal / biomassKg) * 100 : null
 
             await mutation.mutateAsync({
                 system_id: systemId,
@@ -65,6 +137,11 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                 feeding_amount: values.amount_kg,
                 feeding_response: values.feeding_response,
             })
+            setSubmissionSummary(
+                `Saved. Daily total for ${selectedSystem?.label ?? `System ${systemId}`}: ${dailyTotal.toFixed(2)} kg.${
+                    feedRatePct != null ? ` Feed rate: ${feedRatePct.toFixed(2)}% of biomass.` : ""
+                }`,
+            )
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 amount_kg: 0,
@@ -78,12 +155,45 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
         }
     }
 
+    if (feeds.length === 0) {
+        return (
+            <DependencyBlocker
+                title="No feed types found."
+                description="Add a feed type to continue."
+                actionLabel={showQuickCreate ? "Hide feed type form" : "Add feed type"}
+                onAction={() => setShowQuickCreate((current) => !current)}
+            >
+                {showQuickCreate ? <FeedTypeQuickCreate onCreated={() => setShowQuickCreate(false)} /> : null}
+            </DependencyBlocker>
+        )
+    }
+
     return (
         <div className="max-w-2xl">
             <div className="mb-6">
                 <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
-                <p className="text-sm text-muted-foreground">Log daily feeding for a system.</p>
+                <p className="text-sm text-muted-foreground">Log daily feeding for a system. Session, weather, and notes will land with the normalized feed-event schema.</p>
             </div>
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+                <div className={cn("rounded-md border px-3 py-2 text-sm font-medium", doBadgeClass)}>
+                    {doBadgeLabel}
+                </div>
+                {selectedFeed?.feed_pellet_size ? (
+                    <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                        Pellet guide: <span className="font-medium text-foreground">{selectedFeed.feed_pellet_size}</span>
+                    </div>
+                ) : null}
+            </div>
+            {existingDailyRecords.length > 0 ? (
+                <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+                    Feeding is already recorded for {selectedSystem?.label ?? "this system"} on {selectedDate}. Check before adding a duplicate entry.
+                </div>
+            ) : null}
+            {submissionSummary ? (
+                <div className="mb-4 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
+                    {submissionSummary}
+                </div>
+            ) : null}
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -196,18 +306,29 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Response</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select response" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="very_good">Very Good</SelectItem>
-                                            <SelectItem value="good">Good</SelectItem>
-                                            <SelectItem value="bad">Bad</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <FormControl>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { value: "very_good", label: "Excellent" },
+                                                { value: "good", label: "Good" },
+                                                { value: "bad", label: "Poor" },
+                                            ].map((option) => (
+                                                <button
+                                                    key={option.value}
+                                                    type="button"
+                                                    onClick={() => field.onChange(option.value)}
+                                                    className={cn(
+                                                        "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                                                        selectedResponse === option.value
+                                                            ? "border-primary bg-primary text-primary-foreground"
+                                                            : "border-border bg-background hover:bg-muted/50",
+                                                    )}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}

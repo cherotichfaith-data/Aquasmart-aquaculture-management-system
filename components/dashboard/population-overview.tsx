@@ -13,6 +13,7 @@ import {
 import { format } from "date-fns"
 import type { Database } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
+import type { DashboardPageInitialData } from "@/features/dashboard/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useProductionTrend } from "@/lib/hooks/use-dashboard"
@@ -42,6 +43,8 @@ export default function PopulationOverview({
     periodParam,
     dateFrom,
     dateTo,
+    farmId: initialFarmId,
+    initialData,
 }: {
     stage: SummaryRow["growth_stage"]
     batch?: string
@@ -50,8 +53,11 @@ export default function PopulationOverview({
     periodParam?: string | null
     dateFrom?: string
     dateTo?: string
+    farmId?: string | null
+    initialData?: DashboardPageInitialData["productionTrend"]
 }) {
-    const { farmId } = useActiveFarm()
+    const { farmId: activeFarmId } = useActiveFarm()
+    const farmId = activeFarmId ?? initialFarmId
     const summaryQuery = useProductionTrend({
         farmId,
         stage: stage ?? undefined,
@@ -60,6 +66,7 @@ export default function PopulationOverview({
         timePeriod: periodParam ?? timePeriod,
         dateFrom: dateFrom ?? null,
         dateTo: dateTo ?? null,
+        initialData,
     })
 
     const chartData = useMemo(() => {
