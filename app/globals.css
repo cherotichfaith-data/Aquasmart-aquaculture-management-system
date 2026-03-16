@@ -253,3 +253,9 @@ next-router-prefetch {
     @apply max-w-3xl text-sm text-muted-foreground;
   }
 }
+@layer components {
+  .page-toolbar {
+    @apply flex flex-wrap items-center gap-3 rounded-[1.35rem] border border-border/80 bg-card/88 px-4 py-3 shadow-sm backdrop-blur-sm;
+    box-shadow: 0 12px 28px -28px rgba(15, 23, 32, 0.5);
+  }
+}

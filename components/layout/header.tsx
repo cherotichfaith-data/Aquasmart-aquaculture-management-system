@@ -37,7 +37,6 @@ export default function Header({
   const { farm } = useActiveFarm()
   const hideBorder = pathname === "/water-quality" && searchParams.get("tab") === "depth"
   const showAddData = pathname === "/"
-  const showDashboardTitle = pathname === "/"
   const defaultPeriod: TimePeriod = (() => {
     if (pathname.startsWith("/feed") || pathname.startsWith("/sampling")) return "quarter"
     if (pathname.startsWith("/water-quality")) return "month"
@@ -79,20 +78,19 @@ export default function Header({
   }
 
   return (
-    <header className={`bg-card/90 sticky top-0 z-20 backdrop-blur ${hideBorder ? "" : "border-b border-border"}`}>
-      <div className="flex flex-col gap-3 px-4 py-3">
+    <header className={`sticky top-0 z-20 bg-background/72 backdrop-blur-xl ${hideBorder ? "" : "border-b border-border/70"}`}>
+      <div className="flex flex-col gap-4 px-4 py-4 md:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={onMenuClick} className="p-2 hover:bg-accent rounded-sm transition-colors md:hidden">
+            <button onClick={onMenuClick} className="rounded-xl border border-border/70 bg-card/80 p-2 transition-colors hover:bg-accent md:hidden">
               <Menu size={20} />
             </button>
-            {showDashboardTitle ? (
-              <div className="hidden md:block">
-                <div className="text-xs text-foreground">
-                  {farm?.name ? <p>{farm.name}</p> : <p>Welcome to Aquasmart</p>}
-                </div>
+            <div className="hidden md:block">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Aquasmart Ops</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-semibold text-foreground">{farm?.name ?? "Aquasmart"}</span>
               </div>
-            ) : null}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -114,7 +112,7 @@ export default function Header({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative h-9 w-9 rounded-full cursor-pointer bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground border border-border/70"
+                  className="relative h-10 w-10 rounded-2xl cursor-pointer border border-border/70 bg-card/80 text-foreground hover:bg-accent hover:text-accent-foreground"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
@@ -166,7 +164,7 @@ export default function Header({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="relative h-9 w-9 rounded-full cursor-pointer bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground border border-border/70"
+                  className="relative h-10 w-10 rounded-2xl cursor-pointer border border-border/70 bg-card/80 text-foreground hover:bg-accent hover:text-accent-foreground"
                 >
                   <Avatar className="h-9 w-9">
                     <AvatarImage src="/avatars/01.png" alt={user?.email || "User"} />
@@ -202,28 +200,34 @@ export default function Header({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <TimePeriodSelector
-            selectedPeriod={timePeriod}
-            onPeriodChange={setTimePeriod}
-            variant="compact"
-          />
-          <FarmSelector
-            selectedBatch={selectedBatch}
-            selectedSystem={selectedSystem}
-            selectedStage={selectedStage}
-            onBatchChange={setSelectedBatch}
-            onSystemChange={setSelectedSystem}
-            onStageChange={setSelectedStage}
-            showStage
-            showCounts={false}
-            variant="compact"
-          />
+        <div className="page-toolbar">
+          <div className="flex flex-wrap items-center gap-2">
+            <TimePeriodSelector
+              selectedPeriod={timePeriod}
+              onPeriodChange={setTimePeriod}
+              variant="compact"
+            />
+            <FarmSelector
+              selectedBatch={selectedBatch}
+              selectedSystem={selectedSystem}
+              selectedStage={selectedStage}
+              onBatchChange={setSelectedBatch}
+              onSystemChange={setSelectedSystem}
+              onStageChange={setSelectedStage}
+              showStage
+              showCounts={false}
+              variant="compact"
+            />
+          </div>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="hidden rounded-full border border-border/80 bg-background/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground xl:block">
+              Ctrl+K Quick Actions
+            </div>
           {showAddData ? (
-            <div className="ml-auto">
+            <div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button className="h-9 rounded-md px-3 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button className="h-10 rounded-xl px-4 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90">
                     <PlusCircle className="h-4 w-4 mr-2" />
                     Add Data
                   </Button>
@@ -257,6 +261,7 @@ export default function Header({
               </DropdownMenu>
             </div>
           ) : null}
+          </div>
         </div>
       </div>
     </header>

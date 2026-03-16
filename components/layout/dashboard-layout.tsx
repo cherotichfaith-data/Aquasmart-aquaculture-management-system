@@ -56,22 +56,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [router])
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="relative flex min-h-screen bg-background">
       <Sidebar
         open={sidebarOpen}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         onCollapseToggle={() => setSidebarCollapsed((prev) => !prev)}
       />
-      <div className="flex-1 flex flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <Header
           onMenuClick={() => setSidebarOpen(!sidebarOpen)}
         />
-        <main className="flex-1 px-6 pb-6 pt-0 md:px-8 md:pb-8 md:pt-0 animate-in fade-in-0 duration-300">{children}</main>
+        <main className="flex-1 overflow-x-hidden px-4 pb-10 pt-5 md:px-8 lg:px-10 animate-in fade-in-0 duration-300"><div className="mx-auto w-full max-w-[1720px]">{children}</div></main>
       </div>
       <ShortcutsHelp />
       <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-[1.5rem] border-border/80 bg-card/95 backdrop-blur-xl">
           <DialogHeader>
             <DialogTitle>Quick Actions</DialogTitle>
             <DialogDescription>Jump straight to common tasks.</DialogDescription>

@@ -38,7 +38,7 @@ export function DataErrorState({
   onRetry?: () => void
 }) {
   return (
-    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+    <div className="rounded-[1.5rem] border border-destructive/40 bg-destructive/5 p-5 text-sm text-destructive shadow-sm">
       <div className="flex items-center gap-2 font-semibold">
         <AlertTriangle className="h-4 w-4" />
         <span>{title}</span>
@@ -71,8 +71,8 @@ export function EmptyState({
   action?: React.ReactNode
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+    <div className="rounded-[1.5rem] border border-dashed border-border bg-muted/20 p-6 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
       <h3 className="mt-3 text-sm font-semibold text-foreground">{title}</h3>
