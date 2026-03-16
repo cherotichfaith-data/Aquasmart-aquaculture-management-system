@@ -174,3 +174,82 @@ next-router-prefetch {
     }
   }
 }
+@layer components {
+  .page-shell {
+    @apply space-y-8;
+  }
+
+  .page-hero {
+    @apply relative overflow-hidden rounded-[1.75rem] border border-border/80 bg-card/92 p-5 shadow-sm md:p-7;
+    box-shadow:
+      0 18px 40px -28px rgba(15, 23, 32, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  }
+
+  .page-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba(36, 91, 132, 0.06), transparent 40%),
+      radial-gradient(circle at top right, rgba(106, 138, 165, 0.08), transparent 24%);
+    pointer-events: none;
+  }
+
+  .page-hero > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .page-chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
+  }
+
+  .page-section {
+    @apply space-y-4;
+  }
+
+  .dense-table-shell {
+    @apply overflow-auto rounded-[1.1rem] border border-border/80 bg-card/70;
+  }
+
+  .dense-table {
+    @apply w-full min-w-full text-sm;
+  }
+
+  .dense-table thead th {
+    @apply sticky top-0 z-10 bg-muted/75 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/75 backdrop-blur-sm;
+  }
+
+  .dense-table tbody td {
+    @apply px-3 py-2.5 align-top;
+  }
+
+  .legend-pills {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .legend-pill {
+    @apply inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground;
+  }
+
+  .legend-pill-swatch {
+    @apply h-2.5 w-2.5 rounded-full;
+  }
+
+  .queue-card {
+    @apply rounded-[1.1rem] border px-3 py-3 text-left transition-colors;
+  }
+
+  .section-heading {
+    @apply flex flex-wrap items-end justify-between gap-3;
+  }
+
+  .section-heading-title {
+    @apply text-lg font-semibold tracking-tight text-foreground md:text-xl;
+  }
+
+  .section-heading-copy {
+    @apply max-w-3xl text-sm text-muted-foreground;
+  }
+}
