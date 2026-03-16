@@ -7,6 +7,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import {
   Activity,
   AlertTriangle,
+  BarChart3,
   Droplets,
   Fish,
   LayoutDashboard,
@@ -33,7 +34,10 @@ const navigationSections = [
   },
   {
     title: "Analyze",
-    items: [{ name: "Reports", href: "/reports", icon: Activity }],
+    items: [
+      { name: "Production", href: "/production", icon: BarChart3 },
+      { name: "Reports", href: "/reports", icon: Activity },
+    ],
   },
   {
     title: "Capture",
@@ -81,40 +85,47 @@ export default function Sidebar({
       {open && <div className="fixed inset-0 bg-black/50 md:hidden z-30" onClick={onToggle} />}
 
       <aside
-        className={`fixed md:sticky top-0 left-0 h-screen bg-sidebar border-r border-sidebar-border shadow-lg transform transition-[width,transform] duration-300 z-40 flex flex-col ${collapsed ? "md:w-20" : "md:w-64"} w-64 ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        className={`fixed md:sticky top-0 left-0 h-screen border-r border-sidebar-border bg-sidebar shadow-2xl transform transition-[width,transform] duration-300 z-40 flex flex-col ${collapsed ? "md:w-24" : "md:w-72"} w-72 ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           }`}
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg, rgba(255,255,255,0.02), transparent 18%), radial-gradient(circle at top right, rgba(94,234,212,0.12), transparent 28%)",
+        }}
       >
-        <div className="flex items-center justify-between p-4 border-b border-sidebar-border md:hidden">
+        <div className="flex items-center justify-between border-b border-sidebar-border px-5 py-4 md:hidden">
           <h1 className="font-semibold text-lg text-sidebar-foreground">AQ</h1>
           <button onClick={onToggle} className="text-sidebar-foreground">
             <X size={20} />
           </button>
         </div>
 
-        <div className="hidden md:flex items-center p-4 border-b border-sidebar-border">
-          <div className="w-9 h-9 rounded-sm bg-sidebar-primary flex items-center justify-center shadow-sm shrink-0">
+        <div className="hidden border-b border-sidebar-border px-4 py-5 md:flex md:flex-col md:items-stretch md:gap-4">
+          <div className="flex items-center">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary shadow-sm">
             <span className="text-sidebar-primary-foreground font-semibold">AQ</span>
-          </div>
-          {!collapsed && (
-            <div className="ml-3">
-              <p className="font-semibold text-sidebar-foreground leading-none">Aquasmart</p>
             </div>
-          )}
-          <button
-            type="button"
-            onClick={onCollapseToggle}
-            className="ml-auto rounded-sm p-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-          </button>
+            {!collapsed && (
+              <div className="ml-3">
+                <p className="font-semibold leading-none text-sidebar-foreground">Aquasmart</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-sidebar-foreground/55">Operations Console</p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onCollapseToggle}
+              className="ml-auto rounded-xl p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
-        <nav className="p-4 space-y-5 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+        <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           {navigationSections.map((section) => (
             <div key={section.title} className="space-y-2">
               {!collapsed ? (
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55">
+                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">
                   {section.title}
                 </p>
               ) : null}
@@ -127,7 +138,7 @@ export default function Sidebar({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center px-3 py-2.5 rounded-sm transition-colors justify-center ${waterQualityActive
+                    className={`flex items-center justify-center rounded-2xl px-3 py-3 transition-colors ${waterQualityActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                       }`}
@@ -141,7 +152,7 @@ export default function Sidebar({
               return (
                 <div key={item.href}>
                   <div
-                    className={`flex items-center px-3 py-2.5 rounded-sm transition-colors gap-3 ${waterQualityActive
+                    className={`flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors ${waterQualityActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                       }`}
@@ -157,17 +168,17 @@ export default function Sidebar({
                         event.stopPropagation()
                         setWaterQualityOpen((prev) => !prev)
                       }}
-                      className="rounded-sm p-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      className="rounded-xl p-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                       aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
                     >
                       <ChevronDown className={`h-4 w-4 transition-transform ${waterQualityOpen ? "rotate-180" : ""}`} />
                     </button>
                   </div>
                   {waterQualityOpen && (
-                    <div className="ml-7 mt-1 space-y-1">
+                    <div className="ml-7 mt-2 space-y-1">
                       <Link
                         href="/water-quality"
-                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${overviewActive
+                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${overviewActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           }`}
@@ -176,7 +187,7 @@ export default function Sidebar({
                       </Link>
                       <Link
                         href="/water-quality?tab=parameter"
-                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${parameterActive
+                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${parameterActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           }`}
@@ -185,7 +196,7 @@ export default function Sidebar({
                       </Link>
                       <Link
                         href="/water-quality?tab=environment"
-                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${environmentActive
+                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${environmentActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           }`}
@@ -194,7 +205,7 @@ export default function Sidebar({
                       </Link>
                       <Link
                         href="/water-quality?tab=depth"
-                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${depthProfileActive
+                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${depthProfileActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           }`}
@@ -203,7 +214,7 @@ export default function Sidebar({
                       </Link>
                       <Link
                         href="/water-quality?tab=alerts"
-                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${alertsActive
+                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${alertsActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           }`}
@@ -212,7 +223,7 @@ export default function Sidebar({
                       </Link>
                       <Link
                         href="/water-quality?tab=sensors"
-                        className={`block rounded-sm px-3 py-2 text-xs font-medium transition-colors ${sensorsActive
+                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${sensorsActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           }`}
@@ -231,7 +242,7 @@ export default function Sidebar({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center px-3 py-2.5 rounded-sm transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
+                className={`flex items-center rounded-2xl px-3 py-3 transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
                   ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   }`}
@@ -247,7 +258,7 @@ export default function Sidebar({
           ))}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="border-t border-sidebar-border p-4">
           <button
             onClick={async () => {
               if (signingOut) return
@@ -259,7 +270,7 @@ export default function Sidebar({
                 setSigningOut(false)
               }
             }}
-            className={`flex items-center px-3 py-2.5 w-full rounded-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors cursor-pointer disabled:opacity-60 ${collapsed ? "justify-center" : "gap-3"}`}
+            className={`flex w-full items-center rounded-2xl px-3 py-3 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-60 ${collapsed ? "justify-center" : "gap-3"}`}
             disabled={signingOut}
             title={collapsed ? "Log out" : undefined}
           >
