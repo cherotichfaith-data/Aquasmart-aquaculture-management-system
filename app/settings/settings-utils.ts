@@ -8,6 +8,8 @@ export type SettingsFormState = {
   lowDoThreshold: number
   highAmmoniaThreshold: number
   highMortalityThreshold: number
+  lowFeedingRateThreshold: number
+  highFeedingRateThreshold: number
 }
 
 export const DEFAULT_SETTINGS: SettingsFormState = {
@@ -20,6 +22,8 @@ export const DEFAULT_SETTINGS: SettingsFormState = {
   lowDoThreshold: 4.0,
   highAmmoniaThreshold: 0.05,
   highMortalityThreshold: 2.0,
+  lowFeedingRateThreshold: 15,
+  highFeedingRateThreshold: 40,
 }
 
 export const hasActionableSbError = (err: unknown) => {

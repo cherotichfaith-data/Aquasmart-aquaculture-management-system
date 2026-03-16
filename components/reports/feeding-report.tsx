@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFeedingRecords } from "@/lib/hooks/use-reports"
 import { useProductionSummary } from "@/lib/hooks/use-production"
@@ -17,6 +17,14 @@ const formatDateLabel = (value: string | number) => {
   if (Number.isNaN(parsed.getTime())) return String(value)
   return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(parsed)
 }
+
+const formatMetric = (value: number | null | undefined, digits = 2) =>
+  value == null || Number.isNaN(value)
+    ? "N/A"
+    : value.toLocaleString(undefined, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      })
 
 export default function FeedingReport({
   dateRange,
@@ -142,7 +150,40 @@ export default function FeedingReport({
     const vals = summaryRows.map((row) => row.biomass_increase_period).filter((v): v is number => typeof v === "number")
     return vals.reduce((a, b) => a + b, 0)
   }, [summaryRows])
-  const costPerKgGainDisplay = "N/A"
+  const costPerKgGainDisplay = totalKgFed > 0 && biomassGain > 0 ? "Awaiting cost data" : "N/A"
+  const systemBreakdownRows = useMemo(() => {
+    const bySystem = new Map<number, { totalKg: number; entries: number; proteinMass: number; proteinWeight: number; lastDate: string | null }>()
+    records.forEach((row) => {
+      if (row.system_id == null) return
+      const bucket = bySystem.get(row.system_id) ?? {
+        totalKg: 0,
+        entries: 0,
+        proteinMass: 0,
+        proteinWeight: 0,
+        lastDate: null,
+      }
+      const amount = row.feeding_amount ?? 0
+      bucket.totalKg += amount
+      bucket.entries += 1
+      if (typeof row.feed_type?.crude_protein_percentage === "number") {
+        bucket.proteinMass += row.feed_type.crude_protein_percentage * amount
+        bucket.proteinWeight += amount
+      }
+      if (!bucket.lastDate || String(row.date ?? "") > bucket.lastDate) {
+        bucket.lastDate = row.date ?? null
+      }
+      bySystem.set(row.system_id, bucket)
+    })
+    return Array.from(bySystem.entries())
+      .map(([systemId, bucket]) => ({
+        systemId,
+        totalKg: bucket.totalKg,
+        entries: bucket.entries,
+        avgProtein: bucket.proteinWeight > 0 ? bucket.proteinMass / bucket.proteinWeight : null,
+        lastDate: bucket.lastDate,
+      }))
+      .sort((left, right) => right.totalKg - left.totalKg)
+  }, [records])
 
   if (errorMessages.length > 0) {
     return (
@@ -159,9 +200,13 @@ export default function FeedingReport({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between text-xs">
+      <div className="filter-bar text-xs">
         <DataUpdatedAt updatedAt={latestUpdatedAt} />
-        <DataFetchingBadge isFetching={feedingRecordsQuery.isFetching || summaryQuery.isFetching || feedingTableQuery.isFetching} isLoading={loading} />
+        <div className="legend-pills">
+          <div className="legend-pill">{records.length} feeding rows</div>
+          <div className="legend-pill">{systemBreakdownRows.length} systems in scope</div>
+          <DataFetchingBadge isFetching={feedingRecordsQuery.isFetching || summaryQuery.isFetching || feedingTableQuery.isFetching} isLoading={loading} />
+        </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -197,7 +242,7 @@ export default function FeedingReport({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{costPerKgGainDisplay}</div>
-            <p className="text-xs text-muted-foreground mt-1">Feed cost unavailable in base schema</p>
+            <p className="text-xs text-muted-foreground mt-1">Add delivery pricing on incoming feed to unlock this KPI</p>
           </CardContent>
         </Card>
       </div>
@@ -208,6 +253,9 @@ export default function FeedingReport({
           <CardDescription>Daily feeding records from the backend</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 legend-pills">
+            <div className="legend-pill"><span className="legend-pill-swatch bg-[var(--color-chart-1)]" /> Feed (kg)</div>
+          </div>
           {loading ? (
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
           ) : (
@@ -223,7 +271,6 @@ export default function FeedingReport({
                     formatter={(value, name) => [`${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`, String(name)]}
                     contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
                   />
-                  <Legend />
                   <Line type="monotone" dataKey="feeding_amount" stroke="var(--color-chart-1)" strokeWidth={2.4} name="Feed (kg)" />
                   </LineChart>
                 </ResponsiveContainer>
@@ -239,6 +286,9 @@ export default function FeedingReport({
           <CardDescription>Daily eFCR trend for feed analysis reporting.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 legend-pills">
+            <div className="legend-pill"><span className="legend-pill-swatch bg-[var(--color-chart-3)]" /> eFCR</div>
+          </div>
           <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
@@ -251,7 +301,6 @@ export default function FeedingReport({
                   formatter={(value, name) => [Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), String(name)]}
                   contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
                 />
-                <Legend />
                 <Line type="monotone" dataKey="efcr_period" stroke="var(--color-chart-3)" strokeWidth={2.4} name="eFCR" />
                 </LineChart>
               </ResponsiveContainer>
@@ -262,13 +311,65 @@ export default function FeedingReport({
 
       <Card>
         <CardHeader>
+          <CardTitle>Per-Cage Feed Breakdown</CardTitle>
+          <CardDescription>Total feed, entry count, and weighted protein by cage in the selected period.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="dense-table-shell">
+            <table className="dense-table">
+              <thead>
+                <tr className="border-b border-border">
+                  <th>System</th>
+                  <th>Total Feed (kg)</th>
+                  <th>Entries</th>
+                  <th>Avg Protein (%)</th>
+                  <th>Last Feed Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {systemBreakdownRows.length > 0 ? (
+                  systemBreakdownRows.map((row) => (
+                    <tr key={row.systemId} className="border-b border-border/70 hover:bg-muted/35">
+                      <td className="font-medium">System {row.systemId}</td>
+                      <td>{formatMetric(row.totalKg)}</td>
+                      <td>{row.entries}</td>
+                      <td>{formatMetric(row.avgProtein)}</td>
+                      <td>{row.lastDate ?? "-"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">
+                      No cage-level feeding rows found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle>Feeding Records</CardTitle>
-            <div className="flex gap-2">
+            <div>
+              <CardTitle>Feeding Records</CardTitle>
+              <CardDescription>Operational detail rows and export controls for the selected scope.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="filter-bar">
+            <div className="legend-pills">
+              <div className="legend-pill">{showFeedingRecords ? "Detailed table visible" : "Detailed table hidden"}</div>
+              <div className="legend-pill">Max rows {tableLimitValue}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <select
                 value={tableLimit}
                 onChange={(event) => setTableLimit(event.target.value)}
-                className="px-3 py-2 rounded-md border border-input text-sm"
+                className="h-10 rounded-xl border border-input bg-background px-3 text-sm font-medium"
                 aria-label="Rows to display"
               >
                 <option value="50">50 rows</option>
@@ -277,14 +378,14 @@ export default function FeedingReport({
               </select>
               <button
                 type="button"
-                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                className="h-10 rounded-xl border border-input px-3 text-sm hover:bg-muted/40"
                 onClick={() => setShowFeedingRecords((prev) => !prev)}
               >
                 {showFeedingRecords ? "Hide details" : "View details"}
               </button>
               <button
                 type="button"
-                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                className="h-10 rounded-xl border border-input px-3 text-sm hover:bg-muted/40"
                 onClick={() =>
                   downloadCsv({
                     filename: `feed-analysis-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
@@ -305,7 +406,7 @@ export default function FeedingReport({
               </button>
               <button
                 type="button"
-                className="px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+                className="h-10 rounded-xl border border-input px-3 text-sm hover:bg-muted/40"
                 onClick={() =>
                   printBrandedPdf({
                     title: "Feed Analysis Report",
@@ -336,19 +437,17 @@ export default function FeedingReport({
               </button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
           {showFeedingRecords ? (
-            <div className="overflow-x-auto rounded-md border border-border/80">
-              <table className="w-full text-sm">
+            <div className="dense-table-shell">
+              <table className="dense-table">
               <thead>
-                <tr className="border-b border-border bg-muted/60">
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Feed Type</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Amount (kg)</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Response</th>
+                <tr className="border-b border-border">
+                  <th>Date</th>
+                  <th>System</th>
+                  <th>Batch</th>
+                  <th>Feed Type</th>
+                  <th>Amount (kg)</th>
+                  <th>Response</th>
                 </tr>
               </thead>
               <tbody>
@@ -361,12 +460,12 @@ export default function FeedingReport({
                 ) : tableRecords.length > 0 ? (
                   tableRecords.map((row) => (
                     <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
-                      <td className="px-4 py-2 font-medium">{row.date}</td>
-                      <td className="px-4 py-2">{row.system_id}</td>
-                      <td className="px-4 py-2">{row.batch_id ?? "-"}</td>
-                      <td className="px-4 py-2">{row.feed_type?.feed_line ?? row.feed_type_id}</td>
-                      <td className="px-4 py-2">{row.feeding_amount}</td>
-                      <td className="px-4 py-2">{row.feeding_response}</td>
+                      <td className="font-medium">{row.date}</td>
+                      <td>{row.system_id}</td>
+                      <td>{row.batch_id ?? "-"}</td>
+                      <td>{row.feed_type?.feed_line ?? row.feed_type_id}</td>
+                      <td>{row.feeding_amount}</td>
+                      <td>{row.feeding_response}</td>
                     </tr>
                   ))
                 ) : (

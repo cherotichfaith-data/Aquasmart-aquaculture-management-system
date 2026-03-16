@@ -10,6 +10,7 @@ type FcrTrendRow = Database["public"]["Functions"]["get_fcr_trend"]["Returns"][n
 type GrowthTrendRow = Database["public"]["Functions"]["get_growth_trend"]["Returns"][number]
 type RunningStockRow = Database["public"]["Functions"]["get_running_stock"]["Returns"][number]
 type FeedingRecordRow = Tables<"feeding_record">
+type FeedPlanRow = Tables<"feed_plan">
 type FishHarvestRow = Tables<"fish_harvest">
 type FishSamplingWeightRow = Tables<"fish_sampling_weight">
 type FishMortalityRow = Tables<"fish_mortality">
@@ -29,26 +30,12 @@ type RecentRowsTable =
   | "fish_stocking"
   | "system"
 
-export type FeedIncomingWithType = FeedIncomingRow & { feed_type: FeedTypeRow | null }
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
-export type FeedFarmKpisToday = FarmKpisTodayRow
+type FeedFarmKpisToday = FarmKpisTodayRow
 export type FeedFcrTrendRow = FcrTrendRow
 export type FeedGrowthTrendRow = GrowthTrendRow
 export type FeedRunningStockRow = RunningStockRow
-
-type FeedIncomingEnrichedRow = {
-  id: number | null
-  created_at: string | null
-  date: string | null
-  feed_amount: number | null
-  feed_type_id: number | null
-  feed_label: string | null
-  feed_line: string | null
-  crude_protein_percentage: number | null
-  crude_fat_percentage: number | null
-  feed_category: string | null
-  feed_pellet_size: string | null
-}
+export type FeedPlan = FeedPlanRow
 
 type FeedTypeProjection = {
   feed_type_id: number | null
@@ -79,11 +66,6 @@ type FeedingRecordJoinedRow = {
   }> | null
 }
 
-const projectionFrom = (
-  supabase: ReturnType<typeof import("@/utils/supabase/client").createClient>,
-  relation: "report_feed_incoming_enriched",
-) => (supabase as unknown as { from: (name: string) => any }).from(relation)
-
 const projectFeedType = (row: FeedTypeProjection | null | undefined): FeedTypeRow | null => {
   if (!row || typeof row.feed_type_id !== "number") return null
 
@@ -104,45 +86,6 @@ const isAbortLikeError = (err: unknown): boolean => {
   const name = String(e.name ?? "").toLowerCase()
   const message = String(e.message ?? "").toLowerCase()
   return name.includes("abort") || name.includes("cancel") || message.includes("abort") || message.includes("cancel")
-}
-
-export async function getFeedIncomingWithType(params?: {
-  dateFrom?: string
-  dateTo?: string
-  limit?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedIncomingWithType>> {
-  const clientResult = await getClientOrError("getFeedIncomingWithType", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = projectionFrom(supabase, "report_feed_incoming_enriched").select("*").order("date", { ascending: false })
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error)) {
-      return toQuerySuccess<FeedIncomingWithType>([])
-    }
-    if (isSbPermissionDenied(error)) {
-      return toQuerySuccess<FeedIncomingWithType>([])
-    }
-    return toQueryError("getFeedIncomingWithType", error)
-  }
-
-  const mapped = ((data ?? []) as FeedIncomingEnrichedRow[]).map((row) => ({
-    id: row.id,
-    created_at: row.created_at,
-    date: row.date,
-    feed_amount: row.feed_amount,
-    feed_type_id: row.feed_type_id,
-    feed_type: projectFeedType(row),
-  })) as FeedIncomingWithType[]
-
-  return toQuerySuccess<FeedIncomingWithType>(mapped)
 }
 
 export async function getFeedingRecords(params?: {
@@ -271,6 +214,45 @@ export async function getRunningStock(params: {
   if (error) return toQueryError("getRunningStock", error)
 
   return toQuerySuccess<FeedRunningStockRow>((data ?? []) as FeedRunningStockRow[])
+}
+
+export async function getFeedPlans(params: {
+  farmId?: string | null
+  dateFrom?: string
+  dateTo?: string
+  signal?: AbortSignal
+}): Promise<QueryResult<FeedPlanRow>> {
+  if (!params.farmId) {
+    return toQuerySuccess<FeedPlanRow>([])
+  }
+
+  const clientResult = await getClientOrError("getFeedPlans", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase
+    .from("feed_plan")
+    .select("*")
+    .eq("farm_id", params.farmId)
+    .eq("is_active", true)
+
+  if (params.dateTo) {
+    query = query.lte("effective_from", params.dateTo)
+  }
+  if (params.dateFrom) {
+    query = query.or(`effective_to.is.null,effective_to.gte.${params.dateFrom}`)
+  }
+  if (params.signal) query = query.abortSignal(params.signal)
+  query = query.order("effective_from", { ascending: false })
+
+  const { data, error } = await query
+  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedPlanRow>([])
+  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
+    return toQuerySuccess<FeedPlanRow>([])
+  }
+  if (error) return toQueryError("getFeedPlans", error)
+
+  return toQuerySuccess<FeedPlanRow>((data ?? []) as FeedPlanRow[])
 }
 
 export async function getFcrTrend(params: {

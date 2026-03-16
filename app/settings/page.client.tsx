@@ -16,6 +16,11 @@ import { AlertThresholdsSection, FarmInformationSection, SaveSettingsButton } fr
 import { DataErrorState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 
+type AlertThresholdWithFeeding = Tables<"alert_threshold"> & {
+  low_feeding_rate_threshold?: number | null
+  high_feeding_rate_threshold?: number | null
+}
+
 const isAbortLikeError = (err: unknown): boolean => {
   if (!err) return false
   const e = err as { name?: string; message?: string }
@@ -45,13 +50,13 @@ export default function SettingsPage() {
       const sessionUser = await getSessionUser(supabase, "settings:load:getSession")
       if (!sessionUser) {
         return {
-          thresholdRow: null as Tables<"alert_threshold"> | null,
+          thresholdRow: null as AlertThresholdWithFeeding | null,
           nextThresholdDenied: thresholdDenied,
         }
       }
 
       let nextThresholdDenied = thresholdDenied
-      let thresholdRow: Tables<"alert_threshold"> | null = null
+      let thresholdRow: AlertThresholdWithFeeding | null = null
 
       if (farmId && !thresholdDenied) {
         let query = supabase
@@ -70,7 +75,7 @@ export default function SettingsPage() {
         } else if (error && !isAbortLikeError(error) && hasActionableSbError(error)) {
           logSbError("settings:load:threshold", error)
         } else {
-          thresholdRow = data ?? null
+          thresholdRow = (data as AlertThresholdWithFeeding | null) ?? null
         }
       }
 
@@ -134,6 +139,8 @@ export default function SettingsPage() {
       lowDoThreshold: thresholdRow?.low_do_threshold ?? prev.lowDoThreshold,
       highAmmoniaThreshold: thresholdRow?.high_ammonia_threshold ?? prev.highAmmoniaThreshold,
       highMortalityThreshold: thresholdRow?.high_mortality_threshold ?? prev.highMortalityThreshold,
+      lowFeedingRateThreshold: thresholdRow?.low_feeding_rate_threshold ?? prev.lowFeedingRateThreshold,
+      highFeedingRateThreshold: thresholdRow?.high_feeding_rate_threshold ?? prev.highFeedingRateThreshold,
     }))
     setHasLoadedSettings(true)
     setLoading(false)
@@ -241,12 +248,17 @@ export default function SettingsPage() {
             throw farmError
           }
 
-          const thresholdPayload: TablesInsert<"alert_threshold"> = {
+          const thresholdPayload: TablesInsert<"alert_threshold"> & {
+            low_feeding_rate_threshold?: number | null
+            high_feeding_rate_threshold?: number | null
+          } = {
             scope: "farm",
             farm_id: resolvedFarmId,
             low_do_threshold: settings.lowDoThreshold,
             high_ammonia_threshold: settings.highAmmoniaThreshold,
             high_mortality_threshold: settings.highMortalityThreshold,
+            low_feeding_rate_threshold: settings.lowFeedingRateThreshold,
+            high_feeding_rate_threshold: settings.highFeedingRateThreshold,
           }
 
           if (thresholdId) {
@@ -370,4 +382,3 @@ export default function SettingsPage() {
     </DashboardLayout>
   )
 }
-
