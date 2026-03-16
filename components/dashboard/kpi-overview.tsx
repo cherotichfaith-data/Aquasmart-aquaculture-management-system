@@ -8,13 +8,13 @@ import { useKpiOverview } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 
-const kpiHrefMap: Record<string, string> = {
-  efcr: "/feed",
-  mortality: "/mortality",
-  abw: "/sampling",
-  biomass: "/sampling",
-  biomass_density: "/sampling",
-  feeding: "/feed",
+const kpiProductionFilterMap: Record<string, string | null> = {
+  efcr: "efcr_periodic",
+  mortality: "mortality",
+  abw: "abw",
+  biomass: null,
+  biomass_density: "density",
+  feeding: "feeding",
 }
 
 interface KPIOverviewProps {
@@ -56,6 +56,18 @@ export default function KPIOverview({
 
   const metrics = metricsQuery.data?.metrics ?? []
   const errorMessage = getErrorMessage(metricsQuery.error)
+  const buildProductionHref = (metricKey: string) => {
+    const params = new URLSearchParams()
+    if (system !== "all") params.set("system", system)
+    if (stage !== "all") params.set("stage", stage)
+    if (batch !== "all") params.set("batch", batch)
+    params.set("period", periodParam ?? timePeriod)
+
+    const mappedFilter = kpiProductionFilterMap[metricKey]
+    if (mappedFilter) params.set("filter", mappedFilter)
+
+    return `/production?${params.toString()}`
+  }
 
   if (metricsQuery.isError) {
     return (
@@ -93,7 +105,7 @@ export default function KPIOverview({
       ) : null}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => {
-          const href = kpiHrefMap[metric.key] ?? "/reports"
+          const href = buildProductionHref(metric.key)
           return (
             <KPICard
               key={metric.key}

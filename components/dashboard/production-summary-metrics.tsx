@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo } from "react"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useProductionSummaryMetrics } from "@/lib/hooks/use-dashboard"
@@ -49,6 +50,14 @@ export default function ProductionSummaryMetrics({
     initialData,
   })
   const errorMessage = getErrorMessage(metricsQuery.error)
+  const productionHref = useMemo(() => {
+    const params = new URLSearchParams()
+    if (system && system !== "all") params.set("system", system)
+    if (stage !== "all") params.set("stage", stage)
+    if (batch && batch !== "all") params.set("batch", batch)
+    params.set("period", periodParam ?? timePeriod)
+    return `/production?${params.toString()}`
+  }, [batch, periodParam, stage, system, timePeriod])
 
   const metrics = useMemo(() => {
     const data = metricsQuery.data
@@ -99,10 +108,12 @@ export default function ProductionSummaryMetrics({
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {metrics.map((metric) => (
-          <div key={metric.label} className={metricCardClass}>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{metric.label}</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{metric.value}</p>
-          </div>
+          <Link key={metric.label} href={productionHref} className="block">
+            <div className={`${metricCardClass} transition-shadow hover:shadow-md`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{metric.label}</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{metric.value}</p>
+            </div>
+          </Link>
         ))}
       </div>
     </div>
