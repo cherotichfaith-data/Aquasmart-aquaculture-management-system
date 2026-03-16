@@ -6,10 +6,10 @@ import { useActiveFarm } from "@/hooks/use-active-farm"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
   getBatchSystemIds,
+  getFeedPlans,
   getFarmKpisToday,
   getFcrTrend,
   getFeedingRecords,
-  getFeedIncomingWithType,
   getGrowthTrend,
   getMortalityData,
   getRecentEntries,
@@ -21,39 +21,8 @@ import { getSurvivalTrend } from "@/lib/api/mortality"
 import type {
   FeedFcrTrendRow,
   FeedGrowthTrendRow,
-  FeedIncomingWithType,
   FeedingRecordWithType,
 } from "@/lib/api/reports"
-
-export function useFeedIncoming(params?: {
-  dateFrom?: string
-  dateTo?: string
-  limit?: number
-  enabled?: boolean
-  farmId?: string | null
-  initialData?: QueryResult<FeedIncomingWithType>
-}) {
-  const { session } = useAuth()
-  const { farmId } = useActiveFarm()
-  const resolvedFarmId = params?.farmId ?? farmId
-  const enabled = Boolean(session) && (params?.enabled ?? true)
-  return useQuery({
-    queryKey: [
-      "reports",
-      "feed-incoming",
-      resolvedFarmId ?? "all",
-      params?.dateFrom ?? "",
-      params?.dateTo ?? "",
-      params?.limit ?? 50,
-    ],
-    queryFn: ({ signal }) =>
-      getFeedIncomingWithType({ dateFrom: params?.dateFrom, dateTo: params?.dateTo, limit: params?.limit, signal }),
-    enabled,
-    staleTime: 5 * 60_000,
-    initialData: params?.initialData,
-    initialDataUpdatedAt: params?.initialData ? 0 : undefined,
-  })
-}
 
 export function useFarmKpisToday(params?: {
   farmId?: string | null
@@ -80,6 +49,33 @@ export function useRunningStock(params?: {
   return useQuery({
     queryKey: ["reports", "running-stock", resolvedFarmId ?? "all"],
     queryFn: ({ signal }) => getRunningStock({ farmId: resolvedFarmId, signal }),
+    enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
+    staleTime: 60_000,
+  })
+}
+
+export function useFeedPlans(params?: {
+  farmId?: string | null
+  systemIds?: number[]
+  batchId?: number
+  dateFrom?: string
+  dateTo?: string
+  enabled?: boolean
+}) {
+  const { session } = useAuth()
+  const { farmId } = useActiveFarm()
+  const resolvedFarmId = params?.farmId ?? farmId
+  return useQuery({
+    queryKey: [
+      "reports",
+      "feed-plans",
+      resolvedFarmId ?? "all",
+      params?.systemIds?.join(",") ?? "all-systems",
+      params?.batchId ?? "all",
+      params?.dateFrom ?? "",
+      params?.dateTo ?? "",
+    ],
+    queryFn: ({ signal }) => getFeedPlans({ ...params, farmId: resolvedFarmId, signal }),
     enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
     staleTime: 60_000,
   })

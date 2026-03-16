@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layout/dashboard-layout"
 import { useAnalyticsPageBootstrap } from "@/hooks/use-analytics-page-bootstrap"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import {
+  useFeedPlans,
   useFarmKpisToday,
   useFeedingRecords,
   useRunningStock,
@@ -24,6 +25,7 @@ import {
   buildFeedDeviationCells,
   buildFeedRateSeries,
   formatFeedDayLabel,
+  selectApplicableFeedPlan,
   type FcrInterval,
 } from "./feed-analytics"
 import {
@@ -128,6 +130,14 @@ export default function FeedManagementPage({
     farmId,
     enabled: Boolean(farmId),
   })
+  const feedPlansQuery = useFeedPlans({
+    farmId,
+    systemIds: scopedSystemIdList,
+    batchId: Number.isFinite(batchId) ? (batchId as number) : undefined,
+    dateFrom,
+    dateTo,
+    enabled: Boolean(farmId) && hasDateRange,
+  })
   const feedingEnabled = (hasSystem || scopedSystemIdList.length > 0) && hasDateRange
   const feedingRecordsQuery = useFeedingRecords({
     farmId,
@@ -195,7 +205,9 @@ export default function FeedManagementPage({
   const growthTrendRowsRaw = growthTrendQuery.data?.status === "success" ? growthTrendQuery.data.data : []
   const survivalTrendRowsRaw = survivalTrendQuery.data?.status === "success" ? survivalTrendQuery.data.data : []
   const runningStockRows = runningStockQuery.data?.status === "success" ? runningStockQuery.data.data : []
+  const feedPlans = feedPlansQuery.data?.status === "success" ? feedPlansQuery.data.data : []
   const measurementsRaw = measurementsQuery.data?.status === "success" ? measurementsQuery.data.data : []
+  const selectedFeedTypeId = selectedFeedType === "all" ? null : Number(selectedFeedType)
 
   const feedingRecords = useMemo(() => {
     return feedingRecordsRaw
@@ -222,33 +234,55 @@ export default function FeedManagementPage({
     [measurementsRaw, scopedSystemIds],
   )
 
-  const feedRatePoints = useMemo(() => buildFeedRateSeries(inventoryRows), [inventoryRows])
+  const feedRatePoints = useMemo(
+    () =>
+      buildFeedRateSeries({
+        rows: inventoryRows,
+        feedPlans,
+        batchId: Number.isFinite(batchId) ? (batchId as number) : null,
+        selectedFeedTypeId: Number.isFinite(selectedFeedTypeId) ? selectedFeedTypeId : null,
+      }),
+    [batchId, feedPlans, inventoryRows, selectedFeedTypeId],
+  )
   const fcrIntervals = useMemo<FcrInterval[]>(
     () =>
       fcrTrendRowsRaw
-        .map((row) => ({
-          systemId: row.system_id,
-          startDate: row.period_start,
-          endDate: row.period_end,
-          days: row.days_interval,
-          previousAbwG: 0,
-          currentAbwG: row.abw_end_g,
-          liveFishCount: null,
-          totalFeedKg: row.total_feed_kg,
-          weightGainKg: row.weight_gain_kg,
-          fcr: row.fcr,
-          sgrPctPerDay: null,
-          warning:
-            row.fcr > 2
-              ? "Above target FCR."
-              : row.fcr < 1.2
-                ? "Below target FCR. Check feed rate against growth."
-                : null,
-          dominantFeedType: null,
-          dominantFeedTypeId: null,
-        }))
+        .map((row) => {
+          const matchedPlan = selectApplicableFeedPlan(feedPlans, {
+            systemId: row.system_id,
+            date: row.period_end,
+            abwG: row.abw_end_g,
+            batchId: Number.isFinite(batchId) ? (batchId as number) : null,
+            feedTypeId: Number.isFinite(selectedFeedTypeId) ? selectedFeedTypeId : null,
+          })
+          const targetEfcr = matchedPlan?.target_efcr ?? null
+          const upperTarget = targetEfcr != null ? targetEfcr * 1.1 : 2
+          const lowerTarget = targetEfcr != null ? targetEfcr * 0.85 : 1.2
+
+          return {
+            systemId: row.system_id,
+            startDate: row.period_start,
+            endDate: row.period_end,
+            days: row.days_interval,
+            previousAbwG: 0,
+            currentAbwG: row.abw_end_g,
+            liveFishCount: null,
+            totalFeedKg: row.total_feed_kg,
+            weightGainKg: row.weight_gain_kg,
+            fcr: row.fcr,
+            sgrPctPerDay: null,
+            warning:
+              row.fcr > upperTarget
+                ? `Above ${targetEfcr != null ? `target eFCR ${targetEfcr.toFixed(2)}` : "target FCR"}.`
+                : row.fcr < lowerTarget
+                  ? `Below ${targetEfcr != null ? `target eFCR ${targetEfcr.toFixed(2)}` : "expected FCR"}. Check feed rate against growth.`
+                  : null,
+            dominantFeedType: null,
+            dominantFeedTypeId: null,
+          }
+        })
         .sort((a, b) => (a.systemId === b.systemId ? a.endDate.localeCompare(b.endDate) : a.systemId - b.systemId)),
-    [fcrTrendRowsRaw],
+    [batchId, fcrTrendRowsRaw, feedPlans, selectedFeedTypeId],
   )
 
   const exceptionWindowRecords = useMemo(() => {
@@ -488,6 +522,8 @@ export default function FeedManagementPage({
     getQueryResultError(farmKpisQuery.data),
     getErrorMessage(runningStockQuery.error),
     getQueryResultError(runningStockQuery.data),
+    getErrorMessage(feedPlansQuery.error),
+    getQueryResultError(feedPlansQuery.data),
     getErrorMessage(feedTypesQuery.error),
     getQueryResultError(feedTypesQuery.data),
     getErrorMessage(feedingRecordsQuery.error),
@@ -511,6 +547,7 @@ export default function FeedManagementPage({
   const loading =
     farmKpisQuery.isLoading ||
     runningStockQuery.isLoading ||
+    feedPlansQuery.isLoading ||
     feedTypesQuery.isLoading ||
     feedingRecordsQuery.isLoading ||
     inventoryQuery.isLoading ||

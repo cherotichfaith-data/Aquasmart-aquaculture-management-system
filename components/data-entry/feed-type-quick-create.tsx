@@ -120,6 +120,7 @@ export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
       <div className="space-y-1">
         <h3 className="font-medium">Add Feed Type</h3>
         <p className="text-sm text-muted-foreground">Create the missing feed type without leaving data entry.</p>
+        <p className="text-sm text-muted-foreground">Protein is required. Fat is strongly recommended so feed analysis and cost reporting are not left incomplete later.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -160,10 +161,12 @@ export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
         <div className="space-y-2">
           <Label htmlFor="protein">Protein %</Label>
           <Input id="protein" type="number" step="0.1" value={protein} onChange={(event) => setProtein(event.target.value)} />
+          <p className="text-xs text-muted-foreground">Required for feed-quality reporting and weighted nutrition metrics.</p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="fat">Fat % (Optional)</Label>
+          <Label htmlFor="fat">Fat % (Recommended)</Label>
           <Input id="fat" type="number" step="0.1" value={fat} onChange={(event) => setFat(event.target.value)} />
+          <p className="text-xs text-muted-foreground">Leave blank only if the supplier spec sheet is unavailable.</p>
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">

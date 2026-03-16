@@ -17,11 +17,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Database } from "@/lib/types/database"
+import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useRecordFeeding } from "@/lib/hooks/use-feeding"
-import { useFeedingRecords } from "@/lib/hooks/use-reports"
+import { useFeedPlans, useFeedingRecords } from "@/lib/hooks/use-reports"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { logSbError } from "@/utils/supabase/log"
+import { selectApplicableFeedPlan } from "@/app/feed/feed-analytics"
 import { DependencyBlocker } from "./dependency-blocker"
 import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import { cn } from "@/lib/utils"
@@ -44,6 +46,7 @@ interface FeedingFormProps {
 }
 
 export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, defaultBatchId = null }: FeedingFormProps) {
+    const { farmId } = useActiveFarm()
     const mutation = useRecordFeeding()
     const [showQuickCreate, setShowQuickCreate] = useState(false)
     const [submissionSummary, setSubmissionSummary] = useState<string | null>(null)
@@ -60,6 +63,10 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
         },
     })
     const selectedSystemId = Number(form.watch("system_id"))
+    const selectedBatchValue = form.watch("batch_id")
+    const selectedBatchId = selectedBatchValue && selectedBatchValue !== "none" ? Number(selectedBatchValue) : null
+    const selectedBatchIdForQuery: number | undefined =
+        typeof selectedBatchId === "number" && Number.isFinite(selectedBatchId) ? selectedBatchId : undefined
     const selectedDate = form.watch("date")
     const selectedFeedId = Number(form.watch("feed_id"))
     const selectedResponse = form.watch("feeding_response")
@@ -74,12 +81,21 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
         enabled: Boolean(selectedDate) && Number.isFinite(selectedSystemId),
     })
     const inventoryQuery = useDailyFishInventory({
+        farmId,
         systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
         dateFrom: selectedDate || undefined,
         dateTo: selectedDate || undefined,
         limit: 7,
         orderAsc: false,
-        enabled: Boolean(selectedDate) && Number.isFinite(selectedSystemId),
+        enabled: Boolean(farmId) && Boolean(selectedDate) && Number.isFinite(selectedSystemId),
+    })
+    const feedPlansQuery = useFeedPlans({
+        farmId,
+        systemIds: Number.isFinite(selectedSystemId) ? [selectedSystemId] : [],
+        batchId: selectedBatchIdForQuery,
+        dateFrom: selectedDate || undefined,
+        dateTo: selectedDate || undefined,
+        enabled: Boolean(farmId) && Boolean(selectedDate) && Number.isFinite(selectedSystemId),
     })
     const doQuery = useWaterQualityMeasurements({
         systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
@@ -93,6 +109,17 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
         duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []
     const latestInventoryRow =
         inventoryQuery.data?.status === "success" ? inventoryQuery.data.data[0] ?? null : null
+    const matchedFeedPlan = useMemo(() => {
+        const rows = feedPlansQuery.data?.status === "success" ? feedPlansQuery.data.data : []
+        if (!selectedDate || !Number.isFinite(selectedSystemId)) return null
+        return selectApplicableFeedPlan(rows, {
+            systemId: selectedSystemId,
+            date: selectedDate,
+            abwG: latestInventoryRow?.abw_last_sampling ?? null,
+            batchId: Number.isFinite(selectedBatchId) ? selectedBatchId : null,
+            feedTypeId: Number.isFinite(selectedFeedId) ? selectedFeedId : null,
+        })
+    }, [feedPlansQuery.data, latestInventoryRow?.abw_last_sampling, selectedBatchId, selectedDate, selectedFeedId, selectedSystemId])
     const latestDoReading = useMemo(() => {
         const rows = doQuery.data?.status === "success" ? doQuery.data.data : []
         return rows
@@ -118,6 +145,16 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                 : doValue < 5
                     ? `DO ${doValue.toFixed(1)} mg/L - caution.`
                     : `DO ${doValue.toFixed(1)} mg/L`
+    const targetDailyFeedKg = useMemo(() => {
+        if (matchedFeedPlan?.target_daily_feed_kg != null) return matchedFeedPlan.target_daily_feed_kg
+        const biomassKg = latestInventoryRow?.biomass_last_sampling ?? null
+        const targetRate = matchedFeedPlan?.target_feeding_rate_pct ?? null
+        return biomassKg != null && biomassKg > 0 && targetRate != null ? (biomassKg * targetRate) / 100 : null
+    }, [latestInventoryRow?.biomass_last_sampling, matchedFeedPlan])
+    const plannedDailyFeedText =
+        matchedFeedPlan?.target_feeding_rate_pct != null
+            ? `${matchedFeedPlan.target_feeding_rate_pct.toFixed(2)}% biomass`
+            : null
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
@@ -128,6 +165,8 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
             const dailyTotal = existingTotal + values.amount_kg
             const biomassKg = latestInventoryRow?.biomass_last_sampling ?? null
             const feedRatePct = biomassKg && biomassKg > 0 ? (dailyTotal / biomassKg) * 100 : null
+            const percentOfPlan =
+                targetDailyFeedKg != null && targetDailyFeedKg > 0 ? (dailyTotal / targetDailyFeedKg) * 100 : null
 
             await mutation.mutateAsync({
                 system_id: systemId,
@@ -140,6 +179,12 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
             setSubmissionSummary(
                 `Saved. Daily total for ${selectedSystem?.label ?? `System ${systemId}`}: ${dailyTotal.toFixed(2)} kg.${
                     feedRatePct != null ? ` Feed rate: ${feedRatePct.toFixed(2)}% of biomass.` : ""
+                }${
+                    targetDailyFeedKg != null
+                        ? ` Target: ${targetDailyFeedKg.toFixed(2)} kg/day${plannedDailyFeedText ? ` (${plannedDailyFeedText})` : ""}.`
+                        : ""
+                }${
+                    percentOfPlan != null ? ` Plan coverage: ${percentOfPlan.toFixed(0)}%.` : ""
                 }`,
             )
             form.reset({
@@ -178,6 +223,12 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                 <div className={cn("rounded-md border px-3 py-2 text-sm font-medium", doBadgeClass)}>
                     {doBadgeLabel}
                 </div>
+                {plannedDailyFeedText ? (
+                    <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+                        Active feed target: <span className="font-medium">{plannedDailyFeedText}</span>
+                        {targetDailyFeedKg != null ? ` (${targetDailyFeedKg.toFixed(2)} kg/day)` : ""}
+                    </div>
+                ) : null}
                 {selectedFeed?.feed_pellet_size ? (
                     <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
                         Pellet guide: <span className="font-medium text-foreground">{selectedFeed.feed_pellet_size}</span>
@@ -343,4 +394,3 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
         </div>
     )
 }
-
