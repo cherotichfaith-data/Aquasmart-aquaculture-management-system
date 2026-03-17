@@ -30,7 +30,7 @@ export default function TimePeriodSelector({
   }
   const triggerClass =
     variant === "compact"
-      ? "h-9 min-w-[140px] rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground inline-flex items-center justify-between gap-2"
+      ? "inline-flex h-10 min-w-[140px] items-center justify-between gap-2 rounded-xl border border-input bg-background/90 px-3 text-sm font-medium text-foreground shadow-sm"
       : "h-9 min-w-[120px] rounded-full border border-border bg-card/80 px-4 text-xs font-semibold text-foreground shadow-sm inline-flex items-center justify-between gap-2"
 
   return (

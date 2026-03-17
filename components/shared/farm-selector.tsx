@@ -81,7 +81,7 @@ export default function FarmSelector({
 
   const selectClass =
     variant === "compact"
-      ? "h-9 min-w-[150px] rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground"
+      ? "h-10 min-w-[150px] rounded-xl border border-input bg-background/90 px-3 text-sm font-medium text-foreground shadow-sm"
       : "px-3 py-2 rounded-md border border-input bg-background text-sm"
 
   return (

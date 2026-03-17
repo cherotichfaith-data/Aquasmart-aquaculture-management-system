@@ -193,10 +193,13 @@ export default function SystemsTable({
             <DataFetchingBadge isFetching={systemsQuery.isFetching} isLoading={systemsQuery.isLoading} />
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <p className="text-xs text-muted-foreground">{totalRows} systems shown</p>
+        <div className="filter-bar mt-3">
+          <div className="legend-pills">
+            <div className="legend-pill">{totalRows} systems shown</div>
+            <div className="legend-pill">{filterMode === "all" ? "Full queue" : filterMode === "top5" ? "Best eFCR" : filterMode === "bottom5" ? "Worst eFCR" : "Missing data"}</div>
+          </div>
           <select
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            className="h-9 rounded-xl border border-input bg-background px-3 text-xs font-semibold"
             value={filterMode}
             onChange={(event) => setFilterMode(event.target.value as SystemFilterMode)}
             aria-label="System performance filter"
@@ -208,7 +211,7 @@ export default function SystemsTable({
           </select>
         </div>
       </div>
-      <div className="max-h-[60vh] overflow-auto rounded-md border border-border/80">
+      <div className="dense-table-shell max-h-[60vh]">
         <Table>
           <TableHeader className="bg-muted/60">
             <TableRow>
@@ -376,4 +379,5 @@ export default function SystemsTable({
     </div>
   )
 }
+
 
