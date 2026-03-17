@@ -280,7 +280,7 @@ export default function SystemsTable({
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-chart-2" />
+                        <span className={`h-2 w-2 rounded-full ${criticalWaterQuality ? "bg-destructive" : hasMissingDays || staleSampling ? "bg-chart-3" : "bg-chart-2"}`} />
                         <div>
                           <p className="text-sm font-medium text-foreground">{system.system_name || system.system_id}</p>
                           <p className="text-[11px] text-muted-foreground">
@@ -379,5 +379,6 @@ export default function SystemsTable({
     </div>
   )
 }
+
 
 
