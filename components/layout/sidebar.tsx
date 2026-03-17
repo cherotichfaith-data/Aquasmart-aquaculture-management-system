@@ -107,7 +107,6 @@ export default function Sidebar({
             {!collapsed && (
               <div className="ml-3">
                 <p className="font-semibold leading-none text-sidebar-foreground">Aquasmart</p>
-                <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-sidebar-foreground/55">Operations Console</p>
               </div>
             )}
             <button

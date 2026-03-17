@@ -86,7 +86,6 @@ export default function Header({
               <Menu size={20} />
             </button>
             <div className="hidden md:block">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Aquasmart Ops</p>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-semibold text-foreground">{farm?.name ?? "Aquasmart"}</span>
               </div>
@@ -220,9 +219,6 @@ export default function Header({
             />
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div className="hidden rounded-full border border-border/80 bg-background/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground xl:block">
-              Ctrl+K Quick Actions
-            </div>
           {showAddData ? (
             <div>
               <DropdownMenu>
