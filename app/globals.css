@@ -237,6 +237,10 @@ next-router-prefetch {
     @apply h-2.5 w-2.5 rounded-full;
   }
 
+  .filter-bar {
+    @apply flex flex-wrap items-center justify-between gap-3 rounded-[1.1rem] border border-border/80 bg-muted/20 px-3 py-3;
+  }
+
   .queue-card {
     @apply rounded-[1.1rem] border px-3 py-3 text-left transition-colors;
   }
@@ -259,3 +263,4 @@ next-router-prefetch {
     box-shadow: 0 12px 28px -28px rgba(15, 23, 32, 0.5);
   }
 }
+
