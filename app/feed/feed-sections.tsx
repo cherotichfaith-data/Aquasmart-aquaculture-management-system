@@ -5,10 +5,8 @@ import {
   Area,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -22,12 +20,12 @@ import { LazyRender } from "@/components/shared/lazy-render"
 import type { FcrInterval, FeedDeviationCell, FeedRatePoint } from "./feed-analytics"
 
 const CHART_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "#14b8a6",
-  "#f97316",
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+  "var(--color-primary)",
 ]
 
 const DEVIATION_CLASSES: Record<FeedDeviationCell["status"], string> = {
@@ -395,17 +393,32 @@ export function FeedRateSection({
   systemNameById: Map<number, string>
 }) {
   const chartRows = useMemo(() => {
-    const byDate = new Map<string, Record<string, string | number | null>>()
+    const byDate = new Map<
+      string,
+      Record<string, string | number | null> & { lowerBandSum: number; lowerBandCount: number; upperBandSum: number; upperBandCount: number }
+    >()
     points.forEach((point) => {
       const current = byDate.get(point.date) ?? {
         date: point.date,
         label: point.label,
-        lowerBand: point.lowerBand,
-        upperBand: point.upperBand,
+        lowerBand: null,
+        upperBand: null,
+        lowerBandSum: 0,
+        lowerBandCount: 0,
+        upperBandSum: 0,
+        upperBandCount: 0,
       }
       current[`system_${point.systemId}`] = point.feedRatePct
-      if (point.lowerBand != null) current.lowerBand = point.lowerBand
-      if (point.upperBand != null) current.upperBand = point.upperBand
+      if (point.lowerBand != null) {
+        current.lowerBandSum += point.lowerBand
+        current.lowerBandCount += 1
+        current.lowerBand = current.lowerBandSum / current.lowerBandCount
+      }
+      if (point.upperBand != null) {
+        current.upperBandSum += point.upperBand
+        current.upperBandCount += 1
+        current.upperBand = current.upperBandSum / current.upperBandCount
+      }
       byDate.set(point.date, current)
     })
     return Array.from(byDate.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -426,9 +439,20 @@ export function FeedRateSection({
     <Card>
       <CardHeader>
         <CardTitle>Feed Rate vs Target</CardTitle>
-        <CardDescription>Feed offered as percent of biomass.</CardDescription>
+        <CardDescription>Feed offered as percent of biomass against the scoped target corridor.</CardDescription>
       </CardHeader>
       <CardContent>
+        {series.length > 0 ? (
+          <div className="mb-4 legend-pills">
+            <div className="legend-pill"><span className="legend-pill-swatch bg-chart-2" /> Target corridor</div>
+            {series.map((item) => (
+              <div key={item.key} className="legend-pill">
+                <span className="legend-pill-swatch" style={{ backgroundColor: item.color }} />
+                {item.label}
+              </div>
+            ))}
+          </div>
+        ) : null}
         <ChartFrame loading={loading} emptyLabel="No feed-rate data available for the selected scope." hasData={chartRows.length > 0}>
           <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
             <ResponsiveContainer width="100%" height="100%">
@@ -440,9 +464,9 @@ export function FeedRateSection({
                   labelFormatter={(value, payload) => formatFullDate(String(payload?.[0]?.payload?.date ?? value))}
                   formatter={(value, name) => [`${formatNumber(Number(value), 2)}%`, String(name)]}
                 />
-                <Legend />
-                <Area type="monotone" dataKey="upperBand" stroke="transparent" fill="rgba(34,197,94,0.08)" name="Target" />
-                <Line type="monotone" dataKey="lowerBand" stroke="#16a34a" strokeDasharray="4 4" dot={false} name="Target" />
+                
+                <Area type="monotone" dataKey="upperBand" stroke="transparent" fill="color-mix(in srgb, var(--color-chart-2) 12%, transparent)" name="Scoped target" />
+                <Line type="monotone" dataKey="lowerBand" stroke="var(--color-chart-2)" strokeDasharray="4 4" dot={false} name="Scoped target" />
                 {series.map((item) => (
                   <Line
                     key={item.key}
@@ -498,9 +522,19 @@ export function FeedFcrSection({
     <Card>
       <CardHeader>
         <CardTitle>FCR Trend</CardTitle>
-        <CardDescription>Interval feed efficiency by cage.</CardDescription>
+        <CardDescription>Interval feed efficiency by cage with target checks handled in the exception rail.</CardDescription>
       </CardHeader>
       <CardContent>
+        {series.length > 0 ? (
+          <div className="mb-4 legend-pills">
+            {series.map((item) => (
+              <div key={item.key} className="legend-pill">
+                <span className="legend-pill-swatch" style={{ backgroundColor: item.color }} />
+                {item.label}
+              </div>
+            ))}
+          </div>
+        ) : null}
         <ChartFrame loading={loading} emptyLabel="No FCR intervals available for the selected scope." hasData={chartRows.length > 0}>
           <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
             <ResponsiveContainer width="100%" height="100%">
@@ -512,9 +546,9 @@ export function FeedFcrSection({
                   labelFormatter={(value, payload) => formatFullDate(String(payload?.[0]?.payload?.date ?? value))}
                   formatter={(value, name) => [formatNumber(Number(value), 2), String(name)]}
                 />
-                <Legend />
-                <ReferenceLine y={1.5} stroke="#16a34a" strokeDasharray="4 4" />
-                <ReferenceLine y={2.0} stroke="#ef4444" strokeDasharray="4 4" />
+                
+                
+                
                 {series.map((item) => (
                   <Line
                     key={item.key}
