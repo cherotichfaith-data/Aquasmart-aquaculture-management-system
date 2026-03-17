@@ -6,7 +6,6 @@ import SystemHistorySheet from "@/components/systems/system-history-sheet"
 import { useAnalyticsPageBootstrap } from "@/hooks/use-analytics-page-bootstrap"
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -774,6 +773,12 @@ export default function SamplingPage() {
                 )} (${projection.daysToTarget} days).`
               : ""}
           </p>
+          <div className="mb-4 legend-pills">
+            <div className="legend-pill"><span className="legend-pill-swatch bg-[var(--color-chart-1)]" /> Observed ABW</div>
+            <div className="legend-pill"><span className="legend-pill-swatch bg-[hsl(var(--muted-foreground))]" /> Target ABW</div>
+            <div className="legend-pill"><span className="legend-pill-swatch bg-[var(--color-chart-4)]" /> Projection</div>
+            <div className="legend-pill"><span className="legend-pill-swatch bg-[var(--color-chart-3)]" /> Transfer markers</div>
+          </div>
           {loading ? (
             <div className="h-80 flex items-center justify-center text-muted-foreground">Loading chart...</div>
           ) : chartDisplayRows.length > 0 ? (
@@ -791,7 +796,7 @@ export default function SamplingPage() {
                       String(name),
                     ]}
                   />
-                  <Legend />
+                  
                   <ReferenceLine y={10} stroke="hsl(var(--border))" strokeDasharray="2 4" label="10g" />
                   <ReferenceLine y={50} stroke="hsl(var(--border))" strokeDasharray="2 4" label="50g" />
                   {transferMarkers.map((marker, index) => {
@@ -803,10 +808,10 @@ export default function SamplingPage() {
                           : "out"
                     const stroke =
                       direction === "in"
-                        ? "hsl(var(--chart-2))"
+                        ? "var(--color-chart-2)"
                         : direction === "out"
-                          ? "hsl(var(--chart-4))"
-                          : "hsl(var(--chart-3))"
+                          ? "var(--color-chart-4)"
+                          : "var(--color-chart-3)"
                     const label =
                       index === 0
                         ? direction === "in"
@@ -825,9 +830,9 @@ export default function SamplingPage() {
                       />
                     )
                   })}
-                  <Line type="monotone" dataKey="abw" stroke="hsl(var(--chart-1))" strokeWidth={2.5} name="Observed ABW (g)" />
+                  <Line type="monotone" dataKey="abw" stroke="var(--color-chart-1)" strokeWidth={2.5} name="Observed ABW (g)" />
                   <Line type="monotone" dataKey="targetAbw" stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" name="Target ABW (g)" dot={false} />
-                  <Line type="monotone" dataKey="projectionAbw" stroke="hsl(var(--chart-4))" strokeDasharray="4 4" name="Projection" dot={false} connectNulls />
+                  <Line type="monotone" dataKey="projectionAbw" stroke="var(--color-chart-4)" strokeDasharray="4 4" name="Projection" dot={false} connectNulls />
                   </LineChart>
                 </ResponsiveContainer>
               </LazyRender>

@@ -455,9 +455,9 @@ export default function SystemHistorySheet({
                             return [`${formatNumber(Number(value), 1)} ${unit}`, String(name)]
                           }} />
                           <Legend />
-                          <Line yAxisId="left" type="monotone" dataKey="biomass" stroke="hsl(var(--chart-1))" strokeWidth={2.4} name="Biomass (kg)" dot={false} />
-                          <Line yAxisId="right" type="monotone" dataKey="abw" stroke="hsl(var(--chart-2))" strokeWidth={2.4} name="ABW (g)" dot={false} />
-                          <Bar yAxisId="left" dataKey="feed" fill="hsl(var(--chart-3))" name="Feed (kg)" radius={[4, 4, 0, 0]} />
+                          <Line yAxisId="left" type="monotone" dataKey="biomass" stroke="var(--color-chart-1)" strokeWidth={2.4} name="Biomass (kg)" dot={false} />
+                          <Line yAxisId="right" type="monotone" dataKey="abw" stroke="var(--color-chart-2)" strokeWidth={2.4} name="ABW (g)" dot={false} />
+                          <Bar yAxisId="left" dataKey="feed" fill="var(--color-chart-3)" name="Feed (kg)" radius={[4, 4, 0, 0]} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -539,8 +539,8 @@ export default function SystemHistorySheet({
                             return [`${formatNumber(Number(value), 2)} ${unit}`, String(name)]
                           }} />
                           <Legend />
-                          <Line yAxisId="left" type="monotone" dataKey="dissolvedOxygen" stroke="hsl(var(--chart-1))" strokeWidth={2.4} name="DO (mg/L)" dot={false} />
-                          <Line yAxisId="right" type="monotone" dataKey="temperature" stroke="hsl(var(--chart-4))" strokeWidth={2.4} name="Temperature (C)" dot={false} />
+                          <Line yAxisId="left" type="monotone" dataKey="dissolvedOxygen" stroke="var(--color-chart-1)" strokeWidth={2.4} name="DO (mg/L)" dot={false} />
+                          <Line yAxisId="right" type="monotone" dataKey="temperature" stroke="var(--color-chart-4)" strokeWidth={2.4} name="Temperature (C)" dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
