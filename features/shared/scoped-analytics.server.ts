@@ -1,11 +1,12 @@
 import { createClient } from "@/utils/supabase/server"
 import { fetchTimePeriodBounds } from "@/lib/time-period-bounds"
 import type { Database, Enums } from "@/lib/types/database"
+import type { TimePeriod } from "@/lib/time-period"
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>
 
 export type ScopedAnalyticsStage = "all" | Enums<"system_growth_stage">
-export type ScopedAnalyticsTimePeriod = Enums<"time_period">
+export type ScopedAnalyticsTimePeriod = TimePeriod
 export type ScopedSystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
 
 export function parseSelectedNumericId(value?: string | null): number | undefined {

@@ -14,17 +14,9 @@ import {
   getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
+import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
 
 const DEFAULT_TIME_PERIOD: FeedPageInitialFilters["timePeriod"] = "quarter"
-const VALID_TIME_PERIODS: FeedPageInitialFilters["timePeriod"][] = [
-  "day",
-  "week",
-  "2 weeks",
-  "month",
-  "quarter",
-  "6 months",
-  "year",
-]
 const VALID_STAGES: FeedPageInitialFilters["selectedStage"][] = ["all", "nursing", "grow_out"]
 
 function toSuccess<T>(data: T[]): QueryResult<T> {
@@ -44,8 +36,8 @@ export function parseFeedPageFilters(searchParams?: Record<string, string | stri
       ? (selectedStageRaw as FeedPageInitialFilters["selectedStage"])
       : "all"
   const timePeriod =
-    typeof timePeriodRaw === "string" && VALID_TIME_PERIODS.includes(timePeriodRaw as FeedPageInitialFilters["timePeriod"])
-      ? (timePeriodRaw as FeedPageInitialFilters["timePeriod"])
+    typeof timePeriodRaw === "string" && isTimePeriod(timePeriodRaw)
+      ? (timePeriodRaw as TimePeriod)
       : DEFAULT_TIME_PERIOD
 
   return {

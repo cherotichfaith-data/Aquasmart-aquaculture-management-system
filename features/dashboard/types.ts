@@ -1,9 +1,10 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { TimeBounds } from "@/lib/api/dashboard"
 import type { QueryResult } from "@/lib/supabase-client"
+import type { TimePeriod } from "@/lib/time-period"
 
 export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
-export type DashboardTimePeriod = Enums<"time_period">
+export type DashboardTimePeriod = TimePeriod
 
 export type ProductionTrendRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 export type DashboardSystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]

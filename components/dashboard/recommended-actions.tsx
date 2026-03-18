@@ -7,6 +7,7 @@ import { useRecommendedActions } from "@/lib/hooks/use-dashboard"
 import { useActiveFarm } from "@/hooks/use-active-farm"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
+import type { TimePeriod } from "@/lib/time-period"
 
 const priorityStyles = {
   High: "bg-destructive/15 text-destructive",
@@ -27,7 +28,7 @@ export default function RecommendedActions({
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
-  timePeriod?: Enums<"time_period">
+  timePeriod?: TimePeriod
   dateFrom?: string
   dateTo?: string
   farmId?: string | null

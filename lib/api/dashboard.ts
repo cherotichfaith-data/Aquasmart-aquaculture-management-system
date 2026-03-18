@@ -1,10 +1,10 @@
 import type { Database, Enums } from "@/lib/types/database"
-import { parseDateToTimePeriod } from "@/lib/utils"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { getDailyFishInventory } from "@/lib/api/inventory"
 import { fetchTimePeriodBounds, type AnalyticsTimeScope, type TimeBounds } from "@/lib/time-period-bounds"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/utils/supabase/log"
+import type { TimePeriod } from "@/lib/time-period"
 
 type DashboardRow = Database["public"]["Functions"]["api_dashboard"]["Returns"][number]
 type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
@@ -18,7 +18,7 @@ type DashboardRpcArgs = {
   p_growth_stage?: string
   p_start_date?: string
   p_end_date?: string
-  p_time_period?: Enums<"time_period">
+  p_time_period?: TimePeriod
 }
 
 const dashboardRpcArgs = (params: {
@@ -27,17 +27,15 @@ const dashboardRpcArgs = (params: {
   stage?: Enums<"system_growth_stage">
   dateFrom?: string
   dateTo?: string
-  timePeriod?: Enums<"time_period"> | string
+  timePeriod?: TimePeriod
 }): DashboardRpcArgs => {
-  const hasRange = Boolean(params.dateFrom || params.dateTo)
-  const parsed = !hasRange && params.timePeriod ? parseDateToTimePeriod(params.timePeriod) : null
   return {
     p_farm_id: params.farmId,
     p_system_id: params.systemId ?? undefined,
     p_growth_stage: params.stage ?? undefined,
     p_start_date: params.dateFrom ?? undefined,
     p_end_date: params.dateTo ?? undefined,
-    p_time_period: parsed?.period ?? undefined,
+    p_time_period: !params.dateFrom && !params.dateTo ? params.timePeriod ?? undefined : undefined,
   }
 }
 
@@ -46,7 +44,7 @@ type DashboardConsolidatedRpcArgs = {
   p_system_id?: number
   p_start_date?: string
   p_end_date?: string
-  p_time_period?: Enums<"time_period">
+  p_time_period?: TimePeriod
 }
 
 const dashboardConsolidatedRpcArgs = (params: {
@@ -54,16 +52,14 @@ const dashboardConsolidatedRpcArgs = (params: {
   systemId?: number
   dateFrom?: string
   dateTo?: string
-  timePeriod?: Enums<"time_period"> | string
+  timePeriod?: TimePeriod
 }): DashboardConsolidatedRpcArgs => {
-  const hasRange = Boolean(params.dateFrom || params.dateTo)
-  const parsed = !hasRange && params.timePeriod ? parseDateToTimePeriod(params.timePeriod) : null
   return {
     p_farm_id: params.farmId,
     p_system_id: params.systemId ?? undefined,
     p_start_date: params.dateFrom ?? undefined,
     p_end_date: params.dateTo ?? undefined,
-    p_time_period: parsed?.period ?? undefined,
+    p_time_period: !params.dateFrom && !params.dateTo ? params.timePeriod ?? undefined : undefined,
   }
 }
 type DashboardSystemsRpcArgs = {
@@ -213,7 +209,7 @@ const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
 
 export async function getDashboardSnapshot(params?: {
   systemId?: number
-  timePeriod?: Enums<"time_period"> | string
+  timePeriod?: TimePeriod
   stage?: Enums<"system_growth_stage">
   dateFrom?: string | null
   dateTo?: string | null
@@ -355,7 +351,7 @@ export async function getDashboardConsolidated(params?: {
   systemId?: number | null
   dateFrom?: string | null
   dateTo?: string | null
-  timePeriod?: Enums<"time_period"> | string
+  timePeriod?: TimePeriod
   signal?: AbortSignal
 }): Promise<QueryResult<DashboardConsolidatedRow>> {
   if (!params?.farmId) return toQuerySuccess<DashboardConsolidatedRow>([])
@@ -390,7 +386,7 @@ export async function getDashboardConsolidated(params?: {
 }
 
 export async function getTimePeriodBounds(
-  timePeriod: Enums<"time_period"> | string,
+  timePeriod: TimePeriod,
   signal?: AbortSignal,
   farmId?: string | null,
   scope: AnalyticsTimeScope = "dashboard",

@@ -40,7 +40,6 @@ export default function PopulationOverview({
     batch,
     system,
     timePeriod,
-    periodParam,
     dateFrom,
     dateTo,
     farmId: initialFarmId,
@@ -50,7 +49,6 @@ export default function PopulationOverview({
     batch?: string
     system?: string
     timePeriod: TimePeriod
-    periodParam?: string | null
     dateFrom?: string
     dateTo?: string
     farmId?: string | null
@@ -63,7 +61,7 @@ export default function PopulationOverview({
         stage: stage ?? undefined,
         batch: batch ?? "all",
         system,
-        timePeriod: periodParam ?? timePeriod,
+        timePeriod,
         dateFrom: dateFrom ?? null,
         dateTo: dateTo ?? null,
         initialData,

@@ -26,6 +26,7 @@ import { getDailyFishInventory } from "@/lib/api/inventory"
 import { getWaterQualityRatings } from "@/lib/api/water-quality"
 import { getProductionSummary } from "@/lib/api/production"
 import { getBatchSystemIds, getRecentActivities, getTransferData } from "@/lib/api/reports"
+import type { TimePeriod } from "@/lib/time-period"
 
 async function resolveScopedSystemIds(params: {
   farmId?: string | null
@@ -103,10 +104,9 @@ const hasCompleteSystemMetrics = (row: DashboardSystemRow): boolean => {
 export function useKpiOverview(params: {
   farmId?: string | null
   stage: "all" | Enums<"system_growth_stage">
-  timePeriod: Enums<"time_period">
+  timePeriod: TimePeriod
   batch?: string
   system?: string
-  periodParam?: string | null
   dateFrom?: string | null
   dateTo?: string | null
   initialData?: { metrics: KPIOverviewMetric[]; dateBounds: { start: string | null; end: string | null } }
@@ -120,7 +120,6 @@ export function useKpiOverview(params: {
       params.timePeriod,
       params.batch ?? "all",
       params.system ?? "all",
-      params.periodParam ?? "",
       params.dateFrom ?? "",
       params.dateTo ?? "",
     ],
@@ -414,8 +413,7 @@ export function useProductionSummaryMetrics(params: {
   stage: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
-  timePeriod?: Enums<"time_period">
-  periodParam?: string | null
+  timePeriod?: TimePeriod
   dateFrom?: string | null
   dateTo?: string | null
   initialData?: ProductionSummaryMetrics
@@ -428,7 +426,7 @@ export function useProductionSummaryMetrics(params: {
       params.stage ?? "all",
       params.batch ?? "all",
       params.system ?? "all",
-      params.periodParam ?? params.timePeriod ?? "2 weeks",
+      params.timePeriod ?? "2 weeks",
       params.dateFrom ?? "",
       params.dateTo ?? "",
     ],
@@ -548,8 +546,7 @@ export function useSystemsTable(params: {
   stage: Enums<"system_growth_stage"> | "all"
   batch?: string
   system?: string
-  timePeriod?: Enums<"time_period">
-  periodParam?: string | null
+  timePeriod?: TimePeriod
   dateFrom?: string | null
   dateTo?: string | null
   includeIncomplete?: boolean
@@ -564,7 +561,6 @@ export function useSystemsTable(params: {
       params.batch ?? "all",
       params.system ?? "all",
       params.timePeriod ?? "2 weeks",
-      params.periodParam ?? "",
       params.dateFrom ?? "",
       params.dateTo ?? "",
       params.includeIncomplete ?? false,
@@ -652,7 +648,7 @@ export function useProductionTrend(params: {
   stage?: Enums<"system_growth_stage">
   batch?: string
   system?: string
-  timePeriod: Enums<"time_period"> | string
+  timePeriod: TimePeriod
   dateFrom?: string | null
   dateTo?: string | null
   initialData?: ProductionTrendRow[]
@@ -747,7 +743,7 @@ export function useRecommendedActions(params: {
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
-  timePeriod?: Enums<"time_period">
+  timePeriod?: TimePeriod
   dateFrom?: string | null
   dateTo?: string | null
   initialData?: RecommendedAction[]

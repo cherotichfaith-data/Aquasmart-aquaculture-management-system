@@ -14,6 +14,7 @@ import type {
   SystemsTableData,
 } from "./types"
 import { toQuerySuccess } from "@/lib/api/_utils"
+import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
 import {
   buildRecommendedActionsFromAnalytics,
   computeMortalityRateFromProduction,
@@ -37,15 +38,6 @@ type FishStockingRow = Database["public"]["Tables"]["fish_stocking"]["Row"]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "2 weeks"
-const VALID_TIME_PERIODS: DashboardPageInitialFilters["timePeriod"][] = [
-  "day",
-  "week",
-  "2 weeks",
-  "month",
-  "quarter",
-  "6 months",
-  "year",
-]
 const VALID_STAGES: DashboardPageInitialFilters["selectedStage"][] = ["all", "nursing", "grow_out"]
 
 export function parseDashboardPageFilters(
@@ -64,9 +56,8 @@ export function parseDashboardPageFilters(
       ? (selectedStageRaw as DashboardPageInitialFilters["selectedStage"])
       : "all"
   const timePeriod =
-    typeof timePeriodRaw === "string" &&
-    VALID_TIME_PERIODS.includes(timePeriodRaw as DashboardPageInitialFilters["timePeriod"])
-      ? (timePeriodRaw as DashboardPageInitialFilters["timePeriod"])
+    typeof timePeriodRaw === "string" && isTimePeriod(timePeriodRaw)
+      ? (timePeriodRaw as TimePeriod)
       : DEFAULT_TIME_PERIOD
 
   return {

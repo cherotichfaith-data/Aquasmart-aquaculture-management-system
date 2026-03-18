@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react"
 import type { Enums } from "@/lib/types/database"
+import { DEFAULT_TIME_PERIOD, isTimePeriod, type TimePeriod } from "@/lib/time-period"
 
 export type StageFilter = "all" | Enums<"system_growth_stage">
-export type TimePeriod = Enums<"time_period">
+export type { TimePeriod } from "@/lib/time-period"
 
 export type SharedFiltersState = {
   selectedBatch: string
@@ -15,17 +16,13 @@ export type SharedFiltersState = {
 
 const STORAGE_KEY = "aquasmart:shared-filters:v1"
 const EVENT_NAME = "aquasmart:shared-filters"
-const TIME_PERIODS: TimePeriod[] = ["day", "week", "2 weeks", "month", "quarter", "6 months", "year"]
 const STAGES: StageFilter[] = ["all", "nursing", "grow_out"]
-
-const isTimePeriod = (value: unknown): value is TimePeriod =>
-  typeof value === "string" && TIME_PERIODS.includes(value as TimePeriod)
 
 const isStage = (value: unknown): value is StageFilter =>
   typeof value === "string" && STAGES.includes(value as StageFilter)
 
 export function useSharedFilters(
-  defaultTimePeriod: TimePeriod = "2 weeks",
+  defaultTimePeriod: TimePeriod = DEFAULT_TIME_PERIOD,
   initialValues?: Partial<SharedFiltersState>,
 ) {
   const hasInitialValues = Boolean(initialValues)

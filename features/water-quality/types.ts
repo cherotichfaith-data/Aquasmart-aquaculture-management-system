@@ -1,6 +1,7 @@
 import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { TimeBounds } from "@/lib/api/dashboard"
+import type { TimePeriod } from "@/lib/time-period"
 
 export type WaterQualityRow = Tables<"water_quality_measurement">
 export type WaterQualityInsert = Database["public"]["Tables"]["water_quality_measurement"]["Insert"]
@@ -16,7 +17,7 @@ export type WaterQualityPageFilters = {
   selectedBatch: string
   selectedSystem: string
   selectedStage: "all" | Enums<"system_growth_stage">
-  timePeriod: Enums<"time_period">
+  timePeriod: TimePeriod
   activeTab: WaterQualityPageTab
 }
 export type WaterQualitySystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]

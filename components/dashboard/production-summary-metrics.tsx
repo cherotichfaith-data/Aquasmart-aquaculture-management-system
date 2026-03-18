@@ -8,6 +8,7 @@ import type { DashboardPageInitialData } from "@/features/dashboard/types"
 import type { Enums } from "@/lib/types/database"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
+import type { TimePeriod } from "@/lib/time-period"
 
 const formatNumber = (value: number) => Intl.NumberFormat().format(Math.round(value))
 const formatKg = (value: number) => `${Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value)} kg`
@@ -20,7 +21,6 @@ export default function ProductionSummaryMetrics({
   batch,
   system,
   timePeriod = "2 weeks",
-  periodParam,
   dateFrom,
   dateTo,
   farmId: initialFarmId,
@@ -29,8 +29,7 @@ export default function ProductionSummaryMetrics({
   stage: "all" | Enums<"system_growth_stage">
   batch?: string
   system?: string
-  timePeriod?: Enums<"time_period">
-  periodParam?: string | null
+  timePeriod?: TimePeriod
   dateFrom?: string
   dateTo?: string
   farmId?: string | null
@@ -44,7 +43,6 @@ export default function ProductionSummaryMetrics({
     batch,
     system,
     timePeriod,
-    periodParam,
     dateFrom: dateFrom ?? null,
     dateTo: dateTo ?? null,
     initialData,
@@ -55,9 +53,9 @@ export default function ProductionSummaryMetrics({
     if (system && system !== "all") params.set("system", system)
     if (stage !== "all") params.set("stage", stage)
     if (batch && batch !== "all") params.set("batch", batch)
-    params.set("period", periodParam ?? timePeriod)
+    params.set("period", timePeriod)
     return `/production?${params.toString()}`
-  }, [batch, periodParam, stage, system, timePeriod])
+  }, [batch, stage, system, timePeriod])
 
   const metrics = useMemo(() => {
     const data = metricsQuery.data

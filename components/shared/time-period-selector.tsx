@@ -1,11 +1,10 @@
 "use client"
 
-import type { Enums } from "@/lib/types/database"
-
 import { ChevronDown } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { TIME_PERIOD_LABELS, TIME_PERIODS, type TimePeriod } from "@/lib/time-period"
 
-export type TimePeriod = Enums<"time_period">
+export type { TimePeriod } from "@/lib/time-period"
 
 interface TimePeriodSelectorProps {
   selectedPeriod: TimePeriod
@@ -18,16 +17,6 @@ export default function TimePeriodSelector({
   onPeriodChange,
   variant = "default",
 }: TimePeriodSelectorProps) {
-  const periods: TimePeriod[] = ["day", "week", "2 weeks", "month", "quarter", "6 months", "year"]
-  const periodLabels: Record<TimePeriod, string> = {
-    day: "Today",
-    week: "Week",
-    "2 weeks": "2 Weeks",
-    month: "Month",
-    quarter: "Quarter",
-    "6 months": "6 Months",
-    year: "Year",
-  }
   const triggerClass =
     variant === "compact"
       ? "inline-flex h-10 min-w-[140px] items-center justify-between gap-2 rounded-xl border border-input bg-background/90 px-3 text-sm font-medium text-foreground shadow-sm"
@@ -42,13 +31,13 @@ export default function TimePeriodSelector({
             className={triggerClass}
             aria-label="Select time period"
           >
-            <span>{periodLabels[selectedPeriod]}</span>
+            <span>{TIME_PERIOD_LABELS[selectedPeriod]}</span>
             <ChevronDown size={14} className="text-muted-foreground" />
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-56 p-3">
           <div className="space-y-2">
-            {periods.map((period) => (
+            {TIME_PERIODS.map((period) => (
               <button
                 key={period}
                 onClick={() => onPeriodChange(period)}
@@ -56,7 +45,7 @@ export default function TimePeriodSelector({
                   selectedPeriod === period ? "bg-primary text-primary-foreground" : "hover:bg-muted"
                 }`}
               >
-                {periodLabels[period]}
+                {TIME_PERIOD_LABELS[period]}
               </button>
             ))}
           </div>

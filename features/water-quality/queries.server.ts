@@ -25,6 +25,7 @@ import {
   getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
+import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
 
 export async function listWaterQualityMeasurements(
   input: ListWaterQualityMeasurementsInput,
@@ -53,15 +54,6 @@ export async function listWaterQualityMeasurements(
 }
 
 const DEFAULT_TIME_PERIOD: WaterQualityPageFilters["timePeriod"] = "month"
-const VALID_TIME_PERIODS: WaterQualityPageFilters["timePeriod"][] = [
-  "day",
-  "week",
-  "2 weeks",
-  "month",
-  "quarter",
-  "6 months",
-  "year",
-]
 const VALID_STAGES: WaterQualityPageFilters["selectedStage"][] = ["all", "nursing", "grow_out"]
 const VALID_TABS: WaterQualityPageTab[] = ["overview", "alerts", "sensors", "parameter", "environment", "depth"]
 
@@ -86,8 +78,8 @@ export function parseWaterQualityPageFilters(
         ? (selectedStageRaw as WaterQualityPageFilters["selectedStage"])
         : "all",
     timePeriod:
-      typeof timePeriodRaw === "string" && VALID_TIME_PERIODS.includes(timePeriodRaw as WaterQualityPageFilters["timePeriod"])
-        ? (timePeriodRaw as WaterQualityPageFilters["timePeriod"])
+      typeof timePeriodRaw === "string" && isTimePeriod(timePeriodRaw)
+        ? (timePeriodRaw as TimePeriod)
         : DEFAULT_TIME_PERIOD,
     activeTab: typeof activeTabRaw === "string" && isValidTab(activeTabRaw) ? activeTabRaw : "overview",
   }
