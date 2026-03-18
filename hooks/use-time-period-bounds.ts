@@ -1,11 +1,9 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import type { Enums } from "@/lib/types/database"
 import { getTimePeriodBounds } from "@/lib/api/dashboard"
 import type { TimeBounds } from "@/lib/api/dashboard"
-
-type TimePeriod = Enums<"time_period"> | string
+import type { TimePeriod } from "@/lib/time-period"
 
 export function useTimePeriodBounds(params: {
   farmId?: string | null

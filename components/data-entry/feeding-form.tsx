@@ -146,7 +146,6 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                     ? `DO ${doValue.toFixed(1)} mg/L - caution.`
                     : `DO ${doValue.toFixed(1)} mg/L`
     const targetDailyFeedKg = useMemo(() => {
-        if (matchedFeedPlan?.target_daily_feed_kg != null) return matchedFeedPlan.target_daily_feed_kg
         const biomassKg = latestInventoryRow?.biomass_last_sampling ?? null
         const targetRate = matchedFeedPlan?.target_feeding_rate_pct ?? null
         return biomassKg != null && biomassKg > 0 && targetRate != null ? (biomassKg * targetRate) / 100 : null

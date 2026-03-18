@@ -287,25 +287,21 @@ export default function SettingsPage() {
             setThresholdId(insertedThreshold?.id ?? null)
           }
 
-          const profilePayload: TablesInsert<"profiles"> = {
-            id: user.id,
-            email: settings.email,
-            owner: settings.owner,
-            farm_name: settings.farmName,
-            location: settings.location,
-            phone: settings.phone,
+          const farmUserPayload: TablesInsert<"farm_user"> = {
+            farm_id: resolvedFarmId,
+            user_id: user.id,
             role: settings.role,
           }
 
-          const { error: mainProfileError } = await supabase
-            .from("profiles")
-            .upsert(profilePayload, { onConflict: "id" })
+          const { error: farmUserError } = await supabase
+            .from("farm_user")
+            .upsert(farmUserPayload, { onConflict: "farm_id,user_id" })
 
-          if (mainProfileError) {
-            if (hasActionableSbError(mainProfileError)) {
-              logSbError("settings:save:profiles", mainProfileError)
+          if (farmUserError) {
+            if (hasActionableSbError(farmUserError)) {
+              logSbError("settings:save:farmUserUpsert", farmUserError)
             }
-            throw mainProfileError
+            throw farmUserError
           }
 
           if (typeof window !== "undefined") {

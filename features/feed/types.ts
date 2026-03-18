@@ -2,9 +2,9 @@ import type { Database } from "@/lib/types/database"
 import type { FeedingRecordWithType } from "@/lib/api/reports"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { TimeBounds } from "@/lib/api/dashboard"
+import type { TimePeriod } from "@/lib/time-period"
 
 export type StageFilter = "all" | Database["public"]["Enums"]["system_growth_stage"]
-export type TimePeriod = Database["public"]["Enums"]["time_period"]
 export type SystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
 export type FeedTypeOption = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 export type DailyInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]

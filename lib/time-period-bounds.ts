@@ -1,5 +1,5 @@
-import type { Enums } from "@/lib/types/database"
-import { parseDateToTimePeriod } from "@/lib/utils"
+import type { Database } from "@/lib/types/database"
+import { periodMap, type TimePeriod } from "@/lib/time-period"
 
 export type AnalyticsTimeScope =
   | "dashboard"
@@ -59,20 +59,20 @@ export async function fetchTimePeriodBounds(
   supabase: RpcClient,
   params: {
     farmId: string
-    timePeriod: Enums<"time_period"> | string
+    timePeriod: TimePeriod
     scope?: AnalyticsTimeScope
     signal?: AbortSignal
   },
 ): Promise<TimeBounds> {
-  const parsed = parseDateToTimePeriod(params.timePeriod)
   const scope = params.scope ?? "dashboard"
+  const scopedPayload: Database["public"]["Functions"]["api_time_period_bounds_scoped"]["Args"] = {
+    p_farm_id: params.farmId,
+    p_time_period: periodMap[params.timePeriod],
+    p_scope: scope,
+  }
 
   let scopedQuery = withAbortSignal(
-    (supabase.rpc as any)("api_time_period_bounds_scoped", {
-      p_farm_id: params.farmId,
-      p_time_period: parsed.period,
-      p_scope: scope,
-    }).maybeSingle(),
+    (supabase.rpc as any)("api_time_period_bounds_scoped", scopedPayload).maybeSingle(),
     params.signal,
   )
 
@@ -101,7 +101,7 @@ export async function fetchTimePeriodBounds(
     supabase
       .rpc("api_time_period_bounds", {
         p_farm_id: params.farmId,
-        p_time_period: parsed.period,
+        p_time_period: periodMap[params.timePeriod],
       })
       .maybeSingle(),
     params.signal,

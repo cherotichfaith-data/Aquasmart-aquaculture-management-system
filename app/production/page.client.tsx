@@ -7,7 +7,7 @@ import type { Enums } from "@/lib/types/database"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import { parseDateToTimePeriod, sortByDateAsc } from "@/lib/utils"
+import { sortByDateAsc } from "@/lib/utils"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
 import { useSharedFilters } from "@/hooks/use-shared-filters"
 import { useActiveFarm } from "@/hooks/use-active-farm"
@@ -21,6 +21,7 @@ import ProductionMetricFilter from "@/components/production/metrics-filter"
 import ProductionChart from "@/components/production/production-chart"
 import ProductionTable from "@/components/production/production-table"
 import { PRODUCTION_METRICS, parseProductionMetric } from "@/components/production/metrics"
+import { resolveTimePeriod } from "@/lib/time-period"
 
 const parseStageParam = (value: string | null): "all" | Enums<"system_growth_stage"> => {
   if (value === "nursing" || value === "grow_out") return value
@@ -43,8 +44,7 @@ function ProductionContent() {
   const paramSystem = searchParams.get("system") ?? "all"
   const paramStage = parseStageParam(searchParams.get("stage"))
   const periodParam = searchParams.get("period")
-  const parsedPeriod = parseDateToTimePeriod(periodParam)
-  const paramPeriod: TimePeriod = parsedPeriod.period
+  const paramPeriod: TimePeriod = resolveTimePeriod(periodParam)
   const paramBatch = searchParams.get("batch") ?? "all"
   const hasUrlFilters = ["system", "stage", "period", "batch"].some((key) => searchParams.get(key) != null)
 

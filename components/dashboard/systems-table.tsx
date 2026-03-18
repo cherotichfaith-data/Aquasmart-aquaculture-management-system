@@ -10,13 +10,13 @@ import { useSystemsTable } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import SystemHistorySheet from "@/components/systems/system-history-sheet"
+import type { TimePeriod } from "@/lib/time-period"
 
 interface SystemsTableProps {
   stage: Enums<"system_growth_stage"> | "all"
   batch?: string
   system?: string
-  timePeriod?: Enums<"time_period">
-  periodParam?: string | null
+  timePeriod?: TimePeriod
   dateFrom?: string
   dateTo?: string
   farmId?: string | null
@@ -87,7 +87,6 @@ export default function SystemsTable({
   batch = "all",
   system = "all",
   timePeriod = "2 weeks",
-  periodParam,
   dateFrom,
   dateTo,
   farmId: initialFarmId,
@@ -110,7 +109,6 @@ export default function SystemsTable({
     batch,
     system,
     timePeriod,
-    periodParam,
     dateFrom: dateFrom ?? null,
     dateTo: dateTo ?? null,
     includeIncomplete: true,
@@ -149,7 +147,7 @@ export default function SystemsTable({
 
   useEffect(() => {
     setPageIndex(0)
-  }, [batch, farmId, stage, system, timePeriod, periodParam, filterMode])
+  }, [batch, farmId, stage, system, timePeriod, filterMode])
 
   useEffect(() => {
     if (selectedSystemId === null) return

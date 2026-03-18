@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { useSearchParams, usePathname } from "next/navigation"
+import { useSearchParams, usePathname, useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { Download } from "lucide-react"
 import type { DashboardPageInitialData, DashboardPageInitialFilters } from "@/features/dashboard/types"
@@ -19,9 +19,8 @@ import RecommendedActions from "@/components/dashboard/recommended-actions"
 import ProductionSummaryMetrics from "@/components/dashboard/production-summary-metrics"
 import * as XLSX from "xlsx"
 import { getProductionSummary } from "@/lib/api/production"
-import { parseDateToTimePeriod } from "@/lib/utils"
 import { logSbError } from "@/utils/supabase/log"
-import { useRouter } from "next/navigation"
+import { resolveTimePeriod } from "@/lib/time-period"
 
 export default function DashboardPage({
   initialFarmId,
@@ -39,14 +38,13 @@ export default function DashboardPage({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const periodParam = searchParams.get("period")
-  const parsedPeriod = parseDateToTimePeriod(periodParam)
   const {
     selectedBatch,
     selectedSystem,
     selectedStage,
     timePeriod,
     setTimePeriod,
-  } = useSharedFilters(parsedPeriod.period, initialFilters)
+  } = useSharedFilters(resolveTimePeriod(periodParam), initialFilters)
   const boundsQuery = useTimePeriodBounds({ farmId, timePeriod, initialData: initialData?.bounds })
   const dateFrom = boundsQuery.start ?? undefined
   const dateTo = boundsQuery.end ?? undefined
@@ -56,10 +54,11 @@ export default function DashboardPage({
     if (lastPeriodParam.current === periodParam) return
     lastPeriodParam.current = periodParam
     if (!periodParam) return
-    if (parsedPeriod.period !== timePeriod) {
-      setTimePeriod(parsedPeriod.period)
+    const nextPeriod = resolveTimePeriod(periodParam)
+    if (nextPeriod !== timePeriod) {
+      setTimePeriod(nextPeriod)
     }
-  }, [periodParam, parsedPeriod.period, setTimePeriod, timePeriod])
+  }, [periodParam, setTimePeriod, timePeriod])
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
@@ -132,7 +131,6 @@ export default function DashboardPage({
             dateTo={dateTo}
             batch={selectedBatch}
             system={selectedSystem}
-            periodParam={periodParam}
             initialData={initialData?.kpiOverview}
           />
         </section>
@@ -151,7 +149,6 @@ export default function DashboardPage({
               timePeriod={timePeriod}
               dateFrom={dateFrom}
               dateTo={dateTo}
-              periodParam={periodParam}
               initialData={initialData?.productionTrend}
             />
             <WaterQualityIndex
@@ -184,7 +181,6 @@ export default function DashboardPage({
             timePeriod={timePeriod}
             dateFrom={dateFrom}
             dateTo={dateTo}
-            periodParam={periodParam}
             initialData={initialData?.systemsTable}
           />
         </section>
@@ -204,7 +200,6 @@ export default function DashboardPage({
             timePeriod={timePeriod}
             dateFrom={dateFrom}
             dateTo={dateTo}
-            periodParam={periodParam}
             initialData={initialData?.productionSummaryMetrics}
           />
         </section>

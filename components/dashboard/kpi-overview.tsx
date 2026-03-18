@@ -7,6 +7,7 @@ import { useActiveFarm } from "@/hooks/use-active-farm"
 import { useKpiOverview } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
+import type { TimePeriod } from "@/lib/time-period"
 
 const kpiProductionFilterMap: Record<string, string | null> = {
   efcr: "efcr_periodic",
@@ -19,10 +20,9 @@ const kpiProductionFilterMap: Record<string, string | null> = {
 
 interface KPIOverviewProps {
   stage: "all" | Enums<"system_growth_stage">
-  timePeriod?: Enums<"time_period">
+  timePeriod?: TimePeriod
   batch?: string
   system?: string
-  periodParam?: string | null
   dateFrom?: string
   dateTo?: string
   farmId?: string | null
@@ -34,7 +34,6 @@ export default function KPIOverview({
   timePeriod = "2 weeks",
   batch = "all",
   system = "all",
-  periodParam,
   dateFrom,
   dateTo,
   farmId: initialFarmId,
@@ -48,7 +47,6 @@ export default function KPIOverview({
     timePeriod,
     batch,
     system,
-    periodParam,
     dateFrom: dateFrom ?? null,
     dateTo: dateTo ?? null,
     initialData,
@@ -61,7 +59,7 @@ export default function KPIOverview({
     if (system !== "all") params.set("system", system)
     if (stage !== "all") params.set("stage", stage)
     if (batch !== "all") params.set("batch", batch)
-    params.set("period", periodParam ?? timePeriod)
+    params.set("period", timePeriod)
 
     const mappedFilter = kpiProductionFilterMap[metricKey]
     if (mappedFilter) params.set("filter", mappedFilter)
