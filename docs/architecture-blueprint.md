@@ -19,7 +19,7 @@ This is the cleanest fit for the current product because AquaSmart has:
 
 Observed in this codebase:
 
-- `app/*/page.tsx` routes usually hand off to `page.client.tsx`
+- `src/app/*/page.tsx` routes usually hand off to `page.client.tsx`
 - there are `104` files marked with `"use client"`
 - React Query is acting as the main page data transport layer
 - browser-side Supabase access is still the dominant read path
@@ -157,7 +157,7 @@ For AquaSmart, the research supports:
 ## Recommended Folder Structure
 
 ```text
-app/
+src/app/
   (marketing)/
   (auth)/
   (ops)/
@@ -171,7 +171,7 @@ app/
     settings/page.tsx
     water-quality/page.tsx
 
-features/
+src/features/
   auth/
     queries.server.ts
     commands.server.ts
@@ -190,16 +190,14 @@ features/
   inventory/
   reports/
 
-shared/
+src/components/
   ui/
-  hooks/
-  lib/
-  config/
 
-lib/
+src/lib/
   supabase/
   cache/
-  db/
+  api/
+  hooks/
 ```
 
 ## Recommended Feature Slice Layout
@@ -207,10 +205,7 @@ lib/
 Each business domain should look like this:
 
 ```text
-features/feeding/
-  components/
-    feeding-form.tsx
-    feeding-table.tsx
+src/features/<domain>/
   commands.server.ts
   queries.server.ts
   query-keys.ts
@@ -225,7 +220,7 @@ Rules:
 - `commands.server.ts` contains explicit write operations
 - `schemas.ts` contains zod validation and input contracts
 - `mappers.ts` converts DB rows into UI-facing shapes
-- `components/` only renders UI
+- `src/components/` only renders UI
 
 ## Data Access Model
 
@@ -242,9 +237,9 @@ Preferred pattern:
 Example pattern:
 
 ```text
-app/(ops)/feed/page.tsx
-  -> features/feed/queries.server.ts
-  -> lib/supabase/server client
+src/app/(ops)/feed/page.tsx
+  -> src/features/feed/queries.server.ts
+  -> src/lib/supabase/server client
   -> RPC or read model
   -> optional client hydration
 ```
@@ -530,11 +525,11 @@ Those add operational overhead without solving AquaSmart's current bottlenecks.
 
 ## Recommended First Execution Plan
 
-If work starts immediately, the first three concrete refactors should be:
+If work continues incrementally, the first three concrete refactors should be:
 
-1. create `features/feeding`, `features/stocking`, `features/water-quality`, and `features/systems`
-2. replace generic write calls with explicit server commands for data entry
-3. convert one reporting page and one dashboard page to server-owned reads with optional hydration
+1. keep only feature slices that are imported by real routes
+2. replace generic write calls with explicit server commands for the highest-risk data-entry paths
+3. convert page-level analytics reads to server-owned feature queries with optional hydration
 
 That will establish the pattern without forcing a full rewrite.
 

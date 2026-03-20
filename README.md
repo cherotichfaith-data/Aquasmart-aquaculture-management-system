@@ -10,6 +10,7 @@ The current product structure follows a simple aquaculture software pattern:
 - `Configure`: settings
 
 See [product-structure.md](/C:/Users/Admin/Downloads/aquasmart1/docs/product-structure.md) for the current information architecture and feature ownership.
+See [code-organization.md](/C:/Users/Admin/Downloads/aquasmart1/docs/code-organization.md) for the current code-organization rules.
 
 ## What The App Currently Covers
 
@@ -75,31 +76,27 @@ See [product-structure.md](/C:/Users/Admin/Downloads/aquasmart1/docs/product-str
 
 ## Feature Modules
 
-### `features/dashboard`
+### `src/features/dashboard`
 
 - Dashboard filters, server queries, and dashboard-specific data shaping
 - Drives KPI, systems, health, recommendation, and recent-activity presentation
 
-### `features/feed`
+### `src/features/feed`
 
 - Feed-page filters and queries
 - Combines feeding records, inventory context, and water-quality overlays for feed analysis
 
-### `features/water-quality`
+### `src/features/water-quality`
 
 - Water-quality filters, measurement reads, ratings, overlays, thresholds, latest status, and sync status
 
-### `features/farm`
+### `src/features/farm`
 
 - Farm-level server concerns and ownership context
 
-### `features/systems`, `features/stocking`, `features/feeding`
-
-- Focused domain slices for operational workflows and related data access
-
 ## UI Modules
 
-### `components/dashboard`
+### `src/components/dashboard`
 
 - KPI overview
 - Population/production overview
@@ -108,15 +105,15 @@ See [product-structure.md](/C:/Users/Admin/Downloads/aquasmart1/docs/product-str
 - Recommended actions
 - Recent activities
 
-### `components/data-entry`
+### `src/components/data-entry`
 
 - Modular data-entry forms and recent-entry UI
 
-### `components/reports`
+### `src/components/reports`
 
 - Report components used by the reports screen
 
-### `components/notifications`
+### `src/components/notifications`
 
 - Notification and background-refresh related UI providers
 
@@ -124,9 +121,9 @@ See [product-structure.md](/C:/Users/Admin/Downloads/aquasmart1/docs/product-str
 
 ### Frontend Data Path
 
-- App Router pages load server data from `features/*/queries.server.ts`
-- Shared API access lives in `lib/api/*`
-- React Query hooks live in `lib/hooks/*`
+- App Router pages load server data from `src/features/*/queries.server.ts`
+- Shared API access lives in `src/lib/api/*`
+- React Query hooks live in `src/lib/hooks/*`
 - Supabase is the backend for auth, RLS, tables, views, RPCs, and materialized views
 
 ### Current Analytics Read Model
@@ -173,14 +170,15 @@ See [product-structure.md](/C:/Users/Admin/Downloads/aquasmart1/docs/product-str
 
 ## Project Structure
 
-- `app/`: App Router routes
-- `components/`: UI modules and reusable presentation
-- `features/`: page/domain server-query modules and typed feature boundaries
-- `lib/api/`: Supabase RPC/table read helpers
-- `lib/hooks/`: React Query hooks and mutation invalidation helpers
-- `lib/types/`: generated database types
+- `src/app/`: App Router routes
+- `src/components/`: UI modules and reusable presentation
+- `src/features/`: active route-facing server-query modules and domain server boundaries
+- `src/lib/api/`: Supabase RPC/table read helpers
+- `src/lib/hooks/`: React Query hooks and mutation invalidation helpers
+- `src/lib/types/`: generated database types
+- `src/lib/supabase/`: Supabase client/server/auth helpers
 - `docs/`: architecture notes and implementation reference docs
-- `utils/`: Supabase client/server/auth helpers
+- `supabase/`: migrations and backend project config
 
 ## Running Locally
 
@@ -220,6 +218,7 @@ npx tsc --noEmit
 - Reads are intended to go through approved RPCs, views, projections, or constrained table reads
 - The backend is under active refinement toward lower-cost analytics reads and clearer domain-scoped projections
 - See [architecture-blueprint.md](/C:/Users/Admin/Downloads/aquasmart1/docs/architecture-blueprint.md) for the structural target
+- See [README.md](/C:/Users/Admin/Downloads/aquasmart1/src/features/README.md) for active feature-slice rules
 
 ## License
 
