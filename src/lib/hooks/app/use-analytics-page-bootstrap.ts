@@ -21,6 +21,14 @@ const hasSharedFilterOverrides = (value?: SharedFilterOverrides) =>
         value.timePeriod !== undefined),
   )
 
+const normalizeFarmId = (value?: string | null) => {
+  const trimmed = typeof value === "string" ? value.trim() : ""
+  if (!trimmed || trimmed === "null" || trimmed === "undefined") {
+    return null
+  }
+  return trimmed
+}
+
 export function useAnalyticsPageBootstrap(params: {
   initialFarmId?: string | null
   defaultTimePeriod?: TimePeriod
@@ -29,8 +37,9 @@ export function useAnalyticsPageBootstrap(params: {
   initialBounds?: TimeBounds
   boundsEnabled?: boolean
 } = {}) {
-  const activeFarm = useActiveFarm({ initialFarmId: params.initialFarmId })
-  const farmId = activeFarm.farmId ?? params.initialFarmId ?? null
+  const initialFarmId = normalizeFarmId(params.initialFarmId)
+  const activeFarm = useActiveFarm({ initialFarmId })
+  const farmId = activeFarm.farmId ?? initialFarmId ?? null
 
   const sharedFilterInitialValues = useMemo(() => {
     const merged: SharedFilterOverrides = {}

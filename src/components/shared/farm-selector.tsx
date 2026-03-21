@@ -31,7 +31,7 @@ export default function FarmSelector({
   showCounts = true,
   variant = "default",
 }: FarmSelectorProps) {
-  const { farmId } = useActiveFarm()
+  const { farmId, loading: farmLoading } = useActiveFarm()
   const batchId =
     selectedBatch !== "all" && Number.isFinite(Number(selectedBatch)) ? Number(selectedBatch) : undefined
 
@@ -87,18 +87,37 @@ export default function FarmSelector({
   }, [allSystems, selectedStage])
 
   useEffect(() => {
-    if (batchesQuery.isLoading || selectedBatch === "all") return
+    if (!farmId || farmLoading || selectedBatch === "all") return
+    if (batchesQuery.isLoading || batchesQuery.data?.status !== "success") return
     if (!batches.some((batch) => String(batch.id) === selectedBatch)) {
       onBatchChange("all")
     }
-  }, [batches, batchesQuery.isLoading, onBatchChange, selectedBatch])
+  }, [batches, batchesQuery.data?.status, batchesQuery.isLoading, farmId, farmLoading, onBatchChange, selectedBatch])
 
   useEffect(() => {
-    if (systemsQuery.isLoading || (selectedBatch !== "all" && batchSystemsQuery.isLoading) || selectedSystem === "all") return
+    if (!farmId || farmLoading || selectedSystem === "all") return
+    if (systemsQuery.isLoading || systemsQuery.data?.status !== "success") return
+    if (
+      selectedBatch !== "all" &&
+      (batchSystemsQuery.isLoading || batchSystemsQuery.data?.status !== "success")
+    ) {
+      return
+    }
     if (!systems.some((system) => String(system.id) === selectedSystem)) {
       onSystemChange("all")
     }
-  }, [batchSystemsQuery.isLoading, onSystemChange, selectedBatch, selectedSystem, systems, systemsQuery.isLoading])
+  }, [
+    batchSystemsQuery.data?.status,
+    batchSystemsQuery.isLoading,
+    farmId,
+    farmLoading,
+    onSystemChange,
+    selectedBatch,
+    selectedSystem,
+    systems,
+    systemsQuery.data?.status,
+    systemsQuery.isLoading,
+  ])
 
   const selectClass =
     variant === "compact"

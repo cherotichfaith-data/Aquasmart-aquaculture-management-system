@@ -73,6 +73,55 @@ export default function Header({
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
   const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
 
+  const replaceFilterParams = (next: {
+    selectedBatch?: string
+    selectedSystem?: string
+    selectedStage?: SharedFiltersState["selectedStage"]
+    timePeriod?: TimePeriod
+  }) => {
+    const params = new URLSearchParams(searchParams.toString())
+    const nextBatch = next.selectedBatch ?? selectedBatch
+    const nextSystem = next.selectedSystem ?? selectedSystem
+    const nextStage = next.selectedStage ?? selectedStage
+    const nextPeriod = next.timePeriod ?? timePeriod
+
+    if (nextSystem !== "all") params.set("system", nextSystem)
+    else params.delete("system")
+
+    if (nextBatch !== "all") params.set("batch", nextBatch)
+    else params.delete("batch")
+
+    if (nextStage !== "all") params.set("stage", nextStage)
+    else params.delete("stage")
+
+    params.set("period", nextPeriod)
+
+    const nextQuery = params.toString()
+    const currentQuery = searchParams.toString()
+    if (nextQuery === currentQuery) return
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+  }
+
+  const handleBatchChange = (value: string) => {
+    setSelectedBatch(value)
+    replaceFilterParams({ selectedBatch: value })
+  }
+
+  const handleSystemChange = (value: string) => {
+    setSelectedSystem(value)
+    replaceFilterParams({ selectedSystem: value })
+  }
+
+  const handleStageChange = (value: SharedFiltersState["selectedStage"]) => {
+    setSelectedStage(value)
+    replaceFilterParams({ selectedStage: value })
+  }
+
+  const handleTimePeriodChange = (value: TimePeriod) => {
+    setTimePeriod(value)
+    replaceFilterParams({ timePeriod: value })
+  }
+
   const handleSignOut = async () => {
     if (signingOut) return
     setSigningOut(true)
@@ -221,16 +270,16 @@ export default function Header({
           <div className="flex flex-wrap items-center gap-2">
             <TimePeriodSelector
               selectedPeriod={timePeriod}
-              onPeriodChange={setTimePeriod}
+              onPeriodChange={handleTimePeriodChange}
               variant="compact"
             />
             <FarmSelector
               selectedBatch={selectedBatch}
               selectedSystem={selectedSystem}
               selectedStage={selectedStage}
-              onBatchChange={setSelectedBatch}
-              onSystemChange={setSelectedSystem}
-              onStageChange={setSelectedStage}
+              onBatchChange={handleBatchChange}
+              onSystemChange={handleSystemChange}
+              onStageChange={handleStageChange}
               showStage
               showCounts={false}
               variant="compact"
