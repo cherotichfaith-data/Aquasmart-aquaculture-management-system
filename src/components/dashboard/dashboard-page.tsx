@@ -1,11 +1,9 @@
 "use client"
 
-import { useEffect } from "react"
-import { useSearchParams, usePathname, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import type { DashboardPageInitialData, DashboardPageInitialFilters } from "@/features/dashboard/types"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { useSharedFilters } from "@/lib/hooks/app/use-shared-filters"
 import { useTimePeriodBounds } from "@/lib/hooks/app/use-time-period-bounds"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import KPIOverview from "@/components/dashboard/kpi-overview"
@@ -20,9 +18,7 @@ import { resolveTimePeriod } from "@/lib/time-period"
 import { DashboardExportButton } from "./dashboard-export-button"
 import { SectionHeading } from "@/components/shared/section-heading"
 import {
-  buildDashboardSearchParams,
   downloadDashboardSummary,
-  hasDashboardUrlFilters,
   parseDashboardStageParam,
 } from "./dashboard-page-utils"
 
@@ -37,8 +33,6 @@ export default function DashboardPage({
 }) {
   const { farmId: activeFarmId } = useActiveFarm({ initialFarmId })
   const farmId = activeFarmId ?? initialFarmId ?? null
-  const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
   const periodParam = searchParams.get("period")
   const systemParam = searchParams.get("system") ?? "all"
@@ -46,17 +40,10 @@ export default function DashboardPage({
   const stageParam = searchParams.get("stage")
   const paramStage = parseDashboardStageParam(stageParam)
   const paramPeriod = resolveTimePeriod(periodParam)
-  const hasUrlFilters = hasDashboardUrlFilters(searchParams)
-  const {
-    selectedBatch,
-    setSelectedBatch,
-    selectedSystem,
-    setSelectedSystem,
-    selectedStage,
-    setSelectedStage,
-    timePeriod,
-    setTimePeriod,
-  } = useSharedFilters(paramPeriod, initialFilters)
+  const selectedBatch = batchParam
+  const selectedSystem = systemParam
+  const selectedStage = paramStage
+  const timePeriod = paramPeriod
   const boundsQuery = useTimePeriodBounds({ farmId, timePeriod, initialData: initialData?.bounds })
   const dateFrom = boundsQuery.start ?? undefined
   const dateTo = boundsQuery.end ?? undefined
@@ -68,42 +55,6 @@ export default function DashboardPage({
     initialSystemsData: initialData?.systemOptions,
     initialBatchSystemsData: initialData?.batchSystems,
   })
-
-  useEffect(() => {
-    if (!hasUrlFilters) return
-    if (selectedSystem !== systemParam) setSelectedSystem(systemParam)
-    if (selectedStage !== paramStage) setSelectedStage(paramStage)
-    if (timePeriod !== paramPeriod) setTimePeriod(paramPeriod)
-    if (selectedBatch !== batchParam) setSelectedBatch(batchParam)
-  }, [
-    batchParam,
-    hasUrlFilters,
-    paramPeriod,
-    paramStage,
-    selectedBatch,
-    selectedStage,
-    selectedSystem,
-    setSelectedBatch,
-    setSelectedStage,
-    setSelectedSystem,
-    setTimePeriod,
-    systemParam,
-    timePeriod,
-  ])
-
-  useEffect(() => {
-    const params = buildDashboardSearchParams({
-      searchParams,
-      selectedSystem,
-      selectedStage,
-      timePeriod,
-      selectedBatch,
-    })
-    const nextQuery = params.toString()
-    const currentQuery = searchParams.toString()
-    if (nextQuery === currentQuery) return
-    router.replace(`${pathname}?${params.toString()}`)
-  }, [pathname, router, searchParams, selectedBatch, selectedStage, selectedSystem, timePeriod])
 
   const handleDownload = async () => {
     try {

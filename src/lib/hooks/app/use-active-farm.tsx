@@ -20,9 +20,18 @@ type ActiveFarm = {
 }
 
 const getStorageKey = (userId: string) => `aquasmart:${userId}:activeFarmId`
+
+const normalizeFarmId = (value?: string | null) => {
+  const trimmed = typeof value === "string" ? value.trim() : ""
+  if (!trimmed || trimmed === "null" || trimmed === "undefined") {
+    return null
+  }
+  return trimmed
+}
+
 export function useActiveFarm(params?: { initialFarmId?: string | null }) {
   const { user, session, isLoading } = useAuth()
-  const [activeFarmId, setActiveFarmId] = useState<string | null>(params?.initialFarmId ?? null)
+  const [activeFarmId, setActiveFarmId] = useState<string | null>(normalizeFarmId(params?.initialFarmId))
 
   const farmsQuery = useFarmOptions({ enabled: Boolean(session) })
 
@@ -41,12 +50,12 @@ export function useActiveFarm(params?: { initialFarmId?: string | null }) {
     let urlFarmId: string | null = null
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search)
-      urlFarmId = params.get("farmId")
+      urlFarmId = normalizeFarmId(params.get("farmId"))
     }
 
     let storedFarmId: string | null = null
     if (user?.id && typeof window !== "undefined") {
-      storedFarmId = window.localStorage.getItem(getStorageKey(user.id))
+      storedFarmId = normalizeFarmId(window.localStorage.getItem(getStorageKey(user.id)))
     }
 
     const farmIds = farms.map((row) => row.id)
@@ -66,9 +75,7 @@ export function useActiveFarm(params?: { initialFarmId?: string | null }) {
   useEffect(() => {
     const handler = (event: Event) => {
       const maybeCustom = event as CustomEvent<{ farmId?: string }>
-      if (maybeCustom?.detail?.farmId) {
-        setActiveFarmId(maybeCustom.detail.farmId)
-      }
+      setActiveFarmId(normalizeFarmId(maybeCustom?.detail?.farmId) ?? null)
     }
 
     if (typeof window !== "undefined") {

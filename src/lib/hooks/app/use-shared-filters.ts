@@ -18,6 +18,18 @@ const STORAGE_KEY = "aquasmart:shared-filters:v1"
 const EVENT_NAME = "aquasmart:shared-filters"
 const STAGES: StageFilter[] = ["all", "nursing", "grow_out"]
 
+const hasMeaningfulInitialValues = (
+  initialValues: Partial<SharedFiltersState> | undefined,
+  defaultTimePeriod: TimePeriod,
+) =>
+  Boolean(
+    initialValues &&
+      ((initialValues.selectedBatch !== undefined && initialValues.selectedBatch !== "all") ||
+        (initialValues.selectedSystem !== undefined && initialValues.selectedSystem !== "all") ||
+        (initialValues.selectedStage !== undefined && initialValues.selectedStage !== "all") ||
+        (initialValues.timePeriod !== undefined && initialValues.timePeriod !== defaultTimePeriod)),
+  )
+
 const isStage = (value: unknown): value is StageFilter =>
   typeof value === "string" && STAGES.includes(value as StageFilter)
 
@@ -25,7 +37,7 @@ export function useSharedFilters(
   defaultTimePeriod: TimePeriod = DEFAULT_TIME_PERIOD,
   initialValues?: Partial<SharedFiltersState>,
 ) {
-  const hasInitialValues = Boolean(initialValues)
+  const hasInitialValues = hasMeaningfulInitialValues(initialValues, defaultTimePeriod)
   const initialBatch = initialValues?.selectedBatch ?? "all"
   const initialSystem = initialValues?.selectedSystem ?? "all"
   const initialStage = initialValues?.selectedStage ?? "all"

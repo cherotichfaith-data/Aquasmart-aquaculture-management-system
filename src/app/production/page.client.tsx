@@ -1,11 +1,9 @@
 "use client"
 
-import { Suspense, useEffect, useMemo } from "react"
-import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import { Suspense, useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import type { Enums } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
-import { useSharedFilters } from "@/lib/hooks/app/use-shared-filters"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
@@ -23,8 +21,6 @@ import {
 
 function ProductionContent() {
   const searchParams = useSearchParams()
-  const router = useRouter()
-  const pathname = usePathname()
   const { farmId } = useActiveFarm()
 
   const metricParam = searchParams.get("metric")
@@ -34,61 +30,10 @@ function ProductionContent() {
   const periodParam = searchParams.get("period")
   const paramPeriod: TimePeriod = resolveProductionPeriodParam(periodParam)
   const paramBatch = searchParams.get("batch") ?? "all"
-  const hasUrlFilters = ["system", "stage", "period", "batch"].some((key) => searchParams.get(key) != null)
-
-  const {
-    selectedSystem,
-    setSelectedSystem,
-    selectedStage,
-    setSelectedStage,
-    timePeriod,
-    setTimePeriod,
-    selectedBatch,
-    setSelectedBatch,
-  } = useSharedFilters(paramPeriod)
-
-  useEffect(() => {
-    if (!hasUrlFilters) return
-    setSelectedSystem(paramSystem)
-    setSelectedStage(paramStage)
-    setTimePeriod(paramPeriod)
-    setSelectedBatch(paramBatch)
-  }, [
-    hasUrlFilters,
-    paramBatch,
-    paramPeriod,
-    paramStage,
-    paramSystem,
-    setSelectedBatch,
-    setSelectedStage,
-    setSelectedSystem,
-    setTimePeriod,
-  ])
-
-  useEffect(() => {
-    const params = new URLSearchParams()
-    if (selectedSystem !== "all") params.set("system", selectedSystem)
-    if (selectedStage !== "all") params.set("stage", selectedStage)
-    params.set("period", timePeriod)
-    if (selectedBatch !== "all") params.set("batch", selectedBatch)
-    if (filterParam) params.set("filter", filterParam)
-    if (metricParam) params.set("metric", metricParam)
-
-    const nextQuery = params.toString()
-    const currentQuery = searchParams.toString()
-    if (nextQuery === currentQuery) return
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
-  }, [
-    pathname,
-    selectedSystem,
-    selectedStage,
-    timePeriod,
-    selectedBatch,
-    router,
-    searchParams,
-    metricParam,
-    filterParam,
-  ])
+  const selectedSystem = paramSystem
+  const selectedStage = paramStage
+  const timePeriod = paramPeriod
+  const selectedBatch = paramBatch
 
   const metricFilter = parseProductionMetric(filterParam)
   const metricMeta = PRODUCTION_METRICS[metricFilter]
