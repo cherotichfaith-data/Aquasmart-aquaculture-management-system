@@ -17,9 +17,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Database } from "@/lib/types/database"
+import type { SystemOption } from "@/lib/system-options"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { DependencyBlocker } from "./dependency-blocker"
+import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
     origin_system_id: z.string().min(1, "Origin system is required"),
@@ -29,7 +31,6 @@ const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(1, "Count must be positive"),
     total_weight_kg: z.coerce.number().min(0, "Weight must be positive"),
-    average_body_weight_g: z.coerce.number().min(0).optional(),
 })
 
 const TRANSFER_TYPE_OPTIONS = [
@@ -41,7 +42,7 @@ const TRANSFER_TYPE_OPTIONS = [
 ] as const
 
 interface TransferFormProps {
-    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    systems: SystemOption[]
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     defaultSystemId?: number | null
     defaultBatchId?: number | null
@@ -56,12 +57,19 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             number_of_fish: 0,
+            total_weight_kg: 0,
             origin_system_id: defaultSystemId ? String(defaultSystemId) : "",
             target_system_id: "",
             transfer_type: "transfer",
             batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
+    const originSystemId = form.watch("origin_system_id")
+    const targetSystemId = form.watch("target_system_id")
+    const selectedBatchId = form.watch("batch_id")
+    const numberOfFish = form.watch("number_of_fish")
+    const totalWeightKg = form.watch("total_weight_kg")
+    const computedAbw = numberOfFish > 0 && totalWeightKg > 0 ? (totalWeightKg * 1000) / numberOfFish : null
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
@@ -75,7 +83,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
             const targetId = Number(values.target_system_id)
             const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
 
-            const payload = {
+            await mutation.mutateAsync({
                 origin_system_id: originId,
                 target_system_id: targetId,
                 transfer_type: values.transfer_type,
@@ -83,15 +91,12 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
                 date: values.date,
                 number_of_fish_transfer: values.number_of_fish,
                 total_weight_transfer: values.total_weight_kg,
-                abw: values.average_body_weight_g ?? null,
-            }
-
-            await mutation.mutateAsync(payload)
+                abw: values.number_of_fish > 0 ? (values.total_weight_kg * 1000) / values.number_of_fish : null,
+            })
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
                 total_weight_kg: 0,
-                average_body_weight_g: 0,
                 origin_system_id: values.origin_system_id,
                 target_system_id: values.transfer_type === "count_check" ? values.origin_system_id : "",
                 transfer_type: values.transfer_type,
@@ -181,6 +186,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
                             )}
                         />
                     </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
@@ -207,6 +213,12 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
                             )}
                         />
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SelectedSystemInfo systems={systems} systemId={originSystemId} title="Origin System" />
+                        <SelectedSystemInfo systems={systems} systemId={targetSystemId} title="Destination System" />
+                    </div>
+
                     <FormField
                         control={form.control}
                         name="batch_id"
@@ -233,6 +245,8 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
                         )}
                     />
 
+                    <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
+
                     <FormField
                         control={form.control}
                         name="date"
@@ -247,7 +261,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
                         )}
                     />
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="number_of_fish"
@@ -274,20 +288,12 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
                                 </FormItem>
                             )}
                         />
-                        <FormField
-                            control={form.control}
-                            name="average_body_weight_g"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>ABW (g) (Optional)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
                     </div>
+
+                    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                        Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter count and total weight"}
+                    </div>
+
                     <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
                         {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
@@ -297,4 +303,3 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
         </div>
     )
 }
-

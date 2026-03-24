@@ -83,7 +83,7 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
     }
 
     return (
-        <div className="max-w-2xl">
+        <div className="max-w-5xl">
             <div className="mb-6">
                 <h2 className="text-xl font-semibold tracking-tight">Incoming Feed</h2>
                 <p className="text-sm text-muted-foreground">Log new feed deliveries.</p>
@@ -111,25 +111,38 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Feed Type</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select feed" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {feeds.map((f) => (
-                                                <SelectItem key={f.id} value={String(f.id)}>
-                                                    {f.label ?? f.feed_line ?? `Feed ${f.id}`}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger className="w-full sm:flex-1">
+                                                    <SelectValue placeholder="Select feed" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {feeds.map((f) => (
+                                                    <SelectItem key={f.id} value={String(f.id)}>
+                                                        {f.label ?? f.feed_line ?? `Feed ${f.id}`}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <Button
+                                            type="button"
+                                            variant={showQuickCreate ? "secondary" : "outline"}
+                                            size="sm"
+                                            className="shrink-0"
+                                            onClick={() => setShowQuickCreate((current) => !current)}
+                                        >
+                                            {showQuickCreate ? "Hide new feed type" : "Add new feed type"}
+                                        </Button>
+                                    </div>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
                     </div>
+
+                    {showQuickCreate ? <FeedTypeQuickCreate onCreated={() => setShowQuickCreate(false)} /> : null}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField

@@ -16,9 +16,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Database } from "@/lib/types/database"
+import type { SystemOption } from "@/lib/system-options"
 import { useToast } from "@/lib/hooks/app/use-toast"
 import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
 import { logSbError } from "@/lib/supabase/log"
+import { SelectedSystemInfo } from "./selection-info"
 
 const optionalNumber = z.preprocess(
     (value) => (value === "" || value == null ? undefined : Number(value)),
@@ -44,7 +46,7 @@ type MeasurementParameter =
     Database["public"]["Tables"]["water_quality_measurement"]["Row"]["parameter_name"]
 
 interface WaterQualityFormProps {
-    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    systems: SystemOption[]
     defaultSystemId?: number | null
 }
 
@@ -69,6 +71,7 @@ export function WaterQualityForm({ systems, defaultSystemId = null }: WaterQuali
             secchi_disk: undefined,
         },
     })
+    const selectedSystemId = form.watch("system_id")
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
@@ -214,6 +217,8 @@ export function WaterQualityForm({ systems, defaultSystemId = null }: WaterQuali
                             )}
                         />
                     </div>
+
+                    <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <FormField

@@ -176,7 +176,7 @@ export function MortalityRecordsSection({
       <CardContent>
         {showMortalityRecords ? (
           <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead><tr className="border-b border-border bg-muted/60"><th className="px-4 py-2 text-left font-semibold text-foreground">Date</th><th className="px-4 py-2 text-left font-semibold text-foreground">System</th><th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th><th className="px-4 py-2 text-left font-semibold text-foreground">Fish Dead</th><th className="px-4 py-2 text-left font-semibold text-foreground">Cause</th><th className="px-4 py-2 text-left font-semibold text-foreground">Notes</th></tr></thead>
               <tbody>
                 {tableLoading ? (

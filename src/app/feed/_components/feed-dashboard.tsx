@@ -86,12 +86,12 @@ export function FeedDashboard({
 }) {
   return (
     <>
-      <div className="flex items-center justify-between rounded-lg border border-border/80 bg-card p-4 shadow-sm">
-        <h1 className="text-3xl font-bold">Feed</h1>
+      <div className="flex flex-col gap-3 rounded-lg border border-border/80 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold sm:text-3xl">Feed</h1>
         <select
           value={selectedFeedType}
           onChange={(event) => onSelectedFeedTypeChange(event.target.value)}
-          className="h-10 min-w-[220px] rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground"
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground sm:w-auto sm:min-w-[220px]"
           aria-label="Filter by feed type"
         >
           <option value="all">All Feed Types</option>

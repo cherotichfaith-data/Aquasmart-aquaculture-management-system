@@ -279,7 +279,7 @@ export function PerformanceRecordsSection({
       <CardContent>
         {showPerformanceRecords ? (
           <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">
                   <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>

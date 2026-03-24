@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Database } from "@/lib/types/database"
+import type { SystemOption } from "@/lib/system-options"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useRecordFeeding } from "@/lib/hooks/use-feeding"
 import { useFeedPlans, useFeedingRecords } from "@/lib/hooks/use-reports"
@@ -24,9 +25,21 @@ import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { logSbError } from "@/lib/supabase/log"
 import { selectApplicableFeedPlan } from "@/app/feed/_lib/feed-analytics"
+import { cn } from "@/lib/utils"
 import { DependencyBlocker } from "./dependency-blocker"
 import { FeedTypeQuickCreate } from "./feed-type-quick-create"
-import { cn } from "@/lib/utils"
+import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+
+type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
+    feeding_response: "very_good" | "good" | "fair" | "bad"
+}
+
+const FEEDING_RESPONSE_OPTIONS = [
+    { value: "very_good", label: "Excellent" },
+    { value: "good", label: "Good" },
+    { value: "fair", label: "Fair" },
+    { value: "bad", label: "Poor" },
+] as const
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -34,11 +47,11 @@ const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
     feed_id: z.string().min(1, "Feed type is required"),
     amount_kg: z.coerce.number().min(0, "Amount must be positive"),
-    feeding_response: z.enum(["very_good", "good", "bad"]),
+    feeding_response: z.enum(["very_good", "good", "fair", "bad"]),
 })
 
 interface FeedingFormProps {
-    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    systems: SystemOption[]
     feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     defaultSystemId?: number | null
@@ -69,7 +82,6 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
         typeof selectedBatchId === "number" && Number.isFinite(selectedBatchId) ? selectedBatchId : undefined
     const selectedDate = form.watch("date")
     const selectedFeedId = Number(form.watch("feed_id"))
-    const selectedResponse = form.watch("feeding_response")
     const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
     const selectedFeed = feeds.find((feed) => feed.id === selectedFeedId) ?? null
 
@@ -167,14 +179,16 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
             const percentOfPlan =
                 targetDailyFeedKg != null && targetDailyFeedKg > 0 ? (dailyTotal / targetDailyFeedKg) * 100 : null
 
-            await mutation.mutateAsync({
+            const payload = {
                 system_id: systemId,
                 batch_id: Number.isFinite(batchId as number) ? batchId : null,
                 date: values.date,
                 feed_type_id: feedTypeId,
                 feeding_amount: values.amount_kg,
                 feeding_response: values.feeding_response,
-            })
+            } as unknown as FeedingInsertOverride
+
+            await mutation.mutateAsync(payload)
             setSubmissionSummary(
                 `Saved. Daily total for ${selectedSystem?.label ?? `System ${systemId}`}: ${dailyTotal.toFixed(2)} kg.${
                     feedRatePct != null ? ` Feed rate: ${feedRatePct.toFixed(2)}% of biomass.` : ""
@@ -213,10 +227,10 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
     }
 
     return (
-        <div className="max-w-2xl">
+        <div className="max-w-5xl">
             <div className="mb-6">
                 <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
-                <p className="text-sm text-muted-foreground">Log daily feeding for a system. Session, weather, and notes will land with the normalized feed-event schema.</p>
+                <p className="text-sm text-muted-foreground">Record daily feed usage for a system.</p>
             </div>
             <div className="mb-4 flex flex-wrap items-center gap-3">
                 <div className={cn("rounded-md border px-3 py-2 text-sm font-medium", doBadgeClass)}>
@@ -311,30 +325,48 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                         />
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
+                        <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchValue} />
+                    </div>
+
                     <FormField
                         control={form.control}
                         name="feed_id"
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Feed Type</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select feed" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {feeds.map((f) => (
-                                            <SelectItem key={f.id} value={String(f.id)}>
-                                                {f.label ?? f.feed_line ?? `Feed ${f.id}`}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger className="w-full sm:flex-1">
+                                                <SelectValue placeholder="Select feed" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {feeds.map((f) => (
+                                                <SelectItem key={f.id} value={String(f.id)}>
+                                                    {f.label ?? f.feed_line ?? `Feed ${f.id}`}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button
+                                        type="button"
+                                        variant={showQuickCreate ? "secondary" : "outline"}
+                                        size="sm"
+                                        className="shrink-0"
+                                        onClick={() => setShowQuickCreate((current) => !current)}
+                                    >
+                                        {showQuickCreate ? "Hide new feed type" : "Add new feed type"}
+                                    </Button>
+                                </div>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
+
+                    {showQuickCreate ? <FeedTypeQuickCreate onCreated={() => setShowQuickCreate(false)} /> : null}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
@@ -356,29 +388,20 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Response</FormLabel>
-                                    <FormControl>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[
-                                                { value: "very_good", label: "Excellent" },
-                                                { value: "good", label: "Good" },
-                                                { value: "bad", label: "Poor" },
-                                            ].map((option) => (
-                                                <button
-                                                    key={option.value}
-                                                    type="button"
-                                                    onClick={() => field.onChange(option.value)}
-                                                    className={cn(
-                                                        "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-                                                        selectedResponse === option.value
-                                                            ? "border-primary bg-primary text-primary-foreground"
-                                                            : "border-border bg-background hover:bg-muted/50",
-                                                    )}
-                                                >
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select response" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {FEEDING_RESPONSE_OPTIONS.map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>
                                                     {option.label}
-                                                </button>
+                                                </SelectItem>
                                             ))}
-                                        </div>
-                                    </FormControl>
+                                        </SelectContent>
+                                    </Select>
                                     <FormMessage />
                                 </FormItem>
                             )}

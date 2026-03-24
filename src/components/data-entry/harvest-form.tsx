@@ -16,8 +16,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Database } from "@/lib/types/database"
+import type { SystemOption } from "@/lib/system-options"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
 import { logSbError } from "@/lib/supabase/log"
+import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -29,7 +31,7 @@ const formSchema = z.object({
 })
 
 interface HarvestFormProps {
-    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    systems: SystemOption[]
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     defaultSystemId?: number | null
     defaultBatchId?: number | null
@@ -49,6 +51,11 @@ export function HarvestForm({ systems, batches, defaultSystemId = null, defaultB
             batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
+    const selectedSystemId = form.watch("system_id")
+    const selectedBatchId = form.watch("batch_id")
+    const numberOfFish = form.watch("number_of_fish")
+    const amountKg = form.watch("amount_kg")
+    const computedAbw = numberOfFish > 0 && amountKg > 0 ? (amountKg * 1000) / numberOfFish : null
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
@@ -150,6 +157,11 @@ export function HarvestForm({ systems, batches, defaultSystemId = null, defaultB
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
+                        <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="number_of_fish"
@@ -176,6 +188,9 @@ export function HarvestForm({ systems, batches, defaultSystemId = null, defaultB
                                 </FormItem>
                             )}
                         />
+                    </div>
+                    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                        Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter count and weight"}
                     </div>
                     <FormField
                         control={form.control}

@@ -180,11 +180,11 @@ export default function SystemsTable({
   }
 
   return (
-    <div className="rounded-lg border border-border/90 bg-card p-6 shadow-sm">
+    <div className="rounded-lg border border-border/90 bg-card p-4 shadow-sm sm:p-6">
       <div className="mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold text-foreground">System Status</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <DataUpdatedAt updatedAt={systemsQuery.dataUpdatedAt} />
             <DataFetchingBadge isFetching={systemsQuery.isFetching} isLoading={systemsQuery.isLoading} />
           </div>
@@ -195,7 +195,7 @@ export default function SystemsTable({
             <div className="legend-pill">{filterMode === "all" ? "Full queue" : filterMode === "top5" ? "Best eFCR" : filterMode === "bottom5" ? "Worst eFCR" : "Missing data"}</div>
           </div>
           <select
-            className="h-9 rounded-xl border border-input bg-background px-3 text-xs font-semibold"
+            className="h-9 w-full rounded-xl border border-input bg-background px-3 text-xs font-semibold sm:w-auto"
             value={filterMode}
             onChange={(event) => setFilterMode(event.target.value as SystemFilterMode)}
             aria-label="System performance filter"
@@ -208,7 +208,7 @@ export default function SystemsTable({
         </div>
       </div>
       <div className="dense-table-shell max-h-[60vh]">
-        <Table>
+        <Table className="min-w-[760px]">
           <TableHeader className="bg-muted/60">
             <TableRow>
               <TableHead className="sticky top-0 bg-muted/70 text-[11px] uppercase tracking-wide text-foreground/80">

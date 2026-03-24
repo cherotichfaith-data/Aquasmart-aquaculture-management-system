@@ -124,7 +124,7 @@ export function GrowthRecordsSection({
       <CardContent>
         {showGrowthRecords ? (
           <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead><tr className="border-b border-border bg-muted/60"><th className="px-4 py-2 text-left font-semibold text-foreground">System</th><th className="px-4 py-2 text-center font-semibold text-foreground">ABW</th><th className="px-4 py-2 text-center font-semibold text-foreground">Biomass</th><th className="px-4 py-2 text-center font-semibold text-foreground">Fish Count</th><th className="px-4 py-2 text-center font-semibold text-foreground">Daily Gain</th></tr></thead>
               <tbody>
                 {loading ? (

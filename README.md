@@ -199,6 +199,7 @@ Environment:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ```
 
 Run:
@@ -206,6 +207,15 @@ Run:
 ```bash
 npm run dev
 ```
+
+Database types:
+
+```bash
+npm run db:types
+```
+
+- This repo intentionally does not install the Supabase CLI locally.
+- Generate `src/lib/types/database.ts` in a trusted external environment such as CI, WSL, or another machine.
 
 Type-check:
 

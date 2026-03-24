@@ -67,7 +67,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Header
           onMenuClick={() => setSidebarOpen(!sidebarOpen)}
         />
-        <main className="flex-1 overflow-x-hidden px-4 pb-10 pt-5 md:px-8 lg:px-10 animate-in fade-in-0 duration-300"><div className="mx-auto w-full max-w-[1720px]">{children}</div></main>
+        <main className="flex-1 overflow-x-hidden px-3 pb-8 pt-4 sm:px-4 md:px-6 md:pb-10 md:pt-5 lg:px-10 animate-in fade-in-0 duration-300">
+          <div className="mx-auto w-full max-w-[1720px]">{children}</div>
+        </main>
       </div>
       <ShortcutsHelp />
       <Dialog open={commandOpen} onOpenChange={setCommandOpen}>

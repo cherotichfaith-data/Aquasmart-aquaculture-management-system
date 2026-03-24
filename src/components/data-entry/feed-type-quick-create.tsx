@@ -123,7 +123,7 @@ export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
         <p className="text-sm text-muted-foreground">Protein is required. Fat is strongly recommended so feed analysis and cost reporting are not left incomplete later.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="feed-line">Feed Line</Label>
           <Input id="feed-line" value={feedLine} onChange={(event) => setFeedLine(event.target.value)} placeholder="e.g. Grower 2mm" />
@@ -169,24 +169,30 @@ export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
           <p className="text-xs text-muted-foreground">Leave blank only if the supplier spec sheet is unavailable.</p>
         </div>
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <Label>Supplier</Label>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setShowSupplierForm((current) => !current)}>
+          <Label>Supplier</Label>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start">
+            <Select value={supplierId} onValueChange={setSupplierId} disabled={suppliersQuery.isLoading || suppliers.length === 0}>
+              <SelectTrigger className="w-full sm:flex-1">
+                <SelectValue placeholder={suppliersQuery.isLoading ? "Loading suppliers..." : "Select supplier"} />
+              </SelectTrigger>
+              <SelectContent>
+                {suppliers.map((supplier) => (
+                  <SelectItem key={supplier.id} value={String(supplier.id)}>
+                    {supplier.company_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant={showSupplierForm ? "secondary" : "outline"}
+              size="sm"
+              className="shrink-0 whitespace-nowrap lg:min-w-[11rem]"
+              onClick={() => setShowSupplierForm((current) => !current)}
+            >
               {showSupplierForm || suppliers.length === 0 ? "Hide supplier form" : "New supplier"}
             </Button>
           </div>
-          <Select value={supplierId} onValueChange={setSupplierId} disabled={suppliersQuery.isLoading || suppliers.length === 0}>
-            <SelectTrigger>
-              <SelectValue placeholder={suppliersQuery.isLoading ? "Loading suppliers..." : "Select supplier"} />
-            </SelectTrigger>
-            <SelectContent>
-              {suppliers.map((supplier) => (
-                <SelectItem key={supplier.id} value={String(supplier.id)}>
-                  {supplier.company_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 

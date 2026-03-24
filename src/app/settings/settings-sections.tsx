@@ -13,11 +13,11 @@ export function FarmInformationSection({
   handleChange: ChangeFn
 }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-6">
-      <h2 className="text-xl font-semibold mb-4">Farm Information</h2>
+    <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
+      <h2 className="mb-4 text-lg font-semibold leading-tight sm:text-xl">Farm Information</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-2">Farm Name</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">Farm Name</label>
           <input
             type="text"
             value={settings.farmName}
@@ -26,7 +26,7 @@ export function FarmInformationSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">Location</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">Location</label>
           <input
             type="text"
             value={settings.location}
@@ -35,7 +35,7 @@ export function FarmInformationSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">Owner Name</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">Owner Name</label>
           <input
             type="text"
             value={settings.owner}
@@ -44,7 +44,7 @@ export function FarmInformationSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">Email</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">Email</label>
           <input
             type="email"
             value={settings.email}
@@ -53,7 +53,7 @@ export function FarmInformationSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">Phone</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">Phone</label>
           <input
             type="tel"
             value={settings.phone}
@@ -62,7 +62,7 @@ export function FarmInformationSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">Role</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">Role</label>
           <select
             value={settings.role}
             onChange={(e) => handleChange("role", e.target.value)}
@@ -88,15 +88,15 @@ export function AlertThresholdsSection({
   handleChange: ChangeFn
 }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-6">
-      <div className="flex items-center gap-2 mb-4">
+    <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
+      <div className="mb-4 flex items-center gap-2">
         <AlertCircle size={20} className="text-primary" />
-        <h2 className="text-xl font-semibold">Alert Thresholds</h2>
+        <h2 className="text-lg font-semibold leading-tight sm:text-xl">Alert Thresholds</h2>
       </div>
-      <p className="text-sm text-muted-foreground mb-4">Configure when alerts should trigger</p>
+      <p className="mb-4 text-sm leading-6 text-muted-foreground">Configure when alerts should trigger</p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-2">Low DO Alert (mg/L)</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">Low DO Alert (mg/L)</label>
           <input
             type="number"
             step="0.1"
@@ -106,7 +106,7 @@ export function AlertThresholdsSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">High Ammonia Alert (mg/L)</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">High Ammonia Alert (mg/L)</label>
           <input
             type="number"
             step="0.01"
@@ -116,7 +116,7 @@ export function AlertThresholdsSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">High Mortality Alert (%/day)</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">High Mortality Alert (%/day)</label>
           <input
             type="number"
             step="0.1"
@@ -126,7 +126,7 @@ export function AlertThresholdsSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">Low Feeding Rate Alert (kg/t)</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">Low Feeding Rate Alert (kg/t)</label>
           <input
             type="number"
             step="0.1"
@@ -136,7 +136,7 @@ export function AlertThresholdsSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">High Feeding Rate Alert (kg/t)</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">High Feeding Rate Alert (kg/t)</label>
           <input
             type="number"
             step="0.1"
@@ -152,17 +152,19 @@ export function AlertThresholdsSection({
 
 export function SaveSettingsButton({
   isSaving,
+  disabled = false,
   onSave,
 }: {
   isSaving: boolean
+  disabled?: boolean
   onSave: () => void
 }) {
   return (
     <div className="flex justify-end">
       <button
         onClick={onSave}
-        disabled={isSaving}
-        className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+        disabled={isSaving || disabled}
+        className="flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
       >
         <Save size={18} />
         {isSaving ? "Saving..." : "Save Settings"}

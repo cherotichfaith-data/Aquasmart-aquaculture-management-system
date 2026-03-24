@@ -121,11 +121,11 @@ export default function FarmSelector({
 
   const selectClass =
     variant === "compact"
-      ? "h-10 min-w-[150px] rounded-xl border border-input bg-background/90 px-3 text-sm font-medium text-foreground shadow-sm"
+      ? "h-10 w-full rounded-xl border border-input bg-background/90 px-3 text-sm font-medium text-foreground shadow-sm sm:w-auto sm:min-w-[150px]"
       : "px-3 py-2 rounded-md border border-input bg-background text-sm"
 
   return (
-    <div className={variant === "compact" ? "flex flex-wrap items-center gap-2" : "flex flex-col gap-2 md:flex-row md:items-end"}>
+    <div className={variant === "compact" ? "flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center" : "flex flex-col gap-2 md:flex-row md:items-end"}>
       {showStage ? (
         <select
           value={selectedStage}
@@ -175,7 +175,7 @@ export default function FarmSelector({
         ))}
       </select>
       {showCounts ? (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground sm:ml-1">
           Systems: {systemCount} | Batches: {batchCount}
         </span>
       ) : null}

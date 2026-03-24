@@ -3,7 +3,7 @@
 import type { ReactNode } from "react"
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-const REPORT_ACTION_BUTTON_CLASS = "px-3 py-2 rounded-md border border-input text-sm hover:bg-muted/40"
+const REPORT_ACTION_BUTTON_CLASS = "px-3 py-2 rounded-md border border-input text-sm font-medium hover:bg-muted/40"
 
 export function ReportSectionHeader({
   title,
@@ -16,12 +16,12 @@ export function ReportSectionHeader({
 }) {
   return (
     <CardHeader>
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <CardTitle>{title}</CardTitle>
-          {description ? <CardDescription>{description}</CardDescription> : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <CardTitle className="leading-tight">{title}</CardTitle>
+          {description ? <CardDescription className="mt-1 max-w-3xl leading-6">{description}</CardDescription> : null}
         </div>
-        {actions}
+        {actions ? <div className="w-full sm:w-auto">{actions}</div> : null}
       </div>
     </CardHeader>
   )
@@ -98,14 +98,14 @@ export function ReportRecordsToolbar({
   compact?: boolean
 }) {
   const buttonClass = compact
-    ? "h-10 rounded-xl border border-input px-3 text-sm hover:bg-muted/40"
+    ? "h-10 w-full rounded-xl border border-input px-3 text-sm font-medium hover:bg-muted/40 sm:w-auto"
     : REPORT_ACTION_BUTTON_CLASS
   const selectClass = compact
-    ? "h-10 rounded-xl border border-input bg-background px-3 text-sm font-medium"
+    ? "h-10 w-full rounded-xl border border-input bg-background px-3 text-sm font-medium sm:w-auto"
     : "px-3 py-2 rounded-md border border-input text-sm"
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
       {tableLimit != null && onTableLimitChange ? (
         <ReportLimitSelect value={tableLimit} onChange={onTableLimitChange} className={selectClass} />
       ) : null}

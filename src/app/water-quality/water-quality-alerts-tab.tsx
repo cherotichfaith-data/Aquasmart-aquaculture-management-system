@@ -28,7 +28,7 @@ export function WaterQualityAlertsTab({
             <p className="text-sm text-muted-foreground">Ranked by severity and recency for the selected scope.</p>
           </div>
           <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="bg-muted/50 border-b border-border">
                   <th className="px-3 py-2 text-left font-semibold">System</th>
