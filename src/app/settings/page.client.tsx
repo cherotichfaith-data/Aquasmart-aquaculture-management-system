@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const { user, profile } = useAuth()
   const { farm, farmId, loading: farmLoading } = useActiveFarm()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const missingFarmAssignment = Boolean(user?.id) && !farmLoading && !farmId
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const settingsLoadQuery = useQuery({
@@ -170,6 +171,7 @@ export default function SettingsPage() {
       saved={saved}
       errorMsg={errorMsg}
       settingsLoadError={settingsLoadQuery.isError ? (settingsLoadError ?? "Please retry or check your connection.") : null}
+      missingFarmAssignment={missingFarmAssignment}
       onRetryLoad={() => settingsLoadQuery.refetch()}
       settings={settings}
       onChange={handleChange}

@@ -1,7 +1,14 @@
 import type { Database } from "@/lib/types/database"
 
-export type SystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number] & {
-  unit: string | null
+export type SystemOption = {
+  farm_id: string
+  farm_name: string
+  growth_stage: Database["public"]["Enums"]["system_growth_stage"]
+  id: number
+  is_active: boolean
+  label: string
+  type: string
+  unit?: string | null
 }
 
 export type SystemOptionSource = Pick<
@@ -23,7 +30,7 @@ export function formatSystemOptionLabel(system: Pick<SystemOptionSource, "id" | 
 
 export function mapSystemRowToOption(system: SystemOptionSource): SystemOption {
   return {
-    farm_id: system.farm_id,
+    farm_id: system.farm_id ?? "",
     farm_name: "",
     growth_stage: system.growth_stage,
     id: system.id,

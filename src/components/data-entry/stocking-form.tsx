@@ -17,10 +17,16 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Database } from "@/lib/types/database"
+import type { SystemOption } from "@/lib/system-options"
 import { useRecordStocking } from "@/lib/hooks/use-stocking"
 import { logSbError } from "@/lib/supabase/log"
 import { BatchQuickCreate } from "./batch-quick-create"
 import { DependencyBlocker } from "./dependency-blocker"
+import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+
+type StockingInsertWithNotes = Database["public"]["Tables"]["fish_stocking"]["Insert"] & {
+    notes?: string | null
+}
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -28,12 +34,12 @@ const formSchema = z.object({
     stocking_date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(1, "Quantity must be positive"),
     total_weight_kg: z.coerce.number().min(0, "Weight must be positive"),
-    average_body_weight_g: z.coerce.number().min(0).optional(),
+    notes: z.string().max(500, "Notes must be 500 characters or fewer").optional(),
     type_of_stocking: z.enum(["empty", "already_stocked"]),
 })
 
 interface StockingFormProps {
-    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    systems: SystemOption[]
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     defaultSystemId?: number | null
     defaultBatchId?: number | null
@@ -49,36 +55,43 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
             stocking_date: new Date().toISOString().split("T")[0],
             number_of_fish: 0,
             total_weight_kg: 0,
-            average_body_weight_g: 0,
+            notes: "",
             system_id: defaultSystemId ? String(defaultSystemId) : "",
             batch_id: defaultBatchId ? String(defaultBatchId) : "",
             type_of_stocking: "empty",
         },
     })
+    const selectedSystemId = form.watch("system_id")
+    const selectedBatchId = form.watch("batch_id")
+    const numberOfFish = form.watch("number_of_fish")
+    const totalWeightKg = form.watch("total_weight_kg")
+    const computedAbw = numberOfFish > 0 && totalWeightKg > 0 ? (totalWeightKg * 1000) / numberOfFish : null
 
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            const abw = values.average_body_weight_g ?? 0
-
             const systemId = Number(values.system_id)
             const batchId = Number(values.batch_id)
+            const abw = values.number_of_fish > 0 ? (values.total_weight_kg * 1000) / values.number_of_fish : 0
 
-            await mutation.mutateAsync({
+            const payload: StockingInsertWithNotes = {
                 system_id: systemId,
                 batch_id: batchId,
                 date: values.stocking_date,
                 number_of_fish_stocking: values.number_of_fish,
                 total_weight_stocking: values.total_weight_kg,
                 abw,
+                notes: values.notes?.trim() ? values.notes.trim() : null,
                 type_of_stocking: values.type_of_stocking,
-            })
+            }
+
+            await mutation.mutateAsync(payload)
 
             form.reset({
                 stocking_date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
                 total_weight_kg: 0,
-                average_body_weight_g: 0,
+                notes: "",
                 system_id: values.system_id,
                 batch_id: values.batch_id,
                 type_of_stocking: values.type_of_stocking,
@@ -173,7 +186,12 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
                         />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
+                        <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="number_of_fish"
@@ -200,19 +218,10 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
                                 </FormItem>
                             )}
                         />
-                        <FormField
-                            control={form.control}
-                            name="average_body_weight_g"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>ABW (g) (Auto)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                    </div>
+
+                    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                        Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter quantity and total weight"}
                     </div>
 
                     <FormField
@@ -232,6 +241,25 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
                                         <SelectItem value="already_stocked">Already stocked</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+
+                    <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Notes (Optional)</FormLabel>
+                                <FormControl>
+                                    <textarea
+                                        {...field}
+                                        rows={3}
+                                        className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                        placeholder="Stock condition, acclimation detail, or any exception."
+                                    />
+                                </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}

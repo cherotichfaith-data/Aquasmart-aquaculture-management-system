@@ -149,8 +149,19 @@ next-router-prefetch {
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased leading-relaxed;
     background-image: linear-gradient(180deg, var(--background) 0%, var(--secondary) 100%);
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 
   .dark body {
@@ -176,11 +187,11 @@ next-router-prefetch {
 }
 @layer components {
   .page-shell {
-    @apply space-y-8;
+    @apply space-y-7 md:space-y-9;
   }
 
   .page-hero {
-    @apply relative overflow-hidden rounded-[1.75rem] border border-border/80 bg-card/92 p-5 shadow-sm md:p-7;
+    @apply relative overflow-hidden rounded-[1.75rem] border border-border/80 bg-card/92 p-5 shadow-sm md:p-7 lg:p-8;
     box-shadow:
       0 18px 40px -28px rgba(15, 23, 32, 0.45),
       inset 0 1px 0 rgba(255, 255, 255, 0.75);
@@ -206,11 +217,11 @@ next-router-prefetch {
   }
 
   .page-section {
-    @apply space-y-4;
+    @apply space-y-5;
   }
 
   .dense-table-shell {
-    @apply overflow-auto rounded-[1.1rem] border border-border/80 bg-card/70;
+    @apply w-full max-w-full overflow-auto rounded-[1.1rem] border border-border/80 bg-card/70;
   }
 
   .dense-table {
@@ -230,7 +241,7 @@ next-router-prefetch {
   }
 
   .legend-pill {
-    @apply inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground;
+    @apply inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-3 py-1.5 text-[11px] font-semibold leading-none text-muted-foreground;
   }
 
   .legend-pill-swatch {
@@ -238,28 +249,28 @@ next-router-prefetch {
   }
 
   .filter-bar {
-    @apply flex flex-wrap items-center justify-between gap-3 rounded-[1.1rem] border border-border/80 bg-muted/20 px-3 py-3;
+    @apply flex flex-col gap-3 rounded-[1.1rem] border border-border/80 bg-muted/20 px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4 sm:py-3.5;
   }
 
   .queue-card {
-    @apply rounded-[1.1rem] border px-3 py-3 text-left transition-colors;
+    @apply rounded-[1.1rem] border px-3 py-3.5 text-left transition-colors;
   }
 
   .section-heading {
-    @apply flex flex-wrap items-end justify-between gap-3;
+    @apply flex flex-wrap items-end justify-between gap-3 sm:gap-4;
   }
 
   .section-heading-title {
-    @apply text-lg font-semibold tracking-tight text-foreground md:text-xl;
+    @apply text-lg font-semibold tracking-tight leading-tight text-foreground md:text-xl;
   }
 
   .section-heading-copy {
-    @apply max-w-3xl text-sm text-muted-foreground;
+    @apply max-w-3xl text-sm leading-6 text-muted-foreground;
   }
 }
 @layer components {
   .page-toolbar {
-    @apply flex flex-wrap items-center gap-3 rounded-[1.35rem] border border-border/80 bg-card/88 px-4 py-3 shadow-sm backdrop-blur-sm;
+    @apply flex flex-col items-stretch gap-3 rounded-[1.35rem] border border-border/80 bg-card/88 px-4 py-3.5 shadow-sm backdrop-blur-sm sm:flex-row sm:flex-wrap sm:items-center;
     box-shadow: 0 12px 28px -28px rgba(15, 23, 32, 0.5);
   }
 }

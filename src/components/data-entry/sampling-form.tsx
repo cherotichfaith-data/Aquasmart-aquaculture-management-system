@@ -16,8 +16,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Database } from "@/lib/types/database"
+import type { SystemOption } from "@/lib/system-options"
 import { useRecordSampling } from "@/lib/hooks/use-sampling"
 import { logSbError } from "@/lib/supabase/log"
+import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -25,11 +27,10 @@ const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().min(1, "Sample count must be at least 1"),
     total_weight_kg: z.coerce.number().min(0, "Weight must be positive"),
-    average_body_weight_g: z.coerce.number().min(0).optional(),
 })
 
 interface SamplingFormProps {
-    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    systems: SystemOption[]
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     defaultSystemId?: number | null
     defaultBatchId?: number | null
@@ -45,10 +46,14 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
             number_of_fish: 0,
             total_weight_kg: 0,
             system_id: defaultSystemId ? String(defaultSystemId) : "",
-            average_body_weight_g: 0,
             batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
+    const selectedSystemId = form.watch("system_id")
+    const selectedBatchId = form.watch("batch_id")
+    const numberOfFish = form.watch("number_of_fish")
+    const totalWeightKg = form.watch("total_weight_kg")
+    const computedAbw = numberOfFish > 0 && totalWeightKg > 0 ? (totalWeightKg * 1000) / numberOfFish : null
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
@@ -61,13 +66,12 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
                 date: values.date,
                 number_of_fish_sampling: values.number_of_fish,
                 total_weight_sampling: values.total_weight_kg,
-                abw: values.average_body_weight_g || 0,
+                abw: values.number_of_fish > 0 ? (values.total_weight_kg * 1000) / values.number_of_fish : 0,
             })
             form.reset({
                 date: new Date().toISOString().split("T")[0],
                 number_of_fish: 0,
                 total_weight_kg: 0,
-                average_body_weight_g: 0,
                 system_id: values.system_id,
                 batch_id: values.batch_id,
             })
@@ -149,7 +153,12 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
                         />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
+                        <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="number_of_fish"
@@ -176,20 +185,12 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
                                 </FormItem>
                             )}
                         />
-                        <FormField
-                            control={form.control}
-                            name="average_body_weight_g"
-                            render={({ field }) => (
-                                <FormItem>
-                            <FormLabel>ABW (g) (Optional)</FormLabel>
-                                    <FormControl>
-                                <Input type="number" step="0.01" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
                     </div>
+
+                    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                        Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter sample count and total weight"}
+                    </div>
+
                     <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
                         {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Entry
@@ -199,4 +200,3 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
         </div>
     )
 }
-

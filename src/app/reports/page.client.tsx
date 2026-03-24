@@ -53,13 +53,15 @@ export default function ReportsPage() {
         <TimelineIntegrityNote systemId={selectedSystemId} dateFrom={dateFrom} dateTo={dateTo} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-4xl grid-cols-5 border border-border/80 bg-muted/60">
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-            <TabsTrigger value="feeding">Feeding</TabsTrigger>
-            <TabsTrigger value="mortality">Mortality</TabsTrigger>
-            <TabsTrigger value="growth">Growth</TabsTrigger>
-            <TabsTrigger value="water-quality">Water Quality</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-1">
+            <TabsList className="inline-flex h-auto min-w-max flex-nowrap border border-border/80 bg-muted/60 p-1 sm:grid sm:w-full sm:max-w-4xl sm:grid-cols-5">
+              <TabsTrigger value="performance">Performance</TabsTrigger>
+              <TabsTrigger value="feeding">Feeding</TabsTrigger>
+              <TabsTrigger value="mortality">Mortality</TabsTrigger>
+              <TabsTrigger value="growth">Growth</TabsTrigger>
+              <TabsTrigger value="water-quality">Water Quality</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="performance" className="mt-6">
             <PerformanceReport

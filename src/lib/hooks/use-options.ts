@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { useAuth } from "@/components/providers/auth-provider"
+import type { SystemOption } from "@/lib/system-options"
 import {
   getBatchOptions,
   getFarmOptions,
@@ -20,7 +21,7 @@ export function useSystemOptions(params?: {
   stage?: Enums<"system_growth_stage"> | "all"
   activeOnly?: boolean
   enabled?: boolean
-  initialData?: QueryResult<Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]>
+  initialData?: QueryResult<SystemOption>
 }) {
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)

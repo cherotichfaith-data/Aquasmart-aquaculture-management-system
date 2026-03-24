@@ -94,7 +94,7 @@ export function WaterQualityDepthTab({
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Select value={selectedDepthProfileDate ?? ""} onValueChange={onSelectDepthProfileDate}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Select date" />
             </SelectTrigger>
             <SelectContent>

@@ -14,10 +14,11 @@ import { StockingForm } from "./stocking-form"
 import { SystemForm } from "./system-form"
 import { RecentEntriesList } from "./recent-entries-list"
 import type { Database, Tables } from "@/lib/types/database"
+import type { SystemOption } from "@/lib/system-options"
 
 interface DataEntryInterfaceProps {
     farmId: string | null
-    systems: Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number][]
+    systems: SystemOption[]
     feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     recentEntries: {
@@ -65,17 +66,17 @@ export function DataEntryInterface({
     }, [defaultTab])
 
     return (
-        <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-6">
-            <aside className="w-full md:w-64 bg-card border border-border/80 rounded-lg overflow-hidden shrink-0 h-fit md:h-auto shadow-sm">
+        <div className="flex min-h-0 flex-col gap-4 md:gap-6 xl:h-[calc(100vh-100px)] xl:flex-row">
+            <aside className="w-full overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm xl:h-auto xl:w-64 xl:shrink-0">
                 <div className="p-4 font-semibold border-b border-border/80 bg-muted/60 text-foreground">Data Capture</div>
-                <ScrollArea className="h-[200px] md:h-full">
-                    <div className="flex flex-col p-2 gap-1">
+                <ScrollArea className="w-full xl:h-full">
+                    <div className="flex gap-1 p-2 xl:flex-col">
                         {sidebarItems.map((item) => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
                                 className={cn(
-                                    "text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                    "min-w-[132px] rounded-md px-4 py-2 text-left text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer xl:min-w-0",
                                     activeTab === item.id
                                         ? "bg-primary text-primary-foreground shadow-sm"
                                         : "text-foreground/80 hover:text-foreground"
@@ -88,7 +89,7 @@ export function DataEntryInterface({
                 </ScrollArea>
             </aside>
 
-            <main className="flex-1 bg-card border border-border/80 rounded-lg p-6 overflow-y-auto shadow-sm">
+            <main className="flex-1 rounded-lg border border-border/80 bg-card p-4 shadow-sm md:p-6 xl:overflow-y-auto">
                 {activeTab === "mortality" && (
                     <>
                         <MortalityForm

@@ -146,20 +146,20 @@ export default function Header({
 
   return (
     <header className={`sticky top-0 z-20 bg-background/72 backdrop-blur-xl ${hideBorder ? "" : "border-b border-border/70"}`}>
-      <div className="flex flex-col gap-4 px-4 py-4 md:px-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4 md:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <button onClick={onMenuClick} className="rounded-xl border border-border/70 bg-card/80 p-2 transition-colors hover:bg-accent md:hidden">
               <Menu size={20} />
             </button>
-            <div className="hidden md:block">
+            <div className="min-w-0">
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-semibold text-foreground">{farm?.name ?? "Aquasmart"}</span>
+                <span className="truncate font-semibold text-foreground">{farm?.name ?? "Aquasmart"}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {/* Role Badge */}
             {role && (
               <Badge
@@ -189,7 +189,7 @@ export default function Header({
                   <span className="sr-only">Notifications</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuContent align="end" className="w-[calc(100vw-1.5rem)] max-w-80 sm:w-80">
                 <DropdownMenuLabel>Notifications</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <div className="max-h-[300px] overflow-y-auto">
@@ -267,7 +267,7 @@ export default function Header({
         </div>
 
         <div className="page-toolbar">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <TimePeriodSelector
               selectedPeriod={timePeriod}
               onPeriodChange={handleTimePeriodChange}
@@ -285,12 +285,12 @@ export default function Header({
               variant="compact"
             />
           </div>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto sm:flex-wrap sm:justify-end">
           {showAddData ? (
-            <div>
+            <div className="w-full sm:w-auto">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button className="h-10 rounded-xl px-4 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button className="h-10 w-full rounded-xl px-4 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">
                     <PlusCircle className="h-4 w-4 mr-2" />
                     Add Data
                   </Button>

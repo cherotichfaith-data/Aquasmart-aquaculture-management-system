@@ -19,11 +19,11 @@ export default function TimePeriodSelector({
 }: TimePeriodSelectorProps) {
   const triggerClass =
     variant === "compact"
-      ? "inline-flex h-10 min-w-[140px] items-center justify-between gap-2 rounded-xl border border-input bg-background/90 px-3 text-sm font-medium text-foreground shadow-sm"
+      ? "inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-input bg-background/90 px-3 text-sm font-medium text-foreground shadow-sm sm:w-auto sm:min-w-[140px]"
       : "h-9 min-w-[120px] rounded-full border border-border bg-card/80 px-4 text-xs font-semibold text-foreground shadow-sm inline-flex items-center justify-between gap-2"
 
   return (
-    <div className="flex items-center">
+    <div className="flex w-full items-center sm:w-auto">
       <Popover>
         <PopoverTrigger asChild>
           <button

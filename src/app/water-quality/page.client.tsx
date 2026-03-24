@@ -412,12 +412,12 @@ export default function WaterQualityPage({
         />
 
         <div
-          className={`flex flex-wrap items-center justify-end gap-2 ${
+          className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end ${
             activeTab === "depth" || activeTab === "parameter" ? "mt-8 md:mt-10" : "mt-4 md:mt-6"
           }`}
         >
           <Select value={selectedParameter} onValueChange={(value) => setSelectedParameter(value as WqParameter)}>
-            <SelectTrigger className="w-[220px]">
+            <SelectTrigger className="w-full sm:w-[220px]">
               <SelectValue placeholder="Select parameter" />
             </SelectTrigger>
             <SelectContent>

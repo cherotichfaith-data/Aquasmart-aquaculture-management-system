@@ -86,52 +86,14 @@ export async function saveSettingsData(params: {
     return { errorMessage: "No active session." }
   }
 
-  let resolvedFarmId = farmId
+  const resolvedFarmId = farmId
   let nextThresholdId = thresholdId
 
   if (!resolvedFarmId) {
-    const { data: newFarm, error: farmCreateError } = await supabase
-      .from("farm")
-      .insert({
-        name: settings.farmName,
-        location: settings.location,
-        owner: settings.owner,
-        email: settings.email,
-        phone: settings.phone,
-      })
-      .select("id")
-      .single()
-
-    if (farmCreateError) {
-      if (isSbPermissionDenied(farmCreateError)) {
-        return {
-          errorMessage:
-            "You do not have permission to create a farm. Ask an admin to assign your account to an existing farm.",
-        }
-      }
-      if (hasActionableSbError(farmCreateError)) {
-        logSbError("settings:save:farmCreate", farmCreateError)
-      }
-      throw farmCreateError
+    return {
+      errorMessage:
+        "No farm is assigned to this account. Ask an admin to add your email to an existing farm invite list.",
     }
-
-    resolvedFarmId = newFarm?.id ?? null
-    if (resolvedFarmId) {
-      const role = profileRole ?? "admin"
-      const { error: membershipError } = await supabase
-        .from("farm_user")
-        .insert({ farm_id: resolvedFarmId, user_id: userId, role })
-      if (membershipError) {
-        if (hasActionableSbError(membershipError)) {
-          logSbError("settings:save:farmUser", membershipError)
-        }
-        throw membershipError
-      }
-    }
-  }
-
-  if (!resolvedFarmId) {
-    return { errorMessage: "No farm selected for this account." }
   }
 
   const farmPayload: TablesUpdate<"farm"> = {

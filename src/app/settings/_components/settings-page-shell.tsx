@@ -11,6 +11,7 @@ export function SettingsPageShell({
   saved,
   errorMsg,
   settingsLoadError,
+  missingFarmAssignment,
   onRetryLoad,
   settings,
   onChange,
@@ -21,6 +22,7 @@ export function SettingsPageShell({
   saved: boolean
   errorMsg: string | null
   settingsLoadError: string | null
+  missingFarmAssignment: boolean
   onRetryLoad: () => void
   settings: SettingsFormState
   onChange: (field: string, value: string | number) => void
@@ -57,6 +59,14 @@ export function SettingsPageShell({
             <p className="text-red-700 dark:text-red-300 font-medium">{errorMsg}</p>
           </div>
         ) : null}
+        {missingFarmAssignment ? (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-3">
+            <AlertCircle className="text-amber-700 dark:text-amber-300" size={20} />
+            <p className="text-amber-800 dark:text-amber-200 font-medium">
+              No farm is assigned to this account. Ask an admin to add your email to an existing farm invite list before editing settings.
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-6">
           {settingsLoadError ? (
@@ -68,7 +78,7 @@ export function SettingsPageShell({
           ) : null}
           <FarmInformationSection settings={settings} handleChange={onChange} />
           <AlertThresholdsSection settings={settings} handleChange={onChange} />
-          <SaveSettingsButton isSaving={isSaving} onSave={onSave} />
+          <SaveSettingsButton isSaving={isSaving} disabled={missingFarmAssignment} onSave={onSave} />
         </div>
       </div>
     </DashboardLayout>
