@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/supabase/require-user"
 import type { Database } from "@/lib/types/database"
+import { redirect } from "next/navigation"
 
 export type FarmOption = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
 
@@ -24,5 +25,23 @@ export async function resolveInitialFarmId(searchFarmId?: string | null) {
   return {
     farmId,
     farms,
+  }
+}
+
+export async function requireInitialFarmId(searchFarmId?: string | null) {
+  const context = await resolveInitialFarmId(searchFarmId)
+
+  if (!context.farmId) {
+    redirect("/onboarding")
+  }
+
+  return context
+}
+
+export async function redirectIfFarmExists() {
+  const { farmId } = await resolveInitialFarmId()
+
+  if (farmId) {
+    redirect("/")
   }
 }

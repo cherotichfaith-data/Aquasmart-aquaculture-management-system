@@ -54,9 +54,9 @@ export function useBatchOptions(params?: {
 export function useFeedTypeOptions(params?: {
   initialData?: QueryResult<Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]>
 }) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   return useQuery({
-    queryKey: ["options", "feeds"],
+    queryKey: ["options", "feeds", user?.id ?? "anon"],
     queryFn: ({ signal }) => getFeedTypeOptions({ signal }),
     enabled: Boolean(session),
     staleTime: 5 * 60_000,
@@ -66,9 +66,9 @@ export function useFeedTypeOptions(params?: {
 }
 
 export function useFeedSupplierOptions(params?: { enabled?: boolean }) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   return useQuery({
-    queryKey: ["options", "feed-suppliers"],
+    queryKey: ["options", "feed-suppliers", user?.id ?? "anon"],
     queryFn: ({ signal }) => getFeedSupplierOptions({ signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
@@ -76,9 +76,9 @@ export function useFeedSupplierOptions(params?: { enabled?: boolean }) {
 }
 
 export function useFingerlingSupplierOptions(params?: { enabled?: boolean }) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   return useQuery({
-    queryKey: ["options", "fingerling-suppliers"],
+    queryKey: ["options", "fingerling-suppliers", user?.id ?? "anon"],
     queryFn: ({ signal }) => getFingerlingSupplierOptions({ signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
@@ -86,9 +86,9 @@ export function useFingerlingSupplierOptions(params?: { enabled?: boolean }) {
 }
 
 export function useFarmOptions(params?: { enabled?: boolean }) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   return useQuery({
-    queryKey: ["options", "farms"],
+    queryKey: ["options", "farms", user?.id ?? "anon"],
     queryFn: ({ signal }) => getFarmOptions({ signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
@@ -117,10 +117,10 @@ export function useSystemVolumes(params?: {
 }
 
 export function useAppConfig(params?: { keys?: string[]; enabled?: boolean }) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   const keys = params?.keys ?? []
   return useQuery({
-    queryKey: ["app-config", keys.join(",") || "none"],
+    queryKey: ["app-config", user?.id ?? "anon", keys.join(",") || "none"],
     queryFn: ({ signal }) => getAppConfig({ keys, signal }),
     enabled: Boolean(session) && keys.length > 0 && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
