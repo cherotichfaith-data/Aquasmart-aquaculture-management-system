@@ -63,7 +63,7 @@ export function SettingsPageShell({
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-3">
             <AlertCircle className="text-amber-700 dark:text-amber-300" size={20} />
             <p className="text-amber-800 dark:text-amber-200 font-medium">
-              No farm is assigned to this account. Ask an admin to add your email to an existing farm invite list before editing settings.
+              No farm workspace exists for this account yet. You should be redirected to the onboarding flow to create one.
             </p>
           </div>
         ) : null}

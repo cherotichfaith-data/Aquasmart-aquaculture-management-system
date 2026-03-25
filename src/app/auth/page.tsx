@@ -105,7 +105,7 @@ export default function AuthPage() {
         process.env.NEXT_PUBLIC_SITE_URL ??
         process.env.NEXT_PUBLIC_APP_URL ??
         window.location.origin
-      const redirectTo = `${baseUrl}/auth/callback?next=/auth/verify-success`
+      const redirectTo = `${baseUrl}/auth/callback?next=/onboarding`
       const { data, error } = await withTimeout(
         supabase.auth.signUp({
           email: trimmedEmail,

@@ -92,7 +92,7 @@ export async function saveSettingsData(params: {
   if (!resolvedFarmId) {
     return {
       errorMessage:
-        "No farm is assigned to this account. Ask an admin to add your email to an existing farm invite list.",
+        "No farm workspace exists for this account yet. Complete onboarding to create your farm workspace.",
     }
   }
 

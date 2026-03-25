@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { AuthProvider, ThemeProvider, QueryProvider } from "@/components/providers"
+import { FarmOnboardingGate } from "@/components/providers/farm-onboarding-gate"
 import { ToastProvider } from "@/components/shared/toast-provider"
 import { NotificationsProvider } from "@/components/notifications/notifications-provider"
 import "./globals.css"
@@ -48,7 +49,7 @@ export default function RootLayout({
             <QueryProvider>
               <ToastProvider>
                 <NotificationsProvider>
-                  {children}
+                  <FarmOnboardingGate>{children}</FarmOnboardingGate>
                 </NotificationsProvider>
               </ToastProvider>
             </QueryProvider>

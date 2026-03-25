@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import RootPageClient from "./page.client"
 import { createClient } from "@/lib/supabase/server"
-import { resolveInitialFarmId } from "@/features/farm/queries.server"
+import { requireInitialFarmId } from "@/features/farm/queries.server"
 import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 
@@ -77,7 +77,7 @@ export default async function Page({
   const resolvedSearchParams = (await searchParams) ?? {}
   const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
   const initialFilters = parseDashboardPageFilters(resolvedSearchParams)
-  const { farmId } = await resolveInitialFarmId(searchFarmId)
+  const { farmId } = await requireInitialFarmId(searchFarmId)
   const initialData = await getDashboardPageInitialData({
     farmId,
     filters: initialFilters,
