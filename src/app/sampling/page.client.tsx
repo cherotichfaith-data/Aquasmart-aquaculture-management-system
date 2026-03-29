@@ -4,25 +4,22 @@ import { useMemo, useState } from "react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import SystemHistorySheet from "@/components/systems/system-history-sheet"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
-import { useSamplingData, useTransferData } from "@/lib/hooks/use-reports"
+import { useSamplingData } from "@/lib/hooks/use-reports"
+import { useProductionSummary } from "@/lib/hooks/use-production"
+import { diffDateDays, formatBucketLabel, formatGranularityLabel, getBucketGranularity, getBucketKey } from "@/lib/time-series"
 import { sortByDateAsc } from "@/lib/utils"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
 import { useAppConfig, useSystemVolumes } from "@/lib/hooks/use-options"
-import { TimelineIntegrityNote } from "@/components/shared/timeline-integrity-note"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import {
-  DEFAULT_GROWTH_CURVE,
-  DEFAULT_HARVEST_TARGET_G,
-  DEFAULT_MOVE_TARGET_G,
   DEFAULT_TARGET_DENSITY,
   formatDayLabel,
   safeDayDiff,
   resolveTargetAbw,
 } from "@/app/sampling/_lib/formatters"
 import { SamplingGrowthDashboard } from "@/app/sampling/_components/sampling-growth-dashboard"
-
 
 export default function SamplingPage() {
   const [selectedHistorySystemId, setSelectedHistorySystemId] = useState<number | null>(null)
@@ -91,28 +88,29 @@ export default function SamplingPage() {
     limit: 2000,
     enabled: samplingQueryEnabled && hasBounds,
   })
-  const tableEnabled = samplingQueryEnabled && hasBounds
-  const transferQuery = useTransferData({
-    batchId: Number.isFinite(batchId) ? batchId : undefined,
+  const productionSummaryQuery = useProductionSummary({
+    farmId,
+    systemId: hasSystem ? (systemId as number) : undefined,
+    stage: selectedStage === "all" ? undefined : selectedStage,
     dateFrom,
     dateTo,
-    limit: 2000,
-    enabled: samplingQueryEnabled && hasBounds,
+    limit: 5000,
+    enabled: hasBounds,
   })
 
   const rows = samplingQuery.data?.status === "success" ? samplingQuery.data.data : []
   const loading =
     samplingQuery.isLoading ||
-    transferQuery.isLoading ||
+    productionSummaryQuery.isLoading ||
     systemsQuery.isLoading ||
     batchSystemsQuery.isLoading ||
     systemsTableQuery.isLoading ||
     systemVolumesQuery.isLoading
   const errorMessages = [
     getErrorMessage(samplingQuery.error),
-    getErrorMessage(transferQuery.error),
+    getErrorMessage(productionSummaryQuery.error),
     getQueryResultError(samplingQuery.data),
-    getQueryResultError(transferQuery.data),
+    getQueryResultError(productionSummaryQuery.data),
     getErrorMessage(systemsQuery.error),
     getQueryResultError(systemsQuery.data),
     getErrorMessage(batchSystemsQuery.error),
@@ -123,7 +121,7 @@ export default function SamplingPage() {
   ].filter(Boolean) as string[]
   const latestUpdatedAt = Math.max(
     samplingQuery.dataUpdatedAt ?? 0,
-    transferQuery.dataUpdatedAt ?? 0,
+    productionSummaryQuery.dataUpdatedAt ?? 0,
     systemsQuery.dataUpdatedAt ?? 0,
     batchSystemsQuery.dataUpdatedAt ?? 0,
     systemsTableQuery.dataUpdatedAt ?? 0,
@@ -134,6 +132,12 @@ export default function SamplingPage() {
   const filteredRows = useMemo(
     () => rows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
     [rows, scopedSystemIds],
+  )
+  const productionRowsRaw =
+    productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const productionRows = useMemo(
+    () => productionRowsRaw.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
+    [productionRowsRaw, scopedSystemIds],
   )
   const systemNameById = useMemo(() => {
     const map = new Map<number, string>()
@@ -177,16 +181,15 @@ export default function SamplingPage() {
     return map
   }, [appConfigQuery.data])
   const targetDensity = Number(configMap.get("target_density_kg_m3") ?? "")
-  const targetDensityKgM3 = Number.isFinite(targetDensity) && targetDensity > 0 ? targetDensity : DEFAULT_TARGET_DENSITY
+  const targetDensityKgM3 =
+    Number.isFinite(targetDensity) && targetDensity > 0 ? targetDensity : DEFAULT_TARGET_DENSITY
   const harvestTargetValue = Number(configMap.get("target_harvest_weight_g") ?? "")
-  const harvestTargetG =
-    Number.isFinite(harvestTargetValue) && harvestTargetValue > 0 ? harvestTargetValue : DEFAULT_HARVEST_TARGET_G
+  const harvestTargetG = Number.isFinite(harvestTargetValue) && harvestTargetValue > 0 ? harvestTargetValue : null
   const moveTargetValue = Number(configMap.get("target_move_weight_g") ?? "")
-  const moveTargetG =
-    Number.isFinite(moveTargetValue) && moveTargetValue > 0 ? moveTargetValue : DEFAULT_MOVE_TARGET_G
+  const moveTargetG = Number.isFinite(moveTargetValue) && moveTargetValue > 0 ? moveTargetValue : null
   const curveOverride = configMap.get("growth_curve_points")
   const targetCurvePoints = useMemo(() => {
-    if (!curveOverride) return DEFAULT_GROWTH_CURVE
+    if (!curveOverride) return null
     try {
       const parsed = JSON.parse(curveOverride)
       if (Array.isArray(parsed)) {
@@ -199,41 +202,10 @@ export default function SamplingPage() {
         if (cleaned.length > 1) return cleaned
       }
     } catch {
-      // fall back to defaults
+      return null
     }
-    return DEFAULT_GROWTH_CURVE
+    return null
   }, [curveOverride])
-  const transferRows = transferQuery.data?.status === "success" ? transferQuery.data.data : []
-  const transferMarkers = useMemo(() => {
-    const markers = new Map<
-      string,
-      { date: string; label: string; count: number; inbound: number; outbound: number }
-    >()
-    transferRows.forEach((row) => {
-      if (!row.date) return
-      const originInScope = hasSystem
-        ? row.origin_system_id === systemId
-        : scopedSystemIds.has(row.origin_system_id)
-      const targetInScope = hasSystem
-        ? row.target_system_id === systemId
-        : scopedSystemIds.has(row.target_system_id)
-      if (!originInScope && !targetInScope) return
-      const current =
-        markers.get(row.date) ?? {
-          date: row.date,
-          label: formatDayLabel(row.date),
-          count: 0,
-          inbound: 0,
-          outbound: 0,
-        }
-      current.count += 1
-      if (originInScope) current.outbound += 1
-      if (targetInScope) current.inbound += 1
-      markers.set(row.date, current)
-    })
-    return sortByDateAsc(Array.from(markers.values()), (item) => item.date)
-  }, [transferRows, hasSystem, scopedSystemIds, systemId])
-
   const chartRows = useMemo(() => {
     const byDate = new Map<string, { sampled: number; totalWeight: number; weightedAbw: number; abwWeight: number; fallbackAbw: number; fallbackCount: number }>()
     filteredRows.forEach((item) => {
@@ -272,7 +244,7 @@ export default function SamplingPage() {
     const startDate = baseRows[0].date
     return baseRows.map((row) => {
       const daySinceStart = safeDayDiff(startDate, row.date) ?? 0
-      const targetAbw = resolveTargetAbw(daySinceStart, targetCurvePoints)
+      const targetAbw = targetCurvePoints ? resolveTargetAbw(daySinceStart, targetCurvePoints) : null
       return {
         ...row,
         targetAbw,
@@ -318,147 +290,140 @@ export default function SamplingPage() {
     return resolved
   }, [filteredRows])
 
-  const transferPerformanceBySystem = useMemo(() => {
-    const result = new Map<
-      number,
-      { status: "OK" | "Growth check" | "Insufficient data" | "No transfer"; transferDate: string | null; postAdg: number | null; baselineAdg: number | null }
-    >()
+  const harvestBySystem = useMemo(() => {
+    const map = new Map<number, number>()
+    productionRows.forEach((row) => {
+      if (row.system_id == null) return
+      map.set(row.system_id, (map.get(row.system_id) ?? 0) + (row.total_weight_harvested ?? 0))
+    })
+    return map
+  }, [productionRows])
 
-    const scopedIds = hasSystem ? [systemId as number] : Array.from(scopedSystemIds)
-    scopedIds.forEach((id) => {
-      if (!Number.isFinite(id)) return
-      const transfers = transferRows
-        .filter((row) => row.date && (row.origin_system_id === id || row.target_system_id === id))
-        .map((row) => row.date as string)
-        .sort((a, b) => String(a).localeCompare(String(b)))
-
-      if (transfers.length === 0) {
-        result.set(id, { status: "No transfer", transferDate: null, postAdg: null, baselineAdg: null })
-        return
-      }
-
-      const series = samplingSeriesBySystem.get(id) ?? []
-      if (series.length < 2) {
-        result.set(id, { status: "Insufficient data", transferDate: transfers[transfers.length - 1], postAdg: null, baselineAdg: null })
-        return
-      }
-
-      const transferDate = transfers[transfers.length - 1]
-      let beforeIndex = -1
-      let afterIndex = -1
-      series.forEach((point, idx) => {
-        if (point.date <= transferDate) beforeIndex = idx
-        if (afterIndex === -1 && point.date >= transferDate) afterIndex = idx
+  const growthSystemRows = useMemo(() => {
+    return scopedSystemIdList
+      .map((currentSystemId) => {
+        const series = samplingSeriesBySystem.get(currentSystemId) ?? []
+        const first = series[0] ?? null
+        const last = series[series.length - 1] ?? null
+        const overallDays = first && last ? diffDateDays(first.date, last.date) : null
+        const overallSgr =
+          first &&
+          last &&
+          overallDays != null &&
+          overallDays > 0 &&
+          first.abw > 0 &&
+          last.abw > 0
+            ? ((Math.log(last.abw) - Math.log(first.abw)) / overallDays) * 100
+            : null
+        const dashboardRow = dashboardRowBySystemId.get(currentSystemId) ?? null
+        return {
+          systemId: currentSystemId,
+          label:
+            systemNameById.get(currentSystemId) ??
+            dashboardRow?.system_name ??
+            `System ${currentSystemId}`,
+          samples: series.length,
+          latestAbw: last?.abw ?? dashboardRow?.abw ?? null,
+          currentBiomass: dashboardRow?.biomass_end ?? null,
+          overallSgr,
+          totalHarvestKg: harvestBySystem.get(currentSystemId) ?? 0,
+        }
       })
-
-      if (beforeIndex === -1 || afterIndex === -1) {
-        result.set(id, { status: "Insufficient data", transferDate, postAdg: null, baselineAdg: null })
-        return
-      }
-      if (afterIndex === beforeIndex) {
-        afterIndex = Math.min(series.length - 1, beforeIndex + 1)
-      }
-      const before = series[beforeIndex]
-      const after = series[afterIndex]
-      const before2 = beforeIndex > 0 ? series[beforeIndex - 1] : null
-
-      const postDays = safeDayDiff(before.date, after.date)
-      const postAdg = postDays && postDays > 0 ? (after.abw - before.abw) / postDays : null
-      const baselineDays = before2 ? safeDayDiff(before2.date, before.date) : null
-      const baselineAdg =
-        before2 && baselineDays && baselineDays > 0 ? (before.abw - before2.abw) / baselineDays : null
-
-      if (postAdg == null || baselineAdg == null) {
-        result.set(id, { status: "Insufficient data", transferDate, postAdg, baselineAdg })
-        return
-      }
-
-      const status = postAdg < baselineAdg * 0.7 ? "Growth check" : "OK"
-      result.set(id, { status, transferDate, postAdg, baselineAdg })
-    })
-
-    return result
-  }, [hasSystem, samplingSeriesBySystem, scopedSystemIds, systemId, transferRows])
-
-  const growthRows = useMemo(() => {
-    const bySystem = new Map<number, Map<string, { sampled: number; totalWeight: number; weightedAbw: number; abwWeight: number; fallbackAbw: number; fallbackCount: number; batchId: number | null }>>()
-    filteredRows.forEach((row) => {
-      if (!row.date || row.system_id == null) return
-      const systemId = row.system_id
-      const systemDates = bySystem.get(systemId) ?? new Map()
-      const current =
-        systemDates.get(row.date) ?? {
-          sampled: 0,
-          totalWeight: 0,
-          weightedAbw: 0,
-          abwWeight: 0,
-          fallbackAbw: 0,
-          fallbackCount: 0,
-          batchId: null,
-        }
-      const sampled = row.number_of_fish_sampling ?? 0
-      current.sampled += sampled
-      current.totalWeight += row.total_weight_sampling ?? 0
-      if (typeof row.abw === "number") {
-        if (sampled > 0) {
-          current.weightedAbw += row.abw * sampled
-          current.abwWeight += sampled
-        } else {
-          current.fallbackAbw += row.abw
-          current.fallbackCount += 1
-        }
-      }
-      if (current.batchId == null && row.batch_id != null) {
-        current.batchId = row.batch_id
-      }
-      systemDates.set(row.date, current)
-      bySystem.set(systemId, systemDates)
-    })
-
-    const rows = Array.from(bySystem.entries()).map(([systemId, dateMap]) => {
-      const entries = sortByDateAsc(
-        Array.from(dateMap.entries()).map(([date, current]) => ({
-          date,
-          abw:
-            current.abwWeight > 0
-              ? current.weightedAbw / current.abwWeight
-              : current.fallbackCount > 0
-                ? current.fallbackAbw / current.fallbackCount
-                : null,
-          fishSampled: current.sampled,
-          totalWeight: current.totalWeight,
-          batchId: current.batchId,
-        })),
-        (item) => item.date,
+      .filter(
+        (row) =>
+          row.samples > 0 ||
+          row.latestAbw != null ||
+          row.currentBiomass != null ||
+          row.totalHarvestKg > 0,
       )
-      const latest = entries[entries.length - 1]
-      const prev = entries.length > 1 ? entries[entries.length - 2] : null
-      let dailyGain: number | null = null
-      if (prev && latest?.abw != null && prev.abw != null) {
-        const prevDate = new Date(`${prev.date}T00:00:00`)
-        const latestDate = new Date(`${latest.date}T00:00:00`)
-        const days = Math.max(1, Math.round((latestDate.getTime() - prevDate.getTime()) / 86_400_000))
-        dailyGain = (latest.abw - prev.abw) / days
-      }
-      const transferPerformance = transferPerformanceBySystem.get(systemId)
-      return {
-        systemId,
-        systemName: systemNameById.get(systemId) ?? `System ${systemId}`,
-        date: latest?.date ?? null,
-        abw: latest?.abw ?? null,
-        fishSampled: latest?.fishSampled ?? null,
-        totalWeight: latest?.totalWeight ?? null,
-        batchId: latest?.batchId ?? null,
-        dailyGain,
-        transferStatus: transferPerformance?.status ?? "No transfer",
-        transferDate: transferPerformance?.transferDate ?? null,
-        postTransferAdg: transferPerformance?.postAdg ?? null,
-        baselineAdg: transferPerformance?.baselineAdg ?? null,
-      }
+  }, [dashboardRowBySystemId, harvestBySystem, samplingSeriesBySystem, scopedSystemIdList, systemNameById])
+
+  const bestGrowthSystem = useMemo(() => {
+    return (
+      growthSystemRows
+        .filter((row) => row.samples > 0 && row.latestAbw != null)
+        .sort((left, right) => right.samples - left.samples || (right.latestAbw ?? 0) - (left.latestAbw ?? 0))[0] ??
+      null
+    )
+  }, [growthSystemRows])
+
+  const bestGrowthTrajectory = useMemo(() => {
+    if (!bestGrowthSystem) return []
+    return (samplingSeriesBySystem.get(bestGrowthSystem.systemId) ?? []).map((row) => ({
+      date: row.date,
+      label: formatDayLabel(row.date),
+      abw: row.abw,
+    }))
+  }, [bestGrowthSystem, samplingSeriesBySystem])
+
+  const currentAbwRows = useMemo(
+    () =>
+      growthSystemRows
+        .filter((row) => row.latestAbw != null)
+        .sort((left, right) => (right.latestAbw ?? 0) - (left.latestAbw ?? 0))
+        .map((row) => ({ systemId: row.systemId, label: row.label, abw: row.latestAbw ?? 0 })),
+    [growthSystemRows],
+  )
+
+  const sgrRows = useMemo(
+    () =>
+      growthSystemRows
+        .filter((row) => row.overallSgr != null)
+        .sort((left, right) => (right.overallSgr ?? 0) - (left.overallSgr ?? 0))
+        .map((row) => ({ systemId: row.systemId, label: row.label, sgr: row.overallSgr ?? 0 })),
+    [growthSystemRows],
+  )
+
+  const harvestGranularity = useMemo(() => getBucketGranularity(timePeriod), [timePeriod])
+  const harvestGranularityLabel = useMemo(() => formatGranularityLabel(harvestGranularity), [harvestGranularity])
+
+  const harvestTimelineSystems = useMemo(
+    () =>
+      growthSystemRows
+        .filter((row) => row.totalHarvestKg > 0)
+        .sort((left, right) => right.totalHarvestKg - left.totalHarvestKg)
+        .slice(0, 4)
+        .map((row) => ({ systemId: row.systemId, label: row.label })),
+    [growthSystemRows],
+  )
+
+  const harvestTimelineRows = useMemo(() => {
+    if (harvestTimelineSystems.length === 0) return []
+
+    const buckets = Array.from(
+      new Set(
+        productionRows
+          .map((row) => getBucketKey(row.date, harvestGranularity))
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ).sort()
+
+    const bySystemBucket = new Map<string, number>()
+    productionRows.forEach((row) => {
+      if (row.system_id == null) return
+      const key = getBucketKey(row.date, harvestGranularity)
+      if (!key) return
+      bySystemBucket.set(
+        `${row.system_id}:${key}`,
+        (bySystemBucket.get(`${row.system_id}:${key}`) ?? 0) + (row.total_weight_harvested ?? 0),
+      )
     })
 
-    return rows.sort((a, b) => a.systemName.localeCompare(b.systemName))
-  }, [filteredRows, systemNameById, transferPerformanceBySystem])
+    const cumulative = new Map<number, number>()
+    return buckets.map((bucket) => {
+      const current: Record<string, string | number> = {
+        bucket,
+        label: formatBucketLabel(bucket, harvestGranularity),
+      }
+      harvestTimelineSystems.forEach((row) => {
+        const bucketHarvest = bySystemBucket.get(`${row.systemId}:${bucket}`) ?? 0
+        const nextValue = (cumulative.get(row.systemId) ?? 0) + bucketHarvest
+        cumulative.set(row.systemId, nextValue)
+        current[`system_${row.systemId}`] = nextValue
+      })
+      return current
+    })
+  }, [harvestGranularity, harvestTimelineSystems, productionRows])
 
   const latestAbw = chartRows.length > 0 ? chartRows[chartRows.length - 1]?.abw ?? null : null
   const avgAbw = chartRows.length > 0 ? chartRows.reduce((sum, row) => sum + (row.abw ?? 0), 0) / chartRows.length : null
@@ -495,6 +460,7 @@ export default function SamplingPage() {
   const projection = useMemo(() => {
     const points = chartRows.filter((row) => typeof row.abw === "number") as Array<{ date: string; abw: number }>
     if (points.length < 2) return null
+    if (targetWeightG == null || !Number.isFinite(targetWeightG) || targetWeightG <= 0) return null
     const last = points[points.length - 1]
     const prev = points[points.length - 2]
     const days = safeDayDiff(prev.date, last.date)
@@ -503,7 +469,6 @@ export default function SamplingPage() {
     const sgr = ((Math.log(last.abw) - Math.log(prev.abw)) / days) * 100
     if (!Number.isFinite(sgr) || sgr <= 0) return null
     const target = targetWeightG
-    if (!Number.isFinite(target) || target <= 0) return null
     const remaining =
       Math.log(target) - Math.log(last.abw)
     if (!Number.isFinite(remaining)) return null
@@ -523,32 +488,6 @@ export default function SamplingPage() {
     }
   }, [chartRows, targetWeightG])
 
-  const chartDisplayRows = useMemo(() => {
-    if (chartRows.length === 0) return []
-    const rows = chartRows.map((row) => ({
-      ...row,
-      projectionAbw: null as number | null,
-    }))
-    if (projection && projection.daysToTarget > 0) {
-      rows[rows.length - 1] = {
-        ...rows[rows.length - 1],
-        projectionAbw: rows[rows.length - 1].abw ?? null,
-      }
-      const projectedDateString = projection.projectedDate.toISOString().split("T")[0]
-      const daySinceStart = safeDayDiff(chartRows[0].date, projectedDateString) ?? 0
-      rows.push({
-        date: projectedDateString,
-        abw: null,
-        fishSampled: 0,
-        totalWeight: 0,
-        targetAbw: resolveTargetAbw(daySinceStart, targetCurvePoints),
-        projectionAbw: projection.targetWeight,
-        label: formatDayLabel(projectedDateString),
-      })
-    }
-    return rows
-  }, [chartRows, projection, targetCurvePoints])
-
   const projectionLabel = resolvedStage === "nursing" ? "Estimated Move Date" : "Estimated Harvest Date"
 
   const selectedSystemRow = hasSystem ? dashboardRowBySystemId.get(systemId as number) ?? null : null
@@ -557,7 +496,7 @@ export default function SamplingPage() {
   const volumeM3 = hasSystem ? volumeBySystemId.get(systemId as number) ?? null : null
   const abwKg = abwForCapacity != null && abwForCapacity > 0 ? abwForCapacity / 1000 : null
   const targetBiomassKg =
-    volumeM3 != null && Number.isFinite(volumeM3) ? volumeM3 * targetDensityKgM3 : null
+    volumeM3 != null && Number.isFinite(volumeM3) && targetDensityKgM3 != null ? volumeM3 * targetDensityKgM3 : null
   const maxFish =
     targetBiomassKg != null && abwKg != null && abwKg > 0 ? targetBiomassKg / abwKg : null
   const utilization =
@@ -576,32 +515,13 @@ export default function SamplingPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 rounded-lg border border-border/80 bg-card p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-3xl font-bold">Growth</h1>
-              <p className="text-muted-foreground mt-1">ABW trends, projection, and movement or harvest readiness</p>
-            </div>
-            <div className="flex flex-col items-end gap-1 text-xs">
-              <DataUpdatedAt updatedAt={latestUpdatedAt} />
-              <DataFetchingBadge isFetching={samplingQuery.isFetching || systemsTableQuery.isFetching} isLoading={loading} />
-            </div>
-          </div>
-        </div>
-
-        <TimelineIntegrityNote
-          systemId={hasSystem ? systemId : undefined}
-          dateFrom={dateFrom ?? null}
-          dateTo={dateTo ?? null}
-        />
-
         {errorMessages.length > 0 ? (
           <DataErrorState
             title="Unable to load sampling data"
             description={errorMessages[0]}
             onRetry={() => {
               samplingQuery.refetch()
-              transferQuery.refetch()
+              productionSummaryQuery.refetch()
               systemsQuery.refetch()
               batchSystemsQuery.refetch()
               systemsTableQuery.refetch()
@@ -634,13 +554,13 @@ export default function SamplingPage() {
           volumeM3={volumeM3}
           targetBiomassKg={targetBiomassKg}
           loading={loading}
-          chartDisplayRows={chartDisplayRows}
-          transferMarkers={transferMarkers}
-          growthRows={growthRows}
-          tableEnabled={tableEnabled}
-          latestUpdatedAt={latestUpdatedAt}
-          isFetching={samplingQuery.isFetching || systemsTableQuery.isFetching}
-          onSelectHistorySystem={setSelectedHistorySystemId}
+          bestGrowthSystem={bestGrowthSystem}
+          bestGrowthTrajectory={bestGrowthTrajectory}
+          currentAbwRows={currentAbwRows}
+          sgrRows={sgrRows}
+          harvestTimelineRows={harvestTimelineRows}
+          harvestTimelineSystems={harvestTimelineSystems}
+          harvestGranularityLabel={harvestGranularityLabel}
         />
         <SystemHistorySheet
           open={selectedHistorySystemId !== null}

@@ -25,7 +25,7 @@ export function useScopedSystemIds(params: Params) {
   const systemsQuery = useSystemOptions({
     farmId: params.farmId,
     stage: params.selectedStage,
-    activeOnly: true,
+    activeOnly: false,
     enabled: params.enabled,
     initialData: params.initialSystemsData,
   })
@@ -36,6 +36,8 @@ export function useScopedSystemIds(params: Params) {
     enabled: params.enabled,
     initialData: params.initialBatchSystemsData,
   })
+
+  const hasScopeFilters = hasSystem || params.selectedStage !== "all" || params.selectedBatch !== "all"
 
   const scopedSystemIdList = useMemo(() => {
     const stageIds =
@@ -59,6 +61,7 @@ export function useScopedSystemIds(params: Params) {
   return {
     selectedSystemId,
     hasSystem,
+    hasScopeFilters,
     batchId,
     scopedSystemIdList,
     scopedSystemIds,

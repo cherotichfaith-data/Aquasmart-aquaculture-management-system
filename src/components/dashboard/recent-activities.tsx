@@ -32,7 +32,7 @@ export default function RecentActivities({
   const { farmId: activeFarmId } = useActiveFarm()
   const farmId = initialFarmId ?? activeFarmId
   const entriesQuery = useRecentEntries({ farmId, initialData: initialEntries })
-  const systemsQuery = useSystemOptions({ farmId, activeOnly: true, initialData: initialSystems })
+  const systemsQuery = useSystemOptions({ farmId, activeOnly: false, initialData: initialSystems })
   const loading = entriesQuery.isLoading || systemsQuery.isLoading
   const entryErrors = useMemo(() => {
     const data = entriesQuery.data
@@ -107,7 +107,7 @@ export default function RecentActivities({
         system_id: row.system_id ?? null,
         batch_id: null,
       })),
-      ...normalize(data.incoming_feed?.status === "success" ? data.incoming_feed.data : [], "feed_incoming", (_row: any) => ({
+      ...normalize(data.incoming_feed?.status === "success" ? data.incoming_feed.data : [], "feed_inventory_snapshot", (_row: any) => ({
         system_id: null,
         batch_id: null,
       })),
@@ -161,7 +161,8 @@ export default function RecentActivities({
         return "fish_harvest"
       case "incoming_feed_events":
       case "feed_incoming":
-        return "feed_incoming"
+      case "feed_inventory_snapshot":
+        return "feed_inventory_snapshot"
       case "stocking_events":
       case "fish_stocking":
         return "fish_stocking"
@@ -184,7 +185,7 @@ export default function RecentActivities({
         return <CornerDownRight size={16} />
       case "fish_harvest":
         return <Fish size={16} />
-      case "feed_incoming":
+      case "feed_inventory_snapshot":
         return <Clock size={16} />
       case "fish_stocking":
         return <Fish size={16} />
@@ -207,7 +208,7 @@ export default function RecentActivities({
         return "bg-chart-4/15 text-chart-4"
       case "fish_harvest":
         return "bg-chart-2/15 text-chart-2"
-      case "feed_incoming":
+      case "feed_inventory_snapshot":
         return "bg-chart-3/15 text-chart-3"
       case "fish_stocking":
         return "bg-chart-2/15 text-chart-2"
@@ -230,8 +231,8 @@ export default function RecentActivities({
         return "Transfer"
       case "fish_harvest":
         return "Harvest"
-      case "feed_incoming":
-        return "Incoming feed"
+      case "feed_inventory_snapshot":
+        return "Feed inventory"
       case "fish_stocking":
         return "Stocking"
       default:

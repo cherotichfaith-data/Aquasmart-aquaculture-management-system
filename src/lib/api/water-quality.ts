@@ -1,6 +1,13 @@
 import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryKpiRpc, queryOptionsView, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import {
+  getClientOrError,
+  isAbortLikeError,
+  queryKpiRpc,
+  queryOptionsView,
+  toQueryError,
+  toQuerySuccess,
+} from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 type OverlayRow = Database["public"]["Functions"]["api_daily_overlay"]["Returns"][number]
@@ -10,20 +17,6 @@ type SyncStatusRow = Database["public"]["Functions"]["api_water_quality_sync_sta
 type MeasurementRow = Tables<"api_water_quality_measurements">
 type DailyRatingRow = Tables<"api_daily_water_quality_rating">
 type ThresholdRow = Tables<"api_alert_thresholds">
-
-const isAbortLikeError = (err: unknown): boolean => {
-  if (!err) return false
-  const e = err as { name?: string; message?: string }
-  const name = String(e.name ?? "").toLowerCase()
-  const message = String(e.message ?? "").toLowerCase()
-  return (
-    name.includes("abort") ||
-    name.includes("cancel") ||
-    message.includes("abort") ||
-    message.includes("cancel") ||
-    message.includes("canceled")
-  )
-}
 
 const isQuietError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)

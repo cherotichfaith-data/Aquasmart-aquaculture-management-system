@@ -21,6 +21,11 @@ export function useProductionSummaryMetrics(params: {
   initialData?: ProductionSummaryMetrics
 }) {
   const { session } = useAuth()
+  const hasBounds = Boolean(params.dateFrom) && Boolean(params.dateTo)
+  const canUseInitialData =
+    hasBounds &&
+    params.initialData?.dateBounds.start === params.dateFrom &&
+    params.initialData?.dateBounds.end === params.dateTo
 
   return useQuery({
     queryKey: [
@@ -36,8 +41,9 @@ export function useProductionSummaryMetrics(params: {
     queryFn: async ({ signal }) => {
       const empty: ProductionSummaryMetrics = {
         totalStockedFish: 0,
-        totalMortalities: 0,
-        netTransferAdjustments: 0,
+        cumulativeMortality: 0,
+        transferInFish: 0,
+        transferOutFish: 0,
         totalHarvestedFish: 0,
         totalHarvestedKg: 0,
         dateBounds: { start: null, end: null },
@@ -107,44 +113,48 @@ export function useProductionSummaryMetrics(params: {
         : summaryResult.data
 
       let totalStockedFish = 0
-      let totalMortalities = 0
+      let cumulativeMortality = 0
       let totalHarvestedFish = 0
       let totalHarvestedKg = 0
+      let transferInFish = 0
+      let transferOutFish = 0
 
       filtered.forEach((row) => {
         totalStockedFish += row.number_of_fish_stocked ?? 0
-        totalMortalities += row.daily_mortality_count ?? 0
+        cumulativeMortality += row.daily_mortality_count ?? 0
         totalHarvestedFish += row.number_of_fish_harvested ?? 0
         totalHarvestedKg += row.total_weight_harvested ?? 0
       })
 
-      const netTransferAdjustments =
-        scopedSet === null
-          ? 0
-          : transferResult.data.reduce((sum, row) => {
-              const count = row.number_of_fish_transfer ?? 0
-              const originInScope = scopedSet.has(row.origin_system_id)
-              const targetInScope = scopedSet.has(row.target_system_id)
+      if (scopedSet !== null) {
+        transferResult.data.forEach((row) => {
+          const count = row.number_of_fish_transfer ?? 0
+          const originInScope = scopedSet.has(row.origin_system_id)
+          const targetInScope = row.target_system_id != null && scopedSet.has(row.target_system_id)
 
-              if (targetInScope && !originInScope) return sum + count
-              if (originInScope && !targetInScope) return sum - count
-              return sum
-            }, 0)
+          if (targetInScope && !originInScope) {
+            transferInFish += count
+          } else if (originInScope && !targetInScope) {
+            transferOutFish += count
+          }
+        })
+      }
 
       return {
         totalStockedFish,
-        totalMortalities,
-        netTransferAdjustments,
+        cumulativeMortality,
+        transferInFish,
+        transferOutFish,
         totalHarvestedFish,
         totalHarvestedKg,
         dateBounds: { start: dateFrom, end: dateTo },
       } as ProductionSummaryMetrics
     },
-    enabled: Boolean(session) && Boolean(params.farmId),
+    enabled: Boolean(session) && Boolean(params.farmId) && hasBounds,
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: true,
-    initialData: params.initialData,
-    initialDataUpdatedAt: params.initialData ? 0 : undefined,
+    initialData: canUseInitialData ? params.initialData : undefined,
+    initialDataUpdatedAt: canUseInitialData ? 0 : undefined,
   })
 }

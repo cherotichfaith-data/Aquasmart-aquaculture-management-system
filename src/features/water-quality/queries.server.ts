@@ -208,7 +208,13 @@ export async function getWaterQualityPageInitialData(params: {
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
 
   const [bounds, systemOptions, batchSystems, syncStatus, latestStatus, thresholds] = await Promise.all([
-    getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "water_quality"),
+    getScopedTimeBounds(
+      supabase,
+      params.farmId,
+      params.filters.timePeriod,
+      "water_quality",
+      selectedSystemId,
+    ),
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<
       WaterQualitySystemOption[]
     >,

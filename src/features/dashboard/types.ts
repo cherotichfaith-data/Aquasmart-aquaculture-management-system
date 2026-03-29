@@ -1,7 +1,6 @@
 import type { Database, Enums } from "@/lib/types/database"
-import type { TimeBounds } from "@/lib/api/dashboard"
 import type { QueryResult } from "@/lib/supabase-client"
-import type { TimePeriod } from "@/lib/time-period"
+import type { TimeBounds, TimePeriod } from "@/lib/time-period"
 
 export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
 export type DashboardTimePeriod = TimePeriod
@@ -17,7 +16,7 @@ export type DashboardRecentEntriesData = {
   transfer: QueryResult<Database["public"]["Tables"]["fish_transfer"]["Row"]>
   harvest: QueryResult<Database["public"]["Tables"]["fish_harvest"]["Row"]>
   water_quality: QueryResult<Database["public"]["Tables"]["water_quality_measurement"]["Row"]>
-  incoming_feed: QueryResult<Database["public"]["Tables"]["feed_incoming"]["Row"]>
+  incoming_feed: QueryResult<Database["public"]["Tables"]["feed_inventory_snapshot"]["Row"]>
   stocking: QueryResult<Database["public"]["Tables"]["fish_stocking"]["Row"]>
   systems: QueryResult<Database["public"]["Tables"]["system"]["Row"]>
 }
@@ -29,6 +28,9 @@ export type KPIOverviewMetric = {
   unit?: string
   decimals?: number
   trend: number | null
+  trendFormat?: "percent" | "delta"
+  trendDecimals?: number
+  trendUnit?: string
   invertTrend: boolean
   tone?: "good" | "warn" | "bad" | "neutral"
   badge?: string
@@ -43,8 +45,9 @@ export type RecommendedAction = {
 
 export type ProductionSummaryMetrics = {
   totalStockedFish: number
-  totalMortalities: number
-  netTransferAdjustments: number
+  cumulativeMortality: number
+  transferInFish: number
+  transferOutFish: number
   totalHarvestedFish: number
   totalHarvestedKg: number
   dateBounds: { start: string | null; end: string | null }

@@ -1,18 +1,7 @@
 "use client"
 
-import type { Enums } from "@/lib/types/database"
 import { sortByDateAsc } from "@/lib/utils"
 import { formatCompactDate } from "@/lib/analytics-format"
-import type { TimePeriod } from "@/components/shared/time-period-selector"
-import { resolveTimePeriod } from "@/lib/time-period"
-
-export const parseStageParam = (value: string | null): "all" | Enums<"system_growth_stage"> => {
-  if (value === "nursing" || value === "grow_out") return value
-  return "all"
-}
-
-export const resolveProductionPeriodParam = (periodParam: string | null): TimePeriod =>
-  resolveTimePeriod(periodParam)
 
 function averageByDate(items: Array<{ date: string; value: number | null }>) {
   const byDate = new Map<string, { sum: number; count: number }>()
@@ -82,24 +71,26 @@ export function buildProductionChartRows(params: {
     )
   } else if (metricFilter === "abw") {
     chartRows = weightedByDate(
-      productionRows.map((row) => ({
-        date: row.date ?? "",
-        value: row.average_body_weight ?? null,
-        weight: row.number_of_fish_inventory ?? null,
-      })),
+      productionRows
+        .filter((row) => row.activity === "sampling")
+        .map((row) => ({
+          date: row.date ?? "",
+          value: row.average_body_weight ?? null,
+          weight: row.number_of_fish_inventory ?? null,
+        })),
     )
   } else if (metricFilter === "mortality") {
     chartRows = averageByDate(
       inventoryRows.map((row) => ({
         date: row.inventory_date ?? "",
-        value: row.mortality_rate ?? null,
+        value: typeof row.mortality_rate === "number" ? row.mortality_rate * 100 : null,
       })),
     )
   } else if (metricFilter === "feeding") {
     chartRows = averageByDate(
       inventoryRows.map((row) => ({
         date: row.inventory_date ?? "",
-        value: row.feeding_rate ?? null,
+        value: typeof row.feeding_rate === "number" ? row.feeding_rate * 100 : null,
       })),
     )
   } else if (metricFilter === "density") {

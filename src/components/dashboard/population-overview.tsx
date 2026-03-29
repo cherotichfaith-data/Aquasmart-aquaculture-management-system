@@ -31,6 +31,7 @@ export default function PopulationOverview({
     dateTo,
     farmId: initialFarmId,
     initialData,
+    initialBounds,
 }: {
     stage?: "all" | Enums<"system_growth_stage"> | null
     batch?: string
@@ -41,9 +42,13 @@ export default function PopulationOverview({
     dateTo?: string
     farmId?: string | null
     initialData?: DashboardPageInitialData["productionTrend"]
+    initialBounds?: DashboardPageInitialData["bounds"]
 }) {
     const { farmId: activeFarmId } = useActiveFarm()
     const farmId = activeFarmId ?? initialFarmId
+    const boundsReady = Boolean(dateFrom && dateTo)
+    const canUseInitialData =
+        boundsReady && initialBounds?.start === dateFrom && initialBounds?.end === dateTo
     const summaryQuery = useProductionTrend({
         farmId,
         stage: stage && stage !== "all" ? stage : undefined,
@@ -53,7 +58,7 @@ export default function PopulationOverview({
         scopedSystemIds,
         dateFrom: dateFrom ?? null,
         dateTo: dateTo ?? null,
-        initialData,
+        initialData: canUseInitialData ? initialData : undefined,
     })
 
     const chartData = useMemo(() => {
@@ -113,7 +118,7 @@ export default function PopulationOverview({
                     <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
                 </CardHeader>
                 <CardContent className="pt-4">
-                    {summaryQuery.isLoading ? (
+                    {!boundsReady || summaryQuery.isLoading ? (
                         <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
                     ) : chartData.length ? (
                         <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
@@ -152,7 +157,7 @@ export default function PopulationOverview({
                     <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
                 </CardHeader>
                 <CardContent className="pt-4">
-                    {summaryQuery.isLoading ? (
+                    {!boundsReady || summaryQuery.isLoading ? (
                         <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
                     ) : chartData.length ? (
                         <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>

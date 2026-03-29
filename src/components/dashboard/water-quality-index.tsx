@@ -31,9 +31,9 @@ const getWqiLabel = (value: number | null) => {
 
 const scoreDissolvedOxygen = (value: number | null, lowDoThreshold: number) => {
   if (value == null) return null
-  if (value >= lowDoThreshold * 1.2) return 90
+  if (value >= lowDoThreshold + 2) return 90
   if (value >= lowDoThreshold) return 60
-  if (value >= lowDoThreshold * 0.8) return 30
+  if (value >= lowDoThreshold - 1) return 30
   return 0
 }
 
@@ -116,6 +116,7 @@ export default function WaterQualityIndex({
   initialBatchSystemsData,
   initialMeasurements,
   initialThresholds,
+  initialBounds,
 }: {
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
@@ -129,10 +130,13 @@ export default function WaterQualityIndex({
   initialBatchSystemsData?: DashboardPageInitialData["batchSystems"]
   initialMeasurements?: DashboardPageInitialData["waterQualityMeasurements"]
   initialThresholds?: DashboardPageInitialData["alertThresholds"]
+  initialBounds?: DashboardPageInitialData["bounds"]
 }) {
   const { farmId: activeFarmId } = useActiveFarm()
   const farmId = activeFarmId ?? initialFarmId
   const boundsReady = Boolean(dateFrom && dateTo)
+  const canUseInitialMeasurements =
+    boundsReady && initialBounds?.start === dateFrom && initialBounds?.end === dateTo
 
   const scopedSystems = useScopedSystemIds({
     farmId,
@@ -154,7 +158,7 @@ export default function WaterQualityIndex({
     requireSystem: false,
     limit: 2000,
     enabled: boundsReady,
-    initialData: initialMeasurements,
+    initialData: canUseInitialMeasurements ? initialMeasurements : undefined,
   })
 
   const thresholdsQuery = useAlertThresholds({ farmId, initialData: initialThresholds })
@@ -162,7 +166,7 @@ export default function WaterQualityIndex({
     const rows = getRows(thresholdsQuery.data)
     return rows.find((row: any) => row.scope === "farm" && row.system_id == null) ?? rows[0] ?? null
   }, [thresholdsQuery.data])
-  const lowDoThreshold = thresholdRow?.low_do_threshold ?? 4
+  const lowDoThreshold = thresholdRow?.low_do_threshold ?? 5
 
   const temperatureStats = useMemo(() => {
     const scope = new Set(scopedSystemIdList)

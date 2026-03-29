@@ -205,12 +205,13 @@ export function FeedMatrixSection({
     })
     return map
   }, [cells])
+  const dateWindowLabel = dates.length === 1 ? "1 day" : `${dates.length} days`
 
   return (
     <Card className="overflow-hidden">
       <CardHeader className="border-b border-border/70 bg-muted/20">
         <CardTitle>Cage Feed Deviation</CardTitle>
-        <CardDescription>Last 14 days of ration variance by cage.</CardDescription>
+        <CardDescription>{`${dateWindowLabel} of ration variance within the selected time period.`}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
         {loading ? (

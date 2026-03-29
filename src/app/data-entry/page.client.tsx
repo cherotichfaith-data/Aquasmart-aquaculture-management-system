@@ -6,13 +6,15 @@ import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataEntryInterface } from "@/components/data-entry/data-entry-interface"
 import { SystemForm } from "@/components/data-entry/system-form"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { useBatchOptions, useFeedTypeOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { useRecentEntries } from "@/lib/hooks/use-reports"
-import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { DataErrorState } from "@/components/shared/data-states"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
 export default function DataEntryPageClient() {
   const { farmId } = useActiveFarm()
+  const activeFarmRoleQuery = useActiveFarmRole(farmId)
 
   const systemsQuery = useSystemOptions({ farmId })
   const batchesQuery = useBatchOptions({ farmId })
@@ -24,7 +26,13 @@ export default function DataEntryPageClient() {
   const batchParam = searchParams.get("batch")
 
   const defaultTab = useMemo(() => {
-    if (!typeParam) return "stocking"
+    if (!typeParam) {
+      const role = activeFarmRoleQuery.data
+      if (role === "system_operator") return "feeding"
+      if (role === "data_analyst") return "sampling"
+      if (role === "viewer") return "feeding"
+      return "feeding"
+    }
     const normalized = typeParam.toLowerCase()
     if (normalized === "system") return "system"
     if (normalized === "stocking") return "stocking"
@@ -35,8 +43,8 @@ export default function DataEntryPageClient() {
     if (normalized === "harvest") return "harvest"
     if (normalized === "incoming_feed" || normalized === "incoming-feed") return "incoming_feed"
     if (normalized === "water_quality" || normalized === "water-quality") return "water_quality"
-    return "stocking"
-  }, [typeParam])
+    return "feeding"
+  }, [activeFarmRoleQuery.data, typeParam])
   const defaultSystemId = useMemo(() => {
     const parsed = Number(systemParam)
     return Number.isFinite(parsed) ? parsed : null
@@ -118,22 +126,8 @@ export default function DataEntryPageClient() {
   )
 
   return (
-    <DashboardLayout>
-      <div className="container mx-auto py-8">
-        <div className="flex flex-col gap-2 mb-6 rounded-lg border border-border/80 bg-card p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Data Capture</h1>
-              <p className="text-muted-foreground">
-                Record farm operations and measurements.
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1 text-xs">
-              <DataUpdatedAt updatedAt={latestUpdatedAt} />
-              <DataFetchingBadge isFetching={recentEntriesQuery.isFetching} isLoading={loading} />
-            </div>
-          </div>
-        </div>
+    <DashboardLayout showHeaderToolbar={false}>
+      <div className="container mx-auto py-0 sm:py-0">
         {systemsErrorMessages.length > 0 ? (
           <DataErrorState
             title="Unable to load systems"

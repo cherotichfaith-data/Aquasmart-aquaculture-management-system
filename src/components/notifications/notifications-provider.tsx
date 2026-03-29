@@ -12,14 +12,10 @@ import { useRouter } from "next/navigation"
 import type { Tables } from "@/lib/types/database"
 
 type AlertThresholdRow = Tables<"alert_threshold">
-type AlertThresholdWithFeeding = AlertThresholdRow & {
-  low_feeding_rate_threshold?: number | null
-  high_feeding_rate_threshold?: number | null
-}
 type WaterQualityRow = Tables<"water_quality_measurement">
 type DailyInventoryRow = Tables<"daily_fish_inventory_table">
 
-type NotificationKind = "water_quality" | "mortality" | "feeding"
+type NotificationKind = "water_quality" | "mortality"
 type NotificationSeverity = "warning" | "critical"
 
 export type AlertNotification = {
@@ -48,6 +44,7 @@ const NotificationsContext = createContext<NotificationsContextValue | undefined
 const MAX_NOTIFICATIONS = 50
 
 const formatNumber = (value: number, decimals = 2) => Number(value.toFixed(decimals))
+const formatPercent = (value: number, decimals = 2) => formatNumber(value * 100, decimals)
 
 const isAbortLikeError = (err: unknown): boolean => {
   if (!err) return false
@@ -323,13 +320,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
           const systemLabel = buildSystemLabel(systemMap, row.system_id)
           if (threshold.high_mortality_threshold != null && row.mortality_rate != null) {
-            if (row.mortality_rate > threshold.high_mortality_threshold) {
+            const mortalityPercent = row.mortality_rate * 100
+            if (mortalityPercent > threshold.high_mortality_threshold) {
               addNotification({
                 id: `mortality-${row.id}`,
                 title: "High Mortality Rate",
-                description: `${systemLabel} mortality is ${formatNumber(row.mortality_rate)}% (threshold ${formatNumber(
+                description: `${systemLabel} mortality is ${formatPercent(row.mortality_rate)}%/day (threshold ${formatNumber(
                   threshold.high_mortality_threshold,
-                )}%).`,
+                )}%/day).`,
                 createdAt: row.inventory_date ?? new Date().toISOString(),
                 systemId: row.system_id,
                 kind: "mortality",
@@ -337,46 +335,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 read: false,
                 href: `/reports?tab=mortality&system=${row.system_id}`,
                 actionLabel: "View mortality",
-              })
-            }
-          }
-
-          const feedingRate = row.feeding_rate
-          const typedThreshold = threshold as AlertThresholdWithFeeding
-          const lowFeed = typedThreshold.low_feeding_rate_threshold
-          const highFeed = typedThreshold.high_feeding_rate_threshold
-
-          if (typeof feedingRate === "number") {
-            if (typeof lowFeed === "number" && feedingRate < lowFeed) {
-              addNotification({
-                id: `feeding-low-${row.id}`,
-                title: "Low Feeding Rate",
-                description: `${systemLabel} feeding rate is ${formatNumber(feedingRate)} kg/t (threshold ${formatNumber(
-                  lowFeed,
-                )}).`,
-                createdAt: row.inventory_date ?? new Date().toISOString(),
-                systemId: row.system_id,
-                kind: "feeding",
-                severity: "warning",
-                read: false,
-                href: `/feed?system=${row.system_id}`,
-                actionLabel: "Review feeding",
-              })
-            }
-            if (typeof highFeed === "number" && feedingRate > highFeed) {
-              addNotification({
-                id: `feeding-high-${row.id}`,
-                title: "High Feeding Rate",
-                description: `${systemLabel} feeding rate is ${formatNumber(feedingRate)} kg/t (threshold ${formatNumber(
-                  highFeed,
-                )}).`,
-                createdAt: row.inventory_date ?? new Date().toISOString(),
-                systemId: row.system_id,
-                kind: "feeding",
-                severity: "warning",
-                read: false,
-                href: `/feed?system=${row.system_id}`,
-                actionLabel: "Review feeding",
               })
             }
           }

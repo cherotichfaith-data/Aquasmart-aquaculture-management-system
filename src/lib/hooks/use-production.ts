@@ -33,7 +33,7 @@ export function useProductionSummary(params?: {
     queryFn: ({ signal }) => getProductionSummary({ ...params, signal }),
     enabled,
     staleTime: 5 * 60_000,
-    initialData: params?.initialData,
-    initialDataUpdatedAt: params?.initialData ? 0 : undefined,
+    initialData: enabled ? params?.initialData : undefined,
+    initialDataUpdatedAt: enabled && params?.initialData ? 0 : undefined,
   })
 }

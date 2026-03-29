@@ -93,8 +93,6 @@ export default function SettingsPage() {
       lowDoThreshold: thresholdRow?.low_do_threshold ?? prev.lowDoThreshold,
       highAmmoniaThreshold: thresholdRow?.high_ammonia_threshold ?? prev.highAmmoniaThreshold,
       highMortalityThreshold: thresholdRow?.high_mortality_threshold ?? prev.highMortalityThreshold,
-      lowFeedingRateThreshold: thresholdRow?.low_feeding_rate_threshold ?? prev.lowFeedingRateThreshold,
-      highFeedingRateThreshold: thresholdRow?.high_feeding_rate_threshold ?? prev.highFeedingRateThreshold,
     }))
     setHasLoadedSettings(true)
     setLoading(false)

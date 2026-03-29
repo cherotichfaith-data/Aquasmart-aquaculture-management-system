@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   public: {
     Tables: {
       _affected_systems: {
@@ -113,13 +108,6 @@ export type Database = {
             foreignKeyName: "alert_log_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "alert_log_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -179,13 +167,6 @@ export type Database = {
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "analytics_system_day_mv"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "alert_threshold_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
             referencedColumns: ["system_id"]
           },
           {
@@ -328,13 +309,6 @@ export type Database = {
             foreignKeyName: "daily_fish_inventory_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "daily_fish_inventory_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -399,32 +373,10 @@ export type Database = {
             foreignKeyName: "daily_water_quality_rating_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "daily_water_quality_rating_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
         ]
-      }
-      dashboard_time_period: {
-        Row: {
-          days_since_start: number
-          time_period: Database["public"]["Enums"]["time_period"]
-        }
-        Insert: {
-          days_since_start: number
-          time_period: Database["public"]["Enums"]["time_period"]
-        }
-        Update: {
-          days_since_start?: number
-          time_period?: Database["public"]["Enums"]["time_period"]
-        }
-        Relationships: []
       }
       farm: {
         Row: {
@@ -527,6 +479,63 @@ export type Database = {
           },
         ]
       }
+      feed_inventory_snapshot: {
+        Row: {
+          bag_weight_kg: number
+          created_at: string
+          date: string
+          farm_id: string
+          feed_type_id: number
+          id: number
+          notes: string | null
+          number_of_bags: number
+          open_bags_kg: number
+          snapshot_time: string
+          total_stock_kg: number | null
+        }
+        Insert: {
+          bag_weight_kg: number
+          created_at?: string
+          date: string
+          farm_id: string
+          feed_type_id: number
+          id?: number
+          notes?: string | null
+          number_of_bags: number
+          open_bags_kg?: number
+          snapshot_time: string
+          total_stock_kg?: number | null
+        }
+        Update: {
+          bag_weight_kg?: number
+          created_at?: string
+          date?: string
+          farm_id?: string
+          feed_type_id?: number
+          id?: number
+          notes?: string | null
+          number_of_bags?: number
+          open_bags_kg?: number
+          snapshot_time?: string
+          total_stock_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_inventory_snapshot_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farm"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_inventory_snapshot_feed_type_id_fkey"
+            columns: ["feed_type_id"]
+            isOneToOne: false
+            referencedRelation: "feed_type"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feed_plan: {
         Row: {
           abw_max_g: number | null
@@ -615,13 +624,6 @@ export type Database = {
             foreignKeyName: "feed_plan_system_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "feed_plan_system_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -701,6 +703,7 @@ export type Database = {
           feeding_amount: number
           feeding_response: Database["public"]["Enums"]["feeding_response"]
           id: number
+          notes: string | null
           system_id: number
         }
         Insert: {
@@ -711,6 +714,7 @@ export type Database = {
           feeding_amount: number
           feeding_response: Database["public"]["Enums"]["feeding_response"]
           id?: number
+          notes?: string | null
           system_id: number
         }
         Update: {
@@ -721,6 +725,7 @@ export type Database = {
           feeding_amount?: number
           feeding_response?: Database["public"]["Enums"]["feeding_response"]
           id?: number
+          notes?: string | null
           system_id?: number
         }
         Relationships: [
@@ -736,13 +741,6 @@ export type Database = {
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "analytics_system_day_mv"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "feed_record_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
             referencedColumns: ["system_id"]
           },
           {
@@ -900,13 +898,6 @@ export type Database = {
             foreignKeyName: "fish_harvest_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "fish_harvest_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -988,13 +979,6 @@ export type Database = {
             foreignKeyName: "mortality_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "mortality_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -1007,6 +991,7 @@ export type Database = {
           created_at: string
           date: string
           id: number
+          notes: string | null
           number_of_fish_sampling: number
           system_id: number
           total_weight_sampling: number
@@ -1017,6 +1002,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: number
+          notes?: string | null
           number_of_fish_sampling: number
           system_id: number
           total_weight_sampling: number
@@ -1027,6 +1013,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: number
+          notes?: string | null
           number_of_fish_sampling?: number
           system_id?: number
           total_weight_sampling?: number
@@ -1051,13 +1038,6 @@ export type Database = {
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "analytics_system_day_mv"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "fish_weight_sampling_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
             referencedColumns: ["system_id"]
           },
           {
@@ -1132,13 +1112,6 @@ export type Database = {
             foreignKeyName: "stocking_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "stocking_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -1150,10 +1123,12 @@ export type Database = {
           batch_id: number | null
           created_at: string
           date: string
+          external_target_name: string | null
           id: number
+          notes: string | null
           number_of_fish_transfer: number
           origin_system_id: number
-          target_system_id: number
+          target_system_id: number | null
           total_weight_transfer: number
           transfer_type: Database["public"]["Enums"]["transfer_type"]
         }
@@ -1162,10 +1137,12 @@ export type Database = {
           batch_id?: number | null
           created_at?: string
           date: string
+          external_target_name?: string | null
           id?: number
+          notes?: string | null
           number_of_fish_transfer: number
           origin_system_id: number
-          target_system_id: number
+          target_system_id?: number | null
           total_weight_transfer: number
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
         }
@@ -1174,10 +1151,12 @@ export type Database = {
           batch_id?: number | null
           created_at?: string
           date?: string
+          external_target_name?: string | null
           id?: number
+          notes?: string | null
           number_of_fish_transfer?: number
           origin_system_id?: number
-          target_system_id?: number
+          target_system_id?: number | null
           total_weight_transfer?: number
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
         }
@@ -1207,13 +1186,6 @@ export type Database = {
             foreignKeyName: "transfer_origin_system_id_fkey"
             columns: ["origin_system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "transfer_origin_system_id_fkey"
-            columns: ["origin_system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -1229,13 +1201,6 @@ export type Database = {
             columns: ["target_system_id"]
             isOneToOne: false
             referencedRelation: "analytics_system_day_mv"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "transfer_target_system_id_fkey"
-            columns: ["target_system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
             referencedColumns: ["system_id"]
           },
           {
@@ -1288,13 +1253,6 @@ export type Database = {
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "analytics_system_day_mv"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "production_cycle_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
             referencedColumns: ["system_id"]
           },
           {
@@ -1439,6 +1397,7 @@ export type Database = {
           created_at: string
           date: string
           id: number
+          location_reference: string | null
           measured_at: string
           parameter_name: Database["public"]["Enums"]["water_quality_parameters"]
           parameter_value: number
@@ -1450,6 +1409,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: number
+          location_reference?: string | null
           measured_at: string
           parameter_name: Database["public"]["Enums"]["water_quality_parameters"]
           parameter_value: number
@@ -1461,6 +1421,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: number
+          location_reference?: string | null
           measured_at?: string
           parameter_name?: Database["public"]["Enums"]["water_quality_parameters"]
           parameter_value?: number
@@ -1488,13 +1449,6 @@ export type Database = {
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "analytics_system_day_mv"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "water_quality_measurements_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
             referencedColumns: ["system_id"]
           },
           {
@@ -1691,13 +1645,6 @@ export type Database = {
             foreignKeyName: "alert_threshold_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "alert_threshold_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -1746,13 +1693,6 @@ export type Database = {
             foreignKeyName: "daily_fish_inventory_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "daily_fish_inventory_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -1793,13 +1733,6 @@ export type Database = {
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "analytics_system_day_mv"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "daily_water_quality_rating_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
             referencedColumns: ["system_id"]
           },
           {
@@ -1867,13 +1800,6 @@ export type Database = {
             foreignKeyName: "water_quality_measurements_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "water_quality_measurements_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
             referencedRelation: "system"
             referencedColumns: ["id"]
           },
@@ -1918,113 +1844,6 @@ export type Database = {
           },
           {
             foreignKeyName: "daily_fish_inventory_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "daily_fish_inventory_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "system"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "system_farm_id_fkey"
-            columns: ["farm_id"]
-            isOneToOne: false
-            referencedRelation: "farm"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      dashboard: {
-        Row: {
-          abw: number | null
-          abw_arrow: Database["public"]["Enums"]["arrows"] | null
-          abw_latest_date: string | null
-          average_biomass: number | null
-          average_number_of_fish: number | null
-          biomass_density: number | null
-          biomass_density_arrow: Database["public"]["Enums"]["arrows"] | null
-          efcr: number | null
-          efcr_arrow: Database["public"]["Enums"]["arrows"] | null
-          efcr_denominator_period: number | null
-          efcr_latest_date: string | null
-          farm_id: string | null
-          feeding_latest_date_nonzero: string | null
-          feeding_latest_date_recorded: string | null
-          feeding_rate: number | null
-          feeding_rate_arrow: Database["public"]["Enums"]["arrows"] | null
-          feeding_rate_latest_date: string | null
-          growth_stage:
-            | Database["public"]["Enums"]["system_growth_stage"]
-            | null
-          input_end_date: string | null
-          input_start_date: string | null
-          mortality_latest_date_nonzero: string | null
-          mortality_latest_date_recorded: string | null
-          mortality_rate: number | null
-          mortality_rate_arrow: Database["public"]["Enums"]["arrows"] | null
-          mortality_rate_latest_date: string | null
-          sampling_end_date: string | null
-          sampling_start_date: string | null
-          system_id: number | null
-          system_name: string | null
-          time_period: string | null
-          total_feed_period: number | null
-          water_quality_arrow: Database["public"]["Enums"]["arrows"] | null
-          water_quality_latest_date: string | null
-          water_quality_rating_average:
-            | Database["public"]["Enums"]["water_quality_rating"]
-            | null
-          water_quality_rating_numeric_average: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "system_farm_id_fkey"
-            columns: ["farm_id"]
-            isOneToOne: false
-            referencedRelation: "farm"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      efcr_period_last_sampling_view: {
-        Row: {
-          biomass_efcr_multiple: number | null
-          biomass_last_sampling: number | null
-          efcr_period_last_sampling: number | null
-          farm_id: string | null
-          inventory_date: string | null
-          last_sampling_date: string | null
-          system_id: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fish_weight_sampling_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "analytics_system_day"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "fish_weight_sampling_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "analytics_system_day_mv"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "fish_weight_sampling_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard"
-            referencedColumns: ["system_id"]
-          },
-          {
-            foreignKeyName: "fish_weight_sampling_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "system"
@@ -2111,39 +1930,6 @@ export type Database = {
       }
     }
     Functions: {
-      api_daily_fish_inventory: {
-        Args: {
-          p_cursor_date?: string
-          p_end_date?: string
-          p_farm_id: string
-          p_limit?: number
-          p_order_asc?: boolean
-          p_start_date?: string
-          p_system_id?: number
-        }
-        Returns: {
-          abw_last_sampling: number
-          biomass_density: number
-          biomass_last_sampling: number
-          farm_id: string
-          feeding_amount: number
-          feeding_amount_aggregated: number
-          feeding_rate: number
-          inventory_date: string
-          last_sampling_date: string
-          mortality_rate: number
-          number_of_fish: number
-          number_of_fish_harvested: number
-          number_of_fish_mortality: number
-          number_of_fish_mortality_aggregated: number
-          number_of_fish_stocked: number
-          number_of_fish_transferred_in: number
-          number_of_fish_transferred_out: number
-          system_id: number
-          system_name: string
-          system_volume: number
-        }[]
-      }
       api_daily_fish_inventory_rpc: {
         Args: {
           p_cursor_date?: string
@@ -2190,55 +1976,6 @@ export type Database = {
           inventory_date: string
           number_of_fish_mortality: number
           system_id: number
-        }[]
-      }
-      api_dashboard: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_growth_stage?: string
-          p_limit?: number
-          p_order_desc?: boolean
-          p_start_date?: string
-          p_system_id?: number
-          p_time_period?: string
-        }
-        Returns: {
-          abw: number
-          abw_arrow: string
-          abw_latest_date: string
-          average_biomass: number
-          average_number_of_fish: number
-          biomass_density: number
-          biomass_density_arrow: string
-          efcr: number
-          efcr_arrow: string
-          efcr_denominator_period: number
-          efcr_latest_date: string
-          farm_id: string
-          feeding_latest_date_nonzero: string
-          feeding_latest_date_recorded: string
-          feeding_rate: number
-          feeding_rate_arrow: string
-          feeding_rate_latest_date: string
-          growth_stage: string
-          input_end_date: string
-          input_start_date: string
-          mortality_latest_date_nonzero: string
-          mortality_latest_date_recorded: string
-          mortality_rate: number
-          mortality_rate_arrow: string
-          mortality_rate_latest_date: string
-          sampling_end_date: string
-          sampling_start_date: string
-          system_id: number
-          system_name: string
-          time_period: string
-          total_feed_period: number
-          water_quality_arrow: string
-          water_quality_latest_date: string
-          water_quality_rating_average: string
-          water_quality_rating_numeric_average: number
         }[]
       }
       api_dashboard_consolidated: {
@@ -2306,24 +2043,6 @@ export type Database = {
           worst_parameter: string
           worst_parameter_unit: string
           worst_parameter_value: number
-        }[]
-      }
-      api_efcr_trend: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_id?: number
-        }
-        Returns: {
-          biomass_efcr_multiple: number
-          biomass_last_sampling: number
-          efcr_period_last_sampling: number
-          farm_id: string
-          inventory_date: string
-          last_sampling_date: string
-          system_id: number
-          system_name: string
         }[]
       }
       api_farm_options_rpc: {
@@ -2449,46 +2168,48 @@ export type Database = {
           system_id: number
         }[]
       }
-      api_time_period_bounds: {
-        Args: {
-          p_anchor_date?: string
-          p_farm_id: string
-          p_time_period: string
-        }
-        Returns: {
-          input_end_date: string
-          input_start_date: string
-          time_period: string
-        }[]
-      }
-      api_time_period_bounds_scoped: {
-        Args: {
-          p_anchor_date?: string
-          p_farm_id: string
-          p_scope?: string
-          p_time_period: string
-        }
-        Returns: {
-          anchor_scope: string
-          available_days: number
-          available_from_date: string
-          input_end_date: string
-          input_start_date: string
-          is_truncated: boolean
-          latest_available_date: string
-          requested_days: number
-          resolved_days: number
-          staleness_days: number
-          time_period: string
-        }[]
-      }
-      api_time_period_options: {
-        Args: never
-        Returns: {
-          days_since_start: number
-          time_period: Database["public"]["Enums"]["time_period"]
-        }[]
-      }
+      api_time_period_bounds:
+        | {
+            Args: {
+              p_anchor_date?: string
+              p_farm_id: string
+              p_scope?: string
+              p_time_period: string
+            }
+            Returns: {
+              anchor_scope: string
+              available_days: number
+              available_from_date: string
+              input_end_date: string
+              input_start_date: string
+              is_truncated: boolean
+              latest_available_date: string
+              requested_days: number
+              resolved_days: number
+              staleness_days: number
+              time_period: string
+            }[]
+          }
+        | {
+            Args: {
+              p_anchor_date?: string
+              p_farm_id: string
+              p_time_period: Database["public"]["Enums"]["time_period"]
+            }
+            Returns: {
+              anchor_scope: string
+              available_days: number
+              available_from_date: string
+              input_end_date: string
+              input_start_date: string
+              is_truncated: boolean
+              latest_available_date: string
+              requested_days: number
+              resolved_days: number
+              staleness_days: number
+              time_period: string
+            }[]
+          }
       api_water_quality_sync_status: {
         Args: { p_farm_id: string }
         Returns: {
@@ -2509,6 +2230,10 @@ export type Database = {
           measurement_rating: Database["public"]["Enums"]["water_quality_rating"]
           severity_rank: number
         }[]
+      }
+      ensure_reference_system_for_farm: {
+        Args: { p_farm_id: string }
+        Returns: undefined
       }
       get_farm_kpis_today: {
         Args: { p_farm_id: string }
@@ -2536,8 +2261,37 @@ export type Database = {
           weight_gain_kg: number
         }[]
       }
+      get_fcr_trend_window: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date: string
+          p_system_id: number
+        }
+        Returns: {
+          abw_end_g: number
+          days_interval: number
+          fcr: number
+          period_end: string
+          period_start: string
+          total_feed_kg: number
+          weight_gain_kg: number
+        }[]
+      }
       get_growth_trend: {
         Args: { p_days?: number; p_system_id: number }
+        Returns: {
+          abw_g: number
+          adg_g_day: number
+          days_interval: number
+          prev_abw_g: number
+          sample_date: string
+          sgr_pct_day: number
+          weight_gain_g: number
+        }[]
+      }
+      get_growth_trend_window: {
+        Args: { p_end_date?: string; p_start_date: string; p_system_id: number }
         Returns: {
           abw_g: number
           adg_g_day: number
@@ -2597,10 +2351,6 @@ export type Database = {
         Returns: undefined
       }
       refresh_kpi_materialized_views: { Args: never; Returns: undefined }
-      refresh_mortality_daily_rollup: {
-        Args: { p_batch_id: number; p_event_date: string; p_system_id: number }
-        Returns: undefined
-      }
       request_matview_refresh: { Args: never; Returns: undefined }
       transfer_impacts_efcr: {
         Args: {
@@ -2667,7 +2417,7 @@ export type Database = {
         | "external_out"
       type_of_harvest: "partial" | "final"
       type_of_stocking: "empty" | "already_stocked"
-      units: "m" | "mg/l" | "ppt" | "°C" | "pH" | "NTU" | "µS/cm"
+      units: "m" | "mg/l" | "ppt" | "┬░C" | "pH" | "NTU" | "┬╡S/cm"
       water_quality_parameters:
         | "pH"
         | "temperature"
@@ -2861,7 +2611,7 @@ export const Constants = {
       ],
       type_of_harvest: ["partial", "final"],
       type_of_stocking: ["empty", "already_stocked"],
-      units: ["m", "mg/l", "ppt", "°C", "pH", "NTU", "µS/cm"],
+      units: ["m", "mg/l", "ppt", "┬░C", "pH", "NTU", "┬╡S/cm"],
       water_quality_parameters: [
         "pH",
         "temperature",
@@ -2876,3 +2626,4 @@ export const Constants = {
     },
   },
 } as const
+

@@ -57,6 +57,7 @@ export default function KPIOverview({
 
   const metrics = metricsQuery.data?.metrics ?? []
   const errorMessage = getErrorMessage(metricsQuery.error)
+  const waitingForBounds = !dateFrom || !dateTo
   const buildProductionHref = (metricKey: string) => {
     const params = new URLSearchParams()
     if (system !== "all") params.set("system", system)
@@ -80,7 +81,7 @@ export default function KPIOverview({
     )
   }
 
-  if (metricsQuery.isLoading) {
+  if (waitingForBounds || metricsQuery.isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array(4)
@@ -115,6 +116,9 @@ export default function KPIOverview({
               trend={metric.trend}
               decimals={metric.decimals}
               formatUnit={metric.unit}
+              trendFormat={metric.trendFormat}
+              trendDecimals={metric.trendDecimals}
+              trendUnit={metric.trendUnit}
               invertTrend={metric.invertTrend}
               href={href}
             />

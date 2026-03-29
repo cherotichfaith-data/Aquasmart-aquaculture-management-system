@@ -3,57 +3,44 @@
 import { Suspense, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import type { TimePeriod } from "@/components/shared/time-period-selector"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
-import { useTimePeriodBounds } from "@/lib/hooks/app/use-time-period-bounds"
 import { PRODUCTION_METRICS, parseProductionMetric } from "@/components/production/metrics"
 import { ProductionSections } from "./_components/production-sections"
-import {
-  buildProductionChartRows,
-  parseStageParam,
-  resolveProductionPeriodParam,
-} from "./_lib/production-page"
+import { buildProductionChartRows } from "./_lib/production-page"
 
 function ProductionContent() {
   const searchParams = useSearchParams()
-  const { farmId } = useActiveFarm()
+  const {
+    farmId,
+    selectedBatch,
+    selectedSystem,
+    selectedStage,
+    dateFrom,
+    dateTo,
+    boundsReady: hasBounds,
+  } = useAnalyticsPageBootstrap()
 
-  const metricParam = searchParams.get("metric")
   const filterParam = searchParams.get("filter")
-  const paramSystem = searchParams.get("system") ?? "all"
-  const paramStage = parseStageParam(searchParams.get("stage"))
-  const periodParam = searchParams.get("period")
-  const paramPeriod: TimePeriod = resolveProductionPeriodParam(periodParam)
-  const paramBatch = searchParams.get("batch") ?? "all"
-  const selectedSystem = paramSystem
-  const selectedStage = paramStage
-  const timePeriod = paramPeriod
-  const selectedBatch = paramBatch
 
   const metricFilter = parseProductionMetric(filterParam)
   const metricMeta = PRODUCTION_METRICS[metricFilter]
   const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
   const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
 
-  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod })
-  const hasBounds = boundsQuery.hasBounds
   const dateRange = useMemo(() => {
-    if (hasBounds) {
-      return { startDate: boundsQuery.start ?? "", endDate: boundsQuery.end ?? "" }
-    }
-    return { startDate: "", endDate: "" }
-  }, [hasBounds, boundsQuery.start, boundsQuery.end])
+    return { startDate: hasBounds ? (dateFrom ?? "") : "", endDate: hasBounds ? (dateTo ?? "") : "" }
+  }, [dateFrom, dateTo, hasBounds])
   const rangeEnabled = hasBounds
 
   const systemOptionsQuery = useSystemOptions({
     farmId,
     stage: selectedStage,
-    activeOnly: true,
+    activeOnly: false,
   })
   const batchSystemIdsQuery = useBatchSystemIds({
     batchId: Number.isFinite(batchId) ? batchId : undefined,

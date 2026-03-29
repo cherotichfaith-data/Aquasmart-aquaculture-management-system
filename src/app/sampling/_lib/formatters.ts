@@ -1,3 +1,5 @@
+import { diffDateDays } from "@/lib/time-series"
+
 export const DEFAULT_TARGET_DENSITY = 15
 export const DEFAULT_HARVEST_TARGET_G = 1200
 export const DEFAULT_MOVE_TARGET_G = 50
@@ -29,10 +31,7 @@ export const formatWithUnit = (value: number | null | undefined, decimals: numbe
 }
 
 export const safeDayDiff = (start: string, end: string) => {
-  const startDate = new Date(`${start}T00:00:00`)
-  const endDate = new Date(`${end}T00:00:00`)
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null
-  return Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000))
+  return diffDateDays(start, end)
 }
 
 export const resolveTargetAbw = (daySinceStart: number, curve: Array<{ day: number; abw: number }>) => {

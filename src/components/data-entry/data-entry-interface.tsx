@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { MortalityForm } from "./mortality-form"
 import { FeedingForm } from "./feeding-form"
 import { SamplingForm } from "./sampling-form"
@@ -28,7 +27,7 @@ interface DataEntryInterfaceProps {
         transfer: Tables<"fish_transfer">[]
         harvest: Tables<"fish_harvest">[]
         water_quality: Tables<"water_quality_measurement">[]
-        incoming_feed: Tables<"feed_incoming">[]
+        incoming_feed: Tables<"feed_inventory_snapshot">[]
         stocking: Tables<"fish_stocking">[]
         systems: Tables<"system">[]
     }
@@ -38,15 +37,15 @@ interface DataEntryInterfaceProps {
 }
 
 const sidebarItems = [
-    { id: "system", label: "System" },
+    { id: "system", label: "System Setup" },
     { id: "stocking", label: "Stocking" },
-    { id: "mortality", label: "Mortality" },
     { id: "feeding", label: "Feeding" },
+    { id: "incoming_feed", label: "Feed Inventory" },
     { id: "sampling", label: "Sampling" },
+    { id: "mortality", label: "Mortality" },
     { id: "transfer", label: "Transfer" },
-    { id: "harvest", label: "Harvest" },
     { id: "water_quality", label: "Water Quality" },
-    { id: "incoming_feed", label: "Incoming Feed" },
+    { id: "harvest", label: "Harvest" },
 ] as const
 
 export function DataEntryInterface({
@@ -55,7 +54,7 @@ export function DataEntryInterface({
     feeds,
     batches,
     recentEntries,
-    defaultTab = "stocking",
+    defaultTab = "feeding",
     defaultSystemId = null,
     defaultBatchId = null,
 }: DataEntryInterfaceProps) {
@@ -66,17 +65,16 @@ export function DataEntryInterface({
     }, [defaultTab])
 
     return (
-        <div className="flex min-h-0 flex-col gap-4 md:gap-6 xl:h-[calc(100vh-100px)] xl:flex-row">
-            <aside className="w-full overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm xl:h-auto xl:w-64 xl:shrink-0">
-                <div className="p-4 font-semibold border-b border-border/80 bg-muted/60 text-foreground">Data Capture</div>
-                <ScrollArea className="w-full xl:h-full">
-                    <div className="flex gap-1 p-2 xl:flex-col">
+        <div className="space-y-3 sm:space-y-4 md:space-y-6">
+            <div className="overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm">
+                <div className="overflow-x-auto">
+                    <div className="flex min-w-max gap-2 p-2">
                         {sidebarItems.map((item) => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
                                 className={cn(
-                                    "min-w-[132px] rounded-md px-4 py-2 text-left text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer xl:min-w-0",
+                                    "shrink-0 rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer",
                                     activeTab === item.id
                                         ? "bg-primary text-primary-foreground shadow-sm"
                                         : "text-foreground/80 hover:text-foreground"
@@ -86,10 +84,10 @@ export function DataEntryInterface({
                             </button>
                         ))}
                     </div>
-                </ScrollArea>
-            </aside>
+                </div>
+            </div>
 
-            <main className="flex-1 rounded-lg border border-border/80 bg-card p-4 shadow-sm md:p-6 xl:overflow-y-auto">
+            <main className="min-w-0 rounded-lg border border-border/80 bg-card p-3 shadow-sm sm:p-4 md:p-6 xl:overflow-y-auto">
                 {activeTab === "mortality" && (
                     <>
                         <MortalityForm
@@ -99,55 +97,61 @@ export function DataEntryInterface({
                             defaultSystemId={defaultSystemId}
                             defaultBatchId={defaultBatchId}
                         />
-                        <RecentEntriesList data={recentEntries.mortality} type="mortality" />
+                        <RecentEntriesList data={recentEntries.mortality} type="mortality" systems={systems} />
                     </>
                 )}
                 {activeTab === "feeding" && (
                     <>
                         <FeedingForm systems={systems} feeds={feeds} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
-                        <RecentEntriesList data={recentEntries.feeding} type="feeding" />
+                        <RecentEntriesList data={recentEntries.feeding} type="feeding" systems={systems} />
                     </>
                 )}
                 {activeTab === "sampling" && (
                     <>
                         <SamplingForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
-                        <RecentEntriesList data={recentEntries.sampling} type="sampling" />
+                        <RecentEntriesList data={recentEntries.sampling} type="sampling" systems={systems} />
                     </>
                 )}
                 {activeTab === "transfer" && (
                     <>
                         <TransferForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
-                        <RecentEntriesList data={recentEntries.transfer} type="transfer" />
+                        <RecentEntriesList data={recentEntries.transfer} type="transfer" systems={systems} />
                     </>
                 )}
                 {activeTab === "harvest" && (
                     <>
-                        <HarvestForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
-                        <RecentEntriesList data={recentEntries.harvest} type="harvest" />
+                        <HarvestForm
+                            farmId={farmId}
+                            systems={systems}
+                            batches={batches}
+                            defaultSystemId={defaultSystemId}
+                            defaultBatchId={defaultBatchId}
+                        />
+                        <RecentEntriesList data={recentEntries.harvest} type="harvest" systems={systems} />
                     </>
                 )}
                 {activeTab === "water_quality" && (
                     <>
-                        <WaterQualityForm systems={systems} defaultSystemId={defaultSystemId} />
-                        <RecentEntriesList data={recentEntries.water_quality} type="water_quality" />
+                        <WaterQualityForm farmId={farmId} systems={systems} defaultSystemId={defaultSystemId} />
+                        <RecentEntriesList data={recentEntries.water_quality} type="water_quality" systems={systems} />
                     </>
                 )}
                 {activeTab === "incoming_feed" && (
                     <>
                         <IncomingFeedForm feeds={feeds} farmId={farmId} />
-                        <RecentEntriesList data={recentEntries.incoming_feed} type="incoming_feed" />
+                        <RecentEntriesList data={recentEntries.incoming_feed} type="incoming_feed" systems={systems} />
                     </>
                 )}
                 {activeTab === "stocking" && (
                     <>
                         <StockingForm systems={systems} batches={batches} defaultSystemId={defaultSystemId} defaultBatchId={defaultBatchId} />
-                        <RecentEntriesList data={recentEntries.stocking} type="stocking" />
+                        <RecentEntriesList data={recentEntries.stocking} type="stocking" systems={systems} />
                     </>
                 )}
                 {activeTab === "system" && (
                     <>
                         <SystemForm />
-                        <RecentEntriesList data={recentEntries.systems} type="system" />
+                        <RecentEntriesList data={recentEntries.systems} type="system" systems={systems} />
                     </>
                 )}
             </main>

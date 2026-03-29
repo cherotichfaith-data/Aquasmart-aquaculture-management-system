@@ -1,12 +1,15 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
+import { formatNumberValue } from "@/lib/analytics-format"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
 import { ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
+import { buildComplianceRows, buildExcursionLogRows } from "./report-selectors"
 
 type Props = {
   dateRange?: { from: string; to: string }
@@ -15,13 +18,20 @@ type Props = {
 }
 
 export default function WaterQualityComplianceReport({ dateRange, systemId, farmName }: Props) {
-  const boundsReady = Boolean(dateRange?.from && dateRange?.to)
+  const [reportDateFrom, setReportDateFrom] = useState(dateRange?.from ?? "")
+  const [reportDateTo, setReportDateTo] = useState(dateRange?.to ?? "")
+  const boundsReady = Boolean(reportDateFrom && reportDateTo)
+
+  useEffect(() => {
+    setReportDateFrom(dateRange?.from ?? "")
+    setReportDateTo(dateRange?.to ?? "")
+  }, [dateRange?.from, dateRange?.to])
+
   const measurementsQuery = useWaterQualityMeasurements({
     systemId,
-    dateFrom: dateRange?.from,
-    dateTo: dateRange?.to,
+    dateFrom: reportDateFrom,
+    dateTo: reportDateTo,
     requireSystem: false,
-    limit: 2000,
     enabled: boundsReady,
   })
   const thresholdsQuery = useAlertThresholds()
@@ -33,40 +43,11 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
     { error: measurementsQuery.error, result: measurementsQuery.data },
     { error: thresholdsQuery.error, result: thresholdsQuery.data },
   )
-  const latestUpdatedAt = Math.max(
-    measurementsQuery.dataUpdatedAt ?? 0,
-    thresholdsQuery.dataUpdatedAt ?? 0,
-  )
+  const latestUpdatedAt = Math.max(measurementsQuery.dataUpdatedAt ?? 0, thresholdsQuery.dataUpdatedAt ?? 0)
 
-  const farmThreshold = useMemo(
-    () => thresholdRows.find((row) => row.scope === "farm" && row.system_id == null) ?? null,
-    [thresholdRows],
-  )
+  const enrichedRows = useMemo(() => buildComplianceRows(rows, thresholdRows), [rows, thresholdRows])
 
-  const enrichedRows = useMemo(() => {
-    const lowDo = farmThreshold?.low_do_threshold ?? 4
-    const highAmmonia = farmThreshold?.high_ammonia_threshold ?? 0.5
-    return rows.map((row) => {
-      let excursion = false
-      if (row.parameter_name === "dissolved_oxygen" && typeof row.parameter_value === "number") {
-        excursion = row.parameter_value < lowDo
-      }
-      if (row.parameter_name === "ammonia" && typeof row.parameter_value === "number") {
-        excursion = row.parameter_value > highAmmonia
-      }
-      return { ...row, excursion }
-    })
-  }, [farmThreshold?.high_ammonia_threshold, farmThreshold?.low_do_threshold, rows])
-
-  const excursionCount = useMemo(() => enrichedRows.filter((row) => row.excursion).length, [enrichedRows])
-  const attentionRows = useMemo(() => {
-    const sorted = [...enrichedRows].sort((a, b) => {
-      const left = `${a.date ?? ""} ${a.time ?? ""}`.trim()
-      const right = `${b.date ?? ""} ${b.time ?? ""}`.trim()
-      return right.localeCompare(left)
-    })
-    return sorted.filter((row) => row.excursion).slice(0, 200)
-  }, [enrichedRows])
+  const excursionLogRows = useMemo(() => buildExcursionLogRows(enrichedRows), [enrichedRows])
 
   return (
     <AnalyticsSection
@@ -83,25 +64,25 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
       <Card>
         <CardHeader>
           <CardTitle>Compliance Summary</CardTitle>
-          <CardDescription>Regulatory water-quality reporting dataset with excursion flags.</CardDescription>
+          <CardDescription>Excursions resolve thresholds per system, then farm, then default.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div className="rounded-md border border-border/80 p-3">
-              <p className="text-xs text-muted-foreground">Readings in period</p>
+              <p className="text-xs text-muted-foreground">Readings in report window</p>
               <p className="text-xl font-semibold">{enrichedRows.length}</p>
             </div>
             <div className="rounded-md border border-border/80 p-3">
-              <p className="text-xs text-muted-foreground">Excursions flagged</p>
-              <p className="text-xl font-semibold">{excursionCount}</p>
+              <p className="text-xs text-muted-foreground">Excursion episodes</p>
+              <p className="text-xl font-semibold">{excursionLogRows.length}</p>
             </div>
             <div className="rounded-md border border-border/80 p-3">
-              <p className="text-xs text-muted-foreground">Low DO threshold</p>
-              <p className="text-xl font-semibold">{farmThreshold?.low_do_threshold ?? "N/A"}</p>
+              <p className="text-xs text-muted-foreground">Report start</p>
+              <p className="text-xl font-semibold">{reportDateFrom || "N/A"}</p>
             </div>
             <div className="rounded-md border border-border/80 p-3">
-              <p className="text-xs text-muted-foreground">High ammonia threshold</p>
-              <p className="text-xl font-semibold">{farmThreshold?.high_ammonia_threshold ?? "N/A"}</p>
+              <p className="text-xs text-muted-foreground">Report end</p>
+              <p className="text-xl font-semibold">{reportDateTo || "N/A"}</p>
             </div>
           </div>
         </CardContent>
@@ -109,64 +90,82 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
 
       <Card>
         <ReportSectionHeader
-          title="Water-Quality Compliance Records"
-          description="Showing the most recent excursion records (attention needed)."
+          title="DO Excursion Log"
+          description="All resolved dissolved-oxygen and ammonia excursion episodes in the report window."
           actions={
-            <ReportRecordsToolbar
-              onExportCsv={() =>
-                downloadCsv({
-                  filename: `water-quality-compliance-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
-                  headers: ["date", "time", "system_name", "parameter_name", "parameter_value", "unit", "water_depth", "created_at", "operator", "excursion"],
-                  rows: attentionRows.map((row) => [row.date, row.time, row.system_name ?? row.system_id, row.parameter_name, row.parameter_value, row.unit, row.water_depth, row.created_at, "unknown", row.excursion ? "YES" : "NO"]),
-                })
-              }
-              onExportPdf={() =>
-                printBrandedPdf({
-                  title: "Water-Quality Compliance Report",
-                  subtitle: "Regulatory compliance export with excursion flags",
-                  farmName,
-                  dateRange,
-                  summaryLines: [`Total readings (loaded): ${enrichedRows.length}`, `Excursions flagged (loaded): ${excursionCount}`, `DO threshold: ${farmThreshold?.low_do_threshold ?? "N/A"}`, `Ammonia threshold: ${farmThreshold?.high_ammonia_threshold ?? "N/A"}`, `Showing ${attentionRows.length} most recent excursions.`, "Certification: Generated from audited AquaSmart view datasets."],
-                  tableHeaders: ["Date", "Time", "System", "Parameter", "Reading", "Unit", "Excursion"],
-                  tableRows: attentionRows.map((row) => [row.date, row.time, row.system_name ?? row.system_id, row.parameter_name, row.parameter_value, row.unit ?? "-", row.excursion ? "YES" : "NO"]),
-                  commentary: "Operator field currently unavailable in api_water_quality_measurements and is marked as unknown.",
-                })
-              }
-            />
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+              <Input type="date" value={reportDateFrom} onChange={(event) => setReportDateFrom(event.target.value)} className="sm:w-[170px]" aria-label="Water quality report start date" />
+              <Input type="date" value={reportDateTo} onChange={(event) => setReportDateTo(event.target.value)} className="sm:w-[170px]" aria-label="Water quality report end date" />
+              <ReportRecordsToolbar
+                onExportCsv={() =>
+                  downloadCsv({
+                    filename: `water-quality-compliance-${reportDateFrom || "start"}-to-${reportDateTo || "end"}.csv`,
+                    headers: ["date", "cage", "parameter", "value", "threshold", "duration_hours", "action_taken"],
+                    rows: excursionLogRows.map((row) => [row.date, row.cage, row.parameter, row.value, row.threshold, row.durationHours, row.actionTaken]),
+                  })
+                }
+                onExportPdf={() =>
+                  printBrandedPdf({
+                    title: "Water-Quality Compliance Report",
+                    subtitle: "Export-ready excursion log",
+                    farmName,
+                    dateRange: { from: reportDateFrom, to: reportDateTo },
+                    summaryLines: [
+                      `Readings in report window: ${enrichedRows.length}`,
+                      `Excursion episodes: ${excursionLogRows.length}`,
+                      "Threshold precedence: system -> farm -> default",
+                    ],
+                    tableHeaders: ["Date", "Cage", "Parameter", "Value", "Threshold", "Duration (hours)", "Action taken"],
+                    tableRows: excursionLogRows.map((row) => [
+                      row.date,
+                      row.cage,
+                      row.parameter,
+                      typeof row.value === "number" ? formatNumberValue(row.value, { decimals: 2, minimumDecimals: 2 }) : "-",
+                      typeof row.threshold === "number" ? formatNumberValue(row.threshold, { decimals: 2, minimumDecimals: 2 }) : "-",
+                      typeof row.durationHours === "number" ? formatNumberValue(row.durationHours, { decimals: 2, minimumDecimals: 2 }) : "-",
+                      row.actionTaken,
+                    ]),
+                    commentary: "Action taken is currently unavailable in the source view and is exported as Not recorded.",
+                  })
+                }
+              />
+            </div>
           }
         />
         <CardContent>
           <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">
-                  <th className="px-4 py-2 text-left font-semibold">Timestamp</th>
-                  <th className="px-4 py-2 text-left font-semibold">System</th>
+                  <th className="px-4 py-2 text-left font-semibold">Date</th>
+                  <th className="px-4 py-2 text-left font-semibold">Cage</th>
                   <th className="px-4 py-2 text-left font-semibold">Parameter</th>
-                  <th className="px-4 py-2 text-left font-semibold">Reading</th>
-                  <th className="px-4 py-2 text-left font-semibold">Unit</th>
-                  <th className="px-4 py-2 text-left font-semibold">Excursion</th>
+                  <th className="px-4 py-2 text-left font-semibold">Value</th>
+                  <th className="px-4 py-2 text-left font-semibold">Threshold</th>
+                  <th className="px-4 py-2 text-left font-semibold">Duration (hours)</th>
+                  <th className="px-4 py-2 text-left font-semibold">Action taken</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">Loading...</td>
+                    <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">Loading...</td>
                   </tr>
-                ) : attentionRows.length ? (
-                  attentionRows.map((row) => (
-                    <tr key={row.id ?? `${row.system_id}-${row.date}-${row.time}-${row.parameter_name}`} className="border-b border-border/70 hover:bg-muted/35">
-                      <td className="px-4 py-2">{row.date} {row.time ?? "00:00"}</td>
-                      <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
-                      <td className="px-4 py-2">{row.parameter_name}</td>
-                      <td className="px-4 py-2">{row.parameter_value ?? "-"}</td>
-                      <td className="px-4 py-2">{row.unit ?? "-"}</td>
-                      <td className={`px-4 py-2 font-medium ${row.excursion ? "text-destructive" : "text-chart-2"}`}>{row.excursion ? "YES" : "NO"}</td>
+                ) : excursionLogRows.length ? (
+                  excursionLogRows.map((row) => (
+                    <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
+                      <td className="px-4 py-2">{row.date}</td>
+                      <td className="px-4 py-2">{row.cage}</td>
+                      <td className="px-4 py-2">{row.parameter}</td>
+                      <td className="px-4 py-2">{typeof row.value === "number" ? formatNumberValue(row.value, { decimals: 2, minimumDecimals: 2 }) : "-"}</td>
+                      <td className="px-4 py-2">{typeof row.threshold === "number" ? formatNumberValue(row.threshold, { decimals: 2, minimumDecimals: 2 }) : "-"}</td>
+                      <td className="px-4 py-2">{typeof row.durationHours === "number" ? formatNumberValue(row.durationHours, { decimals: 2, minimumDecimals: 2 }) : "-"}</td>
+                      <td className="px-4 py-2">{row.actionTaken}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">No excursions flagged</td>
+                    <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">No excursions found in the selected report window.</td>
                   </tr>
                 )}
               </tbody>

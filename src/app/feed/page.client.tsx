@@ -13,14 +13,13 @@ import {
   useScopedGrowthTrend,
   useScopedSurvivalTrend,
 } from "@/lib/hooks/use-reports"
+import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useFeedTypeOptions } from "@/lib/hooks/use-options"
-import { useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
-import SystemHistorySheet from "@/components/systems/system-history-sheet"
-import { DataErrorState } from "@/components/shared/data-states"
-import { TimelineIntegrityNote } from "@/components/shared/timeline-integrity-note"
+import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import type { FeedPageInitialData, FeedPageInitialFilters } from "@/features/feed/types"
+import { countTimeRangeDays } from "@/lib/time-period"
 import {
   buildConsecutivePoorAlerts,
   buildFeedDeviationCells,
@@ -36,7 +35,6 @@ import {
   buildLatestDoBySystem,
   buildLatestFeedRateBySystem,
   buildLatestRowBySystem,
-  formatFeedTypeLabel,
 } from "./_lib/feed-page"
 import { FeedDashboard } from "./_components/feed-dashboard"
 
@@ -54,17 +52,26 @@ export default function FeedManagementPage({
     selectedBatch,
     selectedSystem,
     selectedStage,
+    timePeriod,
     dateFrom: boundsStart,
     dateTo: boundsEnd,
     boundsReady,
   } = useAnalyticsPageBootstrap({
     initialFarmId,
-    defaultTimePeriod: "month",
+    defaultTimePeriod: "quarter",
     initialFilters,
     initialBounds: initialData.bounds,
   })
   const [selectedFeedType, setSelectedFeedType] = useState("all")
   const [selectedHistorySystemId, setSelectedHistorySystemId] = useState<number | null>(null)
+  const initialFilterMatch =
+    selectedBatch === initialFilters.selectedBatch &&
+    selectedSystem === initialFilters.selectedSystem &&
+    selectedStage === initialFilters.selectedStage
+  const initialBoundsMatch = boundsReady && initialData.bounds.start === boundsStart && initialData.bounds.end === boundsEnd
+  const canUseInitialScopedData = initialFilterMatch && initialBoundsMatch
+  const canUseInitialSystemsData = selectedStage === initialFilters.selectedStage
+  const canUseInitialBatchSystemsData = selectedBatch === initialFilters.selectedBatch
 
   const {
     selectedSystemId: systemId,
@@ -79,13 +86,18 @@ export default function FeedManagementPage({
     selectedStage,
     selectedBatch,
     selectedSystem,
-    initialSystemsData: initialData.systems,
-    initialBatchSystemsData: initialData.batchSystems,
+    initialSystemsData: canUseInitialSystemsData ? initialData.systems : undefined,
+    initialBatchSystemsData: canUseInitialBatchSystemsData ? initialData.batchSystems : undefined,
   })
 
   const hasDateRange = boundsReady
   const dateFrom = boundsStart
   const dateTo = boundsEnd
+  const trendWindowDays = useMemo(() => countTimeRangeDays(dateFrom, dateTo) ?? 180, [dateFrom, dateTo])
+  const heatmapWindowDays = useMemo(() => {
+    const rangeDays = countTimeRangeDays(dateFrom, dateTo)
+    return rangeDays == null ? 14 : Math.min(rangeDays, 30)
+  }, [dateFrom, dateTo])
 
   const feedTypesQuery = useFeedTypeOptions({ initialData: initialData.feedTypes })
   const farmKpisQuery = useFarmKpisToday({
@@ -114,7 +126,7 @@ export default function FeedManagementPage({
     dateTo,
     limit: 4000,
     enabled: feedingEnabled,
-    initialData: initialData.feedingRecords,
+    initialData: canUseInitialScopedData ? initialData.feedingRecords : undefined,
   })
   const inventoryQuery = useDailyFishInventory({
     farmId,
@@ -124,18 +136,31 @@ export default function FeedManagementPage({
     limit: 5000,
     orderAsc: true,
     enabled: feedingEnabled,
-    initialData: initialData.inventory,
+    initialData: canUseInitialScopedData ? initialData.inventory : undefined,
   })
   const fcrTrendQuery = useScopedFcrTrend({
     farmId,
     systemIds: scopedSystemIdList,
-    days: 180,
+    days: trendWindowDays,
+    dateFrom,
+    dateTo,
     enabled: feedingEnabled,
   })
   const growthTrendQuery = useScopedGrowthTrend({
     systemIds: scopedSystemIdList,
-    days: 180,
+    days: trendWindowDays,
+    dateFrom,
+    dateTo,
     enabled: feedingEnabled,
+  })
+  const productionSummaryQuery = useProductionSummary({
+    farmId,
+    systemId: hasSystem ? (systemId as number) : undefined,
+    stage: selectedStage === "all" ? undefined : selectedStage,
+    dateFrom,
+    dateTo,
+    limit: 5000,
+    enabled: hasDateRange,
   })
   const survivalTrendQuery = useScopedSurvivalTrend({
     systemIds: scopedSystemIdList,
@@ -169,6 +194,7 @@ export default function FeedManagementPage({
   const inventoryRowsRaw = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
   const fcrTrendRowsRaw = fcrTrendQuery.data?.status === "success" ? fcrTrendQuery.data.data : []
   const growthTrendRowsRaw = growthTrendQuery.data?.status === "success" ? growthTrendQuery.data.data : []
+  const productionRowsRaw = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const survivalTrendRowsRaw = survivalTrendQuery.data?.status === "success" ? survivalTrendQuery.data.data : []
   const runningStockRows = runningStockQuery.data?.status === "success" ? runningStockQuery.data.data : []
   const feedPlans = feedPlansQuery.data?.status === "success" ? feedPlansQuery.data.data : []
@@ -187,6 +213,10 @@ export default function FeedManagementPage({
   const inventoryRows = useMemo(
     () => inventoryRowsRaw.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
     [inventoryRowsRaw, scopedSystemIds],
+  )
+  const productionRows = useMemo(
+    () => productionRowsRaw.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
+    [productionRowsRaw, scopedSystemIds],
   )
 
   const measurements = useMemo(
@@ -251,24 +281,20 @@ export default function FeedManagementPage({
     [batchId, fcrTrendRowsRaw, feedPlans, selectedFeedTypeId],
   )
 
+  const heatmapDates = useMemo(() => {
+    if (!dateFrom || !dateTo) return []
+    return buildDateWindow(dateFrom, dateTo, heatmapWindowDays)
+  }, [dateFrom, dateTo, heatmapWindowDays])
   const exceptionWindowRecords = useMemo(() => {
-    if (!dateTo) return feedingRecords
-    const end = new Date(`${dateTo}T00:00:00`)
-    const start = new Date(end)
-    start.setDate(start.getDate() - 13)
-    const minDate = start.toISOString().split("T")[0]
-    return feedingRecords.filter((row) => row.date != null && row.date >= minDate && row.date <= dateTo)
-  }, [dateTo, feedingRecords])
+    if (heatmapDates.length === 0) return feedingRecords
+    const heatmapDateSet = new Set(heatmapDates)
+    return feedingRecords.filter((row) => row.date != null && heatmapDateSet.has(row.date))
+  }, [feedingRecords, heatmapDates])
 
   const poorAlerts = useMemo(
     () => buildConsecutivePoorAlerts({ feedingRecords: exceptionWindowRecords, systemLabels: systemNameById }),
     [exceptionWindowRecords, systemNameById],
   )
-
-  const heatmapDates = useMemo(() => {
-    if (!dateFrom || !dateTo) return []
-    return buildDateWindow(dateFrom, dateTo, 14)
-  }, [dateFrom, dateTo])
   const matrixCells = useMemo(
     () =>
       buildFeedDeviationCells({
@@ -283,20 +309,6 @@ export default function FeedManagementPage({
     () => feedingRecords.map((row) => row.date).filter(Boolean).sort().pop() ?? null,
     [feedingRecords],
   )
-  const scopedFeedTodayKg = useMemo(() => {
-    if (!latestFeedDate) return 0
-    return feedingRecords
-      .filter((row) => row.date === latestFeedDate)
-      .reduce((total, row) => total + (row.feeding_amount ?? 0), 0)
-  }, [feedingRecords, latestFeedDate])
-  const scopedFedSystemsToday = useMemo(() => {
-    if (!latestFeedDate) return 0
-    return new Set(
-      feedingRecords
-        .filter((row) => row.date === latestFeedDate && row.system_id != null)
-        .map((row) => row.system_id as number),
-    ).size
-  }, [feedingRecords, latestFeedDate])
 
   const worstFcr = useMemo(() => {
     const row = fcrIntervals
@@ -319,40 +331,21 @@ export default function FeedManagementPage({
     [survivalTrendRowsRaw],
   )
   const latestDoBySystem = useMemo(() => buildLatestDoBySystem(measurements), [measurements])
+  const thresholdsQuery = useAlertThresholds({ farmId })
+  const lowDoThreshold = useMemo(() => {
+    const rows = thresholdsQuery.data?.status === "success" ? thresholdsQuery.data.data : []
+    return rows.find((row) => row.system_id == null)?.low_do_threshold ?? rows[0]?.low_do_threshold ?? 5
+  }, [thresholdsQuery.data])
 
-  const overfeedingCount = useMemo(() => {
-    const latestBySystem = new Map<number, (typeof feedRatePoints)[number]>()
-    feedRatePoints
-      .slice()
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-      .forEach((point) => {
-        if (!latestBySystem.has(point.systemId)) latestBySystem.set(point.systemId, point)
-      })
-    return Array.from(latestBySystem.values()).filter(
-      (point) => point.feedRatePct != null && point.upperBand != null && point.feedRatePct > point.upperBand,
-    ).length
-  }, [feedRatePoints])
-
-  const poorAppetiteCount = useMemo(
-    () => new Set(poorAlerts.map((alert) => alert.systemId)).size,
-    [poorAlerts],
-  )
   const lowGrowthCount = useMemo(() => {
     return Array.from(latestGrowthBySystem.values()).filter((row) => row.sgr_pct_day < 0.7).length
   }, [latestGrowthBySystem])
-  const survivalRiskCount = useMemo(() => {
-    return Array.from(latestSurvivalBySystem.values()).filter((row) => row.survival_pct < 95).length
-  }, [latestSurvivalBySystem])
   const farmKpis = farmKpisQuery.data?.status === "success" ? (farmKpisQuery.data.data[0] ?? null) : null
   const minStockDays = useMemo(() => {
     if (farmKpis?.min_stock_days != null) return farmKpis.min_stock_days
     if (runningStockRows.length === 0) return null
     return Math.min(...runningStockRows.map((row) => row.days_remaining))
   }, [farmKpis, runningStockRows])
-  const feedTodayKg = farmKpis?.feed_today_kg ?? scopedFeedTodayKg
-  const fedSystemsToday = farmKpis?.systems_fed ?? scopedFedSystemsToday
-  const activeSystemCount = farmKpis?.active_systems ?? scopedSystemIdList.length
-
   const exceptionItems = useMemo<FeedExceptionItem[]>(
     () =>
       buildFeedExceptionItems({
@@ -363,8 +356,9 @@ export default function FeedManagementPage({
         poorAlerts,
         runningStockRows,
         systemNameById,
+        lowDoThreshold,
       }),
-    [latestDoBySystem, latestFeedRateBySystem, latestGrowthBySystem, latestSurvivalBySystem, poorAlerts, runningStockRows, systemNameById],
+    [latestDoBySystem, latestFeedRateBySystem, latestGrowthBySystem, latestSurvivalBySystem, poorAlerts, runningStockRows, systemNameById, lowDoThreshold],
   )
 
   const errorMessages = [
@@ -384,10 +378,14 @@ export default function FeedManagementPage({
     getQueryResultError(fcrTrendQuery.data),
     getErrorMessage(growthTrendQuery.error),
     getQueryResultError(growthTrendQuery.data),
+    getErrorMessage(productionSummaryQuery.error),
+    getQueryResultError(productionSummaryQuery.data),
     getErrorMessage(survivalTrendQuery.error),
     getQueryResultError(survivalTrendQuery.data),
     getErrorMessage(measurementsQuery.error),
     getQueryResultError(measurementsQuery.data),
+    getErrorMessage(thresholdsQuery.error),
+    getQueryResultError(thresholdsQuery.data),
     getErrorMessage(systemsQuery.error),
     getQueryResultError(systemsQuery.data),
     getErrorMessage(batchSystemsQuery.error),
@@ -403,20 +401,14 @@ export default function FeedManagementPage({
     inventoryQuery.isLoading ||
     fcrTrendQuery.isLoading ||
     growthTrendQuery.isLoading ||
+    productionSummaryQuery.isLoading ||
     survivalTrendQuery.isLoading ||
     measurementsQuery.isLoading
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <FeedDashboard
-          selectedFeedType={selectedFeedType}
-          onSelectedFeedTypeChange={setSelectedFeedType}
-          feedTypes={feedTypes}
-          formatFeedTypeLabel={formatFeedTypeLabel}
-          hasSystem={hasSystem}
-          systemId={systemId}
-          boundsStart={boundsStart ?? null}
-          boundsEnd={boundsEnd ?? null}
+          timePeriod={timePeriod}
           errorMessage={errorMessages[0] ?? null}
           onRetry={() => {
             farmKpisQuery.refetch()
@@ -426,30 +418,31 @@ export default function FeedManagementPage({
             inventoryQuery.refetch()
             fcrTrendQuery.refetch()
             growthTrendQuery.refetch()
+            productionSummaryQuery.refetch()
             survivalTrendQuery.refetch()
             measurementsQuery.refetch()
             systemsQuery.refetch()
             batchSystemsQuery.refetch()
           }}
-          latestFeedDate={latestFeedDate}
-          feedTodayKg={feedTodayKg}
-          fedSystemsToday={fedSystemsToday}
-          activeSystemCount={activeSystemCount}
-          minStockDays={minStockDays}
-          overfeedingCount={overfeedingCount}
-          poorAppetiteCount={poorAppetiteCount}
-          lowGrowthCount={lowGrowthCount}
-          survivalRiskCount={survivalRiskCount}
-          worstFcr={worstFcr}
           loading={loading}
           scopedSystemIdList={scopedSystemIdList}
-          heatmapDates={heatmapDates}
-          matrixCells={matrixCells}
           systemNameById={systemNameById}
           exceptionItems={exceptionItems}
           runningStockRows={runningStockRows}
+          feedingRecords={feedingRecords}
+          inventoryRows={inventoryRows}
+          productionRows={productionRows}
+          growthRows={growthTrendRowsRaw}
+          survivalRows={survivalTrendRowsRaw}
+          measurements={measurements}
           feedRatePoints={feedRatePoints}
           fcrIntervals={fcrIntervals}
+          latestFeedDate={latestFeedDate}
+          minStockDays={minStockDays}
+          lowGrowthCount={lowGrowthCount}
+          worstFcr={worstFcr}
+          heatmapDates={heatmapDates}
+          matrixCells={matrixCells}
           selectedHistorySystemId={selectedHistorySystemId}
           onSelectedHistorySystemIdChange={setSelectedHistorySystemId}
           farmId={farmId}

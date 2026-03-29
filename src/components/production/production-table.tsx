@@ -54,19 +54,21 @@ export default function ProductionTable({
                 <TableRow>
                   <TableHead className="text-xs uppercase tracking-wide">Date</TableHead>
                   <TableHead className="text-xs uppercase tracking-wide">System</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide">Activity</TableHead>
                   <TableHead className="text-xs uppercase tracking-wide text-right">Fish</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide text-right">Biomass</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide text-right">ABW</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide text-right">Biomass +</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide text-right">Feed</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-right">Biomass (kg)</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-right">ABW (g)</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-right">Biomass Gain (kg)</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-right">Feed (kg)</TableHead>
                   <TableHead className="text-xs uppercase tracking-wide text-right">eFCR</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow key={`${row.system_id ?? "system"}-${row.date ?? ""}`}>
+                  <TableRow key={`${row.system_id ?? "system"}-${row.date ?? ""}-${row.activity ?? "activity"}-${row.activity_rank ?? "rank"}`}>
                     <TableCell className="font-medium">{row.date ?? "--"}</TableCell>
                     <TableCell>{row.system_name ?? row.system_id ?? "--"}</TableCell>
+                    <TableCell>{row.activity ?? "--"}</TableCell>
                     <TableCell className="text-right">{formatNumberValue(row.number_of_fish_inventory)}</TableCell>
                     <TableCell className="text-right">{formatNumberValue(row.total_biomass, { decimals: 1 })} kg</TableCell>
                     <TableCell className="text-right">{formatNumberValue(row.average_body_weight, { decimals: 1 })} g</TableCell>

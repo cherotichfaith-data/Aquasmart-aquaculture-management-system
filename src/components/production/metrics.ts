@@ -13,8 +13,8 @@ export const PRODUCTION_METRICS = {
   },
   mortality: {
     label: "Mortality rate",
-    unit: "rate/day",
-    decimals: 4,
+    unit: "%/day",
+    decimals: 2,
     source: "inventory",
   },
   abw: {
@@ -25,7 +25,7 @@ export const PRODUCTION_METRICS = {
   },
   feeding: {
     label: "Feeding rate",
-    unit: "kg/t",
+    unit: "% BW/day",
     decimals: 2,
     source: "inventory",
   },

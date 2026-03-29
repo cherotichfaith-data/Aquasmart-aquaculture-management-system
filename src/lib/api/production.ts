@@ -1,6 +1,13 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import {
+  getClientOrError,
+  isAbortLikeError,
+  isInvalidBigintUuidError,
+  queryKpiRpc,
+  toQueryError,
+  toQuerySuccess,
+} from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
@@ -23,19 +30,6 @@ const productionRpcArgs = (params: {
   p_start_date: params.dateFrom ?? undefined,
   p_end_date: params.dateTo ?? undefined,
 })
-
-const isAbortLikeError = (err: unknown): boolean => {
-  if (!err) return false
-  const e = err as { name?: string; message?: string }
-  const name = String(e.name ?? "").toLowerCase()
-  const message = String(e.message ?? "").toLowerCase()
-  return (
-    name.includes("abort") ||
-    message.includes("abort") ||
-    message.includes("canceled") ||
-    message.includes("cancel")
-  )
-}
 
 const isQuietError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
@@ -71,7 +65,7 @@ export async function getProductionSummary(params?: {
 
   const { data, error } = await query
   if (error) {
-    if (isQuietError(error)) return empty<ProductionSummaryRow>()
+    if (isQuietError(error) || isInvalidBigintUuidError(error)) return empty<ProductionSummaryRow>()
     return toQueryError("getProductionSummary", error)
   }
 

@@ -32,9 +32,13 @@ const FEED_PELLET_SIZES: Enums<"feed_pellet_size">[] = [
 
 interface FeedTypeQuickCreateProps {
   onCreated?: () => void
+  allowSupplierCreate?: boolean
 }
 
-export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
+export function FeedTypeQuickCreate({
+  onCreated,
+  allowSupplierCreate = true,
+}: FeedTypeQuickCreateProps) {
   const suppliersQuery = useFeedSupplierOptions()
   const createSupplier = useCreateFeedSupplier()
   const createFeedType = useCreateFeedType()
@@ -115,12 +119,12 @@ export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
     onCreated?.()
   }
 
+  const showSupplierEditor = allowSupplierCreate && (showSupplierForm || suppliers.length === 0)
+
   return (
     <div className="space-y-4 rounded-lg border border-border/80 bg-background p-4">
       <div className="space-y-1">
         <h3 className="font-medium">Add Feed Type</h3>
-        <p className="text-sm text-muted-foreground">Create the missing feed type without leaving data entry.</p>
-        <p className="text-sm text-muted-foreground">Protein is required. Fat is strongly recommended so feed analysis and cost reporting are not left incomplete later.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -161,18 +165,16 @@ export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
         <div className="space-y-2">
           <Label htmlFor="protein">Protein %</Label>
           <Input id="protein" type="number" step="0.1" value={protein} onChange={(event) => setProtein(event.target.value)} />
-          <p className="text-xs text-muted-foreground">Required for feed-quality reporting and weighted nutrition metrics.</p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="fat">Fat % (Recommended)</Label>
+          <Label htmlFor="fat">Fat %</Label>
           <Input id="fat" type="number" step="0.1" value={fat} onChange={(event) => setFat(event.target.value)} />
-          <p className="text-xs text-muted-foreground">Leave blank only if the supplier spec sheet is unavailable.</p>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 md:col-span-3">
           <Label>Supplier</Label>
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start">
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
             <Select value={supplierId} onValueChange={setSupplierId} disabled={suppliersQuery.isLoading || suppliers.length === 0}>
-              <SelectTrigger className="w-full sm:flex-1">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder={suppliersQuery.isLoading ? "Loading suppliers..." : "Select supplier"} />
               </SelectTrigger>
               <SelectContent>
@@ -183,20 +185,25 @@ export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              type="button"
-              variant={showSupplierForm ? "secondary" : "outline"}
-              size="sm"
-              className="shrink-0 whitespace-nowrap lg:min-w-[11rem]"
-              onClick={() => setShowSupplierForm((current) => !current)}
-            >
-              {showSupplierForm || suppliers.length === 0 ? "Hide supplier form" : "New supplier"}
-            </Button>
+            {allowSupplierCreate ? (
+              <Button
+                type="button"
+                variant={showSupplierForm ? "secondary" : "outline"}
+                size="sm"
+                className="w-full md:w-auto md:min-w-[11rem]"
+                onClick={() => setShowSupplierForm((current) => !current)}
+              >
+                {showSupplierForm || suppliers.length === 0 ? "Hide supplier form" : "New supplier"}
+              </Button>
+            ) : null}
           </div>
+          {!allowSupplierCreate && suppliers.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No supplier found. Add one from Feed Inventory first.</p>
+          ) : null}
         </div>
       </div>
 
-      {(showSupplierForm || suppliers.length === 0) ? (
+      {showSupplierEditor ? (
         <div className="space-y-4 rounded-lg border border-dashed border-border/80 bg-muted/20 p-4">
           <div className="space-y-1">
             <h4 className="font-medium">Add Supplier</h4>
@@ -240,7 +247,11 @@ export function FeedTypeQuickCreate({ onCreated }: FeedTypeQuickCreateProps) {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <Button type="button" onClick={handleCreateFeedType} disabled={createFeedType.isPending}>
+      <Button
+        type="button"
+        onClick={handleCreateFeedType}
+        disabled={createFeedType.isPending || (!allowSupplierCreate && suppliers.length === 0)}
+      >
         {createFeedType.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Add feed type
       </Button>

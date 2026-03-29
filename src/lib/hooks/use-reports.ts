@@ -31,15 +31,56 @@ function reportsQueryOptions<TResult>(params: {
   enabled: boolean
   staleTime: number
   initialData?: TResult
+  refetchOnWindowFocus?: boolean
 }) {
   return queryOptions({
     queryKey: params.queryKey,
     queryFn: params.queryFn,
     enabled: params.enabled,
     staleTime: params.staleTime,
-    initialData: params.initialData,
-    initialDataUpdatedAt: params.initialData ? 0 : undefined,
+    initialData: params.enabled ? params.initialData : undefined,
+    initialDataUpdatedAt: params.enabled && params.initialData ? 0 : undefined,
+    refetchOnWindowFocus: params.refetchOnWindowFocus,
   })
+}
+
+const SCOPED_TREND_CONCURRENCY = 4
+
+async function collectScopedTrendRows<T>(params: {
+  systemIds: number[]
+  signal: AbortSignal
+  fetcher: (systemId: number) => Promise<QueryResult<T>>
+  errorMessage: string
+}): Promise<QueryResult<T & { system_id: number }>> {
+  const results: Array<{ system_id: number; rows: T[] }> = []
+
+  for (let index = 0; index < params.systemIds.length; index += SCOPED_TREND_CONCURRENCY) {
+    const chunk = params.systemIds.slice(index, index + SCOPED_TREND_CONCURRENCY)
+    const chunkResults = await Promise.all(
+      chunk.map(async (systemId) => {
+        const result = await params.fetcher(systemId)
+        return { systemId, result }
+      }),
+    )
+
+    const firstError = chunkResults.find((item) => item.result.status === "error")?.result
+    if (firstError?.status === "error") {
+      throw new Error(firstError.error ?? params.errorMessage)
+    }
+
+    results.push(
+      ...chunkResults.flatMap((item) =>
+        item.result.status === "success" ? [{ system_id: item.systemId, rows: item.result.data }] : [],
+      ),
+    )
+
+    if (params.signal.aborted) {
+      break
+    }
+  }
+
+  const data = results.flatMap((item) => item.rows.map((row) => ({ ...row, system_id: item.system_id })))
+  return { status: "success", data }
 }
 
 export function useFarmKpisToday(params?: {
@@ -207,6 +248,8 @@ export function useScopedFcrTrend(params?: {
   farmId?: string | null
   systemIds?: number[]
   days?: number
+  dateFrom?: string
+  dateTo?: string
   enabled?: boolean
 }) {
   const { session } = useAuth()
@@ -220,32 +263,28 @@ export function useScopedFcrTrend(params?: {
         "fcr-trend",
         resolvedFarmId ?? "all",
         systemIds.join(","),
+        params?.dateFrom ?? "",
+        params?.dateTo ?? "",
         params?.days ?? 180,
       ],
       queryFn: async ({ signal }) => {
-        const results = await Promise.all(
-          systemIds.map(async (systemId) => {
-            const result = await getFcrTrend({
+        return collectScopedTrendRows<FeedFcrTrendRow>({
+          systemIds,
+          signal,
+          fetcher: (systemId) =>
+            getFcrTrend({
               farmId: resolvedFarmId,
               systemId,
               days: params?.days,
+              dateFrom: params?.dateFrom,
+              dateTo: params?.dateTo,
               signal,
-            })
-            return { systemId, result }
-          }),
-        )
-        const firstError = results.find((item) => item.result.status === "error")?.result
-        if (firstError?.status === "error") {
-          throw new Error(firstError.error ?? "Failed to load FCR trend")
-        }
-        const data = results.flatMap((item) =>
-          item.result.status === "success"
-            ? item.result.data.map((row) => ({ ...row, system_id: item.systemId }))
-            : [],
-        )
-        return { status: "success" as const, data } satisfies QueryResult<FeedFcrTrendRow & { system_id: number }>
+            }),
+          errorMessage: "Failed to load FCR trend",
+        })
       },
       enabled: Boolean(session) && Boolean(resolvedFarmId) && systemIds.length > 0 && (params?.enabled ?? true),
+      refetchOnWindowFocus: false,
       staleTime: 60_000,
     }),
   )
@@ -254,36 +293,39 @@ export function useScopedFcrTrend(params?: {
 export function useScopedGrowthTrend(params?: {
   systemIds?: number[]
   days?: number
+  dateFrom?: string
+  dateTo?: string
   enabled?: boolean
 }) {
   const { session } = useAuth()
   const systemIds = params?.systemIds?.filter((id) => Number.isFinite(id)) ?? []
   return useQuery(
     reportsQueryOptions({
-      queryKey: ["reports", "growth-trend", systemIds.join(","), params?.days ?? 180],
+      queryKey: [
+        "reports",
+        "growth-trend",
+        systemIds.join(","),
+        params?.dateFrom ?? "",
+        params?.dateTo ?? "",
+        params?.days ?? 180,
+      ],
       queryFn: async ({ signal }) => {
-        const results = await Promise.all(
-          systemIds.map(async (systemId) => {
-            const result = await getGrowthTrend({
+        return collectScopedTrendRows<FeedGrowthTrendRow>({
+          systemIds,
+          signal,
+          fetcher: (systemId) =>
+            getGrowthTrend({
               systemId,
               days: params?.days,
+              dateFrom: params?.dateFrom,
+              dateTo: params?.dateTo,
               signal,
-            })
-            return { systemId, result }
-          }),
-        )
-        const firstError = results.find((item) => item.result.status === "error")?.result
-        if (firstError?.status === "error") {
-          throw new Error(firstError.error ?? "Failed to load growth trend")
-        }
-        const data = results.flatMap((item) =>
-          item.result.status === "success"
-            ? item.result.data.map((row) => ({ ...row, system_id: item.systemId }))
-            : [],
-        )
-        return { status: "success" as const, data } satisfies QueryResult<FeedGrowthTrendRow & { system_id: number }>
+            }),
+          errorMessage: "Failed to load growth trend",
+        })
       },
       enabled: Boolean(session) && systemIds.length > 0 && (params?.enabled ?? true),
+      refetchOnWindowFocus: false,
       staleTime: 60_000,
     }),
   )
@@ -307,33 +349,25 @@ export function useScopedSurvivalTrend(params?: {
         params?.dateTo ?? "",
       ],
       queryFn: async ({ signal }) => {
-        const results = await Promise.all(
-          systemIds.map(async (systemId) => {
-            const result = await getSurvivalTrend({
+        return collectScopedTrendRows({
+          systemIds,
+          signal,
+          fetcher: (systemId) =>
+            getSurvivalTrend({
               systemId,
               dateFrom: params?.dateFrom,
               dateTo: params?.dateTo,
               signal,
-            })
-            return { systemId, result }
-          }),
-        )
-        const firstError = results.find((item) => item.result.status === "error")?.result
-        if (firstError?.status === "error") {
-          throw new Error(firstError.error ?? "Failed to load survival trend")
-        }
-        const data = results.flatMap((item) =>
-          item.result.status === "success"
-            ? item.result.data.map((row) => ({ ...row, system_id: item.systemId }))
-            : [],
-        )
-        return { status: "success" as const, data }
+            }),
+          errorMessage: "Failed to load survival trend",
+        })
       },
       enabled:
         Boolean(session) &&
         systemIds.length > 0 &&
         Boolean(params?.dateFrom) &&
         (params?.enabled ?? true),
+      refetchOnWindowFocus: false,
       staleTime: 60_000,
     }),
   )

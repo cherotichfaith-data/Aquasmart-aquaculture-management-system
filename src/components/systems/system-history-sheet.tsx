@@ -227,16 +227,53 @@ export default function SystemHistorySheet({
     [harvestRows],
   )
 
+  const sampledAbwByDate = useMemo(() => {
+    const byDate = new Map<string, { weightedAbw: number; sampleWeight: number; fallbackAbw: number; fallbackCount: number }>()
+
+    samplingRows.forEach((row) => {
+      if (!row.date || typeof row.abw !== "number") return
+
+      const current = byDate.get(row.date) ?? {
+        weightedAbw: 0,
+        sampleWeight: 0,
+        fallbackAbw: 0,
+        fallbackCount: 0,
+      }
+      const sampleCount = row.number_of_fish_sampling ?? 0
+
+      if (sampleCount > 0) {
+        current.weightedAbw += row.abw * sampleCount
+        current.sampleWeight += sampleCount
+      } else {
+        current.fallbackAbw += row.abw
+        current.fallbackCount += 1
+      }
+
+      byDate.set(row.date, current)
+    })
+
+    return new Map(
+      Array.from(byDate.entries()).map(([date, current]) => [
+        date,
+        current.sampleWeight > 0
+          ? current.weightedAbw / current.sampleWeight
+          : current.fallbackCount > 0
+            ? current.fallbackAbw / current.fallbackCount
+            : null,
+      ]),
+    )
+  }, [samplingRows])
+
   const inventoryTrendRows = useMemo(
     () =>
       inventoryRows.map((row) => ({
         date: row.inventory_date,
         label: formatCompactDate(row.inventory_date),
         biomass: row.biomass_last_sampling,
-        abw: row.abw_last_sampling,
+        abw: sampledAbwByDate.get(row.inventory_date) ?? null,
         feed: row.feeding_amount,
       })),
-    [inventoryRows],
+    [inventoryRows, sampledAbwByDate],
   )
 
   const waterTrendRows = useMemo(() => {
@@ -317,13 +354,16 @@ export default function SystemHistorySheet({
     })
     transferRows.forEach((row) => {
       const direction = row.origin_system_id === systemId ? "Out" : "In"
-      const counterpart = row.origin_system_id === systemId ? row.target_system_id : row.origin_system_id
+      const counterpart =
+        row.origin_system_id === systemId
+          ? row.external_target_name?.trim() || row.target_system_id || "external location"
+          : row.origin_system_id
       items.push({
         id: `transfer-${row.id}`,
         date: row.date,
         createdAt: row.created_at,
         type: "Transfer",
-        detail: `${direction} ${formatNumberValue(row.number_of_fish_transfer)} fish ${direction === "Out" ? "to" : "from"} system ${counterpart}`,
+        detail: `${direction} ${formatNumberValue(row.number_of_fish_transfer)} fish ${direction === "Out" ? "to" : "from"} ${direction === "Out" && typeof counterpart === "string" ? counterpart : `system ${counterpart}`}`,
       })
     })
     harvestRows.forEach((row) => {

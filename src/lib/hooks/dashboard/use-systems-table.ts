@@ -21,6 +21,11 @@ export function useSystemsTable(params: {
   initialData?: SystemsTableData
 }) {
   const { session } = useAuth()
+  const hasBounds = Boolean(params.dateFrom) && Boolean(params.dateTo)
+  const canUseInitialData =
+    hasBounds &&
+    params.initialData?.meta.start === params.dateFrom &&
+    params.initialData?.meta.end === params.dateTo
 
   return useQuery({
     queryKey: [
@@ -104,11 +109,11 @@ export function useSystemsTable(params: {
         meta: { source: "api_dashboard_systems", start: startDate, end: endDate },
       }
     },
-    enabled: Boolean(session) && Boolean(params.farmId),
+    enabled: Boolean(session) && Boolean(params.farmId) && hasBounds,
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: true,
-    initialData: params.initialData,
-    initialDataUpdatedAt: params.initialData ? 0 : undefined,
+    initialData: canUseInitialData ? params.initialData : undefined,
+    initialDataUpdatedAt: canUseInitialData ? 0 : undefined,
   })
 }

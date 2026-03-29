@@ -1,6 +1,6 @@
 import type { Database } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, isAbortLikeError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
@@ -34,14 +34,6 @@ const dailyInventoryRpcArgs = (params: {
   p_order_asc: params.orderAsc ?? false,
   p_limit: params.limit ?? 5000,
 })
-
-const isAbortLikeError = (err: unknown): boolean => {
-  if (!err) return false
-  const e = err as { name?: string; message?: string }
-  const name = String(e.name ?? "").toLowerCase()
-  const message = String(e.message ?? "").toLowerCase()
-  return name.includes("abort") || message.includes("abort") || message.includes("canceled")
-}
 
 export async function getDailyFishInventory(params?: {
   systemId?: number

@@ -1,6 +1,13 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryOptionsRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import {
+  getClientOrError,
+  isAbortLikeError,
+  queryOptionsRpc,
+  toQueryError,
+  toQuerySuccess,
+  type OptionsRpcName,
+} from "@/lib/api/_utils"
 import { mapSystemRowToOption, type SystemOption, type SystemOptionSource } from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
@@ -12,22 +19,10 @@ type FeedSupplierRow = Database["public"]["Tables"]["feed_supplier"]["Row"]
 type FingerlingSupplierRow = Database["public"]["Tables"]["fingerling_supplier"]["Row"]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
+type OptionsRpcRow<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Returns"][number]
+type OptionsRpcArgs<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Args"]
 
 const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
-
-const isAbortLikeError = (err: unknown): boolean => {
-  if (!err) return false
-  const e = err as { name?: string; message?: string }
-  const name = String(e.name ?? "").toLowerCase()
-  const message = String(e.message ?? "").toLowerCase()
-  return (
-    name.includes("abort") ||
-    name.includes("cancel") ||
-    message.includes("abort") ||
-    message.includes("cancel") ||
-    message.includes("canceled")
-  )
-}
 
 const isQuietOptionsError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
@@ -40,24 +35,25 @@ const isQuietTableError = (err: unknown): boolean =>
  * - requires session (options are user-specific)
  * - returns [] on quiet errors
  */
-async function rpcOrEmpty<T>(
+async function rpcOrEmpty<Name extends OptionsRpcName>(
   tag: string,
-  rpcCall: (supabase: any) => any,
+  name: Name,
+  args?: OptionsRpcArgs<Name>,
   signal?: AbortSignal,
-): Promise<QueryResult<T>> {
+): Promise<QueryResult<OptionsRpcRow<Name>>> {
   const clientResult = await getClientOrError(tag, { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let q = rpcCall(supabase)
+  let q = args === undefined ? queryOptionsRpc(supabase, name) : queryOptionsRpc(supabase, name, args)
   if (signal) q = q.abortSignal(signal)
 
   const { data, error } = await q
   if (error) {
-    if (isQuietOptionsError(error)) return empty<T>()
+    if (isQuietOptionsError(error)) return empty<OptionsRpcRow<Name>>()
     return toQueryError(tag, error)
   }
-  return toQuerySuccess<T>((data ?? []) as T[])
+  return toQuerySuccess<OptionsRpcRow<Name>>((data ?? []) as OptionsRpcRow<Name>[])
 }
 
 export async function getSystemOptions(params?: {
@@ -105,9 +101,10 @@ export async function getBatchOptions(params?: {
   if (!params?.farmId) return empty<BatchListItem>()
   const farmId = params.farmId
 
-  const res = await rpcOrEmpty<BatchListItem>(
+  const res = await rpcOrEmpty(
     "getBatchOptions",
-    (supabase) => queryOptionsRpc(supabase, "api_fingerling_batch_options_rpc", { p_farm_id: farmId }),
+    "api_fingerling_batch_options_rpc",
+    { p_farm_id: farmId },
     params?.signal,
   )
   if (res.status !== "success") return res
@@ -122,9 +119,10 @@ export async function getFeedTypeOptions(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FeedTypeOptionRow>> {
-  const res = await rpcOrEmpty<FeedTypeOptionRow>(
+  const res = await rpcOrEmpty(
     "getFeedTypeOptions",
-    (supabase) => queryOptionsRpc(supabase, "api_feed_type_options_rpc"),
+    "api_feed_type_options_rpc",
+    undefined,
     params?.signal,
   )
   if (res.status !== "success") return res
@@ -179,9 +177,10 @@ export async function getFarmOptions(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FarmOptionRow>> {
-  const res = await rpcOrEmpty<FarmOptionRow>(
+  const res = await rpcOrEmpty(
     "getFarmOptions",
-    (supabase) => queryOptionsRpc(supabase, "api_farm_options_rpc"),
+    "api_farm_options_rpc",
+    undefined,
     params?.signal,
   )
   if (res.status !== "success") return res

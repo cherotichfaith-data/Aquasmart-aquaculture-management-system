@@ -10,7 +10,15 @@ import { ShortcutsHelp } from "@/components/shared/shortcuts-help"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+  hideHeader = false,
+  showHeaderToolbar = true,
+}: {
+  children: React.ReactNode
+  hideHeader?: boolean
+  showHeaderToolbar?: boolean
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
@@ -64,10 +72,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         onCollapseToggle={() => setSidebarCollapsed((prev) => !prev)}
       />
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <Header
-          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-        />
-        <main className="flex-1 overflow-x-hidden px-3 pb-8 pt-4 sm:px-4 md:px-6 md:pb-10 md:pt-5 lg:px-10 animate-in fade-in-0 duration-300">
+        {hideHeader ? null : (
+          <Header
+            onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+            showToolbar={showHeaderToolbar}
+          />
+        )}
+        <main
+          className={
+            hideHeader
+              ? "flex-1 overflow-x-hidden px-3 pb-8 pt-3 sm:px-4 md:px-6 md:pb-10 md:pt-4 lg:px-10 animate-in fade-in-0 duration-300"
+              : showHeaderToolbar
+                ? "flex-1 overflow-x-hidden px-3 pb-8 pt-4 sm:px-4 md:px-6 md:pb-10 md:pt-5 lg:px-10 animate-in fade-in-0 duration-300"
+                : "flex-1 overflow-x-hidden px-3 pb-8 pt-0 sm:px-4 md:px-6 md:pb-10 md:pt-0 lg:px-10 animate-in fade-in-0 duration-300"
+          }
+        >
           <div className="mx-auto w-full max-w-[1720px]">{children}</div>
         </main>
       </div>

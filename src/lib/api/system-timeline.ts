@@ -1,24 +1,10 @@
 import type { Database } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import { getClientOrError, isAbortLikeError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 export type SystemTimelineBoundsRow =
   Database["public"]["Functions"]["api_system_timeline_bounds"]["Returns"][number]
-
-const isAbortLikeError = (err: unknown): boolean => {
-  if (!err) return false
-  const e = err as { name?: string; message?: string }
-  const name = String(e.name ?? "").toLowerCase()
-  const message = String(e.message ?? "").toLowerCase()
-  return (
-    name.includes("abort") ||
-    name.includes("cancel") ||
-    message.includes("abort") ||
-    message.includes("cancel") ||
-    message.includes("canceled")
-  )
-}
 
 const empty = (): QueryResult<SystemTimelineBoundsRow> => toQuerySuccess<SystemTimelineBoundsRow>([])
 

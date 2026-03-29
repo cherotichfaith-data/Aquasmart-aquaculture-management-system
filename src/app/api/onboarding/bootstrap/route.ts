@@ -15,17 +15,6 @@ const onboardingSchema = z
     lowDoThreshold: z.number().finite().min(0),
     highAmmoniaThreshold: z.number().finite().min(0),
     highMortalityThreshold: z.number().finite().min(0),
-    lowFeedingRateThreshold: z.number().finite().min(0),
-    highFeedingRateThreshold: z.number().finite().min(0),
-  })
-  .superRefine((value, ctx) => {
-    if (value.highFeedingRateThreshold < value.lowFeedingRateThreshold) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "High feeding-rate threshold must be greater than or equal to the low threshold.",
-        path: ["highFeedingRateThreshold"],
-      })
-    }
   })
 
 export async function POST(request: Request) {
@@ -115,12 +104,7 @@ export async function POST(request: Request) {
       low_do_threshold: payload.lowDoThreshold,
       high_ammonia_threshold: payload.highAmmoniaThreshold,
       high_mortality_threshold: payload.highMortalityThreshold,
-      low_feeding_rate_threshold: payload.lowFeedingRateThreshold,
-      high_feeding_rate_threshold: payload.highFeedingRateThreshold,
-    } as TablesInsert<"alert_threshold"> & {
-      low_feeding_rate_threshold?: number | null
-      high_feeding_rate_threshold?: number | null
-    })
+    } as TablesInsert<"alert_threshold">)
 
   if (thresholdError) {
     logSbError("onboarding:bootstrap:createThresholds", thresholdError)
