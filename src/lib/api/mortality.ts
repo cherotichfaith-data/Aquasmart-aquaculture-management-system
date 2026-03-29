@@ -1,33 +1,14 @@
 import type { QueryResult } from "@/lib/supabase-client"
 import type { AlertSeverity, AlertLogRow, MortalityEventRow, SurvivalTrendRow } from "@/lib/types/mortality"
-import { getClientOrError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import {
+  getClientOrError,
+  isAbortLikeError,
+  isMissingObjectError,
+  queryKpiRpc,
+  toQueryError,
+  toQuerySuccess,
+} from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-
-const fromTable = (
-  supabase: ReturnType<typeof import("@/lib/supabase/client").createClient>,
-  table: string,
-) => (supabase as unknown as { from: (name: string) => any }).from(table)
-
-const runRpc = (
-  supabase: ReturnType<typeof import("@/lib/supabase/client").createClient>,
-  name: string,
-  args: Record<string, unknown>,
-) => (supabase as unknown as { rpc: (rpcName: string, rpcArgs?: Record<string, unknown>) => any }).rpc(name, args)
-
-const isAbortLikeError = (err: unknown): boolean => {
-  if (!err) return false
-  const e = err as { name?: string; message?: string }
-  const name = String(e.name ?? "").toLowerCase()
-  const message = String(e.message ?? "").toLowerCase()
-  return name.includes("abort") || name.includes("cancel") || message.includes("abort") || message.includes("cancel")
-}
-
-const isMissingObjectError = (err: unknown) => {
-  const code = String(
-    typeof err === "object" && err !== null && "code" in err ? (err as { code?: string }).code ?? "" : "",
-  )
-  return code === "42P01" || code === "42883"
-}
 
 export async function getMortalityEvents(params?: {
   farmId?: string | null
@@ -42,7 +23,7 @@ export async function getMortalityEvents(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = fromTable(supabase, "fish_mortality").select("*")
+  let query = supabase.from("fish_mortality").select("*")
   if (params?.farmId) query = query.eq("farm_id", params.farmId)
   if (params?.systemId) query = query.eq("system_id", params.systemId)
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
@@ -82,7 +63,7 @@ export async function getAlertLog(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = fromTable(supabase, "alert_log").select("*")
+  let query = supabase.from("alert_log").select("*")
   if (params?.farmId) query = query.eq("farm_id", params.farmId)
   if (params?.systemId) query = query.eq("system_id", params.systemId)
   if (params?.severity) query = query.eq("severity", params.severity)
@@ -123,7 +104,7 @@ export async function getSurvivalTrend(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = runRpc(supabase, "get_survival_trend", {
+  let query = queryKpiRpc(supabase, "get_survival_trend", {
     p_system_id: params.systemId,
     p_start_date: params.dateFrom,
     p_end_date: params.dateTo,

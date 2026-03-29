@@ -4,9 +4,12 @@ import { useQuery } from "@tanstack/react-query"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
 import type { KPIOverviewMetric } from "@/features/dashboard/types"
+import { scaleFractionToPercent } from "@/lib/analytics-format"
 import {
+  aggregateInventoryMetrics,
+  computeEfcrFromProductionRows,
   computeMortalityRateFromProduction,
-  toTrendPercent,
+  toTrendDelta,
 } from "@/features/dashboard/analytics-shared"
 import { getDashboardConsolidated } from "@/lib/api/dashboard"
 import { getDailyFishInventory } from "@/lib/api/inventory"
@@ -27,6 +30,12 @@ export function useKpiOverview(params: {
   initialData?: { metrics: KPIOverviewMetric[]; dateBounds: { start: string | null; end: string | null } }
 }) {
   const { session } = useAuth()
+  const canUseInitialData =
+    Boolean(params.initialData) &&
+    Boolean(params.dateFrom) &&
+    Boolean(params.dateTo) &&
+    params.initialData?.dateBounds.start === params.dateFrom &&
+    params.initialData?.dateBounds.end === params.dateTo
 
   return useQuery({
     queryKey: [
@@ -97,90 +106,15 @@ export function useKpiOverview(params: {
           ? productionRowsRaw.filter((row) => row.system_id != null && scopedIdSet.has(row.system_id))
           : productionRowsRaw
 
-        let totalFeed = 0
-        let totalBiomass = 0
-        let biomassCount = 0
-        let totalAbw = 0
-        let abwCount = 0
-        let totalBiomassDensity = 0
-        let biomassDensityCount = 0
-        let totalFish = 0
-        let fishCount = 0
-        let mortalityWeighted = 0
-        let feedingWeighted = 0
-
-        inventoryRows.forEach((row) => {
-          const feed = row.feeding_amount ?? 0
-          const biomass = row.biomass_last_sampling
-          const fish = row.number_of_fish
-          const abw = row.abw_last_sampling
-          const biomassDensity = row.biomass_density
-          const mortalityCount = row.number_of_fish_mortality ?? 0
-
-          totalFeed += feed
-          if (typeof biomass === "number") {
-            totalBiomass += biomass
-            biomassCount += 1
-          }
-          if (typeof abw === "number") {
-            totalAbw += abw
-            abwCount += 1
-          }
-          if (typeof biomassDensity === "number") {
-            totalBiomassDensity += biomassDensity
-            biomassDensityCount += 1
-          }
-          if (typeof fish === "number") {
-            totalFish += fish
-            fishCount += 1
-          }
-
-          if (typeof fish === "number" && fish > 0) {
-            const mortalityRateRow =
-              typeof row.mortality_rate === "number"
-                ? row.mortality_rate
-                : mortalityCount / fish
-            mortalityWeighted += mortalityRateRow * fish
-          }
-
-          if (typeof biomass === "number" && biomass > 0) {
-            const feedingRateRow =
-              typeof row.feeding_rate === "number"
-                ? row.feeding_rate
-                : (feed * 1000) / biomass
-            feedingWeighted += feedingRateRow * biomass
-          }
-        })
-
-        const avgBiomass = biomassCount > 0 ? totalBiomass / biomassCount : null
-        const avgAbw = abwCount > 0 ? totalAbw / abwCount : null
-        const avgBiomassDensity = biomassDensityCount > 0 ? totalBiomassDensity / biomassDensityCount : null
-        const feedRate =
-          totalBiomass > 0 ? (feedingWeighted > 0 ? feedingWeighted / totalBiomass : (totalFeed * 1000) / totalBiomass) : null
-        const mortalityRateFromInventory = totalFish > 0 ? mortalityWeighted / totalFish : null
-
-        const gainAdjusted = productionRows.reduce((sum, row) => {
-          const biomassIncrease = row.biomass_increase_period ?? 0
-          const transferOut = (row as any).total_weight_transfer_out ?? 0
-          const transferIn = (row as any).total_weight_transfer_in ?? 0
-          const harvested = (row as any).total_weight_harvested ?? 0
-          const stocked = (row as any).total_weight_stocked ?? 0
-          return sum + (biomassIncrease - transferOut + transferIn + harvested - stocked)
-        }, 0)
-
-        const feedSum = productionRows.reduce(
-          (sum, row) => sum + (row.total_feed_amount_period ?? 0),
-          0,
-        )
-
-        const efcr = gainAdjusted !== 0 ? feedSum / gainAdjusted : null
+        const inventoryMetrics = aggregateInventoryMetrics(inventoryRows)
+        const efcr = computeEfcrFromProductionRows(productionRows)
         const mortalityRateFromProduction = computeMortalityRateFromProduction(
           productionRows.map((row) => ({
             number_of_fish_inventory: row.number_of_fish_inventory,
             daily_mortality_count: row.daily_mortality_count,
           })),
         )
-        const mortalityRate = mortalityRateFromInventory ?? mortalityRateFromProduction
+        const mortalityRate = inventoryMetrics.mortalityRate ?? mortalityRateFromProduction
 
         const wqResult = await getWaterQualityRatings({
           farmId: params.farmId ?? null,
@@ -196,27 +130,30 @@ export function useKpiOverview(params: {
         const wqRows = scopedIdSet
           ? wqResult.data.filter((row) => row.system_id != null && scopedIdSet.has(row.system_id))
           : wqResult.data
-        const consolidatedResult = await getDashboardConsolidated({
-          farmId: params.farmId ?? null,
-          systemId: singleSystemId,
-          dateFrom: range.start,
-          dateTo: range.end,
-          signal,
-        })
+        const consolidatedResult = singleSystemId
+          ? await getDashboardConsolidated({
+              farmId: params.farmId ?? null,
+              systemId: singleSystemId,
+              dateFrom: range.start,
+              dateTo: range.end,
+              signal,
+            })
+          : null
         const consolidatedRow =
-          consolidatedResult.status === "success" ? consolidatedResult.data[0] ?? null : null
+          consolidatedResult?.status === "success" ? consolidatedResult.data[0] ?? null : null
 
         const resolvedEfcr = consolidatedRow?.efcr_period_consolidated ?? efcr
         const resolvedMortalityRate = consolidatedRow?.mortality_rate ?? mortalityRate
-        const resolvedAvgBiomass = consolidatedRow?.average_biomass ?? avgBiomass
-        const resolvedBiomassDensity = consolidatedRow?.biomass_density ?? avgBiomassDensity
-        const resolvedFeedingRate = consolidatedRow?.feeding_rate ?? feedRate
-        const resolvedAbw = consolidatedRow?.abw_asof_end ?? avgAbw
+        const resolvedAvgBiomass = consolidatedRow?.average_biomass ?? inventoryMetrics.averageBiomass
+        const resolvedBiomassDensity = consolidatedRow?.biomass_density ?? inventoryMetrics.biomassDensity
+        const resolvedFeedingRate = consolidatedRow?.feeding_rate ?? inventoryMetrics.feedingRate
+        const resolvedAbw = consolidatedRow?.abw_asof_end ?? inventoryMetrics.abwAsOfEnd
+        const displayedMortalityRate = scaleFractionToPercent(resolvedMortalityRate)
+        const displayedFeedingRate = scaleFractionToPercent(resolvedFeedingRate)
         const resolvedWqAverage =
           wqRows && wqRows.length
             ? wqRows.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / wqRows.length
             : null
-
         const wqRounded = resolvedWqAverage === null ? null : Math.round(resolvedWqAverage)
         const wqLabel =
           wqRounded === null
@@ -233,12 +170,12 @@ export function useKpiOverview(params: {
 
         const trendByKey: Record<string, number | null> = consolidatedRow
           ? {
-              efcr: toTrendPercent(resolvedEfcr, consolidatedRow.efcr_period_consolidated_delta),
-              mortality: toTrendPercent(resolvedMortalityRate, consolidatedRow.mortality_rate_delta),
-              biomass: toTrendPercent(resolvedAvgBiomass, consolidatedRow.average_biomass_delta),
-              biomass_density: toTrendPercent(resolvedBiomassDensity, consolidatedRow.biomass_density_delta),
-              feeding: toTrendPercent(resolvedFeedingRate, consolidatedRow.feeding_rate_delta),
-              abw: toTrendPercent(resolvedAbw, consolidatedRow.abw_asof_end_delta),
+              efcr: toTrendDelta(consolidatedRow.efcr_period_consolidated_delta),
+              mortality: scaleFractionToPercent(toTrendDelta(consolidatedRow.mortality_rate_delta)),
+              biomass: toTrendDelta(consolidatedRow.average_biomass_delta),
+              biomass_density: toTrendDelta(consolidatedRow.biomass_density_delta),
+              feeding: scaleFractionToPercent(toTrendDelta(consolidatedRow.feeding_rate_delta)),
+              abw: toTrendDelta(consolidatedRow.abw_asof_end_delta),
               water_quality: null,
             }
           : {}
@@ -250,15 +187,20 @@ export function useKpiOverview(params: {
             value: resolvedEfcr,
             decimals: 2,
             trend: trendByKey.efcr ?? null,
+            trendFormat: "delta",
+            trendDecimals: 2,
             invertTrend: true,
           },
           {
             key: "mortality",
             label: "Mortality Rate",
-            value: resolvedMortalityRate,
-            unit: "rate/day",
-            decimals: 4,
+            value: displayedMortalityRate,
+            unit: "%/day",
+            decimals: 2,
             trend: trendByKey.mortality ?? null,
+            trendFormat: "delta",
+            trendDecimals: 2,
+            trendUnit: "%/day",
             invertTrend: true,
           },
           {
@@ -268,6 +210,9 @@ export function useKpiOverview(params: {
             unit: "g",
             decimals: 1,
             trend: trendByKey.abw ?? null,
+            trendFormat: "delta",
+            trendDecimals: 1,
+            trendUnit: "g",
             invertTrend: false,
           },
           {
@@ -277,6 +222,9 @@ export function useKpiOverview(params: {
             unit: "kg",
             decimals: 1,
             trend: trendByKey.biomass ?? null,
+            trendFormat: "delta",
+            trendDecimals: 1,
+            trendUnit: "kg",
             invertTrend: false,
           },
           {
@@ -286,15 +234,21 @@ export function useKpiOverview(params: {
             unit: "kg/m3",
             decimals: 2,
             trend: trendByKey.biomass_density ?? null,
+            trendFormat: "delta",
+            trendDecimals: 2,
+            trendUnit: "kg/m3",
             invertTrend: false,
           },
           {
             key: "feeding",
             label: "Feeding Rate",
-            value: resolvedFeedingRate,
-            unit: "kg/t",
+            value: displayedFeedingRate,
+            unit: "% BW/day",
             decimals: 2,
             trend: trendByKey.feeding ?? null,
+            trendFormat: "delta",
+            trendDecimals: 2,
+            trendUnit: "% BW/day",
             invertTrend: false,
           },
           {
@@ -317,11 +271,11 @@ export function useKpiOverview(params: {
       }
       return buildRangeMetrics({ start: dateFrom, end: dateTo })
     },
-    enabled: Boolean(session) && Boolean(params.farmId),
+    enabled: Boolean(session) && Boolean(params.farmId) && Boolean(params.dateFrom) && Boolean(params.dateTo),
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: true,
-    initialData: params.initialData,
-    initialDataUpdatedAt: params.initialData ? 0 : undefined,
+    initialData: canUseInitialData ? params.initialData : undefined,
+    initialDataUpdatedAt: canUseInitialData ? 0 : undefined,
   })
 }

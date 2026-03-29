@@ -1,10 +1,10 @@
 "use client"
 
+import { useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import type { DashboardPageInitialData, DashboardPageInitialFilters } from "@/features/dashboard/types"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { useTimePeriodBounds } from "@/lib/hooks/app/use-time-period-bounds"
+import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import KPIOverview from "@/components/dashboard/kpi-overview"
 import PopulationOverview from "@/components/dashboard/population-overview"
@@ -31,23 +31,29 @@ export default function DashboardPage({
   initialFilters?: DashboardPageInitialFilters
   initialData?: DashboardPageInitialData
 }) {
-  const { farmId: activeFarmId } = useActiveFarm({ initialFarmId })
-  const farmId = activeFarmId ?? initialFarmId ?? null
   const searchParams = useSearchParams()
   const periodParam = searchParams.get("period")
-  const systemParam = searchParams.get("system") ?? "all"
-  const batchParam = searchParams.get("batch") ?? "all"
+  const systemParam = searchParams.get("system")
+  const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")
-  const paramStage = parseDashboardStageParam(stageParam)
-  const paramPeriod = resolveTimePeriod(periodParam)
-  const selectedBatch = batchParam
-  const selectedSystem = systemParam
-  const selectedStage = paramStage
-  const timePeriod = paramPeriod
-  const boundsQuery = useTimePeriodBounds({ farmId, timePeriod, initialData: initialData?.bounds })
-  const dateFrom = boundsQuery.start ?? undefined
-  const dateTo = boundsQuery.end ?? undefined
-  const { selectedSystemId, scopedSystemIdList } = useScopedSystemIds({
+  const filterOverrides = useMemo(
+    () => ({
+      selectedBatch: batchParam ?? "all",
+      selectedSystem: systemParam ?? "all",
+      selectedStage: parseDashboardStageParam(stageParam),
+      timePeriod: resolveTimePeriod(periodParam, initialFilters?.timePeriod ?? "2 weeks"),
+    }),
+    [batchParam, initialFilters?.timePeriod, periodParam, stageParam, systemParam],
+  )
+  const { farmId, selectedBatch, selectedSystem, selectedStage, timePeriod, dateFrom, dateTo } =
+    useAnalyticsPageBootstrap({
+      initialFarmId,
+      defaultTimePeriod: initialFilters?.timePeriod ?? "2 weeks",
+      initialFilters,
+      filterOverrides,
+      initialBounds: initialData?.bounds,
+    })
+  const { selectedSystemId, scopedSystemIdList, hasScopeFilters } = useScopedSystemIds({
     farmId,
     selectedStage,
     selectedBatch,
@@ -55,6 +61,7 @@ export default function DashboardPage({
     initialSystemsData: initialData?.systemOptions,
     initialBatchSystemsData: initialData?.batchSystems,
   })
+  const appliedScopedSystemIds = hasScopeFilters ? scopedSystemIdList : null
 
   const handleDownload = async () => {
     try {
@@ -83,7 +90,7 @@ export default function DashboardPage({
             dateTo={dateTo}
             batch={selectedBatch}
             system={selectedSystem}
-            scopedSystemIds={scopedSystemIdList}
+            scopedSystemIds={appliedScopedSystemIds}
             initialData={initialData?.kpiOverview}
           />
         </section>
@@ -94,17 +101,18 @@ export default function DashboardPage({
             description="Trends for production, efficiency, and water quality health."
           />
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
-            <PopulationOverview
-              farmId={farmId}
-              stage={selectedStage}
-              batch={selectedBatch}
-              system={selectedSystem}
-              timePeriod={timePeriod}
-              scopedSystemIds={scopedSystemIdList}
-              dateFrom={dateFrom}
-              dateTo={dateTo}
-              initialData={initialData?.productionTrend}
-            />
+          <PopulationOverview
+            farmId={farmId}
+            stage={selectedStage}
+            batch={selectedBatch}
+            system={selectedSystem}
+            timePeriod={timePeriod}
+            scopedSystemIds={appliedScopedSystemIds}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            initialData={initialData?.productionTrend}
+            initialBounds={initialData?.bounds}
+          />
             <WaterQualityIndex
               farmId={farmId}
               stage={selectedStage}
@@ -112,13 +120,14 @@ export default function DashboardPage({
               system={selectedSystem}
               dateFrom={dateFrom}
               dateTo={dateTo}
-              scopedSystemIds={scopedSystemIdList}
+              scopedSystemIds={appliedScopedSystemIds}
               resolvedSystemId={selectedSystemId}
-              initialSystemsData={initialData?.systemOptions}
-              initialBatchSystemsData={initialData?.batchSystems}
-              initialMeasurements={initialData?.waterQualityMeasurements}
-              initialThresholds={initialData?.alertThresholds}
-            />
+            initialSystemsData={initialData?.systemOptions}
+            initialBatchSystemsData={initialData?.batchSystems}
+            initialMeasurements={initialData?.waterQualityMeasurements}
+            initialThresholds={initialData?.alertThresholds}
+            initialBounds={initialData?.bounds}
+          />
           </div>
         </section>
 
@@ -135,7 +144,7 @@ export default function DashboardPage({
             timePeriod={timePeriod}
             dateFrom={dateFrom}
             dateTo={dateTo}
-            scopedSystemIds={scopedSystemIdList}
+            scopedSystemIds={appliedScopedSystemIds}
             initialData={initialData?.systemsTable}
           />
         </section>
@@ -153,7 +162,7 @@ export default function DashboardPage({
             timePeriod={timePeriod}
             dateFrom={dateFrom}
             dateTo={dateTo}
-            scopedSystemIds={scopedSystemIdList}
+            scopedSystemIds={appliedScopedSystemIds}
             initialData={initialData?.productionSummaryMetrics}
           />
         </section>
@@ -182,8 +191,9 @@ export default function DashboardPage({
             timePeriod={timePeriod}
             dateFrom={dateFrom}
             dateTo={dateTo}
-            scopedSystemIds={scopedSystemIdList}
+            scopedSystemIds={appliedScopedSystemIds}
             initialData={initialData?.recommendedActions}
+            initialBounds={initialData?.bounds}
           />
         </section>
       </div>

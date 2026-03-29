@@ -17,6 +17,7 @@ export function useRecordSampling() {
         number_of_fish_sampling: payload.number_of_fish_sampling ?? null,
         total_weight_sampling: payload.total_weight_sampling ?? null,
         abw: payload.abw ?? null,
+        notes: payload.notes ?? null,
         created_at: new Date().toISOString(),
         status: "pending",
       }

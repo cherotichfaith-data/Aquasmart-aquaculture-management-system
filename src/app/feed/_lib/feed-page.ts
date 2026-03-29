@@ -89,12 +89,14 @@ export function buildFeedExceptionItems(params: {
   latestDoBySystem: Map<number, { date: string; value: number }>
   latestFeedRateBySystem: Map<number, FeedRatePoint>
   latestGrowthBySystem: Map<number, { system_id: number; sample_date: string; sgr_pct_day: number }>
-  latestSurvivalBySystem: Map<number, { system_id: number; event_date: string; survival_pct: number }>
+  latestSurvivalBySystem: Map<number, { system_id: number; event_date: string; survival_pct: number | null }>
   poorAlerts: Array<{ systemId: number; date: string; message: string }>
   runningStockRows: FeedRunningStockRow[]
   systemNameById: Map<number, string>
+  lowDoThreshold?: number | null
 }) {
   const items: FeedExceptionItem[] = []
+  const lowDoThreshold = params.lowDoThreshold ?? 5
 
   Array.from(params.latestFeedRateBySystem.values())
     .filter((point) => point.feedRatePct != null && (point.upperBand != null || point.lowerBand != null))
@@ -142,22 +144,24 @@ export function buildFeedExceptionItems(params: {
     })
 
   Array.from(params.latestSurvivalBySystem.values())
-    .filter((row) => row.survival_pct < 95)
+    .filter((row) => row.survival_pct != null && row.survival_pct < 95)
     .forEach((row) => {
+      const survivalPct = row.survival_pct
+      if (survivalPct == null) return
       items.push({
         id: `survival-${row.system_id}`,
-        severity: row.survival_pct < 90 ? "critical" : "warning",
+        severity: survivalPct < 90 ? "critical" : "warning",
         title: `${params.systemNameById.get(row.system_id) ?? `System ${row.system_id}`} survival risk`,
-        detail: `Survival ${row.survival_pct.toFixed(1)}% on ${formatFeedDayLabel(row.event_date)}.`,
+        detail: `Survival ${survivalPct.toFixed(1)}% on ${formatFeedDayLabel(row.event_date)}.`,
         systemId: row.system_id,
       })
     })
 
   Array.from(params.latestDoBySystem.entries()).forEach(([systemId, reading]) => {
-    if (reading.value >= 6) return
+    if (reading.value >= lowDoThreshold) return
     items.push({
       id: `do-${systemId}`,
-      severity: reading.value < 4 ? "critical" : "warning",
+      severity: reading.value < lowDoThreshold - 1 ? "critical" : "warning",
       title: `${params.systemNameById.get(systemId) ?? `System ${systemId}`} low DO`,
       detail: `DO ${reading.value.toFixed(1)} mg/L on ${formatFeedDayLabel(reading.date)}.`,
       systemId,

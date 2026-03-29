@@ -1,8 +1,8 @@
 "use client"
 
 import { useMemo } from "react"
-import type { TimeBounds } from "@/lib/api/dashboard"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import type { TimeBounds } from "@/lib/time-period"
 import {
   useSharedFilters,
   type SharedFiltersState,
@@ -83,9 +83,14 @@ export function useAnalyticsPageBootstrap(params: {
   ])
 
   const sharedFilters = useSharedFilters(params.defaultTimePeriod ?? "2 weeks", sharedFilterInitialValues)
+  const selectedSystemId =
+    sharedFilters.selectedSystem !== "all" && Number.isFinite(Number(sharedFilters.selectedSystem))
+      ? Number(sharedFilters.selectedSystem)
+      : undefined
   const boundsQuery = useTimePeriodBounds({
     farmId,
     timePeriod: sharedFilters.timePeriod,
+    systemId: selectedSystemId,
     enabled: params.boundsEnabled,
     initialData: params.initialBounds,
   })

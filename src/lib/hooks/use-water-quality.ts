@@ -27,8 +27,8 @@ function waterQualityQueryOptions<TResult>(params: {
     enabled: params.enabled,
     queryFn: params.queryFn,
     staleTime: params.staleTime,
-    initialData: params.initialData,
-    initialDataUpdatedAt: params.initialData ? 0 : undefined,
+    initialData: params.enabled ? params.initialData : undefined,
+    initialDataUpdatedAt: params.enabled && params.initialData ? 0 : undefined,
   })
 }
 

@@ -1,8 +1,7 @@
 import type { Database } from "@/lib/types/database"
 import type { FeedingRecordWithType } from "@/lib/api/reports"
 import type { QueryResult } from "@/lib/supabase-client"
-import type { TimeBounds } from "@/lib/api/dashboard"
-import type { TimePeriod } from "@/lib/time-period"
+import type { TimeBounds, TimePeriod } from "@/lib/time-period"
 
 export type StageFilter = "all" | Database["public"]["Enums"]["system_growth_stage"]
 export type SystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]

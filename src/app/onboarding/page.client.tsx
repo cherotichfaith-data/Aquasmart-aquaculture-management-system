@@ -65,8 +65,6 @@ export default function OnboardingPageClient() {
           lowDoThreshold: settings.lowDoThreshold,
           highAmmoniaThreshold: settings.highAmmoniaThreshold,
           highMortalityThreshold: settings.highMortalityThreshold,
-          lowFeedingRateThreshold: settings.lowFeedingRateThreshold,
-          highFeedingRateThreshold: settings.highFeedingRateThreshold,
         }),
       })
 
@@ -121,7 +119,7 @@ export default function OnboardingPageClient() {
               <div>
                 <p className="text-sm font-semibold text-foreground">Baseline thresholds</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  These defaults seed water-quality, feeding-rate, and mortality alerts. You can refine them in Settings after onboarding.
+                  These defaults seed water-quality and mortality alerts. You can refine them in Settings after onboarding.
                 </p>
               </div>
             </div>
@@ -231,34 +229,12 @@ export default function OnboardingPageClient() {
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">High mortality alert (%/day)</span>
+                <span className="text-sm font-medium text-foreground/90">High mortality alert threshold (%/day)</span>
                 <input
                   type="number"
                   step="0.1"
                   value={settings.highMortalityThreshold}
                   onChange={(event) => handleChange("highMortalityThreshold", Number.parseFloat(event.target.value || "0"))}
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Low feeding-rate alert (kg/t)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.lowFeedingRateThreshold}
-                  onChange={(event) => handleChange("lowFeedingRateThreshold", Number.parseFloat(event.target.value || "0"))}
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">High feeding-rate alert (kg/t)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.highFeedingRateThreshold}
-                  onChange={(event) => handleChange("highFeedingRateThreshold", Number.parseFloat(event.target.value || "0"))}
                   className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
               </label>

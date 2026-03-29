@@ -5,7 +5,9 @@
   "packageManager": "npm@10",
   "scripts": {
     "db:types": "node -e \"console.error('Local Supabase CLI is intentionally disabled in this repo. Generate database types in a trusted external environment and save the result to src/lib/types/database.ts.'); process.exit(1)\"",
-    "dev": "next dev --webpack",
+    "dev": "dotenv -e .env.local -- next dev --webpack",
+    "dev:local": "dotenv -e .env.local -- next dev --webpack",
+    "dev:demo": "dotenv -e .env.local -e .env.demo -o -- next dev --webpack",
     "dev:turbo": "next dev --turbo",
     "build": "next build",
     "start": "next start",
@@ -75,6 +77,7 @@
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.0",
     "postcss": "^8.5",

@@ -154,18 +154,14 @@ See [code-organization.md](/C:/Users/Admin/Downloads/aquasmart1/docs/code-organi
 
 ## Important Backend Objects
 
-- `api_dashboard`
 - `api_dashboard_systems`
 - `api_dashboard_consolidated`
 - `api_daily_fish_inventory_rpc`
 - `api_production_summary`
-- `api_efcr_trend`
 - `api_time_period_bounds`
-- `api_time_period_bounds_scoped`
 - `api_latest_water_quality_status`
 - `api_water_quality_sync_status`
 - `analytics_system_day`
-- `dashboard`
 - `production_summary`
 
 ## Project Structure

@@ -116,32 +116,12 @@ export function AlertThresholdsSection({
           />
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-foreground/90">High Mortality Alert (%/day)</label>
+          <label className="mb-2 block text-sm font-medium text-foreground/90">High mortality alert threshold (%/day)</label>
           <input
             type="number"
             step="0.1"
             value={settings.highMortalityThreshold ?? ""}
             onChange={(e) => handleChange("highMortalityThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
-            className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-medium text-foreground/90">Low Feeding Rate Alert (kg/t)</label>
-          <input
-            type="number"
-            step="0.1"
-            value={settings.lowFeedingRateThreshold ?? ""}
-            onChange={(e) => handleChange("lowFeedingRateThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
-            className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-medium text-foreground/90">High Feeding Rate Alert (kg/t)</label>
-          <input
-            type="number"
-            step="0.1"
-            value={settings.highFeedingRateThreshold ?? ""}
-            onChange={(e) => handleChange("highFeedingRateThreshold", e.target.value === "" ? "" : Number.parseFloat(e.target.value))}
             className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>

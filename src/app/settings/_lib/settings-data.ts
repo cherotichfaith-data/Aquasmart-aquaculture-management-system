@@ -6,10 +6,7 @@ import { getSessionUser } from "@/lib/supabase/session"
 import type { Tables, TablesInsert, TablesUpdate } from "@/lib/types/database"
 import { hasActionableSbError, type SettingsFormState } from "../settings-utils"
 
-export type AlertThresholdWithFeeding = Tables<"alert_threshold"> & {
-  low_feeding_rate_threshold?: number | null
-  high_feeding_rate_threshold?: number | null
-}
+export type AlertThresholdRow = Tables<"alert_threshold">
 
 export const isAbortLikeError = (err: unknown): boolean => {
   if (!err) return false
@@ -29,7 +26,7 @@ export async function loadSettingsData(params: {
   const { supabase, userId, farmId, thresholdDenied, signal } = params
   if (!userId) {
     return {
-      thresholdRow: null as AlertThresholdWithFeeding | null,
+      thresholdRow: null as AlertThresholdRow | null,
       nextThresholdDenied: thresholdDenied,
     }
   }
@@ -37,13 +34,13 @@ export async function loadSettingsData(params: {
   const sessionUser = await getSessionUser(supabase as any, "settings:load:getSession")
   if (!sessionUser) {
     return {
-      thresholdRow: null as AlertThresholdWithFeeding | null,
+      thresholdRow: null as AlertThresholdRow | null,
       nextThresholdDenied: thresholdDenied,
     }
   }
 
   let nextThresholdDenied = thresholdDenied
-  let thresholdRow: AlertThresholdWithFeeding | null = null
+  let thresholdRow: AlertThresholdRow | null = null
 
   if (farmId && !thresholdDenied) {
     let query = supabase
@@ -62,7 +59,7 @@ export async function loadSettingsData(params: {
     } else if (error && !isAbortLikeError(error) && hasActionableSbError(error)) {
       logSbError("settings:load:threshold", error)
     } else {
-      thresholdRow = (data as AlertThresholdWithFeeding | null) ?? null
+      thresholdRow = (data as AlertThresholdRow | null) ?? null
     }
   }
 
@@ -119,17 +116,12 @@ export async function saveSettingsData(params: {
     throw farmError
   }
 
-  const thresholdPayload: TablesInsert<"alert_threshold"> & {
-    low_feeding_rate_threshold?: number | null
-    high_feeding_rate_threshold?: number | null
-  } = {
+  const thresholdPayload: TablesInsert<"alert_threshold"> = {
     scope: "farm",
     farm_id: resolvedFarmId,
     low_do_threshold: settings.lowDoThreshold,
     high_ammonia_threshold: settings.highAmmoniaThreshold,
     high_mortality_threshold: settings.highMortalityThreshold,
-    low_feeding_rate_threshold: settings.lowFeedingRateThreshold,
-    high_feeding_rate_threshold: settings.highFeedingRateThreshold,
   }
 
   if (thresholdId) {

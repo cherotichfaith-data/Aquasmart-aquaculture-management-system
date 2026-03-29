@@ -76,7 +76,14 @@ export async function getFeedPageInitialData(params: {
   }
 
   const supabase = await createClient()
-  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "feeding")
+  const selectedSystemId = parseSelectedNumericId(params.filters.selectedSystem)
+  const bounds = await getScopedTimeBounds(
+    supabase,
+    params.farmId,
+    params.filters.timePeriod,
+    "feeding",
+    selectedSystemId,
+  )
   const [systems, batchSystems, feedTypes] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<SystemOption[]>,
     getScopedBatchSystems(supabase, parseSelectedNumericId(params.filters.selectedBatch)),

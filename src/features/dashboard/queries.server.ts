@@ -1,10 +1,14 @@
 import type { Database } from "@/lib/types/database"
-import type { TimeBounds } from "@/lib/time-period-bounds"
-import { fetchTimePeriodBounds } from "@/lib/time-period-bounds"
-import { mapSystemRowToOption, type SystemOptionSource } from "@/lib/system-options"
+import type { TimeBounds } from "@/lib/time-period"
 import { sortByDateAsc } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/supabase/require-user"
+import {
+  getScopedBatchSystems,
+  getScopedSystemOptions,
+  getScopedTimeBounds,
+  parseSelectedNumericId,
+} from "@/features/shared/scoped-analytics.server"
 import type {
   DashboardPageInitialData,
   DashboardPageInitialFilters,
@@ -15,11 +19,14 @@ import type {
   SystemsTableData,
 } from "./types"
 import { toQuerySuccess } from "@/lib/api/_utils"
+import { scaleFractionToPercent } from "@/lib/analytics-format"
 import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
 import {
+  aggregateInventoryMetrics,
   buildRecommendedActionsFromAnalytics,
+  computeEfcrFromProductionRows,
   computeMortalityRateFromProduction,
-  toTrendPercent,
+  toTrendDelta,
 } from "./analytics-shared"
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>
@@ -27,16 +34,16 @@ type DailyInventoryRow = Database["public"]["Functions"]["api_daily_fish_invento
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
 type DailyRatingRow = Database["public"]["Views"]["api_daily_water_quality_rating"]["Row"]
 type FishTransferRow = Database["public"]["Tables"]["fish_transfer"]["Row"]
-type SystemOptionRow = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 type FishMortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
 type FeedingRecordRow = Database["public"]["Tables"]["feeding_record"]["Row"]
 type FishSamplingWeightRow = Database["public"]["Tables"]["fish_sampling_weight"]["Row"]
 type FishHarvestRow = Database["public"]["Tables"]["fish_harvest"]["Row"]
-type FeedIncomingRow = Database["public"]["Tables"]["feed_incoming"]["Row"]
+type FeedInventorySnapshotRow = Database["public"]["Tables"]["feed_inventory_snapshot"]["Row"]
 type FishStockingRow = Database["public"]["Tables"]["fish_stocking"]["Row"]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
+type FarmKpisTodayRow = Database["public"]["Functions"]["get_farm_kpis_today"]["Returns"][number]
 
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "2 weeks"
 const VALID_STAGES: DashboardPageInitialFilters["selectedStage"][] = ["all", "nursing", "grow_out"]
@@ -73,12 +80,9 @@ async function getTimeBounds(
   supabase: ServerClient,
   farmId: string,
   timePeriod: DashboardPageInitialFilters["timePeriod"],
+  systemId?: number,
 ): Promise<TimeBounds> {
-  return fetchTimePeriodBounds(supabase as never, {
-    farmId,
-    timePeriod,
-    scope: "dashboard",
-  })
+  return getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", systemId)
 }
 
 async function getDashboardSystemsRaw(
@@ -106,58 +110,9 @@ async function getDashboardSystemsRaw(
   return (data ?? []) as DashboardSystemRow[]
 }
 
-async function getSystemOptions(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    stage: DashboardPageInitialFilters["selectedStage"]
-  },
-): Promise<SystemOptionRow[]> {
-  let query = supabase
-    .from("system")
-    .select("id, farm_id, growth_stage, is_active, name, type, unit")
-    .eq("farm_id", params.farmId)
-    .eq("is_active", true)
-
-  if (params.stage !== "all") {
-    query = query.eq("growth_stage", params.stage)
-  }
-
-  const { data, error } = await query.order("name", { ascending: true })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return ((data ?? []) as unknown as SystemOptionSource[])
-    .map(mapSystemRowToOption)
-    .sort((a, b) => a.label.localeCompare(b.label))
-}
-
 async function getBatchSystemIds(supabase: ServerClient, batchId?: number): Promise<number[]> {
-  if (!batchId || !Number.isFinite(batchId)) return []
-
-  const { data, error } = await supabase
-    .from("fish_stocking")
-    .select("system_id")
-    .eq("batch_id", batchId)
-    .not("system_id", "is", null)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return Array.from(
-    new Set((data ?? []).map((row) => row.system_id).filter((value): value is number => typeof value === "number")),
-  )
-}
-
-async function getBatchSystemRows(
-  supabase: ServerClient,
-  batchId?: number,
-): Promise<Array<{ system_id: number }>> {
-  const ids = await getBatchSystemIds(supabase, batchId)
-  return ids.map((system_id) => ({ system_id }))
+  const rows = await getScopedBatchSystems(supabase, batchId)
+  return rows.map((row) => row.system_id)
 }
 
 async function getProductionSummaryRows(
@@ -290,6 +245,8 @@ async function getDashboardConsolidated(
     dateTo?: string | null
   },
 ): Promise<DashboardConsolidatedRow | null> {
+  if (!params.systemId) return null
+
   const { data, error } = await supabase.rpc("api_dashboard_consolidated", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
@@ -302,6 +259,21 @@ async function getDashboardConsolidated(
   }
 
   return ((data ?? []) as DashboardConsolidatedRow[])[0] ?? null
+}
+
+async function getFarmKpisTodayRow(
+  supabase: ServerClient,
+  farmId: string,
+): Promise<FarmKpisTodayRow | null> {
+  const { data, error } = await supabase.rpc("get_farm_kpis_today", {
+    p_farm_id: farmId,
+  })
+
+  if (error) {
+    return null
+  }
+
+  return ((data ?? []) as FarmKpisTodayRow[])[0] ?? null
 }
 
 async function getTransferRows(
@@ -334,7 +306,7 @@ async function getFarmSystemIdsForRecent(supabase: ServerClient, farmId: string)
 
 async function getRecentRows<T>(
   supabase: ServerClient,
-  table: "fish_mortality" | "feeding_record" | "fish_sampling_weight" | "fish_transfer" | "fish_harvest" | "water_quality_measurement" | "feed_incoming" | "fish_stocking" | "system",
+  table: "fish_mortality" | "feeding_record" | "fish_sampling_weight" | "fish_transfer" | "fish_harvest" | "water_quality_measurement" | "feed_inventory_snapshot" | "fish_stocking" | "system",
   orderColumn: string,
   farmId: string,
   farmSystemIds: number[],
@@ -345,7 +317,7 @@ async function getRecentRows<T>(
     case "fish_mortality":
       query = query.eq("farm_id", farmId)
       break
-    case "feed_incoming":
+    case "feed_inventory_snapshot":
     case "system":
       query = query.eq("farm_id", farmId)
       break
@@ -394,7 +366,7 @@ async function getRecentEntries(supabase: ServerClient, farmId: string) {
       farmId,
       farmSystemIds,
     ),
-    getRecentRows<FeedIncomingRow>(supabase, "feed_incoming", "date", farmId, farmSystemIds),
+    getRecentRows<FeedInventorySnapshotRow>(supabase, "feed_inventory_snapshot", "date", farmId, farmSystemIds),
     getRecentRows<FishStockingRow>(supabase, "fish_stocking", "date", farmId, farmSystemIds),
     getRecentRows<SystemRow>(supabase, "system", "created_at", farmId, farmSystemIds),
   ])
@@ -467,95 +439,28 @@ function buildKpiOverview(params: {
   const wqRows = params.waterQualityRows.filter(
     (row) => row.system_id != null && params.scopedSystemIds.includes(row.system_id),
   )
-
-  let totalFeed = 0
-  let totalBiomass = 0
-  let biomassCount = 0
-  let totalAbw = 0
-  let abwCount = 0
-  let totalBiomassDensity = 0
-  let biomassDensityCount = 0
-  let totalFish = 0
-  let fishCount = 0
-  let mortalityWeighted = 0
-  let feedingWeighted = 0
-
-  inventoryRows.forEach((row) => {
-    const feed = row.feeding_amount ?? 0
-    const biomass = row.biomass_last_sampling
-    const fish = row.number_of_fish
-    const abw = row.abw_last_sampling
-    const biomassDensity = row.biomass_density
-    const mortalityCount = row.number_of_fish_mortality ?? 0
-
-    totalFeed += feed
-    if (typeof biomass === "number") {
-      totalBiomass += biomass
-      biomassCount += 1
-    }
-    if (typeof abw === "number") {
-      totalAbw += abw
-      abwCount += 1
-    }
-    if (typeof biomassDensity === "number") {
-      totalBiomassDensity += biomassDensity
-      biomassDensityCount += 1
-    }
-    if (typeof fish === "number") {
-      totalFish += fish
-      fishCount += 1
-    }
-
-    if (typeof fish === "number" && fish > 0) {
-      const mortalityRateRow =
-        typeof row.mortality_rate === "number" ? row.mortality_rate : mortalityCount / fish
-      mortalityWeighted += mortalityRateRow * fish
-    }
-
-    if (typeof biomass === "number" && biomass > 0) {
-      const feedingRateRow =
-        typeof row.feeding_rate === "number" ? row.feeding_rate : (feed * 1000) / biomass
-      feedingWeighted += feedingRateRow * biomass
-    }
-  })
-
-  const avgBiomass = biomassCount > 0 ? totalBiomass / biomassCount : null
-  const avgAbw = abwCount > 0 ? totalAbw / abwCount : null
-  const avgBiomassDensity = biomassDensityCount > 0 ? totalBiomassDensity / biomassDensityCount : null
-  const feedRate =
-    totalBiomass > 0 ? (feedingWeighted > 0 ? feedingWeighted / totalBiomass : (totalFeed * 1000) / totalBiomass) : null
-  const mortalityRateFromInventory = totalFish > 0 ? mortalityWeighted / totalFish : null
-
-  const gainAdjusted = productionRows.reduce((sum, row) => {
-    const biomassIncrease = row.biomass_increase_period ?? 0
-    const transferOut = ("total_weight_transfer_out" in row ? row.total_weight_transfer_out : 0) ?? 0
-    const transferIn = ("total_weight_transfer_in" in row ? row.total_weight_transfer_in : 0) ?? 0
-    const harvested = ("total_weight_harvested" in row ? row.total_weight_harvested : 0) ?? 0
-    const stocked = ("total_weight_stocked" in row ? row.total_weight_stocked : 0) ?? 0
-    return sum + (biomassIncrease - transferOut + transferIn + harvested - stocked)
-  }, 0)
-
-  const feedSum = productionRows.reduce((sum, row) => sum + (row.total_feed_amount_period ?? 0), 0)
-  const efcr = gainAdjusted !== 0 ? feedSum / gainAdjusted : null
+  const inventoryMetrics = aggregateInventoryMetrics(inventoryRows)
+  const efcr = computeEfcrFromProductionRows(productionRows)
   const mortalityRateFromProduction = computeMortalityRateFromProduction(
     productionRows.map((row) => ({
       number_of_fish_inventory: row.number_of_fish_inventory,
       daily_mortality_count: row.daily_mortality_count,
     })),
   )
-  const mortalityRate = mortalityRateFromInventory ?? mortalityRateFromProduction
+  const mortalityRate = inventoryMetrics.mortalityRate ?? mortalityRateFromProduction
 
   const resolvedEfcr = params.consolidatedRow?.efcr_period_consolidated ?? efcr
   const resolvedMortalityRate = params.consolidatedRow?.mortality_rate ?? mortalityRate
-  const resolvedAvgBiomass = params.consolidatedRow?.average_biomass ?? avgBiomass
-  const resolvedBiomassDensity = params.consolidatedRow?.biomass_density ?? avgBiomassDensity
-  const resolvedFeedingRate = params.consolidatedRow?.feeding_rate ?? feedRate
-  const resolvedAbw = params.consolidatedRow?.abw_asof_end ?? avgAbw
+  const resolvedAvgBiomass = params.consolidatedRow?.average_biomass ?? inventoryMetrics.averageBiomass
+  const resolvedBiomassDensity = params.consolidatedRow?.biomass_density ?? inventoryMetrics.biomassDensity
+  const resolvedFeedingRate = params.consolidatedRow?.feeding_rate ?? inventoryMetrics.feedingRate
+  const resolvedAbw = params.consolidatedRow?.abw_asof_end ?? inventoryMetrics.abwAsOfEnd
+  const displayedMortalityRate = scaleFractionToPercent(resolvedMortalityRate)
+  const displayedFeedingRate = scaleFractionToPercent(resolvedFeedingRate)
   const resolvedWqAverage =
     wqRows.length > 0
       ? wqRows.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / wqRows.length
       : null
-
   const wqRounded = resolvedWqAverage === null ? null : Math.round(resolvedWqAverage)
   const wqLabel =
     wqRounded === null
@@ -572,12 +477,12 @@ function buildKpiOverview(params: {
 
   const trendByKey: Record<string, number | null> = params.consolidatedRow
     ? {
-        efcr: toTrendPercent(resolvedEfcr, params.consolidatedRow.efcr_period_consolidated_delta),
-        mortality: toTrendPercent(resolvedMortalityRate, params.consolidatedRow.mortality_rate_delta),
-        biomass: toTrendPercent(resolvedAvgBiomass, params.consolidatedRow.average_biomass_delta),
-        biomass_density: toTrendPercent(resolvedBiomassDensity, params.consolidatedRow.biomass_density_delta),
-        feeding: toTrendPercent(resolvedFeedingRate, params.consolidatedRow.feeding_rate_delta),
-        abw: toTrendPercent(resolvedAbw, params.consolidatedRow.abw_asof_end_delta),
+        efcr: toTrendDelta(params.consolidatedRow.efcr_period_consolidated_delta),
+        mortality: scaleFractionToPercent(toTrendDelta(params.consolidatedRow.mortality_rate_delta)),
+        biomass: toTrendDelta(params.consolidatedRow.average_biomass_delta),
+        biomass_density: toTrendDelta(params.consolidatedRow.biomass_density_delta),
+        feeding: scaleFractionToPercent(toTrendDelta(params.consolidatedRow.feeding_rate_delta)),
+        abw: toTrendDelta(params.consolidatedRow.abw_asof_end_delta),
         water_quality: null,
       }
     : {}
@@ -589,15 +494,20 @@ function buildKpiOverview(params: {
       value: resolvedEfcr,
       decimals: 2,
       trend: trendByKey.efcr ?? null,
+      trendFormat: "delta",
+      trendDecimals: 2,
       invertTrend: true,
     },
     {
       key: "mortality",
       label: "Mortality Rate",
-      value: resolvedMortalityRate,
-      unit: "rate/day",
-      decimals: 4,
+      value: displayedMortalityRate,
+      unit: "%/day",
+      decimals: 2,
       trend: trendByKey.mortality ?? null,
+      trendFormat: "delta",
+      trendDecimals: 2,
+      trendUnit: "%/day",
       invertTrend: true,
     },
     {
@@ -607,6 +517,9 @@ function buildKpiOverview(params: {
       unit: "g",
       decimals: 1,
       trend: trendByKey.abw ?? null,
+      trendFormat: "delta",
+      trendDecimals: 1,
+      trendUnit: "g",
       invertTrend: false,
     },
     {
@@ -616,6 +529,9 @@ function buildKpiOverview(params: {
       unit: "kg",
       decimals: 1,
       trend: trendByKey.biomass ?? null,
+      trendFormat: "delta",
+      trendDecimals: 1,
+      trendUnit: "kg",
       invertTrend: false,
     },
     {
@@ -625,15 +541,21 @@ function buildKpiOverview(params: {
       unit: "kg/m3",
       decimals: 2,
       trend: trendByKey.biomass_density ?? null,
+      trendFormat: "delta",
+      trendDecimals: 2,
+      trendUnit: "kg/m3",
       invertTrend: false,
     },
     {
       key: "feeding",
       label: "Feeding Rate",
-      value: resolvedFeedingRate,
-      unit: "kg/t",
+      value: displayedFeedingRate,
+      unit: "% BW/day",
       decimals: 2,
       trend: trendByKey.feeding ?? null,
+      trendFormat: "delta",
+      trendDecimals: 2,
+      trendUnit: "% BW/day",
       invertTrend: false,
     },
     {
@@ -663,8 +585,9 @@ function buildProductionSummaryMetrics(params: {
 }): ProductionSummaryMetrics {
   const empty: ProductionSummaryMetrics = {
     totalStockedFish: 0,
-    totalMortalities: 0,
-    netTransferAdjustments: 0,
+    cumulativeMortality: 0,
+    transferInFish: 0,
+    transferOutFish: 0,
     totalHarvestedFish: 0,
     totalHarvestedKg: 0,
     dateBounds: { start: params.dateFrom, end: params.dateTo },
@@ -678,31 +601,36 @@ function buildProductionSummaryMetrics(params: {
   const scopedSet = new Set(params.scopedSystemIds)
 
   let totalStockedFish = 0
-  let totalMortalities = 0
+  let cumulativeMortality = 0
   let totalHarvestedFish = 0
   let totalHarvestedKg = 0
+  let transferInFish = 0
+  let transferOutFish = 0
 
   filtered.forEach((row) => {
     totalStockedFish += row.number_of_fish_stocked ?? 0
-    totalMortalities += row.daily_mortality_count ?? 0
+    cumulativeMortality += row.daily_mortality_count ?? 0
     totalHarvestedFish += row.number_of_fish_harvested ?? 0
     totalHarvestedKg += row.total_weight_harvested ?? 0
   })
 
-  const netTransferAdjustments = params.transferRows.reduce((sum, row) => {
+  params.transferRows.forEach((row) => {
     const count = row.number_of_fish_transfer ?? 0
     const originInScope = scopedSet.has(row.origin_system_id)
-    const targetInScope = scopedSet.has(row.target_system_id)
+    const targetInScope = row.target_system_id != null && scopedSet.has(row.target_system_id)
 
-    if (targetInScope && !originInScope) return sum + count
-    if (originInScope && !targetInScope) return sum - count
-    return sum
-  }, 0)
+    if (targetInScope && !originInScope) {
+      transferInFish += count
+    } else if (originInScope && !targetInScope) {
+      transferOutFish += count
+    }
+  })
 
   return {
     totalStockedFish,
-    totalMortalities,
-    netTransferAdjustments,
+    cumulativeMortality,
+    transferInFish,
+    transferOutFish,
     totalHarvestedFish,
     totalHarvestedKg,
     dateBounds: { start: params.dateFrom, end: params.dateTo },
@@ -743,8 +671,9 @@ export async function getDashboardPageInitialData(params: {
     systemsTable: { rows: [], meta: { reason: "Missing farmId", start: null, end: null } },
     productionSummaryMetrics: {
       totalStockedFish: 0,
-      totalMortalities: 0,
-      netTransferAdjustments: 0,
+      cumulativeMortality: 0,
+      transferInFish: 0,
+      transferOutFish: 0,
       totalHarvestedFish: 0,
       totalHarvestedKg: 0,
       dateBounds: { start: null, end: null },
@@ -768,17 +697,15 @@ export async function getDashboardPageInitialData(params: {
   if (!params.farmId) return empty
 
   const supabase = await createClient()
-  const bounds = await getTimeBounds(supabase, params.farmId, params.filters.timePeriod)
+  const selectedSystemId = parseSelectedNumericId(params.filters.selectedSystem)
+  const bounds = await getTimeBounds(supabase, params.farmId, params.filters.timePeriod, selectedSystemId)
   if (!bounds.start || !bounds.end) {
     return {
       ...empty,
       bounds,
-      systemOptions: toQuerySuccess(await getSystemOptions(supabase, {
-        farmId: params.farmId,
-        stage: params.filters.selectedStage,
-      })),
+      systemOptions: toQuerySuccess(await getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage)),
       batchSystems: toQuerySuccess(
-        await getBatchSystemRows(
+        await getScopedBatchSystems(
           supabase,
           params.filters.selectedBatch !== "all" ? Number(params.filters.selectedBatch) : undefined,
         ),
@@ -791,21 +718,14 @@ export async function getDashboardPageInitialData(params: {
     }
   }
 
-  const selectedSystemId =
-    params.filters.selectedSystem !== "all" && Number.isFinite(Number(params.filters.selectedSystem))
-      ? Number(params.filters.selectedSystem)
-      : undefined
   const batchId =
     params.filters.selectedBatch !== "all" && Number.isFinite(Number(params.filters.selectedBatch))
       ? Number(params.filters.selectedBatch)
       : undefined
 
   const [systemOptions, batchSystems, dashboardSystems, recentEntries, alertThresholds] = await Promise.all([
-    getSystemOptions(supabase, {
-      farmId: params.farmId,
-      stage: params.filters.selectedStage,
-    }),
-    getBatchSystemRows(supabase, batchId),
+    getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage),
+    getScopedBatchSystems(supabase, batchId),
     getDashboardSystemsRaw(supabase, {
       farmId: params.farmId,
       stage: params.filters.selectedStage,

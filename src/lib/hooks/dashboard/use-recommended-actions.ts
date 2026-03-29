@@ -22,6 +22,7 @@ export function useRecommendedActions(params: {
   initialData?: RecommendedAction[]
 }) {
   const { session } = useAuth()
+  const hasBounds = Boolean(params.dateFrom) && Boolean(params.dateTo)
 
   return useQuery({
     queryKey: [
@@ -111,9 +112,9 @@ export function useRecommendedActions(params: {
         waterQualityRows: wqResult.data,
       })
     },
-    enabled: Boolean(session) && Boolean(params.farmId),
+    enabled: Boolean(session) && Boolean(params.farmId) && hasBounds,
     staleTime: 5 * 60_000,
-    initialData: params.initialData,
-    initialDataUpdatedAt: params.initialData ? 0 : undefined,
+    initialData: hasBounds ? params.initialData : undefined,
+    initialDataUpdatedAt: hasBounds && params.initialData ? 0 : undefined,
   })
 }

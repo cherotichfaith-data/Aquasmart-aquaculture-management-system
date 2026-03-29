@@ -7,6 +7,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -15,37 +16,58 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
-import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
+import { formatChartDate, formatNumberValue, formatPercentRateValue } from "@/lib/analytics-format"
 import { ReportRecordsHiddenState, ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
 
 export function PerformanceSummaryCards({
   summary,
 }: {
   summary: {
-    efcr_period_consolidated: number | null
-    feeding_rate: number | null
+    efcr_aggregated_consolidated: number | null
     average_biomass: number | null
     mortality_rate: number | null
+    survival_rate_pct: number | null
+    total_harvest_kg: number | null
+    total_harvest_fish: number | null
   } | null
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Farm eFCR</CardTitle>
+          <CardTitle className="text-sm font-medium">Cycle eFCR</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{summary?.efcr_period_consolidated ?? "N/A"}</div>
-          <p className="text-xs text-muted-foreground mt-1">Derived from production rows with resolved timelines</p>
+          <div className="text-2xl font-bold">
+            {formatNumberValue(summary?.efcr_aggregated_consolidated, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Last in-period row per cycle from `api_production_summary`</p>
         </CardContent>
       </Card>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Farm Feeding Rate</CardTitle>
+          <CardTitle className="text-sm font-medium">Survival Rate</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{summary?.feeding_rate ?? "N/A"}</div>
-          <p className="text-xs text-muted-foreground mt-1">Consolidated feed rate</p>
+          <div className="text-2xl font-bold">
+            {summary?.survival_rate_pct != null
+              ? `${formatNumberValue(summary.survival_rate_pct, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}%`
+              : "N/A"}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">(stocked - cumulative mortality - transfers out) / stocked</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Total Harvest</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {formatNumberValue(summary?.total_harvest_kg, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatNumberValue(summary?.total_harvest_fish, { decimals: 0, fallback: "N/A" })} fish
+          </p>
         </CardContent>
       </Card>
       <Card>
@@ -53,8 +75,8 @@ export function PerformanceSummaryCards({
           <CardTitle className="text-sm font-medium">Farm Biomass</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{summary?.average_biomass ?? "N/A"}</div>
-          <p className="text-xs text-muted-foreground mt-1">All systems</p>
+          <div className="text-2xl font-bold">{formatNumberValue(summary?.average_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div>
+          <p className="mt-1 text-xs text-muted-foreground">Latest total biomass across in-scope cycles</p>
         </CardContent>
       </Card>
       <Card>
@@ -62,8 +84,8 @@ export function PerformanceSummaryCards({
           <CardTitle className="text-sm font-medium">Farm Mortality</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{summary?.mortality_rate ?? "N/A"}</div>
-          <p className="text-xs text-muted-foreground mt-1">Consolidated rate</p>
+          <div className="text-2xl font-bold">{formatPercentRateValue(summary?.mortality_rate, 2, "%/day", "N/A")}</div>
+          <p className="mt-1 text-xs text-muted-foreground">Latest daily mortality ratio across in-scope cycles</p>
         </CardContent>
       </Card>
     </div>
@@ -106,6 +128,8 @@ export function PerformanceTrendSection({
                     contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
                   />
                   <Legend />
+                  <ReferenceLine yAxisId="left" y={1.5} stroke="var(--color-chart-4)" strokeDasharray="6 4" ifOverflow="extendDomain" label={{ value: "App target 1.5", position: "insideTopLeft", fill: "currentColor", fontSize: 12 }} />
+                  <ReferenceLine yAxisId="left" y={2} stroke="var(--color-chart-5)" strokeDasharray="3 3" ifOverflow="extendDomain" label={{ value: "Industry 2.0", position: "insideTopRight", fill: "currentColor", fontSize: 12 }} />
                   <Line yAxisId="left" type="monotone" dataKey="efcr_period" stroke="var(--color-chart-1)" strokeWidth={2.4} name="eFCR" />
                   <Line yAxisId="right" type="monotone" dataKey="total_biomass" stroke="var(--color-chart-2)" strokeWidth={2.4} name="Biomass (kg)" />
                 </LineChart>
@@ -167,12 +191,12 @@ export function BenchmarkStatusSection({
     <Card>
       <CardHeader>
         <CardTitle>Benchmark Status</CardTitle>
-        <CardDescription>Quick target checks for the two core risk metrics.</CardDescription>
+        <CardDescription>Hardcoded historical benchmarks for eFCR and mortality.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {benchmarkCards.map((item) => {
-            const isMortality = item.metric === "Mortality Rate"
+            const isMortality = item.metric === "Daily Mortality Rate"
             const actual =
               typeof item.actual === "number"
                 ? isMortality
@@ -226,9 +250,12 @@ export function PerformanceRecordsSection({
   dateRange?: { from: string; to: string }
   farmName?: string | null
   summary: {
-    efcr_period_consolidated: number | null
+    efcr_aggregated_consolidated: number | null
     mortality_rate: number | null
     average_biomass: number | null
+    survival_rate_pct: number | null
+    total_harvest_kg: number | null
+    total_harvest_fish: number | null
   } | null
   rows: any[]
   tableRows: any[]
@@ -238,10 +265,14 @@ export function PerformanceRecordsSection({
   const exportRows = (showPerformanceRecords ? tableRows : rows.slice(0, tableLimitValue)).map((row) => [
     row.date,
     row.system_name ?? row.system_id,
-    row.efcr_period,
-    row.total_biomass,
-    row.daily_mortality_count,
+    row.cycle_id,
     row.efcr_aggregated,
+    typeof row.number_of_fish_stocked === "number" && row.number_of_fish_stocked > 0
+      ? ((row.number_of_fish_stocked - (row.cumulative_mortality ?? 0) - (row.number_of_fish_transfer_out ?? 0)) / row.number_of_fish_stocked) * 100
+      : null,
+    row.total_weight_harvested_aggregated,
+    row.number_of_fish_harvested,
+    row.daily_mortality_count,
   ])
 
   return (
@@ -257,7 +288,7 @@ export function PerformanceRecordsSection({
             onExportCsv={() =>
               downloadCsv({
                 filename: `performance-report-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
-                headers: ["date", "system_name", "efcr_period", "total_biomass", "daily_mortality_count", "efcr_aggregated"],
+                headers: ["date", "system_name", "cycle_id", "efcr_aggregated", "survival_rate_pct", "total_harvest_kg", "total_harvest_fish", "daily_mortality_count"],
                 rows: exportRows,
               })
             }
@@ -267,10 +298,25 @@ export function PerformanceRecordsSection({
                 subtitle: "KPI summary, trends, and benchmark review",
                 farmName,
                 dateRange,
-                summaryLines: [`Farm eFCR: ${summary?.efcr_period_consolidated ?? "N/A"}`, `Farm Mortality Rate: ${summary?.mortality_rate ?? "N/A"}`, `Farm Biomass: ${summary?.average_biomass ?? "N/A"}`],
-                tableHeaders: ["Date", "System", "eFCR", "Biomass", "Mortality", "eFCR (Agg)"],
-                tableRows: exportRows,
-                commentary: "Generated from api_production_summary rows for systems with resolved production timelines.",
+                summaryLines: [
+                  `Cycle eFCR: ${formatNumberValue(summary?.efcr_aggregated_consolidated, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}`,
+                  `Survival rate: ${summary?.survival_rate_pct != null ? `${formatNumberValue(summary.survival_rate_pct, { decimals: 2, minimumDecimals: 2 })}%` : "N/A"}`,
+                  `Farm Mortality Rate: ${formatPercentRateValue(summary?.mortality_rate, 2, "%/day", "N/A")}`,
+                  `Farm Biomass: ${formatNumberValue(summary?.average_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg`,
+                  `Total harvest: ${formatNumberValue(summary?.total_harvest_kg, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg / ${formatNumberValue(summary?.total_harvest_fish, { decimals: 0, fallback: "N/A" })} fish`,
+                ],
+                tableHeaders: ["Date", "System", "Cycle", "eFCR", "Survival (%)", "Harvest (kg)", "Harvest (fish)", "Mortality (%/day)"],
+                tableRows: exportRows.map((row) => [
+                  row[0],
+                  row[1],
+                  row[2],
+                  typeof row[3] === "number" ? formatNumberValue(row[3], { decimals: 2, minimumDecimals: 2 }) : row[3],
+                  typeof row[4] === "number" ? formatNumberValue(row[4], { decimals: 2, minimumDecimals: 2 }) : row[4],
+                  typeof row[5] === "number" ? formatNumberValue(row[5], { decimals: 1, minimumDecimals: 1 }) : row[5],
+                  row[6],
+                  row[7],
+                ]),
+                commentary: "Generated from the last in-period `api_production_summary` row per cycle.",
               })
             }
           />
@@ -279,21 +325,23 @@ export function PerformanceRecordsSection({
       <CardContent>
         {showPerformanceRecords ? (
           <div className="overflow-x-auto rounded-md border border-border/80">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">
                   <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
                   <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Cycle</th>
                   <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Biomass (kg)</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR (Agg)</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Survival (%)</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Harvest (kg)</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Harvest (fish)</th>
+                  <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality (%/day)</th>
                 </tr>
               </thead>
               <tbody>
                 {tableLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
                       Loading...
                     </td>
                   </tr>
@@ -302,16 +350,25 @@ export function PerformanceRecordsSection({
                     <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
                       <td className="px-4 py-2 font-medium">{row.date}</td>
                       <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
-                      <td className="px-4 py-2 text-center">{row.efcr_period ?? "-"}</td>
-                      <td className="px-4 py-2 text-center">{row.total_biomass ?? "-"}</td>
-                      <td className="px-4 py-2 text-center">{row.daily_mortality_count ?? "-"}</td>
-                      <td className="px-4 py-2 text-center">{row.efcr_aggregated ?? "-"}</td>
+                      <td className="px-4 py-2 text-center">{row.cycle_id ?? "-"}</td>
+                      <td className="px-4 py-2 text-center">{formatNumberValue(row.efcr_aggregated, { decimals: 2, minimumDecimals: 2, fallback: "-" })}</td>
+                      <td className="px-4 py-2 text-center">
+                        {typeof row.number_of_fish_stocked === "number" && row.number_of_fish_stocked > 0
+                          ? formatNumberValue(
+                              ((row.number_of_fish_stocked - (row.cumulative_mortality ?? 0) - (row.number_of_fish_transfer_out ?? 0)) / row.number_of_fish_stocked) * 100,
+                              { decimals: 2, minimumDecimals: 2, fallback: "-" },
+                            )
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-2 text-center">{formatNumberValue(row.total_weight_harvested_aggregated, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
+                      <td className="px-4 py-2 text-center">{formatNumberValue(row.number_of_fish_harvested, { decimals: 0, fallback: "-" })}</td>
+                      <td className="px-4 py-2 text-center">{formatNumberValue(row.daily_mortality_count, { decimals: 0, fallback: "-" })}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
-                      No performance records were found for systems with resolved production timelines.
+                    <td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
+                      No end-of-period cycle rows were found for the selected report window.
                     </td>
                   </tr>
                 )}

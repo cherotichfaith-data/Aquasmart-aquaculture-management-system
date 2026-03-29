@@ -14,6 +14,7 @@ export function useRecentActivities(params?: {
   enabled?: boolean
   initialData?: QueryResult<Database["public"]["Tables"]["change_log"]["Row"]>
 }) {
+  const enabled = params?.enabled ?? true
   return useQuery({
     queryKey: [
       "recent-activities",
@@ -32,11 +33,11 @@ export function useRecentActivities(params?: {
         limit: params?.limit ?? 5,
         signal,
       }),
-    enabled: params?.enabled ?? true,
+    enabled,
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: 5 * 60_000,
-    initialData: params?.initialData,
-    initialDataUpdatedAt: params?.initialData ? 0 : undefined,
+    initialData: enabled ? params?.initialData : undefined,
+    initialDataUpdatedAt: enabled && params?.initialData ? 0 : undefined,
   })
 }

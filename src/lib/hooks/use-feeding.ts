@@ -17,6 +17,7 @@ export function useRecordFeeding() {
         feed_type_id: payload.feed_type_id ?? null,
         feeding_amount: payload.feeding_amount ?? null,
         feeding_response: payload.feeding_response ?? null,
+        notes: payload.notes ?? null,
         created_at: new Date().toISOString(),
         status: "pending",
       }

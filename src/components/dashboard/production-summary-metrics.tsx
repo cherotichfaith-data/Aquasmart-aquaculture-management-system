@@ -40,6 +40,7 @@ export default function ProductionSummaryMetrics({
 }) {
   const { farmId: activeFarmId } = useActiveFarm()
   const farmId = activeFarmId ?? initialFarmId
+  const boundsReady = Boolean(dateFrom && dateTo)
   const metricsQuery = useProductionSummaryMetrics({
     farmId,
     stage,
@@ -65,20 +66,24 @@ export default function ProductionSummaryMetrics({
     const data = metricsQuery.data
     if (!data) {
       return [
-        { label: "Total Input (Stocked Fish)", value: "--" },
-        { label: "Total Mortalities", value: "--" },
-        { label: "Net Adjustments (Transfers)", value: "--" },
-        { label: "Total Harvested (Fish)", value: "--" },
-        { label: "Total Harvested (kg)", value: "--" },
+        { label: "Total Stocked", value: "--" },
+        { label: "Cumulative Mortality", value: "--" },
+        { label: "Net Transfers", value: "--" },
+        { label: "Total Harvested", value: "--" },
       ]
     }
 
     return [
-      { label: "Total Input (Stocked Fish)", value: formatWholeNumber(data.totalStockedFish) },
-      { label: "Total Mortalities", value: formatWholeNumber(data.totalMortalities) },
-      { label: "Net Adjustments (Transfers)", value: formatWholeNumber(data.netTransferAdjustments) },
-      { label: "Total Harvested (Fish)", value: formatWholeNumber(data.totalHarvestedFish) },
-      { label: "Total Harvested (kg)", value: formatKg(data.totalHarvestedKg) },
+      { label: "Total Stocked", value: `${formatWholeNumber(data.totalStockedFish)} fish` },
+      { label: "Cumulative Mortality", value: `${formatWholeNumber(data.cumulativeMortality)} fish` },
+      {
+        label: "Net Transfers",
+        value: `+${formatWholeNumber(data.transferInFish)} fish / -${formatWholeNumber(data.transferOutFish)} fish`,
+      },
+      {
+        label: "Total Harvested",
+        value: `${formatKg(data.totalHarvestedKg)} | ${formatWholeNumber(data.totalHarvestedFish)} fish`,
+      },
     ]
   }, [metricsQuery.data])
 
@@ -92,10 +97,10 @@ export default function ProductionSummaryMetrics({
     )
   }
 
-  if (metricsQuery.isLoading) {
+  if (!boundsReady || metricsQuery.isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
           <div key={index} className={`${metricCardClass} h-[98px] animate-pulse bg-muted/30`} />
         ))}
       </div>
@@ -108,7 +113,7 @@ export default function ProductionSummaryMetrics({
         <DataUpdatedAt updatedAt={metricsQuery.dataUpdatedAt} />
         <DataFetchingBadge isFetching={metricsQuery.isFetching} isLoading={metricsQuery.isLoading} />
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
           <Link key={metric.label} href={productionHref} className="block">
             <div className={`${metricCardClass} transition-shadow hover:shadow-md`}>
@@ -121,4 +126,3 @@ export default function ProductionSummaryMetrics({
     </div>
   )
 }
-

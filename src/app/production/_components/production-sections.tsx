@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import ProductionMetricFilter from "@/components/production/metrics-filter"
 import ProductionChart from "@/components/production/production-chart"
 import ProductionTable from "@/components/production/production-table"
-import { TimelineIntegrityNote } from "@/components/shared/timeline-integrity-note"
 
 export function ProductionSections({
   systemId,
@@ -62,19 +61,12 @@ export function ProductionSections({
           </div>
         </div>
 
-        <TimelineIntegrityNote
-          systemId={systemId}
-          dateFrom={startDate}
-          dateTo={endDate}
-        />
-
         <div className="flex flex-wrap items-center gap-2">
           <ProductionMetricFilter />
         </div>
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">Production Metrics</h2>
         <ProductionChart
           metric={metricFilter}
           rows={formattedChartRows}

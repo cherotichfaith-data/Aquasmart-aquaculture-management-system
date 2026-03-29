@@ -1,7 +1,6 @@
 import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import type { TimeBounds } from "@/lib/api/dashboard"
-import type { TimePeriod } from "@/lib/time-period"
+import type { TimeBounds, TimePeriod } from "@/lib/time-period"
 
 export type WaterQualityRow = Tables<"water_quality_measurement">
 export type WaterQualityInsert = Database["public"]["Tables"]["water_quality_measurement"]["Insert"]

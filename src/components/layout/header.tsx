@@ -32,8 +32,10 @@ const parseStageParam = (value: string | null): SharedFiltersState["selectedStag
 
 export default function Header({
   onMenuClick,
+  showToolbar = true,
 }: {
   onMenuClick: () => void
+  showToolbar?: boolean
 }) {
   const { user, role, signOut } = useAuth()
   const router = useRouter()
@@ -266,66 +268,68 @@ export default function Header({
           </div>
         </div>
 
-        <div className="page-toolbar">
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-            <TimePeriodSelector
-              selectedPeriod={timePeriod}
-              onPeriodChange={handleTimePeriodChange}
-              variant="compact"
-            />
-            <FarmSelector
-              selectedBatch={selectedBatch}
-              selectedSystem={selectedSystem}
-              selectedStage={selectedStage}
-              onBatchChange={handleBatchChange}
-              onSystemChange={handleSystemChange}
-              onStageChange={handleStageChange}
-              showStage
-              showCounts={false}
-              variant="compact"
-            />
-          </div>
-          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto sm:flex-wrap sm:justify-end">
-          {showAddData ? (
-            <div className="w-full sm:w-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button className="h-10 w-full rounded-xl px-4 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Add Data
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Quick Entry</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => router.push(`/data-entry?type=feeding${systemParam}${batchParam}`)}
-                  >
-                    <Fish className="mr-2 h-4 w-4" />
-                    Record Feeding
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => router.push(`/data-entry?type=sampling${systemParam}${batchParam}`)}
-                  >
-                    <FlaskConical className="mr-2 h-4 w-4" />
-                    Record Sampling
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => router.push(`/data-entry?type=water_quality${systemParam}`)}
-                  >
-                    <Droplets className="mr-2 h-4 w-4" />
-                    Record Water Quality
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push("/data-entry")}>
-                    View All Entry Types
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+        {showToolbar ? (
+          <div className="page-toolbar">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              <TimePeriodSelector
+                selectedPeriod={timePeriod}
+                onPeriodChange={handleTimePeriodChange}
+                variant="compact"
+              />
+              <FarmSelector
+                selectedBatch={selectedBatch}
+                selectedSystem={selectedSystem}
+                selectedStage={selectedStage}
+                onBatchChange={handleBatchChange}
+                onSystemChange={handleSystemChange}
+                onStageChange={handleStageChange}
+                showStage
+                showCounts={false}
+                variant="compact"
+              />
             </div>
-          ) : null}
+            <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto sm:flex-wrap sm:justify-end">
+            {showAddData ? (
+              <div className="w-full sm:w-auto">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="h-10 w-full rounded-xl px-4 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add Data
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Quick Entry</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/data-entry?type=feeding${systemParam}${batchParam}`)}
+                    >
+                      <Fish className="mr-2 h-4 w-4" />
+                      Record Feeding
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/data-entry?type=sampling${systemParam}${batchParam}`)}
+                    >
+                      <FlaskConical className="mr-2 h-4 w-4" />
+                      Record Sampling
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/data-entry?type=water_quality${systemParam}`)}
+                    >
+                      <Droplets className="mr-2 h-4 w-4" />
+                      Record Water Quality
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push("/data-entry")}>
+                      View All Entry Types
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </header>
   )

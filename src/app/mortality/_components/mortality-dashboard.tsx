@@ -435,7 +435,7 @@ export function MortalityDashboard({
                       yAxisId="right"
                       type="monotone"
                       dataKey="survivalPct"
-                      name="Survival %"
+                      name="Survival (%)"
                       stroke="hsl(var(--chart-1))"
                       strokeWidth={2.3}
                       dot={false}

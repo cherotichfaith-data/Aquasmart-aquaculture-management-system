@@ -1,14 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getClientOrError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+import {
+  getClientOrError,
+  isAbortLikeError,
+  isInvalidBigintUuidError,
+  isMissingObjectError,
+  queryKpiRpc,
+  toQueryError,
+  toQuerySuccess,
+} from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
+import { countTimeRangeDays } from "@/lib/time-period"
 
-type FeedIncomingRow = Tables<"feed_incoming">
+type FeedInventorySnapshotRow = Tables<"feed_inventory_snapshot">
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type FarmKpisTodayRow = Database["public"]["Functions"]["get_farm_kpis_today"]["Returns"][number]
 type FcrTrendRow = Database["public"]["Functions"]["get_fcr_trend"]["Returns"][number]
+type FcrTrendWindowRow = Database["public"]["Functions"]["get_fcr_trend_window"]["Returns"][number]
 type GrowthTrendRow = Database["public"]["Functions"]["get_growth_trend"]["Returns"][number]
+type GrowthTrendWindowRow = Database["public"]["Functions"]["get_growth_trend_window"]["Returns"][number]
 type RunningStockRow = Database["public"]["Functions"]["get_running_stock"]["Returns"][number]
 type FeedingRecordRow = Tables<"feeding_record">
 type FeedPlanRow = Tables<"feed_plan">
@@ -28,14 +39,14 @@ type RecentRowsTable =
   | "fish_transfer"
   | "fish_harvest"
   | "water_quality_measurement"
-  | "feed_incoming"
+  | "feed_inventory_snapshot"
   | "fish_stocking"
   | "system"
 
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
 type FeedFarmKpisToday = FarmKpisTodayRow
-export type FeedFcrTrendRow = FcrTrendRow
-export type FeedGrowthTrendRow = GrowthTrendRow
+export type FeedFcrTrendRow = FcrTrendRow | FcrTrendWindowRow
+export type FeedGrowthTrendRow = GrowthTrendRow | GrowthTrendWindowRow
 export type FeedRunningStockRow = RunningStockRow
 export type FeedPlan = FeedPlanRow
 
@@ -80,14 +91,6 @@ const projectFeedType = (row: FeedTypeProjection | null | undefined): FeedTypeRo
     feed_category: String(row.feed_category ?? ""),
     feed_pellet_size: String(row.feed_pellet_size ?? ""),
   }
-}
-
-const isAbortLikeError = (err: unknown): boolean => {
-  if (!err) return false
-  const e = err as { name?: string; message?: string }
-  const name = String(e.name ?? "").toLowerCase()
-  const message = String(e.message ?? "").toLowerCase()
-  return name.includes("abort") || name.includes("cancel") || message.includes("abort") || message.includes("cancel")
 }
 
 export async function getFeedingRecords(params?: {
@@ -188,6 +191,9 @@ export async function getFarmKpisToday(params: {
   if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
     return toQuerySuccess<FeedFarmKpisToday>([])
   }
+  if (error && isInvalidBigintUuidError(error)) {
+    return toQuerySuccess<FeedFarmKpisToday>([])
+  }
   if (error) return toQueryError("getFarmKpisToday", error)
 
   return toQuerySuccess<FeedFarmKpisToday>((data ?? []) as FeedFarmKpisToday[])
@@ -213,6 +219,9 @@ export async function getRunningStock(params: {
   if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
     return toQuerySuccess<FeedRunningStockRow>([])
   }
+  if (error && isInvalidBigintUuidError(error)) {
+    return toQuerySuccess<FeedRunningStockRow>([])
+  }
   if (error) return toQueryError("getRunningStock", error)
 
   return toQuerySuccess<FeedRunningStockRow>((data ?? []) as FeedRunningStockRow[])
@@ -220,11 +229,16 @@ export async function getRunningStock(params: {
 
 export async function getFeedPlans(params: {
   farmId?: string | null
+  systemIds?: number[]
+  batchId?: number
   dateFrom?: string
   dateTo?: string
   signal?: AbortSignal
 }): Promise<QueryResult<FeedPlanRow>> {
-  if (!params.farmId) {
+  const systemIds = (params.systemIds ?? []).filter((value) => Number.isFinite(value))
+  const hasBatchId = Number.isFinite(params.batchId)
+
+  if (!params.farmId && systemIds.length === 0 && !hasBatchId) {
     return toQuerySuccess<FeedPlanRow>([])
   }
 
@@ -232,11 +246,18 @@ export async function getFeedPlans(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase
-    .from("feed_plan")
-    .select("*")
-    .eq("farm_id", params.farmId)
-    .eq("is_active", true)
+  if (systemIds.length === 0 && !hasBatchId) {
+    return toQuerySuccess<FeedPlanRow>([])
+  }
+
+  let query = supabase.from("feed_plan").select("*").eq("is_active", true)
+
+  if (systemIds.length > 0) {
+    query = query.in("system_id", systemIds)
+  }
+  if (hasBatchId) {
+    query = query.eq("batch_id", params.batchId as number)
+  }
 
   if (params.dateTo) {
     query = query.lte("effective_from", params.dateTo)
@@ -249,7 +270,10 @@ export async function getFeedPlans(params: {
 
   const { data, error } = await query
   if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedPlanRow>([])
-  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
+  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error) || isMissingObjectError(error))) {
+    return toQuerySuccess<FeedPlanRow>([])
+  }
+  if (error && isInvalidBigintUuidError(error)) {
     return toQuerySuccess<FeedPlanRow>([])
   }
   if (error) return toQueryError("getFeedPlans", error)
@@ -257,10 +281,31 @@ export async function getFeedPlans(params: {
   return toQuerySuccess<FeedPlanRow>((data ?? []) as FeedPlanRow[])
 }
 
+async function runTrendQuery<Row>(params: {
+  tag: string
+  query: PromiseLike<{ data: Row[] | null; error: unknown }>
+  signal?: AbortSignal
+  emptyOnInvalidBigint?: boolean
+}): Promise<QueryResult<Row>> {
+  const { data, error } = await params.query
+  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<Row>([])
+  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
+    return toQuerySuccess<Row>([])
+  }
+  if (params.emptyOnInvalidBigint && error && isInvalidBigintUuidError(error)) {
+    return toQuerySuccess<Row>([])
+  }
+  if (error) return toQueryError(params.tag, error)
+
+  return toQuerySuccess<Row>((data ?? []) as Row[])
+}
+
 export async function getFcrTrend(params: {
   farmId?: string | null
   systemId?: number
   days?: number
+  dateFrom?: string
+  dateTo?: string
   signal?: AbortSignal
 }): Promise<QueryResult<FeedFcrTrendRow>> {
   if (!params.farmId || !params.systemId) {
@@ -271,26 +316,33 @@ export async function getFcrTrend(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = queryKpiRpc(supabase, "get_fcr_trend", {
-    p_farm_id: params.farmId,
-    p_system_id: params.systemId,
-    p_days: params.days,
-  })
+  let query = params.dateFrom
+    ? queryKpiRpc(supabase, "get_fcr_trend_window", {
+        p_farm_id: params.farmId,
+        p_system_id: params.systemId,
+        p_start_date: params.dateFrom,
+        p_end_date: params.dateTo ?? undefined,
+      })
+    : queryKpiRpc(supabase, "get_fcr_trend", {
+        p_farm_id: params.farmId,
+        p_system_id: params.systemId,
+        p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
+      })
   if (params.signal) query = query.abortSignal(params.signal)
 
-  const { data, error } = await query
-  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedFcrTrendRow>([])
-  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
-    return toQuerySuccess<FeedFcrTrendRow>([])
-  }
-  if (error) return toQueryError("getFcrTrend", error)
-
-  return toQuerySuccess<FeedFcrTrendRow>((data ?? []) as FeedFcrTrendRow[])
+  return runTrendQuery<FeedFcrTrendRow>({
+    tag: "getFcrTrend",
+    query,
+    signal: params.signal,
+    emptyOnInvalidBigint: true,
+  })
 }
 
 export async function getGrowthTrend(params: {
   systemId?: number
   days?: number
+  dateFrom?: string
+  dateTo?: string
   signal?: AbortSignal
 }): Promise<QueryResult<FeedGrowthTrendRow>> {
   if (!params.systemId) {
@@ -301,20 +353,23 @@ export async function getGrowthTrend(params: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = queryKpiRpc(supabase, "get_growth_trend", {
-    p_system_id: params.systemId,
-    p_days: params.days,
-  })
+  let query = params.dateFrom
+    ? queryKpiRpc(supabase, "get_growth_trend_window", {
+        p_system_id: params.systemId,
+        p_start_date: params.dateFrom,
+        p_end_date: params.dateTo ?? undefined,
+      })
+    : queryKpiRpc(supabase, "get_growth_trend", {
+        p_system_id: params.systemId,
+        p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
+      })
   if (params.signal) query = query.abortSignal(params.signal)
 
-  const { data, error } = await query
-  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedGrowthTrendRow>([])
-  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
-    return toQuerySuccess<FeedGrowthTrendRow>([])
-  }
-  if (error) return toQueryError("getGrowthTrend", error)
-
-  return toQuerySuccess<FeedGrowthTrendRow>((data ?? []) as FeedGrowthTrendRow[])
+  return runTrendQuery<FeedGrowthTrendRow>({
+    tag: "getGrowthTrend",
+    query,
+    signal: params.signal,
+  })
 }
 
 export async function getHarvests(params?: {
@@ -528,7 +583,7 @@ const emptyRecentEntries = () => ({
   transfer: toQuerySuccess<FishTransferRow>([]),
   harvest: toQuerySuccess<FishHarvestRow>([]),
   water_quality: toQuerySuccess<WaterQualityMeasurementRow>([]),
-  incoming_feed: toQuerySuccess<FeedIncomingRow>([]),
+  incoming_feed: toQuerySuccess<FeedInventorySnapshotRow>([]),
   stocking: toQuerySuccess<FishStockingRow>([]),
   systems: toQuerySuccess<SystemRow>([]),
 })
@@ -574,7 +629,7 @@ async function getRecentRows<T>(
     case "fish_mortality":
       query = query.eq("farm_id", farmId)
       break
-    case "feed_incoming":
+    case "feed_inventory_snapshot":
     case "system":
       query = query.eq("farm_id", farmId)
       break
@@ -655,7 +710,11 @@ export async function getRecentEntries(farmId?: string | null, signal?: AbortSig
       farmSystemIds,
       signal,
     }),
-    getRecentRows<FeedIncomingRow>(supabase, "feed_incoming", "date", { farmId, farmSystemIds, signal }),
+    getRecentRows<FeedInventorySnapshotRow>(supabase, "feed_inventory_snapshot", "date", {
+      farmId,
+      farmSystemIds,
+      signal,
+    }),
     getRecentRows<FishStockingRow>(supabase, "fish_stocking", "date", { farmId, farmSystemIds, signal }),
     getRecentRows<SystemRow>(supabase, "system", "created_at", { farmId, farmSystemIds, signal }),
   ])

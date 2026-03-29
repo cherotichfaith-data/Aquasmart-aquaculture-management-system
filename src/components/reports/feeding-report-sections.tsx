@@ -1,12 +1,18 @@
 "use client"
 
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
 import { ReportRecordsHiddenState, ReportRecordsToolbar } from "./report-shared"
+
+type CageSeries = {
+  key: string
+  label: string
+  color: string
+}
 
 export function FeedingStatusRow({
   latestUpdatedAt,
@@ -26,7 +32,7 @@ export function FeedingStatusRow({
       <DataUpdatedAt updatedAt={latestUpdatedAt} />
       <div className="legend-pills">
         <div className="legend-pill">{recordsCount} feeding rows</div>
-        <div className="legend-pill">{systemCount} systems in scope</div>
+        <div className="legend-pill">{systemCount} cages in scope</div>
         <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
       </div>
     </div>
@@ -37,82 +43,153 @@ export function FeedingSummaryCards({
   totalKgFed,
   avgEfcr,
   avgProtein,
-  costPerKgGainDisplay,
 }: {
   totalKgFed: number
   avgEfcr: number | null
   avgProtein: number | null
-  costPerKgGainDisplay: string
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Feed (kg)</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{totalKgFed.toFixed(2)}</div><p className="text-xs text-muted-foreground mt-1">Within selected period</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Average eFCR</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{avgEfcr?.toFixed(2) ?? "N/A"}</div><p className="text-xs text-muted-foreground mt-1">From production rows with resolved timelines</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Avg Protein (%)</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{avgProtein?.toFixed(2) ?? "N/A"}</div><p className="text-xs text-muted-foreground mt-1">Weighted by feeding amount</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Cost per kg Gain</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{costPerKgGainDisplay}</div><p className="text-xs text-muted-foreground mt-1">Add delivery pricing on incoming feed to unlock this KPI</p></CardContent></Card>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Feed (kg)</CardTitle></CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formatNumberValue(totalKgFed, { decimals: 2, minimumDecimals: 2, fallback: "0.00" })}</div>
+          <p className="mt-1 text-xs text-muted-foreground">Within selected period</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Average eFCR</CardTitle></CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formatNumberValue(avgEfcr, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
+          <p className="mt-1 text-xs text-muted-foreground">Weighted from in-period `api_production_summary` eFCR rows</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Avg Protein (%)</CardTitle></CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formatNumberValue(avgProtein, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
+          <p className="mt-1 text-xs text-muted-foreground">Weighted by feed amount using joined `feed_type.crude_protein_percentage`</p>
+        </CardContent>
+      </Card>
     </div>
   )
 }
 
-export function FeedingTrendSection({
-  title,
-  description,
-  legendLabel,
-  stroke,
+function EmptyChartState({ label }: { label: string }) {
+  return <div className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">{label}</div>
+}
+
+export function FeedByCageSection({
   loading,
   rows,
-  dataKey,
-  valueSuffix,
-  name,
+  cageSeries,
 }: {
-  title: string
-  description: string
-  legendLabel: string
-  stroke: string
   loading: boolean
-  rows: any[]
-  dataKey: string
-  valueSuffix: string
-  name: string
+  rows: Array<Record<string, number | string>>
+  cageSeries: CageSeries[]
 }) {
   return (
     <Card>
-      <CardHeader><CardTitle>{title}</CardTitle><CardDescription>{description}</CardDescription></CardHeader>
+      <CardHeader>
+        <CardTitle>Feed by Cage Over Time</CardTitle>
+        <CardDescription>Stacked feed kilograms by date bucket and cage.</CardDescription>
+      </CardHeader>
       <CardContent>
-        <div className="mb-4 legend-pills">
-          <div className="legend-pill"><span className="legend-pill-swatch" style={{ backgroundColor: stroke }} /> {legendLabel}</div>
-        </div>
-        <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
-          <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={rows}>
-                <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <Tooltip labelFormatter={(label) => formatChartDate(label)} formatter={(value, tooltipName) => [`${formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 })}${valueSuffix}`, String(tooltipName)]} contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }} />
-                <Line type="monotone" dataKey={dataKey} stroke={stroke} strokeWidth={2.4} name={name} />
-              </LineChart>
-            </ResponsiveContainer>
-          </LazyRender>
-        </div>
+        {loading ? (
+          <EmptyChartState label="Loading..." />
+        ) : rows.length === 0 ? (
+          <EmptyChartState label="No feeding rows found for the selected period." />
+        ) : (
+          <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
+            <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={rows}>
+                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
+                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip
+                    labelFormatter={(label) => formatChartDate(String(label))}
+                    formatter={(value, name) => [`${formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 })} kg`, String(name)]}
+                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
+                  />
+                  <Legend />
+                  {cageSeries.map((series) => (
+                    <Bar key={series.key} dataKey={series.key} name={series.label} fill={series.color} stackId="feed" radius={[4, 4, 0, 0]} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </LazyRender>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
 }
 
-export function FeedingBreakdownSection({ rows }: { rows: any[] }) {
+export function EfcrByCageSection({
+  loading,
+  rows,
+  cageSeries,
+}: {
+  loading: boolean
+  rows: Array<Record<string, number | string | null>>
+  cageSeries: CageSeries[]
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>eFCR Trend by Cage</CardTitle>
+        <CardDescription>Per-cage line trend from in-period `api_production_summary` rows.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <EmptyChartState label="Loading..." />
+        ) : rows.length === 0 ? (
+          <EmptyChartState label="No eFCR rows found for the selected period." />
+        ) : (
+          <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
+            <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={rows}>
+                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
+                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip
+                    labelFormatter={(label) => formatChartDate(String(label))}
+                    formatter={(value, name) => [formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }), String(name)]}
+                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
+                  />
+                  <Legend />
+                  {cageSeries.map((series) => (
+                    <Line key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.4} dot={false} connectNulls />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </LazyRender>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+export function FeedingBreakdownSection({
+  rows,
+}: {
+  rows: Array<{ systemId: number; systemLabel: string; totalKg: number; entries: number; avgProtein: number | null; lastDate: string | null }>
+}) {
   return (
     <Card>
       <CardHeader><CardTitle>Per-Cage Feed Breakdown</CardTitle><CardDescription>Total feed, entry count, and weighted protein by cage in the selected period.</CardDescription></CardHeader>
       <CardContent>
         <div className="dense-table-shell">
           <table className="dense-table">
-            <thead><tr className="border-b border-border"><th>System</th><th>Total Feed (kg)</th><th>Entries</th><th>Avg Protein (%)</th><th>Last Feed Date</th></tr></thead>
+            <thead><tr className="border-b border-border"><th>Cage</th><th>Total Feed (kg)</th><th>Entries</th><th>Avg Protein (%)</th><th>Last Feed Date</th></tr></thead>
             <tbody>
               {rows.length > 0 ? (
                 rows.map((row) => (
                   <tr key={row.systemId} className="border-b border-border/70 hover:bg-muted/35">
-                    <td className="font-medium">System {row.systemId}</td><td>{formatNumberValue(row.totalKg, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</td><td>{row.entries}</td><td>{formatNumberValue(row.avgProtein, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</td><td>{row.lastDate ?? "-"}</td>
+                    <td className="font-medium">{row.systemLabel}</td><td>{formatNumberValue(row.totalKg, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</td><td>{row.entries}</td><td>{formatNumberValue(row.avgProtein, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</td><td>{row.lastDate ?? "-"}</td>
                   </tr>
                 ))
               ) : (
@@ -166,6 +243,7 @@ export function FeedingRecordsSection({
     row.feeding_response,
     row.feed_type?.crude_protein_percentage,
   ])
+
   return (
     <Card>
       <CardHeader><CardTitle>Feeding Records</CardTitle><CardDescription>Operational detail rows and export controls for the selected scope.</CardDescription></CardHeader>
@@ -194,10 +272,14 @@ export function FeedingRecordsSection({
                 subtitle: "Consumption and efficiency analysis",
                 farmName,
                 dateRange,
-                summaryLines: [`Total kg fed: ${totalKgFed.toFixed(2)}`, `Average eFCR: ${avgEfcr?.toFixed(2) ?? "N/A"}`, `Average protein (%): ${avgProtein?.toFixed(2) ?? "N/A"}`, `Biomass gain (kg): ${biomassGain.toFixed(2)}`],
+                summaryLines: [
+                  `Total kg fed: ${formatNumberValue(totalKgFed, { decimals: 2, minimumDecimals: 2, fallback: "0.00" })}`,
+                  `Average eFCR: ${formatNumberValue(avgEfcr, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}`,
+                  `Average protein (%): ${formatNumberValue(avgProtein, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}`,
+                  `Biomass gain (kg): ${formatNumberValue(biomassGain, { decimals: 2, minimumDecimals: 2, fallback: "0.00" })}`,
+                ],
                 tableHeaders: ["Date", "System", "Batch", "Feed Type", "Amount (kg)", "Response", "Protein (%)"],
                 tableRows: exportRows.map((row) => [row[0], row[1], row[2] ?? "-", row[3], row[4], row[5], row[6] ?? "-"]),
-                commentary: "Cost per kg gain is not computed because feed cost fields are not available in current schema.",
               })
             }
           />

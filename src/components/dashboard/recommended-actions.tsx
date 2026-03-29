@@ -25,6 +25,7 @@ export default function RecommendedActions({
   dateTo,
   farmId: initialFarmId,
   initialData,
+  initialBounds,
 }: {
   stage?: "all" | Enums<"system_growth_stage">
   batch?: string
@@ -35,9 +36,13 @@ export default function RecommendedActions({
   dateTo?: string
   farmId?: string | null
   initialData?: DashboardPageInitialData["recommendedActions"]
+  initialBounds?: DashboardPageInitialData["bounds"]
 }) {
   const { farmId: activeFarmId } = useActiveFarm()
   const farmId = activeFarmId ?? initialFarmId
+  const boundsReady = Boolean(dateFrom && dateTo)
+  const canUseInitialData =
+    boundsReady && initialBounds?.start === dateFrom && initialBounds?.end === dateTo
   const actionsQuery = useRecommendedActions({
     farmId,
     stage: stage ?? "all",
@@ -47,7 +52,7 @@ export default function RecommendedActions({
     scopedSystemIds,
     dateFrom: dateFrom ?? null,
     dateTo: dateTo ?? null,
-    initialData,
+    initialData: canUseInitialData ? initialData : undefined,
   })
 
   const actions = useMemo(() => actionsQuery.data ?? [], [actionsQuery.data])
@@ -64,7 +69,7 @@ export default function RecommendedActions({
     )
   }
 
-  if (loading) {
+  if (!boundsReady || loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array(3)

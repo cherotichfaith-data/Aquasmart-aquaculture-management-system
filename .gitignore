@@ -17,7 +17,10 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-.env*
+.env
+.env.local
+.env.demo
+.env.*.local
 
 # vercel
 .vercel
@@ -28,3 +31,5 @@ next-env.d.ts
 zpfile
 sql.commands
 Product Requirements Document.xlsx
+supabase/.temp/
+supabase/.branches/

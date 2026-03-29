@@ -8,7 +8,6 @@ import PerformanceReport from "@/components/reports/performance-report"
 import MortalityReport from "@/components/reports/mortality-report"
 import GrowthReport from "@/components/reports/growth-report"
 import WaterQualityComplianceReport from "@/components/reports/water-quality-compliance-report"
-import { TimelineIntegrityNote } from "@/components/shared/timeline-integrity-note"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 
@@ -49,8 +48,6 @@ export default function ReportsPage() {
             <p className="text-muted-foreground mt-1">Exports, compliance, and period summaries without inferring fake production dates.</p>
           </div>
         </div>
-
-        <TimelineIntegrityNote systemId={selectedSystemId} dateFrom={dateFrom} dateTo={dateTo} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="overflow-x-auto pb-1">

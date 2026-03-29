@@ -68,6 +68,19 @@ export const formatUnitValue = (
   return base === fallback ? fallback : `${base} ${unit}`
 }
 
+export const scaleFractionToPercent = (value: number | null | undefined) =>
+  value == null || Number.isNaN(value) || !Number.isFinite(value) ? null : value * 100
+
+export const formatPercentRateValue = (
+  value: number | null | undefined,
+  decimals: number,
+  unit: string,
+  fallback = "--",
+) => {
+  const scaled = scaleFractionToPercent(value)
+  return formatUnitValue(scaled, decimals, unit, fallback)
+}
+
 export const formatRateValue = (
   value: number | null | undefined,
   decimals = 4,

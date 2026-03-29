@@ -5,7 +5,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import type { WaterQualityPageFilters, WaterQualityPageInitialData } from "@/features/water-quality/types"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import SystemHistorySheet from "@/components/systems/system-history-sheet"
-import { TimelineIntegrityNote } from "@/components/shared/timeline-integrity-note"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import {
   useAlertThresholds,
@@ -27,8 +26,8 @@ import {
   buildAggregatedReadings,
   buildAlgalActivity,
   buildAllSystemsWqi,
+  buildDiurnalDoPattern,
   buildCurrentAlerts,
-  buildDailyDoVariation,
   buildDailyParameterByDate,
   buildDailyRiskTrend,
   buildDailyTempAverage,
@@ -109,6 +108,10 @@ export default function WaterQualityPage({
   const [activeTab, setActiveTab] = useState(() => initialFilters?.activeTab ?? "overview")
   const [selectedHistorySystemId, setSelectedHistorySystemId] = useState<number | null>(null)
   const chartLimit = 2000
+  const initialStageMatch = selectedStage === (initialFilters?.selectedStage ?? "all")
+  const initialBatchMatch = selectedBatch === (initialFilters?.selectedBatch ?? "all")
+  const initialSystemMatch = selectedSystem === (initialFilters?.selectedSystem ?? "all")
+  const initialBoundsMatch = boundsReady && initialData?.bounds.start === dateFrom && initialData?.bounds.end === dateTo
 
   const {
     selectedSystemId,
@@ -120,14 +123,14 @@ export default function WaterQualityPage({
     selectedStage,
     selectedBatch,
     selectedSystem,
-    initialSystemsData: initialData?.systemOptions,
-    initialBatchSystemsData: initialData?.batchSystems,
+    initialSystemsData: initialStageMatch ? initialData?.systemOptions : undefined,
+    initialBatchSystemsData: initialBatchMatch ? initialData?.batchSystems : undefined,
   })
 
   const syncStatusQuery = useWaterQualitySyncStatus({ farmId, initialData: initialData?.syncStatus })
   const latestStatusQuery = useLatestWaterQualityStatus(selectedSystemId, {
     farmId,
-    initialData: initialData?.latestStatus,
+    initialData: initialSystemMatch ? initialData?.latestStatus : undefined,
   })
   const ratingsQuery = useDailyWaterQualityRating({
     farmId,
@@ -137,7 +140,7 @@ export default function WaterQualityPage({
     requireSystem: false,
     limit: chartLimit,
     enabled: boundsReady,
-    initialData: initialData?.ratings,
+    initialData: initialBoundsMatch && initialSystemMatch ? initialData?.ratings : undefined,
   })
   const measurementsQuery = useWaterQualityMeasurements({
     farmId,
@@ -147,7 +150,7 @@ export default function WaterQualityPage({
     requireSystem: false,
     limit: chartLimit,
     enabled: boundsReady,
-    initialData: initialData?.measurements,
+    initialData: initialBoundsMatch && initialSystemMatch ? initialData?.measurements : undefined,
   })
   const overlayQuery = useWaterQualityOverlay({
     farmId,
@@ -156,7 +159,7 @@ export default function WaterQualityPage({
     dateTo,
     requireSystem: false,
     enabled: boundsReady,
-    initialData: initialData?.overlay,
+    initialData: initialBoundsMatch && initialSystemMatch ? initialData?.overlay : undefined,
   })
   const activitiesQuery = useRecentActivities({
     tableName: "water_quality_measurement",
@@ -164,7 +167,7 @@ export default function WaterQualityPage({
     dateTo: dateTo ? `${dateTo}T23:59:59` : undefined,
     limit: 1500,
     enabled: boundsReady,
-    initialData: initialData?.activities,
+    initialData: initialBoundsMatch ? initialData?.activities : undefined,
   })
   const thresholdsQuery = useAlertThresholds({ farmId, initialData: initialData?.thresholds })
   const scopedSystemIds = scopedSystemIdList
@@ -200,9 +203,13 @@ export default function WaterQualityPage({
       ),
     [ratingsQuery.data, scopedSystemIds],
   )
-  const thresholdRow = useMemo(() => selectThresholdRow(getResultRows(thresholdsQuery.data)), [thresholdsQuery.data])
-  const lowDoThreshold = thresholdRow?.low_do_threshold ?? 4
-  const highAmmoniaThreshold = thresholdRow?.high_ammonia_threshold ?? 0.5
+  const thresholdRows = useMemo(() => getResultRows(thresholdsQuery.data), [thresholdsQuery.data])
+  const thresholdRow = useMemo(
+    () => selectThresholdRow(thresholdRows, selectedSystemId ?? undefined),
+    [selectedSystemId, thresholdRows],
+  )
+  const lowDoThreshold = thresholdRow?.low_do_threshold ?? 5
+  const highAmmoniaThreshold = thresholdRow?.high_ammonia_threshold ?? 0.05
 
   const systemLabelById = useMemo(() => buildSystemLabelById(systemsRows), [systemsRows])
   const systemOptions = useMemo(() => buildSystemOptions(systemsRows), [systemsRows])
@@ -252,8 +259,8 @@ export default function WaterQualityPage({
   const nutrientLoad = useMemo(() => buildNutrientLoad(selectedReadings), [selectedReadings])
   const algalActivity = useMemo(() => buildAlgalActivity(selectedReadings), [selectedReadings])
   const allSystemsWqi = useMemo(
-    () => buildAllSystemsWqi(systemOptions, latestReadingsBySystem, lowDoThreshold, temperatureStats),
-    [latestReadingsBySystem, lowDoThreshold, systemOptions, temperatureStats],
+    () => buildAllSystemsWqi(systemOptions, latestReadingsBySystem, thresholdRows, temperatureStats),
+    [latestReadingsBySystem, systemOptions, temperatureStats, thresholdRows],
   )
   const averageWqi = useMemo(() => getAverageWqi(allSystemsWqi), [allSystemsWqi])
   const averageWqiLabel = useMemo(() => getWqiLabel(averageWqi), [averageWqi])
@@ -283,7 +290,7 @@ export default function WaterQualityPage({
     () => buildParameterTrendData(scopedMeasurementRows, selectedParameter, overlayByDate),
     [overlayByDate, scopedMeasurementRows, selectedParameter],
   )
-  const dailyDoVariation = useMemo(() => buildDailyDoVariation(scopedMeasurementRows), [scopedMeasurementRows])
+  const diurnalDoPattern = useMemo(() => buildDiurnalDoPattern(scopedMeasurementRows), [scopedMeasurementRows])
   const dailyTempAverage = useMemo(() => buildDailyTempAverage(scopedMeasurementRows), [scopedMeasurementRows])
   const depthProfileScopeIds = selectedSystemId != null ? [selectedSystemId] : []
   const depthProfiles = useMemo(
@@ -336,8 +343,7 @@ export default function WaterQualityPage({
   const surfaceDo = doProfileSeries[0]?.dissolvedOxygen ?? null
   const bottomDo = doProfileSeries.length ? doProfileSeries[doProfileSeries.length - 1].dissolvedOxygen : null
   const doGradient = surfaceDo != null && bottomDo != null ? surfaceDo - bottomDo : null
-  const isStratified = surfaceDo != null && bottomDo != null && bottomDo < 3 && surfaceDo > 5
-  const hasGradient = doGradient != null && doGradient > 2
+  const isStratified = surfaceDo != null && bottomDo != null && bottomDo < 4 && surfaceDo > 6
 
   const surfaceTemp = tempProfileSeries[0]?.temperature ?? null
   const bottomTemp = tempProfileSeries.length ? tempProfileSeries[tempProfileSeries.length - 1].temperature : null
@@ -405,12 +411,6 @@ export default function WaterQualityPage({
   return (
     <DashboardLayout>
       <div className={`space-y-6 ${activeTab === "depth" || activeTab === "parameter" ? "-mt-6 md:-mt-8" : ""}`}>
-        <TimelineIntegrityNote
-          systemId={selectedSystemId ?? undefined}
-          dateFrom={dateFrom ?? null}
-          dateTo={dateTo ?? null}
-        />
-
         <div
           className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end ${
             activeTab === "depth" || activeTab === "parameter" ? "mt-8 md:mt-10" : "mt-4 md:mt-6"
@@ -504,7 +504,6 @@ export default function WaterQualityPage({
                 depthProfileDoData={depthProfileDoData}
                 depthProfileTempData={depthProfileTempData}
                 isStratified={isStratified}
-                hasGradient={hasGradient}
                 surfaceDo={surfaceDo}
                 bottomDo={bottomDo}
                 doGradient={doGradient}
@@ -525,7 +524,7 @@ export default function WaterQualityPage({
                 highAmmoniaThreshold={highAmmoniaThreshold}
                 showFeedingOverlay={showFeedingOverlay}
                 showMortalityOverlay={showMortalityOverlay}
-                dailyDoVariation={dailyDoVariation}
+                diurnalDoPattern={diurnalDoPattern}
                 dailyTempAverage={dailyTempAverage}
               />
             </TabsContent>

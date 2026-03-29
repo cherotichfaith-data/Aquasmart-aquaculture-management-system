@@ -2,10 +2,11 @@ import { createClient } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/supabase/require-user"
 import type { Database } from "@/lib/types/database"
 import { redirect } from "next/navigation"
+import { cache } from "react"
 
 export type FarmOption = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
 
-export async function listFarmOptions(): Promise<FarmOption[]> {
+export const listFarmOptions = cache(async (): Promise<FarmOption[]> => {
   await requireUser()
   const supabase = await createClient()
 
@@ -15,7 +16,7 @@ export async function listFarmOptions(): Promise<FarmOption[]> {
   }
 
   return ((data ?? []) as FarmOption[]).sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
-}
+})
 
 export async function resolveInitialFarmId(searchFarmId?: string | null) {
   const farms = await listFarmOptions()

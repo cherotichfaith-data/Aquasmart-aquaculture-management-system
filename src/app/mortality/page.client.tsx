@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import SystemHistorySheet from "@/components/systems/system-history-sheet"
 import { DataErrorState } from "@/components/shared/data-states"
-import { TimelineIntegrityNote } from "@/components/shared/timeline-integrity-note"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useAlertLog, useMortalityEvents } from "@/lib/hooks/use-mortality"
 import { useFeedingRecords, useSamplingData, useScopedSurvivalTrend } from "@/lib/hooks/use-reports"
@@ -85,6 +84,8 @@ export default function MortalityPage() {
   const samplingQuery = useSamplingData({
     systemIds: scopedSystemIdList,
     batchId,
+    dateFrom,
+    dateTo,
     limit: 5000,
     enabled: boundsReady && scopedSystemIdList.length > 0,
   })
@@ -215,11 +216,6 @@ export default function MortalityPage() {
           <h1 className="text-3xl font-bold tracking-tight">Mortality</h1>
         </div>
 
-        <TimelineIntegrityNote
-          systemId={selectedSystem !== "all" ? Number(selectedSystem) : undefined}
-          dateFrom={dateFrom ?? null}
-          dateTo={dateTo ?? null}
-        />
         <MortalityDashboard
           kpis={kpis}
           loading={loading}

@@ -41,7 +41,7 @@ export function resolveSystemTimelineWindow(
   if (!row) return null
 
   const fullStart = row.resolved_start ?? row.first_stocking_date ?? row.first_activity_date ?? row.configured_cycle_start ?? null
-  const fullEnd = row.resolved_end ?? row.final_harvest_date ?? row.snapshot_as_of ?? row.last_activity_date ?? row.configured_cycle_end ?? null
+  const fullEnd = row.resolved_end ?? row.final_harvest_date ?? row.last_activity_date ?? row.configured_cycle_end ?? null
   const windowStart = params?.windowStart ?? null
   const windowEnd = params?.windowEnd ?? null
 

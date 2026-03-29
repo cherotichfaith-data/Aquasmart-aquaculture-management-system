@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
-import { fetchTimePeriodBounds } from "@/lib/time-period-bounds"
+import { buildTimeBoundsFromAvailableRange, fetchTimePeriodBounds } from "@/lib/time-period"
+import { resolveSystemTimelineWindow } from "@/lib/system-timeline-window"
 import type { Database, Enums } from "@/lib/types/database"
 import type { TimePeriod } from "@/lib/time-period"
 import { mapSystemRowToOption, type SystemOptionSource } from "@/lib/system-options"
@@ -21,11 +22,35 @@ export async function getScopedTimeBounds(
   farmId: string,
   timePeriod: ScopedAnalyticsTimePeriod,
   scope: Parameters<typeof fetchTimePeriodBounds>[1]["scope"],
+  systemId?: number,
 ) {
-  return fetchTimePeriodBounds(supabase as never, {
+  const farmBounds = await fetchTimePeriodBounds(supabase, {
     farmId,
     timePeriod,
     scope,
+  })
+
+  if (!systemId || !Number.isFinite(systemId)) return farmBounds
+
+  const { data, error } = await supabase.rpc("api_system_timeline_bounds", {
+    p_farm_id: farmId,
+    p_system_id: systemId,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const timelineRow = ((data ?? []) as Database["public"]["Functions"]["api_system_timeline_bounds"]["Returns"])[0] ?? null
+  const timeline = resolveSystemTimelineWindow(timelineRow)
+
+  if (!timeline?.fullStart || !timeline.fullEnd) return farmBounds
+
+  return buildTimeBoundsFromAvailableRange({
+    timePeriod,
+    availableFromDate: timeline.fullStart,
+    latestAvailableDate: timeline.fullEnd,
+    anchorScope: `${scope}:system`,
   })
 }
 
@@ -38,7 +63,6 @@ export async function getScopedSystemOptions(
     .from("system")
     .select("id, farm_id, growth_stage, is_active, name, type, unit")
     .eq("farm_id", farmId)
-    .eq("is_active", true)
 
   if (stage !== "all") {
     query = query.eq("growth_stage", stage)

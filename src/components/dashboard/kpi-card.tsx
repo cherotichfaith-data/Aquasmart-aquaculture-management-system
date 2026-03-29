@@ -9,6 +9,9 @@ interface KPICardProps {
   trend?: number | null
   decimals?: number
   formatUnit?: string
+  trendFormat?: "percent" | "delta"
+  trendDecimals?: number
+  trendUnit?: string
   invertTrend?: boolean
   neutral?: boolean
   href?: string
@@ -66,14 +69,24 @@ function KPICardContent({
   trend,
   decimals = 1,
   formatUnit,
+  trendFormat = "percent",
+  trendDecimals,
+  trendUnit,
   invertTrend,
   neutral,
 }: KPICardProps) {
-  const hasTrend = trend !== undefined && trend !== null
-  const formattedValue =
-    average === null || average === undefined ? "--" : `${average.toFixed(decimals)}${formatUnit ? formatUnit : ""}`
+  const appendUnit = (value: string, unit?: string) => {
+    if (!unit) return value
+    return unit.startsWith("%") ? `${value}${unit}` : `${value} ${unit}`
+  }
 
-  const trendText = hasTrend ? `${trend > 0 ? "+" : ""}${trend.toFixed(1)}%` : null
+  const hasTrend = trend !== undefined && trend !== null
+  const formattedValue = average === null || average === undefined ? "--" : appendUnit(average.toFixed(decimals), formatUnit)
+  const resolvedTrendDecimals = trendDecimals ?? (trendFormat === "percent" ? 1 : decimals)
+  const resolvedTrendUnit = trendUnit ?? (trendFormat === "percent" ? "%" : undefined)
+  const trendText = hasTrend
+    ? appendUnit(`${trend > 0 ? "+" : ""}${trend.toFixed(resolvedTrendDecimals)}`, resolvedTrendUnit)
+    : null
 
   let trendDirection: "up" | "down" | "flat" = "flat"
   let status: "positive" | "negative" | "neutral" = "neutral"
@@ -108,7 +121,7 @@ function KPICardContent({
           {trendText && (
             <p className={`text-[11px] mt-2 inline-flex items-center gap-1 ${toneStyles[status]}`}>
               <TrendIcon className="h-3 w-3" />
-              <span>{trendText} from previous period</span>
+              <span>{trendText} change vs previous period</span>
             </p>
           )}
         </div>
@@ -128,6 +141,9 @@ export default function KPICard({
   trend,
   decimals,
   formatUnit,
+  trendFormat,
+  trendDecimals,
+  trendUnit,
   invertTrend,
   neutral,
   href,
@@ -140,6 +156,9 @@ export default function KPICard({
       trend={trend}
       decimals={decimals}
       formatUnit={formatUnit}
+      trendFormat={trendFormat}
+      trendDecimals={trendDecimals}
+      trendUnit={trendUnit}
       invertTrend={invertTrend}
       neutral={neutral}
     />

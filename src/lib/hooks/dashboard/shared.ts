@@ -42,7 +42,7 @@ export async function resolveScopedSystemIds(params: {
     const systemsResult = await getSystemOptions({
       farmId,
       stage: params.stage,
-      activeOnly: true,
+      activeOnly: false,
       signal: params.signal,
     })
     if (systemsResult.status !== "success") return null

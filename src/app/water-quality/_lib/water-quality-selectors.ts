@@ -74,6 +74,19 @@ export type SystemWqiRow = WaterQualitySystemListItem & {
   wqiLabel: WaterQualityStatusLabel
 }
 
+export type DiurnalDoPatternRow = {
+  time: string
+  sortKey: number
+  [seriesKey: string]: string | number | null
+}
+
+export type DiurnalDoPattern = {
+  rows: DiurnalDoPatternRow[]
+  dateSeries: string[]
+  insufficientSamples: boolean
+  dominantTimeLabel: string | null
+}
+
 export type SystemRiskRow = {
   systemId: number
   systemName: string
@@ -142,9 +155,9 @@ export function getWqiLabel(value: number | null): WaterQualityStatusLabel {
 
 function scoreDissolvedOxygen(value: number | null, lowDoThreshold: number) {
   if (value == null) return null
-  if (value >= lowDoThreshold * 1.2) return 90
+  if (value >= lowDoThreshold + 2) return 90
   if (value >= lowDoThreshold) return 60
-  if (value >= lowDoThreshold * 0.8) return 30
+  if (value >= lowDoThreshold - 1) return 30
   return 0
 }
 
@@ -190,8 +203,17 @@ export function buildSystemOptions(rows: WaterQualitySystemOption[]): WaterQuali
     .sort((a, b) => a.label.localeCompare(b.label))
 }
 
-export function selectThresholdRow(rows: WaterQualityThresholdRow[]) {
-  return rows.find((row) => row.scope === "farm" && row.system_id == null) ?? rows[0] ?? null
+export function selectThresholdRow(rows: WaterQualityThresholdRow[], systemId?: number | null) {
+  if (systemId != null) {
+    const systemThreshold = rows.find((row) => row.system_id === systemId)
+    if (systemThreshold) return systemThreshold
+  }
+  return (
+    rows.find((row) => row.scope === "farm" && row.system_id == null) ??
+    rows.find((row) => row.scope === "default") ??
+    rows[0] ??
+    null
+  )
 }
 
 export function buildRatingTrendBySystemId(rows: WaterQualityRatingRow[]) {
@@ -414,15 +436,16 @@ export function buildAlgalActivity(readings: CurrentReadings): AlgalActivity {
 export function buildAllSystemsWqi(
   systemOptions: WaterQualitySystemListItem[],
   latestReadingsBySystem: Map<number, LatestReadingState>,
-  lowDoThreshold: number,
+  thresholdRows: WaterQualityThresholdRow[],
   temperatureStats: { mean: number | null; std: number | null },
 ) {
   return systemOptions.map((system) => {
     const readings = latestReadingsBySystem.get(system.id)?.readings ?? {}
+    const thresholdRow = selectThresholdRow(thresholdRows, system.id)
     const wqi = calculateWqi(
       readings.dissolved_oxygen ?? null,
       readings.temperature ?? null,
-      lowDoThreshold,
+      thresholdRow?.low_do_threshold ?? 5,
       temperatureStats.mean,
       temperatureStats.std,
     )
@@ -438,6 +461,79 @@ export function getAverageWqi(allSystemsWqi: SystemWqiRow[]) {
   const values = allSystemsWqi.map((system) => system.wqi).filter((value): value is number => typeof value === "number")
   if (!values.length) return null
   return values.reduce((sum, value) => sum + value, 0) / values.length
+}
+
+function normalizeTimeLabel(value: string | null) {
+  if (!value) return null
+  const match = String(value).match(/^(\d{2}:\d{2})/)
+  return match ? match[1] : String(value).slice(0, 5)
+}
+
+function timeLabelToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.MAX_SAFE_INTEGER
+  return hours * 60 + minutes
+}
+
+export function buildDiurnalDoPattern(rows: WaterQualityMeasurementViewRow[]): DiurnalDoPattern {
+  const doRows = rows
+    .filter((row) => row.parameter_name === "dissolved_oxygen")
+    .filter(
+      (row): row is WaterQualityMeasurementViewRow & { date: string; time: string; parameter_value: number } =>
+        row.date != null && row.time != null && typeof row.parameter_value === "number",
+    )
+
+  const recentDates = Array.from(new Set(doRows.map((row) => row.date)))
+    .sort((left, right) => right.localeCompare(left))
+    .slice(0, 7)
+    .sort((left, right) => left.localeCompare(right))
+
+  if (!recentDates.length) {
+    return { rows: [], dateSeries: [], insufficientSamples: true, dominantTimeLabel: null }
+  }
+
+  const dateSet = new Set(recentDates)
+  const filteredRows = doRows.filter((row) => dateSet.has(row.date))
+  const byTime = new Map<string, DiurnalDoPatternRow>()
+  const timeFrequency = new Map<string, number>()
+  const timesByDate = new Map<string, Set<string>>()
+  const aggregateByDateAndTime = new Map<string, { sum: number; count: number }>()
+
+  filteredRows.forEach((row) => {
+    const timeLabel = normalizeTimeLabel(row.time)
+    if (!timeLabel) return
+    const aggregateKey = `${row.date}|${timeLabel}`
+    const current = aggregateByDateAndTime.get(aggregateKey) ?? { sum: 0, count: 0 }
+    current.sum += row.parameter_value
+    current.count += 1
+    aggregateByDateAndTime.set(aggregateKey, current)
+
+    timeFrequency.set(timeLabel, (timeFrequency.get(timeLabel) ?? 0) + 1)
+    const dateTimes = timesByDate.get(row.date) ?? new Set<string>()
+    dateTimes.add(timeLabel)
+    timesByDate.set(row.date, dateTimes)
+  })
+
+  aggregateByDateAndTime.forEach((aggregate, key) => {
+    const [date, timeLabel] = key.split("|")
+    const row = byTime.get(timeLabel) ?? { time: timeLabel, sortKey: timeLabelToMinutes(timeLabel) }
+    row[date] = aggregate.count > 0 ? aggregate.sum / aggregate.count : null
+    byTime.set(timeLabel, row)
+  })
+
+  const dominantTimeLabel =
+    Array.from(timeFrequency.entries()).sort((left, right) => right[1] - left[1])[0]?.[0] ?? null
+  const averageSamplesPerDate =
+    timesByDate.size > 0
+      ? Array.from(timesByDate.values()).reduce((sum, set) => sum + set.size, 0) / timesByDate.size
+      : 0
+
+  return {
+    rows: Array.from(byTime.values()).sort((left, right) => left.sortKey - right.sortKey),
+    dateSeries: recentDates,
+    insufficientSamples: averageSamplesPerDate < 2,
+    dominantTimeLabel,
+  }
 }
 
 function severityRank(rating: string | null) {
