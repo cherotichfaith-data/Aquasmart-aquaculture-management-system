@@ -1,6 +1,8 @@
 "use client"
 
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
+import { invalidateSystemWriteQueries } from "@/lib/cache/react-query"
+import { createSystem } from "@/lib/commands/operations"
+import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 import type { Database } from "@/lib/types/database"
 
 type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
@@ -8,12 +10,11 @@ type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
 }
 
 export function useCreateSystem() {
-  return useInsertMutation({
-    table: "system",
+  return useWriteThroughMutation({
+    mutationFn: createSystem,
     activityTableName: "system",
     recentEntryKey: "systems",
     buildOptimisticEntry: (payload) => {
-      if (Array.isArray(payload)) return null
       const systemPayload = payload as SystemInsertWithUnit
       return {
         id: `optimistic-${Date.now()}`,
@@ -26,7 +27,11 @@ export function useCreateSystem() {
         status: "pending",
       }
     },
-    invalidate: ["dashboard", "options", "recent-activity", "recent-entries"],
+    invalidate: async ({ queryClient, result }) =>
+      invalidateSystemWriteQueries(queryClient, {
+        farmId: result.meta.farmId,
+        date: result.meta.date,
+      }),
     successMessage: "System created successfully.",
     errorMessage: "Failed to create system.",
   })

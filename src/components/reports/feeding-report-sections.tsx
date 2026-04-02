@@ -7,6 +7,7 @@ import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
 import { ReportRecordsHiddenState, ReportRecordsToolbar } from "./report-shared"
+import { chartGridProps, chartLegendProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 
 type CageSeries = {
   key: string
@@ -100,19 +101,19 @@ export function FeedByCageSection({
         ) : rows.length === 0 ? (
           <EmptyChartState label="No feeding rows found for the selected period." />
         ) : (
-          <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="soft-panel-subtle h-[320px] p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={rows}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="date" />
+                  <YAxis {...chartYAxisProps} />
                   <Tooltip
                     labelFormatter={(label) => formatChartDate(String(label))}
                     formatter={(value, name) => [`${formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 })} kg`, String(name)]}
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
+                    contentStyle={chartTooltipStyle}
                   />
-                  <Legend />
+                  <Legend {...chartLegendProps} />
                   {cageSeries.map((series) => (
                     <Bar key={series.key} dataKey={series.key} name={series.label} fill={series.color} stackId="feed" radius={[4, 4, 0, 0]} />
                   ))}
@@ -147,19 +148,19 @@ export function EfcrByCageSection({
         ) : rows.length === 0 ? (
           <EmptyChartState label="No eFCR rows found for the selected period." />
         ) : (
-          <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="soft-panel-subtle h-[320px] p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={rows}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="date" />
+                  <YAxis {...chartYAxisProps} />
                   <Tooltip
                     labelFormatter={(label) => formatChartDate(String(label))}
                     formatter={(value, name) => [formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }), String(name)]}
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
+                    contentStyle={chartTooltipStyle}
                   />
-                  <Legend />
+                  <Legend {...chartLegendProps} />
                   {cageSeries.map((series) => (
                     <Line key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.4} dot={false} connectNulls />
                   ))}

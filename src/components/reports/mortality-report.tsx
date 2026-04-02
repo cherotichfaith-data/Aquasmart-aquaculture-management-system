@@ -7,7 +7,7 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
-import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/types/mortality"
+import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import {
   MortalityCauseSections,
   MortalityRecordsSection,

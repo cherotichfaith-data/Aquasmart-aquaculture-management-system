@@ -22,12 +22,12 @@ export function WaterQualityAlertsTab({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
+        <div className="soft-panel p-5 space-y-4">
           <div>
             <h2 className="font-semibold">System Risk Table</h2>
             <p className="text-sm text-muted-foreground">Ranked by severity and recency for the selected scope.</p>
           </div>
-          <div className="overflow-x-auto rounded-md border border-border/80">
+          <div className="soft-table-shell">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="bg-muted/50 border-b border-border">
@@ -106,18 +106,18 @@ export function WaterQualityAlertsTab({
         </div>
 
         <div className="space-y-4">
-          <div className="bg-card border border-border rounded-lg p-5">
+          <div className="soft-panel p-5">
             <h3 className="font-semibold">Current Alerts</h3>
             <p className="text-sm text-muted-foreground">Latest status and threshold conditions.</p>
             <div className="mt-3 space-y-2">
               {currentAlerts.length ? (
                 currentAlerts.slice(0, 3).map((alert) => (
-                  <div key={alert} className="rounded-md border border-border/80 bg-muted/20 p-3 text-sm">
+                  <div key={alert} className="soft-panel-subtle p-3 text-sm">
                     {alert}
                   </div>
                 ))
               ) : (
-                <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                <div className="soft-panel-subtle bg-muted/24 p-3 text-sm text-muted-foreground">
                   No active alerts in the current scope.
                 </div>
               )}
@@ -126,7 +126,7 @@ export function WaterQualityAlertsTab({
               ) : null}
             </div>
           </div>
-          <div className="bg-card border border-border rounded-lg p-5">
+          <div className="soft-panel p-5">
             <h3 className="font-semibold">Threshold Snapshot</h3>
             <p className="text-sm text-muted-foreground">Managed in farm settings.</p>
             <div className="mt-3 space-y-2 text-sm">
@@ -148,37 +148,37 @@ export function WaterQualityAlertsTab({
           <h2 className="text-2xl font-bold text-foreground">Alerts</h2>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="bg-card border border-border rounded-lg p-5 space-y-3">
+          <div className="soft-panel p-5 space-y-3">
             <h3 className="font-semibold">Alert Intelligence</h3>
             <p className="text-sm text-muted-foreground">Current conditions that require attention.</p>
             {currentAlerts.length ? (
               <div className="space-y-2">
                 {currentAlerts.map((alert) => (
-                  <div key={alert} className="rounded-md border border-border/80 bg-muted/20 p-3 text-sm">
+                  <div key={alert} className="soft-panel-subtle p-3 text-sm">
                     {alert}
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+              <div className="soft-panel-subtle bg-muted/24 p-3 text-sm text-muted-foreground">
                 No current alerts in the selected scope.
               </div>
             )}
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-5 space-y-3">
+          <div className="soft-panel p-5 space-y-3">
             <h3 className="font-semibold">Emerging Risks</h3>
             <p className="text-sm text-muted-foreground">Trend-based signals and volatility checks.</p>
             {emergingRisks.length ? (
               <div className="space-y-2">
                 {emergingRisks.map((alert) => (
-                  <div key={alert} className="rounded-md border border-orange-300/50 bg-orange-500/10 text-orange-700 dark:text-orange-300 p-3 text-sm">
+                  <div key={alert} className="rounded-md bg-orange-500/10 p-3 text-sm text-orange-700 shadow-[0_16px_34px_-28px_rgba(249,115,22,0.35)] dark:text-orange-300">
                     {alert}
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+              <div className="soft-panel-subtle bg-muted/24 p-3 text-sm text-muted-foreground">
                 No emerging risks detected in the last two weeks.
               </div>
             )}

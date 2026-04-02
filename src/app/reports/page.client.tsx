@@ -42,16 +42,9 @@ export default function ReportsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="rounded-lg border border-border/80 bg-card p-4 shadow-sm">
-          <div>
-            <h1 className="text-3xl font-bold">Reports</h1>
-            <p className="text-muted-foreground mt-1">Exports, compliance, and period summaries without inferring fake production dates.</p>
-          </div>
-        </div>
-
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="overflow-x-auto pb-1">
-            <TabsList className="inline-flex h-auto min-w-max flex-nowrap border border-border/80 bg-muted/60 p-1 sm:grid sm:w-full sm:max-w-4xl sm:grid-cols-5">
+            <TabsList className="inline-flex h-auto min-w-max flex-nowrap bg-muted/35 p-1 shadow-[0_18px_42px_-34px_rgba(15,23,32,0.45)] sm:grid sm:w-full sm:max-w-4xl sm:grid-cols-5">
               <TabsTrigger value="performance">Performance</TabsTrigger>
               <TabsTrigger value="feeding">Feeding</TabsTrigger>
               <TabsTrigger value="mortality">Mortality</TabsTrigger>

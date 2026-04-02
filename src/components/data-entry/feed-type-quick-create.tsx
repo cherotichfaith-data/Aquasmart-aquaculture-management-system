@@ -75,7 +75,7 @@ export function FeedTypeQuickCreate({
       location_country: supplierCountry.trim(),
       location_city: supplierCity.trim() || null,
     })
-    const nextSupplierId = created[0]?.id
+    const nextSupplierId = created.data?.id
     if (nextSupplierId != null) {
       setSupplierId(String(nextSupplierId))
     }

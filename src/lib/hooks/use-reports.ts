@@ -3,6 +3,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { queryKeys } from "@/lib/cache/query-keys"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
   getBatchSystemIds,
@@ -92,7 +93,7 @@ export function useFarmKpisToday(params?: {
   const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
-      queryKey: ["reports", "farm-kpis-today", resolvedFarmId ?? "all"],
+      queryKey: queryKeys.reports.farmKpisToday(resolvedFarmId),
       queryFn: ({ signal }) => getFarmKpisToday({ farmId: resolvedFarmId, signal }),
       enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
       staleTime: 60_000,
@@ -109,7 +110,7 @@ export function useRunningStock(params?: {
   const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
-      queryKey: ["reports", "running-stock", resolvedFarmId ?? "all"],
+      queryKey: queryKeys.reports.runningStock(resolvedFarmId),
       queryFn: ({ signal }) => getRunningStock({ farmId: resolvedFarmId, signal }),
       enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
       staleTime: 60_000,
@@ -130,15 +131,7 @@ export function useFeedPlans(params?: {
   const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "feed-plans",
-        resolvedFarmId ?? "all",
-        params?.systemIds?.join(",") ?? "all-systems",
-        params?.batchId ?? "all",
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-      ],
+      queryKey: queryKeys.reports.feedPlans({ ...params, farmId: resolvedFarmId }),
       queryFn: ({ signal }) => getFeedPlans({ ...params, farmId: resolvedFarmId, signal }),
       enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
       staleTime: 60_000,
@@ -162,17 +155,7 @@ export function useFeedingRecords(params?: {
   const resolvedFarmId = params?.farmId ?? farmId
   return useQuery({
     ...reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "feeding-records",
-        resolvedFarmId ?? "all",
-        params?.systemId ?? "all",
-        params?.systemIds?.join(",") ?? "all-systems",
-        params?.batchId ?? "all",
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-        params?.limit ?? 100,
-      ],
+      queryKey: queryKeys.reports.feedingRecords({ ...params, farmId: resolvedFarmId }),
       queryFn: ({ signal }) => getFeedingRecords({ ...params, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
@@ -195,17 +178,7 @@ export function useSamplingData(params?: {
   const { farmId } = useActiveFarm()
   return useQuery(
     reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "sampling",
-        farmId ?? "all",
-        params?.systemId ?? "all",
-        params?.systemIds?.join(",") ?? "all-systems",
-        params?.batchId ?? "all",
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-        params?.limit ?? 100,
-      ],
+      queryKey: queryKeys.reports.sampling({ ...params, farmId }),
       queryFn: ({ signal }) => getSamplingData({ ...params, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
@@ -226,17 +199,7 @@ export function useStockingData(params?: {
   const { farmId } = useActiveFarm()
   return useQuery(
     reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "stocking",
-        farmId ?? "all",
-        params?.systemId ?? "all",
-        params?.systemIds?.join(",") ?? "all-systems",
-        params?.batchId ?? "all",
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-        params?.limit ?? 100,
-      ],
+      queryKey: queryKeys.reports.stocking({ ...params, farmId }),
       queryFn: ({ signal }) => getStockings({ ...params, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
@@ -258,15 +221,13 @@ export function useScopedFcrTrend(params?: {
   const systemIds = params?.systemIds?.filter((id) => Number.isFinite(id)) ?? []
   return useQuery(
     reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "fcr-trend",
-        resolvedFarmId ?? "all",
-        systemIds.join(","),
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-        params?.days ?? 180,
-      ],
+      queryKey: queryKeys.reports.fcrTrend({
+        farmId: resolvedFarmId,
+        systemIds,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        days: params?.days,
+      }),
       queryFn: async ({ signal }) => {
         return collectScopedTrendRows<FeedFcrTrendRow>({
           systemIds,
@@ -301,14 +262,12 @@ export function useScopedGrowthTrend(params?: {
   const systemIds = params?.systemIds?.filter((id) => Number.isFinite(id)) ?? []
   return useQuery(
     reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "growth-trend",
-        systemIds.join(","),
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-        params?.days ?? 180,
-      ],
+      queryKey: queryKeys.reports.growthTrend({
+        systemIds,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        days: params?.days,
+      }),
       queryFn: async ({ signal }) => {
         return collectScopedTrendRows<FeedGrowthTrendRow>({
           systemIds,
@@ -341,13 +300,11 @@ export function useScopedSurvivalTrend(params?: {
   const systemIds = params?.systemIds?.filter((id) => Number.isFinite(id)) ?? []
   return useQuery(
     reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "survival-trend-scoped",
-        systemIds.join(","),
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-      ],
+      queryKey: queryKeys.reports.survivalTrendScoped({
+        systemIds,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+      }),
       queryFn: async ({ signal }) => {
         return collectScopedTrendRows({
           systemIds,
@@ -384,15 +341,7 @@ export function useTransferData(params?: {
   const { farmId } = useActiveFarm()
   return useQuery(
     reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "transfer",
-        farmId ?? "all",
-        params?.batchId ?? "all",
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-        params?.limit ?? 100,
-      ],
+      queryKey: queryKeys.reports.transfer({ ...params, farmId }),
       queryFn: ({ signal }) => getTransferData({ ...params, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
@@ -413,17 +362,7 @@ export function useMortalityData(params?: {
   const { farmId } = useActiveFarm()
   return useQuery(
     reportsQueryOptions({
-      queryKey: [
-        "reports",
-        "mortality",
-        farmId ?? "all",
-        params?.systemId ?? "all",
-        params?.systemIds?.join(",") ?? "all-systems",
-        params?.batchId ?? "all",
-        params?.dateFrom ?? "",
-        params?.dateTo ?? "",
-        params?.limit ?? 100,
-      ],
+      queryKey: queryKeys.reports.mortality({ ...params, farmId }),
       queryFn: ({ signal }) => getMortalityData({ ...params, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
@@ -440,7 +379,7 @@ export function useRecentEntries(params?: {
   const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
-      queryKey: ["reports", "recent-entries", resolvedFarmId ?? "all"],
+      queryKey: queryKeys.reports.recentEntries(resolvedFarmId),
       queryFn: ({ signal }) => getRecentEntries(resolvedFarmId, signal),
       enabled: Boolean(session) && Boolean(resolvedFarmId),
       staleTime: 5 * 60_000,
@@ -460,7 +399,7 @@ export function useBatchSystemIds(params?: {
   const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
-      queryKey: ["reports", "batch-system-ids", resolvedFarmId ?? "all", params?.batchId ?? "all"],
+      queryKey: queryKeys.reports.batchSystemIds({ farmId: resolvedFarmId, batchId: params?.batchId }),
       queryFn: ({ signal }) => {
         if (!params?.batchId || !Number.isFinite(params.batchId)) {
           return Promise.resolve({ status: "success" as const, data: [] as Array<{ system_id: number }> })

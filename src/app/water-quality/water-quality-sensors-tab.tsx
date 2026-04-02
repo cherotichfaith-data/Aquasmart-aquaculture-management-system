@@ -19,7 +19,7 @@ export function WaterQualitySensorsTab({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 border border-indigo-500/20">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 shadow-[0_14px_32px_-26px_rgba(99,102,241,0.45)]">
           <Radio className="h-5 w-5 text-indigo-400" />
         </div>
         <div>
@@ -114,7 +114,7 @@ export function WaterQualitySensorsTab({
                   </div>
                 </div>
                 {isOffline ? (
-                  <div className="mt-3 rounded bg-red-500/10 border border-red-500/20 p-2">
+                  <div className="mt-3 rounded bg-red-500/10 p-2 shadow-[0_14px_30px_-24px_rgba(239,68,68,0.3)]">
                     <p className="text-[10px] text-red-600 dark:text-red-300">No data received for more than 24 hours.</p>
                   </div>
                 ) : null}

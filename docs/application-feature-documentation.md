@@ -768,6 +768,7 @@ DO scoring:
 Temperature scoring:
 
 - compare temperature against overall mean and standard deviation
+- if temperature variance is `0`, an exact match to the mean still scores as optimal instead of being treated as missing data
 - 90 within 1 standard deviation
 - 60 within 2 standard deviations
 - 30 within 3 standard deviations
@@ -776,12 +777,13 @@ Temperature scoring:
 Final WQI:
 
 - `WQI = (DO score + temperature score) / 2`
+- in all-systems views, the displayed score is the average of per-system WQI values, not a WQI recomputed from pooled average readings
 
 WQI label mapping:
 
 - `Good` for `>= 70`
-- `Moderate` for `>= 50`
-- `Poor` otherwise
+- `Moderate` for `50-69`
+- `Poor` for `< 50`
 
 #### Nutrient load
 

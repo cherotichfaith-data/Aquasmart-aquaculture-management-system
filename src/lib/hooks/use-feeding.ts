@@ -1,15 +1,26 @@
 "use client"
 
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { queryKeys } from "@/lib/cache/query-keys"
+import { invalidateFeedingWriteQueries } from "@/lib/cache/react-query"
+import { recordFeeding, type FeedingInsertInput } from "@/lib/commands/feeding"
+import { useToast } from "@/lib/hooks/app/use-toast"
+import {
+  addOptimisticActivity,
+  addOptimisticRecentEntry,
+  restoreRecentEntries,
+} from "@/lib/hooks/use-mutation-optimistic"
 
 export function useRecordFeeding() {
-  return useInsertMutation({
-    table: "feeding_record",
-    activityTableName: "feeding_record",
-    recentEntryKey: "feeding",
-    buildOptimisticEntry: (payload) => {
-      if (Array.isArray(payload)) return null
-      return {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: (payload: FeedingInsertInput) => recordFeeding(payload),
+    onMutate: (payload) => {
+      addOptimisticActivity(queryClient, { tableName: "feeding_record" })
+
+      const optimistic = {
         id: `optimistic-${Date.now()}`,
         date: payload.date,
         system_id: payload.system_id,
@@ -21,9 +32,41 @@ export function useRecordFeeding() {
         created_at: new Date().toISOString(),
         status: "pending",
       }
+
+      const previous = addOptimisticRecentEntry(queryClient, {
+        key: "feeding",
+        entry: optimistic,
+      })
+
+      return { previous }
     },
-    invalidate: ["dashboard", "inventory", "recent-activity", "recent-entries"],
-    successMessage: "Feeding event recorded.",
-    errorMessage: "Failed to record feeding event.",
+    onSuccess: async ({ data, meta }) => {
+      queryClient.setQueryData(queryKeys.reports.recentEntries(meta.farmId), (old: any) => {
+        if (!old || typeof old !== "object" || !old.feeding || old.feeding.status !== "success") return old
+        const nextFeeding = [data, ...(old.feeding.data ?? [])].slice(0, 5)
+        return {
+          ...old,
+          feeding: {
+            ...old.feeding,
+            data: nextFeeding,
+          },
+        }
+      })
+
+      await invalidateFeedingWriteQueries(queryClient, {
+        farmId: meta.farmId,
+        date: meta.date,
+      })
+
+      toast({ title: "Success", description: "Feeding event recorded." })
+    },
+    onError: (error: any, _payload, context) => {
+      restoreRecentEntries(queryClient, context?.previous)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error?.message ?? "Failed to record feeding event.",
+      })
+    },
   })
 }

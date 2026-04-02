@@ -1,4 +1,4 @@
-import type { RecommendedAction } from "./types"
+import type { KPIOverviewMetric, RecommendedAction } from "./types"
 
 type ProductionMortalityLikeRow = {
   number_of_fish_inventory: number | null
@@ -34,6 +34,92 @@ type WaterQualityRecommendationRow = {
   system_id: number | null
   rating_date: string | null
   rating_numeric: number | null
+}
+
+function countDistinctSystems<T extends { system_id: number | null }>(
+  rows: T[],
+  predicate: (row: T) => boolean,
+) {
+  return new Set(rows.filter(predicate).map((row) => row.system_id).filter((systemId): systemId is number => systemId != null)).size
+}
+
+function buildCoverageLabel(covered: number, total: number) {
+  const systemWord = total === 1 ? "system" : "systems"
+  return `${covered}/${total} ${systemWord}`
+}
+
+export function buildKpiTrustMap(params: {
+  totalSystems: number
+  inventoryRows: InventoryMetricRow[]
+  productionRows: Array<ProductionEfcrRow & { system_id: number | null }>
+  waterQualityRows: WaterQualityRecommendationRow[]
+}): Record<string, NonNullable<KPIOverviewMetric["trust"]>> {
+  const totalSystems = params.totalSystems
+  const inventoryRows = params.inventoryRows
+  const productionRows = params.productionRows
+  const waterQualityRows = params.waterQualityRows
+
+  return {
+    efcr: {
+      source: "Production summary",
+      basis: "In-window conversion",
+      coverage: buildCoverageLabel(
+        countDistinctSystems(
+          productionRows,
+          (row) => isFiniteMetric(row.total_feed_amount_period) || isFiniteMetric(row.biomass_increase_period),
+        ),
+        totalSystems,
+      ),
+    },
+    mortality: {
+      source: "Inventory + production",
+      basis: "In-window rate",
+      coverage: buildCoverageLabel(
+        countDistinctSystems(
+          inventoryRows,
+          (row) => isFiniteMetric(row.mortality_rate) || isFiniteMetric(row.number_of_fish_mortality),
+        ),
+        totalSystems,
+      ),
+    },
+    abw: {
+      source: "Sampling + inventory",
+      basis: "Latest in-window sample",
+      coverage: buildCoverageLabel(countDistinctSystems(inventoryRows, (row) => isFiniteMetric(row.abw_last_sampling)), totalSystems),
+    },
+    biomass: {
+      source: "Inventory",
+      basis: "As-of-end biomass",
+      coverage: buildCoverageLabel(
+        countDistinctSystems(inventoryRows, (row) => isFiniteMetric(row.biomass_last_sampling)),
+        totalSystems,
+      ),
+    },
+    biomass_density: {
+      source: "Inventory + volume",
+      basis: "Biomass / volume",
+      coverage: buildCoverageLabel(
+        countDistinctSystems(inventoryRows, (row) => isFiniteMetric(row.biomass_last_sampling) && isFiniteMetric(row.system_volume)),
+        totalSystems,
+      ),
+    },
+    feeding: {
+      source: "Feed records + biomass",
+      basis: "% body weight/day",
+      coverage: buildCoverageLabel(
+        countDistinctSystems(inventoryRows, (row) => isFiniteMetric(row.feeding_rate) || isFiniteMetric(row.feeding_amount)),
+        totalSystems,
+      ),
+    },
+    water_quality: {
+      source: "Daily water ratings",
+      basis: "Average in-window rating",
+      coverage: buildCoverageLabel(
+        countDistinctSystems(waterQualityRows, (row) => isFiniteMetric(row.rating_numeric)),
+        totalSystems,
+      ),
+    },
+  }
 }
 
 export function computeMortalityRateFromProduction(rows: ProductionMortalityLikeRow[]): number | null {
@@ -298,3 +384,5 @@ export function buildRecommendedActionsFromAnalytics(params: {
 
   return nextActions.slice(0, 3)
 }
+
+

@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useRecordMortality } from "@/lib/hooks/use-mortality"
-import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/types/mortality"
+import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 

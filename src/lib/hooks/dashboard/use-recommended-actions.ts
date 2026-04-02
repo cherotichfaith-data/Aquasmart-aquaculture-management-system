@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
+import { queryKeys } from "@/lib/cache/query-keys"
 import type { RecommendedAction } from "@/features/dashboard/types"
 import { buildRecommendedActionsFromAnalytics } from "@/features/dashboard/analytics-shared"
 import { getDailyFishInventory } from "@/lib/api/inventory"
@@ -25,16 +26,7 @@ export function useRecommendedActions(params: {
   const hasBounds = Boolean(params.dateFrom) && Boolean(params.dateTo)
 
   return useQuery({
-    queryKey: [
-      "recommended-actions",
-      params.farmId ?? "all",
-      params.stage ?? "all",
-      params.batch ?? "all",
-      params.system ?? "all",
-      params.timePeriod ?? "2 weeks",
-      params.dateFrom ?? "",
-      params.dateTo ?? "",
-    ],
+    queryKey: queryKeys.dashboard.recommendedActions(params),
     queryFn: async ({ signal }) => {
       const dateFrom = params.dateFrom ?? null
       const dateTo = params.dateTo ?? null

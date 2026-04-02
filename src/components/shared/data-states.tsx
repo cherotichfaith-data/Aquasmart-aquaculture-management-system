@@ -15,9 +15,9 @@ export function DataFetchingBadge({
 }) {
   if (!isFetching || isLoading) return null
   return (
-    <Badge variant="secondary" className="gap-1 animate-pulse">
+    <Badge variant="secondary" className="gap-1 rounded-full bg-background/70 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] shadow-[0_12px_28px_-24px_rgba(15,23,32,0.3)] animate-pulse">
       <RefreshCw className="h-3 w-3 animate-spin" />
-      Updating...
+      Refreshing
     </Badge>
   )
 }
@@ -25,7 +25,7 @@ export function DataFetchingBadge({
 export function DataUpdatedAt({ updatedAt }: { updatedAt?: number | null }) {
   if (!updatedAt) return null
   const label = formatDistanceToNow(updatedAt, { addSuffix: true })
-  return <span className="text-xs text-muted-foreground">Updated {label}</span>
+  return <span className="text-[11px] font-medium tracking-[0.02em] text-muted-foreground">Updated {label}</span>
 }
 
 export function DataErrorState({

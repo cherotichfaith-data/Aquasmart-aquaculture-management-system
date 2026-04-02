@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { queryKeys } from "@/lib/cache/query-keys"
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getRecentActivities } from "@/lib/api/reports"
@@ -16,14 +17,7 @@ export function useRecentActivities(params?: {
 }) {
   const enabled = params?.enabled ?? true
   return useQuery({
-    queryKey: [
-      "recent-activities",
-      params?.tableName ?? "all",
-      params?.changeType ?? "all",
-      params?.dateFrom ?? "all",
-      params?.dateTo ?? "all",
-      params?.limit ?? 5,
-    ],
+    queryKey: queryKeys.activity.recentActivities(params),
     queryFn: ({ signal }) =>
       getRecentActivities({
         tableName: params?.tableName,

@@ -4,6 +4,7 @@ import {
   getClientOrError,
   isAbortLikeError,
   queryOptionsRpc,
+  resolveClientReadQuery,
   toQueryError,
   toQuerySuccess,
   type OptionsRpcName,
@@ -48,12 +49,12 @@ async function rpcOrEmpty<Name extends OptionsRpcName>(
   let q = args === undefined ? queryOptionsRpc(supabase, name) : queryOptionsRpc(supabase, name, args)
   if (signal) q = q.abortSignal(signal)
 
-  const { data, error } = await q
-  if (error) {
-    if (isQuietOptionsError(error)) return empty<OptionsRpcRow<Name>>()
-    return toQueryError(tag, error)
-  }
-  return toQuerySuccess<OptionsRpcRow<Name>>((data ?? []) as OptionsRpcRow<Name>[])
+  return resolveClientReadQuery<OptionsRpcRow<Name>>({
+    tag,
+    query: q,
+    signal,
+    quietWhen: isQuietOptionsError,
+  })
 }
 
 export async function getSystemOptions(params?: {
@@ -82,13 +83,15 @@ export async function getSystemOptions(params?: {
     query = query.abortSignal(params.signal)
   }
 
-  const { data, error } = await query.order("name", { ascending: true })
-  if (error) {
-    if (params.signal?.aborted || isQuietOptionsError(error)) return empty<SystemListItem>()
-    return toQueryError("getSystemOptions", error)
-  }
+  const result = await resolveClientReadQuery<SystemOptionSource>({
+    tag: "getSystemOptions",
+    query: query.order("name", { ascending: true }),
+    signal: params.signal,
+    quietWhen: isQuietOptionsError,
+  })
+  if (result.status !== "success") return result
 
-  const rows = ((data ?? []) as unknown as SystemOptionSource[])
+  const rows = (result.data as unknown as SystemOptionSource[])
     .map(mapSystemRowToOption)
     .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
   return toQuerySuccess<SystemListItem>(rows)
@@ -141,15 +144,12 @@ export async function getFeedSupplierOptions(params?: {
   let query = supabase.from("feed_supplier").select("*").order("company_name", { ascending: true })
   if (params?.signal) query = query.abortSignal(params.signal)
 
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isQuietTableError(error)) {
-      return empty<FeedSupplierRow>()
-    }
-    return toQueryError("getFeedSupplierOptions", error)
-  }
-
-  return toQuerySuccess<FeedSupplierRow>((data ?? []) as FeedSupplierRow[])
+  return resolveClientReadQuery<FeedSupplierRow>({
+    tag: "getFeedSupplierOptions",
+    query,
+    signal: params?.signal,
+    quietWhen: isQuietTableError,
+  })
 }
 
 export async function getFingerlingSupplierOptions(params?: {
@@ -162,15 +162,12 @@ export async function getFingerlingSupplierOptions(params?: {
   let query = supabase.from("fingerling_supplier").select("*").order("company_name", { ascending: true })
   if (params?.signal) query = query.abortSignal(params.signal)
 
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isQuietTableError(error)) {
-      return empty<FingerlingSupplierRow>()
-    }
-    return toQueryError("getFingerlingSupplierOptions", error)
-  }
-
-  return toQuerySuccess<FingerlingSupplierRow>((data ?? []) as FingerlingSupplierRow[])
+  return resolveClientReadQuery<FingerlingSupplierRow>({
+    tag: "getFingerlingSupplierOptions",
+    query,
+    signal: params?.signal,
+    quietWhen: isQuietTableError,
+  })
 }
 
 export async function getFarmOptions(params?: {
@@ -213,17 +210,12 @@ export async function getSystemVolumes(params?: {
   }
   if (params.signal) query = query.abortSignal(params.signal)
 
-  const { data, error } = await query
-  if (error) {
-    if (params.signal?.aborted || isQuietTableError(error)) {
-      return empty<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>()
-    }
-    return toQueryError("getSystemVolumes", error)
-  }
-
-  return toQuerySuccess<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>(
-    (data ?? []) as Array<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>,
-  )
+  return resolveClientReadQuery<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>({
+    tag: "getSystemVolumes",
+    query,
+    signal: params.signal,
+    quietWhen: isQuietTableError,
+  })
 }
 
 export async function getAppConfig(params: {
@@ -237,11 +229,10 @@ export async function getAppConfig(params: {
 
   let query = supabase.from("app_config").select("key, value").in("key", params.keys)
   if (params.signal) query = query.abortSignal(params.signal)
-  const { data, error } = await query
-  if (error) {
-    if (params.signal?.aborted || isQuietTableError(error)) return empty<AppConfigRow>()
-    return toQueryError("getAppConfig", error)
-  }
-
-  return toQuerySuccess<AppConfigRow>((data ?? []) as AppConfigRow[])
+  return resolveClientReadQuery<AppConfigRow>({
+    tag: "getAppConfig",
+    query,
+    signal: params.signal,
+    quietWhen: isQuietTableError,
+  })
 }

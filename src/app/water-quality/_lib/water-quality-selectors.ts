@@ -15,6 +15,7 @@ import {
   type MeasurementEvent,
   type WqParameter,
 } from "./water-quality-utils"
+import { calculateWqi, getWqiLabel, selectThresholdRow, type WaterQualityStatusLabel } from "@/lib/water-quality-index"
 
 export type EnvParameter =
   | "dissolved_oxygen"
@@ -33,11 +34,6 @@ export type DepthProfileRow = {
   dissolvedOxygen: number | null
   temperature: number | null
   pH: number | null
-}
-
-export type WaterQualityStatusLabel = {
-  label: string
-  color: string
 }
 
 export type WaterQualitySystemListItem = {
@@ -146,42 +142,8 @@ const ENV_PARAMETERS = new Set<EnvParameter>([
   "secchi_disk_depth",
 ])
 
-export function getWqiLabel(value: number | null): WaterQualityStatusLabel {
-  if (value == null) return { label: "No data", color: "hsl(var(--muted-foreground))" }
-  if (value >= 70) return { label: "Good", color: "#10B981" }
-  if (value >= 50) return { label: "Moderate", color: "#F59E0B" }
-  return { label: "Poor", color: "#EF4444" }
-}
-
-function scoreDissolvedOxygen(value: number | null, lowDoThreshold: number) {
-  if (value == null) return null
-  if (value >= lowDoThreshold + 2) return 90
-  if (value >= lowDoThreshold) return 60
-  if (value >= lowDoThreshold - 1) return 30
-  return 0
-}
-
-function scoreTemperature(value: number | null, tempMean: number | null, tempStd: number | null) {
-  if (value == null || tempMean == null || tempStd == null || tempStd === 0) return null
-  const delta = Math.abs(value - tempMean)
-  if (delta <= tempStd) return 90
-  if (delta <= tempStd * 2) return 60
-  if (delta <= tempStd * 3) return 30
-  return 0
-}
-
-export function calculateWqi(
-  doValue: number | null,
-  tempValue: number | null,
-  lowDoThreshold: number,
-  tempMean: number | null,
-  tempStd: number | null,
-) {
-  const doScore = scoreDissolvedOxygen(doValue, lowDoThreshold)
-  const tempScore = scoreTemperature(tempValue, tempMean, tempStd)
-  if (doScore == null || tempScore == null) return null
-  return (doScore + tempScore) / 2
-}
+export { calculateWqi, getWqiLabel, selectThresholdRow }
+export type { WaterQualityStatusLabel }
 
 export function buildSystemLabelById(rows: WaterQualitySystemOption[]) {
   const map = new Map<number, string>()
@@ -201,19 +163,6 @@ export function buildSystemOptions(rows: WaterQualitySystemOption[]): WaterQuali
       label: system.label ?? `System ${system.id}`,
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
-}
-
-export function selectThresholdRow(rows: WaterQualityThresholdRow[], systemId?: number | null) {
-  if (systemId != null) {
-    const systemThreshold = rows.find((row) => row.system_id === systemId)
-    if (systemThreshold) return systemThreshold
-  }
-  return (
-    rows.find((row) => row.scope === "farm" && row.system_id == null) ??
-    rows.find((row) => row.scope === "default") ??
-    rows[0] ??
-    null
-  )
 }
 
 export function buildRatingTrendBySystemId(rows: WaterQualityRatingRow[]) {

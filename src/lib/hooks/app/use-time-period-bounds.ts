@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { useMemo } from "react"
+import { queryKeys } from "@/lib/cache/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import {
   buildTimeBoundsFromAvailableRange,
@@ -27,7 +28,7 @@ export function useTimePeriodBounds(params: {
     enabled: enabled && Boolean(params.systemId),
   })
   const query = useQuery({
-    queryKey: ["time-period-bounds", params.farmId ?? "all", params.timePeriod, params.systemId ?? "all"],
+    queryKey: queryKeys.timePeriodBounds(params),
     queryFn: ({ signal }) =>
       !params.farmId
         ? Promise.resolve<TimeBounds>({ start: null, end: null })

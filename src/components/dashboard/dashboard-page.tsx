@@ -100,19 +100,19 @@ export default function DashboardPage({
             title="Feed Efficiency and Water Quality Monitoring"
             description="Trends for production, efficiency, and water quality health."
           />
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
-          <PopulationOverview
-            farmId={farmId}
-            stage={selectedStage}
-            batch={selectedBatch}
-            system={selectedSystem}
-            timePeriod={timePeriod}
-            scopedSystemIds={appliedScopedSystemIds}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            initialData={initialData?.productionTrend}
-            initialBounds={initialData?.bounds}
-          />
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <PopulationOverview
+              farmId={farmId}
+              stage={selectedStage}
+              batch={selectedBatch}
+              system={selectedSystem}
+              timePeriod={timePeriod}
+              scopedSystemIds={appliedScopedSystemIds}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              initialData={initialData?.productionTrend}
+              initialBounds={initialData?.bounds}
+            />
             <WaterQualityIndex
               farmId={farmId}
               stage={selectedStage}
@@ -122,12 +122,12 @@ export default function DashboardPage({
               dateTo={dateTo}
               scopedSystemIds={appliedScopedSystemIds}
               resolvedSystemId={selectedSystemId}
-            initialSystemsData={initialData?.systemOptions}
-            initialBatchSystemsData={initialData?.batchSystems}
-            initialMeasurements={initialData?.waterQualityMeasurements}
-            initialThresholds={initialData?.alertThresholds}
-            initialBounds={initialData?.bounds}
-          />
+              initialSystemsData={initialData?.systemOptions}
+              initialBatchSystemsData={initialData?.batchSystems}
+              initialMeasurements={initialData?.waterQualityMeasurements}
+              initialThresholds={initialData?.alertThresholds}
+              initialBounds={initialData?.bounds}
+            />
           </div>
         </section>
 

@@ -1,14 +1,12 @@
 import type { QueryResult } from "@/lib/supabase-client"
-import type { AlertSeverity, AlertLogRow, MortalityEventRow, SurvivalTrendRow } from "@/lib/types/mortality"
-import {
-  getClientOrError,
-  isAbortLikeError,
-  isMissingObjectError,
-  queryKpiRpc,
-  toQueryError,
-  toQuerySuccess,
-} from "@/lib/api/_utils"
-import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
+import type { Database, Tables } from "@/lib/types/database"
+import type { AlertSeverity } from "@/lib/mortality"
+import { postJson } from "@/lib/commands/_utils"
+import { isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
+
+type AlertLogRow = Tables<"alert_log">
+type MortalityEventRow = Tables<"fish_mortality">
+type SurvivalTrendRow = Database["public"]["Functions"]["get_survival_trend"]["Returns"][number]
 
 export async function getMortalityEvents(params?: {
   farmId?: string | null
@@ -19,35 +17,24 @@ export async function getMortalityEvents(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<MortalityEventRow>> {
-  const clientResult = await getClientOrError("getMortalityEvents", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("fish_mortality").select("*")
-  if (params?.farmId) query = query.eq("farm_id", params.farmId)
-  if (params?.systemId) query = query.eq("system_id", params.systemId)
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  query = query.order("date", { ascending: false }).order("created_at", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (
-      params?.signal?.aborted ||
-      isAbortLikeError(error) ||
-      isSbPermissionDenied(error) ||
-      isSbAuthMissing(error) ||
-      isMissingObjectError(error)
-    ) {
-      return toQuerySuccess<MortalityEventRow>([])
-    }
+  try {
+    const response = await postJson<{ data: MortalityEventRow[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/mortality/events/query",
+      {
+        farmId: params?.farmId,
+        systemId: params?.systemId,
+        batchId: params?.batchId,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<MortalityEventRow>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<MortalityEventRow>([])
     return toQueryError("getMortalityEvents", error)
   }
-
-  return toQuerySuccess<MortalityEventRow>((data ?? []) as MortalityEventRow[])
 }
 
 export async function getAlertLog(params?: {
@@ -59,35 +46,24 @@ export async function getAlertLog(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<AlertLogRow>> {
-  const clientResult = await getClientOrError("getAlertLog", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("alert_log").select("*")
-  if (params?.farmId) query = query.eq("farm_id", params.farmId)
-  if (params?.systemId) query = query.eq("system_id", params.systemId)
-  if (params?.severity) query = query.eq("severity", params.severity)
-  if (params?.ruleCodes?.length) query = query.in("rule_code", params.ruleCodes)
-  if (params?.unacknowledgedOnly) query = query.is("acknowledged_at", null)
-  query = query.order("fired_at", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (
-      params?.signal?.aborted ||
-      isAbortLikeError(error) ||
-      isSbPermissionDenied(error) ||
-      isSbAuthMissing(error) ||
-      isMissingObjectError(error)
-    ) {
-      return toQuerySuccess<AlertLogRow>([])
-    }
+  try {
+    const response = await postJson<{ data: AlertLogRow[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/mortality/alerts/query",
+      {
+        farmId: params?.farmId,
+        systemId: params?.systemId,
+        severity: params?.severity,
+        ruleCodes: params?.ruleCodes,
+        unacknowledgedOnly: params?.unacknowledgedOnly,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<AlertLogRow>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<AlertLogRow>([])
     return toQueryError("getAlertLog", error)
   }
-
-  return toQuerySuccess<AlertLogRow>((data ?? []) as AlertLogRow[])
 }
 
 export async function getSurvivalTrend(params: {
@@ -99,31 +75,19 @@ export async function getSurvivalTrend(params: {
   if (!params.systemId || !params.dateFrom) {
     return toQuerySuccess<SurvivalTrendRow>([])
   }
-
-  const clientResult = await getClientOrError("getSurvivalTrend", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryKpiRpc(supabase, "get_survival_trend", {
-    p_system_id: params.systemId,
-    p_start_date: params.dateFrom,
-    p_end_date: params.dateTo,
-  })
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (
-      params.signal?.aborted ||
-      isAbortLikeError(error) ||
-      isSbPermissionDenied(error) ||
-      isSbAuthMissing(error) ||
-      isMissingObjectError(error)
-    ) {
-      return toQuerySuccess<SurvivalTrendRow>([])
-    }
+  try {
+    const response = await postJson<{ data: SurvivalTrendRow[] }, Omit<typeof params, "signal">>(
+      "/api/mortality/survival-trend/query",
+      {
+        systemId: params.systemId,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+      },
+      { signal: params.signal },
+    )
+    return toQuerySuccess<SurvivalTrendRow>(response.data)
+  } catch (error) {
+    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<SurvivalTrendRow>([])
     return toQueryError("getSurvivalTrend", error)
   }
-
-  return toQuerySuccess<SurvivalTrendRow>((data ?? []) as SurvivalTrendRow[])
 }

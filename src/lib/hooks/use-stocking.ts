@@ -1,43 +1,36 @@
 "use client"
 
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
+import { invalidateInventoryWriteQueries } from "@/lib/cache/react-query"
+import { recordStocking } from "@/lib/commands/operations"
+import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 
 export function useRecordStocking() {
-  return useInsertMutation({
-    table: "fish_stocking",
+  return useWriteThroughMutation({
+    mutationFn: recordStocking,
     activityTableName: "fish_stocking",
     recentEntryKey: "stocking",
     buildOptimisticEntry: (payload) => {
-      const entry = (Array.isArray(payload) ? payload[0] : payload) as
-        | {
-            date?: string
-            system_id?: number
-            batch_id?: number | null
-            number_of_fish_stocking?: number | null
-            total_weight_stocking?: number | null
-            notes?: string | null
-            type_of_stocking?: string | null
-            abw?: number | null
-          }
-        | undefined
-      if (entry) {
-        return {
-          id: `optimistic-${Date.now()}`,
-          date: entry.date,
-          system_id: entry.system_id,
-          batch_id: entry.batch_id ?? null,
-          number_of_fish_stocking: entry.number_of_fish_stocking ?? null,
-          total_weight_stocking: entry.total_weight_stocking ?? null,
-          notes: entry.notes ?? null,
-          type_of_stocking: entry.type_of_stocking ?? null,
-          abw: entry.abw ?? null,
-          created_at: new Date().toISOString(),
-          status: "pending",
-        }
+      return {
+        id: `optimistic-${Date.now()}`,
+        date: payload.date,
+        system_id: payload.system_id,
+        batch_id: payload.batch_id ?? null,
+        number_of_fish_stocking: payload.number_of_fish_stocking ?? null,
+        total_weight_stocking: payload.total_weight_stocking ?? null,
+        notes: payload.notes ?? null,
+        type_of_stocking: payload.type_of_stocking ?? null,
+        abw: payload.abw ?? null,
+        created_at: new Date().toISOString(),
+        status: "pending",
       }
-      return null
     },
-    invalidate: ["dashboard", "inventory", "recent-activity", "recent-entries"],
+    invalidate: async ({ queryClient, result }) =>
+      invalidateInventoryWriteQueries(queryClient, {
+        farmId: result.meta.farmId,
+        date: result.meta.date,
+        tableName: "fish_stocking",
+        includeProductionQueries: true,
+      }),
     successMessage: "Stocking recorded.",
     errorMessage: "Failed to record stocking.",
   })

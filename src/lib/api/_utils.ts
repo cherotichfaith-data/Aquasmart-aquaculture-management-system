@@ -169,3 +169,36 @@ export function toQueryError<T>(tag: string, err: unknown): QueryResult<T> {
 export function toQuerySuccess<T>(data: T[] | null | undefined): QueryResult<T> {
   return { status: "success", data: (data ?? []) as T[] }
 }
+
+type ClientReadQuery<Row> = PromiseLike<{ data: Row[] | null; error: unknown }>
+
+export async function resolveClientReadQuery<Row>(params: {
+  tag: string
+  query: ClientReadQuery<Row>
+  signal?: AbortSignal
+  allowMissingObject?: boolean
+  allowInvalidBigint?: boolean
+  emptyOnAnyError?: boolean
+  quietWhen?: (err: unknown) => boolean
+}): Promise<QueryResult<Row>> {
+  const { data, error } = await params.query
+
+  if (!error) {
+    return toQuerySuccess<Row>((data ?? []) as Row[])
+  }
+
+  if (
+    params.emptyOnAnyError ||
+    params.signal?.aborted ||
+    isAbortLikeError(error) ||
+    isSbPermissionDenied(error) ||
+    isSbAuthMissing(error) ||
+    (params.allowMissingObject && isMissingObjectError(error)) ||
+    (params.allowInvalidBigint && isInvalidBigintUuidError(error)) ||
+    params.quietWhen?.(error)
+  ) {
+    return toQuerySuccess<Row>([])
+  }
+
+  return toQueryError<Row>(params.tag, error)
+}

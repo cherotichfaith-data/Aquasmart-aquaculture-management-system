@@ -7,6 +7,7 @@ import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate } from "@/lib/analytics-format"
 import { ReportRecordsHiddenState, ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
+import { chartGridProps, chartLegendProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 
 export function MortalitySummaryCards({
   latestDate,
@@ -39,15 +40,15 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
         ) : chartRows.length === 0 ? (
           <EmptyState title="No mortality records" description="No mortality records fall within the selected range." />
         ) : (
-          <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="soft-panel-subtle h-[300px] p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartRows}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip labelFormatter={(label) => formatChartDate(label)} formatter={(value, name) => [Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 }), String(name)]} contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }} />
-                  <Legend />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="date" />
+                  <YAxis {...chartYAxisProps} />
+                  <Tooltip labelFormatter={(label) => formatChartDate(label)} formatter={(value, name) => [Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 }), String(name)]} contentStyle={chartTooltipStyle} />
+                  <Legend {...chartLegendProps} />
                   <Line type="monotone" dataKey="dead_count" stroke="var(--color-destructive)" strokeWidth={2.4} name="Mortality Count" />
                 </LineChart>
               </ResponsiveContainer>
@@ -68,13 +69,13 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
           {causeBreakdown.length === 0 ? (
             <EmptyState title="No cause data" description="New mortality records with cause tags will appear here." />
           ) : (
-            <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
+            <div className="soft-panel-subtle h-[280px] p-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={causeBreakdown}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-18} textAnchor="end" height={70} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(value) => [Number(value).toLocaleString(), "Dead count"]} />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="label" interval={0} angle={-18} textAnchor="end" height={70} tick={{ ...chartXAxisProps.tick, fontSize: 10.5 }} />
+                  <YAxis {...chartYAxisProps} />
+                  <Tooltip formatter={(value) => [Number(value).toLocaleString(), "Dead count"]} contentStyle={chartTooltipStyle} />
                   <Bar dataKey="count" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -90,7 +91,7 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
           ) : (
             <div className="space-y-2">
               {causeBreakdown.map((row) => (
-                <div key={row.cause} className="flex justify-between rounded-md border border-border/80 px-3 py-2 text-sm">
+                <div key={row.cause} className="soft-panel-subtle flex justify-between px-3 py-2 text-sm">
                   <span>{row.label}</span><span className="font-medium">{row.count.toLocaleString()}</span>
                 </div>
               ))}
@@ -175,7 +176,7 @@ export function MortalityRecordsSection({
       />
       <CardContent>
         {showMortalityRecords ? (
-          <div className="overflow-x-auto rounded-md border border-border/80">
+          <div className="soft-table-shell">
             <table className="w-full min-w-[720px] text-sm">
               <thead><tr className="border-b border-border bg-muted/60"><th className="px-4 py-2 text-left font-semibold text-foreground">Date</th><th className="px-4 py-2 text-left font-semibold text-foreground">System</th><th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th><th className="px-4 py-2 text-left font-semibold text-foreground">Fish Dead</th><th className="px-4 py-2 text-left font-semibold text-foreground">Cause</th><th className="px-4 py-2 text-left font-semibold text-foreground">Notes</th></tr></thead>
               <tbody>

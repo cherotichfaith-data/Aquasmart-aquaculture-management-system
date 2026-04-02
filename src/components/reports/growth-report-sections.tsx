@@ -38,7 +38,7 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
         {loading ? (
           <div className="flex h-[300px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="soft-panel-subtle h-[300px] p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartRows}>
@@ -65,7 +65,7 @@ export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean;
         {loading ? (
           <div className="flex h-[300px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="soft-panel-subtle h-[300px] p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartRows}>
@@ -149,7 +149,7 @@ export function GrowthRecordsSection({
       />
       <CardContent>
         {showGrowthRecords ? (
-          <div className="overflow-x-auto rounded-md border border-border/80">
+          <div className="soft-table-shell">
             <table className="w-full min-w-[1040px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">

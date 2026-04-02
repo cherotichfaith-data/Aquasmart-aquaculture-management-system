@@ -91,14 +91,14 @@ export default function Sidebar({
       {open && <div className="fixed inset-0 bg-black/50 md:hidden z-30" onClick={onToggle} />}
 
       <aside
-        className={`fixed md:sticky top-0 left-0 h-screen border-r border-sidebar-border bg-sidebar shadow-2xl transform transition-[width,transform] duration-300 z-40 flex flex-col ${collapsed ? "md:w-24" : "md:w-72"} w-[min(88vw,20rem)] md:w-72 ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        className={`fixed md:sticky top-0 left-0 h-screen bg-sidebar shadow-[0_26px_60px_-38px_rgba(15,23,32,0.6)] transform transition-[width,transform] duration-300 z-40 flex flex-col ${collapsed ? "md:w-24" : "md:w-72"} w-[min(88vw,20rem)] md:w-72 ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           }`}
         style={{
           backgroundImage:
             "linear-gradient(180deg, rgba(255,255,255,0.02), transparent 18%), radial-gradient(circle at top right, rgba(94,234,212,0.12), transparent 28%)",
         }}
       >
-        <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4 md:hidden">
+        <div className="flex items-center justify-between px-4 py-4 md:hidden">
           <div>
             <h1 className="font-semibold text-lg text-sidebar-foreground">AQ</h1>
             <p className="text-xs text-sidebar-foreground/65">Aquasmart navigation</p>
@@ -108,7 +108,7 @@ export default function Sidebar({
           </button>
         </div>
 
-        <div className="hidden border-b border-sidebar-border px-4 py-5 md:flex md:flex-col md:items-stretch md:gap-4">
+        <div className="hidden px-4 py-5 md:flex md:flex-col md:items-stretch md:gap-4">
           <div className="flex items-center">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary shadow-sm">
             <span className="text-sidebar-primary-foreground font-semibold">AQ</span>
@@ -274,7 +274,7 @@ export default function Sidebar({
           ))}
         </nav>
 
-        <div className="border-t border-sidebar-border p-4">
+        <div className="p-4">
           <button
             onClick={async () => {
               if (signingOut) return

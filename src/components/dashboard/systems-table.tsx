@@ -301,11 +301,11 @@ export default function SystemsTable({
   }
 
   return (
-    <div className="rounded-lg border border-border/90 bg-card p-4 shadow-sm sm:p-6">
+    <div className="soft-panel p-4 sm:p-6">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-foreground">System Status</h2>
-          <p className="text-xs text-muted-foreground">{totalRows} active cages in scope</p>
+          <h2 className="text-[1.08rem] font-semibold tracking-[-0.02em] text-foreground">System Status</h2>
+          <p className="text-[11px] font-medium text-muted-foreground">{totalRows} active cages in scope</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <DataUpdatedAt updatedAt={combinedUpdatedAt} />

@@ -1,17 +1,7 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import {
-  getClientOrError,
-  isAbortLikeError,
-  isInvalidBigintUuidError,
-  isMissingObjectError,
-  queryKpiRpc,
-  toQueryError,
-  toQuerySuccess,
-} from "@/lib/api/_utils"
-import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import { countTimeRangeDays } from "@/lib/time-period"
+import { postJson } from "@/lib/commands/_utils"
+import { isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 
 type FeedInventorySnapshotRow = Tables<"feed_inventory_snapshot">
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
@@ -31,17 +21,6 @@ type SystemRow = Tables<"system">
 type WaterQualityMeasurementRow = Tables<"water_quality_measurement">
 type FishTransferRow = Tables<"fish_transfer">
 type FishStockingRow = Tables<"fish_stocking">
-type ReportsClient = SupabaseClient<Database>
-type RecentRowsTable =
-  | "fish_mortality"
-  | "feeding_record"
-  | "fish_sampling_weight"
-  | "fish_transfer"
-  | "fish_harvest"
-  | "water_quality_measurement"
-  | "feed_inventory_snapshot"
-  | "fish_stocking"
-  | "system"
 
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
 type FeedFarmKpisToday = FarmKpisTodayRow
@@ -49,49 +28,6 @@ export type FeedFcrTrendRow = FcrTrendRow | FcrTrendWindowRow
 export type FeedGrowthTrendRow = GrowthTrendRow | GrowthTrendWindowRow
 export type FeedRunningStockRow = RunningStockRow
 export type FeedPlan = FeedPlanRow
-
-type FeedTypeProjection = {
-  feed_type_id: number | null
-  feed_label: string | null
-  feed_line: string | null
-  crude_protein_percentage: number | null
-  crude_fat_percentage: number | null
-  feed_category: string | null
-  feed_pellet_size: string | null
-}
-
-type FeedingRecordJoinedRow = {
-  id: number | null
-  created_at: string | null
-  date: string | null
-  batch_id: number | null
-  feed_type_id: number | null
-  feeding_amount: number | null
-  feeding_response: FeedingRecordRow["feeding_response"] | null
-  system_id: number | null
-  feed_type: Array<{
-    id: number | null
-    feed_line: string | null
-    crude_protein_percentage: number | null
-    crude_fat_percentage: number | null
-    feed_category: string | null
-    feed_pellet_size: string | null
-  }> | null
-}
-
-const projectFeedType = (row: FeedTypeProjection | null | undefined): FeedTypeRow | null => {
-  if (!row || typeof row.feed_type_id !== "number") return null
-
-  return {
-    id: row.feed_type_id,
-    label: row.feed_label ?? row.feed_line ?? `Feed ${row.feed_type_id}`,
-    feed_line: row.feed_line ?? row.feed_label ?? `Feed ${row.feed_type_id}`,
-    crude_protein_percentage: row.crude_protein_percentage ?? 0,
-    crude_fat_percentage: row.crude_fat_percentage ?? 0,
-    feed_category: String(row.feed_category ?? ""),
-    feed_pellet_size: String(row.feed_pellet_size ?? ""),
-  }
-}
 
 export async function getFeedingRecords(params?: {
   systemId?: number
@@ -102,73 +38,24 @@ export async function getFeedingRecords(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FeedingRecordWithType>> {
-  const clientResult = await getClientOrError("getFeedingRecords", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("feeding_record").select(`
-      id,
-      created_at,
-      date,
-      batch_id,
-      feed_type_id,
-      feeding_amount,
-      feeding_response,
-      system_id,
-      feed_type:feed_type_id (
-        id,
-        feed_line,
-        crude_protein_percentage,
-        crude_fat_percentage,
-        feed_category,
-        feed_pellet_size
-      )
-    `)
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
-  }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  query = query.order("date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return toQuerySuccess<FeedingRecordWithType>([])
-    }
+  try {
+    const response = await postJson<{ data: FeedingRecordWithType[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/reports/feeding-records/query",
+      {
+        systemId: params?.systemId,
+        systemIds: params?.systemIds,
+        batchId: params?.batchId,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<FeedingRecordWithType>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedingRecordWithType>([])
     return toQueryError("getFeedingRecords", error)
   }
-
-  const mapped = ((data ?? []) as unknown as FeedingRecordJoinedRow[]).map((row) => ({
-    id: row.id,
-    created_at: row.created_at,
-    date: row.date,
-    batch_id: row.batch_id,
-    feed_type_id: row.feed_type_id,
-    feeding_amount: row.feeding_amount,
-    feeding_response: row.feeding_response,
-    system_id: row.system_id,
-    feed_type: projectFeedType(
-      row.feed_type?.[0]
-        ? {
-            feed_type_id: row.feed_type[0].id,
-            feed_label: row.feed_type[0].feed_line,
-            feed_line: row.feed_type[0].feed_line,
-            crude_protein_percentage: row.feed_type[0].crude_protein_percentage,
-            crude_fat_percentage: row.feed_type[0].crude_fat_percentage,
-            feed_category: row.feed_type[0].feed_category,
-            feed_pellet_size: row.feed_type[0].feed_pellet_size,
-          }
-        : null,
-    ),
-  })) as FeedingRecordWithType[]
-
-  return toQuerySuccess<FeedingRecordWithType>(mapped)
 }
 
 export async function getFarmKpisToday(params: {
@@ -179,24 +66,17 @@ export async function getFarmKpisToday(params: {
     return toQuerySuccess<FeedFarmKpisToday>([])
   }
 
-  const clientResult = await getClientOrError("getFarmKpisToday", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryKpiRpc(supabase, "get_farm_kpis_today", { p_farm_id: params.farmId })
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedFarmKpisToday>([])
-  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
-    return toQuerySuccess<FeedFarmKpisToday>([])
+  try {
+    const response = await postJson<{ data: FeedFarmKpisToday[] }, Omit<typeof params, "signal">>(
+      "/api/reports/farm-kpis-today/query",
+      { farmId: params.farmId },
+      { signal: params.signal },
+    )
+    return toQuerySuccess<FeedFarmKpisToday>(response.data)
+  } catch (error) {
+    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedFarmKpisToday>([])
+    return toQueryError("getFarmKpisToday", error)
   }
-  if (error && isInvalidBigintUuidError(error)) {
-    return toQuerySuccess<FeedFarmKpisToday>([])
-  }
-  if (error) return toQueryError("getFarmKpisToday", error)
-
-  return toQuerySuccess<FeedFarmKpisToday>((data ?? []) as FeedFarmKpisToday[])
 }
 
 export async function getRunningStock(params: {
@@ -207,24 +87,17 @@ export async function getRunningStock(params: {
     return toQuerySuccess<FeedRunningStockRow>([])
   }
 
-  const clientResult = await getClientOrError("getRunningStock", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryKpiRpc(supabase, "get_running_stock", { p_farm_id: params.farmId })
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedRunningStockRow>([])
-  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
-    return toQuerySuccess<FeedRunningStockRow>([])
+  try {
+    const response = await postJson<{ data: FeedRunningStockRow[] }, Omit<typeof params, "signal">>(
+      "/api/reports/running-stock/query",
+      { farmId: params.farmId },
+      { signal: params.signal },
+    )
+    return toQuerySuccess<FeedRunningStockRow>(response.data)
+  } catch (error) {
+    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedRunningStockRow>([])
+    return toQueryError("getRunningStock", error)
   }
-  if (error && isInvalidBigintUuidError(error)) {
-    return toQuerySuccess<FeedRunningStockRow>([])
-  }
-  if (error) return toQueryError("getRunningStock", error)
-
-  return toQuerySuccess<FeedRunningStockRow>((data ?? []) as FeedRunningStockRow[])
 }
 
 export async function getFeedPlans(params: {
@@ -235,69 +108,23 @@ export async function getFeedPlans(params: {
   dateTo?: string
   signal?: AbortSignal
 }): Promise<QueryResult<FeedPlanRow>> {
-  const systemIds = (params.systemIds ?? []).filter((value) => Number.isFinite(value))
-  const hasBatchId = Number.isFinite(params.batchId)
-
-  if (!params.farmId && systemIds.length === 0 && !hasBatchId) {
-    return toQuerySuccess<FeedPlanRow>([])
+  try {
+    const response = await postJson<{ data: FeedPlanRow[] }, Omit<typeof params, "signal">>(
+      "/api/reports/feed-plans/query",
+      {
+        farmId: params.farmId,
+        systemIds: params.systemIds,
+        batchId: params.batchId,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+      },
+      { signal: params.signal },
+    )
+    return toQuerySuccess<FeedPlanRow>(response.data)
+  } catch (error) {
+    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedPlanRow>([])
+    return toQueryError("getFeedPlans", error)
   }
-
-  const clientResult = await getClientOrError("getFeedPlans", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  if (systemIds.length === 0 && !hasBatchId) {
-    return toQuerySuccess<FeedPlanRow>([])
-  }
-
-  let query = supabase.from("feed_plan").select("*").eq("is_active", true)
-
-  if (systemIds.length > 0) {
-    query = query.in("system_id", systemIds)
-  }
-  if (hasBatchId) {
-    query = query.eq("batch_id", params.batchId as number)
-  }
-
-  if (params.dateTo) {
-    query = query.lte("effective_from", params.dateTo)
-  }
-  if (params.dateFrom) {
-    query = query.or(`effective_to.is.null,effective_to.gte.${params.dateFrom}`)
-  }
-  if (params.signal) query = query.abortSignal(params.signal)
-  query = query.order("effective_from", { ascending: false })
-
-  const { data, error } = await query
-  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedPlanRow>([])
-  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error) || isMissingObjectError(error))) {
-    return toQuerySuccess<FeedPlanRow>([])
-  }
-  if (error && isInvalidBigintUuidError(error)) {
-    return toQuerySuccess<FeedPlanRow>([])
-  }
-  if (error) return toQueryError("getFeedPlans", error)
-
-  return toQuerySuccess<FeedPlanRow>((data ?? []) as FeedPlanRow[])
-}
-
-async function runTrendQuery<Row>(params: {
-  tag: string
-  query: PromiseLike<{ data: Row[] | null; error: unknown }>
-  signal?: AbortSignal
-  emptyOnInvalidBigint?: boolean
-}): Promise<QueryResult<Row>> {
-  const { data, error } = await params.query
-  if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<Row>([])
-  if (error && (isSbPermissionDenied(error) || isSbAuthMissing(error))) {
-    return toQuerySuccess<Row>([])
-  }
-  if (params.emptyOnInvalidBigint && error && isInvalidBigintUuidError(error)) {
-    return toQuerySuccess<Row>([])
-  }
-  if (error) return toQueryError(params.tag, error)
-
-  return toQuerySuccess<Row>((data ?? []) as Row[])
 }
 
 export async function getFcrTrend(params: {
@@ -312,30 +139,23 @@ export async function getFcrTrend(params: {
     return toQuerySuccess<FeedFcrTrendRow>([])
   }
 
-  const clientResult = await getClientOrError("getFcrTrend", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = params.dateFrom
-    ? queryKpiRpc(supabase, "get_fcr_trend_window", {
-        p_farm_id: params.farmId,
-        p_system_id: params.systemId,
-        p_start_date: params.dateFrom,
-        p_end_date: params.dateTo ?? undefined,
-      })
-    : queryKpiRpc(supabase, "get_fcr_trend", {
-        p_farm_id: params.farmId,
-        p_system_id: params.systemId,
-        p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
-      })
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  return runTrendQuery<FeedFcrTrendRow>({
-    tag: "getFcrTrend",
-    query,
-    signal: params.signal,
-    emptyOnInvalidBigint: true,
-  })
+  try {
+    const response = await postJson<{ data: FeedFcrTrendRow[] }, Omit<typeof params, "signal">>(
+      "/api/reports/fcr-trend/query",
+      {
+        farmId: params.farmId,
+        systemId: params.systemId,
+        days: params.days,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+      },
+      { signal: params.signal },
+    )
+    return toQuerySuccess<FeedFcrTrendRow>(response.data)
+  } catch (error) {
+    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedFcrTrendRow>([])
+    return toQueryError("getFcrTrend", error)
+  }
 }
 
 export async function getGrowthTrend(params: {
@@ -349,27 +169,22 @@ export async function getGrowthTrend(params: {
     return toQuerySuccess<FeedGrowthTrendRow>([])
   }
 
-  const clientResult = await getClientOrError("getGrowthTrend", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = params.dateFrom
-    ? queryKpiRpc(supabase, "get_growth_trend_window", {
-        p_system_id: params.systemId,
-        p_start_date: params.dateFrom,
-        p_end_date: params.dateTo ?? undefined,
-      })
-    : queryKpiRpc(supabase, "get_growth_trend", {
-        p_system_id: params.systemId,
-        p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
-      })
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  return runTrendQuery<FeedGrowthTrendRow>({
-    tag: "getGrowthTrend",
-    query,
-    signal: params.signal,
-  })
+  try {
+    const response = await postJson<{ data: FeedGrowthTrendRow[] }, Omit<typeof params, "signal">>(
+      "/api/reports/growth-trend/query",
+      {
+        systemId: params.systemId,
+        days: params.days,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+      },
+      { signal: params.signal },
+    )
+    return toQuerySuccess<FeedGrowthTrendRow>(response.data)
+  } catch (error) {
+    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedGrowthTrendRow>([])
+    return toQueryError("getGrowthTrend", error)
+  }
 }
 
 export async function getHarvests(params?: {
@@ -381,31 +196,24 @@ export async function getHarvests(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishHarvestRow>> {
-  const clientResult = await getClientOrError("getHarvests", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("fish_harvest").select("*")
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
-  }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  query = query.order("date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return toQuerySuccess<FishHarvestRow>([])
-    }
+  try {
+    const response = await postJson<{ data: FishHarvestRow[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/reports/harvests/query",
+      {
+        systemId: params?.systemId,
+        systemIds: params?.systemIds,
+        batchId: params?.batchId,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<FishHarvestRow>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FishHarvestRow>([])
     return toQueryError("getHarvests", error)
   }
-  return toQuerySuccess<FishHarvestRow>(data as FishHarvestRow[])
 }
 
 export async function getStockings(params?: {
@@ -417,31 +225,24 @@ export async function getStockings(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishStockingRow>> {
-  const clientResult = await getClientOrError("getStockings", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("fish_stocking").select("*")
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
-  }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  query = query.order("date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return toQuerySuccess<FishStockingRow>([])
-    }
+  try {
+    const response = await postJson<{ data: FishStockingRow[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/reports/stockings/query",
+      {
+        systemId: params?.systemId,
+        systemIds: params?.systemIds,
+        batchId: params?.batchId,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<FishStockingRow>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FishStockingRow>([])
     return toQueryError("getStockings", error)
   }
-  return toQuerySuccess<FishStockingRow>(data as FishStockingRow[])
 }
 
 export async function getSamplingData(params?: {
@@ -453,31 +254,24 @@ export async function getSamplingData(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishSamplingWeightRow>> {
-  const clientResult = await getClientOrError("getSamplingData", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("fish_sampling_weight").select("*")
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
-  }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  query = query.order("date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return toQuerySuccess<FishSamplingWeightRow>([])
-    }
+  try {
+    const response = await postJson<{ data: FishSamplingWeightRow[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/reports/sampling/query",
+      {
+        systemId: params?.systemId,
+        systemIds: params?.systemIds,
+        batchId: params?.batchId,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<FishSamplingWeightRow>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FishSamplingWeightRow>([])
     return toQueryError("getSamplingData", error)
   }
-  return toQuerySuccess<FishSamplingWeightRow>(data as FishSamplingWeightRow[])
 }
 
 export async function getMortalityData(params?: {
@@ -489,31 +283,24 @@ export async function getMortalityData(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishMortalityRow>> {
-  const clientResult = await getClientOrError("getMortalityData", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("fish_mortality").select("*")
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
-  }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  query = query.order("date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return toQuerySuccess<FishMortalityRow>([])
-    }
+  try {
+    const response = await postJson<{ data: FishMortalityRow[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/reports/mortality/query",
+      {
+        systemId: params?.systemId,
+        systemIds: params?.systemIds,
+        batchId: params?.batchId,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<FishMortalityRow>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FishMortalityRow>([])
     return toQueryError("getMortalityData", error)
   }
-  return toQuerySuccess<FishMortalityRow>(data as FishMortalityRow[])
 }
 
 export async function getTransferData(params?: {
@@ -523,26 +310,22 @@ export async function getTransferData(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FishTransferRow>> {
-  const clientResult = await getClientOrError("getTransferData", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("fish_transfer").select("*")
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  query = query.order("date", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return toQuerySuccess<FishTransferRow>([])
-    }
+  try {
+    const response = await postJson<{ data: FishTransferRow[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/reports/transfer/query",
+      {
+        batchId: params?.batchId,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<FishTransferRow>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FishTransferRow>([])
     return toQueryError("getTransferData", error)
   }
-  return toQuerySuccess<FishTransferRow>(data as FishTransferRow[])
 }
 
 export async function getRecentActivities(params?: {
@@ -553,27 +336,23 @@ export async function getRecentActivities(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<ChangeLogRow>> {
-  const clientResult = await getClientOrError("getRecentActivities", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("change_log").select("*")
-  if (params?.tableName) query = query.eq("table_name", params.tableName)
-  if (params?.changeType) query = query.eq("change_type", params.changeType)
-  if (params?.dateFrom) query = query.gte("change_time", params.dateFrom)
-  if (params?.dateTo) query = query.lte("change_time", params.dateTo)
-  query = query.order("change_time", { ascending: false })
-  if (params?.limit) query = query.limit(params.limit)
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (isSbPermissionDenied(error) || error?.code === "42P01") {
-      return toQuerySuccess<ChangeLogRow>([])
-    }
+  try {
+    const response = await postJson<{ data: ChangeLogRow[] }, Omit<NonNullable<typeof params>, "signal">>(
+      "/api/reports/recent-activities/query",
+      {
+        tableName: params?.tableName,
+        changeType: params?.changeType,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit,
+      },
+      { signal: params?.signal },
+    )
+    return toQuerySuccess<ChangeLogRow>(response.data)
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<ChangeLogRow>([])
     return toQuerySuccess<ChangeLogRow>([])
   }
-  return toQuerySuccess<ChangeLogRow>(data as ChangeLogRow[])
 }
 
 const emptyRecentEntries = () => ({
@@ -588,147 +367,18 @@ const emptyRecentEntries = () => ({
   systems: toQuerySuccess<SystemRow>([]),
 })
 
-async function getFarmSystemIdsForRecent(
-  supabase: ReportsClient,
-  farmId: string,
-  signal?: AbortSignal,
-): Promise<number[]> {
-  let query = supabase.from("system").select("id").eq("farm_id", farmId)
-  if (signal) query = query.abortSignal(signal)
-  const { data, error } = await query
-  if (error) {
-    throw error
-  }
-  return Array.from(
-    new Set(
-      (data ?? [])
-        .map((row: { id: number | null }) => row.id)
-        .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
-    ),
-  )
-}
-
-async function getRecentRows<T>(
-  supabase: ReportsClient,
-  table: RecentRowsTable,
-  orderColumn: string,
-  params: {
-    farmId: string
-    farmSystemIds: number[]
-    signal?: AbortSignal
-    limit?: number
-  },
-): Promise<QueryResult<T>> {
-  const limit = params.limit ?? 5
-  const { farmId, farmSystemIds, signal } = params
-
-  if (!farmId) return toQuerySuccess<T>([])
-
-  let query = supabase.from(table).select("*")
-  switch (table) {
-    case "fish_mortality":
-      query = query.eq("farm_id", farmId)
-      break
-    case "feed_inventory_snapshot":
-    case "system":
-      query = query.eq("farm_id", farmId)
-      break
-    case "fish_transfer": {
-      if (farmSystemIds.length === 0) return toQuerySuccess<T>([])
-      const systemList = farmSystemIds.join(",")
-      query = query.or(`origin_system_id.in.(${systemList}),target_system_id.in.(${systemList})`)
-      break
-    }
-    default:
-      if (farmSystemIds.length === 0) return toQuerySuccess<T>([])
-      query = query.in("system_id", farmSystemIds)
-      break
-  }
-
-  query = query.order(orderColumn, { ascending: false }).limit(limit)
-  if (signal) query = query.abortSignal(signal)
-  const { data, error } = await query
-  if (error) {
-    if (signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return toQuerySuccess<T>([])
-    }
-    return toQueryError(`getRecentRows:${table}`, error)
-  }
-  return toQuerySuccess<T>(data as T[])
-}
-
 export async function getRecentEntries(farmId?: string | null, signal?: AbortSignal) {
   if (!farmId) return emptyRecentEntries()
-
-  const clientResult = await getClientOrError("getRecentEntries", { requireSession: true })
-  if ("error" in clientResult) {
-    if (clientResult.error.status === "error" && /No active session/i.test(clientResult.error.error ?? "")) {
-      return emptyRecentEntries()
-    }
-    return {
-      mortality: clientResult.error,
-      feeding: clientResult.error,
-      sampling: clientResult.error,
-      transfer: clientResult.error,
-      harvest: clientResult.error,
-      water_quality: clientResult.error,
-      incoming_feed: clientResult.error,
-      stocking: clientResult.error,
-      systems: clientResult.error,
-    }
-  }
-  const { supabase } = clientResult
-
-  let farmSystemIds: number[]
   try {
-    farmSystemIds = await getFarmSystemIdsForRecent(supabase, farmId, signal)
+    const response = await postJson<{ data: ReturnType<typeof emptyRecentEntries> }, { farmId: string | null }>(
+      "/api/reports/recent-entries/query",
+      { farmId },
+      { signal },
+    )
+    return response.data
   } catch (error) {
-    if (signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
-      return emptyRecentEntries()
-    }
+    if (signal?.aborted || isAbortLikeError(error)) return emptyRecentEntries()
     return emptyRecentEntries()
-  }
-
-  const [
-    mortality,
-    feeding,
-    sampling,
-    transfer,
-    harvest,
-    waterQuality,
-    incomingFeed,
-    stocking,
-    systems,
-  ] = await Promise.all([
-    getRecentRows<FishMortalityRow>(supabase, "fish_mortality", "date", { farmId, farmSystemIds, signal }),
-    getRecentRows<FeedingRecordRow>(supabase, "feeding_record", "date", { farmId, farmSystemIds, signal }),
-    getRecentRows<FishSamplingWeightRow>(supabase, "fish_sampling_weight", "date", { farmId, farmSystemIds, signal }),
-    getRecentRows<FishTransferRow>(supabase, "fish_transfer", "date", { farmId, farmSystemIds, signal }),
-    getRecentRows<FishHarvestRow>(supabase, "fish_harvest", "date", { farmId, farmSystemIds, signal }),
-    getRecentRows<WaterQualityMeasurementRow>(supabase, "water_quality_measurement", "date", {
-      farmId,
-      farmSystemIds,
-      signal,
-    }),
-    getRecentRows<FeedInventorySnapshotRow>(supabase, "feed_inventory_snapshot", "date", {
-      farmId,
-      farmSystemIds,
-      signal,
-    }),
-    getRecentRows<FishStockingRow>(supabase, "fish_stocking", "date", { farmId, farmSystemIds, signal }),
-    getRecentRows<SystemRow>(supabase, "system", "created_at", { farmId, farmSystemIds, signal }),
-  ])
-
-  return {
-    mortality,
-    feeding,
-    sampling,
-    transfer,
-    harvest,
-    water_quality: waterQuality,
-    incoming_feed: incomingFeed,
-    stocking,
-    systems,
   }
 }
 
@@ -736,30 +386,15 @@ export async function getBatchSystemIds(params: {
   batchId: number
   signal?: AbortSignal
 }): Promise<QueryResult<{ system_id: number }>> {
-  const clientResult = await getClientOrError("getBatchSystemIds", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase
-    .from("fish_stocking")
-    .select("system_id")
-    .eq("batch_id", params.batchId)
-    .not("system_id", "is", null)
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (
-      params.signal?.aborted ||
-      isAbortLikeError(error) ||
-      isSbPermissionDenied(error) ||
-      isSbAuthMissing(error)
-    ) {
-      return toQuerySuccess<{ system_id: number }>([])
-    }
+  try {
+    const response = await postJson<{ data: Array<{ system_id: number }> }, { batchId: number }>(
+      "/api/reports/batch-system-ids/query",
+      { batchId: params.batchId },
+      { signal: params.signal },
+    )
+    return toQuerySuccess<{ system_id: number }>(response.data)
+  } catch (error) {
+    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<{ system_id: number }>([])
     return toQueryError("getBatchSystemIds", error)
   }
-
-  const uniq = Array.from(new Set((data ?? []).map((row) => row.system_id).filter((id): id is number => typeof id === "number")))
-  return toQuerySuccess<{ system_id: number }>(uniq.map((system_id) => ({ system_id })))
 }

@@ -19,7 +19,7 @@ export function ThemeToggle() {
       type="button"
       variant="ghost"
       size="icon"
-      className="h-9 w-9 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground border border-border/70"
+      className="topbar-control h-9 w-9 rounded-full hover:bg-accent/70 hover:text-accent-foreground"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label={mounted ? (isDark ? "Switch to light mode" : "Switch to dark mode") : "Toggle theme"}
       title={mounted ? (isDark ? "Switch to light mode" : "Switch to dark mode") : "Toggle theme"}

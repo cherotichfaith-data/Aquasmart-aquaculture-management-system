@@ -1,14 +1,15 @@
 "use client"
 
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
+import { invalidateInventoryWriteQueries } from "@/lib/cache/react-query"
+import { recordHarvest } from "@/lib/commands/operations"
+import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 
 export function useRecordHarvest() {
-  return useInsertMutation({
-    table: "fish_harvest",
+  return useWriteThroughMutation({
+    mutationFn: recordHarvest,
     activityTableName: "fish_harvest",
     recentEntryKey: "harvest",
     buildOptimisticEntry: (payload) => {
-      if (Array.isArray(payload)) return null
       return {
         id: `optimistic-${Date.now()}`,
         date: payload.date,
@@ -22,7 +23,13 @@ export function useRecordHarvest() {
         status: "pending",
       }
     },
-    invalidate: ["dashboard", "inventory", "production", "recent-activity", "recent-entries"],
+    invalidate: async ({ queryClient, result }) =>
+      invalidateInventoryWriteQueries(queryClient, {
+        farmId: result.meta.farmId,
+        date: result.meta.date,
+        tableName: "fish_harvest",
+        includeProductionQueries: true,
+      }),
     successMessage: "Harvest recorded.",
     errorMessage: "Failed to record harvest.",
   })

@@ -5,6 +5,7 @@ import {
     Area,
     CartesianGrid,
     ComposedChart,
+    Line,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -20,6 +21,7 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/
 import { LazyRender } from "@/components/shared/lazy-render"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
+import { chartGridProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 
 export default function PopulationOverview({
     stage,
@@ -110,26 +112,27 @@ export default function PopulationOverview({
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
             <Card className="w-full">
-                <CardHeader className="border-b border-border">
-                    <div className="flex items-center justify-between">
+                <CardHeader className="pb-1">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                         <CardTitle>eFCR Trend</CardTitle>
                         <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
                     </div>
                     <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
                 </CardHeader>
-                <CardContent className="pt-4">
+                <CardContent className="pt-2">
                     {!boundsReady || summaryQuery.isLoading ? (
                         <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
                     ) : chartData.length ? (
                         <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
                           <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" tickFormatter={(value: any) => formatChartDate(value, { month: "short", day: "numeric" })} />
-                                <YAxis stroke="var(--color-muted-foreground)" />
+                                <CartesianGrid {...chartGridProps} />
+                                <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={(value: any) => formatChartDate(value, { month: "short", day: "numeric" })} />
+                                <YAxis {...chartYAxisProps} />
                                 <Tooltip
                                     labelFormatter={(value) => formatChartDate(value, { month: "short", day: "numeric" })}
                                     formatter={(value, name) => [formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }), String(name)]}
+                                    contentStyle={chartTooltipStyle}
                                 />
                                 <Area
                                     type="monotone"
@@ -149,26 +152,27 @@ export default function PopulationOverview({
             </Card>
 
             <Card className="w-full">
-                <CardHeader className="border-b border-border">
-                    <div className="flex items-center justify-between">
+                <CardHeader className="pb-1">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                         <CardTitle>Mortality Trend</CardTitle>
                         <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
                     </div>
                     <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
                 </CardHeader>
-                <CardContent className="pt-4">
+                <CardContent className="pt-2">
                     {!boundsReady || summaryQuery.isLoading ? (
                         <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
                     ) : chartData.length ? (
                         <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
                           <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" tickFormatter={(value: any) => formatChartDate(value, { month: "short", day: "numeric" })} />
-                                <YAxis stroke="var(--color-muted-foreground)" />
+                                <CartesianGrid {...chartGridProps} />
+                                <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={(value: any) => formatChartDate(value, { month: "short", day: "numeric" })} />
+                                <YAxis {...chartYAxisProps} />
                                 <Tooltip
                                     labelFormatter={(value) => formatChartDate(value, { month: "short", day: "numeric" })}
                                     formatter={(value, name) => [formatNumberValue(Number(value)), String(name)]}
+                                    contentStyle={chartTooltipStyle}
                                 />
                                 <Area
                                     type="monotone"

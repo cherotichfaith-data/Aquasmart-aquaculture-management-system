@@ -4,6 +4,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,6 +15,7 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/
 import { LazyRender } from "@/components/shared/lazy-render"
 import { PRODUCTION_METRICS, type ProductionMetric } from "@/components/production/metrics"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
+import { chartGridProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 
 export type ProductionChartRow = {
   date: string
@@ -52,14 +54,14 @@ export default function ProductionChart({
 
   return (
     <Card>
-      <CardHeader className="border-b border-border">
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle>{meta.label}</CardTitle>
           <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
         </div>
         <DataUpdatedAt updatedAt={updatedAt} />
       </CardHeader>
-      <CardContent className="pt-4">
+      <CardContent className="pt-2">
         {isLoading ? (
           <div className="h-[280px] flex items-center justify-center text-muted-foreground">
             Loading chart...
@@ -74,9 +76,10 @@ export default function ProductionChart({
                     <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                <XAxis dataKey="label" tickFormatter={(value) => String(value)} minTickGap={24} />
+                <CartesianGrid {...chartGridProps} />
+                <XAxis {...chartXAxisProps} dataKey="label" tickFormatter={(value) => String(value)} />
                 <YAxis
+                  {...chartYAxisProps}
                   width={64}
                   tickFormatter={(value) => formatNumberValue(Number(value), { decimals: meta.decimals })}
                 />
@@ -90,11 +93,7 @@ export default function ProductionChart({
                   labelFormatter={(label, payload) =>
                     formatChartDate(String(payload?.[0]?.payload?.date ?? label))
                   }
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
-                    borderRadius: 8,
-                  }}
+                  contentStyle={chartTooltipStyle}
                 />
                 <Area
                   type="monotone"

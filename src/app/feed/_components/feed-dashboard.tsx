@@ -18,6 +18,15 @@ import {
   YAxis,
 } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  chartGridProps,
+  chartLegendProps,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  chartXAxisProps,
+  chartYAxisProps,
+} from "@/components/charts/recharts-theme"
 import { cn } from "@/lib/utils"
 import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import type { Database } from "@/lib/types/database"
@@ -397,14 +406,8 @@ export function FeedDashboard({
 
   return (
     <>
-      <div className="space-y-4 rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Feed performance dashboard</h1>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-4 border-b border-border/70">
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4 border-b border-border/40 pb-1">
           {SECTION_OPTIONS.map((option) => (
             <button
               key={option.key}
@@ -450,11 +453,16 @@ export function FeedDashboard({
                 <div className="h-[260px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={overviewRows}>
-                      <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                      <XAxis dataKey="label" />
-                      <YAxis />
-                      <Tooltip formatter={(value, name) => [`${formatMetric(Number(value), 1)} kg`, String(name)]} />
-                      <Legend />
+                      <CartesianGrid {...chartGridProps} />
+                      <XAxis {...chartXAxisProps} dataKey="label" />
+                      <YAxis {...chartYAxisProps} />
+                      <Tooltip
+                        formatter={(value, name) => [`${formatMetric(Number(value), 1)} kg`, String(name)]}
+                        contentStyle={chartTooltipStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        itemStyle={chartTooltipItemStyle}
+                      />
+                      <Legend {...chartLegendProps} />
                       <Bar dataKey="feedKg" name="Feed" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="harvestKg" name="Harvest" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
                     </ComposedChart>
@@ -470,10 +478,15 @@ export function FeedDashboard({
                 <div className="h-[260px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={overviewRows}>
-                      <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                      <XAxis dataKey="label" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => [formatMetric(Number(value), 0), "Mortality"]} />
+                      <CartesianGrid {...chartGridProps} />
+                      <XAxis {...chartXAxisProps} dataKey="label" />
+                      <YAxis {...chartYAxisProps} />
+                      <Tooltip
+                        formatter={(value) => [formatMetric(Number(value), 0), "Mortality"]}
+                        contentStyle={chartTooltipStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        itemStyle={chartTooltipItemStyle}
+                      />
                       <Bar dataKey="mortalityFish" name="Mortality" radius={[4, 4, 0, 0]}>
                         {overviewRows.map((row) => (
                           <Cell
@@ -496,10 +509,15 @@ export function FeedDashboard({
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={overviewRows}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                    <XAxis dataKey="label" />
-                    <YAxis domain={["dataMin - 0.5", "dataMax + 0.5"]} />
-                    <Tooltip formatter={(value) => [`${formatMetric(Number(value), 2)} mg/L`, "DO mean"]} />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="label" />
+                    <YAxis {...chartYAxisProps} domain={["dataMin - 0.5", "dataMax + 0.5"]} />
+                    <Tooltip
+                      formatter={(value) => [`${formatMetric(Number(value), 2)} mg/L`, "DO mean"]}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
+                    />
                     <Line type="monotone" dataKey="doAvg" stroke="var(--color-chart-1)" strokeWidth={2.5} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -585,11 +603,16 @@ export function FeedDashboard({
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={cageRows.filter((row) => row.totalHarvestKg > 0 && row.crudeFcr != null)}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                    <XAxis dataKey="label" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [formatMetric(Number(value), 2), "Crude FCR"]} />
-                    <Legend />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="label" />
+                    <YAxis {...chartYAxisProps} />
+                    <Tooltip
+                      formatter={(value) => [formatMetric(Number(value), 2), "Crude FCR"]}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
+                    />
+                    <Legend {...chartLegendProps} />
                     <Bar dataKey="crudeFcr" name="Crude FCR" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]} />
                     <Line type="monotone" dataKey={() => 2} name="Benchmark 2.0" stroke="var(--color-chart-2)" strokeDasharray="4 4" dot={false} />
                   </ComposedChart>
@@ -620,10 +643,15 @@ export function FeedDashboard({
               <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={overviewRows}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                    <XAxis dataKey="label" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`${formatMetric(Number(value), 1)} kg`, "Feed"]} />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="label" />
+                    <YAxis {...chartYAxisProps} />
+                    <Tooltip
+                      formatter={(value) => [`${formatMetric(Number(value), 1)} kg`, "Feed"]}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
+                    />
                     <Bar dataKey="feedKg" name="Feed" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -644,8 +672,13 @@ export function FeedDashboard({
                           <Cell key={row.name} fill={RESPONSE_COLORS[row.name]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => [formatMetric(Number(value), 0), "Sessions"]} />
-                      <Legend />
+                      <Tooltip
+                        formatter={(value) => [formatMetric(Number(value), 0), "Sessions"]}
+                        contentStyle={chartTooltipStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        itemStyle={chartTooltipItemStyle}
+                      />
+                      <Legend {...chartLegendProps} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -659,10 +692,15 @@ export function FeedDashboard({
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={feedTypeRows} layout="vertical">
-                      <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                      <XAxis type="number" />
-                      <YAxis dataKey="label" type="category" width={140} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(value) => [`${formatMetric(Number(value), 1)} kg`, "Feed volume"]} />
+                      <CartesianGrid {...chartGridProps} />
+                      <XAxis {...chartXAxisProps} type="number" />
+                      <YAxis {...chartYAxisProps} dataKey="label" type="category" width={140} tick={{ ...chartYAxisProps.tick, fontSize: 10.5 }} />
+                      <Tooltip
+                        formatter={(value) => [`${formatMetric(Number(value), 1)} kg`, "Feed volume"]}
+                        contentStyle={chartTooltipStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        itemStyle={chartTooltipItemStyle}
+                      />
                       <Bar dataKey="kg" fill="var(--color-chart-4)" radius={[4, 4, 4, 4]} />
                     </BarChart>
                   </ResponsiveContainer>

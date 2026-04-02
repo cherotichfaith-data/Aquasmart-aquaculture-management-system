@@ -1,6 +1,8 @@
 import type { QueryResult } from "@/lib/supabase-client"
-import { createClient } from "@/lib/supabase/server"
-import { requireUser } from "@/lib/supabase/require-user"
+import { runServerReadThrough } from "@/lib/cache/server"
+import { cacheTags } from "@/lib/cache/tags"
+import { createAccessTokenClient } from "@/lib/supabase/server"
+import { requireUserContext } from "@/lib/supabase/require-user"
 import { toQuerySuccess } from "@/lib/api/_utils"
 import type {
   FeedPageInitialData,
@@ -18,6 +20,7 @@ import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
 
 const DEFAULT_TIME_PERIOD: FeedPageInitialFilters["timePeriod"] = "quarter"
 const VALID_STAGES: FeedPageInitialFilters["selectedStage"][] = ["all", "nursing", "grow_out"]
+type ServerClient = ReturnType<typeof createAccessTokenClient>
 
 function toSuccess<T>(data: T[]): QueryResult<T> {
   return toQuerySuccess<T>(data)
@@ -48,7 +51,7 @@ export function parseFeedPageFilters(searchParams?: Record<string, string | stri
   }
 }
 
-async function getFeedTypeOptions(supabase: Awaited<ReturnType<typeof createClient>>): Promise<FeedTypeOption[]> {
+async function getFeedTypeOptions(supabase: ServerClient): Promise<FeedTypeOption[]> {
   const { data, error } = await supabase.rpc("api_feed_type_options_rpc")
 
   if (error) {
@@ -58,12 +61,12 @@ async function getFeedTypeOptions(supabase: Awaited<ReturnType<typeof createClie
   return (data ?? []) as FeedTypeOption[]
 }
 
-export async function getFeedPageInitialData(params: {
+async function loadFeedPageInitialData(
+  supabase: ServerClient,
+  params: {
   farmId: string | null
   filters: FeedPageInitialFilters
 }): Promise<FeedPageInitialData> {
-  await requireUser()
-
   if (!params.farmId) {
     return {
       bounds: { start: null, end: null },
@@ -75,7 +78,6 @@ export async function getFeedPageInitialData(params: {
     }
   }
 
-  const supabase = await createClient()
   const selectedSystemId = parseSelectedNumericId(params.filters.selectedSystem)
   const bounds = await getScopedTimeBounds(
     supabase,
@@ -109,4 +111,33 @@ export async function getFeedPageInitialData(params: {
     feedingRecords: toSuccess([]),
     inventory: toSuccess([]),
   }
+}
+
+export async function getFeedPageInitialData(params: {
+  farmId: string | null
+  filters: FeedPageInitialFilters
+}): Promise<FeedPageInitialData> {
+  const { user, accessToken } = await requireUserContext()
+
+  return runServerReadThrough({
+    keyParts: [
+      "feed-page",
+      user.id,
+      params.farmId,
+      params.filters.selectedBatch,
+      params.filters.selectedSystem,
+      params.filters.selectedStage,
+      params.filters.timePeriod,
+    ],
+    tags: params.farmId
+      ? [
+          cacheTags.feedTypes(),
+          cacheTags.farm(params.farmId),
+          cacheTags.systems(params.farmId),
+          cacheTags.inventory(params.farmId),
+          cacheTags.feeding(params.farmId),
+        ]
+      : [],
+    loader: () => loadFeedPageInitialData(createAccessTokenClient(accessToken), params),
+  })
 }
