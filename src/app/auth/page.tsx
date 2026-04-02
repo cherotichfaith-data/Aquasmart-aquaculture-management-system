@@ -3,21 +3,16 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Suspense, lazy, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { createClient } from "@/lib/supabase/client"
-
-const Dithering = lazy(() =>
-  import("@paper-design/shaders-react").then((mod) => ({ default: mod.Dithering })),
-)
 
 export default function AuthPage() {
   const supabase = createClient()
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin")
@@ -157,7 +152,7 @@ export default function AuthPage() {
   }, [])
 
   return (
-    <div className="auth-page" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+    <div className="auth-page">
       <button
         type="button"
         className="theme-toggle-btn"
@@ -166,19 +161,6 @@ export default function AuthPage() {
       >
         {isDark ? <Sun size={18} /> : <Moon size={18} />}
       </button>
-      <Suspense fallback={<div className="absolute inset-0 bg-muted/20 pointer-events-none" />}>
-        <div className="absolute inset-0 z-0 pointer-events-none opacity-35 dark:opacity-30 mix-blend-multiply dark:mix-blend-screen">
-          <Dithering
-            colorBack="#00000000"
-            colorFront={isDark ? "#34D399" : "#22C55E"}
-            shape="warp"
-            type="4x4"
-            speed={isHovered ? 0.6 : 0.2}
-            className="size-full"
-            minPixelRatio={1}
-          />
-        </div>
-      </Suspense>
       <style jsx global>{`
         @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
@@ -193,13 +175,27 @@ export default function AuthPage() {
           font-family: "Inter", sans-serif;
           min-height: 100vh;
           overflow: hidden;
-          background: var(--background);
+          background:
+            linear-gradient(
+              135deg,
+              color-mix(in srgb, var(--chart-5) 70%, transparent),
+              color-mix(in srgb, var(--chart-3) 46%, transparent)
+            ),
+            url("/Multi-region-aquaculture-scaled.webp") center / cover no-repeat;
           color: var(--foreground);
           position: relative;
         }
 
         .auth-page::before {
-          display: none;
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--background) 14%, transparent),
+            color-mix(in srgb, var(--chart-5) 24%, transparent)
+          );
+          pointer-events: none;
         }
 
         @keyframes waterFlow {
@@ -231,17 +227,17 @@ export default function AuthPage() {
           width: 2.25rem;
           height: 2.25rem;
           border-radius: 999px;
-          border: 1px solid var(--border);
-          background: color-mix(in srgb, var(--card) 92%, transparent);
-          color: var(--foreground);
+          border: 1px solid color-mix(in srgb, var(--card) 22%, transparent);
+          background: color-mix(in srgb, var(--card) 20%, transparent);
+          color: var(--card-foreground);
           cursor: pointer;
-          backdrop-filter: blur(8px);
+          backdrop-filter: blur(14px);
           transition: all 0.2s ease;
         }
 
         .theme-toggle-btn:hover {
-          background: var(--accent);
-          color: var(--accent-foreground);
+          background: color-mix(in srgb, var(--accent) 32%, transparent);
+          color: var(--card-foreground);
         }
 
         .toast-container {
@@ -275,8 +271,8 @@ export default function AuthPage() {
           width: 100%;
           overflow: hidden;
           border-radius: 0.75rem;
-          border: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
-          background: color-mix(in srgb, var(--primary) 72%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--card));
+          background: color-mix(in srgb, var(--card) 68%, var(--primary));
           backdrop-filter: blur(12px);
           padding: 1rem 2rem 1rem 1rem;
           box-shadow: 0 10px 40px color-mix(in srgb, var(--foreground) 25%, transparent);
@@ -312,12 +308,12 @@ export default function AuthPage() {
           font-size: 0.875rem;
           font-weight: 700;
           margin-bottom: 0.25rem;
-          color: var(--foreground);
+          color: var(--card-foreground);
         }
         .toast-description {
           font-size: 0.875rem;
           opacity: 0.9;
-          color: color-mix(in srgb, var(--foreground) 78%, transparent);
+          color: color-mix(in srgb, var(--card-foreground) 78%, transparent);
         }
 
         .toast-close {
@@ -331,7 +327,7 @@ export default function AuthPage() {
           opacity: 0;
           transition: opacity 0.2s;
           font-size: 1.25rem;
-          color: var(--foreground);
+          color: var(--card-foreground);
         }
         .toast:hover .toast-close {
           opacity: 0.7;
@@ -361,15 +357,28 @@ export default function AuthPage() {
         }
 
         .login-card {
-          background: color-mix(in srgb, var(--card) 55%, transparent);
-          border-radius: 18px;
+          background: linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--card) 82%, transparent),
+            color-mix(in srgb, var(--card) 68%, transparent)
+          );
+          border-radius: 24px;
           padding: 3rem 2.5rem;
-          box-shadow: 0 18px 60px color-mix(in srgb, var(--foreground) 25%, transparent);
-          border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
-          backdrop-filter: blur(12px);
+          box-shadow: 0 24px 70px color-mix(in srgb, var(--chart-5) 18%, transparent);
+          border: 1px solid color-mix(in srgb, var(--card) 70%, transparent);
+          backdrop-filter: blur(18px);
           max-width: 460px;
           width: 100%;
           animation: fadeIn 0.8s ease-out 0.2s backwards;
+        }
+
+        .dark .login-card {
+          background: linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--card) 24%, transparent),
+            color-mix(in srgb, var(--card) 10%, transparent)
+          );
+          border: 1px solid color-mix(in srgb, var(--card) 24%, transparent);
         }
 
         @keyframes fadeIn {
@@ -405,10 +414,10 @@ export default function AuthPage() {
           font-size: 1.1rem;
           font-weight: 800;
           margin-bottom: 0.5rem;
-          color: var(--foreground);
+          color: var(--card-foreground);
         }
         .login-header p {
-          color: color-mix(in srgb, var(--foreground) 78%, transparent);
+          color: color-mix(in srgb, var(--card-foreground) 76%, transparent);
           font-size: 0.95rem;
           margin-bottom: 1.8rem;
           line-height: 1.55;
@@ -421,7 +430,7 @@ export default function AuthPage() {
           display: block;
           font-size: 0.9rem;
           font-weight: 700;
-          color: color-mix(in srgb, var(--foreground) 90%, transparent);
+          color: var(--card-foreground);
           margin-bottom: 0.5rem;
         }
 
@@ -429,24 +438,34 @@ export default function AuthPage() {
           width: 100%;
           padding: 0.9rem 1rem;
           font-size: 0.95rem;
-          color: var(--foreground);
-          background: color-mix(in srgb, var(--background) 55%, transparent);
-          border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
-          border-radius: 10px;
+          color: var(--card-foreground);
+          background: color-mix(in srgb, var(--card) 74%, transparent);
+          border: 1px solid color-mix(in srgb, var(--border) 92%, transparent);
+          border-radius: 14px;
           transition: all 0.25s;
           font-family: inherit;
+          backdrop-filter: blur(10px);
+        }
+
+        .dark .form-input {
+          background: color-mix(in srgb, var(--card) 18%, transparent);
+          border: 1px solid color-mix(in srgb, var(--card) 20%, transparent);
         }
         .form-input::placeholder {
-          color: color-mix(in srgb, var(--foreground) 45%, transparent);
+          color: color-mix(in srgb, var(--card-foreground) 56%, transparent);
         }
         .form-input:focus {
           outline: none;
-          background: color-mix(in srgb, var(--background) 75%, transparent);
-          border-color: color-mix(in srgb, var(--primary) 90%, transparent);
-          box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent);
+          background: color-mix(in srgb, var(--card) 92%, transparent);
+          border-color: color-mix(in srgb, var(--primary) 74%, white);
+          box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+        }
+
+        .dark .form-input:focus {
+          background: color-mix(in srgb, var(--card) 24%, transparent);
         }
         .form-input:hover:not(:focus) {
-          border-color: color-mix(in srgb, var(--primary) 65%, transparent);
+          border-color: color-mix(in srgb, var(--primary) 24%, var(--card));
         }
 
         .sign-in-btn {
@@ -481,7 +500,7 @@ export default function AuthPage() {
           margin-top: 1rem;
           text-align: center;
           font-size: 0.9rem;
-          color: color-mix(in srgb, var(--foreground) 72%, transparent);
+          color: color-mix(in srgb, var(--card-foreground) 88%, transparent);
         }
 
         .link-btn {
@@ -603,7 +622,7 @@ export default function AuthPage() {
                   onChange={(event) => setPassword(event.target.value)}
                 />
                 {authMode === "signup" && (
-                  <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "color-mix(in srgb, var(--foreground) 68%, transparent)" }}>
+                  <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "color-mix(in srgb, var(--card-foreground) 72%, transparent)" }}>
                     Use at least 8 characters to create a secure password.
                   </div>
                 )}
