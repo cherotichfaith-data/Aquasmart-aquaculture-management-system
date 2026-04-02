@@ -5,6 +5,7 @@ import { CartesianGrid, Legend, ResponsiveContainer, Scatter, ScatterChart, Tool
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { chartGridProps, chartLegendProps, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 import { formatTimestamp } from "./_lib/water-quality-utils"
 import type { DepthProfileRow } from "./_lib/water-quality-selectors"
 
@@ -18,7 +19,7 @@ const DepthProfileTooltip = ({
   if (!active || !payload?.length || !payload[0]?.payload) return null
   const point = payload[0].payload
   return (
-    <div className="rounded-md border border-border bg-card p-3 shadow-md">
+    <div className="rounded-[1rem] bg-card/92 p-3 text-foreground shadow-[0_20px_42px_-30px_rgba(15,23,32,0.5)] backdrop-blur-xl">
       <p className="text-xs text-muted-foreground">Depth: {point.depth.toFixed(1)} m</p>
       <p className="mt-1 text-sm font-semibold text-foreground">
         {point.series}: {point.value.toFixed(2)}
@@ -61,7 +62,7 @@ export function WaterQualityDepthTab({
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-purple-500/20 bg-purple-500/15">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 shadow-[0_14px_32px_-26px_rgba(168,85,247,0.42)]">
             <Layers className="h-5 w-5 text-purple-400" />
           </div>
           <div>
@@ -129,25 +130,27 @@ export function WaterQualityDepthTab({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[360px] rounded-md border border-border/80 bg-muted/20 p-2">
+              <div className="soft-panel-subtle h-[360px] p-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <ScatterChart margin={{ top: 12, right: 24, left: 12, bottom: 12 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid {...chartGridProps} />
                     <XAxis
+                      {...chartXAxisProps}
                       type="number"
                       dataKey="value"
-                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                      tick={{ ...chartXAxisProps.tick, fontSize: 10.5 }}
                       label={{ value: "Parameter value", position: "insideBottom", offset: -2, fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                     />
                     <YAxis
+                      {...chartYAxisProps}
                       type="number"
                       dataKey="depth"
                       reversed
-                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                      tick={{ ...chartYAxisProps.tick, fontSize: 10.5 }}
                       label={{ value: "Depth (m)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                     />
                     <Tooltip content={<DepthProfileTooltip />} />
-                    <Legend />
+                    <Legend {...chartLegendProps} />
                     <Scatter name="DO (mg/L)" data={doScatterData} fill="#3B82F6" />
                     <Scatter name="Temperature (deg C)" data={tempScatterData} fill="#F59E0B" />
                   </ScatterChart>

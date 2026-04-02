@@ -1,8 +1,10 @@
 import type { Database } from "@/lib/types/database"
 import type { TimeBounds } from "@/lib/time-period"
 import { sortByDateAsc } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/server"
-import { requireUser } from "@/lib/supabase/require-user"
+import { runServerReadThrough } from "@/lib/cache/server"
+import { cacheTags } from "@/lib/cache/tags"
+import { createAccessTokenClient } from "@/lib/supabase/server"
+import { requireUserContext } from "@/lib/supabase/require-user"
 import {
   getScopedBatchSystems,
   getScopedSystemOptions,
@@ -23,13 +25,14 @@ import { scaleFractionToPercent } from "@/lib/analytics-format"
 import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
 import {
   aggregateInventoryMetrics,
+  buildKpiTrustMap,
   buildRecommendedActionsFromAnalytics,
   computeEfcrFromProductionRows,
   computeMortalityRateFromProduction,
   toTrendDelta,
 } from "./analytics-shared"
 
-type ServerClient = Awaited<ReturnType<typeof createClient>>
+type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DailyInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
 type DailyRatingRow = Database["public"]["Views"]["api_daily_water_quality_rating"]["Row"]
@@ -487,6 +490,13 @@ function buildKpiOverview(params: {
       }
     : {}
 
+  const trustByKey = buildKpiTrustMap({
+    totalSystems: params.scopedSystemIds.length,
+    inventoryRows,
+    productionRows,
+    waterQualityRows: wqRows,
+  })
+
   const metrics: KPIOverviewMetric[] = [
     {
       key: "efcr",
@@ -497,6 +507,7 @@ function buildKpiOverview(params: {
       trendFormat: "delta",
       trendDecimals: 2,
       invertTrend: true,
+      trust: trustByKey.efcr,
     },
     {
       key: "mortality",
@@ -509,6 +520,7 @@ function buildKpiOverview(params: {
       trendDecimals: 2,
       trendUnit: "%/day",
       invertTrend: true,
+      trust: trustByKey.mortality,
     },
     {
       key: "abw",
@@ -521,6 +533,7 @@ function buildKpiOverview(params: {
       trendDecimals: 1,
       trendUnit: "g",
       invertTrend: false,
+      trust: trustByKey.abw,
     },
     {
       key: "biomass",
@@ -533,6 +546,7 @@ function buildKpiOverview(params: {
       trendDecimals: 1,
       trendUnit: "kg",
       invertTrend: false,
+      trust: trustByKey.biomass,
     },
     {
       key: "biomass_density",
@@ -545,6 +559,7 @@ function buildKpiOverview(params: {
       trendDecimals: 2,
       trendUnit: "kg/m3",
       invertTrend: false,
+      trust: trustByKey.biomass_density,
     },
     {
       key: "feeding",
@@ -557,6 +572,7 @@ function buildKpiOverview(params: {
       trendDecimals: 2,
       trendUnit: "% BW/day",
       invertTrend: false,
+      trust: trustByKey.feeding,
     },
     {
       key: "water_quality",
@@ -567,6 +583,7 @@ function buildKpiOverview(params: {
       invertTrend: false,
       tone: wqTone,
       badge: wqBadge,
+      trust: trustByKey.water_quality,
     },
   ]
 
@@ -656,13 +673,8 @@ function buildSystemsTable(params: {
   }
 }
 
-export async function getDashboardPageInitialData(params: {
-  farmId: string | null
-  filters: DashboardPageInitialFilters
-}): Promise<DashboardPageInitialData> {
-  await requireUser()
-
-  const empty: DashboardPageInitialData = {
+function buildEmptyDashboardPageInitialData(): DashboardPageInitialData {
+  return {
     bounds: { start: null, end: null },
     systemOptions: toQuerySuccess([]),
     batchSystems: toQuerySuccess([]),
@@ -693,10 +705,17 @@ export async function getDashboardPageInitialData(params: {
     alertThresholds: toQuerySuccess([]),
     recommendedActions: [],
   }
+}
 
+async function loadDashboardPageInitialData(
+  supabase: ServerClient,
+  params: {
+  farmId: string | null
+  filters: DashboardPageInitialFilters
+}): Promise<DashboardPageInitialData> {
+  const empty = buildEmptyDashboardPageInitialData()
   if (!params.farmId) return empty
 
-  const supabase = await createClient()
   const selectedSystemId = parseSelectedNumericId(params.filters.selectedSystem)
   const bounds = await getTimeBounds(supabase, params.farmId, params.filters.timePeriod, selectedSystemId)
   if (!bounds.start || !bounds.end) {
@@ -831,4 +850,34 @@ export async function getDashboardPageInitialData(params: {
       waterQualityRows,
     }),
   }
+}
+
+export async function getDashboardPageInitialData(params: {
+  farmId: string | null
+  filters: DashboardPageInitialFilters
+}): Promise<DashboardPageInitialData> {
+  const { user, accessToken } = await requireUserContext()
+
+  return runServerReadThrough({
+    keyParts: [
+      "dashboard-page",
+      user.id,
+      params.farmId,
+      params.filters.selectedBatch,
+      params.filters.selectedSystem,
+      params.filters.selectedStage,
+      params.filters.timePeriod,
+    ],
+    tags: params.farmId
+      ? [
+          cacheTags.farm(params.farmId),
+          cacheTags.systems(params.farmId),
+          cacheTags.inventory(params.farmId),
+          cacheTags.dashboard(params.farmId),
+          cacheTags.waterQuality(params.farmId),
+          cacheTags.reports(params.farmId, "recent-entries"),
+        ]
+      : [],
+    loader: () => loadDashboardPageInitialData(createAccessTokenClient(accessToken), params),
+  })
 }

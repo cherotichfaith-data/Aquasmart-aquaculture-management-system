@@ -1,14 +1,15 @@
 "use client"
 
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
+import { invalidateFeedInventoryWriteQueries } from "@/lib/cache/react-query"
+import { recordFeedInventorySnapshot } from "@/lib/commands/operations"
+import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 
 export function useRecordFeedInventorySnapshot() {
-  return useInsertMutation({
-    table: "feed_inventory_snapshot",
+  return useWriteThroughMutation({
+    mutationFn: recordFeedInventorySnapshot,
     activityTableName: "feed_inventory_snapshot",
     recentEntryKey: "incoming_feed",
     buildOptimisticEntry: (payload) => {
-      if (Array.isArray(payload)) return null
       return {
         id: `optimistic-${Date.now()}`,
         farm_id: payload.farm_id,
@@ -27,7 +28,11 @@ export function useRecordFeedInventorySnapshot() {
         status: "pending",
       }
     },
-    invalidate: ["dashboard", "inventory", "reports", "recent-activity", "recent-entries"],
+    invalidate: async ({ queryClient, result }) =>
+      invalidateFeedInventoryWriteQueries(queryClient, {
+        farmId: result.meta.farmId,
+        date: result.meta.date,
+      }),
     successMessage: "Feed inventory snapshot recorded.",
     errorMessage: "Failed to record feed inventory snapshot.",
   })

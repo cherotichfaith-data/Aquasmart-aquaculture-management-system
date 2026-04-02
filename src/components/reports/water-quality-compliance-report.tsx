@@ -68,19 +68,19 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="rounded-md border border-border/80 p-3">
+            <div className="soft-panel-subtle p-3">
               <p className="text-xs text-muted-foreground">Readings in report window</p>
               <p className="text-xl font-semibold">{enrichedRows.length}</p>
             </div>
-            <div className="rounded-md border border-border/80 p-3">
+            <div className="soft-panel-subtle p-3">
               <p className="text-xs text-muted-foreground">Excursion episodes</p>
               <p className="text-xl font-semibold">{excursionLogRows.length}</p>
             </div>
-            <div className="rounded-md border border-border/80 p-3">
+            <div className="soft-panel-subtle p-3">
               <p className="text-xs text-muted-foreground">Report start</p>
               <p className="text-xl font-semibold">{reportDateFrom || "N/A"}</p>
             </div>
-            <div className="rounded-md border border-border/80 p-3">
+            <div className="soft-panel-subtle p-3">
               <p className="text-xs text-muted-foreground">Report end</p>
               <p className="text-xl font-semibold">{reportDateTo || "N/A"}</p>
             </div>
@@ -94,8 +94,8 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
           description="All resolved dissolved-oxygen and ammonia excursion episodes in the report window."
           actions={
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-              <Input type="date" value={reportDateFrom} onChange={(event) => setReportDateFrom(event.target.value)} className="sm:w-[170px]" aria-label="Water quality report start date" />
-              <Input type="date" value={reportDateTo} onChange={(event) => setReportDateTo(event.target.value)} className="sm:w-[170px]" aria-label="Water quality report end date" />
+              <Input type="date" value={reportDateFrom} onChange={(event) => setReportDateFrom(event.target.value)} className="soft-input-surface sm:w-[170px]" aria-label="Water quality report start date" />
+              <Input type="date" value={reportDateTo} onChange={(event) => setReportDateTo(event.target.value)} className="soft-input-surface sm:w-[170px]" aria-label="Water quality report end date" />
               <ReportRecordsToolbar
                 onExportCsv={() =>
                   downloadCsv({
@@ -133,7 +133,7 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
           }
         />
         <CardContent>
-          <div className="overflow-x-auto rounded-md border border-border/80">
+          <div className="soft-table-shell">
             <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">

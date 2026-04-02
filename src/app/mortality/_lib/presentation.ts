@@ -1,6 +1,6 @@
 "use client"
 
-import type { MortalityCause } from "@/lib/types/mortality"
+import type { MortalityCause } from "@/lib/mortality"
 import type { InvestigationStatus, MortalityRiskRow } from "../mortality-selectors"
 
 export const CAUSE_LABELS: Record<MortalityCause, string> = {

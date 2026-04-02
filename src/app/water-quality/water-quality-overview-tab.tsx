@@ -34,7 +34,7 @@ export function WaterQualityOverviewTab({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-500/20">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 shadow-[0_14px_32px_-26px_rgba(34,211,238,0.45)]">
             <Droplets className="h-5 w-5 text-cyan-400" />
           </div>
           <div>
@@ -192,7 +192,7 @@ export function WaterQualityOverviewTab({
               </Card>
             ))
           ) : (
-            <Card className="border border-border bg-muted/30">
+            <Card className="bg-muted/30 shadow-none">
               <CardContent className="p-3 text-sm text-muted-foreground">No alerts for the selected scope.</CardContent>
             </Card>
           )}

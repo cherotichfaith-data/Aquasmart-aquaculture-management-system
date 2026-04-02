@@ -1,14 +1,15 @@
 "use client"
 
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
+import { invalidateInventoryWriteQueries } from "@/lib/cache/react-query"
+import { recordSampling } from "@/lib/commands/operations"
+import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 
 export function useRecordSampling() {
-  return useInsertMutation({
-    table: "fish_sampling_weight",
+  return useWriteThroughMutation({
+    mutationFn: recordSampling,
     activityTableName: "fish_sampling_weight",
     recentEntryKey: "sampling",
     buildOptimisticEntry: (payload) => {
-      if (Array.isArray(payload)) return null
       return {
         id: `optimistic-${Date.now()}`,
         date: payload.date,
@@ -22,7 +23,13 @@ export function useRecordSampling() {
         status: "pending",
       }
     },
-    invalidate: ["dashboard", "inventory", "production", "recent-activity", "recent-entries"],
+    invalidate: async ({ queryClient, result }) =>
+      invalidateInventoryWriteQueries(queryClient, {
+        farmId: result.meta.farmId,
+        date: result.meta.date,
+        tableName: "fish_sampling_weight",
+        includeProductionQueries: true,
+      }),
     successMessage: "Sampling event recorded.",
     errorMessage: "Failed to record sampling.",
   })

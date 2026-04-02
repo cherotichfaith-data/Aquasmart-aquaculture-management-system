@@ -18,6 +18,7 @@ import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue, formatPercentRateValue } from "@/lib/analytics-format"
 import { ReportRecordsHiddenState, ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
+import { chartGridProps, chartLegendProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 
 export function PerformanceSummaryCards({
   summary,
@@ -109,14 +110,14 @@ export function PerformanceTrendSection({
         {loading ? (
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="soft-panel-subtle h-[300px] p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartRows}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="date" />
+                  <YAxis {...chartYAxisProps} yAxisId="left" />
+                  <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" />
                   <Tooltip
                     labelFormatter={(label) => formatChartDate(label)}
                     formatter={(value, name) => {
@@ -125,11 +126,11 @@ export function PerformanceTrendSection({
                       }
                       return [`${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`, String(name)]
                     }}
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
+                    contentStyle={chartTooltipStyle}
                   />
-                  <Legend />
-                  <ReferenceLine yAxisId="left" y={1.5} stroke="var(--color-chart-4)" strokeDasharray="6 4" ifOverflow="extendDomain" label={{ value: "App target 1.5", position: "insideTopLeft", fill: "currentColor", fontSize: 12 }} />
-                  <ReferenceLine yAxisId="left" y={2} stroke="var(--color-chart-5)" strokeDasharray="3 3" ifOverflow="extendDomain" label={{ value: "Industry 2.0", position: "insideTopRight", fill: "currentColor", fontSize: 12 }} />
+                  <Legend {...chartLegendProps} />
+                  <ReferenceLine yAxisId="left" y={1.5} stroke="var(--color-chart-4)" strokeDasharray="6 4" ifOverflow="extendDomain" label={{ value: "App target 1.5", position: "insideTopLeft", fill: "hsl(var(--muted-foreground))", fontSize: 10.5 }} />
+                  <ReferenceLine yAxisId="left" y={2} stroke="var(--color-chart-5)" strokeDasharray="3 3" ifOverflow="extendDomain" label={{ value: "Industry 2.0", position: "insideTopRight", fill: "hsl(var(--muted-foreground))", fontSize: 10.5 }} />
                   <Line yAxisId="left" type="monotone" dataKey="efcr_period" stroke="var(--color-chart-1)" strokeWidth={2.4} name="eFCR" />
                   <Line yAxisId="right" type="monotone" dataKey="total_biomass" stroke="var(--color-chart-2)" strokeWidth={2.4} name="Biomass (kg)" />
                 </LineChart>
@@ -159,18 +160,18 @@ export function SystemBiomassComparisonSection({
         {loading ? (
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="h-[300px] rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="soft-panel-subtle h-[300px] p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={latestBySystemRows}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                  <XAxis dataKey="system_name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="system_name" />
+                  <YAxis {...chartYAxisProps} />
                   <Tooltip
                     formatter={(value, name) => [`${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`, String(name)]}
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }}
+                    contentStyle={chartTooltipStyle}
                   />
-                  <Legend />
+                  <Legend {...chartLegendProps} />
                   <Bar dataKey="total_biomass" fill="var(--color-chart-1)" name="Biomass (kg)" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -210,7 +211,7 @@ export function BenchmarkStatusSection({
                 : "bg-chart-4/10 border-chart-4/25 text-chart-4"
 
             return (
-              <div key={item.metric} className="rounded-md border border-border/80 bg-muted/20 p-3">
+              <div key={item.metric} className="soft-panel-subtle p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold">{item.metric}</p>
                   <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${toneClass}`}>
@@ -324,7 +325,7 @@ export function PerformanceRecordsSection({
       />
       <CardContent>
         {showPerformanceRecords ? (
-          <div className="overflow-x-auto rounded-md border border-border/80">
+          <div className="soft-table-shell">
             <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">

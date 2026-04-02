@@ -1,24 +1,113 @@
 
 
+
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '"public", "extensions"', false);
+SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
 
-CREATE SCHEMA IF NOT EXISTS "public";
+CREATE SCHEMA IF NOT EXISTS "archive";
 
 
-ALTER SCHEMA "public" OWNER TO "pg_database_owner";
+ALTER SCHEMA "archive" OWNER TO "postgres";
+
+
+CREATE EXTENSION IF NOT EXISTS "pg_cron" WITH SCHEMA "pg_catalog";
+
+
+
+
+
+
+CREATE SCHEMA IF NOT EXISTS "energy";
+
+
+ALTER SCHEMA "energy" OWNER TO "postgres";
+
+
+CREATE SCHEMA IF NOT EXISTS "legacy";
+
+
+ALTER SCHEMA "legacy" OWNER TO "postgres";
+
+
+CREATE EXTENSION IF NOT EXISTS "pg_net" WITH SCHEMA "extensions";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "pgsodium";
+
+
+
+
+
+
+CREATE SCHEMA IF NOT EXISTS "private";
+
+
+ALTER SCHEMA "private" OWNER TO "postgres";
 
 
 COMMENT ON SCHEMA "public" IS 'standard public schema';
+
+
+
+CREATE EXTENSION IF NOT EXISTS "btree_gist" WITH SCHEMA "extensions";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA "extensions";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "pgjwt" WITH SCHEMA "extensions";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
+
+
+
 
 
 
@@ -193,6 +282,59 @@ CREATE TYPE "public"."water_quality_rating" AS ENUM (
 
 
 ALTER TYPE "public"."water_quality_rating" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."api_rate_limit_check"("p_scope" "text", "p_subject" "text", "p_limit" integer, "p_window_seconds" integer) RETURNS TABLE("allowed" boolean, "limit" integer, "remaining" integer, "reset_at" timestamp with time zone, "retry_after_seconds" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'private'
+    AS $$
+DECLARE
+    v_now timestamp with time zone := now();
+    v_window_start timestamp with time zone;
+    v_count integer;
+    v_reset_at timestamp with time zone;
+BEGIN
+    IF coalesce(p_scope, '') = '' THEN
+        RAISE EXCEPTION 'p_scope is required';
+    END IF;
+
+    IF coalesce(p_subject, '') = '' THEN
+        RAISE EXCEPTION 'p_subject is required';
+    END IF;
+
+    IF p_limit IS NULL OR p_limit <= 0 THEN
+        RAISE EXCEPTION 'p_limit must be positive';
+    END IF;
+
+    IF p_window_seconds IS NULL OR p_window_seconds <= 0 THEN
+        RAISE EXCEPTION 'p_window_seconds must be positive';
+    END IF;
+
+    v_window_start := to_timestamp(floor(extract(epoch FROM v_now) / p_window_seconds) * p_window_seconds);
+
+    INSERT INTO "private"."api_rate_limit_bucket" ("scope", "subject", "window_start", "request_count", "updated_at")
+    VALUES (p_scope, p_subject, v_window_start, 1, v_now)
+    ON CONFLICT ("scope", "subject", "window_start")
+    DO UPDATE
+    SET
+        "request_count" = "api_rate_limit_bucket"."request_count" + 1,
+        "updated_at" = EXCLUDED."updated_at"
+    RETURNING "api_rate_limit_bucket"."request_count" INTO v_count;
+
+    v_reset_at := v_window_start + make_interval(secs => p_window_seconds);
+
+    RETURN QUERY
+    SELECT
+        v_count <= p_limit,
+        p_limit,
+        GREATEST(p_limit - LEAST(v_count, p_limit), 0),
+        v_reset_at,
+        GREATEST(CEIL(EXTRACT(epoch FROM (v_reset_at - v_now)))::integer, 0);
+END;
+$$;
+
+
+ALTER FUNCTION "private"."api_rate_limit_check"("p_scope" "text", "p_subject" "text", "p_limit" integer, "p_window_seconds" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."after_event_update_inventory"() RETURNS "trigger"
@@ -672,7 +814,7 @@ $$;
 ALTER FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "system_growth_stage" DEFAULT NULL::"system_growth_stage", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "growth_stage" "system_growth_stage", "input_start_date" "date", "input_end_date" "date", "as_of_date" "date", "fish_end" double precision, "biomass_end" double precision, "sampling_end_date" "date", "sample_age_days" integer, "efcr" double precision, "efcr_date" "date", "feed_total" double precision, "abw" double precision, "feeding_rate" double precision, "mortality_rate" double precision, "biomass_density" double precision, "missing_days_count" integer, "water_quality_rating_average" "text", "water_quality_rating_numeric_average" double precision, "water_quality_latest_date" "date", "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text")
+CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "growth_stage" "public"."system_growth_stage", "input_start_date" "date", "input_end_date" "date", "as_of_date" "date", "fish_end" double precision, "biomass_end" double precision, "sampling_end_date" "date", "sample_age_days" integer, "efcr" double precision, "efcr_date" "date", "feed_total" double precision, "abw" double precision, "feeding_rate" double precision, "mortality_rate" double precision, "biomass_density" double precision, "missing_days_count" integer, "water_quality_rating_average" "text", "water_quality_rating_numeric_average" double precision, "water_quality_latest_date" "date", "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
@@ -876,7 +1018,7 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
 $$;
 
 
-ALTER FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
+ALTER FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."api_farm_options_rpc"() RETURNS TABLE("id" "uuid", "label" "text", "location" "text")
@@ -1097,7 +1239,7 @@ $$;
 ALTER FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid" DEFAULT NULL::"uuid", "p_stage" "system_growth_stage" DEFAULT NULL::"system_growth_stage", "p_active_only" boolean DEFAULT true) RETURNS TABLE("id" bigint, "label" "text", "type" "text", "growth_stage" "system_growth_stage", "is_active" boolean, "farm_id" "uuid", "farm_name" "text")
+CREATE OR REPLACE FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid" DEFAULT NULL::"uuid", "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_active_only" boolean DEFAULT true) RETURNS TABLE("id" bigint, "label" "text", "type" "text", "growth_stage" "public"."system_growth_stage", "is_active" boolean, "farm_id" "uuid", "farm_name" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
@@ -1119,7 +1261,7 @@ CREATE OR REPLACE FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid" 
 $$;
 
 
-ALTER FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "system_growth_stage", "p_active_only" boolean) OWNER TO "postgres";
+ALTER FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_active_only" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "resolved_start" "date", "resolved_end" "date", "resolved_ongoing" boolean, "snapshot_as_of" "date", "first_stocking_date" "date", "final_harvest_date" "date", "first_activity_date" "date", "last_activity_date" "date", "configured_cycle_start" "date", "configured_cycle_end" "date", "period_source" "text")
@@ -1266,7 +1408,7 @@ $$;
 ALTER FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds"("p_farm_id" "uuid", "p_time_period" "time_period", "p_anchor_date" "date" DEFAULT NULL::"date") RETURNS TABLE("time_period" "text", "input_start_date" "date", "input_end_date" "date", "anchor_scope" "text", "latest_available_date" "date", "available_from_date" "date", "requested_days" integer, "available_days" integer, "resolved_days" integer, "staleness_days" integer, "is_truncated" boolean)
+CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds"("p_farm_id" "uuid", "p_time_period" "public"."time_period", "p_anchor_date" "date" DEFAULT NULL::"date") RETURNS TABLE("time_period" "text", "input_start_date" "date", "input_end_date" "date", "anchor_scope" "text", "latest_available_date" "date", "available_from_date" "date", "requested_days" integer, "available_days" integer, "resolved_days" integer, "staleness_days" integer, "is_truncated" boolean)
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
@@ -1291,7 +1433,7 @@ CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds"("p_farm_id" "uuid",
 $$;
 
 
-ALTER FUNCTION "public"."api_time_period_bounds"("p_farm_id" "uuid", "p_time_period" "time_period", "p_anchor_date" "date") OWNER TO "postgres";
+ALTER FUNCTION "public"."api_time_period_bounds"("p_farm_id" "uuid", "p_time_period" "public"."time_period", "p_anchor_date" "date") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds"("p_farm_id" "uuid", "p_time_period" "text", "p_anchor_date" "date" DEFAULT NULL::"date", "p_scope" "text" DEFAULT 'dashboard'::"text") RETURNS TABLE("time_period" "text", "input_start_date" "date", "input_end_date" "date", "anchor_scope" "text", "latest_available_date" "date", "available_from_date" "date", "requested_days" integer, "available_days" integer, "resolved_days" integer, "staleness_days" integer, "is_truncated" boolean)
@@ -1563,7 +1705,7 @@ $$;
 ALTER FUNCTION "public"."assign_feed_incoming_farm_if_missing"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."classify_water_quality_measurement"("p_parameter_value" double precision, "p_optimal" "jsonb", "p_acceptable" "jsonb", "p_critical" "jsonb", "p_lethal" "jsonb") RETURNS TABLE("measurement_rating" "water_quality_rating", "severity_rank" integer, "distance_from_next_better_band" double precision)
+CREATE OR REPLACE FUNCTION "public"."classify_water_quality_measurement"("p_parameter_value" double precision, "p_optimal" "jsonb", "p_acceptable" "jsonb", "p_critical" "jsonb", "p_lethal" "jsonb") RETURNS TABLE("measurement_rating" "public"."water_quality_rating", "severity_rank" integer, "distance_from_next_better_band" double precision)
     LANGUAGE "plpgsql" IMMUTABLE
     AS $$
 declare
@@ -2901,7 +3043,7 @@ $$;
 ALTER FUNCTION "public"."request_matview_refresh"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
@@ -2919,7 +3061,7 @@ CREATE OR REPLACE FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "t
 $$;
 
 
-ALTER FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) OWNER TO "postgres";
+ALTER FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."trg_create_lake_reference_system"() RETURNS "trigger"
@@ -3316,6 +3458,113 @@ SET default_tablespace = '';
 SET default_table_access_method = "heap";
 
 
+CREATE TABLE IF NOT EXISTS "archive"."production_cycle_backup" (
+    "cycle_id" integer,
+    "system_id" bigint,
+    "cycle_start" "date",
+    "cycle_end" "date",
+    "ongoing_cycle" boolean,
+    "delta_biomass" double precision,
+    "delta_number_of_fish" bigint
+);
+
+
+ALTER TABLE "archive"."production_cycle_backup" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "energy"."electrical_appliance" (
+    "id" bigint NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "energy"."electrical_appliance" OWNER TO "postgres";
+
+
+ALTER TABLE "energy"."electrical_appliance" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "energy"."appliances_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "energy"."power_consumption" (
+    "id" bigint NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "energy"."power_consumption" OWNER TO "postgres";
+
+
+ALTER TABLE "energy"."power_consumption" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "energy"."power_consumption_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "energy"."solar_production_historical" (
+    "id" bigint NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "energy"."solar_production_historical" OWNER TO "postgres";
+
+
+ALTER TABLE "energy"."solar_production_historical" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "energy"."solar_production_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "energy"."solar_production_prediction" (
+    "id" bigint NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "energy"."solar_production_prediction" OWNER TO "postgres";
+
+
+ALTER TABLE "energy"."solar_production_prediction" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "energy"."solar_production_prediction_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "private"."api_rate_limit_bucket" (
+    "scope" "text" NOT NULL,
+    "subject" "text" NOT NULL,
+    "window_start" timestamp with time zone NOT NULL,
+    "request_count" integer DEFAULT 0 NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "api_rate_limit_bucket_request_count_check" CHECK (("request_count" >= 0))
+);
+
+
+ALTER TABLE "private"."api_rate_limit_bucket" OWNER TO "postgres";
+
+
 CREATE UNLOGGED TABLE "public"."_affected_systems" (
     "system_id" bigint NOT NULL,
     "min_affected_date" "date" NOT NULL
@@ -3393,7 +3642,7 @@ CREATE OR REPLACE VIEW "public"."analytics_feed_inventory_day" WITH ("security_i
     "fi"."date" AS "fact_date",
     ("count"(*))::integer AS "feed_delivery_count",
     "sum"(COALESCE("fi"."feed_amount", (0)::double precision)) AS "feed_incoming_amount"
-   FROM "feed_incoming" "fi"
+   FROM "public"."feed_incoming" "fi"
   GROUP BY "fi"."farm_id", "fi"."date";
 
 
@@ -3455,13 +3704,13 @@ CREATE TABLE IF NOT EXISTS "public"."daily_water_quality_rating" (
     "id" bigint NOT NULL,
     "system_id" bigint NOT NULL,
     "rating_date" "date" NOT NULL,
-    "rating" "water_quality_rating" NOT NULL,
+    "rating" "public"."water_quality_rating" NOT NULL,
     "created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    "worst_parameter" "water_quality_parameters",
+    "worst_parameter" "public"."water_quality_parameters",
     "worst_parameter_value" double precision,
     "worst_parameter_unit" "text",
     "rating_numeric" integer,
-    CONSTRAINT "daily_water_quality_rating_rating_numeric_matches_rating" CHECK (((("rating" = 'lethal'::"water_quality_rating") AND ("rating_numeric" = 0)) OR (("rating" = 'critical'::"water_quality_rating") AND ("rating_numeric" = 1)) OR (("rating" = 'acceptable'::"water_quality_rating") AND ("rating_numeric" = 2)) OR (("rating" = 'optimal'::"water_quality_rating") AND ("rating_numeric" = 3))))
+    CONSTRAINT "daily_water_quality_rating_rating_numeric_matches_rating" CHECK (((("rating" = 'lethal'::"public"."water_quality_rating") AND ("rating_numeric" = 0)) OR (("rating" = 'critical'::"public"."water_quality_rating") AND ("rating_numeric" = 1)) OR (("rating" = 'acceptable'::"public"."water_quality_rating") AND ("rating_numeric" = 2)) OR (("rating" = 'optimal'::"public"."water_quality_rating") AND ("rating_numeric" = 3))))
 );
 
 
@@ -3487,7 +3736,7 @@ CREATE TABLE IF NOT EXISTS "public"."feeding_record" (
     "feed_type_id" bigint NOT NULL,
     "feeding_amount" double precision NOT NULL,
     "date" "date" NOT NULL,
-    "feeding_response" "feeding_response" NOT NULL,
+    "feeding_response" "public"."feeding_response" NOT NULL,
     "batch_id" bigint,
     "notes" "text"
 );
@@ -3516,7 +3765,7 @@ CREATE TABLE IF NOT EXISTS "public"."fish_harvest" (
     "number_of_fish_harvest" bigint NOT NULL,
     "total_weight_harvest" double precision NOT NULL,
     "abw" double precision NOT NULL,
-    "type_of_harvest" "type_of_harvest" NOT NULL,
+    "type_of_harvest" "public"."type_of_harvest" NOT NULL,
     "batch_id" bigint
 );
 
@@ -3586,7 +3835,7 @@ CREATE TABLE IF NOT EXISTS "public"."fish_stocking" (
     "total_weight_stocking" double precision NOT NULL,
     "abw" double precision NOT NULL,
     "batch_id" bigint NOT NULL,
-    "type_of_stocking" "type_of_stocking" NOT NULL,
+    "type_of_stocking" "public"."type_of_stocking" NOT NULL,
     "notes" "text"
 );
 
@@ -3604,7 +3853,7 @@ CREATE TABLE IF NOT EXISTS "public"."fish_transfer" (
     "total_weight_transfer" double precision NOT NULL,
     "abw" double precision,
     "batch_id" bigint,
-    "transfer_type" "transfer_type" DEFAULT 'transfer'::"transfer_type" NOT NULL,
+    "transfer_type" "public"."transfer_type" DEFAULT 'transfer'::"public"."transfer_type" NOT NULL,
     "notes" "text",
     "external_target_name" "text"
 );
@@ -3616,8 +3865,8 @@ ALTER TABLE "public"."fish_transfer" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."system" (
     "id" bigint NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "type" "system_type" NOT NULL,
-    "growth_stage" "system_growth_stage" NOT NULL,
+    "type" "public"."system_type" NOT NULL,
+    "growth_stage" "public"."system_growth_stage" NOT NULL,
     "volume" double precision,
     "width" double precision,
     "length" double precision,
@@ -3651,7 +3900,7 @@ CREATE TABLE IF NOT EXISTS "public"."water_quality_measurement" (
     "id" bigint NOT NULL,
     "date" "date" NOT NULL,
     "time" time without time zone NOT NULL,
-    "parameter_name" "water_quality_parameters" NOT NULL,
+    "parameter_name" "public"."water_quality_parameters" NOT NULL,
     "water_depth" double precision NOT NULL,
     "parameter_value" double precision NOT NULL,
     "system_id" bigint NOT NULL,
@@ -3679,19 +3928,19 @@ CREATE MATERIALIZED VIEW "public"."analytics_system_day_mv" AS
             "dfit"."mortality_rate",
             ("dfit"."biomass_density")::double precision AS "biomass_density",
             ("dfit"."system_volume")::double precision AS "system_volume"
-           FROM "daily_fish_inventory_table" "dfit"
+           FROM "public"."daily_fish_inventory_table" "dfit"
         ), "feeding_daily" AS (
          SELECT "fr"."system_id",
             "fr"."date" AS "fact_date",
             "sum"(COALESCE("fr"."feeding_amount", (0)::double precision)) AS "feeding_amount_recorded",
             ("count"(*))::integer AS "feeding_events_count"
-           FROM "feeding_record" "fr"
+           FROM "public"."feeding_record" "fr"
           GROUP BY "fr"."system_id", "fr"."date"
         ), "mortality_daily" AS (
          SELECT "fm"."system_id",
             "fm"."date" AS "fact_date",
             ("sum"(COALESCE("fm"."number_of_fish_mortality", (0)::bigint)))::double precision AS "mortality_count_recorded"
-           FROM "fish_mortality" "fm"
+           FROM "public"."fish_mortality" "fm"
           GROUP BY "fm"."system_id", "fm"."date"
         ), "sampling_daily" AS (
          SELECT "fs"."system_id",
@@ -3699,35 +3948,35 @@ CREATE MATERIALIZED VIEW "public"."analytics_system_day_mv" AS
             "avg"("fs"."abw") AS "abw_sampled",
             ("sum"(COALESCE("fs"."number_of_fish_sampling", (0)::bigint)))::double precision AS "number_of_fish_sampled",
             "sum"(COALESCE("fs"."total_weight_sampling", (0)::double precision)) AS "total_weight_sampled"
-           FROM "fish_sampling_weight" "fs"
+           FROM "public"."fish_sampling_weight" "fs"
           GROUP BY "fs"."system_id", "fs"."date"
         ), "stocking_daily" AS (
          SELECT "fs"."system_id",
             "fs"."date" AS "fact_date",
             ("sum"(COALESCE("fs"."number_of_fish_stocking", (0)::bigint)))::double precision AS "number_of_fish_stocked",
             "sum"(COALESCE("fs"."total_weight_stocking", (0)::double precision)) AS "total_weight_stocked"
-           FROM "fish_stocking" "fs"
+           FROM "public"."fish_stocking" "fs"
           GROUP BY "fs"."system_id", "fs"."date"
         ), "harvest_daily" AS (
          SELECT "fh"."system_id",
             "fh"."date" AS "fact_date",
             ("sum"(COALESCE("fh"."number_of_fish_harvest", (0)::bigint)))::double precision AS "number_of_fish_harvested",
             "sum"(COALESCE("fh"."total_weight_harvest", (0)::double precision)) AS "total_weight_harvested"
-           FROM "fish_harvest" "fh"
+           FROM "public"."fish_harvest" "fh"
           GROUP BY "fh"."system_id", "fh"."date"
         ), "transfer_out_daily" AS (
          SELECT "ft"."origin_system_id" AS "system_id",
             "ft"."date" AS "fact_date",
             "sum"(COALESCE("ft"."number_of_fish_transfer", (0)::double precision)) AS "number_of_fish_transfer_out",
             "sum"(COALESCE("ft"."total_weight_transfer", (0)::double precision)) AS "total_weight_transfer_out"
-           FROM "fish_transfer" "ft"
+           FROM "public"."fish_transfer" "ft"
           GROUP BY "ft"."origin_system_id", "ft"."date"
         ), "transfer_in_daily" AS (
          SELECT "ft"."target_system_id" AS "system_id",
             "ft"."date" AS "fact_date",
             "sum"(COALESCE("ft"."number_of_fish_transfer", (0)::double precision)) AS "number_of_fish_transfer_in",
             "sum"(COALESCE("ft"."total_weight_transfer", (0)::double precision)) AS "total_weight_transfer_in"
-           FROM "fish_transfer" "ft"
+           FROM "public"."fish_transfer" "ft"
           GROUP BY "ft"."target_system_id", "ft"."date"
         ), "water_quality_daily" AS (
          SELECT DISTINCT ON ("dwr"."system_id", "dwr"."rating_date") "dwr"."system_id",
@@ -3737,12 +3986,12 @@ CREATE MATERIALIZED VIEW "public"."analytics_system_day_mv" AS
             ("dwr"."worst_parameter")::"text" AS "worst_parameter",
             "dwr"."worst_parameter_value",
             "dwr"."worst_parameter_unit"
-           FROM "daily_water_quality_rating" "dwr"
+           FROM "public"."daily_water_quality_rating" "dwr"
           ORDER BY "dwr"."system_id", "dwr"."rating_date", "dwr"."created_at" DESC, "dwr"."id" DESC
         ), "water_quality_event_dates" AS (
          SELECT "wqm"."system_id",
             "wqm"."date" AS "fact_date"
-           FROM "water_quality_measurement" "wqm"
+           FROM "public"."water_quality_measurement" "wqm"
           GROUP BY "wqm"."system_id", "wqm"."date"
         ), "observed_event_dates" AS (
          SELECT "feeding_daily"."system_id",
@@ -3838,7 +4087,7 @@ CREATE MATERIALIZED VIEW "public"."analytics_system_day_mv" AS
     "wq"."worst_parameter_value",
     "wq"."worst_parameter_unit"
    FROM (((((((((("system_dates" "sd"
-     JOIN "system" "s" ON (("s"."id" = "sd"."system_id")))
+     JOIN "public"."system" "s" ON (("s"."id" = "sd"."system_id")))
      LEFT JOIN "inventory_daily" "inv" ON ((("inv"."system_id" = "sd"."system_id") AND ("inv"."fact_date" = "sd"."fact_date"))))
      LEFT JOIN "feeding_daily" "fd" ON ((("fd"."system_id" = "sd"."system_id") AND ("fd"."fact_date" = "sd"."fact_date"))))
      LEFT JOIN "mortality_daily" "md" ON ((("md"."system_id" = "sd"."system_id") AND ("md"."fact_date" = "sd"."fact_date"))))
@@ -3893,7 +4142,7 @@ CREATE OR REPLACE VIEW "public"."analytics_system_day" AS
     "analytics_system_day_mv"."worst_parameter",
     "analytics_system_day_mv"."worst_parameter_value",
     "analytics_system_day_mv"."worst_parameter_unit"
-   FROM "analytics_system_day_mv";
+   FROM "public"."analytics_system_day_mv";
 
 
 ALTER TABLE "public"."analytics_system_day" OWNER TO "postgres";
@@ -3921,12 +4170,12 @@ CREATE OR REPLACE VIEW "public"."api_alert_thresholds" WITH ("security_invoker"=
     "at"."high_mortality_threshold",
     "at"."created_at",
     "at"."updated_at"
-   FROM "alert_threshold" "at"
+   FROM "public"."alert_threshold" "at"
   WHERE ((("at"."farm_id" IS NOT NULL) AND (EXISTS ( SELECT 1
-           FROM "farm_user" "fu"
+           FROM "public"."farm_user" "fu"
           WHERE (("fu"."farm_id" = "at"."farm_id") AND ("fu"."user_id" = "auth"."uid"()))))) OR (("at"."system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
-           FROM ("system" "s"
-             JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+           FROM ("public"."system" "s"
+             JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
           WHERE (("s"."id" = "at"."system_id") AND ("fu"."user_id" = "auth"."uid"()))))));
 
 
@@ -3953,8 +4202,8 @@ CREATE OR REPLACE VIEW "public"."daily_fish_inventory" AS
     ("t"."system_volume")::double precision AS "system_volume",
     "t"."biomass_density",
     "t"."mortality_rate"
-   FROM ("daily_fish_inventory_table" "t"
-     JOIN "system" "s" ON (("s"."id" = "t"."system_id")));
+   FROM ("public"."daily_fish_inventory_table" "t"
+     JOIN "public"."system" "s" ON (("s"."id" = "t"."system_id")));
 
 
 ALTER TABLE "public"."daily_fish_inventory" OWNER TO "postgres";
@@ -3996,11 +4245,11 @@ CREATE OR REPLACE VIEW "public"."api_daily_fish_inventory" AS
     "dfi"."system_volume",
     "dfi"."biomass_density",
     "dfi"."mortality_rate"
-   FROM (("daily_fish_inventory" "dfi"
-     JOIN "system" "s" ON (("s"."id" = "dfi"."system_id")))
-     JOIN "farm" "f" ON (("f"."id" = "s"."farm_id")))
+   FROM (("public"."daily_fish_inventory" "dfi"
+     JOIN "public"."system" "s" ON (("s"."id" = "dfi"."system_id")))
+     JOIN "public"."farm" "f" ON (("f"."id" = "s"."farm_id")))
   WHERE (EXISTS ( SELECT 1
-           FROM "farm_user" "fu"
+           FROM "public"."farm_user" "fu"
           WHERE (("fu"."farm_id" = "s"."farm_id") AND ("fu"."user_id" = "auth"."uid"()))));
 
 
@@ -4018,10 +4267,10 @@ CREATE OR REPLACE VIEW "public"."api_daily_water_quality_rating" WITH ("security
     "dwr"."worst_parameter_value",
     "dwr"."worst_parameter_unit",
     "dwr"."created_at"
-   FROM ("daily_water_quality_rating" "dwr"
-     JOIN "system" "s" ON (("s"."id" = "dwr"."system_id")))
+   FROM ("public"."daily_water_quality_rating" "dwr"
+     JOIN "public"."system" "s" ON (("s"."id" = "dwr"."system_id")))
   WHERE (EXISTS ( SELECT 1
-           FROM "farm_user" "fu"
+           FROM "public"."farm_user" "fu"
           WHERE (("fu"."farm_id" = "s"."farm_id") AND ("fu"."user_id" = "auth"."uid"()))));
 
 
@@ -4031,8 +4280,8 @@ ALTER TABLE "public"."api_daily_water_quality_rating" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."water_quality_framework" (
     "id" bigint NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "parameter_name" "water_quality_parameters" NOT NULL,
-    "unit" "units" DEFAULT 'mg/l'::"units" NOT NULL,
+    "parameter_name" "public"."water_quality_parameters" NOT NULL,
+    "unit" "public"."units" DEFAULT 'mg/l'::"public"."units" NOT NULL,
     "parameter_optimal" "jsonb",
     "parameter_acceptable" "jsonb",
     "parameter_critical" "jsonb",
@@ -4063,11 +4312,11 @@ CREATE OR REPLACE VIEW "public"."api_water_quality_measurements" WITH ("security
     "wqm"."water_depth",
     "wqf"."unit",
     "wqm"."created_at"
-   FROM (("water_quality_measurement" "wqm"
-     JOIN "system" "s" ON (("s"."id" = "wqm"."system_id")))
-     JOIN "water_quality_framework" "wqf" ON (("wqf"."parameter_name" = "wqm"."parameter_name")))
+   FROM (("public"."water_quality_measurement" "wqm"
+     JOIN "public"."system" "s" ON (("s"."id" = "wqm"."system_id")))
+     JOIN "public"."water_quality_framework" "wqf" ON (("wqf"."parameter_name" = "wqm"."parameter_name")))
   WHERE (EXISTS ( SELECT 1
-           FROM "farm_user" "fu"
+           FROM "public"."farm_user" "fu"
           WHERE (("fu"."farm_id" = "s"."farm_id") AND ("fu"."user_id" = "auth"."uid"()))));
 
 
@@ -4254,8 +4503,8 @@ CREATE TABLE IF NOT EXISTS "public"."feed_type" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "feed_supplier" bigint NOT NULL,
     "feed_line" "text",
-    "feed_category" "feed_category" NOT NULL,
-    "feed_pellet_size" "feed_pellet_size" NOT NULL,
+    "feed_category" "public"."feed_category" NOT NULL,
+    "feed_pellet_size" "public"."feed_pellet_size" NOT NULL,
     "crude_protein_percentage" double precision NOT NULL,
     "crude_fat_percentage" double precision
 );
@@ -4403,26 +4652,26 @@ ALTER SEQUENCE "public"."production_cycle_cycle_id_seq" OWNED BY "public"."produ
 CREATE MATERIALIZED VIEW "public"."production_summary" AS
  WITH "production_event_dates" AS (
          SELECT "fs"."date" AS "event_date"
-           FROM "fish_stocking" "fs"
+           FROM "public"."fish_stocking" "fs"
         UNION ALL
          SELECT "fr"."date" AS "event_date"
-           FROM "feeding_record" "fr"
+           FROM "public"."feeding_record" "fr"
         UNION ALL
          SELECT "fm"."date" AS "event_date"
-           FROM "fish_mortality" "fm"
+           FROM "public"."fish_mortality" "fm"
         UNION ALL
          SELECT "fsw"."date" AS "event_date"
-           FROM "fish_sampling_weight" "fsw"
+           FROM "public"."fish_sampling_weight" "fsw"
         UNION ALL
          SELECT "fh"."date" AS "event_date"
-           FROM "fish_harvest" "fh"
+           FROM "public"."fish_harvest" "fh"
         UNION ALL
          SELECT "ft"."date" AS "event_date"
-           FROM "fish_transfer" "ft"
+           FROM "public"."fish_transfer" "ft"
           WHERE ("ft"."origin_system_id" IS NOT NULL)
         UNION ALL
          SELECT "ft"."date" AS "event_date"
-           FROM "fish_transfer" "ft"
+           FROM "public"."fish_transfer" "ft"
           WHERE ("ft"."target_system_id" IS NOT NULL)
         ), "asof" AS (
          SELECT COALESCE("max"("production_event_dates"."event_date"), CURRENT_DATE) AS "as_of_date"
@@ -4430,32 +4679,32 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
         ), "activity_union" AS (
          SELECT "fs"."system_id",
             "fs"."date"
-           FROM "fish_stocking" "fs"
+           FROM "public"."fish_stocking" "fs"
         UNION ALL
          SELECT "fr"."system_id",
             "fr"."date"
-           FROM "feeding_record" "fr"
+           FROM "public"."feeding_record" "fr"
         UNION ALL
          SELECT "fm"."system_id",
             "fm"."date"
-           FROM "fish_mortality" "fm"
+           FROM "public"."fish_mortality" "fm"
         UNION ALL
          SELECT "fsw"."system_id",
             "fsw"."date"
-           FROM "fish_sampling_weight" "fsw"
+           FROM "public"."fish_sampling_weight" "fsw"
         UNION ALL
          SELECT "fh"."system_id",
             "fh"."date"
-           FROM "fish_harvest" "fh"
+           FROM "public"."fish_harvest" "fh"
         UNION ALL
          SELECT "ft"."origin_system_id" AS "system_id",
             "ft"."date"
-           FROM "fish_transfer" "ft"
+           FROM "public"."fish_transfer" "ft"
           WHERE ("ft"."origin_system_id" IS NOT NULL)
         UNION ALL
          SELECT "ft"."target_system_id" AS "system_id",
             "ft"."date"
-           FROM "fish_transfer" "ft"
+           FROM "public"."fish_transfer" "ft"
           WHERE ("ft"."target_system_id" IS NOT NULL)
         ), "activity_bounds" AS (
          SELECT "au"."system_id",
@@ -4475,21 +4724,21 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
                 END AS "cycle_end",
             (("pc"."cycle_end" IS NULL) OR ("pc"."cycle_end" > COALESCE("ab"."last_activity_date", ( SELECT "asof"."as_of_date"
                    FROM "asof")))) AS "ongoing_cycle"
-           FROM ("production_cycle" "pc"
+           FROM ("public"."production_cycle" "pc"
              LEFT JOIN "activity_bounds" "ab" ON (("ab"."system_id" = "pc"."system_id")))
         ), "explicit_cycle_systems" AS (
          SELECT DISTINCT "pc"."system_id"
-           FROM "production_cycle" "pc"
+           FROM "public"."production_cycle" "pc"
         ), "stocking_bounds" AS (
          SELECT "fs"."system_id",
             "min"("fs"."date") AS "first_stocking_date"
-           FROM "fish_stocking" "fs"
+           FROM "public"."fish_stocking" "fs"
           GROUP BY "fs"."system_id"
         ), "harvest_bounds" AS (
          SELECT "fh"."system_id",
             "max"("fh"."date") AS "final_harvest_date"
-           FROM "fish_harvest" "fh"
-          WHERE ("fh"."type_of_harvest" = 'final'::"type_of_harvest")
+           FROM "public"."fish_harvest" "fh"
+          WHERE ("fh"."type_of_harvest" = 'final'::"public"."type_of_harvest")
           GROUP BY "fh"."system_id"
         ), "fallback_cycle_map" AS (
          SELECT ((- "s"."id"))::integer AS "cycle_id",
@@ -4498,7 +4747,7 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             LEAST(COALESCE("hb"."final_harvest_date", "ab"."last_activity_date"), ( SELECT "asof"."as_of_date"
                    FROM "asof")) AS "cycle_end",
             (("sb"."first_stocking_date" IS NOT NULL) AND ("hb"."final_harvest_date" IS NULL)) AS "ongoing_cycle"
-           FROM (((("system" "s"
+           FROM (((("public"."system" "s"
              LEFT JOIN "stocking_bounds" "sb" ON (("sb"."system_id" = "s"."id")))
              LEFT JOIN "harvest_bounds" "hb" ON (("hb"."system_id" = "s"."id")))
              LEFT JOIN "activity_bounds" "ab" ON (("ab"."system_id" = "s"."id")))
@@ -4530,10 +4779,10 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             "dfit"."number_of_fish" AS "number_of_fish_inventory",
             'sampling'::"text" AS "activity",
             2 AS "activity_rank"
-           FROM ((("fish_sampling_weight" "fs"
+           FROM ((("public"."fish_sampling_weight" "fs"
              JOIN "cycle_map" "cm" ON ((("cm"."system_id" = "fs"."system_id") AND ("fs"."date" >= "cm"."cycle_start") AND ("fs"."date" <= "cm"."cycle_end"))))
-             JOIN "daily_fish_inventory_table" "dfit" ON ((("dfit"."inventory_date" = "fs"."date") AND ("dfit"."system_id" = "fs"."system_id"))))
-             JOIN "system" "sys" ON (("sys"."id" = "fs"."system_id")))
+             JOIN "public"."daily_fish_inventory_table" "dfit" ON ((("dfit"."inventory_date" = "fs"."date") AND ("dfit"."system_id" = "fs"."system_id"))))
+             JOIN "public"."system" "sys" ON (("sys"."id" = "fs"."system_id")))
           WHERE ("fs"."date" <= ( SELECT "asof"."as_of_date"
                    FROM "asof"))
         ), "start_anchor_data" AS (
@@ -4555,9 +4804,9 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
                 END AS "activity",
             1 AS "activity_rank"
            FROM ((("cycle_map" "cm"
-             JOIN "system" "sys" ON (("sys"."id" = "cm"."system_id")))
-             LEFT JOIN "fish_stocking" "fst" ON ((("fst"."system_id" = "cm"."system_id") AND ("fst"."date" = "cm"."cycle_start"))))
-             LEFT JOIN "daily_fish_inventory_table" "dfit" ON ((("dfit"."system_id" = "cm"."system_id") AND ("dfit"."inventory_date" = "cm"."cycle_start"))))
+             JOIN "public"."system" "sys" ON (("sys"."id" = "cm"."system_id")))
+             LEFT JOIN "public"."fish_stocking" "fst" ON ((("fst"."system_id" = "cm"."system_id") AND ("fst"."date" = "cm"."cycle_start"))))
+             LEFT JOIN "public"."daily_fish_inventory_table" "dfit" ON ((("dfit"."system_id" = "cm"."system_id") AND ("dfit"."inventory_date" = "cm"."cycle_start"))))
           WHERE (("cm"."cycle_start" <= ( SELECT "asof"."as_of_date"
                    FROM "asof")) AND (("fst"."system_id" IS NOT NULL) OR ("dfit"."system_id" IS NOT NULL)))
         ), "final_harvest_anchor_data" AS (
@@ -4575,8 +4824,8 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             'final harvest'::"text" AS "activity",
             3 AS "activity_rank"
            FROM (("cycle_map" "cm"
-             JOIN "fish_harvest" "fh" ON ((("fh"."system_id" = "cm"."system_id") AND ("fh"."date" = "cm"."cycle_end") AND ("fh"."type_of_harvest" = 'final'::"type_of_harvest"))))
-             JOIN "system" "sys" ON (("sys"."id" = "fh"."system_id")))
+             JOIN "public"."fish_harvest" "fh" ON ((("fh"."system_id" = "cm"."system_id") AND ("fh"."date" = "cm"."cycle_end") AND ("fh"."type_of_harvest" = 'final'::"public"."type_of_harvest"))))
+             JOIN "public"."system" "sys" ON (("sys"."id" = "fh"."system_id")))
           WHERE (("cm"."cycle_end" IS NOT NULL) AND ("cm"."cycle_end" <= ( SELECT "asof"."as_of_date"
                    FROM "asof")))
         ), "end_anchor_data" AS (
@@ -4594,9 +4843,9 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
                 END AS "activity",
             4 AS "activity_rank"
            FROM ((("cycle_map" "cm"
-             JOIN "system" "sys" ON (("sys"."id" = "cm"."system_id")))
-             JOIN "daily_fish_inventory_table" "dfit" ON ((("dfit"."system_id" = "cm"."system_id") AND ("dfit"."inventory_date" = "cm"."cycle_end"))))
-             LEFT JOIN "fish_harvest" "fh" ON ((("fh"."system_id" = "cm"."system_id") AND ("fh"."date" = "cm"."cycle_end") AND ("fh"."type_of_harvest" = 'final'::"type_of_harvest"))))
+             JOIN "public"."system" "sys" ON (("sys"."id" = "cm"."system_id")))
+             JOIN "public"."daily_fish_inventory_table" "dfit" ON ((("dfit"."system_id" = "cm"."system_id") AND ("dfit"."inventory_date" = "cm"."cycle_end"))))
+             LEFT JOIN "public"."fish_harvest" "fh" ON ((("fh"."system_id" = "cm"."system_id") AND ("fh"."date" = "cm"."cycle_end") AND ("fh"."type_of_harvest" = 'final'::"public"."type_of_harvest"))))
           WHERE (("cm"."cycle_end" IS NOT NULL) AND ("cm"."cycle_end" <= ( SELECT "asof"."as_of_date"
                    FROM "asof")) AND ("cm"."cycle_end" > "cm"."cycle_start") AND ("fh"."system_id" IS NULL))
         ), "base_data" AS (
@@ -4667,7 +4916,7 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             "p"."activity",
             COALESCE("sum"("fr"."feeding_amount"), (0)::double precision) AS "total_feed_amount_period"
            FROM ("periods" "p"
-             LEFT JOIN "feeding_record" "fr" ON ((("fr"."system_id" = "p"."system_id") AND ("p"."previous_date" IS NOT NULL) AND ((("p"."activity" = 'final harvest'::"text") AND ("fr"."date" >= "p"."previous_date") AND ("fr"."date" <= "p"."date")) OR (("p"."activity" <> 'final harvest'::"text") AND ("fr"."date" >= "p"."previous_date") AND ("fr"."date" < "p"."date"))))))
+             LEFT JOIN "public"."feeding_record" "fr" ON ((("fr"."system_id" = "p"."system_id") AND ("p"."previous_date" IS NOT NULL) AND ((("p"."activity" = 'final harvest'::"text") AND ("fr"."date" >= "p"."previous_date") AND ("fr"."date" <= "p"."date")) OR (("p"."activity" <> 'final harvest'::"text") AND ("fr"."date" >= "p"."previous_date") AND ("fr"."date" < "p"."date"))))))
           GROUP BY "p"."cycle_id", "p"."system_id", "p"."date", "p"."activity"
         ), "mortality_amounts" AS (
          SELECT "p"."cycle_id",
@@ -4676,7 +4925,7 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             "p"."activity",
             (COALESCE("sum"("fm"."number_of_fish_mortality"), (0)::numeric))::double precision AS "mortality_period"
            FROM ("periods" "p"
-             LEFT JOIN "fish_mortality" "fm" ON ((("fm"."system_id" = "p"."system_id") AND ("p"."previous_date" IS NOT NULL) AND ("fm"."date" > "p"."previous_date") AND ("fm"."date" <= "p"."date"))))
+             LEFT JOIN "public"."fish_mortality" "fm" ON ((("fm"."system_id" = "p"."system_id") AND ("p"."previous_date" IS NOT NULL) AND ("fm"."date" > "p"."previous_date") AND ("fm"."date" <= "p"."date"))))
           GROUP BY "p"."cycle_id", "p"."system_id", "p"."date", "p"."activity"
         ), "biomass_data" AS (
          SELECT "p"."cycle_id",
@@ -4705,7 +4954,7 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             COALESCE("sum"("ft"."number_of_fish_transfer"), (0)::double precision) AS "number_of_fish_transfer_out",
             COALESCE("sum"("ft"."total_weight_transfer"), (0)::double precision) AS "total_weight_transfer_out"
            FROM ("biomass_data" "bd"
-             LEFT JOIN "fish_transfer" "ft" ON ((("ft"."origin_system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("ft"."date" > "bd"."previous_date") AND ("ft"."date" <= "bd"."date") AND "transfer_impacts_efcr"("ft"."transfer_type", "ft"."origin_system_id", "ft"."target_system_id"))))
+             LEFT JOIN "public"."fish_transfer" "ft" ON ((("ft"."origin_system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("ft"."date" > "bd"."previous_date") AND ("ft"."date" <= "bd"."date") AND "public"."transfer_impacts_efcr"("ft"."transfer_type", "ft"."origin_system_id", "ft"."target_system_id"))))
           GROUP BY "bd"."cycle_id", "bd"."system_id", "bd"."date", "bd"."activity"
         ), "transfer_in_data" AS (
          SELECT "bd"."cycle_id",
@@ -4715,7 +4964,7 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             COALESCE("sum"("ft"."number_of_fish_transfer"), (0)::double precision) AS "number_of_fish_transfer_in",
             COALESCE("sum"("ft"."total_weight_transfer"), (0)::double precision) AS "total_weight_transfer_in"
            FROM ("biomass_data" "bd"
-             LEFT JOIN "fish_transfer" "ft" ON ((("ft"."target_system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("ft"."date" > "bd"."previous_date") AND ("ft"."date" <= "bd"."date") AND "transfer_impacts_efcr"("ft"."transfer_type", "ft"."origin_system_id", "ft"."target_system_id"))))
+             LEFT JOIN "public"."fish_transfer" "ft" ON ((("ft"."target_system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("ft"."date" > "bd"."previous_date") AND ("ft"."date" <= "bd"."date") AND "public"."transfer_impacts_efcr"("ft"."transfer_type", "ft"."origin_system_id", "ft"."target_system_id"))))
           GROUP BY "bd"."cycle_id", "bd"."system_id", "bd"."date", "bd"."activity"
         ), "harvest_data" AS (
          SELECT "bd"."cycle_id",
@@ -4725,7 +4974,7 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             (COALESCE("sum"("fh"."number_of_fish_harvest"), (0)::numeric))::double precision AS "number_of_fish_harvested",
             COALESCE("sum"("fh"."total_weight_harvest"), (0)::double precision) AS "total_weight_harvested"
            FROM ("biomass_data" "bd"
-             LEFT JOIN "fish_harvest" "fh" ON ((("fh"."system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("fh"."date" > "bd"."previous_date") AND ("fh"."date" <= "bd"."date"))))
+             LEFT JOIN "public"."fish_harvest" "fh" ON ((("fh"."system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("fh"."date" > "bd"."previous_date") AND ("fh"."date" <= "bd"."date"))))
           GROUP BY "bd"."cycle_id", "bd"."system_id", "bd"."date", "bd"."activity"
         ), "stocking_data" AS (
          SELECT "bd"."cycle_id",
@@ -4735,7 +4984,7 @@ CREATE MATERIALIZED VIEW "public"."production_summary" AS
             (COALESCE("sum"("fs"."number_of_fish_stocking"), (0)::numeric))::double precision AS "number_of_fish_stocked",
             COALESCE("sum"("fs"."total_weight_stocking"), (0)::double precision) AS "total_weight_stocked"
            FROM ("biomass_data" "bd"
-             LEFT JOIN "fish_stocking" "fs" ON ((("fs"."system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("fs"."date" > "bd"."previous_date") AND ("fs"."date" <= "bd"."date"))))
+             LEFT JOIN "public"."fish_stocking" "fs" ON ((("fs"."system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("fs"."date" > "bd"."previous_date") AND ("fs"."date" <= "bd"."date"))))
           GROUP BY "bd"."cycle_id", "bd"."system_id", "bd"."date", "bd"."activity"
         ), "consolidated" AS (
          SELECT "bd"."cycle_id",
@@ -4841,8 +5090,8 @@ CREATE OR REPLACE VIEW "public"."report_feed_incoming_enriched" WITH ("security_
     "ft"."crude_protein_percentage",
     "ft"."crude_fat_percentage",
     COALESCE(NULLIF(TRIM(BOTH FROM "concat_ws"(' '::"text", "ft"."feed_line", ("ft"."feed_pellet_size")::"text")), ''::"text"), "concat"('Feed ', ("fi"."feed_type_id")::"text")) AS "feed_label"
-   FROM ("feed_incoming" "fi"
-     LEFT JOIN "feed_type" "ft" ON (("ft"."id" = "fi"."feed_type_id")));
+   FROM ("public"."feed_incoming" "fi"
+     LEFT JOIN "public"."feed_type" "ft" ON (("ft"."id" = "fi"."feed_type_id")));
 
 
 ALTER TABLE "public"."report_feed_incoming_enriched" OWNER TO "postgres";
@@ -4946,15 +5195,40 @@ ALTER TABLE "public"."water_quality_measurement" ALTER COLUMN "id" ADD GENERATED
 
 
 
-ALTER TABLE ONLY "public"."change_log" ALTER COLUMN "id" SET DEFAULT "nextval"('"change_log_id_seq"'::"regclass");
+ALTER TABLE ONLY "public"."change_log" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."change_log_id_seq"'::"regclass");
 
 
 
-ALTER TABLE ONLY "public"."daily_fish_inventory_table" ALTER COLUMN "id" SET DEFAULT "nextval"('"daily_fish_inventory_table_id_seq"'::"regclass");
+ALTER TABLE ONLY "public"."daily_fish_inventory_table" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."daily_fish_inventory_table_id_seq"'::"regclass");
 
 
 
-ALTER TABLE ONLY "public"."production_cycle" ALTER COLUMN "cycle_id" SET DEFAULT "nextval"('"production_cycle_cycle_id_seq"'::"regclass");
+ALTER TABLE ONLY "public"."production_cycle" ALTER COLUMN "cycle_id" SET DEFAULT "nextval"('"public"."production_cycle_cycle_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "energy"."electrical_appliance"
+    ADD CONSTRAINT "appliances_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "energy"."power_consumption"
+    ADD CONSTRAINT "power_consumption_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "energy"."solar_production_historical"
+    ADD CONSTRAINT "solar_production_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "energy"."solar_production_prediction"
+    ADD CONSTRAINT "solar_production_prediction_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "private"."api_rate_limit_bucket"
+    ADD CONSTRAINT "api_rate_limit_bucket_pkey" PRIMARY KEY ("scope", "subject", "window_start");
 
 
 
@@ -5135,6 +5409,10 @@ ALTER TABLE ONLY "public"."water_quality_framework"
 
 ALTER TABLE ONLY "public"."water_quality_measurement"
     ADD CONSTRAINT "water_quality_measurements_pkey" PRIMARY KEY ("id");
+
+
+
+CREATE INDEX "api_rate_limit_bucket_updated_at_idx" ON "private"."api_rate_limit_bucket" USING "btree" ("updated_at");
 
 
 
@@ -5338,107 +5616,107 @@ CREATE UNIQUE INDEX "water_quality_measurement_unique" ON "public"."water_qualit
 
 
 
-CREATE OR REPLACE TRIGGER "after_feeding_record_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."feeding_record" FOR EACH ROW EXECUTE FUNCTION "after_event_update_inventory"();
+CREATE OR REPLACE TRIGGER "after_feeding_record_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."feeding_record" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
 
-CREATE OR REPLACE TRIGGER "after_fish_harvest_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "after_event_update_inventory"();
+CREATE OR REPLACE TRIGGER "after_fish_harvest_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
 
-CREATE OR REPLACE TRIGGER "after_fish_mortality_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_mortality" FOR EACH ROW EXECUTE FUNCTION "after_event_update_inventory"();
+CREATE OR REPLACE TRIGGER "after_fish_mortality_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_mortality" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
 
-CREATE OR REPLACE TRIGGER "after_fish_sampling_weight_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "after_event_update_inventory"();
+CREATE OR REPLACE TRIGGER "after_fish_sampling_weight_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
 
-CREATE OR REPLACE TRIGGER "after_fish_stocking_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "after_event_update_inventory"();
+CREATE OR REPLACE TRIGGER "after_fish_stocking_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
 
-CREATE OR REPLACE TRIGGER "after_fish_transfer_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_transfer" FOR EACH ROW EXECUTE FUNCTION "after_event_update_inventory"();
+CREATE OR REPLACE TRIGGER "after_fish_transfer_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_transfer" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
 
-CREATE OR REPLACE TRIGGER "change_log_alert_threshold" AFTER INSERT OR DELETE OR UPDATE ON "public"."alert_threshold" FOR EACH ROW EXECUTE FUNCTION "log_row_change"();
+CREATE OR REPLACE TRIGGER "change_log_alert_threshold" AFTER INSERT OR DELETE OR UPDATE ON "public"."alert_threshold" FOR EACH ROW EXECUTE FUNCTION "public"."log_row_change"();
 
 
 
-CREATE OR REPLACE TRIGGER "change_log_farm" AFTER INSERT OR DELETE OR UPDATE ON "public"."farm" FOR EACH ROW EXECUTE FUNCTION "log_row_change"();
+CREATE OR REPLACE TRIGGER "change_log_farm" AFTER INSERT OR DELETE OR UPDATE ON "public"."farm" FOR EACH ROW EXECUTE FUNCTION "public"."log_row_change"();
 
 
 
-CREATE OR REPLACE TRIGGER "change_log_system" AFTER INSERT OR DELETE OR UPDATE ON "public"."system" FOR EACH ROW EXECUTE FUNCTION "log_row_change"();
+CREATE OR REPLACE TRIGGER "change_log_system" AFTER INSERT OR DELETE OR UPDATE ON "public"."system" FOR EACH ROW EXECUTE FUNCTION "public"."log_row_change"();
 
 
 
-CREATE OR REPLACE TRIGGER "change_log_user_profile" AFTER INSERT OR DELETE OR UPDATE ON "public"."user_profile" FOR EACH ROW EXECUTE FUNCTION "log_row_change"();
+CREATE OR REPLACE TRIGGER "change_log_user_profile" AFTER INSERT OR DELETE OR UPDATE ON "public"."user_profile" FOR EACH ROW EXECUTE FUNCTION "public"."log_row_change"();
 
 
 
-CREATE OR REPLACE TRIGGER "feeding_record_changes_trigger" AFTER DELETE OR UPDATE ON "public"."feeding_record" FOR EACH ROW EXECUTE FUNCTION "log_feeding_record_changes"();
+CREATE OR REPLACE TRIGGER "feeding_record_changes_trigger" AFTER DELETE OR UPDATE ON "public"."feeding_record" FOR EACH ROW EXECUTE FUNCTION "public"."log_feeding_record_changes"();
 
 
 
-CREATE OR REPLACE TRIGGER "fish_harvest_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "update_change_log"();
+CREATE OR REPLACE TRIGGER "fish_harvest_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "public"."update_change_log"();
 
 
 
-CREATE OR REPLACE TRIGGER "fish_mortality_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_mortality" FOR EACH ROW EXECUTE FUNCTION "update_change_log"();
+CREATE OR REPLACE TRIGGER "fish_mortality_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_mortality" FOR EACH ROW EXECUTE FUNCTION "public"."update_change_log"();
 
 
 
-CREATE OR REPLACE TRIGGER "fish_sampling_weight_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "update_change_log"();
+CREATE OR REPLACE TRIGGER "fish_sampling_weight_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "public"."update_change_log"();
 
 
 
-CREATE OR REPLACE TRIGGER "fish_stocking_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "update_change_log"();
+CREATE OR REPLACE TRIGGER "fish_stocking_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "public"."update_change_log"();
 
 
 
-CREATE OR REPLACE TRIGGER "fish_transfer_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_transfer" FOR EACH ROW EXECUTE FUNCTION "update_change_log"();
+CREATE OR REPLACE TRIGGER "fish_transfer_changes_trigger" AFTER DELETE OR UPDATE ON "public"."fish_transfer" FOR EACH ROW EXECUTE FUNCTION "public"."update_change_log"();
 
 
 
-CREATE OR REPLACE TRIGGER "prevent_system_name_change" BEFORE UPDATE ON "public"."system" FOR EACH ROW EXECUTE FUNCTION "prevent_system_name_update"();
+CREATE OR REPLACE TRIGGER "prevent_system_name_change" BEFORE UPDATE ON "public"."system" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_system_name_update"();
 
 
 
-CREATE OR REPLACE TRIGGER "refresh_after_system" AFTER INSERT OR DELETE OR UPDATE ON "public"."system" FOR EACH ROW EXECUTE FUNCTION "refresh_after_system_if_needed"();
+CREATE OR REPLACE TRIGGER "refresh_after_system" AFTER INSERT OR DELETE OR UPDATE ON "public"."system" FOR EACH ROW EXECUTE FUNCTION "public"."refresh_after_system_if_needed"();
 
 
 
-CREATE OR REPLACE TRIGGER "trg_assign_feed_incoming_farm_if_missing" BEFORE INSERT OR UPDATE OF "farm_id" ON "public"."feed_incoming" FOR EACH ROW EXECUTE FUNCTION "assign_feed_incoming_farm_if_missing"();
+CREATE OR REPLACE TRIGGER "trg_assign_feed_incoming_farm_if_missing" BEFORE INSERT OR UPDATE OF "farm_id" ON "public"."feed_incoming" FOR EACH ROW EXECUTE FUNCTION "public"."assign_feed_incoming_farm_if_missing"();
 
 
 
-CREATE OR REPLACE TRIGGER "trg_close_cycle_on_final_harvest" AFTER INSERT OR UPDATE OF "type_of_harvest", "date", "system_id" ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "close_cycle_on_final_harvest"();
+CREATE OR REPLACE TRIGGER "trg_close_cycle_on_final_harvest" AFTER INSERT OR UPDATE OF "type_of_harvest", "date", "system_id" ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "public"."close_cycle_on_final_harvest"();
 
 
 
-CREATE OR REPLACE TRIGGER "trg_create_lake_reference_system" AFTER INSERT ON "public"."farm" FOR EACH ROW EXECUTE FUNCTION "trg_create_lake_reference_system"();
+CREATE OR REPLACE TRIGGER "trg_create_lake_reference_system" AFTER INSERT ON "public"."farm" FOR EACH ROW EXECUTE FUNCTION "public"."trg_create_lake_reference_system"();
 
 
 
-CREATE OR REPLACE TRIGGER "trg_cycle_on_stocking" AFTER INSERT ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "ensure_cycle_on_stocking"();
+CREATE OR REPLACE TRIGGER "trg_cycle_on_stocking" AFTER INSERT ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "public"."ensure_cycle_on_stocking"();
 
 
 
-CREATE OR REPLACE TRIGGER "trg_production_cycle_set_ongoing" BEFORE INSERT OR UPDATE OF "cycle_end" ON "public"."production_cycle" FOR EACH ROW EXECUTE FUNCTION "production_cycle_set_ongoing"();
+CREATE OR REPLACE TRIGGER "trg_production_cycle_set_ongoing" BEFORE INSERT OR UPDATE OF "cycle_end" ON "public"."production_cycle" FOR EACH ROW EXECUTE FUNCTION "public"."production_cycle_set_ongoing"();
 
 
 
-CREATE OR REPLACE TRIGGER "trg_water_quality_alert_check" AFTER INSERT ON "public"."water_quality_measurement" FOR EACH ROW EXECUTE FUNCTION "trg_wq_alert_check"();
+CREATE OR REPLACE TRIGGER "trg_water_quality_alert_check" AFTER INSERT ON "public"."water_quality_measurement" FOR EACH ROW EXECUTE FUNCTION "public"."trg_wq_alert_check"();
 
 
 
-CREATE OR REPLACE TRIGGER "water_quality_framework_refresh_daily_rating" AFTER UPDATE ON "public"."water_quality_framework" FOR EACH ROW EXECUTE FUNCTION "trg_refresh_daily_water_quality_rating_from_framework"();
+CREATE OR REPLACE TRIGGER "water_quality_framework_refresh_daily_rating" AFTER UPDATE ON "public"."water_quality_framework" FOR EACH ROW EXECUTE FUNCTION "public"."trg_refresh_daily_water_quality_rating_from_framework"();
 
 
 
-CREATE OR REPLACE TRIGGER "water_quality_measurement_refresh_daily_rating" AFTER INSERT OR DELETE OR UPDATE ON "public"."water_quality_measurement" FOR EACH ROW EXECUTE FUNCTION "trg_refresh_daily_water_quality_rating"();
+CREATE OR REPLACE TRIGGER "water_quality_measurement_refresh_daily_rating" AFTER INSERT OR DELETE OR UPDATE ON "public"."water_quality_measurement" FOR EACH ROW EXECUTE FUNCTION "public"."trg_refresh_daily_water_quality_rating"();
 
 
 
@@ -5448,37 +5726,37 @@ ALTER TABLE ONLY "public"."alert_log"
 
 
 ALTER TABLE ONLY "public"."alert_log"
-    ADD CONSTRAINT "alert_log_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "farm"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "alert_log_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."alert_log"
-    ADD CONSTRAINT "alert_log_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "alert_log_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."alert_threshold"
-    ADD CONSTRAINT "alert_threshold_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "farm"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "alert_threshold_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."alert_threshold"
-    ADD CONSTRAINT "alert_threshold_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "alert_threshold_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."daily_fish_inventory_table"
-    ADD CONSTRAINT "daily_fish_inventory_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "daily_fish_inventory_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."daily_water_quality_rating"
-    ADD CONSTRAINT "daily_water_quality_rating_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "daily_water_quality_rating_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."farm_user"
-    ADD CONSTRAINT "farm_user_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "farm"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "farm_user_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
 
@@ -5488,87 +5766,87 @@ ALTER TABLE ONLY "public"."farm_user"
 
 
 ALTER TABLE ONLY "public"."feed_incoming"
-    ADD CONSTRAINT "feed_incoming_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "farm"("id");
+    ADD CONSTRAINT "feed_incoming_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id");
 
 
 
 ALTER TABLE ONLY "public"."feed_incoming"
-    ADD CONSTRAINT "feed_incoming_feed_id_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "feed_type"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feed_incoming_feed_id_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "public"."feed_type"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feed_inventory_snapshot"
-    ADD CONSTRAINT "feed_inventory_snapshot_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "farm"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "feed_inventory_snapshot_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feed_inventory_snapshot"
-    ADD CONSTRAINT "feed_inventory_snapshot_feed_type_id_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "feed_type"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feed_inventory_snapshot_feed_type_id_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "public"."feed_type"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feed_plan"
-    ADD CONSTRAINT "feed_plan_batch_fkey" FOREIGN KEY ("batch_id") REFERENCES "fingerling_batch"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feed_plan_batch_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feed_plan"
-    ADD CONSTRAINT "feed_plan_feed_type_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "feed_type"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feed_plan_feed_type_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "public"."feed_type"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feed_plan"
-    ADD CONSTRAINT "feed_plan_system_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feed_plan_system_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feeding_record"
-    ADD CONSTRAINT "feed_record_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feed_record_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feed_type"
-    ADD CONSTRAINT "feed_type_feed_supplier_fkey" FOREIGN KEY ("feed_supplier") REFERENCES "feed_supplier"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feed_type_feed_supplier_fkey" FOREIGN KEY ("feed_supplier") REFERENCES "public"."feed_supplier"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feeding_record"
-    ADD CONSTRAINT "feeding_record_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "fingerling_batch"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feeding_record_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."feeding_record"
-    ADD CONSTRAINT "feeding_record_feed_id_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "feed_type"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "feeding_record_feed_id_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "public"."feed_type"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fingerling_batch"
-    ADD CONSTRAINT "fingerling_batch_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "farm"("id");
+    ADD CONSTRAINT "fingerling_batch_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id");
 
 
 
 ALTER TABLE ONLY "public"."fingerling_batch"
-    ADD CONSTRAINT "fingerling_batch_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "fingerling_supplier"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "fingerling_batch_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "public"."fingerling_supplier"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_harvest"
-    ADD CONSTRAINT "fish_harvest_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "fingerling_batch"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "fish_harvest_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_harvest"
-    ADD CONSTRAINT "fish_harvest_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "fish_harvest_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_mortality"
-    ADD CONSTRAINT "fish_mortality_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "fingerling_batch"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "fish_mortality_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_mortality"
-    ADD CONSTRAINT "fish_mortality_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "farm"("id");
+    ADD CONSTRAINT "fish_mortality_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id");
 
 
 
@@ -5578,52 +5856,52 @@ ALTER TABLE ONLY "public"."fish_mortality"
 
 
 ALTER TABLE ONLY "public"."fish_sampling_weight"
-    ADD CONSTRAINT "fish_sampling_weight_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "fingerling_batch"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "fish_sampling_weight_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_stocking"
-    ADD CONSTRAINT "fish_stocking_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "fingerling_batch"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "fish_stocking_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_transfer"
-    ADD CONSTRAINT "fish_transfer_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "fingerling_batch"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "fish_transfer_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_sampling_weight"
-    ADD CONSTRAINT "fish_weight_sampling_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "fish_weight_sampling_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_mortality"
-    ADD CONSTRAINT "mortality_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "mortality_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."production_cycle"
-    ADD CONSTRAINT "production_cycle_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "production_cycle_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_stocking"
-    ADD CONSTRAINT "stocking_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "stocking_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."system"
-    ADD CONSTRAINT "system_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "farm"("id") ON DELETE SET NULL;
+    ADD CONSTRAINT "system_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE SET NULL;
 
 
 
 ALTER TABLE ONLY "public"."fish_transfer"
-    ADD CONSTRAINT "transfer_origin_system_id_fkey" FOREIGN KEY ("origin_system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "transfer_origin_system_id_fkey" FOREIGN KEY ("origin_system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."fish_transfer"
-    ADD CONSTRAINT "transfer_target_system_id_fkey" FOREIGN KEY ("target_system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "transfer_target_system_id_fkey" FOREIGN KEY ("target_system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
 
@@ -5633,13 +5911,25 @@ ALTER TABLE ONLY "public"."user_profile"
 
 
 ALTER TABLE ONLY "public"."water_quality_measurement"
-    ADD CONSTRAINT "water_quality_measurement_parameter_fkey" FOREIGN KEY ("parameter_name") REFERENCES "water_quality_framework"("parameter_name");
+    ADD CONSTRAINT "water_quality_measurement_parameter_fkey" FOREIGN KEY ("parameter_name") REFERENCES "public"."water_quality_framework"("parameter_name");
 
 
 
 ALTER TABLE ONLY "public"."water_quality_measurement"
-    ADD CONSTRAINT "water_quality_measurements_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "system"("id") ON UPDATE CASCADE;
+    ADD CONSTRAINT "water_quality_measurements_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
+
+
+ALTER TABLE "energy"."electrical_appliance" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "energy"."power_consumption" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "energy"."solar_production_historical" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "energy"."solar_production_prediction" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "Authenticated users can read change_log" ON "public"."change_log" FOR SELECT TO "authenticated" USING (true);
@@ -5655,8 +5945,8 @@ CREATE POLICY "Authenticated users can read water_quality_framework" ON "public"
 
 
 CREATE POLICY "Profiles viewable by farm members" ON "public"."user_profile" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM ("farm_user" "fu1"
-     JOIN "farm_user" "fu2" ON (("fu1"."farm_id" = "fu2"."farm_id")))
+   FROM ("public"."farm_user" "fu1"
+     JOIN "public"."farm_user" "fu2" ON (("fu1"."farm_id" = "fu2"."farm_id")))
   WHERE (("fu1"."user_id" = "auth"."uid"()) AND ("fu2"."user_id" = "user_profile"."user_id")))));
 
 
@@ -5673,9 +5963,9 @@ ALTER TABLE "public"."alert_log" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "alert_log_isolation" ON "public"."alert_log" USING (("farm_id" IN ( SELECT "fu"."farm_id"
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE ("fu"."user_id" = "auth"."uid"())))) WITH CHECK (("farm_id" IN ( SELECT "fu"."farm_id"
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE ("fu"."user_id" = "auth"."uid"()))));
 
 
@@ -5683,32 +5973,32 @@ CREATE POLICY "alert_log_isolation" ON "public"."alert_log" USING (("farm_id" IN
 ALTER TABLE "public"."alert_threshold" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "alert_threshold_delete" ON "public"."alert_threshold" FOR DELETE TO "authenticated" USING (((("scope" = 'farm'::"text") AND "has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))) OR (("scope" = 'system'::"text") AND (EXISTS ( SELECT 1
-   FROM "system" "s"
-  WHERE (("s"."id" = "alert_threshold"."system_id") AND "has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))))))));
+CREATE POLICY "alert_threshold_delete" ON "public"."alert_threshold" FOR DELETE TO "authenticated" USING (((("scope" = 'farm'::"text") AND "public"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))) OR (("scope" = 'system'::"text") AND (EXISTS ( SELECT 1
+   FROM "public"."system" "s"
+  WHERE (("s"."id" = "alert_threshold"."system_id") AND "public"."has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))))))));
 
 
 
 CREATE POLICY "alert_threshold_select_farm_member" ON "public"."alert_threshold" FOR SELECT TO "authenticated" USING (((("farm_id" IS NOT NULL) AND (EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "alert_threshold"."farm_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")))))) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "alert_threshold"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))))));
 
 
 
-CREATE POLICY "alert_threshold_update_admin_manager" ON "public"."alert_threshold" FOR UPDATE TO "authenticated" USING (((("farm_id" IS NOT NULL) AND "has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
-   FROM "system" "s"
-  WHERE (("s"."id" = "alert_threshold"."system_id") AND "has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"]))))))) WITH CHECK (((("farm_id" IS NOT NULL) AND "has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
-   FROM "system" "s"
-  WHERE (("s"."id" = "alert_threshold"."system_id") AND "has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])))))));
+CREATE POLICY "alert_threshold_update_admin_manager" ON "public"."alert_threshold" FOR UPDATE TO "authenticated" USING (((("farm_id" IS NOT NULL) AND "public"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM "public"."system" "s"
+  WHERE (("s"."id" = "alert_threshold"."system_id") AND "public"."has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"]))))))) WITH CHECK (((("farm_id" IS NOT NULL) AND "public"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM "public"."system" "s"
+  WHERE (("s"."id" = "alert_threshold"."system_id") AND "public"."has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])))))));
 
 
 
-CREATE POLICY "alert_threshold_write_admin_manager" ON "public"."alert_threshold" FOR INSERT TO "authenticated" WITH CHECK (((("farm_id" IS NOT NULL) AND "has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
-   FROM "system" "s"
-  WHERE (("s"."id" = "alert_threshold"."system_id") AND "has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])))))));
+CREATE POLICY "alert_threshold_write_admin_manager" ON "public"."alert_threshold" FOR INSERT TO "authenticated" WITH CHECK (((("farm_id" IS NOT NULL) AND "public"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM "public"."system" "s"
+  WHERE (("s"."id" = "alert_threshold"."system_id") AND "public"."has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])))))));
 
 
 
@@ -5722,8 +6012,8 @@ ALTER TABLE "public"."daily_water_quality_rating" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "dwr_select_farm_member" ON "public"."daily_water_quality_rating" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "daily_water_quality_rating"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
@@ -5731,7 +6021,7 @@ CREATE POLICY "dwr_select_farm_member" ON "public"."daily_water_quality_rating" 
 ALTER TABLE "public"."farm" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "farm_delete" ON "public"."farm" FOR DELETE USING ("has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "farm_delete" ON "public"."farm" FOR DELETE USING ("public"."has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -5739,11 +6029,11 @@ CREATE POLICY "farm_insert" ON "public"."farm" FOR INSERT WITH CHECK ((( SELECT 
 
 
 
-CREATE POLICY "farm_select" ON "public"."farm" FOR SELECT USING ("is_farm_member"("id", ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "farm_select" ON "public"."farm" FOR SELECT USING ("public"."is_farm_member"("id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "farm_update" ON "public"."farm" FOR UPDATE USING ("has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "farm_update" ON "public"."farm" FOR UPDATE USING ("public"."has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("public"."has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -5754,15 +6044,15 @@ CREATE POLICY "farm_user: read own" ON "public"."farm_user" FOR SELECT TO "authe
 
 
 
-CREATE POLICY "farm_user_delete" ON "public"."farm_user" FOR DELETE TO "authenticated" USING ("has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "farm_user_delete" ON "public"."farm_user" FOR DELETE TO "authenticated" USING ("public"."has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "farm_user_insert" ON "public"."farm_user" FOR INSERT TO "authenticated" WITH CHECK ("has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "farm_user_insert" ON "public"."farm_user" FOR INSERT TO "authenticated" WITH CHECK ("public"."has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "farm_user_update" ON "public"."farm_user" FOR UPDATE TO "authenticated" USING ("has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "farm_user_update" ON "public"."farm_user" FOR UPDATE TO "authenticated" USING ("public"."has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("public"."has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -5770,27 +6060,27 @@ ALTER TABLE "public"."feed_incoming" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "feed_incoming_delete" ON "public"."feed_incoming" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "feed_incoming"."farm_id") AND ("fu"."user_id" = "auth"."uid"())))));
 
 
 
 CREATE POLICY "feed_incoming_insert" ON "public"."feed_incoming" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "feed_incoming"."farm_id") AND ("fu"."user_id" = "auth"."uid"())))));
 
 
 
 CREATE POLICY "feed_incoming_select" ON "public"."feed_incoming" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "feed_incoming"."farm_id") AND ("fu"."user_id" = "auth"."uid"())))));
 
 
 
 CREATE POLICY "feed_incoming_update" ON "public"."feed_incoming" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "feed_incoming"."farm_id") AND ("fu"."user_id" = "auth"."uid"()))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "feed_incoming"."farm_id") AND ("fu"."user_id" = "auth"."uid"())))));
 
 
@@ -5799,13 +6089,13 @@ ALTER TABLE "public"."feed_inventory_snapshot" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "feed_inventory_snapshot: insert if farm member" ON "public"."feed_inventory_snapshot" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "feed_inventory_snapshot"."farm_id") AND ("fu"."user_id" = "auth"."uid"())))));
 
 
 
 CREATE POLICY "feed_inventory_snapshot: read if farm member" ON "public"."feed_inventory_snapshot" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "feed_inventory_snapshot"."farm_id") AND ("fu"."user_id" = "auth"."uid"())))));
 
 
@@ -5825,7 +6115,7 @@ ALTER TABLE "public"."feed_type" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "feed_type: read if farm member" ON "public"."feed_type" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")))));
 
 
@@ -5838,15 +6128,15 @@ ALTER TABLE "public"."feeding_record" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "feeding_record: insert if farm member" ON "public"."feeding_record" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "feeding_record"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
 CREATE POLICY "feeding_record: read if farm member" ON "public"."feeding_record" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "feeding_record"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
@@ -5855,12 +6145,12 @@ ALTER TABLE "public"."fingerling_batch" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "fingerling_batch: read if user is farm member" ON "public"."fingerling_batch" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")))));
 
 
 
-CREATE POLICY "fingerling_batch_insert_farm_member" ON "public"."fingerling_batch" FOR INSERT TO "authenticated" WITH CHECK ("is_farm_member"("farm_id", ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "fingerling_batch_insert_farm_member" ON "public"."fingerling_batch" FOR INSERT TO "authenticated" WITH CHECK ("public"."is_farm_member"("farm_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -5868,7 +6158,7 @@ ALTER TABLE "public"."fingerling_supplier" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "fingerling_supplier: read if farm member" ON "public"."fingerling_supplier" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "farm_user" "fu"
+   FROM "public"."farm_user" "fu"
   WHERE ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")))));
 
 
@@ -5881,15 +6171,15 @@ ALTER TABLE "public"."fish_harvest" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "fish_harvest: insert if farm member" ON "public"."fish_harvest" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "fish_harvest"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
 CREATE POLICY "fish_harvest: read if farm member" ON "public"."fish_harvest" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "fish_harvest"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
@@ -5898,15 +6188,15 @@ ALTER TABLE "public"."fish_mortality" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "fish_mortality: insert if farm member" ON "public"."fish_mortality" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "fish_mortality"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
 CREATE POLICY "fish_mortality: read if farm member" ON "public"."fish_mortality" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "fish_mortality"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
@@ -5915,15 +6205,15 @@ ALTER TABLE "public"."fish_sampling_weight" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "fish_sampling_weight: insert if farm member" ON "public"."fish_sampling_weight" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "fish_sampling_weight"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
 CREATE POLICY "fish_sampling_weight: read if farm member" ON "public"."fish_sampling_weight" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "fish_sampling_weight"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
@@ -5932,15 +6222,15 @@ ALTER TABLE "public"."fish_stocking" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "fish_stocking: insert if farm member" ON "public"."fish_stocking" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "fish_stocking"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
 CREATE POLICY "fish_stocking: read if farm member" ON "public"."fish_stocking" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "fish_stocking"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
@@ -5949,15 +6239,15 @@ ALTER TABLE "public"."fish_transfer" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "fish_transfer: insert if farm member" ON "public"."fish_transfer" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND (("s"."id" = "fish_transfer"."origin_system_id") OR ("s"."id" = "fish_transfer"."target_system_id"))))));
 
 
 
 CREATE POLICY "fish_transfer: read if farm member" ON "public"."fish_transfer" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND (("s"."id" = "fish_transfer"."origin_system_id") OR ("s"."id" = "fish_transfer"."target_system_id"))))));
 
 
@@ -5965,19 +6255,19 @@ CREATE POLICY "fish_transfer: read if farm member" ON "public"."fish_transfer" F
 ALTER TABLE "public"."system" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "system_delete" ON "public"."system" FOR DELETE USING ("has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "system_delete" ON "public"."system" FOR DELETE USING ("public"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "system_insert" ON "public"."system" FOR INSERT WITH CHECK ("has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "system_insert" ON "public"."system" FOR INSERT WITH CHECK ("public"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "system_select" ON "public"."system" FOR SELECT TO "authenticated" USING ("is_farm_member"("farm_id", ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "system_select" ON "public"."system" FOR SELECT TO "authenticated" USING ("public"."is_farm_member"("farm_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "system_update" ON "public"."system" FOR UPDATE USING ("has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "system_update" ON "public"."system" FOR UPDATE USING ("public"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("public"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -6003,24 +6293,809 @@ ALTER TABLE "public"."water_quality_measurement" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "water_quality_measurement: insert if farm member" ON "public"."water_quality_measurement" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "water_quality_measurement"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
 CREATE POLICY "wqm_select_farm_member" ON "public"."water_quality_measurement" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("system" "s"
-     JOIN "farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
+   FROM ("public"."system" "s"
+     JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("s"."id" = "water_quality_measurement"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
+
+
+
+
+
+ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
+
+
+
+
+
+
+
+
+
+
+
+
+GRANT USAGE ON SCHEMA "private" TO "service_role";
 
 
 
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
-GRANT USAGE ON SCHEMA "public" TO "metabase_reader";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "anon";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+REVOKE ALL ON FUNCTION "private"."api_rate_limit_check"("p_scope" "text", "p_subject" "text", "p_limit" integer, "p_window_seconds" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "private"."api_rate_limit_check"("p_scope" "text", "p_subject" "text", "p_limit" integer, "p_window_seconds" integer) TO "service_role";
 
 
 
@@ -6041,7 +7116,7 @@ GRANT ALL ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", 
 
 
 
-GRANT ALL ON FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
+GRANT ALL ON FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
 
@@ -6065,7 +7140,7 @@ GRANT ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_s
 
 
 
-GRANT ALL ON FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "system_growth_stage", "p_active_only" boolean) TO "service_role";
+GRANT ALL ON FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_active_only" boolean) TO "service_role";
 
 
 
@@ -6074,7 +7149,7 @@ GRANT ALL ON FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", 
 
 
 
-GRANT ALL ON FUNCTION "public"."api_time_period_bounds"("p_farm_id" "uuid", "p_time_period" "time_period", "p_anchor_date" "date") TO "service_role";
+GRANT ALL ON FUNCTION "public"."api_time_period_bounds"("p_farm_id" "uuid", "p_time_period" "public"."time_period", "p_anchor_date" "date") TO "service_role";
 
 
 
@@ -6206,7 +7281,7 @@ GRANT ALL ON FUNCTION "public"."request_matview_refresh"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) TO "service_role";
+GRANT ALL ON FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) TO "service_role";
 
 
 
@@ -6238,160 +7313,202 @@ GRANT ALL ON FUNCTION "public"."water_quality_rating_label"("p_rating_numeric" n
 
 
 
+
+
+
+
+
+
+
+
+
+GRANT ALL ON TABLE "archive"."production_cycle_backup" TO "service_role";
+
+
+
+
+
+
+
+
+
+GRANT ALL ON TABLE "energy"."electrical_appliance" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "energy"."appliances_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "energy"."power_consumption" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "energy"."power_consumption_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "energy"."solar_production_historical" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "energy"."solar_production_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "energy"."solar_production_prediction" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "energy"."solar_production_prediction_id_seq" TO "service_role";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+GRANT ALL ON TABLE "private"."api_rate_limit_bucket" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."_affected_systems" TO "service_role";
-GRANT SELECT ON TABLE "public"."_affected_systems" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."_refresh_queue" TO "service_role";
-GRANT SELECT ON TABLE "public"."_refresh_queue" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."alert_log" TO "service_role";
-GRANT SELECT ON TABLE "public"."alert_log" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."alert_threshold" TO "service_role";
-GRANT SELECT ON TABLE "public"."alert_threshold" TO "metabase_reader";
 GRANT SELECT ON TABLE "public"."alert_threshold" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."feed_incoming" TO "service_role";
-GRANT SELECT ON TABLE "public"."feed_incoming" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."feed_incoming" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."analytics_feed_inventory_day" TO "service_role";
-GRANT SELECT ON TABLE "public"."analytics_feed_inventory_day" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."daily_fish_inventory_table" TO "service_role";
-GRANT SELECT ON TABLE "public"."daily_fish_inventory_table" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."daily_water_quality_rating" TO "service_role";
-GRANT SELECT ON TABLE "public"."daily_water_quality_rating" TO "metabase_reader";
 GRANT SELECT ON TABLE "public"."daily_water_quality_rating" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."feeding_record" TO "service_role";
-GRANT SELECT ON TABLE "public"."feeding_record" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."feeding_record" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."fish_harvest" TO "service_role";
-GRANT SELECT ON TABLE "public"."fish_harvest" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."fish_harvest" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."fish_mortality" TO "service_role";
-GRANT SELECT ON TABLE "public"."fish_mortality" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."fish_mortality" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."fish_sampling_weight" TO "service_role";
-GRANT SELECT ON TABLE "public"."fish_sampling_weight" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."fish_sampling_weight" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."fish_stocking" TO "service_role";
-GRANT SELECT ON TABLE "public"."fish_stocking" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."fish_stocking" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."fish_transfer" TO "service_role";
-GRANT SELECT ON TABLE "public"."fish_transfer" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."fish_transfer" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."system" TO "service_role";
-GRANT SELECT ON TABLE "public"."system" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."system" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."water_quality_measurement" TO "service_role";
-GRANT SELECT ON TABLE "public"."water_quality_measurement" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."water_quality_measurement" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."analytics_system_day_mv" TO "service_role";
-GRANT SELECT ON TABLE "public"."analytics_system_day_mv" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."analytics_system_day" TO "service_role";
-GRANT SELECT ON TABLE "public"."analytics_system_day" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."farm_user" TO "service_role";
-GRANT SELECT ON TABLE "public"."farm_user" TO "metabase_reader";
 GRANT SELECT ON TABLE "public"."farm_user" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."api_alert_thresholds" TO "service_role";
-GRANT SELECT ON TABLE "public"."api_alert_thresholds" TO "metabase_reader";
 GRANT SELECT ON TABLE "public"."api_alert_thresholds" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."daily_fish_inventory" TO "service_role";
-GRANT SELECT ON TABLE "public"."daily_fish_inventory" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."farm" TO "service_role";
-GRANT SELECT ON TABLE "public"."farm" TO "metabase_reader";
 GRANT SELECT ON TABLE "public"."farm" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."api_daily_fish_inventory" TO "service_role";
-GRANT SELECT ON TABLE "public"."api_daily_fish_inventory" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."api_daily_water_quality_rating" TO "service_role";
-GRANT SELECT ON TABLE "public"."api_daily_water_quality_rating" TO "metabase_reader";
 GRANT SELECT ON TABLE "public"."api_daily_water_quality_rating" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."water_quality_framework" TO "service_role";
-GRANT SELECT ON TABLE "public"."water_quality_framework" TO "metabase_reader";
 GRANT SELECT ON TABLE "public"."water_quality_framework" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."api_water_quality_measurements" TO "service_role";
-GRANT SELECT ON TABLE "public"."api_water_quality_measurements" TO "metabase_reader";
 GRANT SELECT ON TABLE "public"."api_water_quality_measurements" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."app_config" TO "service_role";
-GRANT SELECT ON TABLE "public"."app_config" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."change_log" TO "service_role";
-GRANT SELECT ON TABLE "public"."change_log" TO "metabase_reader";
 
 
 
@@ -6413,7 +7530,6 @@ GRANT SELECT,USAGE ON SEQUENCE "public"."feed_incoming_id_seq" TO "authenticated
 
 
 GRANT ALL ON TABLE "public"."feed_inventory_snapshot" TO "service_role";
-GRANT SELECT ON TABLE "public"."feed_inventory_snapshot" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."feed_inventory_snapshot" TO "authenticated";
 
 
@@ -6424,7 +7540,6 @@ GRANT SELECT,USAGE ON SEQUENCE "public"."feed_inventory_snapshot_id_seq" TO "aut
 
 
 GRANT ALL ON TABLE "public"."feed_plan" TO "service_role";
-GRANT SELECT ON TABLE "public"."feed_plan" TO "metabase_reader";
 
 
 
@@ -6437,7 +7552,6 @@ GRANT ALL ON SEQUENCE "public"."feed_record_id_seq" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."feed_supplier" TO "service_role";
-GRANT SELECT ON TABLE "public"."feed_supplier" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."feed_supplier" TO "authenticated";
 
 
@@ -6448,7 +7562,6 @@ GRANT SELECT,USAGE ON SEQUENCE "public"."feed_supplier_id_seq" TO "authenticated
 
 
 GRANT ALL ON TABLE "public"."feed_type" TO "service_role";
-GRANT SELECT ON TABLE "public"."feed_type" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."feed_type" TO "authenticated";
 
 
@@ -6459,7 +7572,6 @@ GRANT SELECT,USAGE ON SEQUENCE "public"."feed_type_id_seq" TO "authenticated";
 
 
 GRANT ALL ON TABLE "public"."fingerling_batch" TO "service_role";
-GRANT SELECT ON TABLE "public"."fingerling_batch" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."fingerling_batch" TO "authenticated";
 
 
@@ -6470,7 +7582,6 @@ GRANT SELECT,USAGE ON SEQUENCE "public"."fingerling_batch_id_seq" TO "authentica
 
 
 GRANT ALL ON TABLE "public"."fingerling_supplier" TO "service_role";
-GRANT SELECT ON TABLE "public"."fingerling_supplier" TO "metabase_reader";
 GRANT SELECT,INSERT ON TABLE "public"."fingerling_supplier" TO "authenticated";
 
 
@@ -6488,7 +7599,6 @@ GRANT ALL ON SEQUENCE "public"."mortality_id_seq" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."production_cycle" TO "service_role";
-GRANT SELECT ON TABLE "public"."production_cycle" TO "metabase_reader";
 
 
 
@@ -6497,12 +7607,10 @@ GRANT ALL ON SEQUENCE "public"."production_cycle_cycle_id_seq" TO "service_role"
 
 
 GRANT ALL ON TABLE "public"."production_summary" TO "service_role";
-GRANT SELECT ON TABLE "public"."production_summary" TO "metabase_reader";
 
 
 
 GRANT ALL ON TABLE "public"."report_feed_incoming_enriched" TO "service_role";
-GRANT SELECT ON TABLE "public"."report_feed_incoming_enriched" TO "metabase_reader";
 
 
 
@@ -6524,7 +7632,6 @@ GRANT ALL ON SEQUENCE "public"."transfer_id_seq" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."user_profile" TO "service_role";
-GRANT SELECT ON TABLE "public"."user_profile" TO "metabase_reader";
 
 
 
@@ -6537,6 +7644,12 @@ GRANT ALL ON SEQUENCE "public"."water_quality_measurements_id_seq" TO "service_r
 
 
 GRANT ALL ON SEQUENCE "public"."water_quality_measurements_id_seq1" TO "service_role";
+
+
+
+
+
+
 
 
 
@@ -6558,7 +7671,31 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "service_role";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT ON TABLES  TO "metabase_reader";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

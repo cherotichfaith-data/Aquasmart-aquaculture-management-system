@@ -113,7 +113,7 @@ function KPICardContent({
     trendDirection === "down" ? ArrowDownRight : trendDirection === "up" ? ArrowUpRight : Minus
 
   return (
-    <div className="w-full cursor-pointer rounded-2xl border border-border bg-card px-4 py-3 text-left shadow-sm transition-shadow hover:shadow-md">
+    <div className="panel-surface w-full cursor-pointer rounded-2xl px-4 py-3 text-left transition-shadow hover:shadow-[0_28px_54px_-38px_rgba(15,23,32,0.52)]">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
@@ -121,7 +121,7 @@ function KPICardContent({
           {trendText && (
             <p className={`text-[11px] mt-2 inline-flex items-center gap-1 ${toneStyles[status]}`}>
               <TrendIcon className="h-3 w-3" />
-              <span>{trendText} change vs previous period</span>
+              <span>{trendText}</span>
             </p>
           )}
         </div>

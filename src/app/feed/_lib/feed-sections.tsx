@@ -5,6 +5,7 @@ import {
   Area,
   CartesianGrid,
   ComposedChart,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -14,6 +15,15 @@ import {
 } from "recharts"
 import { AlertTriangle, CheckCircle2, TrendingDown, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  chartGridProps,
+  chartLegendProps,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  chartXAxisProps,
+  chartYAxisProps,
+} from "@/components/charts/recharts-theme"
 import type { FeedRunningStockRow } from "@/lib/api/reports"
 import { cn } from "@/lib/utils"
 import { LazyRender } from "@/components/shared/lazy-render"
@@ -458,12 +468,15 @@ export function FeedRateSection({
           <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartRows}>
-                <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                <XAxis dataKey="label" />
-                <YAxis />
+                <CartesianGrid {...chartGridProps} />
+                <XAxis {...chartXAxisProps} dataKey="label" />
+                <YAxis {...chartYAxisProps} />
                 <Tooltip
                   labelFormatter={(value, payload) => formatFullDate(String(payload?.[0]?.payload?.date ?? value))}
                   formatter={(value, name) => [`${formatNumber(Number(value), 2)}%`, String(name)]}
+                  contentStyle={chartTooltipStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  itemStyle={chartTooltipItemStyle}
                 />
                 
                 <Area type="monotone" dataKey="upperBand" stroke="transparent" fill="color-mix(in srgb, var(--color-chart-2) 12%, transparent)" name="Scoped target" />
@@ -540,16 +553,20 @@ export function FeedFcrSection({
           <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartRows}>
-                <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                <XAxis dataKey="label" />
-                <YAxis domain={[0, "dataMax + 0.5"]} />
+                <CartesianGrid {...chartGridProps} />
+                <XAxis {...chartXAxisProps} dataKey="label" />
+                <YAxis {...chartYAxisProps} domain={[0, "dataMax + 0.5"]} />
                 <Tooltip
                   labelFormatter={(value, payload) => formatFullDate(String(payload?.[0]?.payload?.date ?? value))}
                   formatter={(value, name) => [formatNumber(Number(value), 2), String(name)]}
+                  contentStyle={chartTooltipStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  itemStyle={chartTooltipItemStyle}
                 />
                 
                 
                 
+                <Legend {...chartLegendProps} />
                 {series.map((item) => (
                   <Line
                     key={item.key}

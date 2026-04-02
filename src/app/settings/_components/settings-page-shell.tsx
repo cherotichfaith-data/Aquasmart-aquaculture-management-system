@@ -31,7 +31,7 @@ export function SettingsPageShell({
 }) {
   if (loading) {
     return (
-      <DashboardLayout>
+      <DashboardLayout hideHeader>
         <div className="flex items-center justify-center p-8">
           <div className="text-muted-foreground">Loading settings...</div>
         </div>
@@ -40,13 +40,8 @@ export function SettingsPageShell({
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout hideHeader>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground mt-1">Manage system configuration and preferences</p>
-        </div>
-
         {saved ? (
           <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 flex items-center gap-3">
             <Check className="text-emerald-600 dark:text-emerald-300" size={20} />

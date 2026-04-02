@@ -3,10 +3,12 @@
 import { useQuery } from "@tanstack/react-query"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
+import { queryKeys } from "@/lib/cache/query-keys"
 import type { KPIOverviewMetric } from "@/features/dashboard/types"
 import { scaleFractionToPercent } from "@/lib/analytics-format"
 import {
   aggregateInventoryMetrics,
+  buildKpiTrustMap,
   computeEfcrFromProductionRows,
   computeMortalityRateFromProduction,
   toTrendDelta,
@@ -38,16 +40,7 @@ export function useKpiOverview(params: {
     params.initialData?.dateBounds.end === params.dateTo
 
   return useQuery({
-    queryKey: [
-      "kpi-overview",
-      params.farmId ?? "all",
-      params.stage,
-      params.timePeriod,
-      params.batch ?? "all",
-      params.system ?? "all",
-      params.dateFrom ?? "",
-      params.dateTo ?? "",
-    ],
+    queryKey: queryKeys.dashboard.kpiOverview(params),
     queryFn: async ({ signal }) => {
       const ratingToneMap: Record<string, { tone: KPIOverviewMetric["tone"]; badge: string }> = {
         optimal: { tone: "good", badge: "Optimal" },
@@ -180,6 +173,13 @@ export function useKpiOverview(params: {
             }
           : {}
 
+        const trustByKey = buildKpiTrustMap({
+          totalSystems: Array.isArray(scopedSystemIds) ? scopedSystemIds.length : 0,
+          inventoryRows,
+          productionRows,
+          waterQualityRows: wqRows ?? [],
+        })
+
         const nextMetrics: KPIOverviewMetric[] = [
           {
             key: "efcr",
@@ -190,6 +190,7 @@ export function useKpiOverview(params: {
             trendFormat: "delta",
             trendDecimals: 2,
             invertTrend: true,
+            trust: trustByKey.efcr,
           },
           {
             key: "mortality",
@@ -202,6 +203,7 @@ export function useKpiOverview(params: {
             trendDecimals: 2,
             trendUnit: "%/day",
             invertTrend: true,
+            trust: trustByKey.mortality,
           },
           {
             key: "abw",
@@ -214,6 +216,7 @@ export function useKpiOverview(params: {
             trendDecimals: 1,
             trendUnit: "g",
             invertTrend: false,
+            trust: trustByKey.abw,
           },
           {
             key: "biomass",
@@ -226,6 +229,7 @@ export function useKpiOverview(params: {
             trendDecimals: 1,
             trendUnit: "kg",
             invertTrend: false,
+            trust: trustByKey.biomass,
           },
           {
             key: "biomass_density",
@@ -238,6 +242,7 @@ export function useKpiOverview(params: {
             trendDecimals: 2,
             trendUnit: "kg/m3",
             invertTrend: false,
+            trust: trustByKey.biomass_density,
           },
           {
             key: "feeding",
@@ -250,6 +255,7 @@ export function useKpiOverview(params: {
             trendDecimals: 2,
             trendUnit: "% BW/day",
             invertTrend: false,
+            trust: trustByKey.feeding,
           },
           {
             key: "water_quality",
@@ -260,6 +266,7 @@ export function useKpiOverview(params: {
             invertTrend: false,
             tone: wqTone,
             badge: wqBadge,
+            trust: trustByKey.water_quality,
           },
         ]
 

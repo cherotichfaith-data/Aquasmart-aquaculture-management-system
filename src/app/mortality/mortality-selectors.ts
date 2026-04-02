@@ -3,9 +3,12 @@
 import { normalizeFeedingResponse } from "@/app/feed/_lib/feed-analytics"
 import type { FeedingRecordWithType } from "@/lib/api/reports"
 import type { Database, Tables } from "@/lib/types/database"
-import type { AlertLogRow, MortalityCause, MortalityEventRow, SurvivalTrendRow } from "@/lib/types/mortality"
+import { isMortalityCause, type MortalityCause } from "@/lib/mortality"
 
 type SystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
+type AlertLogRow = Tables<"alert_log">
+type MortalityEventRow = Tables<"fish_mortality">
+type SurvivalTrendRow = Database["public"]["Functions"]["get_survival_trend"]["Returns"][number]
 type WaterQualityMeasurementRow = Tables<"api_water_quality_measurements">
 type SamplingRow = Tables<"fish_sampling_weight">
 export type InvestigationStatus = "open" | "monitoring" | "resolved" | "escalated"
@@ -312,7 +315,7 @@ export function buildMortalityRiskRows(params: {
     const deaths7d = recentEvents.reduce((sum, row) => sum + row.number_of_fish_mortality, 0)
     const mortalityDays7d = new Set(recentEvents.map((row) => row.date)).size
     const unexplainedLosses = recentEvents
-      .filter((row) => UNEXPLAINED_CAUSES.has(row.cause))
+      .filter((row) => isMortalityCause(row.cause) && UNEXPLAINED_CAUSES.has(row.cause))
       .reduce((sum, row) => sum + row.number_of_fish_mortality, 0)
 
     const survivalSeries = survivalBySystem.get(systemId) ?? []

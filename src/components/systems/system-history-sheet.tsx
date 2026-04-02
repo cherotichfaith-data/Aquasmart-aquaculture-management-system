@@ -19,6 +19,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
+  chartGridProps,
+  chartLegendProps,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  chartXAxisProps,
+  chartYAxisProps,
+} from "@/components/charts/recharts-theme"
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -538,15 +547,15 @@ export default function SystemHistorySheet({
                     <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={inventoryTrendRows}>
-                          <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                          <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                          <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-                          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
+                          <CartesianGrid {...chartGridProps} />
+                          <XAxis {...chartXAxisProps} dataKey="label" />
+                          <YAxis {...chartYAxisProps} yAxisId="left" />
+                          <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" />
                           <Tooltip formatter={(value, name) => {
                             const unit = name === "Biomass (kg)" ? "kg" : name === "Feed (kg)" ? "kg" : "g"
                             return [`${formatNumberValue(Number(value), { decimals: 1 })} ${unit}`, String(name)]
-                          }} />
-                          <Legend />
+                          }} contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} />
+                          <Legend {...chartLegendProps} />
                           <Line yAxisId="left" type="monotone" dataKey="biomass" stroke="var(--color-chart-1)" strokeWidth={2.4} name="Biomass (kg)" dot={false} />
                           <Line yAxisId="right" type="monotone" dataKey="abw" stroke="var(--color-chart-2)" strokeWidth={2.4} name="ABW (g)" dot={false} />
                           <Bar yAxisId="left" dataKey="feed" fill="var(--color-chart-3)" name="Feed (kg)" radius={[4, 4, 0, 0]} />
@@ -622,15 +631,15 @@ export default function SystemHistorySheet({
                     <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={waterTrendRows}>
-                          <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                          <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                          <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-                          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
+                          <CartesianGrid {...chartGridProps} />
+                          <XAxis {...chartXAxisProps} dataKey="label" />
+                          <YAxis {...chartYAxisProps} yAxisId="left" />
+                          <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" />
                           <Tooltip formatter={(value, name) => {
                             const unit = name === "DO (mg/L)" ? "mg/L" : "C"
                             return [`${formatNumberValue(Number(value), { decimals: 2 })} ${unit}`, String(name)]
-                          }} />
-                          <Legend />
+                          }} contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} />
+                          <Legend {...chartLegendProps} />
                           <Line yAxisId="left" type="monotone" dataKey="dissolvedOxygen" stroke="var(--color-chart-1)" strokeWidth={2.4} name="DO (mg/L)" dot={false} />
                           <Line yAxisId="right" type="monotone" dataKey="temperature" stroke="var(--color-chart-4)" strokeWidth={2.4} name="Temperature (C)" dot={false} />
                         </LineChart>
@@ -685,3 +694,4 @@ export default function SystemHistorySheet({
     </Sheet>
   )
 }
+

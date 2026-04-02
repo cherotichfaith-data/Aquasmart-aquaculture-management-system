@@ -25,9 +25,76 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { resolveTimePeriod } from "@/lib/time-period"
 
+type PageMeta = {
+  title: string
+  description?: string
+}
+
 const parseStageParam = (value: string | null): SharedFiltersState["selectedStage"] => {
   if (value === "nursing" || value === "grow_out") return value
   return "all"
+}
+
+const getPageMeta = (pathname: string, tab: string | null): PageMeta | null => {
+  if (pathname === "/") {
+    return {
+      title: "Farm Performance Dashboard",
+      description: "Live production, feed, water-quality, and activity signals across the farm.",
+    }
+  }
+  if (pathname.startsWith("/feed")) {
+    return {
+      title: "Feed Performance Dashboard",
+      description: "Feed efficiency, response quality, and inventory pressure across the selected scope.",
+    }
+  }
+  if (pathname.startsWith("/sampling")) {
+    return {
+      title: "Growth Dashboard",
+      description: "Growth sampling trends, biomass progress, and harvest-readiness indicators.",
+    }
+  }
+  if (pathname.startsWith("/mortality")) {
+    return {
+      title: "Mortality Dashboard",
+      description: "Risk signals, driver correlation, and recent loss events in one operational view.",
+    }
+  }
+  if (pathname.startsWith("/water-quality")) {
+    const tabDescriptions: Record<string, string> = {
+      overview: "Farm-wide quality status, alerts, and system health at a glance.",
+      parameter: "Parameter trends with feeding and mortality overlays for deeper analysis.",
+      environment: "Environmental indicators and system-level water quality exposure.",
+      depth: "Stratification and depth-profile analysis across the water column.",
+      alerts: "Current risk conditions, emerging issues, and threshold-based alerts.",
+      sensors: "Sensor coverage, freshness, and operational status by system.",
+    }
+
+    return {
+      title: "Water Quality Dashboard",
+      description: tabDescriptions[tab ?? "overview"] ?? tabDescriptions.overview,
+    }
+  }
+  if (pathname.startsWith("/production")) {
+    return {
+      title: "Production Analysis",
+      description: "System-level production trends with snapshot-safe reporting across the selected period.",
+    }
+  }
+  if (pathname.startsWith("/reports")) {
+    return {
+      title: "Reports",
+      description: "Exports, compliance, and period summaries without inferring fake production dates.",
+    }
+  }
+  if (pathname.startsWith("/settings")) {
+    return {
+      title: "Settings",
+      description: "Manage farm configuration, alert thresholds, and workspace preferences.",
+    }
+  }
+
+  return null
 }
 
 export default function Header({
@@ -45,6 +112,7 @@ export default function Header({
   const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
   const { farm } = useActiveFarm()
   const hideBorder = pathname === "/water-quality" && searchParams.get("tab") === "depth"
+  const pageMeta = getPageMeta(pathname, searchParams.get("tab"))
   const showAddData = pathname === "/"
   const defaultPeriod: TimePeriod = (() => {
     if (pathname.startsWith("/feed") || pathname.startsWith("/sampling")) return "quarter"
@@ -147,11 +215,11 @@ export default function Header({
   }
 
   return (
-    <header className={`sticky top-0 z-20 bg-background/72 backdrop-blur-xl ${hideBorder ? "" : "border-b border-border/70"}`}>
+    <header className={`sticky top-0 z-20 bg-background/72 shadow-[0_10px_24px_-24px_rgba(15,23,32,0.16)] backdrop-blur-xl dark:shadow-[0_18px_48px_-36px_rgba(15,23,32,0.5)]`}>
       <div className="flex flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <button onClick={onMenuClick} className="rounded-xl border border-border/70 bg-card/80 p-2 transition-colors hover:bg-accent md:hidden">
+            <button onClick={onMenuClick} className="rounded-xl bg-card/55 p-2 text-foreground/85 shadow-[0_12px_28px_-22px_rgba(15,23,32,0.45)] transition-colors hover:bg-accent/70 hover:text-accent-foreground md:hidden">
               <Menu size={20} />
             </button>
             <div className="min-w-0">
@@ -166,7 +234,7 @@ export default function Header({
             {role && (
               <Badge
                 variant="outline"
-                className="hidden sm:flex capitalize bg-sidebar-primary text-sidebar-primary-foreground border-sidebar-primary/70"
+                className="hidden sm:flex capitalize border-transparent bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_14px_30px_-24px_rgba(15,23,32,0.35)]"
               >
                 {formatRole(role)}
               </Badge>
@@ -180,7 +248,7 @@ export default function Header({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative h-10 w-10 rounded-2xl cursor-pointer border border-border/70 bg-card/80 text-foreground hover:bg-accent hover:text-accent-foreground"
+                  className="topbar-control relative h-10 w-10 rounded-2xl cursor-pointer hover:bg-accent/70 hover:text-accent-foreground"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
@@ -232,7 +300,7 @@ export default function Header({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="relative h-10 w-10 rounded-2xl cursor-pointer border border-border/70 bg-card/80 text-foreground hover:bg-accent hover:text-accent-foreground"
+                  className="topbar-control relative h-10 w-10 rounded-2xl cursor-pointer hover:bg-accent/70 hover:text-accent-foreground"
                 >
                   <Avatar className="h-9 w-9">
                     <AvatarImage src="/avatars/01.png" alt={user?.email || "User"} />
@@ -270,6 +338,18 @@ export default function Header({
 
         {showToolbar ? (
           <div className="page-toolbar">
+            {pageMeta ? (
+              <div className="w-full space-y-1">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.85rem]">
+                  {pageMeta.title}
+                </h1>
+                {pageMeta.description ? (
+                  <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                    {pageMeta.description}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
               <TimePeriodSelector
                 selectedPeriod={timePeriod}

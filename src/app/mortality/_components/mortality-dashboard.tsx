@@ -17,8 +17,18 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { EmptyState } from "@/components/shared/data-states"
+import {
+  chartGridProps,
+  chartLegendProps,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  chartXAxisProps,
+  chartYAxisProps,
+} from "@/components/charts/recharts-theme"
+import type { Tables } from "@/lib/types/database"
+import { isMortalityCause, MORTALITY_CAUSES } from "@/lib/mortality"
 import { cn } from "@/lib/utils"
-import { MORTALITY_CAUSES, type AlertLogRow, type MortalityEventRow } from "@/lib/types/mortality"
 import type {
   DriverItem,
   InvestigationStatus,
@@ -37,6 +47,9 @@ import {
   severityVariant,
   trendLabel,
 } from "../_lib/presentation"
+
+type AlertLogRow = Tables<"alert_log">
+type MortalityEventRow = Tables<"fish_mortality">
 
 type SurvivalTrendPoint = {
   date: string
@@ -379,12 +392,15 @@ export function MortalityDashboard({
               <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={deathsTrend}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                    <XAxis dataKey="date" tickFormatter={formatDateLabel} tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={formatDateLabel} />
+                    <YAxis {...chartYAxisProps} />
                     <Tooltip
                       labelFormatter={(value) => formatDateLabel(String(value))}
                       formatter={(value) => [Number(value).toLocaleString(), "Deaths"]}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
                     />
                     <Bar dataKey="deaths" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
                   </ComposedChart>
@@ -410,18 +426,21 @@ export function MortalityDashboard({
               <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={survivalTrend}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                    <XAxis dataKey="date" tickFormatter={formatDateLabel} tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 12 }} />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={formatDateLabel} />
+                    <YAxis {...chartYAxisProps} yAxisId="left" />
+                    <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" domain={[0, 100]} />
                     <Tooltip
                       labelFormatter={(value) => formatDateLabel(String(value))}
                       formatter={(value, name) => [
                         Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }),
                         String(name),
                       ]}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
                     />
-                    <Legend />
+                    <Legend {...chartLegendProps} />
                     <Line
                       yAxisId="left"
                       type="monotone"
@@ -463,10 +482,10 @@ export function MortalityDashboard({
               <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={driverTrend}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                    <XAxis dataKey="date" tickFormatter={formatDateLabel} tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={formatDateLabel} />
+                    <YAxis {...chartYAxisProps} yAxisId="left" />
+                    <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" />
                     <Tooltip
                       labelFormatter={(value) => formatDateLabel(String(value))}
                       formatter={(value, name) => {
@@ -476,8 +495,11 @@ export function MortalityDashboard({
                         }
                         return [Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }), label]
                       }}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
                     />
-                    <Legend />
+                    <Legend {...chartLegendProps} />
                     <Bar yAxisId="left" dataKey="deaths" name="Deaths" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
                     <Line
                       yAxisId="right"
@@ -558,12 +580,14 @@ export function MortalityDashboard({
                           <td className="px-3 py-3 font-medium">{formatDateLabel(row.date)}</td>
                           <td className="px-3 py-3">{systemNameById.get(row.system_id) ?? `System ${row.system_id}`}</td>
                           <td className="px-3 py-3">{row.number_of_fish_mortality.toLocaleString()}</td>
-                          <td className="px-3 py-3">{CAUSE_LABELS[row.cause] ?? row.cause}</td>
+                          <td className="px-3 py-3">{isMortalityCause(row.cause) ? CAUSE_LABELS[row.cause] : row.cause}</td>
                           <td className="px-3 py-3">
                             <div className="flex flex-wrap gap-1.5">
                               {row.is_mass_mortality ? <Badge variant="destructive">Mass</Badge> : null}
                               {reading?.doValue != null && reading.doValue < 4 ? <Badge variant="outline">Low DO</Badge> : null}
-                              {MORTALITY_CAUSES.includes(row.cause) && (row.cause === "unknown" || row.cause === "other") ? (
+                              {isMortalityCause(row.cause) &&
+                              MORTALITY_CAUSES.includes(row.cause) &&
+                              (row.cause === "unknown" || row.cause === "other") ? (
                                 <Badge variant="outline">Unexplained</Badge>
                               ) : null}
                             </div>

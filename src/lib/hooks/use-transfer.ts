@@ -1,14 +1,15 @@
 "use client"
 
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
+import { invalidateInventoryWriteQueries } from "@/lib/cache/react-query"
+import { recordTransfer } from "@/lib/commands/operations"
+import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 
 export function useRecordTransfer() {
-  return useInsertMutation({
-    table: "fish_transfer",
+  return useWriteThroughMutation({
+    mutationFn: recordTransfer,
     activityTableName: "fish_transfer",
     recentEntryKey: "transfer",
     buildOptimisticEntry: (payload) => {
-      if (Array.isArray(payload)) return null
       return {
         id: `optimistic-${Date.now()}`,
         date: payload.date,
@@ -25,7 +26,13 @@ export function useRecordTransfer() {
         status: "pending",
       }
     },
-    invalidate: ["dashboard", "inventory", "recent-activity", "recent-entries"],
+    invalidate: async ({ queryClient, result }) =>
+      invalidateInventoryWriteQueries(queryClient, {
+        farmId: result.meta.farmId,
+        date: result.meta.date,
+        tableName: "fish_transfer",
+        includeProductionQueries: true,
+      }),
     successMessage: "Transfer recorded.",
     errorMessage: "Failed to record transfer.",
   })

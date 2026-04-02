@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { queryKeys } from "@/lib/cache/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/components/providers/auth-provider"
 import { logSbError } from "@/lib/supabase/log"
@@ -31,7 +32,7 @@ export function useActiveFarmRole(farmId?: string | null) {
   const { session, user } = useAuth()
 
   return useQuery({
-    queryKey: ["farm-user-role", farmId ?? "none", user?.id ?? "anon"],
+    queryKey: queryKeys.farmUserRole(farmId, user?.id),
     queryFn: () => getActiveFarmRole({ farmId, userId: user?.id ?? null }),
     enabled: Boolean(session) && Boolean(farmId) && Boolean(user?.id),
     staleTime: 5 * 60_000,

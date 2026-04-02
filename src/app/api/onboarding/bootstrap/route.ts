@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { cacheTags } from "@/lib/cache/tags"
+import { apiRateLimits } from "@/lib/server/rate-limit"
+import { requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { logSbError } from "@/lib/supabase/log"
@@ -19,17 +22,14 @@ const onboardingSchema = z
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    if (authError) {
-      logSbError("onboarding:bootstrap:getUser", authError)
-    }
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 })
-  }
+  const auth = await requireRateLimitedRouteUser(
+    supabase,
+    request,
+    "onboarding:bootstrap",
+    apiRateLimits.onboardingBootstrap,
+  )
+  if ("response" in auth) return auth.response
+  const { user } = auth
 
   const { data: farmOptions, error: farmOptionsError } = await supabase.rpc("api_farm_options_rpc")
   if (farmOptionsError) {
@@ -125,8 +125,13 @@ export async function POST(request: Request) {
     logSbError("onboarding:bootstrap:updateUserMetadata", metadataError)
   }
 
-  return NextResponse.json({
-    farmId: farm.id,
-    alreadyProvisioned: false,
-  })
+  revalidateWriteTags([cacheTags.farmOptions(user.id)])
+
+  return NextResponse.json(
+    {
+      farmId: farm.id,
+      alreadyProvisioned: false,
+    },
+    { status: 201 },
+  )
 }

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
+import { queryKeys } from "@/lib/cache/query-keys"
 import type { ProductionTrendRow } from "@/features/dashboard/types"
 import { getProductionSummary } from "@/lib/api/production"
 import { sortByDateAsc } from "@/lib/utils"
@@ -24,16 +25,7 @@ export function useProductionTrend(params: {
   const hasBounds = Boolean(params.dateFrom) && Boolean(params.dateTo)
 
   return useQuery({
-    queryKey: [
-      "production-trend",
-      params.farmId ?? "all",
-      params.stage ?? "all",
-      params.batch ?? "all",
-      params.system ?? "all",
-      params.timePeriod,
-      params.dateFrom ?? "",
-      params.dateTo ?? "",
-    ],
+    queryKey: queryKeys.dashboard.productionTrend(params),
     queryFn: async ({ signal }) => {
       const dateFrom = params.dateFrom ?? null
       const dateTo = params.dateTo ?? null

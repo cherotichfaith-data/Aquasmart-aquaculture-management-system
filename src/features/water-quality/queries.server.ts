@@ -1,5 +1,7 @@
-import { createClient } from "@/lib/supabase/server"
-import { requireUser } from "@/lib/supabase/require-user"
+import { runServerReadThrough } from "@/lib/cache/server"
+import { cacheTags } from "@/lib/cache/tags"
+import { createAccessTokenClient } from "@/lib/supabase/server"
+import { requireUserContext } from "@/lib/supabase/require-user"
 import { toQuerySuccess } from "@/lib/api/_utils"
 import {
   listWaterQualityMeasurementsInputSchema,
@@ -27,12 +29,14 @@ import {
 } from "@/features/shared/scoped-analytics.server"
 import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
 
+type ServerClient = ReturnType<typeof createAccessTokenClient>
+
 export async function listWaterQualityMeasurements(
   input: ListWaterQualityMeasurementsInput,
 ): Promise<WaterQualityRow[]> {
-  await requireUser()
+  const { accessToken } = await requireUserContext()
   const parsed = listWaterQualityMeasurementsInputSchema.parse(input)
-  const supabase = await createClient()
+  const supabase = createAccessTokenClient(accessToken)
 
   let query = supabase
     .from("water_quality_measurement")
@@ -84,8 +88,6 @@ export function parseWaterQualityPageFilters(
     activeTab: typeof activeTabRaw === "string" && isValidTab(activeTabRaw) ? activeTabRaw : "overview",
   }
 }
-
-type ServerClient = Awaited<ReturnType<typeof createClient>>
 
 async function getSyncStatus(supabase: ServerClient, farmId: string): Promise<WaterQualitySyncRow[]> {
   const { data, error } = await supabase.rpc("api_water_quality_sync_status", { p_farm_id: farmId })
@@ -182,12 +184,12 @@ async function getActivities(
   return (data ?? []) as WaterQualityActivityRow[]
 }
 
-export async function getWaterQualityPageInitialData(params: {
+async function loadWaterQualityPageInitialData(
+  supabase: ServerClient,
+  params: {
   farmId: string | null
   filters: WaterQualityPageFilters
 }): Promise<WaterQualityPageInitialData> {
-  await requireUser()
-
   const empty: WaterQualityPageInitialData = {
     bounds: { start: null, end: null },
     systemOptions: toQuerySuccess([]),
@@ -203,7 +205,6 @@ export async function getWaterQualityPageInitialData(params: {
 
   if (!params.farmId) return empty
 
-  const supabase = await createClient()
   const selectedSystemId = parseSelectedNumericId(params.filters.selectedSystem)
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
 
@@ -279,4 +280,32 @@ export async function getWaterQualityPageInitialData(params: {
     activities: toQuerySuccess(activities),
     thresholds: toQuerySuccess(thresholds),
   }
+}
+
+export async function getWaterQualityPageInitialData(params: {
+  farmId: string | null
+  filters: WaterQualityPageFilters
+}): Promise<WaterQualityPageInitialData> {
+  const { user, accessToken } = await requireUserContext()
+
+  return runServerReadThrough({
+    keyParts: [
+      "water-quality-page",
+      user.id,
+      params.farmId,
+      params.filters.selectedBatch,
+      params.filters.selectedSystem,
+      params.filters.selectedStage,
+      params.filters.timePeriod,
+    ],
+    tags: params.farmId
+      ? [
+          cacheTags.farm(params.farmId),
+          cacheTags.systems(params.farmId),
+          cacheTags.inventory(params.farmId),
+          cacheTags.waterQuality(params.farmId),
+        ]
+      : [],
+    loader: () => loadWaterQualityPageInitialData(createAccessTokenClient(accessToken), params),
+  })
 }

@@ -35,20 +35,20 @@ export default function ProductionTable({
 
   return (
     <Card>
-      <CardHeader className="border-b border-border">
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle>Production Detail</CardTitle>
           <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
         </div>
         <DataUpdatedAt updatedAt={updatedAt} />
       </CardHeader>
-      <CardContent className="pt-4">
+      <CardContent className="pt-2">
         {isLoading ? (
           <div className="h-[240px] flex items-center justify-center text-muted-foreground">
             Loading table...
           </div>
         ) : rows.length ? (
-          <div className="max-h-[480px] overflow-auto rounded-md border border-border/80">
+          <div className="soft-table-shell max-h-[480px]">
             <Table>
               <TableHeader className="bg-muted/60">
                 <TableRow>

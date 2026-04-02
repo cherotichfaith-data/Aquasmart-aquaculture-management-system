@@ -12,8 +12,10 @@ import {
   getWaterQualitySyncStatus,
   getWaterQualityMeasurements,
 } from "@/lib/api/water-quality"
+import { invalidateWaterQualityWriteQueries } from "@/lib/cache/react-query"
+import { recordWaterQuality } from "@/lib/commands/operations"
+import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 import type { Database } from "@/lib/types/database"
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
 
 function waterQualityQueryOptions<TResult>(params: {
   queryKey: readonly unknown[]
@@ -229,12 +231,12 @@ export function useAlertThresholds(params?: {
 }
 
 export function useRecordWaterQuality() {
-  return useInsertMutation({
-    table: "water_quality_measurement",
+  return useWriteThroughMutation({
+    mutationFn: recordWaterQuality,
     activityTableName: "water_quality_measurement",
     recentEntryKey: "water_quality",
     buildOptimisticEntry: (payload) => {
-      const entry = Array.isArray(payload) ? payload[0] : payload
+      const entry = payload[0]
       if (entry) {
         return {
           id: `optimistic-${Date.now()}`,
@@ -250,7 +252,11 @@ export function useRecordWaterQuality() {
       }
       return null
     },
-    invalidate: ["dashboard", "water-quality", "recent-activity", "recent-entries"],
+    invalidate: async ({ queryClient, result }) =>
+      invalidateWaterQualityWriteQueries(queryClient, {
+        farmId: result.meta.farmId,
+        date: result.meta.date,
+      }),
     successMessage: "Water quality data recorded.",
     errorMessage: "Failed to record water quality data.",
   })

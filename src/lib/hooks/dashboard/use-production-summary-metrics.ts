@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
+import { queryKeys } from "@/lib/cache/query-keys"
 import type { ProductionSummaryMetrics } from "@/features/dashboard/types"
 import { getProductionSummary } from "@/lib/api/production"
 import { getTransferData } from "@/lib/api/reports"
@@ -28,16 +29,7 @@ export function useProductionSummaryMetrics(params: {
     params.initialData?.dateBounds.end === params.dateTo
 
   return useQuery({
-    queryKey: [
-      "production-summary-metrics",
-      params.farmId ?? "all",
-      params.stage ?? "all",
-      params.batch ?? "all",
-      params.system ?? "all",
-      params.timePeriod ?? "2 weeks",
-      params.dateFrom ?? "",
-      params.dateTo ?? "",
-    ],
+    queryKey: queryKeys.dashboard.productionSummaryMetrics(params),
     queryFn: async ({ signal }) => {
       const empty: ProductionSummaryMetrics = {
         totalStockedFish: 0,

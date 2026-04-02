@@ -15,6 +15,15 @@ import {
 } from "recharts"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  chartGridProps,
+  chartLegendProps,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  chartXAxisProps,
+  chartYAxisProps,
+} from "@/components/charts/recharts-theme"
 import { formatFullDate, formatWithUnit } from "@/app/sampling/_lib/formatters"
 
 type TrajectoryRow = {
@@ -275,12 +284,15 @@ export function SamplingGrowthDashboard({
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={bestGrowthTrajectory}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                  <XAxis dataKey="label" />
-                  <YAxis />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="label" />
+                  <YAxis {...chartYAxisProps} />
                   <Tooltip
                     labelFormatter={(_, payload) => formatFullDate(String(payload?.[0]?.payload?.date ?? ""))}
                     formatter={(value) => [`${Number(value).toFixed(1)} g`, "ABW"]}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
                   />
                   <Line
                     type="monotone"
@@ -310,10 +322,15 @@ export function SamplingGrowthDashboard({
               <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={currentAbwRows}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`${Number(value).toFixed(1)} g`, "Current ABW"]} />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="label" tick={{ ...chartXAxisProps.tick, fontSize: 10.5 }} />
+                    <YAxis {...chartYAxisProps} />
+                    <Tooltip
+                      formatter={(value) => [`${Number(value).toFixed(1)} g`, "Current ABW"]}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
+                    />
                     <Bar dataKey="abw" radius={[4, 4, 0, 0]}>
                       {currentAbwRows.map((row, index) => (
                         <Cell key={row.systemId} fill={chartColors[index % chartColors.length]} />
@@ -339,10 +356,15 @@ export function SamplingGrowthDashboard({
               <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={sgrRows}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`${Number(value).toFixed(3)}%/day`, "SGR"]} />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="label" tick={{ ...chartXAxisProps.tick, fontSize: 10.5 }} />
+                    <YAxis {...chartYAxisProps} />
+                    <Tooltip
+                      formatter={(value) => [`${Number(value).toFixed(3)}%/day`, "SGR"]}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
+                    />
                     <Bar dataKey="sgr" radius={[4, 4, 0, 0]}>
                       {sgrRows.map((row) => (
                         <Cell
@@ -375,11 +397,16 @@ export function SamplingGrowthDashboard({
             <div className="h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={harvestTimelineRows}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.35} />
-                  <XAxis dataKey="label" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [`${Number(value).toFixed(1)} kg`, "Cumulative harvest"]} />
-                  <Legend />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="label" />
+                  <YAxis {...chartYAxisProps} />
+                  <Tooltip
+                    formatter={(value) => [`${Number(value).toFixed(1)} kg`, "Cumulative harvest"]}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
+                  />
+                  <Legend {...chartLegendProps} />
                   {harvestTimelineSystems.map((row, index) => (
                     <Line
                       key={row.systemId}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { queryKeys } from "@/lib/cache/query-keys"
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -26,7 +27,7 @@ export function useSystemOptions(params?: {
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
   return useQuery({
-    queryKey: ["options", "systems", params?.farmId ?? "all", params?.stage ?? "all", params?.activeOnly ?? false],
+    queryKey: queryKeys.options.systems(params),
     queryFn: ({ signal }) => getSystemOptions({ ...params, signal }),
     enabled,
     staleTime: 5 * 60_000,
@@ -42,7 +43,7 @@ export function useBatchOptions(params?: {
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(params?.farmId)
   return useQuery({
-    queryKey: ["options", "batches", params?.farmId ?? "all"],
+    queryKey: queryKeys.options.batches(params?.farmId),
     queryFn: ({ signal }) => getBatchOptions({ ...params, signal }),
     enabled,
     staleTime: 5 * 60_000,
@@ -56,7 +57,7 @@ export function useFeedTypeOptions(params?: {
 }) {
   const { session, user } = useAuth()
   return useQuery({
-    queryKey: ["options", "feeds", user?.id ?? "anon"],
+    queryKey: queryKeys.options.feeds(user?.id),
     queryFn: ({ signal }) => getFeedTypeOptions({ signal }),
     enabled: Boolean(session),
     staleTime: 5 * 60_000,
@@ -68,7 +69,7 @@ export function useFeedTypeOptions(params?: {
 export function useFeedSupplierOptions(params?: { enabled?: boolean }) {
   const { session, user } = useAuth()
   return useQuery({
-    queryKey: ["options", "feed-suppliers", user?.id ?? "anon"],
+    queryKey: queryKeys.options.feedSuppliers(user?.id),
     queryFn: ({ signal }) => getFeedSupplierOptions({ signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
@@ -78,7 +79,7 @@ export function useFeedSupplierOptions(params?: { enabled?: boolean }) {
 export function useFingerlingSupplierOptions(params?: { enabled?: boolean }) {
   const { session, user } = useAuth()
   return useQuery({
-    queryKey: ["options", "fingerling-suppliers", user?.id ?? "anon"],
+    queryKey: queryKeys.options.fingerlingSuppliers(user?.id),
     queryFn: ({ signal }) => getFingerlingSupplierOptions({ signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
@@ -88,7 +89,7 @@ export function useFingerlingSupplierOptions(params?: { enabled?: boolean }) {
 export function useFarmOptions(params?: { enabled?: boolean }) {
   const { session, user } = useAuth()
   return useQuery({
-    queryKey: ["options", "farms", user?.id ?? "anon"],
+    queryKey: queryKeys.options.farms(user?.id),
     queryFn: ({ signal }) => getFarmOptions({ signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
@@ -103,13 +104,7 @@ export function useSystemVolumes(params?: {
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(params?.farmId)
   return useQuery({
-    queryKey: [
-      "options",
-      "system-volumes",
-      params?.farmId ?? "all",
-      params?.stage ?? "all",
-      params?.activeOnly ?? true,
-    ],
+    queryKey: queryKeys.options.systemVolumes(params),
     queryFn: ({ signal }) => getSystemVolumes({ ...params, signal }),
     enabled,
     staleTime: 5 * 60_000,
@@ -120,7 +115,7 @@ export function useAppConfig(params?: { keys?: string[]; enabled?: boolean }) {
   const { session, user } = useAuth()
   const keys = params?.keys ?? []
   return useQuery({
-    queryKey: ["app-config", user?.id ?? "anon", keys.join(",") || "none"],
+    queryKey: queryKeys.appConfig(keys, user?.id),
     queryFn: ({ signal }) => getAppConfig({ keys, signal }),
     enabled: Boolean(session) && keys.length > 0 && (params?.enabled ?? true),
     staleTime: 5 * 60_000,

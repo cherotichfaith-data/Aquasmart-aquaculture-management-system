@@ -9,10 +9,12 @@ import type {
   SystemWqiRow,
   WaterQualityStatusLabel,
 } from "./_lib/water-quality-selectors"
+import { WQI_GOOD_MIN, WQI_MODERATE_MIN } from "@/lib/water-quality-index"
 
 export function WaterQualityEnvironmentTab({
   wqiValue,
   wqiLabel,
+  isAllSystemsSelected,
   nutrientLoad,
   algalActivity,
   allSystemsWqi,
@@ -22,6 +24,7 @@ export function WaterQualityEnvironmentTab({
 }: {
   wqiValue: number | null
   wqiLabel: WaterQualityStatusLabel
+  isAllSystemsSelected: boolean
   nutrientLoad: NutrientLoad
   algalActivity: AlgalActivity
   allSystemsWqi: SystemWqiRow[]
@@ -33,7 +36,7 @@ export function WaterQualityEnvironmentTab({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/20">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 shadow-[0_14px_32px_-26px_rgba(16,185,129,0.45)]">
             <Gauge className="h-5 w-5 text-emerald-500" />
           </div>
           <div>
@@ -53,7 +56,13 @@ export function WaterQualityEnvironmentTab({
           </CardHeader>
           <CardContent className="flex flex-col items-center py-4">
             <div className="relative">
-              <WaterQualityCircularGauge value={wqiValue ?? 0} max={100} color={wqiLabel.color} label="WQI" />
+              {wqiValue == null ? (
+                <div className="flex h-[160px] w-[160px] items-center justify-center rounded-full bg-muted/24 text-center text-sm text-muted-foreground">
+                  No WQI data
+                </div>
+              ) : (
+                <WaterQualityCircularGauge value={wqiValue} max={100} color={wqiLabel.color} label="WQI" />
+              )}
             </div>
             <div className="mt-4 text-center">
               <span className="text-lg font-bold" style={{ color: wqiLabel.color }}>
@@ -62,18 +71,20 @@ export function WaterQualityEnvironmentTab({
               <p className="text-xs text-muted-foreground mt-1">
                 {wqiValue == null
                   ? "Insufficient data for WQI scoring."
-                  : wqiValue >= 70
-                    ? "Optimal conditions for aquaculture."
-                    : wqiValue >= 50
-                      ? "Some parameters need attention."
-                      : "Immediate intervention recommended."}
+                  : isAllSystemsSelected
+                    ? "Average of per-system WQI scores using each system's latest DO and temperature readings."
+                    : wqiValue >= WQI_GOOD_MIN
+                      ? "Optimal conditions for aquaculture."
+                      : wqiValue >= WQI_MODERATE_MIN
+                        ? "Some parameters need attention."
+                        : "Immediate intervention recommended."}
               </p>
             </div>
             <div className="w-full mt-4 space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Poor (0-50)</span>
-                <span>Moderate (50-70)</span>
-                <span>Good (70-100)</span>
+                <span>{`Poor (<${WQI_MODERATE_MIN})`}</span>
+                <span>{`Moderate (${WQI_MODERATE_MIN}-${WQI_GOOD_MIN - 1})`}</span>
+                <span>{`Good (${WQI_GOOD_MIN}+)`}</span>
               </div>
               <div className="h-2 rounded-full bg-muted overflow-hidden flex">
                 <div className="h-full bg-red-500" style={{ width: "50%" }} />
@@ -103,7 +114,7 @@ export function WaterQualityEnvironmentTab({
                 Nitrate + Nitrite + Ammonia = {nutrientLoad.level === "No data" ? "--" : nutrientLoad.value.toFixed(2)} mg/L
               </p>
             </div>
-            <div className="w-full mt-4 p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
+            <div className="soft-panel-subtle mt-4 w-full p-3 text-xs text-muted-foreground">
               {nutrientLoad.level === "High"
                 ? "High nutrient load. Consider reducing nutrient input."
                 : nutrientLoad.level === "Moderate"

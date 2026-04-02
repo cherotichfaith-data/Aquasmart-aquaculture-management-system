@@ -47,21 +47,12 @@ export function ProductionSections({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link href="/">
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-3xl font-bold">System-level Analysis</h1>
-            <p className="text-muted-foreground">
-              Production metrics based on resolved system timelines, with snapshot dates kept separate from cycle dates.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
           <ProductionMetricFilter />
         </div>
       </div>

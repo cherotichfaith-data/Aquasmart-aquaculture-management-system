@@ -16,6 +16,15 @@ import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-state
 import { LazyRender } from "@/components/shared/lazy-render"
 import { formatTimestamp, type WqParameter } from "./_lib/water-quality-utils"
 import type { DiurnalDoPattern, ParameterTrendRow } from "./_lib/water-quality-selectors"
+import {
+  chartGridProps,
+  chartLegendProps,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  chartXAxisProps,
+  chartYAxisProps,
+} from "@/components/charts/recharts-theme"
 
 const DIURNAL_COLORS = [
   "var(--color-chart-1)",
@@ -74,7 +83,7 @@ export function WaterQualityParameterTab({
         <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
       </div>
       {dataIssues.length ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="rounded-md bg-destructive/8 p-4 text-sm text-destructive shadow-[0_16px_34px_-28px_rgba(220,38,38,0.28)]">
           <p className="mb-1 font-medium">Some water-quality data sources failed to load:</p>
           <ul className="list-disc space-y-1 pl-5">
             {dataIssues.map((issue) => (
@@ -89,14 +98,14 @@ export function WaterQualityParameterTab({
         <div className="flex h-[320px] items-center justify-center text-muted-foreground">No parameter measurements in this range.</div>
       ) : (
         <div className="space-y-4">
-          <div className="h-[320px] rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="soft-panel-subtle h-[320px] p-2">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={parameterTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tickFormatter={formatDateLabel} />
-                  <YAxis yAxisId="param" />
-                  <YAxis yAxisId="overlay" orientation="right" />
+                  <CartesianGrid {...chartGridProps} />
+                  <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={formatDateLabel} />
+                  <YAxis {...chartYAxisProps} yAxisId="param" />
+                  <YAxis {...chartYAxisProps} yAxisId="overlay" orientation="right" />
                   <Tooltip
                     labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
                     formatter={(value, name) => {
@@ -113,8 +122,11 @@ export function WaterQualityParameterTab({
                       }
                       return [`${numeric.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selectedParameterUnit}`.trim(), String(name)]
                     }}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    itemStyle={chartTooltipItemStyle}
                   />
-                  <Legend />
+                  <Legend {...chartLegendProps} />
                   <Line yAxisId="param" type="monotone" dataKey="mean" name="Daily mean" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
                   <Line yAxisId="param" type="monotone" dataKey="rolling" name="7-day mean" stroke="var(--color-chart-2)" strokeDasharray="4 4" dot={false} />
                   {selectedParameter === "dissolved_oxygen" ? (
@@ -134,7 +146,7 @@ export function WaterQualityParameterTab({
             </LazyRender>
           </div>
 
-          <div className="rounded-md border border-border/80 bg-muted/20 p-3">
+          <div className="soft-panel-subtle p-3">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">Diurnal DO Pattern</p>
@@ -151,16 +163,19 @@ export function WaterQualityParameterTab({
                 <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={diurnalDoPattern.rows}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="time" tickFormatter={formatTimeLabel} />
-                      <YAxis />
+                      <CartesianGrid {...chartGridProps} />
+                      <XAxis {...chartXAxisProps} dataKey="time" tickFormatter={formatTimeLabel} />
+                      <YAxis {...chartYAxisProps} />
                       <Tooltip
                         formatter={(value, name) => [
                           `${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mg/L`,
                           formatDateLabel(String(name)),
                         ]}
+                        contentStyle={chartTooltipStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        itemStyle={chartTooltipItemStyle}
                       />
-                      <Legend formatter={(value) => formatDateLabel(String(value))} />
+                      <Legend {...chartLegendProps} formatter={(value) => formatDateLabel(String(value))} />
                       {diurnalDoPattern.dateSeries.map((date, index) => (
                         <Line
                           key={date}
@@ -176,7 +191,7 @@ export function WaterQualityParameterTab({
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+                <div className="mt-3 rounded-md bg-amber-500/10 p-3 text-xs text-amber-700 shadow-[0_16px_34px_-28px_rgba(245,158,11,0.3)] dark:text-amber-300">
                   {diurnalDoPattern.insufficientSamples
                     ? `Recent records show roughly one dissolved oxygen reading per day${diurnalDoPattern.dominantTimeLabel ? `, typically around ${diurnalDoPattern.dominantTimeLabel}` : ""}. Single daily measurements are insufficient for diurnal analysis. Add a PM measurement between 4:00 and 5:00 PM to capture the daily DO peak and align with the 4 PM feed inventory schedule already in use.`
                     : `Recent DO timestamps span multiple times of day${diurnalDoPattern.dominantTimeLabel ? `, with the most common reading time around ${diurnalDoPattern.dominantTimeLabel}` : ""}. Continue collecting both morning and PM readings to compare dawn minimum versus afternoon peak.`}
@@ -185,7 +200,7 @@ export function WaterQualityParameterTab({
             )}
           </div>
 
-          <div className="rounded-md border border-border/80 bg-muted/20 p-3">
+          <div className="soft-panel-subtle p-3">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">Daily Average Temperature</p>
@@ -201,15 +216,18 @@ export function WaterQualityParameterTab({
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={dailyTempAverage}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tickFormatter={formatDateLabel} />
-                    <YAxis />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={formatDateLabel} />
+                    <YAxis {...chartYAxisProps} />
                     <Tooltip
                       labelFormatter={(label) => formatTimestamp(`${label}T00:00:00`)}
                       formatter={(value) => [
                         `${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} deg C`,
                         "Average temperature",
                       ]}
+                      contentStyle={chartTooltipStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      itemStyle={chartTooltipItemStyle}
                     />
                     <Line type="monotone" dataKey="average" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
                   </LineChart>

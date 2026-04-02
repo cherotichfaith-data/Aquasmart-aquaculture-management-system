@@ -9,6 +9,8 @@ import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
+import { calculateWqi, getWqiLabel, selectThresholdRow, WQI_GOOD_MIN, WQI_MODERATE_MIN } from "@/lib/water-quality-index"
+import type { WaterQualityThresholdRow } from "@/features/water-quality/types"
 
 type MeasurementRow = {
   id?: number | null
@@ -21,43 +23,6 @@ type MeasurementRow = {
 
 const getRows = <T,>(result: { status: "success" | "error"; data: T[] | null } | undefined): T[] =>
   result?.status === "success" ? (result.data ?? []) : []
-
-const getWqiLabel = (value: number | null) => {
-  if (value == null) return { label: "No data", color: "hsl(var(--muted-foreground))" }
-  if (value >= 70) return { label: "Good", color: "#10B981" }
-  if (value >= 50) return { label: "Moderate", color: "#F59E0B" }
-  return { label: "Poor", color: "#EF4444" }
-}
-
-const scoreDissolvedOxygen = (value: number | null, lowDoThreshold: number) => {
-  if (value == null) return null
-  if (value >= lowDoThreshold + 2) return 90
-  if (value >= lowDoThreshold) return 60
-  if (value >= lowDoThreshold - 1) return 30
-  return 0
-}
-
-const scoreTemperature = (value: number | null, tempMean: number | null, tempStd: number | null) => {
-  if (value == null || tempMean == null || tempStd == null || tempStd === 0) return null
-  const delta = Math.abs(value - tempMean)
-  if (delta <= tempStd) return 90
-  if (delta <= tempStd * 2) return 60
-  if (delta <= tempStd * 3) return 30
-  return 0
-}
-
-const calculateWqi = (
-  doValue: number | null,
-  tempValue: number | null,
-  lowDoThreshold: number,
-  tempMean: number | null,
-  tempStd: number | null,
-) => {
-  const doScore = scoreDissolvedOxygen(doValue, lowDoThreshold)
-  const tempScore = scoreTemperature(tempValue, tempMean, tempStd)
-  if (doScore == null || tempScore == null) return null
-  return (doScore + tempScore) / 2
-}
 
 const CircularGauge = ({
   value,
@@ -162,11 +127,10 @@ export default function WaterQualityIndex({
   })
 
   const thresholdsQuery = useAlertThresholds({ farmId, initialData: initialThresholds })
-  const thresholdRow = useMemo(() => {
-    const rows = getRows(thresholdsQuery.data)
-    return rows.find((row: any) => row.scope === "farm" && row.system_id == null) ?? rows[0] ?? null
-  }, [thresholdsQuery.data])
-  const lowDoThreshold = thresholdRow?.low_do_threshold ?? 5
+  const thresholdRows = useMemo(
+    () => getRows<WaterQualityThresholdRow>(thresholdsQuery.data),
+    [thresholdsQuery.data],
+  )
 
   const temperatureStats = useMemo(() => {
     const scope = new Set(scopedSystemIdList)
@@ -220,17 +184,18 @@ export default function WaterQualityIndex({
     scopedSystemIdList.forEach((systemId) => {
       const readings = latestReadingsBySystem.get(systemId)
       if (!readings) return
+      const thresholdRow = selectThresholdRow(thresholdRows, systemId)
       const value = calculateWqi(
         readings.doValue ?? null,
         readings.tempValue ?? null,
-        lowDoThreshold,
+        thresholdRow?.low_do_threshold ?? 5,
         temperatureStats.mean,
         temperatureStats.std,
       )
       if (value != null) values.push(value)
     })
     return values
-  }, [latestReadingsBySystem, lowDoThreshold, scopedSystemIdList, temperatureStats])
+  }, [latestReadingsBySystem, scopedSystemIdList, temperatureStats, thresholdRows])
 
   const wqiAverage = wqiValues.length ? wqiValues.reduce((sum, value) => sum + value, 0) / wqiValues.length : null
   const wqiLabel = getWqiLabel(wqiAverage)
@@ -281,14 +246,18 @@ export default function WaterQualityIndex({
           <span className="text-sm font-semibold" style={{ color: wqiLabel.color }}>
             {wqiLabel.label}
           </span>
-          <p className="text-xs text-muted-foreground mt-1">Based on latest DO and temperature readings.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {selectedSystemId != null
+              ? "Based on the selected system's latest DO and temperature readings."
+              : "Average of per-system WQI scores using each system's latest DO and temperature readings."}
+          </p>
         </div>
 
         <div className="mt-4 space-y-1">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Poor (0-50)</span>
-            <span>Moderate (50-70)</span>
-            <span>Good (70-100)</span>
+            <span>{`Poor (<${WQI_MODERATE_MIN})`}</span>
+            <span>{`Moderate (${WQI_MODERATE_MIN}-${WQI_GOOD_MIN - 1})`}</span>
+            <span>{`Good (${WQI_GOOD_MIN}+)`}</span>
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden flex">
             <div className="h-full bg-red-500" style={{ width: "50%" }} />

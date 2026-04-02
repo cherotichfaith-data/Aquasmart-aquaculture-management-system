@@ -1,38 +1,48 @@
 "use client"
 
-import { useInsertMutation } from "@/lib/hooks/use-insert-mutation"
+import { invalidateReferenceDataQueries } from "@/lib/cache/react-query"
+import {
+  createFeedSupplier,
+  createFeedType,
+  createFingerlingBatch,
+  createFingerlingSupplier,
+} from "@/lib/commands/reference-data"
+import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 
 export function useCreateFeedSupplier() {
-  return useInsertMutation({
-    table: "feed_supplier",
-    invalidate: ["options"],
+  return useWriteThroughMutation({
+    mutationFn: createFeedSupplier,
+    invalidate: ({ queryClient }) =>
+      invalidateReferenceDataQueries(queryClient, { kind: "feed-suppliers" }),
     successMessage: "Feed supplier created.",
     errorMessage: "Failed to create feed supplier.",
   })
 }
 
 export function useCreateFeedType() {
-  return useInsertMutation({
-    table: "feed_type",
-    invalidate: ["options"],
+  return useWriteThroughMutation({
+    mutationFn: createFeedType,
+    invalidate: ({ queryClient }) => invalidateReferenceDataQueries(queryClient, { kind: "feed-types" }),
     successMessage: "Feed type created.",
     errorMessage: "Failed to create feed type.",
   })
 }
 
 export function useCreateFingerlingSupplier() {
-  return useInsertMutation({
-    table: "fingerling_supplier",
-    invalidate: ["options"],
+  return useWriteThroughMutation({
+    mutationFn: createFingerlingSupplier,
+    invalidate: ({ queryClient }) =>
+      invalidateReferenceDataQueries(queryClient, { kind: "fingerling-suppliers" }),
     successMessage: "Fingerling supplier created.",
     errorMessage: "Failed to create fingerling supplier.",
   })
 }
 
 export function useCreateFingerlingBatch() {
-  return useInsertMutation({
-    table: "fingerling_batch",
-    invalidate: ["options"],
+  return useWriteThroughMutation({
+    mutationFn: createFingerlingBatch,
+    invalidate: ({ queryClient, payload }) =>
+      invalidateReferenceDataQueries(queryClient, { kind: "batches", farmId: payload.farm_id }),
     successMessage: "Batch created.",
     errorMessage: "Failed to create batch.",
   })

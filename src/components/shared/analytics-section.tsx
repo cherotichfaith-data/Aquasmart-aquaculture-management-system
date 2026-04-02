@@ -35,7 +35,7 @@ export function AnalyticsSection({
   return (
     <div className="space-y-6">
       {statusContent ?? (
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <DataUpdatedAt updatedAt={updatedAt ?? 0} />
           <DataFetchingBadge isFetching={Boolean(isFetching)} isLoading={Boolean(isLoading)} />
         </div>

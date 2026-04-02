@@ -244,7 +244,7 @@ export default function WaterQualityPage({
     [aggregatedReadings, latestReadingsBySystem, selectedSystemId],
   )
   const temperatureStats = useMemo(() => getTemperatureStats(scopedMeasurementRows), [scopedMeasurementRows])
-  const wqiValue = useMemo(
+  const selectedSystemWqi = useMemo(
     () =>
       calculateWqi(
         selectedReadings.dissolved_oxygen ?? null,
@@ -255,7 +255,6 @@ export default function WaterQualityPage({
       ),
     [lowDoThreshold, selectedReadings, temperatureStats.mean, temperatureStats.std],
   )
-  const wqiLabel = useMemo(() => getWqiLabel(wqiValue), [wqiValue])
   const nutrientLoad = useMemo(() => buildNutrientLoad(selectedReadings), [selectedReadings])
   const algalActivity = useMemo(() => buildAlgalActivity(selectedReadings), [selectedReadings])
   const allSystemsWqi = useMemo(
@@ -263,6 +262,8 @@ export default function WaterQualityPage({
     [latestReadingsBySystem, systemOptions, temperatureStats, thresholdRows],
   )
   const averageWqi = useMemo(() => getAverageWqi(allSystemsWqi), [allSystemsWqi])
+  const wqiValue = selectedSystemId != null ? selectedSystemWqi : averageWqi
+  const wqiLabel = useMemo(() => getWqiLabel(wqiValue), [wqiValue])
   const averageWqiLabel = useMemo(() => getWqiLabel(averageWqi), [averageWqi])
   const systemRiskRows = useMemo(
     () => buildSystemRiskRows(latestStatusRows, ratingTrendBySystemId, systemLabelById, lastMeasurementBySystemId),
@@ -466,7 +467,7 @@ export default function WaterQualityPage({
         )}
 
         {CHART_TABS.has(activeTab) && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
+        <div className="soft-panel p-5 space-y-4">
           {activeTab === "parameter" && (
             <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
               <label className="inline-flex items-center gap-2">
@@ -485,6 +486,7 @@ export default function WaterQualityPage({
               <WaterQualityEnvironmentTab
                 wqiValue={wqiValue}
                 wqiLabel={wqiLabel}
+                isAllSystemsSelected={selectedSystemId == null}
                 nutrientLoad={nutrientLoad}
                 algalActivity={algalActivity}
                 allSystemsWqi={allSystemsWqi}

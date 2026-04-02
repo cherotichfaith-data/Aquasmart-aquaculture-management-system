@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
+import { queryKeys } from "@/lib/cache/query-keys"
 import type { DashboardSystemRow, SystemsTableData } from "@/features/dashboard/types"
 import { getDashboardSystems } from "@/lib/api/dashboard"
 import type { TimePeriod } from "@/lib/time-period"
@@ -28,17 +29,7 @@ export function useSystemsTable(params: {
     params.initialData?.meta.end === params.dateTo
 
   return useQuery({
-    queryKey: [
-      "systems-table",
-      params.farmId ?? "all",
-      params.stage,
-      params.batch ?? "all",
-      params.system ?? "all",
-      params.timePeriod ?? "2 weeks",
-      params.dateFrom ?? "",
-      params.dateTo ?? "",
-      params.includeIncomplete ?? false,
-    ],
+    queryKey: queryKeys.dashboard.systemsTable(params),
     queryFn: async ({ signal }) => {
       const farmId = params.farmId ?? null
       if (!farmId) {
