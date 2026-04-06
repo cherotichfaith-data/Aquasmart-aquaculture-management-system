@@ -28,6 +28,10 @@ import {
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
 import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
+import {
+  DEFAULT_WQ_PARAMETER,
+  isWqParameter,
+} from "@/app/water-quality/_lib/water-quality-utils"
 
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 
@@ -73,6 +77,7 @@ export function parseWaterQualityPageFilters(
   const selectedStageRaw = searchParams?.stage
   const timePeriodRaw = searchParams?.period
   const activeTabRaw = searchParams?.tab
+  const selectedParameterRaw = searchParams?.parameter
 
   return {
     selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",
@@ -86,6 +91,10 @@ export function parseWaterQualityPageFilters(
         ? (timePeriodRaw as TimePeriod)
         : DEFAULT_TIME_PERIOD,
     activeTab: typeof activeTabRaw === "string" && isValidTab(activeTabRaw) ? activeTabRaw : "overview",
+    selectedParameter:
+      typeof selectedParameterRaw === "string" && isWqParameter(selectedParameterRaw)
+        ? selectedParameterRaw
+        : DEFAULT_WQ_PARAMETER,
   }
 }
 
@@ -187,9 +196,10 @@ async function getActivities(
 async function loadWaterQualityPageInitialData(
   supabase: ServerClient,
   params: {
-  farmId: string | null
-  filters: WaterQualityPageFilters
-}): Promise<WaterQualityPageInitialData> {
+    farmId: string | null
+    filters: WaterQualityPageFilters
+  },
+): Promise<WaterQualityPageInitialData> {
   const empty: WaterQualityPageInitialData = {
     bounds: { start: null, end: null },
     systemOptions: toQuerySuccess([]),

@@ -8,6 +8,7 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  ChevronDown,
   Droplets,
   Fish,
   LayoutDashboard,
@@ -18,7 +19,6 @@ import {
   PlusCircle,
   ChevronsLeft,
   ChevronsRight,
-  ChevronDown,
 } from "lucide-react"
 
 const navigationSections = [
@@ -49,6 +49,15 @@ const navigationSections = [
   },
 ]
 
+const waterQualityLinks = [
+  { href: "/water-quality", label: "Overview", activeKey: "overview" },
+  { href: "/water-quality?tab=parameter", label: "Parameter Analysis", activeKey: "parameter" },
+  { href: "/water-quality?tab=environment", label: "Environmental Indicators", activeKey: "environment" },
+  { href: "/water-quality?tab=depth", label: "Stratification Analysis", activeKey: "depth" },
+  { href: "/water-quality?tab=alerts", label: "Alerts", activeKey: "alerts" },
+  { href: "/water-quality?tab=sensors", label: "Sensor Activity", activeKey: "sensors" },
+] as const
+
 export default function Sidebar({
   open,
   collapsed,
@@ -66,6 +75,7 @@ export default function Sidebar({
   const { signOut } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
   const [waterQualityOpen, setWaterQualityOpen] = useState(pathname.startsWith("/water-quality"))
+  const [collapsedWaterQualityFlyoutOpen, setCollapsedWaterQualityFlyoutOpen] = useState(false)
 
   const waterQualityActive = pathname === "/water-quality"
   const tabParam = searchParams.get("tab")
@@ -80,42 +90,66 @@ export default function Sidebar({
     if (waterQualityActive) setWaterQualityOpen(true)
   }, [waterQualityActive])
 
+  useEffect(() => {
+    if (!collapsed) {
+      setCollapsedWaterQualityFlyoutOpen(false)
+    }
+  }, [collapsed, pathname])
+
   const handleMobileNavigate = () => {
     if (typeof window !== "undefined" && window.innerWidth < 768 && open) {
       onToggle()
     }
   }
 
+  const desktopWidthClass = collapsed ? "md:w-[4.75rem]" : "md:w-[14.5rem] xl:w-[15.5rem]"
+  const navItemClass = (active: boolean, compact = false) =>
+    `flex items-center rounded-2xl transition-colors ${
+      compact ? "justify-center px-2.5 py-2.5" : "gap-3 px-3 py-2.5"
+    } ${
+      active
+        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+    }`
+
+  const waterQualityLinkClass = (active: boolean) =>
+    `block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
+      active
+        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+        : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+    }`
+
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/50 md:hidden z-30" onClick={onToggle} />}
 
       <aside
-        className={`fixed md:sticky top-0 left-0 h-screen bg-sidebar shadow-[0_26px_60px_-38px_rgba(15,23,32,0.6)] transform transition-[width,transform] duration-300 z-40 flex flex-col ${collapsed ? "md:w-24" : "md:w-72"} w-[min(88vw,20rem)] md:w-72 ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        className={`fixed md:sticky top-0 left-0 h-screen bg-sidebar shadow-[0_24px_54px_-40px_rgba(15,23,32,0.52)] transform transition-[width,transform] duration-300 z-40 flex flex-col ${desktopWidthClass} w-[min(82vw,17rem)] ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           }`}
         style={{
           backgroundImage:
             "linear-gradient(180deg, rgba(255,255,255,0.02), transparent 18%), radial-gradient(circle at top right, rgba(94,234,212,0.12), transparent 28%)",
         }}
       >
-        <div className="flex items-center justify-between px-4 py-4 md:hidden">
+        <div className="flex items-center justify-between px-4 py-3.5 md:hidden">
           <div>
-            <h1 className="font-semibold text-lg text-sidebar-foreground">AQ</h1>
-            <p className="text-xs text-sidebar-foreground/65">Aquasmart navigation</p>
+            <h1 className="font-semibold text-base text-sidebar-foreground">AQ</h1>
+            <p className="text-[11px] text-sidebar-foreground/65">Aquasmart navigation</p>
           </div>
           <button onClick={onToggle} className="rounded-xl p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
             <X size={20} />
           </button>
         </div>
 
-        <div className="hidden px-4 py-5 md:flex md:flex-col md:items-stretch md:gap-4">
+        <div className="hidden px-3 py-4 md:flex md:flex-col md:items-stretch md:gap-3">
           <div className="flex items-center">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary shadow-sm">
-            <span className="text-sidebar-primary-foreground font-semibold">AQ</span>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary shadow-sm">
+            <span className="text-sm font-semibold text-sidebar-primary-foreground">AQ</span>
             </div>
             {!collapsed && (
               <div className="ml-3">
                 <p className="font-semibold leading-none text-sidebar-foreground">Aquasmart</p>
+                <p className="mt-1 text-[11px] text-sidebar-foreground/60">Operations</p>
               </div>
             )}
             <button
@@ -129,46 +163,80 @@ export default function Sidebar({
             </button>
           </div>
         </div>
-        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 md:px-4 md:py-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+        <nav className="flex-1 space-y-4 overflow-y-auto px-2.5 py-3 md:px-3 md:py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           {navigationSections.map((section) => (
-            <div key={section.title} className="space-y-2">
+            <div key={section.title} className="space-y-1.5">
               {!collapsed ? (
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">
+                <p className="px-3 text-[9px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">
                   {section.title}
                 </p>
               ) : null}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {section.items.map((item) => {
             if (item.href === "/water-quality") {
               const Icon = item.icon
               if (collapsed) {
                 return (
-                  <Link
+                  <div
                     key={item.href}
-                    href={item.href}
-                    onClick={handleMobileNavigate}
-                    className={`flex items-center justify-center rounded-2xl px-3 py-3 transition-colors ${waterQualityActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      }`}
-                    title={item.name}
+                    className="relative"
+                    onMouseEnter={() => setCollapsedWaterQualityFlyoutOpen(true)}
+                    onMouseLeave={() => setCollapsedWaterQualityFlyoutOpen(false)}
                   >
-                    <Icon className="h-4 w-4" />
-                  </Link>
+                    <button
+                      type="button"
+                      onClick={() => setCollapsedWaterQualityFlyoutOpen((prev) => !prev)}
+                      className={navItemClass(waterQualityActive || collapsedWaterQualityFlyoutOpen, true)}
+                      title={item.name}
+                      aria-label="Open water quality navigation"
+                      aria-expanded={collapsedWaterQualityFlyoutOpen}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </button>
+                    {collapsedWaterQualityFlyoutOpen ? (
+                      <div className="absolute left-[calc(100%+0.65rem)] top-1/2 z-50 hidden w-56 -translate-y-1/2 rounded-[1.15rem] border border-sidebar-border bg-sidebar/95 p-2 shadow-[0_24px_54px_-28px_rgba(15,23,32,0.42)] backdrop-blur-xl md:block">
+                        <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/55">
+                          Water Quality
+                        </div>
+                        <div className="space-y-1">
+                          {waterQualityLinks.map((link) => {
+                            const isActive =
+                              (link.activeKey === "overview" && overviewActive) ||
+                              (link.activeKey === "parameter" && parameterActive) ||
+                              (link.activeKey === "environment" && environmentActive) ||
+                              (link.activeKey === "depth" && depthProfileActive) ||
+                              (link.activeKey === "alerts" && alertsActive) ||
+                              (link.activeKey === "sensors" && sensorsActive)
+
+                            return (
+                              <Link
+                                key={link.href}
+                                href={link.href}
+                                className={waterQualityLinkClass(isActive)}
+                                onClick={() => {
+                                  setCollapsedWaterQualityFlyoutOpen(false)
+                                  handleMobileNavigate()
+                                }}
+                              >
+                                {link.label}
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 )
               }
 
               return (
                 <div key={item.href}>
                   <div
-                    className={`flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors ${waterQualityActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      }`}
+                    className={navItemClass(waterQualityActive)}
                   >
                     <Link href={item.href} onClick={handleMobileNavigate} className="flex items-center gap-3 flex-1">
                       <Icon className="h-4 w-4" />
-                      <span className="text-sm font-medium">{item.name}</span>
+                      <span className="min-w-0 truncate text-sm font-medium">{item.name}</span>
                     </Link>
                     <button
                       type="button"
@@ -184,67 +252,27 @@ export default function Sidebar({
                     </button>
                   </div>
                   {waterQualityOpen && (
-                    <div className="ml-7 mt-2 space-y-1">
-                      <Link
-                        href="/water-quality"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${overviewActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Overview
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=parameter"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${parameterActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Parameter Analysis
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=environment"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${environmentActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Environmental Indicators
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=depth"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${depthProfileActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Stratification Analysis
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=alerts"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${alertsActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Alerts
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=sensors"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${sensorsActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Sensor Activity
-                      </Link>
+                    <div className="ml-5 mt-1.5 space-y-1">
+                      {waterQualityLinks.map((link) => {
+                        const isActive =
+                          (link.activeKey === "overview" && overviewActive) ||
+                          (link.activeKey === "parameter" && parameterActive) ||
+                          (link.activeKey === "environment" && environmentActive) ||
+                          (link.activeKey === "depth" && depthProfileActive) ||
+                          (link.activeKey === "alerts" && alertsActive) ||
+                          (link.activeKey === "sensors" && sensorsActive)
+
+                        return (
+                          <Link
+                            key={link.href}
+                            href={link.href}
+                            onClick={handleMobileNavigate}
+                            className={waterQualityLinkClass(isActive)}
+                          >
+                            {link.label}
+                          </Link>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -258,14 +286,11 @@ export default function Sidebar({
                 key={item.href}
                 href={item.href}
                 onClick={handleMobileNavigate}
-                className={`flex items-center rounded-2xl px-3 py-3 transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
+                className={navItemClass(isActive, collapsed)}
                 title={collapsed ? item.name : undefined}
               >
                 <Icon className="h-4 w-4" />
-                {!collapsed && <span className="text-sm font-medium">{item.name}</span>}
+                {!collapsed && <span className="min-w-0 truncate text-sm font-medium">{item.name}</span>}
               </Link>
             )
                 })}
@@ -274,7 +299,7 @@ export default function Sidebar({
           ))}
         </nav>
 
-        <div className="p-4">
+        <div className="p-3 md:p-3.5">
           <button
             onClick={async () => {
               if (signingOut) return
@@ -286,7 +311,7 @@ export default function Sidebar({
                 setSigningOut(false)
               }
             }}
-            className={`flex w-full items-center rounded-2xl px-3 py-3 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-60 ${collapsed ? "justify-center" : "gap-3"}`}
+            className={`flex w-full items-center rounded-2xl px-3 py-2.5 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-60 ${collapsed ? "justify-center" : "gap-3"}`}
             disabled={signingOut}
             title={collapsed ? "Log out" : undefined}
           >

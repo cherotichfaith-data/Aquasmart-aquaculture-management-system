@@ -2,6 +2,7 @@ import type { Enums } from "@/lib/types/database"
 
 export type WqParameter = Enums<"water_quality_parameters">
 export type StatusTone = "green" | "yellow" | "red"
+export const DEFAULT_WQ_PARAMETER: WqParameter = "dissolved_oxygen"
 
 export type MeasurementEvent = {
   key: string
@@ -29,6 +30,9 @@ export const parameterLabels: Record<WqParameter, string> = {
   salinity: "Salinity (ppt)",
   secchi_disk_depth: "Secchi Depth",
 }
+
+export const isWqParameter = (value: string | null | undefined): value is WqParameter =>
+  typeof value === "string" && value in parameterLabels
 
 export const operatorColumns = new Set(["created_by", "user_id", "operator_id"])
 

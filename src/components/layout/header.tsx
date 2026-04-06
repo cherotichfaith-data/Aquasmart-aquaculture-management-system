@@ -24,6 +24,13 @@ import { useNotifications } from "@/components/notifications/notifications-provi
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { resolveTimePeriod } from "@/lib/time-period"
+import {
+  DEFAULT_WQ_PARAMETER,
+  isWqParameter,
+  parameterLabels,
+  type WqParameter,
+} from "@/app/water-quality/_lib/water-quality-utils"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type PageMeta = {
   title: string
@@ -113,11 +120,16 @@ export default function Header({
   const { farm } = useActiveFarm()
   const pageMeta = getPageMeta(pathname, searchParams.get("tab"))
   const showAddData = pathname === "/"
+  const isWaterQualityPage = pathname.startsWith("/water-quality")
   const defaultPeriod: TimePeriod = (() => {
     if (pathname.startsWith("/feed") || pathname.startsWith("/sampling")) return "quarter"
     if (pathname.startsWith("/water-quality")) return "month"
     return "2 weeks"
   })()
+  const selectedParameter =
+    isWaterQualityPage && isWqParameter(searchParams.get("parameter"))
+      ? (searchParams.get("parameter") as WqParameter)
+      : DEFAULT_WQ_PARAMETER
   const sharedFilterInitialValues = useMemo<Partial<SharedFiltersState> | undefined>(() => {
     const hasFilterParams = ["system", "batch", "stage", "period"].some((key) => searchParams.get(key) != null)
     if (!hasFilterParams) return undefined
@@ -147,12 +159,14 @@ export default function Header({
     selectedSystem?: string
     selectedStage?: SharedFiltersState["selectedStage"]
     timePeriod?: TimePeriod
+    selectedParameter?: WqParameter
   }) => {
     const params = new URLSearchParams(searchParams.toString())
     const nextBatch = next.selectedBatch ?? selectedBatch
     const nextSystem = next.selectedSystem ?? selectedSystem
     const nextStage = next.selectedStage ?? selectedStage
     const nextPeriod = next.timePeriod ?? timePeriod
+    const nextParameter = next.selectedParameter ?? selectedParameter
 
     if (nextSystem !== "all") params.set("system", nextSystem)
     else params.delete("system")
@@ -164,6 +178,10 @@ export default function Header({
     else params.delete("stage")
 
     params.set("period", nextPeriod)
+    if (isWaterQualityPage) {
+      if (nextParameter !== DEFAULT_WQ_PARAMETER) params.set("parameter", nextParameter)
+      else params.delete("parameter")
+    }
 
     const nextQuery = params.toString()
     const currentQuery = searchParams.toString()
@@ -189,6 +207,11 @@ export default function Header({
   const handleTimePeriodChange = (value: TimePeriod) => {
     setTimePeriod(value)
     replaceFilterParams({ timePeriod: value })
+  }
+
+  const handleWaterQualityParameterChange = (value: string) => {
+    if (!isWqParameter(value)) return
+    replaceFilterParams({ selectedParameter: value as WqParameter })
   }
 
   const handleSignOut = async () => {
@@ -366,6 +389,20 @@ export default function Header({
                 showCounts={false}
                 variant="compact"
               />
+              {isWaterQualityPage ? (
+                <Select value={selectedParameter} onValueChange={handleWaterQualityParameterChange}>
+                  <SelectTrigger className="w-full sm:w-[220px]">
+                    <SelectValue placeholder="Select parameter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(parameterLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
             </div>
             <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto sm:flex-wrap sm:justify-end">
             {showAddData ? (

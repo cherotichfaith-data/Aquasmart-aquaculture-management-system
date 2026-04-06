@@ -17,8 +17,9 @@ import {
 import { useRecentActivities } from "@/lib/hooks/use-dashboard"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import {
+  DEFAULT_WQ_PARAMETER,
   getResultRows,
-  parameterLabels,
+  isWqParameter,
   type WqParameter,
 } from "./_lib/water-quality-utils"
 import {
@@ -63,7 +64,6 @@ import { WaterQualityOverviewTab } from "./water-quality-overview-tab"
 import { WaterQualityParameterTab } from "./water-quality-parameter-tab"
 import { WaterQualitySensorsTab } from "./water-quality-sensors-tab"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   buildWaterQualityTabQuery,
   CHART_TABS,
@@ -101,12 +101,16 @@ export default function WaterQualityPage({
   })
   const selectedSystemValue = selectedSystem
   const isAllSystemsSelected = selectedSystem === "all"
-  const [selectedParameter, setSelectedParameter] = useState<WqParameter>("dissolved_oxygen")
   const [showFeedingOverlay, setShowFeedingOverlay] = useState(true)
   const [showMortalityOverlay, setShowMortalityOverlay] = useState(true)
   const [depthProfileDate, setDepthProfileDate] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState(() => initialFilters?.activeTab ?? "overview")
   const [selectedHistorySystemId, setSelectedHistorySystemId] = useState<number | null>(null)
+  const selectedParameter = useMemo<WqParameter>(() => {
+    const nextParameter = searchParams.get("parameter")
+    if (isWqParameter(nextParameter)) return nextParameter
+    return initialFilters?.selectedParameter ?? DEFAULT_WQ_PARAMETER
+  }, [initialFilters?.selectedParameter, searchParams])
   const chartLimit = 2000
   const initialStageMatch = selectedStage === (initialFilters?.selectedStage ?? "all")
   const initialBatchMatch = selectedBatch === (initialFilters?.selectedBatch ?? "all")
@@ -411,26 +415,7 @@ export default function WaterQualityPage({
     syncStatusQuery.isLoading
   return (
     <DashboardLayout>
-      <div className={`space-y-6 ${activeTab === "depth" || activeTab === "parameter" ? "-mt-6 md:-mt-8" : ""}`}>
-        <div
-          className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end ${
-            activeTab === "depth" || activeTab === "parameter" ? "mt-8 md:mt-10" : "mt-4 md:mt-6"
-          }`}
-        >
-          <Select value={selectedParameter} onValueChange={(value) => setSelectedParameter(value as WqParameter)}>
-            <SelectTrigger className="w-full sm:w-[220px]">
-              <SelectValue placeholder="Select parameter" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(parameterLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
+      <div className="space-y-5">
         {activeTab === "overview" && (
           <WaterQualityOverviewTab
             averageWqi={averageWqi}
@@ -467,74 +452,79 @@ export default function WaterQualityPage({
         )}
 
         {CHART_TABS.has(activeTab) && (
-        <div className="soft-panel p-5 space-y-4">
-          {activeTab === "parameter" && (
-            <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
-              <label className="inline-flex items-center gap-2">
-                <input type="checkbox" checked={showFeedingOverlay} onChange={(e) => setShowFeedingOverlay(e.target.checked)} />
-                Overlay feeding
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input type="checkbox" checked={showMortalityOverlay} onChange={(e) => setShowMortalityOverlay(e.target.checked)} />
-                Overlay mortality
-              </label>
-            </div>
-          )}
+          <div className="soft-panel space-y-4 p-5">
+            {activeTab === "parameter" ? (
+              <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showFeedingOverlay}
+                    onChange={(e) => setShowFeedingOverlay(e.target.checked)}
+                  />
+                  Overlay feeding
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showMortalityOverlay}
+                    onChange={(e) => setShowMortalityOverlay(e.target.checked)}
+                  />
+                  Overlay mortality
+                </label>
+              </div>
+            ) : null}
+            <Tabs value={activeTab}>
+              <TabsContent value="environment">
+                <WaterQualityEnvironmentTab
+                  wqiValue={wqiValue}
+                  wqiLabel={wqiLabel}
+                  isAllSystemsSelected={selectedSystemId == null}
+                  nutrientLoad={nutrientLoad}
+                  algalActivity={algalActivity}
+                  allSystemsWqi={allSystemsWqi}
+                  selectedSystemValue={selectedSystemValue}
+                  onSelectSystem={setSelectedSystem}
+                  onOpenSystemHistory={setSelectedHistorySystemId}
+                />
+              </TabsContent>
 
-          <Tabs value={activeTab}>
-            <TabsContent value="environment">
-              <WaterQualityEnvironmentTab
-                wqiValue={wqiValue}
-                wqiLabel={wqiLabel}
-                isAllSystemsSelected={selectedSystemId == null}
-                nutrientLoad={nutrientLoad}
-                algalActivity={algalActivity}
-                allSystemsWqi={allSystemsWqi}
-                selectedSystemValue={selectedSystemValue}
-                onSelectSystem={setSelectedSystem}
-                onOpenSystemHistory={setSelectedHistorySystemId}
-              />
-            </TabsContent>
+              <TabsContent value="depth">
+                <WaterQualityDepthTab
+                  selectedDepthProfileDate={selectedDepthProfileDate}
+                  onSelectDepthProfileDate={setDepthProfileDate}
+                  depthDates={depthProfiles.dates}
+                  isAllSystemsSelected={isAllSystemsSelected}
+                  depthProfileData={depthProfileData}
+                  depthProfileDoData={depthProfileDoData}
+                  depthProfileTempData={depthProfileTempData}
+                  isStratified={isStratified}
+                  surfaceDo={surfaceDo}
+                  bottomDo={bottomDo}
+                  doGradient={doGradient}
+                  tempGradient={tempGradient}
+                />
+              </TabsContent>
 
-            <TabsContent value="depth">
-              <WaterQualityDepthTab
-                selectedDepthProfileDate={selectedDepthProfileDate}
-                onSelectDepthProfileDate={setDepthProfileDate}
-                depthDates={depthProfiles.dates}
-                isAllSystemsSelected={isAllSystemsSelected}
-                depthProfileData={depthProfileData}
-                depthProfileDoData={depthProfileDoData}
-                depthProfileTempData={depthProfileTempData}
-                isStratified={isStratified}
-                surfaceDo={surfaceDo}
-                bottomDo={bottomDo}
-                doGradient={doGradient}
-                tempGradient={tempGradient}
-              />
-            </TabsContent>
-
-            <TabsContent value="parameter">
-              <WaterQualityParameterTab
-                latestUpdatedAt={latestUpdatedAt}
-                isFetching={measurementsQuery.isFetching || ratingsQuery.isFetching}
-                isLoading={loading}
-                dataIssues={dataIssues}
-                parameterTrendData={parameterTrendData}
-                selectedParameter={selectedParameter}
-                selectedParameterUnit={selectedParameterUnit}
-                lowDoThreshold={lowDoThreshold}
-                highAmmoniaThreshold={highAmmoniaThreshold}
-                showFeedingOverlay={showFeedingOverlay}
-                showMortalityOverlay={showMortalityOverlay}
-                diurnalDoPattern={diurnalDoPattern}
-                dailyTempAverage={dailyTempAverage}
-              />
-            </TabsContent>
-
-          </Tabs>
-        </div>
+              <TabsContent value="parameter">
+                <WaterQualityParameterTab
+                  latestUpdatedAt={latestUpdatedAt}
+                  isFetching={measurementsQuery.isFetching || ratingsQuery.isFetching}
+                  isLoading={loading}
+                  dataIssues={dataIssues}
+                  parameterTrendData={parameterTrendData}
+                  selectedParameter={selectedParameter}
+                  selectedParameterUnit={selectedParameterUnit}
+                  lowDoThreshold={lowDoThreshold}
+                  highAmmoniaThreshold={highAmmoniaThreshold}
+                  showFeedingOverlay={showFeedingOverlay}
+                  showMortalityOverlay={showMortalityOverlay}
+                  diurnalDoPattern={diurnalDoPattern}
+                  dailyTempAverage={dailyTempAverage}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
         )}
-
       </div>
       <SystemHistorySheet
         open={selectedHistorySystemId !== null}
@@ -548,6 +538,3 @@ export default function WaterQualityPage({
     </DashboardLayout>
   )
 }
-
-
-

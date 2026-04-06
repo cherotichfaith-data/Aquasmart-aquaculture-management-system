@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, Bell, Droplets, Gauge, Radio, Thermometer, XCircle } from "lucide-react"
+import { AlertTriangle, Bell, Gauge, Radio, Thermometer, XCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { AlertItem, SystemRiskRow } from "./_lib/water-quality-selectors"
@@ -31,19 +31,8 @@ export function WaterQualityOverviewTab({
   onOpenSystemHistory?: (systemId: number) => void
 }) {
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 shadow-[0_14px_32px_-26px_rgba(34,211,238,0.45)]">
-            <Droplets className="h-5 w-5 text-cyan-400" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-foreground">Water Quality Overview</h2>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card
           className="bg-card border border-border cursor-pointer hover:border-cyan-500/40 transition-all"
           onClick={() => onChangeTab("environment")}

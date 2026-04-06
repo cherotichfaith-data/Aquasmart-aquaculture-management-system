@@ -19,10 +19,34 @@ export default function DashboardLayout({
   hideHeader?: boolean
   showHeaderToolbar?: boolean
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const storedCollapsed = window.localStorage.getItem("dashboard:sidebar-collapsed")
+    const applyResponsiveSidebarState = () => {
+      const isDesktop = window.innerWidth >= 768
+      setSidebarOpen(isDesktop)
+
+      if (storedCollapsed == null) {
+        setSidebarCollapsed(window.innerWidth < 1280)
+      }
+    }
+
+    if (storedCollapsed === "true") setSidebarCollapsed(true)
+    if (storedCollapsed === "false") setSidebarCollapsed(false)
+
+    applyResponsiveSidebarState()
+    window.addEventListener("resize", applyResponsiveSidebarState)
+
+    return () => {
+      window.removeEventListener("resize", applyResponsiveSidebarState)
+    }
+  }, [])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -69,7 +93,15 @@ export default function DashboardLayout({
         open={sidebarOpen}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onCollapseToggle={() => setSidebarCollapsed((prev) => !prev)}
+        onCollapseToggle={() =>
+          setSidebarCollapsed((prev) => {
+            const next = !prev
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem("dashboard:sidebar-collapsed", String(next))
+            }
+            return next
+          })
+        }
       />
       <div className="relative flex min-w-0 flex-1 flex-col">
         {hideHeader ? null : (

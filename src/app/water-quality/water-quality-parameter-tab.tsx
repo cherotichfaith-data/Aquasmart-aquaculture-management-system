@@ -409,10 +409,7 @@ export function WaterQualityParameterTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-foreground">Parameter Analysis</h2>
-      </div>
-      <div className="flex items-center justify-between text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         <DataUpdatedAt updatedAt={latestUpdatedAt} />
         <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
       </div>
