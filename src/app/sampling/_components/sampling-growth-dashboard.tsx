@@ -1,29 +1,18 @@
 "use client"
 
+import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+  Bar as ChartBar,
+  Line as ChartLine,
+} from "@/components/charts/chartjs"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  chartGridProps,
-  chartLegendProps,
-  chartTooltipItemStyle,
-  chartTooltipLabelStyle,
-  chartTooltipStyle,
-  chartXAxisProps,
-  chartYAxisProps,
-} from "@/components/charts/recharts-theme"
+  buildCartesianOptions,
+  createVerticalGradient,
+  getChartPalette,
+} from "@/components/charts/chartjs-theme"
 import { formatFullDate, formatWithUnit } from "@/app/sampling/_lib/formatters"
 
 type TrajectoryRow = {
@@ -50,16 +39,14 @@ type HarvestTimelineSystem = {
 }
 
 const chartCardClass = "rounded-2xl border border-border/80 bg-card shadow-sm"
-const chartColors = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
-]
 
 function EmptyChart({ label }: { label: string }) {
   return <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">{label}</div>
+}
+
+const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
+  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+  return numeric.length ? Math.max(...numeric) : fallback
 }
 
 export function SamplingGrowthDashboard({
@@ -141,6 +128,171 @@ export function SamplingGrowthDashboard({
   harvestTimelineSystems: HarvestTimelineSystem[]
   harvestGranularityLabel: string
 }) {
+  const palette = getChartPalette()
+  const chartColors = [palette.chart1, palette.chart2, palette.chart3, palette.chart4, palette.chart5]
+
+  const trajectoryMax = useMemo(
+    () => Math.max(1, Math.ceil(getMaxNumber(bestGrowthTrajectory.map((row) => row.abw)) * 1.12)),
+    [bestGrowthTrajectory],
+  )
+
+  const currentAbwMax = useMemo(
+    () => Math.max(1, Math.ceil(getMaxNumber(currentAbwRows.map((row) => row.abw)) * 1.12)),
+    [currentAbwRows],
+  )
+
+  const sgrMax = useMemo(() => {
+    const maxValue = getMaxNumber(sgrRows.map((row) => row.sgr))
+    return Math.max(0.25, Math.ceil(maxValue * 1.15 * 1000) / 1000)
+  }, [sgrRows])
+
+  const harvestMax = useMemo(() => {
+    const values = harvestTimelineRows.flatMap((row) =>
+      harvestTimelineSystems.map((system) => {
+        const value = row[`system_${system.systemId}`]
+        return typeof value === "number" ? value : null
+      }),
+    )
+    return Math.max(1, Math.ceil(getMaxNumber(values) * 1.12))
+  }, [harvestTimelineRows, harvestTimelineSystems])
+
+  const trajectoryData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: bestGrowthTrajectory.map((row) => row.label),
+      datasets: [
+        {
+          label: "ABW",
+          data: bestGrowthTrajectory.map((row) => row.abw),
+          borderColor: palette.chart1,
+          backgroundColor: createVerticalGradient(palette.chart1, 0.36, 0.04),
+          borderWidth: 2.6,
+          fill: true,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+        },
+      ],
+    }),
+    [bestGrowthTrajectory, palette.chart1],
+  )
+
+  const trajectoryOptions = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: 0,
+        max: trajectoryMax,
+        yTitle: "ABW (g)",
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatFullDate(bestGrowthTrajectory[items[0]?.dataIndex ?? 0]?.date ?? ""),
+            label: (context: any) => `ABW: ${Number(context.parsed.y).toFixed(1)} g`,
+          },
+        },
+      }),
+    [bestGrowthTrajectory, palette, trajectoryMax],
+  )
+
+  const currentAbwData = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: currentAbwRows.map((row) => row.label),
+      datasets: [
+        {
+          label: "Current ABW",
+          data: currentAbwRows.map((row) => row.abw),
+          backgroundColor: currentAbwRows.map((_, index) => chartColors[index % chartColors.length]),
+          borderRadius: 6,
+        },
+      ],
+    }),
+    [chartColors, currentAbwRows],
+  )
+
+  const currentAbwOptions = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: 0,
+        max: currentAbwMax,
+        yTitle: "ABW (g)",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `Current ABW: ${Number(context.parsed.y).toFixed(1)} g`,
+          },
+        },
+      }),
+    [currentAbwMax, palette],
+  )
+
+  const sgrData = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: sgrRows.map((row) => row.label),
+      datasets: [
+        {
+          label: "SGR",
+          data: sgrRows.map((row) => row.sgr),
+          backgroundColor: sgrRows.map((row) =>
+            row.sgr > 1.5 ? "#16a34a" : row.sgr > 0.8 ? "#3b82f6" : "#f59e0b",
+          ),
+          borderRadius: 6,
+        },
+      ],
+    }),
+    [sgrRows],
+  )
+
+  const sgrOptions = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: 0,
+        max: sgrMax,
+        yTickFormatter: (value) => `${Number(value).toFixed(2)}%`,
+        yTitle: "SGR (%/day)",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `SGR: ${Number(context.parsed.y).toFixed(3)}%/day`,
+          },
+        },
+      }),
+    [palette, sgrMax],
+  )
+
+  const harvestData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: harvestTimelineRows.map((row) => String(row.label ?? "")),
+      datasets: harvestTimelineSystems.map((row, index) => ({
+        label: row.label,
+        data: harvestTimelineRows.map((item) => {
+          const value = item[`system_${row.systemId}`]
+          return typeof value === "number" ? value : null
+        }),
+        borderColor: chartColors[index % chartColors.length],
+        backgroundColor: chartColors[index % chartColors.length],
+        borderWidth: 2.4,
+        pointRadius: 0,
+        spanGaps: true,
+      })),
+    }),
+    [chartColors, harvestTimelineRows, harvestTimelineSystems],
+  )
+
+  const harvestOptions = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: 0,
+        max: harvestMax,
+        yTitle: "Cumulative harvest (kg)",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} kg`,
+          },
+        },
+      }),
+    [harvestMax, palette],
+  )
+
   return (
     <>
       <div className="space-y-4">
@@ -281,28 +433,8 @@ export function SamplingGrowthDashboard({
           ) : bestGrowthTrajectory.length === 0 ? (
             <EmptyChart label="No growth trajectory available in the selected scope." />
           ) : (
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={bestGrowthTrajectory}>
-                  <CartesianGrid {...chartGridProps} />
-                  <XAxis {...chartXAxisProps} dataKey="label" />
-                  <YAxis {...chartYAxisProps} />
-                  <Tooltip
-                    labelFormatter={(_, payload) => formatFullDate(String(payload?.[0]?.payload?.date ?? ""))}
-                    formatter={(value) => [`${Number(value).toFixed(1)} g`, "ABW"]}
-                    contentStyle={chartTooltipStyle}
-                    labelStyle={chartTooltipLabelStyle}
-                    itemStyle={chartTooltipItemStyle}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="abw"
-                    stroke="var(--color-chart-1)"
-                    strokeWidth={2.6}
-                    dot={{ r: 3 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="chart-canvas-shell h-[300px]">
+              <ChartLine data={trajectoryData} options={trajectoryOptions} />
             </div>
           )}
         </CardContent>
@@ -319,25 +451,8 @@ export function SamplingGrowthDashboard({
             {currentAbwRows.length === 0 ? (
               <EmptyChart label="No ABW samples in the selected scope." />
             ) : (
-              <div className="h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={currentAbwRows}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis {...chartXAxisProps} dataKey="label" tick={{ ...chartXAxisProps.tick, fontSize: 10.5 }} />
-                    <YAxis {...chartYAxisProps} />
-                    <Tooltip
-                      formatter={(value) => [`${Number(value).toFixed(1)} g`, "Current ABW"]}
-                      contentStyle={chartTooltipStyle}
-                      labelStyle={chartTooltipLabelStyle}
-                      itemStyle={chartTooltipItemStyle}
-                    />
-                    <Bar dataKey="abw" radius={[4, 4, 0, 0]}>
-                      {currentAbwRows.map((row, index) => (
-                        <Cell key={row.systemId} fill={chartColors[index % chartColors.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="chart-canvas-shell h-[240px]">
+                <ChartBar data={currentAbwData} options={currentAbwOptions} />
               </div>
             )}
           </CardContent>
@@ -353,28 +468,8 @@ export function SamplingGrowthDashboard({
             {sgrRows.length === 0 ? (
               <EmptyChart label="No SGR values in the selected scope." />
             ) : (
-              <div className="h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sgrRows}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis {...chartXAxisProps} dataKey="label" tick={{ ...chartXAxisProps.tick, fontSize: 10.5 }} />
-                    <YAxis {...chartYAxisProps} />
-                    <Tooltip
-                      formatter={(value) => [`${Number(value).toFixed(3)}%/day`, "SGR"]}
-                      contentStyle={chartTooltipStyle}
-                      labelStyle={chartTooltipLabelStyle}
-                      itemStyle={chartTooltipItemStyle}
-                    />
-                    <Bar dataKey="sgr" radius={[4, 4, 0, 0]}>
-                      {sgrRows.map((row) => (
-                        <Cell
-                          key={row.systemId}
-                          fill={row.sgr > 1.5 ? "#16a34a" : row.sgr > 0.8 ? "#3b82f6" : "#f59e0b"}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="chart-canvas-shell h-[240px]">
+                <ChartBar data={sgrData} options={sgrOptions} />
               </div>
             )}
           </CardContent>
@@ -394,32 +489,8 @@ export function SamplingGrowthDashboard({
           {harvestTimelineRows.length === 0 ? (
             <EmptyChart label="No harvest history in the selected scope." />
           ) : (
-            <div className="h-[260px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={harvestTimelineRows}>
-                  <CartesianGrid {...chartGridProps} />
-                  <XAxis {...chartXAxisProps} dataKey="label" />
-                  <YAxis {...chartYAxisProps} />
-                  <Tooltip
-                    formatter={(value) => [`${Number(value).toFixed(1)} kg`, "Cumulative harvest"]}
-                    contentStyle={chartTooltipStyle}
-                    labelStyle={chartTooltipLabelStyle}
-                    itemStyle={chartTooltipItemStyle}
-                  />
-                  <Legend {...chartLegendProps} />
-                  {harvestTimelineSystems.map((row, index) => (
-                    <Line
-                      key={row.systemId}
-                      type="monotone"
-                      dataKey={`system_${row.systemId}`}
-                      name={row.label}
-                      stroke={chartColors[index % chartColors.length]}
-                      strokeWidth={2.4}
-                      dot={false}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="chart-canvas-shell h-[260px]">
+              <ChartLine data={harvestData} options={harvestOptions} />
             </div>
           )}
         </CardContent>

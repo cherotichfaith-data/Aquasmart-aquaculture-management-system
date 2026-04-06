@@ -3,30 +3,19 @@
 import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
+import type { ChartData, ChartOptions } from "chart.js"
 import {
-  Bar,
-  CartesianGrid,
-  Legend,
+  Chart,
   Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+} from "@/components/charts/chartjs"
 import { Fish, Skull, TestTube, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  chartGridProps,
-  chartLegendProps,
-  chartTooltipItemStyle,
-  chartTooltipLabelStyle,
-  chartTooltipStyle,
-  chartXAxisProps,
-  chartYAxisProps,
-} from "@/components/charts/recharts-theme"
+  buildCartesianOptions,
+  getChartPalette,
+} from "@/components/charts/chartjs-theme"
 import {
   Sheet,
   SheetContent,
@@ -61,6 +50,16 @@ type OperationRow = {
   createdAt: string | null
   type: "Stocking" | "Feeding" | "Sampling" | "Mortality" | "Transfer" | "Harvest"
   detail: string
+}
+
+const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
+  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+  return numeric.length ? Math.max(...numeric) : fallback
+}
+
+const getMinNumber = (values: Array<number | null | undefined>, fallback = 0) => {
+  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+  return numeric.length ? Math.min(...numeric) : fallback
 }
 
 const ratingToneClass = (rating: string | null | undefined) => {
@@ -445,6 +444,159 @@ export default function SystemHistorySheet({
     measurementQuery.isFetching
 
   const title = systemLabel ?? summaryRow?.system_name ?? (systemId ? `System ${systemId}` : "System")
+  const palette = getChartPalette()
+
+  const inventoryChartData = useMemo<ChartData<any>>(
+    () => ({
+      labels: inventoryTrendRows.map((row) => row.label),
+      datasets: [
+        {
+          type: "bar",
+          label: "Feed (kg)",
+          data: inventoryTrendRows.map((row) => row.feed),
+          backgroundColor: palette.chart3,
+          yAxisID: "y",
+          order: 3,
+        },
+        {
+          type: "line",
+          label: "Biomass (kg)",
+          data: inventoryTrendRows.map((row) => row.biomass),
+          borderColor: palette.chart1,
+          backgroundColor: palette.chart1,
+          borderWidth: 2.4,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y",
+          order: 1,
+        },
+        {
+          type: "line",
+          label: "ABW (g)",
+          data: inventoryTrendRows.map((row) => row.abw),
+          borderColor: palette.chart2,
+          backgroundColor: palette.chart2,
+          borderWidth: 2.4,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y1",
+          order: 2,
+        },
+      ],
+    }),
+    [inventoryTrendRows, palette.chart1, palette.chart2, palette.chart3],
+  )
+
+  const inventoryChartOptions = useMemo<ChartOptions<"bar">>(() => {
+    const leftMax = Math.max(
+      1,
+      Math.ceil(
+        getMaxNumber([
+          ...inventoryTrendRows.map((row) => row.biomass),
+          ...inventoryTrendRows.map((row) => row.feed),
+        ]) * 1.12,
+      ),
+    )
+    const rightMax = Math.max(1, Math.ceil(getMaxNumber(inventoryTrendRows.map((row) => row.abw)) * 1.12))
+
+    return buildCartesianOptions({
+      palette,
+      legend: true,
+      min: 0,
+      max: leftMax,
+      rightMin: 0,
+      rightMax,
+      yTitle: "Biomass / Feed (kg)",
+      yRightTitle: "ABW (g)",
+      tooltip: {
+        callbacks: {
+          title: (items: any) => formatDateOnly(inventoryTrendRows[items[0]?.dataIndex ?? 0]?.date ?? ""),
+          label: (context: any) => {
+            const label = context.dataset.label ?? ""
+            const numeric = Number(context.parsed.y)
+            const unit = label.includes("ABW") ? "g" : "kg"
+            return `${label}: ${formatNumberValue(numeric, { decimals: 1 })} ${unit}`
+          },
+        },
+      },
+    })
+  }, [inventoryTrendRows, palette])
+
+  const waterChartData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: waterTrendRows.map((row) => row.label),
+      datasets: [
+        {
+          label: "DO (mg/L)",
+          data: waterTrendRows.map((row) => row.dissolvedOxygen),
+          borderColor: palette.chart1,
+          backgroundColor: palette.chart1,
+          borderWidth: 2.4,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y",
+        },
+        {
+          label: "Temperature (C)",
+          data: waterTrendRows.map((row) => row.temperature),
+          borderColor: palette.chart4,
+          backgroundColor: palette.chart4,
+          borderWidth: 2.4,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y1",
+        },
+      ],
+    }),
+    [palette.chart1, palette.chart4, waterTrendRows],
+  )
+
+  const waterChartOptions = useMemo<ChartOptions<"line">>(() => {
+    const doMax = Math.max(1, Math.ceil(getMaxNumber(waterTrendRows.map((row) => row.dissolvedOxygen)) * 1.12))
+    const tempMin = Math.max(0, Math.floor(getMinNumber(waterTrendRows.map((row) => row.temperature)) - 1))
+    const tempMax = Math.ceil(getMaxNumber(waterTrendRows.map((row) => row.temperature)) + 1)
+
+    return buildCartesianOptions({
+      palette,
+      legend: true,
+      min: 0,
+      max: doMax,
+      yTitle: "DO (mg/L)",
+      tooltip: {
+        callbacks: {
+          title: (items: any) => formatDateOnly(waterTrendRows[items[0]?.dataIndex ?? 0]?.date ?? ""),
+          label: (context: any) => {
+            const label = context.dataset.label ?? ""
+            const unit = label.includes("DO") ? "mg/L" : "C"
+            return `${label}: ${formatNumberValue(Number(context.parsed.y), { decimals: 2 })} ${unit}`
+          },
+        },
+      },
+      extraScales: {
+        y1: {
+          position: "right",
+          min: tempMin,
+          max: tempMax,
+          border: { display: false },
+          grid: { drawOnChartArea: false, drawTicks: false },
+          ticks: {
+            color: palette.muted,
+            padding: 10,
+            font: { size: 11, weight: 500 },
+            callback(value: number | string) {
+              return `${Number(value).toFixed(1)} C`
+            },
+          },
+          title: {
+            display: true,
+            text: "Temperature (C)",
+            color: palette.muted,
+            font: { size: 11, weight: 500 },
+          },
+        },
+      },
+    })
+  }, [palette, waterTrendRows])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -544,23 +696,8 @@ export default function SystemHistorySheet({
                   {inventoryTrendRows.length === 0 ? (
                     <EmptyState title="No inventory trend available" description="Daily inventory points for this unit will appear here." icon={TrendingUp} />
                   ) : (
-                    <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={inventoryTrendRows}>
-                          <CartesianGrid {...chartGridProps} />
-                          <XAxis {...chartXAxisProps} dataKey="label" />
-                          <YAxis {...chartYAxisProps} yAxisId="left" />
-                          <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" />
-                          <Tooltip formatter={(value, name) => {
-                            const unit = name === "Biomass (kg)" ? "kg" : name === "Feed (kg)" ? "kg" : "g"
-                            return [`${formatNumberValue(Number(value), { decimals: 1 })} ${unit}`, String(name)]
-                          }} contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} />
-                          <Legend {...chartLegendProps} />
-                          <Line yAxisId="left" type="monotone" dataKey="biomass" stroke="var(--color-chart-1)" strokeWidth={2.4} name="Biomass (kg)" dot={false} />
-                          <Line yAxisId="right" type="monotone" dataKey="abw" stroke="var(--color-chart-2)" strokeWidth={2.4} name="ABW (g)" dot={false} />
-                          <Bar yAxisId="left" dataKey="feed" fill="var(--color-chart-3)" name="Feed (kg)" radius={[4, 4, 0, 0]} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                    <div className="chart-canvas-shell h-[280px]">
+                      <Chart type="bar" data={inventoryChartData} options={inventoryChartOptions} />
                     </div>
                   )}
                 </CardContent>
@@ -628,22 +765,8 @@ export default function SystemHistorySheet({
                   {waterTrendRows.length === 0 ? (
                     <EmptyState title="No water trend available" description="Recent oxygen and temperature measurements will appear here." icon={TestTube} />
                   ) : (
-                    <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={waterTrendRows}>
-                          <CartesianGrid {...chartGridProps} />
-                          <XAxis {...chartXAxisProps} dataKey="label" />
-                          <YAxis {...chartYAxisProps} yAxisId="left" />
-                          <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" />
-                          <Tooltip formatter={(value, name) => {
-                            const unit = name === "DO (mg/L)" ? "mg/L" : "C"
-                            return [`${formatNumberValue(Number(value), { decimals: 2 })} ${unit}`, String(name)]
-                          }} contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} />
-                          <Legend {...chartLegendProps} />
-                          <Line yAxisId="left" type="monotone" dataKey="dissolvedOxygen" stroke="var(--color-chart-1)" strokeWidth={2.4} name="DO (mg/L)" dot={false} />
-                          <Line yAxisId="right" type="monotone" dataKey="temperature" stroke="var(--color-chart-4)" strokeWidth={2.4} name="Temperature (C)" dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                    <div className="chart-canvas-shell h-[280px]">
+                      <Line data={waterChartData} options={waterChartOptions} />
                     </div>
                   )}
                 </CardContent>

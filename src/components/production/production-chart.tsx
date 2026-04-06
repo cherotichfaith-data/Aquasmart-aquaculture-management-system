@@ -1,21 +1,21 @@
 "use client"
 
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
+import { Line } from "@/components/charts/chartjs"
 import { PRODUCTION_METRICS, type ProductionMetric } from "@/components/production/metrics"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
-import { chartGridProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
+import {
+  buildCartesianOptions,
+  buildDailyDateDomain,
+  buildMetricAxisBounds,
+  createVerticalGradient,
+  getChartPalette,
+  getDateAxisMaxTicks,
+} from "@/components/charts/chartjs-theme"
 
 export type ProductionChartRow = {
   date: string
@@ -41,6 +41,66 @@ export default function ProductionChart({
   onRetry?: () => void
 }) {
   const meta = PRODUCTION_METRICS[metric]
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(rows.map((row) => row.date)), [rows])
+  const rowsByDate = useMemo(() => new Map(rows.map((row) => [row.date, row])), [rows])
+  const yBounds = useMemo(
+    () =>
+      buildMetricAxisBounds(rows.map((row) => row.value), {
+        includeZero: metric === "mortality",
+        minFloor: 0,
+        trimOutliers: metric === "efcr_periodic" || metric === "efcr_aggregated",
+      }),
+    [metric, rows],
+  )
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+
+  const data = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: meta.label,
+          data: dateDomain.map((date) => rowsByDate.get(date)?.value ?? null),
+          borderColor: palette.chart2,
+          backgroundColor: createVerticalGradient(palette.chart2, 0.42, 0.03),
+          borderWidth: 2.8,
+          fill: true,
+          pointHoverRadius: 4,
+          pointBackgroundColor: palette.chart2,
+          spanGaps: true,
+        },
+      ],
+    }),
+    [dateDomain, meta.label, palette.chart2, rowsByDate],
+  )
+
+  const options = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: yBounds.min,
+        max: yBounds.max,
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: meta.decimals }),
+        tooltip: {
+          callbacks: {
+            title: (items: any) =>
+              formatChartDate(dateDomain[items[0]?.dataIndex ?? 0] ?? String(items[0]?.label ?? "")),
+            label: (context: any) => {
+              const numeric = Number(context.parsed.y)
+              const value = meta.unit
+                ? `${formatNumberValue(numeric, { decimals: meta.decimals })} ${meta.unit}`
+                : formatNumberValue(numeric, { decimals: meta.decimals })
+              return `${meta.label}: ${value}`
+            },
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(dateDomain[index] ?? "", { month: "short", day: "numeric" }),
+      }),
+    [dateDomain, meta.decimals, meta.label, meta.unit, palette, xLimit, yBounds.max, yBounds.min],
+  )
 
   if (error) {
     return (
@@ -63,49 +123,15 @@ export default function ProductionChart({
       </CardHeader>
       <CardContent className="pt-2">
         {isLoading ? (
-          <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+          <div className="flex h-[280px] items-center justify-center text-muted-foreground">
             Loading chart...
           </div>
         ) : rows.length ? (
-          <LazyRender className="h-[280px]" fallback={<div className="h-full w-full" />}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-                <defs>
-                  <linearGradient id="productionMetricFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid {...chartGridProps} />
-                <XAxis {...chartXAxisProps} dataKey="label" tickFormatter={(value) => String(value)} />
-                <YAxis
-                  {...chartYAxisProps}
-                  width={64}
-                  tickFormatter={(value) => formatNumberValue(Number(value), { decimals: meta.decimals })}
-                />
-                <Tooltip
-                  formatter={(value) => [
-                    meta.unit
-                      ? `${formatNumberValue(Number(value), { decimals: meta.decimals })} ${meta.unit}`
-                      : formatNumberValue(Number(value), { decimals: meta.decimals }),
-                    meta.label,
-                  ]}
-                  labelFormatter={(label, payload) =>
-                    formatChartDate(String(payload?.[0]?.payload?.date ?? label))
-                  }
-                  contentStyle={chartTooltipStyle}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="var(--color-chart-2)"
-                  strokeWidth={2.6}
-                  fill="url(#productionMetricFill)"
-                  activeDot={{ r: 4 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </LazyRender>
+          <div className="chart-canvas-shell">
+            <LazyRender className="h-[300px]" fallback={<div className="h-full w-full" />}>
+              <Line data={data} options={options} />
+            </LazyRender>
+          </div>
         ) : (
           <EmptyState
             title="No production data"

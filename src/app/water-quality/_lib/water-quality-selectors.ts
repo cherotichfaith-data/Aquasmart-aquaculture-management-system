@@ -365,7 +365,7 @@ export function buildNutrientLoad(readings: CurrentReadings): NutrientLoad {
   const hasData = nitrate != null || nitrite != null || ammonia != null
   const value = hasData ? (nitrate ?? 0) + (nitrite ?? 0) + (ammonia ?? 0) : 0
 
-  if (!hasData) return { value: 0, level: "No data", color: "hsl(var(--muted-foreground))" }
+  if (!hasData) return { value: 0, level: "No data", color: "var(--muted-foreground)" }
   if (value >= 2) return { value, level: "High", color: "#EF4444" }
   if (value >= 1) return { value, level: "Moderate", color: "#F59E0B" }
   return { value, level: "Low", color: "#10B981" }
@@ -374,7 +374,7 @@ export function buildNutrientLoad(readings: CurrentReadings): NutrientLoad {
 export function buildAlgalActivity(readings: CurrentReadings): AlgalActivity {
   const secchi = readings.secchi_disk_depth
   if (secchi == null || !Number.isFinite(secchi)) {
-    return { value: 0, level: "No data", color: "hsl(var(--muted-foreground))", source: null }
+    return { value: 0, level: "No data", color: "var(--muted-foreground)", source: null }
   }
   const value = Math.max(0, Math.min(50, 50 - secchi * 10))
   if (value >= 30) return { value, level: "High", color: "#EF4444", source: secchi }

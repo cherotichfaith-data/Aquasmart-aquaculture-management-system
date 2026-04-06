@@ -139,12 +139,8 @@ function ProductionContent() {
 
   return (
     <ProductionSections
-      systemId={Number.isFinite(systemId) ? systemId : undefined}
-      startDate={dateRange.startDate || null}
-      endDate={dateRange.endDate || null}
       formattedChartRows={formattedChartRows}
       metricFilter={metricFilter}
-      inventoryEnabled={inventoryEnabled}
       chartLoading={metricMeta.source === "inventory" ? inventoryQuery.isLoading : productionSummaryQuery.isLoading}
       chartFetching={metricMeta.source === "inventory" ? inventoryQuery.isFetching : productionSummaryQuery.isFetching}
       chartUpdatedAt={chartUpdatedAt}

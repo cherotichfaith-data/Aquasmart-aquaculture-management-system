@@ -84,12 +84,6 @@ export default function DataEntryPageClient() {
     getErrorMessage(recentEntriesQuery.error),
     ...entryErrors,
   ].filter(Boolean) as string[]
-  const latestUpdatedAt = Math.max(
-    systemsQuery.dataUpdatedAt ?? 0,
-    batchesQuery.dataUpdatedAt ?? 0,
-    feedsQuery.dataUpdatedAt ?? 0,
-    recentEntriesQuery.dataUpdatedAt ?? 0,
-  )
   const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
   const batches = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
   const feeds = feedsQuery.data?.status === "success" ? feedsQuery.data.data : []

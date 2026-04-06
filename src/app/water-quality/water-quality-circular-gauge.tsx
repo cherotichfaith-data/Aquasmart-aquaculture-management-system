@@ -22,7 +22,7 @@ export function WaterQualityCircularGauge({
   return (
     <div className="relative flex flex-col items-center">
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={center} cy={center} r={radius} fill="none" stroke="hsl(var(--border))" strokeWidth="10" />
+        <circle cx={center} cy={center} r={radius} fill="none" stroke="var(--border)" strokeWidth="10" />
         <circle
           cx={center}
           cy={center}

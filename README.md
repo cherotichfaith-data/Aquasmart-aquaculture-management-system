@@ -9,9 +9,6 @@ The current product structure follows a simple aquaculture software pattern:
 - `Capture`: data capture
 - `Configure`: settings
 
-See [product-structure.md](/C:/Users/Admin/Downloads/aquasmart1/docs/product-structure.md) for the current information architecture and feature ownership.
-See [code-organization.md](/C:/Users/Admin/Downloads/aquasmart1/docs/code-organization.md) for the current code-organization rules.
-
 ## What The App Currently Covers
 
 - Farm dashboard with KPI summaries, production signals, and recent operational activity
@@ -173,7 +170,6 @@ See [code-organization.md](/C:/Users/Admin/Downloads/aquasmart1/docs/code-organi
 - `src/lib/hooks/`: React Query hooks and mutation invalidation helpers
 - `src/lib/types/`: generated database types
 - `src/lib/supabase/`: Supabase client/server/auth helpers
-- `docs/`: architecture notes and implementation reference docs
 - `supabase/`: migrations and backend project config
 
 ## Running Locally
@@ -223,7 +219,6 @@ npx tsc --noEmit
 
 - Reads are intended to go through approved RPCs, views, projections, or constrained table reads
 - The backend is under active refinement toward lower-cost analytics reads and clearer domain-scoped projections
-- See [architecture-blueprint.md](/C:/Users/Admin/Downloads/aquasmart1/docs/architecture-blueprint.md) for the structural target
 - See [README.md](/C:/Users/Admin/Downloads/aquasmart1/src/features/README.md) for active feature-slice rules
 
 ## License

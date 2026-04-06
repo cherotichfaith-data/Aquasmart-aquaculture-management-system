@@ -9,7 +9,7 @@ export const WQI_GOOD_MIN = 70
 export const WQI_MODERATE_MIN = 50
 
 export function getWqiLabel(value: number | null): WaterQualityStatusLabel {
-  if (value == null) return { label: "No data", color: "hsl(var(--muted-foreground))" }
+  if (value == null) return { label: "No data", color: "var(--muted-foreground)" }
   if (value >= WQI_GOOD_MIN) return { label: "Good", color: "#10B981" }
   if (value >= WQI_MODERATE_MIN) return { label: "Moderate", color: "#F59E0B" }
   return { label: "Poor", color: "#EF4444" }

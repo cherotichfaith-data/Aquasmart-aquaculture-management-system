@@ -1,13 +1,21 @@
 "use client"
 
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
+import { Bar, Line } from "@/components/charts/chartjs"
+import {
+  buildCartesianOptions,
+  buildDailyDateDomain,
+  buildMetricAxisBounds,
+  getChartPalette,
+  getDateAxisMaxTicks,
+} from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
 import { ReportRecordsHiddenState, ReportRecordsToolbar } from "./report-shared"
-import { chartGridProps, chartLegendProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 
 type CageSeries = {
   key: string
@@ -89,6 +97,52 @@ export function FeedByCageSection({
   rows: Array<Record<string, number | string>>
   cageSeries: CageSeries[]
 }) {
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(rows.map((row) => String(row.date ?? ""))), [rows])
+  const rowsByDate = useMemo(
+    () => new Map(rows.map((row) => [String(row.date ?? ""), row])),
+    [rows],
+  )
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+  const data = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: dateDomain,
+      datasets: cageSeries.map((series) => ({
+        label: series.label,
+        data: dateDomain.map((date) => Number(rowsByDate.get(date)?.[series.key] ?? 0)),
+        backgroundColor: series.color,
+        borderColor: series.color,
+        borderWidth: 0,
+        stack: "feed",
+      })),
+    }),
+    [cageSeries, dateDomain, rowsByDate],
+  )
+  const options = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        stacked: true,
+        min: 0,
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 }),
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+            label: (context: any) =>
+              `${context.dataset.label}: ${formatNumberValue(Number(context.parsed.y), {
+                decimals: 2,
+                minimumDecimals: 2,
+              })} kg`,
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+      }),
+    [dateDomain, palette, xLimit],
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -101,24 +155,9 @@ export function FeedByCageSection({
         ) : rows.length === 0 ? (
           <EmptyChartState label="No feeding rows found for the selected period." />
         ) : (
-          <div className="soft-panel-subtle h-[320px] p-2">
+          <div className="chart-canvas-shell h-[320px]">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows}>
-                  <CartesianGrid {...chartGridProps} />
-                  <XAxis {...chartXAxisProps} dataKey="date" />
-                  <YAxis {...chartYAxisProps} />
-                  <Tooltip
-                    labelFormatter={(label) => formatChartDate(String(label))}
-                    formatter={(value, name) => [`${formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 })} kg`, String(name)]}
-                    contentStyle={chartTooltipStyle}
-                  />
-                  <Legend {...chartLegendProps} />
-                  {cageSeries.map((series) => (
-                    <Bar key={series.key} dataKey={series.key} name={series.label} fill={series.color} stackId="feed" radius={[4, 4, 0, 0]} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
+              <Bar data={data} options={options} />
             </LazyRender>
           </div>
         )}
@@ -136,6 +175,68 @@ export function EfcrByCageSection({
   rows: Array<Record<string, number | string | null>>
   cageSeries: CageSeries[]
 }) {
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(rows.map((row) => String(row.date ?? ""))), [rows])
+  const rowsByDate = useMemo(
+    () => new Map(rows.map((row) => [String(row.date ?? ""), row])),
+    [rows],
+  )
+  const yBounds = useMemo(
+    () =>
+      buildMetricAxisBounds(
+        rows.flatMap((row) => cageSeries.map((series) => {
+          const value = row[series.key]
+          return value == null ? null : Number(value)
+        })),
+        { minFloor: 0, trimOutliers: true },
+      ),
+    [cageSeries, rows],
+  )
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+  const data = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: cageSeries.map((series) => ({
+        label: series.label,
+        data: dateDomain.map((date) => {
+          const value = rowsByDate.get(date)?.[series.key]
+          return value == null ? null : Number(value)
+        }),
+        borderColor: series.color,
+        backgroundColor: series.color,
+        borderWidth: 1.8,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        spanGaps: true,
+      })),
+    }),
+    [cageSeries, dateDomain, rowsByDate],
+  )
+  const options = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: yBounds.min,
+        max: Math.max(2.5, yBounds.max ?? 2.5),
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }),
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+            label: (context: any) =>
+              `${context.dataset.label}: ${formatNumberValue(Number(context.parsed.y), {
+                decimals: 2,
+                minimumDecimals: 2,
+              })}`,
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+      }),
+    [dateDomain, palette, xLimit, yBounds.max, yBounds.min],
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -148,24 +249,9 @@ export function EfcrByCageSection({
         ) : rows.length === 0 ? (
           <EmptyChartState label="No eFCR rows found for the selected period." />
         ) : (
-          <div className="soft-panel-subtle h-[320px] p-2">
+          <div className="chart-canvas-shell h-[320px]">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={rows}>
-                  <CartesianGrid {...chartGridProps} />
-                  <XAxis {...chartXAxisProps} dataKey="date" />
-                  <YAxis {...chartYAxisProps} />
-                  <Tooltip
-                    labelFormatter={(label) => formatChartDate(String(label))}
-                    formatter={(value, name) => [formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }), String(name)]}
-                    contentStyle={chartTooltipStyle}
-                  />
-                  <Legend {...chartLegendProps} />
-                  {cageSeries.map((series) => (
-                    <Line key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.4} dot={false} connectNulls />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
+              <Line data={data} options={options} />
             </LazyRender>
           </div>
         )}

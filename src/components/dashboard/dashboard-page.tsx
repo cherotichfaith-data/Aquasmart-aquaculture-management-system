@@ -21,6 +21,7 @@ import {
   downloadDashboardSummary,
   parseDashboardStageParam,
 } from "./dashboard-page-utils"
+import FarmStatusToday from "./farm-status-today"
 
 export default function DashboardPage({
   initialFarmId,
@@ -80,6 +81,13 @@ export default function DashboardPage({
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        <section className="space-y-3">
+          <FarmStatusToday
+            farmId={farmId}
+            initialData={initialData?.farmKpisToday}
+          />
+        </section>
+
         <section className="space-y-4">
           <SectionHeading title="Core Performance Overview" actions={<DashboardExportButton onClick={handleDownload} />} />
           <KPIOverview

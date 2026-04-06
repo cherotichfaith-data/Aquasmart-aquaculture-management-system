@@ -75,9 +75,8 @@ export async function saveSettingsData(params: {
   farmId?: string | null
   settings: SettingsFormState
   thresholdId: string | null
-  profileRole?: string | null
 }) {
-  const { supabase, userId, farmId, settings, thresholdId, profileRole } = params
+  const { supabase, userId, farmId, settings, thresholdId } = params
   const sessionUser = await getSessionUser(supabase as any, "settings:save:getSession")
   if (!sessionUser || !userId) {
     return { errorMessage: "No active session." }

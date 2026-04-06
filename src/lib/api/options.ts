@@ -5,7 +5,6 @@ import {
   isAbortLikeError,
   queryOptionsRpc,
   resolveClientReadQuery,
-  toQueryError,
   toQuerySuccess,
   type OptionsRpcName,
 } from "@/lib/api/_utils"

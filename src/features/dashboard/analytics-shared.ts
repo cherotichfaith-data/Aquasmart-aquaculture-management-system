@@ -22,6 +22,7 @@ type InventoryMetricRow = InventoryRecommendationRow & {
 }
 
 type ProductionEfcrRow = {
+  activity_rank?: number | null
   biomass_increase_period: number | null
   total_feed_amount_period: number | null
   total_weight_transfer_out?: number | null
@@ -250,6 +251,8 @@ export function computeEfcrFromProductionRows(rows: ProductionEfcrRow[]): number
   let denominator = 0
 
   rows.forEach((row) => {
+    if ((row.activity_rank ?? null) === 1) return
+
     feedSum += row.total_feed_amount_period ?? 0
     denominator +=
       (row.biomass_increase_period ?? 0) +

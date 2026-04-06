@@ -111,7 +111,6 @@ export default function Header({
   const [signingOut, setSigningOut] = useState(false)
   const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
   const { farm } = useActiveFarm()
-  const hideBorder = pathname === "/water-quality" && searchParams.get("tab") === "depth"
   const pageMeta = getPageMeta(pathname, searchParams.get("tab"))
   const showAddData = pathname === "/"
   const defaultPeriod: TimePeriod = (() => {
@@ -215,7 +214,7 @@ export default function Header({
   }
 
   return (
-    <header className={`sticky top-0 z-20 bg-background/72 shadow-[0_10px_24px_-24px_rgba(15,23,32,0.16)] backdrop-blur-xl dark:shadow-[0_18px_48px_-36px_rgba(15,23,32,0.5)]`}>
+    <header className="sticky top-0 z-20 bg-background/72 shadow-[0_10px_24px_-24px_rgba(15,23,32,0.16)] backdrop-blur-xl dark:shadow-[0_18px_48px_-36px_rgba(15,23,32,0.5)]">
       <div className="flex flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">

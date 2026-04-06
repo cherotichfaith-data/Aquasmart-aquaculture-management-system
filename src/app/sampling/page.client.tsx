@@ -9,7 +9,7 @@ import { useProductionSummary } from "@/lib/hooks/use-production"
 import { diffDateDays, formatBucketLabel, formatGranularityLabel, getBucketGranularity, getBucketKey } from "@/lib/time-series"
 import { sortByDateAsc } from "@/lib/utils"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
-import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
+import { DataErrorState } from "@/components/shared/data-states"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
 import { useAppConfig, useSystemVolumes } from "@/lib/hooks/use-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
@@ -119,16 +119,6 @@ export default function SamplingPage() {
     getErrorMessage(systemVolumesQuery.error),
     getErrorMessage(appConfigQuery.error),
   ].filter(Boolean) as string[]
-  const latestUpdatedAt = Math.max(
-    samplingQuery.dataUpdatedAt ?? 0,
-    productionSummaryQuery.dataUpdatedAt ?? 0,
-    systemsQuery.dataUpdatedAt ?? 0,
-    batchSystemsQuery.dataUpdatedAt ?? 0,
-    systemsTableQuery.dataUpdatedAt ?? 0,
-    systemVolumesQuery.dataUpdatedAt ?? 0,
-    appConfigQuery.dataUpdatedAt ?? 0,
-  )
-
   const filteredRows = useMemo(
     () => rows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
     [rows, scopedSystemIds],

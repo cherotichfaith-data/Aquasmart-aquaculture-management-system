@@ -128,7 +128,6 @@ export default function SettingsPage() {
             farmId,
             settings,
             thresholdId,
-            profileRole: profile?.role ?? null,
           })
           if (result.errorMessage) {
             setErrorMsg(result.errorMessage)

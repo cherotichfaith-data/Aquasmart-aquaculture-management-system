@@ -1,13 +1,21 @@
 "use client"
 
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
+import { Bar, Line } from "@/components/charts/chartjs"
+import {
+  buildCartesianOptions,
+  buildDailyDateDomain,
+  buildMetricAxisBounds,
+  getChartPalette,
+  getDateAxisMaxTicks,
+} from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { EmptyState } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate } from "@/lib/analytics-format"
 import { ReportRecordsHiddenState, ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
-import { chartGridProps, chartLegendProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 
 export function MortalitySummaryCards({
   latestDate,
@@ -31,6 +39,52 @@ export function MortalitySummaryCards({
 }
 
 export function MortalityTrendSection({ loading, chartRows }: { loading: boolean; chartRows: any[] }) {
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
+  const yBounds = useMemo(
+    () => buildMetricAxisBounds(chartRows.map((row) => row.dead_count), { includeZero: true }),
+    [chartRows],
+  )
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+  const data = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "Mortality Count",
+          data: dateDomain.map((date) => rowsByDate.get(date)?.dead_count ?? null),
+          borderColor: palette.destructive,
+          backgroundColor: palette.destructive,
+          borderWidth: 2.4,
+          pointRadius: 0,
+          spanGaps: true,
+        },
+      ],
+    }),
+    [dateDomain, palette.destructive, rowsByDate],
+  )
+  const options = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: yBounds.min,
+        max: yBounds.max,
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+            label: (context: any) => `${context.dataset.label}: ${Number(context.parsed.y).toLocaleString()}`,
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+      }),
+    [dateDomain, palette, xLimit, yBounds.max, yBounds.min],
+  )
+
   return (
     <Card>
       <CardHeader><CardTitle>Mortality Trend</CardTitle><CardDescription>Daily mortality counts from mortality records</CardDescription></CardHeader>
@@ -40,18 +94,9 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
         ) : chartRows.length === 0 ? (
           <EmptyState title="No mortality records" description="No mortality records fall within the selected range." />
         ) : (
-          <div className="soft-panel-subtle h-[300px] p-2">
+          <div className="chart-canvas-shell h-[300px]">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartRows}>
-                  <CartesianGrid {...chartGridProps} />
-                  <XAxis {...chartXAxisProps} dataKey="date" />
-                  <YAxis {...chartYAxisProps} />
-                  <Tooltip labelFormatter={(label) => formatChartDate(label)} formatter={(value, name) => [Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 }), String(name)]} contentStyle={chartTooltipStyle} />
-                  <Legend {...chartLegendProps} />
-                  <Line type="monotone" dataKey="dead_count" stroke="var(--color-destructive)" strokeWidth={2.4} name="Mortality Count" />
-                </LineChart>
-              </ResponsiveContainer>
+              <Line data={data} options={options} />
             </LazyRender>
           </div>
         )}
@@ -61,6 +106,39 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
 }
 
 export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Array<{ cause: string; label: string; count: number }> }) {
+  const palette = getChartPalette()
+  const data = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: causeBreakdown.map((row) => row.label),
+      datasets: [
+        {
+          label: "Dead count",
+          data: causeBreakdown.map((row) => row.count),
+          backgroundColor: palette.destructive,
+          borderColor: palette.destructive,
+          borderWidth: 0,
+        },
+      ],
+    }),
+    [causeBreakdown, palette.destructive],
+  )
+  const maxValue = Math.max(10, ...causeBreakdown.map((row) => row.count))
+  const options = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: 0,
+        max: Math.ceil(maxValue * 1.1),
+        yTickFormatter: (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `Dead count: ${Number(context.parsed.y).toLocaleString()}`,
+          },
+        },
+      }),
+    [maxValue, palette],
+  )
+
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_1fr]">
       <Card>
@@ -69,16 +147,8 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
           {causeBreakdown.length === 0 ? (
             <EmptyState title="No cause data" description="New mortality records with cause tags will appear here." />
           ) : (
-            <div className="soft-panel-subtle h-[280px] p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={causeBreakdown}>
-                  <CartesianGrid {...chartGridProps} />
-                  <XAxis {...chartXAxisProps} dataKey="label" interval={0} angle={-18} textAnchor="end" height={70} tick={{ ...chartXAxisProps.tick, fontSize: 10.5 }} />
-                  <YAxis {...chartYAxisProps} />
-                  <Tooltip formatter={(value) => [Number(value).toLocaleString(), "Dead count"]} contentStyle={chartTooltipStyle} />
-                  <Bar dataKey="count" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="chart-canvas-shell h-[280px]">
+              <Bar data={data} options={options} />
             </div>
           )}
         </CardContent>

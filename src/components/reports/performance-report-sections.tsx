@@ -1,24 +1,20 @@
 "use client"
 
+import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
+import { Bar, Line } from "@/components/charts/chartjs"
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+  buildCartesianOptions,
+  buildDailyDateDomain,
+  buildMetricAxisBounds,
+  getChartPalette,
+  getDateAxisMaxTicks,
+} from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue, formatPercentRateValue } from "@/lib/analytics-format"
 import { ReportRecordsHiddenState, ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
-import { chartGridProps, chartLegendProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 
 export function PerformanceSummaryCards({
   summary,
@@ -100,6 +96,96 @@ export function PerformanceTrendSection({
   loading: boolean
   chartRows: Array<{ date: string; efcr_period: number | null; total_biomass: number }>
 }) {
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
+  const efcrBounds = useMemo(
+    () => buildMetricAxisBounds(chartRows.map((row) => row.efcr_period), { minFloor: 0, trimOutliers: true }),
+    [chartRows],
+  )
+  const biomassBounds = useMemo(
+    () => buildMetricAxisBounds(chartRows.map((row) => row.total_biomass), { minFloor: 0 }),
+    [chartRows],
+  )
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+  const data = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "App target 1.5",
+          data: dateDomain.map(() => 1.5),
+          borderColor: palette.chart4,
+          backgroundColor: palette.chart4,
+          borderDash: [6, 4],
+          borderWidth: 1.2,
+          pointRadius: 0,
+          yAxisID: "y",
+        },
+        {
+          label: "Industry 2.0",
+          data: dateDomain.map(() => 2),
+          borderColor: palette.chart5,
+          backgroundColor: palette.chart5,
+          borderDash: [3, 3],
+          borderWidth: 1.2,
+          pointRadius: 0,
+          yAxisID: "y",
+        },
+        {
+          label: "eFCR",
+          data: dateDomain.map((date) => rowsByDate.get(date)?.efcr_period ?? null),
+          borderColor: palette.chart1,
+          backgroundColor: palette.chart1,
+          borderWidth: 1.9,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          spanGaps: true,
+          yAxisID: "y",
+        },
+        {
+          label: "Biomass (kg)",
+          data: dateDomain.map((date) => rowsByDate.get(date)?.total_biomass ?? null),
+          borderColor: palette.chart2,
+          backgroundColor: palette.chart2,
+          borderWidth: 1.8,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y1",
+        },
+      ],
+    }),
+    [dateDomain, palette.chart1, palette.chart2, palette.chart4, palette.chart5, rowsByDate],
+  )
+  const options = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: efcrBounds.min,
+        max: Math.max(2.2, efcrBounds.max ?? 2.2),
+        rightMin: biomassBounds.min,
+        rightMax: biomassBounds.max,
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }),
+        yRightTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`,
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+            label: (context: any) => {
+              if (context.dataset.label?.includes("Biomass")) {
+                return `${context.dataset.label}: ${formatNumberValue(Number(context.parsed.y), { decimals: 1, minimumDecimals: 1 })} kg`
+              }
+              return `${context.dataset.label}: ${formatNumberValue(Number(context.parsed.y), { decimals: 2, minimumDecimals: 2 })}`
+            },
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+      }),
+    [biomassBounds.max, biomassBounds.min, dateDomain, efcrBounds.max, efcrBounds.min, palette, xLimit],
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -110,31 +196,9 @@ export function PerformanceTrendSection({
         {loading ? (
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="soft-panel-subtle h-[300px] p-2">
+          <div className="chart-canvas-shell h-[300px]">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartRows}>
-                  <CartesianGrid {...chartGridProps} />
-                  <XAxis {...chartXAxisProps} dataKey="date" />
-                  <YAxis {...chartYAxisProps} yAxisId="left" />
-                  <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" />
-                  <Tooltip
-                    labelFormatter={(label) => formatChartDate(label)}
-                    formatter={(value, name) => {
-                      if (String(name).toLowerCase().includes("efcr")) {
-                        return [formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }), String(name)]
-                      }
-                      return [`${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`, String(name)]
-                    }}
-                    contentStyle={chartTooltipStyle}
-                  />
-                  <Legend {...chartLegendProps} />
-                  <ReferenceLine yAxisId="left" y={1.5} stroke="var(--color-chart-4)" strokeDasharray="6 4" ifOverflow="extendDomain" label={{ value: "App target 1.5", position: "insideTopLeft", fill: "hsl(var(--muted-foreground))", fontSize: 10.5 }} />
-                  <ReferenceLine yAxisId="left" y={2} stroke="var(--color-chart-5)" strokeDasharray="3 3" ifOverflow="extendDomain" label={{ value: "Industry 2.0", position: "insideTopRight", fill: "hsl(var(--muted-foreground))", fontSize: 10.5 }} />
-                  <Line yAxisId="left" type="monotone" dataKey="efcr_period" stroke="var(--color-chart-1)" strokeWidth={2.4} name="eFCR" />
-                  <Line yAxisId="right" type="monotone" dataKey="total_biomass" stroke="var(--color-chart-2)" strokeWidth={2.4} name="Biomass (kg)" />
-                </LineChart>
-              </ResponsiveContainer>
+              <Line data={data} options={options} />
             </LazyRender>
           </div>
         )}
@@ -150,6 +214,40 @@ export function SystemBiomassComparisonSection({
   loading: boolean
   latestBySystemRows: any[]
 }) {
+  const palette = getChartPalette()
+  const data = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: latestBySystemRows.map((row) => row.system_name),
+      datasets: [
+        {
+          label: "Biomass (kg)",
+          data: latestBySystemRows.map((row) => row.total_biomass),
+          backgroundColor: palette.chart1,
+          borderColor: palette.chart1,
+          borderWidth: 0,
+        },
+      ],
+    }),
+    [latestBySystemRows, palette.chart1],
+  )
+  const maxValue = Math.max(10, ...latestBySystemRows.map((row) => Number(row.total_biomass ?? 0)))
+  const options = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: 0,
+        max: Math.ceil(maxValue * 1.1),
+        yTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`,
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `Biomass (kg): ${formatNumberValue(Number(context.parsed.y), { decimals: 1, minimumDecimals: 1 })} kg`,
+          },
+        },
+      }),
+    [maxValue, palette],
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -160,21 +258,9 @@ export function SystemBiomassComparisonSection({
         {loading ? (
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="soft-panel-subtle h-[300px] p-2">
+          <div className="chart-canvas-shell h-[300px]">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={latestBySystemRows}>
-                  <CartesianGrid {...chartGridProps} />
-                  <XAxis {...chartXAxisProps} dataKey="system_name" />
-                  <YAxis {...chartYAxisProps} />
-                  <Tooltip
-                    formatter={(value, name) => [`${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`, String(name)]}
-                    contentStyle={chartTooltipStyle}
-                  />
-                  <Legend {...chartLegendProps} />
-                  <Bar dataKey="total_biomass" fill="var(--color-chart-1)" name="Biomass (kg)" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <Bar data={data} options={options} />
             </LazyRender>
           </div>
         )}

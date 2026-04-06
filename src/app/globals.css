@@ -15,83 +15,91 @@ next-router-prefetch {
 
 :root {
   --card: #ffffff;
-  --ring: #179b98;
-  --input: #d8e6eb;
-  --muted: #ecf5f7;
-  --accent: #d7f0ef;
-  --border: #e5f0f3;
+  --ring: #22c55e;
+  --input: #dcebf4;
+  --muted: #eff7fb;
+  --accent: #dcfce7;
+  --border: #dce9f4;
   --radius: 0.5rem;
-  --chart-1: #179b98;
-  --chart-2: #35c4bd;
-  --chart-3: #1d7fa0;
-  --chart-4: #245c8d;
-  --chart-5: #163e66;
+  --chart-1: #22c55e;
+  --chart-2: #16a34a;
+  --chart-3: #2563eb;
+  --chart-4: #1d4ed8;
+  --chart-5: #1e3a8a;
+  --chart-grid: rgba(127, 140, 141, 0.18);
+  --chart-tooltip-bg: rgba(44, 62, 80, 0.94);
+  --chart-tooltip-border: rgba(236, 240, 241, 0.14);
+  --chart-tooltip-foreground: #f8fbff;
   --popover: #ffffff;
-  --primary: #179b98;
-  --sidebar: #dff2f4;
+  --primary: #22c55e;
+  --sidebar: #e7f1fb;
   --font-mono: "IBM Plex Mono", monospace;
   --font-sans: "DM Sans", sans-serif;
-  --secondary: #dbeef5;
-  --background: #f4fbfd;
+  --secondary: #e1eefb;
+  --background: #f6fbff;
   --font-serif: "Lora", serif;
-  --foreground: #243f4b;
+  --foreground: #18324a;
   --destructive: #ef4444;
   --shadow-blur: 8px;
   --shadow-color: hsl(0 0% 0%);
-  --sidebar-ring: #179b98;
+  --sidebar-ring: #22c55e;
   --shadow-spread: -1px;
   --shadow-opacity: 0.1;
-  --sidebar-accent: #d7f0ef;
-  --sidebar-border: #e5f0f3;
-  --card-foreground: #243f4b;
+  --sidebar-accent: #dcfce7;
+  --sidebar-border: #dce9f4;
+  --card-foreground: #18324a;
   --shadow-offset-x: 0px;
   --shadow-offset-y: 4px;
-  --sidebar-primary: #179b98;
-  --muted-foreground: #5f7884;
-  --accent-foreground: #243f4b;
-  --popover-foreground: #243f4b;
+  --sidebar-primary: #22c55e;
+  --muted-foreground: #5b7389;
+  --accent-foreground: #18324a;
+  --popover-foreground: #18324a;
   --primary-foreground: #ffffff;
-  --sidebar-foreground: #243f4b;
-  --secondary-foreground: #35515f;
+  --sidebar-foreground: #18324a;
+  --secondary-foreground: #294760;
   --destructive-foreground: #ffffff;
-  --sidebar-accent-foreground: #243f4b;
+  --sidebar-accent-foreground: #18324a;
   --sidebar-primary-foreground: #ffffff;
 }
 
 .dark {
-  --card: #10202a;
-  --ring: #45c7bd;
-  --input: #284451;
-  --muted: #0f2530;
-  --accent: #14323d;
-  --border: #1a3945;
+  --card: #0d1c2b;
+  --ring: #4ade80;
+  --input: #1d3550;
+  --muted: #0d2135;
+  --accent: #12311f;
+  --border: #18314c;
   --radius: 0.5rem;
-  --chart-1: #45c7bd;
-  --chart-2: #2db7d3;
-  --chart-3: #1d7fa0;
-  --chart-4: #245c8d;
-  --chart-5: #163e66;
-  --popover: #10202a;
-  --primary: #45c7bd;
-  --sidebar: #10202a;
-  --secondary: #0f2b38;
-  --background: #08131a;
-  --foreground: #d7edf1;
+  --chart-1: #4ade80;
+  --chart-2: #22c55e;
+  --chart-3: #3b82f6;
+  --chart-4: #2563eb;
+  --chart-5: #1d4ed8;
+  --chart-grid: rgba(140, 164, 188, 0.24);
+  --chart-tooltip-bg: rgba(7, 17, 29, 0.94);
+  --chart-tooltip-border: rgba(140, 164, 188, 0.18);
+  --chart-tooltip-foreground: #d9e8f8;
+  --popover: #0d1c2b;
+  --primary: #4ade80;
+  --sidebar: #0d1c2b;
+  --secondary: #0d2841;
+  --background: #07111d;
+  --foreground: #d9e8f8;
   --destructive: #ef4444;
-  --sidebar-ring: #45c7bd;
-  --sidebar-accent: #14323d;
-  --sidebar-border: #1a3945;
-  --card-foreground: #d7edf1;
-  --sidebar-primary: #45c7bd;
-  --muted-foreground: #87a1ab;
-  --accent-foreground: #d7edf1;
-  --popover-foreground: #d7edf1;
-  --primary-foreground: #08131a;
-  --sidebar-foreground: #d7edf1;
-  --secondary-foreground: #aac2cb;
-  --destructive-foreground: #08131a;
-  --sidebar-accent-foreground: #d7edf1;
-  --sidebar-primary-foreground: #08131a;
+  --sidebar-ring: #4ade80;
+  --sidebar-accent: #12311f;
+  --sidebar-border: #18314c;
+  --card-foreground: #d9e8f8;
+  --sidebar-primary: #4ade80;
+  --muted-foreground: #8ca4bc;
+  --accent-foreground: #d9e8f8;
+  --popover-foreground: #d9e8f8;
+  --primary-foreground: #07111d;
+  --sidebar-foreground: #d9e8f8;
+  --secondary-foreground: #afc5dd;
+  --destructive-foreground: #07111d;
+  --sidebar-accent-foreground: #d9e8f8;
+  --sidebar-primary-foreground: #07111d;
 }
 
 @theme inline {
@@ -191,10 +199,9 @@ next-router-prefetch {
   }
 
   .page-hero {
-    @apply relative overflow-hidden rounded-[1.75rem] bg-card/68 p-5 backdrop-blur-xl md:p-7 lg:p-8;
+    @apply relative overflow-hidden rounded-[1.75rem] border border-border bg-card p-5 md:p-7 lg:p-8;
     box-shadow:
-      0 22px 48px -34px rgba(15, 23, 32, 0.45),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      0 22px 48px -34px rgba(15, 23, 32, 0.18);
   }
 
   .page-hero::before {
@@ -213,7 +220,7 @@ next-router-prefetch {
   }
 
   .page-chip {
-    @apply inline-flex items-center gap-2 rounded-full bg-background/65 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground shadow-[0_16px_36px_-30px_rgba(15,23,32,0.4)];
+    @apply inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
   }
 
   .page-section {
@@ -221,8 +228,8 @@ next-router-prefetch {
   }
 
   .dense-table-shell {
-    @apply w-full max-w-full overflow-auto rounded-[1.1rem] bg-card/60 backdrop-blur-sm;
-    box-shadow: 0 20px 42px -34px rgba(15, 23, 32, 0.42);
+    @apply w-full max-w-full overflow-auto rounded-[1.1rem] border border-border bg-card;
+    box-shadow: 0 20px 42px -34px rgba(15, 23, 32, 0.16);
   }
 
   .dense-table {
@@ -230,7 +237,7 @@ next-router-prefetch {
   }
 
   .dense-table thead th {
-    @apply sticky top-0 z-10 bg-muted/70 px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.18em] text-foreground/72 backdrop-blur-md;
+    @apply sticky top-0 z-10 border-b border-border bg-muted px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.18em] text-foreground/72;
   }
 
   .dense-table tbody td {
@@ -242,7 +249,7 @@ next-router-prefetch {
   }
 
   .legend-pill {
-    @apply inline-flex items-center gap-2 rounded-full bg-background/65 px-3 py-1.5 text-[11px] font-semibold leading-none text-muted-foreground shadow-[0_14px_32px_-28px_rgba(15,23,32,0.36)];
+    @apply inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-semibold leading-none text-muted-foreground;
   }
 
   .legend-pill-swatch {
@@ -250,43 +257,54 @@ next-router-prefetch {
   }
 
   .filter-bar {
-    @apply flex flex-col gap-3 rounded-[1.1rem] bg-muted/10 px-3 py-3 shadow-[0_18px_40px_-34px_rgba(15,23,32,0.45)] backdrop-blur-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4 sm:py-3.5;
+    @apply flex flex-col gap-3 rounded-[1.1rem] border border-border bg-muted px-3 py-3 shadow-[0_18px_40px_-34px_rgba(15,23,32,0.14)] sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4 sm:py-3.5;
   }
 
   .panel-surface {
-    @apply bg-card/70 backdrop-blur-xl;
-    box-shadow:
-      0 20px 44px -34px rgba(15, 23, 32, 0.34),
-      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    @apply border border-border bg-card;
+    box-shadow: 0 20px 44px -34px rgba(15, 23, 32, 0.14);
   }
 
   .topbar-control {
-    @apply border border-transparent bg-card/70 text-foreground backdrop-blur-xl;
-    box-shadow:
-      0 14px 32px -24px rgba(15, 23, 32, 0.42),
-      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    @apply border border-border bg-card text-foreground;
+    box-shadow: 0 14px 32px -24px rgba(15, 23, 32, 0.12);
   }
 
   .soft-panel {
-    @apply rounded-[1.25rem] bg-card/62 backdrop-blur-xl;
-    box-shadow: 0 20px 44px -34px rgba(15, 23, 32, 0.44);
+    @apply rounded-[1.25rem] border border-border bg-card;
+    box-shadow: 0 20px 44px -34px rgba(15, 23, 32, 0.14);
   }
 
   .soft-panel-subtle {
-    @apply rounded-[1rem] bg-muted/18 backdrop-blur-sm;
-    box-shadow: 0 16px 34px -30px rgba(15, 23, 32, 0.34);
+    @apply rounded-[1rem] border border-border bg-muted;
+    box-shadow: 0 16px 34px -30px rgba(15, 23, 32, 0.12);
   }
 
   .soft-table-shell {
-    @apply overflow-x-auto rounded-[1rem] bg-card/58 backdrop-blur-sm;
-    box-shadow: 0 20px 42px -34px rgba(15, 23, 32, 0.4);
+    @apply overflow-x-auto rounded-[1rem] border border-border bg-card;
+    box-shadow: 0 20px 42px -34px rgba(15, 23, 32, 0.14);
   }
 
   .soft-input-surface {
-    @apply rounded-xl border-0 bg-background/72;
+    @apply rounded-xl border border-border bg-background;
+    box-shadow: 0 12px 30px -24px rgba(15, 23, 32, 0.1);
+  }
+
+  .chart-canvas-shell {
+    @apply relative overflow-hidden rounded-[1.2rem] border border-border/70 bg-gradient-to-b from-background via-background to-muted/45 p-3 md:p-4;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.22),
-      0 12px 30px -24px rgba(15, 23, 32, 0.44);
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      0 18px 38px -34px rgba(15, 23, 32, 0.18);
+  }
+
+  .chart-canvas-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-chart-3), var(--color-chart-5));
+    opacity: 0.9;
+    pointer-events: none;
   }
 
   .queue-card {
@@ -320,14 +338,18 @@ next-router-prefetch {
 }
 @layer components {
   .page-toolbar {
-    @apply flex flex-col items-stretch gap-3 rounded-[1.35rem] bg-card/62 px-4 py-3.5 backdrop-blur-xl sm:flex-row sm:flex-wrap sm:items-center;
-    box-shadow: 0 14px 30px -28px rgba(15, 23, 32, 0.12);
+    @apply flex flex-col items-stretch gap-3 rounded-[1.35rem] border border-border bg-card px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center;
+    box-shadow: 0 14px 30px -28px rgba(15, 23, 32, 0.1);
   }
 
   .dark .page-toolbar {
+    box-shadow: 0 18px 42px -34px rgba(15, 23, 32, 0.24);
+  }
+
+  .dark .chart-canvas-shell {
     box-shadow:
-      0 18px 42px -34px rgba(15, 23, 32, 0.48),
-      inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 22px 42px -34px rgba(7, 17, 29, 0.48);
   }
 }
 

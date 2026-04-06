@@ -8,12 +8,8 @@ import ProductionChart from "@/components/production/production-chart"
 import ProductionTable from "@/components/production/production-table"
 
 export function ProductionSections({
-  systemId,
-  startDate,
-  endDate,
   formattedChartRows,
   metricFilter,
-  inventoryEnabled,
   chartLoading,
   chartFetching,
   chartUpdatedAt,
@@ -26,12 +22,8 @@ export function ProductionSections({
   summaryError,
   onRetryTable,
 }: {
-  systemId?: number
-  startDate: string | null
-  endDate: string | null
   formattedChartRows: any[]
   metricFilter: any
-  inventoryEnabled: boolean
   chartLoading: boolean
   chartFetching: boolean
   chartUpdatedAt: number

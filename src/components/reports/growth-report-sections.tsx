@@ -1,6 +1,16 @@
 "use client"
 
-import { Area, AreaChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
+import { Line } from "@/components/charts/chartjs"
+import {
+  buildCartesianOptions,
+  buildDailyDateDomain,
+  buildMetricAxisBounds,
+  createVerticalGradient,
+  getChartPalette,
+  getDateAxisMaxTicks,
+} from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
@@ -31,6 +41,53 @@ export function GrowthSummaryCards({ latest }: { latest: any }) {
 }
 
 export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; chartRows: any[] }) {
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
+  const yBounds = useMemo(
+    () => buildMetricAxisBounds(chartRows.map((row) => row.average_body_weight), { minFloor: 0 }),
+    [chartRows],
+  )
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+  const data = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "ABW",
+          data: dateDomain.map((date) => rowsByDate.get(date)?.average_body_weight ?? null),
+          borderColor: palette.chart1,
+          backgroundColor: createVerticalGradient(palette.chart1, 0.3, 0.04),
+          borderWidth: 2.4,
+          fill: true,
+          pointRadius: 0,
+          spanGaps: true,
+        },
+      ],
+    }),
+    [dateDomain, palette.chart1, rowsByDate],
+  )
+  const options = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: yBounds.min,
+        max: yBounds.max,
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} g`,
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+            label: (context: any) =>
+              `ABW: ${formatNumberValue(Number(context.parsed.y), { decimals: 1, minimumDecimals: 1 })} g`,
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+      }),
+    [dateDomain, palette, xLimit, yBounds.max, yBounds.min],
+  )
+
   return (
     <Card>
       <CardHeader><CardTitle>Average Body Weight (ABW)</CardTitle><CardDescription>ABW progression over time</CardDescription></CardHeader>
@@ -38,17 +95,9 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
         {loading ? (
           <div className="flex h-[300px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="soft-panel-subtle h-[300px] p-2">
+          <div className="chart-canvas-shell h-[300px]">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartRows}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip labelFormatter={(label) => formatChartDate(label)} formatter={(value, name) => [`${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} g`, String(name)]} contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }} />
-                  <Area type="monotone" dataKey="average_body_weight" fill="var(--color-chart-1)" stroke="var(--color-chart-1)" fillOpacity={0.3} strokeWidth={2.4} name="ABW" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <Line data={data} options={options} />
             </LazyRender>
           </div>
         )}
@@ -58,6 +107,53 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
 }
 
 export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean; chartRows: any[] }) {
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
+  const yBounds = useMemo(
+    () => buildMetricAxisBounds(chartRows.map((row) => row.total_biomass), { minFloor: 0 }),
+    [chartRows],
+  )
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+  const data = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "Biomass (kg)",
+          data: dateDomain.map((date) => rowsByDate.get(date)?.total_biomass ?? null),
+          borderColor: palette.chart2,
+          backgroundColor: palette.chart2,
+          borderWidth: 2.4,
+          pointRadius: 0,
+          spanGaps: true,
+        },
+      ],
+    }),
+    [dateDomain, palette.chart2, rowsByDate],
+  )
+  const options = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: yBounds.min,
+        max: yBounds.max,
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`,
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+            label: (context: any) =>
+              `Biomass (kg): ${formatNumberValue(Number(context.parsed.y), { decimals: 1, minimumDecimals: 1 })} kg`,
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+      }),
+    [dateDomain, palette, xLimit, yBounds.max, yBounds.min],
+  )
+
   return (
     <Card>
       <CardHeader><CardTitle>Biomass Trend</CardTitle><CardDescription>Total biomass per date</CardDescription></CardHeader>
@@ -65,18 +161,9 @@ export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean;
         {loading ? (
           <div className="flex h-[300px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="soft-panel-subtle h-[300px] p-2">
+          <div className="chart-canvas-shell h-[300px]">
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartRows}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.45} />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip labelFormatter={(label) => formatChartDate(label)} formatter={(value, name) => [`${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`, String(name)]} contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 8 }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="total_biomass" stroke="var(--color-chart-2)" strokeWidth={2.4} name="Biomass (kg)" />
-                </LineChart>
-              </ResponsiveContainer>
+              <Line data={data} options={options} />
             </LazyRender>
           </div>
         )}

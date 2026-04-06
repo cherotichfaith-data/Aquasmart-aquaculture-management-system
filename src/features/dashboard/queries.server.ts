@@ -678,6 +678,7 @@ function buildEmptyDashboardPageInitialData(): DashboardPageInitialData {
     bounds: { start: null, end: null },
     systemOptions: toQuerySuccess([]),
     batchSystems: toQuerySuccess([]),
+    farmKpisToday: toQuerySuccess([]),
     kpiOverview: { metrics: [], dateBounds: { start: null, end: null } },
     productionTrend: [],
     systemsTable: { rows: [], meta: { reason: "Missing farmId", start: null, end: null } },
@@ -734,6 +735,7 @@ async function loadDashboardPageInitialData(
       productionSummaryMetrics: { ...empty.productionSummaryMetrics, dateBounds: bounds },
       recentEntries: await getRecentEntries(supabase, params.farmId),
       alertThresholds: toQuerySuccess(await getAlertThresholds(supabase, params.farmId)),
+      farmKpisToday: toQuerySuccess(await getFarmKpisTodayRow(supabase, params.farmId).then((row) => (row ? [row] : []))),
     }
   }
 
@@ -742,7 +744,7 @@ async function loadDashboardPageInitialData(
       ? Number(params.filters.selectedBatch)
       : undefined
 
-  const [systemOptions, batchSystems, dashboardSystems, recentEntries, alertThresholds] = await Promise.all([
+  const [systemOptions, batchSystems, dashboardSystems, recentEntries, alertThresholds, farmKpisToday] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage),
     getScopedBatchSystems(supabase, batchId),
     getDashboardSystemsRaw(supabase, {
@@ -754,6 +756,7 @@ async function loadDashboardPageInitialData(
     }),
     getRecentEntries(supabase, params.farmId),
     getAlertThresholds(supabase, params.farmId),
+    getFarmKpisTodayRow(supabase, params.farmId),
   ])
 
   const scopedSystemIds = await resolveScopedSystemIds({
@@ -818,6 +821,7 @@ async function loadDashboardPageInitialData(
     bounds,
     systemOptions: toQuerySuccess(systemOptions),
     batchSystems: toQuerySuccess(batchSystems),
+    farmKpisToday: toQuerySuccess(farmKpisToday ? [farmKpisToday] : []),
     kpiOverview: buildKpiOverview({
       scopedSystemIds,
       inventoryRows,

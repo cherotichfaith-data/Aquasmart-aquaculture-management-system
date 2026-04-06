@@ -1,31 +1,24 @@
 "use client"
 
+import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
 import {
   Bar,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
+  Chart,
   Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+} from "@/components/charts/chartjs"
 import { AlertTriangle, Search, Skull, TrendingDown, Waves } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { EmptyState } from "@/components/shared/data-states"
 import {
-  chartGridProps,
-  chartLegendProps,
-  chartTooltipItemStyle,
-  chartTooltipLabelStyle,
-  chartTooltipStyle,
-  chartXAxisProps,
-  chartYAxisProps,
-} from "@/components/charts/recharts-theme"
+  buildCartesianOptions,
+  buildDailyDateDomain,
+  buildMetricAxisBounds,
+  getChartPalette,
+  getDateAxisMaxTicks,
+} from "@/components/charts/chartjs-theme"
 import type { Tables } from "@/lib/types/database"
 import { isMortalityCause, MORTALITY_CAUSES } from "@/lib/mortality"
 import { cn } from "@/lib/utils"
@@ -66,6 +59,16 @@ type LatestReading = {
   doValue: number | null
 }
 
+const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
+  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+  return numeric.length ? Math.max(...numeric) : fallback
+}
+
+const getMinNumber = (values: Array<number | null | undefined>, fallback = 0) => {
+  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+  return numeric.length ? Math.min(...numeric) : fallback
+}
+
 export function MortalityDashboard({
   kpis,
   loading,
@@ -99,6 +102,218 @@ export function MortalityDashboard({
   onSelectHistorySystem: (systemId: number) => void
   onInvestigationStatusChange: (systemId: number, status: InvestigationStatus) => void
 }) {
+  const palette = getChartPalette()
+  const deathsDateDomain = useMemo(() => buildDailyDateDomain(deathsTrend.map((row) => row.date)), [deathsTrend])
+  const deathsByDate = useMemo(() => new Map(deathsTrend.map((row) => [row.date, row])), [deathsTrend])
+  const deathsXAxisLimit = getDateAxisMaxTicks(deathsDateDomain.length)
+  const survivalDateDomain = useMemo(() => buildDailyDateDomain(survivalTrend.map((row) => row.date)), [survivalTrend])
+  const survivalByDate = useMemo(() => new Map(survivalTrend.map((row) => [row.date, row])), [survivalTrend])
+  const survivalXAxisLimit = getDateAxisMaxTicks(survivalDateDomain.length)
+  const driverDateDomain = useMemo(() => buildDailyDateDomain(driverTrend.map((row) => row.date)), [driverTrend])
+  const driverByDate = useMemo(() => new Map(driverTrend.map((row) => [row.date, row])), [driverTrend])
+  const driverXAxisLimit = getDateAxisMaxTicks(driverDateDomain.length)
+
+  const deathsData = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: deathsDateDomain,
+      datasets: [
+        {
+          label: "Deaths",
+          data: deathsDateDomain.map((date) => deathsByDate.get(date)?.deaths ?? 0),
+          backgroundColor: palette.destructive,
+          borderRadius: 6,
+        },
+      ],
+    }),
+    [deathsByDate, deathsDateDomain, palette.destructive],
+  )
+
+  const deathsOptions = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: 0,
+        max: buildMetricAxisBounds(deathsTrend.map((row) => row.deaths), { includeZero: true }).max,
+        xMaxTicksLimit: deathsXAxisLimit,
+        yTickFormatter: (value) => Number(value).toLocaleString(),
+        yTitle: "Deaths",
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatDateLabel(String(deathsDateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+            label: (context: any) => `Deaths: ${Number(context.parsed.y).toLocaleString()}`,
+          },
+        },
+        xTickFormatter: (_value, index) => formatDateLabel(String(deathsDateDomain[index] ?? "")),
+      }),
+    [deathsDateDomain, deathsTrend, deathsXAxisLimit, palette],
+  )
+
+  const survivalData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: survivalDateDomain,
+      datasets: [
+        {
+          label: "Live count",
+          data: survivalDateDomain.map((date) => survivalByDate.get(date)?.liveCount ?? null),
+          borderColor: palette.chart2,
+          backgroundColor: palette.chart2,
+          borderWidth: 2.3,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y",
+        },
+        {
+          label: "Survival (%)",
+          data: survivalDateDomain.map((date) => survivalByDate.get(date)?.survivalPct ?? null),
+          borderColor: palette.chart1,
+          backgroundColor: palette.chart1,
+          borderWidth: 2.3,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y1",
+        },
+      ],
+    }),
+    [palette.chart1, palette.chart2, survivalByDate, survivalDateDomain],
+  )
+
+  const survivalOptions = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: buildMetricAxisBounds(survivalTrend.map((row) => row.liveCount), { minFloor: 0 }).min,
+        max: buildMetricAxisBounds(survivalTrend.map((row) => row.liveCount), { minFloor: 0 }).max,
+        rightMin: 0,
+        rightMax: 100,
+        xMaxTicksLimit: survivalXAxisLimit,
+        yTitle: "Live count",
+        yRightTitle: "Survival (%)",
+        yTickFormatter: (value) => Number(value).toLocaleString(),
+        yRightTickFormatter: (value) => `${Number(value).toFixed(0)}%`,
+        tooltip: {
+          callbacks: {
+            title: (items: any) => formatDateLabel(String(survivalDateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+            label: (context: any) => {
+              const label = context.dataset.label ?? ""
+              if (label.includes("Survival")) {
+                return `${label}: ${Number(context.parsed.y).toFixed(1)}%`
+              }
+              return `${label}: ${Number(context.parsed.y).toLocaleString()}`
+            },
+          },
+        },
+        xTickFormatter: (_value, index) => formatDateLabel(String(survivalDateDomain[index] ?? "")),
+      }),
+    [palette, survivalDateDomain, survivalTrend, survivalXAxisLimit],
+  )
+
+  const driverData = useMemo<ChartData<any>>(
+    () => ({
+      labels: driverDateDomain,
+      datasets: [
+        {
+          type: "bar",
+          label: "Deaths",
+          data: driverDateDomain.map((date) => driverByDate.get(date)?.deaths ?? 0),
+          backgroundColor: palette.destructive,
+          yAxisID: "y",
+          order: 3,
+        },
+        {
+          type: "line",
+          label: "Poor responses",
+          data: driverDateDomain.map((date) => driverByDate.get(date)?.poorResponses ?? null),
+          borderColor: palette.chart5,
+          backgroundColor: palette.chart5,
+          borderDash: [4, 4],
+          borderWidth: 2,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y",
+          order: 2,
+        },
+        {
+          type: "line",
+          label: "DO (mg/L)",
+          data: driverDateDomain.map((date) => driverByDate.get(date)?.avgDo ?? null),
+          borderColor: palette.chart1,
+          backgroundColor: palette.chart1,
+          borderWidth: 2.2,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y1",
+          order: 1,
+        },
+        {
+          type: "line",
+          label: "Temp (C)",
+          data: driverDateDomain.map((date) => driverByDate.get(date)?.avgTemperature ?? null),
+          borderColor: palette.chart4,
+          backgroundColor: palette.chart4,
+          borderWidth: 2.2,
+          pointRadius: 0,
+          spanGaps: true,
+          yAxisID: "y2",
+          order: 1,
+        },
+      ],
+    }),
+    [driverByDate, driverDateDomain, palette.chart1, palette.chart4, palette.chart5, palette.destructive],
+  )
+
+  const driverOptions = useMemo<ChartOptions<"bar">>(() => {
+    const countBounds = buildMetricAxisBounds(
+      [
+        ...driverTrend.map((row) => row.deaths),
+        ...driverTrend.map((row) => row.poorResponses),
+      ],
+      { includeZero: true },
+    )
+    const doBounds = buildMetricAxisBounds(driverTrend.map((row) => row.avgDo), { minFloor: 0 })
+    const tempMin = Math.max(0, Math.floor(getMinNumber(driverTrend.map((row) => row.avgTemperature)) - 1))
+    const tempMax = Math.ceil(getMaxNumber(driverTrend.map((row) => row.avgTemperature)) + 1)
+
+    return buildCartesianOptions({
+      palette,
+      legend: true,
+      min: countBounds.min,
+      max: countBounds.max,
+      rightMin: doBounds.min,
+      rightMax: doBounds.max,
+      xMaxTicksLimit: driverXAxisLimit,
+      yTitle: "Deaths / poor responses",
+      yRightTitle: "DO (mg/L)",
+      yTickFormatter: (value) => Number(value).toLocaleString(),
+      tooltip: {
+        callbacks: {
+          title: (items: any) => formatDateLabel(String(driverDateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+          label: (context: any) => {
+            const label = context.dataset.label ?? ""
+            const numeric = Number(context.parsed.y)
+            if (label === "Deaths" || label === "Poor responses") {
+              return `${label}: ${numeric.toLocaleString()}`
+            }
+            if (label === "DO (mg/L)") {
+              return `${label}: ${numeric.toFixed(2)} mg/L`
+            }
+            return `${label}: ${numeric.toFixed(2)} C`
+          },
+        },
+      },
+      xTickFormatter: (_value, index) => formatDateLabel(String(driverDateDomain[index] ?? "")),
+      extraScales: {
+        y2: {
+          display: false,
+          min: tempMin,
+          max: tempMax,
+          border: { display: false },
+          grid: { drawOnChartArea: false, drawTicks: false },
+        },
+      },
+    })
+  }, [driverDateDomain, driverTrend, driverXAxisLimit, palette])
+
   return (
     <>
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
@@ -389,22 +604,8 @@ export function MortalityDashboard({
                 icon={Skull}
               />
             ) : (
-              <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={deathsTrend}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={formatDateLabel} />
-                    <YAxis {...chartYAxisProps} />
-                    <Tooltip
-                      labelFormatter={(value) => formatDateLabel(String(value))}
-                      formatter={(value) => [Number(value).toLocaleString(), "Deaths"]}
-                      contentStyle={chartTooltipStyle}
-                      labelStyle={chartTooltipLabelStyle}
-                      itemStyle={chartTooltipItemStyle}
-                    />
-                    <Bar dataKey="deaths" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+              <div className="chart-canvas-shell h-[280px]">
+                <Bar data={deathsData} options={deathsOptions} />
               </div>
             )}
           </CardContent>
@@ -423,44 +624,8 @@ export function MortalityDashboard({
                 icon={TrendingDown}
               />
             ) : (
-              <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={survivalTrend}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={formatDateLabel} />
-                    <YAxis {...chartYAxisProps} yAxisId="left" />
-                    <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" domain={[0, 100]} />
-                    <Tooltip
-                      labelFormatter={(value) => formatDateLabel(String(value))}
-                      formatter={(value, name) => [
-                        Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }),
-                        String(name),
-                      ]}
-                      contentStyle={chartTooltipStyle}
-                      labelStyle={chartTooltipLabelStyle}
-                      itemStyle={chartTooltipItemStyle}
-                    />
-                    <Legend {...chartLegendProps} />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="liveCount"
-                      name="Live count"
-                      stroke="hsl(var(--chart-2))"
-                      strokeWidth={2.3}
-                      dot={false}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="survivalPct"
-                      name="Survival (%)"
-                      stroke="hsl(var(--chart-1))"
-                      strokeWidth={2.3}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="chart-canvas-shell h-[280px]">
+                <Line data={survivalData} options={survivalOptions} />
               </div>
             )}
           </CardContent>
@@ -479,58 +644,8 @@ export function MortalityDashboard({
                 icon={Search}
               />
             ) : (
-              <div className="h-[280px] rounded-md border border-border/80 bg-muted/20 p-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={driverTrend}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={formatDateLabel} />
-                    <YAxis {...chartYAxisProps} yAxisId="left" />
-                    <YAxis {...chartYAxisProps} yAxisId="right" orientation="right" />
-                    <Tooltip
-                      labelFormatter={(value) => formatDateLabel(String(value))}
-                      formatter={(value, name) => {
-                        const label = String(name)
-                        if (label === "Deaths" || label === "Poor responses") {
-                          return [Number(value).toLocaleString(), label]
-                        }
-                        return [Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }), label]
-                      }}
-                      contentStyle={chartTooltipStyle}
-                      labelStyle={chartTooltipLabelStyle}
-                      itemStyle={chartTooltipItemStyle}
-                    />
-                    <Legend {...chartLegendProps} />
-                    <Bar yAxisId="left" dataKey="deaths" name="Deaths" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="avgDo"
-                      name="DO (mg/L)"
-                      stroke="hsl(var(--chart-1))"
-                      strokeWidth={2.2}
-                      dot={false}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="avgTemperature"
-                      name="Temp (C)"
-                      stroke="hsl(var(--chart-4))"
-                      strokeWidth={2.2}
-                      dot={false}
-                    />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="poorResponses"
-                      name="Poor responses"
-                      stroke="hsl(var(--chart-5))"
-                      strokeDasharray="4 4"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+              <div className="chart-canvas-shell h-[280px]">
+                <Chart type="bar" data={driverData} options={driverOptions} />
               </div>
             )}
           </CardContent>

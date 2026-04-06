@@ -1,29 +1,20 @@
 "use client"
 
 import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
 import {
-  Area,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
   Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+} from "@/components/charts/chartjs"
 import { AlertTriangle, CheckCircle2, TrendingDown, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  chartGridProps,
-  chartLegendProps,
-  chartTooltipItemStyle,
-  chartTooltipLabelStyle,
-  chartTooltipStyle,
-  chartXAxisProps,
-  chartYAxisProps,
-} from "@/components/charts/recharts-theme"
+  buildCartesianOptions,
+  buildDailyDateDomain,
+  buildMetricAxisBounds,
+  getChartPalette,
+  getDateAxisMaxTicks,
+  withAlpha,
+} from "@/components/charts/chartjs-theme"
 import type { FeedRunningStockRow } from "@/lib/api/reports"
 import { cn } from "@/lib/utils"
 import { LazyRender } from "@/components/shared/lazy-render"
@@ -73,6 +64,9 @@ const formatFullDate = (value: string) => {
   if (Number.isNaN(parsed.getTime())) return value
   return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(parsed)
 }
+
+const getValueOrNull = (value: string | number | null | undefined) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null
 
 function ChartFrame({
   children,
@@ -446,6 +440,79 @@ export function FeedRateSection({
     [points, systemNameById],
   )
 
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => String(row.date ?? ""))), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [String(row.date ?? ""), row])), [chartRows])
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+
+  const chartData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "Target lower",
+          data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.lowerBand)),
+          borderColor: palette.chart2,
+          backgroundColor: withAlpha(palette.chart2, 0.08),
+          borderDash: [4, 4],
+          borderWidth: 1.6,
+          pointRadius: 0,
+          spanGaps: true,
+        },
+        {
+          label: "Target corridor",
+          data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.upperBand)),
+          borderColor: withAlpha(palette.chart2, 0.7),
+          backgroundColor: withAlpha(palette.chart2, 0.14),
+          borderWidth: 1.6,
+          pointRadius: 0,
+          fill: "-1",
+          spanGaps: true,
+        },
+        ...series.map((item) => ({
+          label: item.label,
+          data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.[item.key])),
+          borderColor: item.color,
+          backgroundColor: item.color,
+          borderWidth: 2.2,
+          pointRadius: 0,
+          spanGaps: true,
+        })),
+      ],
+    }),
+    [dateDomain, palette.chart2, rowsByDate, series],
+  )
+
+  const chartOptions = useMemo<ChartOptions<"line">>(() => {
+    const yBounds = buildMetricAxisBounds(
+      [
+        ...chartRows.map((row) => getValueOrNull(row.lowerBand)),
+        ...chartRows.map((row) => getValueOrNull(row.upperBand)),
+        ...chartRows.flatMap((row) => series.map((item) => getValueOrNull(row[item.key]))),
+      ],
+      { minFloor: 0 },
+    )
+
+    return buildCartesianOptions({
+      palette,
+      min: yBounds.min,
+      max: yBounds.max,
+      xMaxTicksLimit: xLimit,
+      yTickFormatter: (value) => `${Number(value).toFixed(1)}%`,
+      yTitle: "Feed rate (% biomass)",
+      tooltip: {
+        callbacks: {
+          title: (items: any) => formatFullDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+          label: (context: any) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(2)}%`,
+        },
+      },
+      xTickFormatter: (_value, index) =>
+        new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+          new Date(`${String(dateDomain[index] ?? "")}T00:00:00`),
+        ),
+    })
+  }, [chartRows, dateDomain, palette, series, xLimit])
+
   return (
     <Card>
       <CardHeader>
@@ -466,35 +533,7 @@ export function FeedRateSection({
         ) : null}
         <ChartFrame loading={loading} emptyLabel="No feed-rate data available for the selected scope." hasData={chartRows.length > 0}>
           <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartRows}>
-                <CartesianGrid {...chartGridProps} />
-                <XAxis {...chartXAxisProps} dataKey="label" />
-                <YAxis {...chartYAxisProps} />
-                <Tooltip
-                  labelFormatter={(value, payload) => formatFullDate(String(payload?.[0]?.payload?.date ?? value))}
-                  formatter={(value, name) => [`${formatNumber(Number(value), 2)}%`, String(name)]}
-                  contentStyle={chartTooltipStyle}
-                  labelStyle={chartTooltipLabelStyle}
-                  itemStyle={chartTooltipItemStyle}
-                />
-                
-                <Area type="monotone" dataKey="upperBand" stroke="transparent" fill="color-mix(in srgb, var(--color-chart-2) 12%, transparent)" name="Scoped target" />
-                <Line type="monotone" dataKey="lowerBand" stroke="var(--color-chart-2)" strokeDasharray="4 4" dot={false} name="Scoped target" />
-                {series.map((item) => (
-                  <Line
-                    key={item.key}
-                    type="monotone"
-                    dataKey={item.key}
-                    name={item.label}
-                    stroke={item.color}
-                    strokeWidth={2.2}
-                    dot={false}
-                    connectNulls
-                  />
-                ))}
-              </ComposedChart>
-            </ResponsiveContainer>
+            <Line data={chartData} options={chartOptions} />
           </LazyRender>
         </ChartFrame>
       </CardContent>
@@ -532,6 +571,54 @@ export function FeedFcrSection({
     [intervals, systemNameById],
   )
 
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => String(row.date ?? ""))), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [String(row.date ?? ""), row])), [chartRows])
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+
+  const chartData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: series.map((item) => ({
+        label: item.label,
+        data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.[item.key])),
+        borderColor: item.color,
+        backgroundColor: item.color,
+        borderWidth: 1.8,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        spanGaps: true,
+      })),
+    }),
+    [dateDomain, rowsByDate, series],
+  )
+
+  const chartOptions = useMemo<ChartOptions<"line">>(() => {
+    const yBounds = buildMetricAxisBounds(
+      chartRows.flatMap((row) => series.map((item) => getValueOrNull(row[item.key]))),
+      { minFloor: 0, trimOutliers: true },
+    )
+
+    return buildCartesianOptions({
+      palette,
+      min: yBounds.min,
+      max: Math.max(1.5, yBounds.max ?? 1.5),
+      xMaxTicksLimit: xLimit,
+      yTickFormatter: (value) => Number(value).toFixed(2),
+      yTitle: "FCR",
+      tooltip: {
+        callbacks: {
+          title: (items: any) => formatFullDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")),
+          label: (context: any) => `${context.dataset.label}: ${formatNumber(Number(context.parsed.y), 2)}`,
+        },
+      },
+      xTickFormatter: (_value, index) =>
+        new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+          new Date(`${String(dateDomain[index] ?? "")}T00:00:00`),
+        ),
+    })
+  }, [chartRows, dateDomain, palette, series, xLimit])
+
   return (
     <Card>
       <CardHeader>
@@ -551,36 +638,7 @@ export function FeedFcrSection({
         ) : null}
         <ChartFrame loading={loading} emptyLabel="No FCR intervals available for the selected scope." hasData={chartRows.length > 0}>
           <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartRows}>
-                <CartesianGrid {...chartGridProps} />
-                <XAxis {...chartXAxisProps} dataKey="label" />
-                <YAxis {...chartYAxisProps} domain={[0, "dataMax + 0.5"]} />
-                <Tooltip
-                  labelFormatter={(value, payload) => formatFullDate(String(payload?.[0]?.payload?.date ?? value))}
-                  formatter={(value, name) => [formatNumber(Number(value), 2), String(name)]}
-                  contentStyle={chartTooltipStyle}
-                  labelStyle={chartTooltipLabelStyle}
-                  itemStyle={chartTooltipItemStyle}
-                />
-                
-                
-                
-                <Legend {...chartLegendProps} />
-                {series.map((item) => (
-                  <Line
-                    key={item.key}
-                    type="monotone"
-                    dataKey={item.key}
-                    name={item.label}
-                    stroke={item.color}
-                    strokeWidth={2.2}
-                    dot={{ r: 3 }}
-                    connectNulls
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+            <Line data={chartData} options={chartOptions} />
           </LazyRender>
         </ChartFrame>
       </CardContent>

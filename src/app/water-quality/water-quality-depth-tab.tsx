@@ -1,32 +1,15 @@
 "use client"
 
+import { useMemo } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
 import { AlertTriangle, CheckCircle, Layers } from "lucide-react"
-import { CartesianGrid, Legend, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts"
+import { Scatter } from "@/components/charts/chartjs"
+import { getChartPalette, buildCartesianOptions } from "@/components/charts/chartjs-theme"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { chartGridProps, chartLegendProps, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
 import { formatTimestamp } from "./_lib/water-quality-utils"
 import type { DepthProfileRow } from "./_lib/water-quality-selectors"
-
-const DepthProfileTooltip = ({
-  active,
-  payload,
-}: {
-  active?: boolean
-  payload?: Array<{ payload?: { depth: number; value: number; series: string } }>
-}) => {
-  if (!active || !payload?.length || !payload[0]?.payload) return null
-  const point = payload[0].payload
-  return (
-    <div className="rounded-[1rem] bg-card/92 p-3 text-foreground shadow-[0_20px_42px_-30px_rgba(15,23,32,0.5)] backdrop-blur-xl">
-      <p className="text-xs text-muted-foreground">Depth: {point.depth.toFixed(1)} m</p>
-      <p className="mt-1 text-sm font-semibold text-foreground">
-        {point.series}: {point.value.toFixed(2)}
-      </p>
-    </div>
-  )
-}
 
 export function WaterQualityDepthTab({
   selectedDepthProfileDate,
@@ -55,8 +38,59 @@ export function WaterQualityDepthTab({
   doGradient: number | null
   tempGradient: number | null
 }) {
-  const doScatterData = depthProfileDoData.map((row) => ({ depth: row.depth, value: row.dissolvedOxygen, series: "DO (mg/L)" }))
-  const tempScatterData = depthProfileTempData.map((row) => ({ depth: row.depth, value: row.temperature, series: "Temperature (deg C)" }))
+  const palette = getChartPalette()
+
+  const scatterData = useMemo<ChartData<"scatter">>(
+    () => ({
+      datasets: [
+        {
+          label: "DO (mg/L)",
+          data: depthProfileDoData.map((row) => ({
+            x: row.dissolvedOxygen,
+            y: row.depth,
+          })),
+          backgroundColor: palette.chart3,
+          borderColor: palette.chart3,
+          pointRadius: 5,
+          pointHoverRadius: 6,
+        },
+        {
+          label: "Temperature (deg C)",
+          data: depthProfileTempData.map((row) => ({
+            x: row.temperature,
+            y: row.depth,
+          })),
+          backgroundColor: "#F59E0B",
+          borderColor: "#F59E0B",
+          pointRadius: 5,
+          pointHoverRadius: 6,
+        },
+      ],
+    }),
+    [depthProfileDoData, depthProfileTempData, palette.chart3],
+  )
+
+  const scatterOptions = useMemo<ChartOptions<"scatter">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        xGrid: true,
+        yReverse: true,
+        xTitle: "Parameter value",
+        yTitle: "Depth (m)",
+        tooltip: {
+          callbacks: {
+            title: () => "",
+            label: (context: any) => {
+              const point = context.raw as { x: number; y: number }
+              return `${context.dataset.label}: ${point.x.toFixed(2)} at ${point.y.toFixed(1)} m`
+            },
+          },
+        },
+      }),
+    [palette],
+  )
 
   return (
     <div className="space-y-6">
@@ -113,11 +147,11 @@ export function WaterQualityDepthTab({
           </Card>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Surface DO</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{surfaceDo != null ? surfaceDo.toFixed(2) : "--"}</div><p className="text-xs text-muted-foreground mt-1">mg/L</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Bottom DO</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{bottomDo != null ? bottomDo.toFixed(2) : "--"}</div><p className="text-xs text-muted-foreground mt-1">mg/L</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">DO Gradient</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{doGradient != null ? doGradient.toFixed(2) : "--"}</div><p className="text-xs text-muted-foreground mt-1">Surface - bottom</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Temp Gradient</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{tempGradient != null ? tempGradient.toFixed(2) : "--"}</div><p className="text-xs text-muted-foreground mt-1">deg C, surface - bottom</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Flag</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{isStratified ? "YES" : "NO"}</div><p className="text-xs text-muted-foreground mt-1">Rule-based status</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Surface DO</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{surfaceDo != null ? surfaceDo.toFixed(2) : "--"}</div><p className="mt-1 text-xs text-muted-foreground">mg/L</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Bottom DO</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{bottomDo != null ? bottomDo.toFixed(2) : "--"}</div><p className="mt-1 text-xs text-muted-foreground">mg/L</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">DO Gradient</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{doGradient != null ? doGradient.toFixed(2) : "--"}</div><p className="mt-1 text-xs text-muted-foreground">Surface - bottom</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Temp Gradient</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{tempGradient != null ? tempGradient.toFixed(2) : "--"}</div><p className="mt-1 text-xs text-muted-foreground">deg C, surface - bottom</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Flag</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{isStratified ? "YES" : "NO"}</div><p className="mt-1 text-xs text-muted-foreground">Rule-based status</p></CardContent></Card>
           </div>
 
           <Card className="bg-card">
@@ -130,31 +164,8 @@ export function WaterQualityDepthTab({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="soft-panel-subtle h-[360px] p-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart margin={{ top: 12, right: 24, left: 12, bottom: 12 }}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis
-                      {...chartXAxisProps}
-                      type="number"
-                      dataKey="value"
-                      tick={{ ...chartXAxisProps.tick, fontSize: 10.5 }}
-                      label={{ value: "Parameter value", position: "insideBottom", offset: -2, fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                    />
-                    <YAxis
-                      {...chartYAxisProps}
-                      type="number"
-                      dataKey="depth"
-                      reversed
-                      tick={{ ...chartYAxisProps.tick, fontSize: 10.5 }}
-                      label={{ value: "Depth (m)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                    />
-                    <Tooltip content={<DepthProfileTooltip />} />
-                    <Legend {...chartLegendProps} />
-                    <Scatter name="DO (mg/L)" data={doScatterData} fill="#3B82F6" />
-                    <Scatter name="Temperature (deg C)" data={tempScatterData} fill="#F59E0B" />
-                  </ScatterChart>
-                </ResponsiveContainer>
+              <div className="chart-canvas-shell h-[360px]">
+                <Scatter data={scatterData} options={scatterOptions} />
               </div>
             </CardContent>
           </Card>

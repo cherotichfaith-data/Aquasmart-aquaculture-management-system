@@ -1,34 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import type { ChartData, ChartOptions } from "chart.js"
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  chartGridProps,
-  chartLegendProps,
-  chartTooltipItemStyle,
-  chartTooltipLabelStyle,
-  chartTooltipStyle,
-  chartXAxisProps,
-  chartYAxisProps,
-} from "@/components/charts/recharts-theme"
-import { cn } from "@/lib/utils"
-import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
+  buildCartesianOptions,
+  getChartPalette,
+} from "@/components/charts/chartjs-theme"
+import { formatNumberValue } from "@/lib/analytics-format"
 import type { Database } from "@/lib/types/database"
 import type { FeedRunningStockRow, FeedingRecordWithType } from "@/lib/api/reports"
 import type { DailyInventoryRow } from "@/features/feed/types"
@@ -36,15 +14,19 @@ import type { TimePeriod } from "@/lib/time-period"
 import { diffDateDays, formatBucketLabel, formatGranularityLabel, getBucketGranularity, getBucketKey } from "@/lib/time-series"
 import SystemHistorySheet from "@/components/systems/system-history-sheet"
 import {
-  FeedExceptionsRail,
-  FeedFcrSection,
-  FeedMatrixSection,
-  FeedRateSection,
-  FeedStockCompact,
   type FeedExceptionItem,
 } from "../_lib/feed-sections"
 import { normalizeFeedingResponse, type FcrInterval, type FeedRatePoint } from "../_lib/feed-analytics"
 import { formatFeedTypeLabel } from "../_lib/feed-page"
+import {
+  FeedAnalyticsSection,
+  FeedCagesSection,
+  FeedDashboardError,
+  FeedDashboardTabs,
+  FeedOperationsSection,
+  FeedOverviewSection,
+  type SectionKey,
+} from "./feed-dashboard-sections"
 
 type ProductionRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 
@@ -56,27 +38,11 @@ type GrowthRow = {
   sgr_pct_day: number
 }
 
-type SurvivalRow = {
-  system_id: number
-  event_date: string
-  survival_pct: number | null
-  daily_deaths: number
-}
-
 type MeasurementRow = {
   system_id: number | null
   date: string | null
   parameter_value: number | null
 }
-
-type SectionKey = "overview" | "cages" | "feed" | "operations"
-
-const SECTION_OPTIONS: Array<{ key: SectionKey; label: string }> = [
-  { key: "overview", label: "Overview" },
-  { key: "cages", label: "Per-cage performance" },
-  { key: "feed", label: "Feed & FCR" },
-  { key: "operations", label: "Operations" },
-]
 
 const RESPONSE_COLORS: Record<string, string> = {
   Excellent: "#3b82f6",
@@ -85,81 +51,13 @@ const RESPONSE_COLORS: Record<string, string> = {
   Poor: "#dc2626",
 }
 
-const chartCardClass = "rounded-2xl border border-border/80 bg-card shadow-sm"
+const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
+  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+  return numeric.length ? Math.max(...numeric) : fallback
+}
 
 function formatMetric(value: number | null | undefined, decimals = 1) {
   return formatNumberValue(value, { decimals, fallback: "N/A" })
-}
-
-function KpiCard({
-  value,
-  label,
-  tone = "default",
-}: {
-  value: string
-  label: string
-  tone?: "default" | "good" | "warn" | "bad" | "info"
-}) {
-  const toneClass =
-    tone === "good"
-      ? "text-emerald-600"
-      : tone === "warn"
-        ? "text-amber-600"
-        : tone === "bad"
-          ? "text-red-600"
-          : tone === "info"
-            ? "text-sky-600"
-            : "text-foreground"
-
-  return (
-    <div className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4 text-center">
-      <div className={cn("text-2xl font-semibold leading-none", toneClass)}>{value}</div>
-      <div className="mt-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-    </div>
-  )
-}
-
-function Callout({
-  tone,
-  children,
-}: {
-  tone: "info" | "warn" | "good" | "bad"
-  children: React.ReactNode
-}) {
-  const toneClass =
-    tone === "info"
-      ? "border-sky-500/40 bg-sky-500/10 text-sky-800 dark:text-sky-200"
-      : tone === "warn"
-        ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
-        : tone === "good"
-          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
-          : "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-200"
-
-  return <div className={cn("rounded-xl border-l-4 px-4 py-3 text-sm leading-6", toneClass)}>{children}</div>
-}
-
-function ChartCard({
-  title,
-  children,
-  description,
-}: {
-  title: string
-  children: React.ReactNode
-  description?: string
-}) {
-  return (
-    <Card className={chartCardClass}>
-      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
-        <CardTitle className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</CardTitle>
-        {description ? <CardDescription>{description}</CardDescription> : null}
-      </CardHeader>
-      <CardContent className="pt-4">{children}</CardContent>
-    </Card>
-  )
-}
-
-function EmptyChart({ label }: { label: string }) {
-  return <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">{label}</div>
 }
 
 export function FeedDashboard({
@@ -175,14 +73,9 @@ export function FeedDashboard({
   inventoryRows,
   productionRows,
   growthRows,
-  survivalRows,
   measurements,
   feedRatePoints,
   fcrIntervals,
-  latestFeedDate,
-  minStockDays,
-  lowGrowthCount,
-  worstFcr,
   heatmapDates,
   matrixCells,
   selectedHistorySystemId,
@@ -203,14 +96,9 @@ export function FeedDashboard({
   inventoryRows: DailyInventoryRow[]
   productionRows: ProductionRow[]
   growthRows: GrowthRow[]
-  survivalRows: SurvivalRow[]
   measurements: MeasurementRow[]
   feedRatePoints: FeedRatePoint[]
   fcrIntervals: FcrInterval[]
-  latestFeedDate: string | null
-  minStockDays: number | null
-  lowGrowthCount: number
-  worstFcr: { label: string; value: number | null } | null
   heatmapDates: string[]
   matrixCells: any[]
   selectedHistorySystemId: number | null
@@ -395,348 +283,356 @@ export function FeedDashboard({
     }
   }, [exceptionItems])
 
-  const badgeClass = (tone: "good" | "warn" | "bad" | "info") =>
-    tone === "good"
-      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-      : tone === "warn"
-        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-        : tone === "bad"
-          ? "bg-red-500/15 text-red-700 dark:text-red-300"
-          : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+  const palette = getChartPalette()
+
+  const overviewComparisonData = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: overviewRows.map((row) => row.label),
+      datasets: [
+        {
+          label: "Feed",
+          data: overviewRows.map((row) => row.feedKg),
+          backgroundColor: palette.chart1,
+          borderRadius: 6,
+        },
+        {
+          label: "Harvest",
+          data: overviewRows.map((row) => row.harvestKg),
+          backgroundColor: palette.chart2,
+          borderRadius: 6,
+        },
+      ],
+    }),
+    [overviewRows, palette.chart1, palette.chart2],
+  )
+
+  const overviewComparisonOptions = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: 0,
+        max: Math.max(
+          1,
+          Math.ceil(
+            getMaxNumber([
+              ...overviewRows.map((row) => row.feedKg),
+              ...overviewRows.map((row) => row.harvestKg),
+            ]) * 1.12,
+          ),
+        ),
+        yTitle: "Weight (kg)",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `${context.dataset.label}: ${formatMetric(Number(context.parsed.y), 1)} kg`,
+          },
+        },
+      }),
+    [overviewRows, palette],
+  )
+
+  const overviewMortalityData = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: overviewRows.map((row) => row.label),
+      datasets: [
+        {
+          label: "Mortality",
+          data: overviewRows.map((row) => row.mortalityFish),
+          backgroundColor: overviewRows.map((row) =>
+            row.mortalityFish > 250 ? "#dc2626" : row.mortalityFish > 50 ? "#f59e0b" : "#16a34a",
+          ),
+          borderRadius: 6,
+        },
+      ],
+    }),
+    [overviewRows],
+  )
+
+  const overviewMortalityOptions = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: 0,
+        max: Math.max(1, Math.ceil(getMaxNumber(overviewRows.map((row) => row.mortalityFish)) * 1.12)),
+        yTickFormatter: (value) => Number(value).toLocaleString(),
+        yTitle: "Mortality (fish)",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `Mortality: ${formatMetric(Number(context.parsed.y), 0)}`,
+          },
+        },
+      }),
+    [overviewRows, palette],
+  )
+
+  const doTrendData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: overviewRows.map((row) => row.label),
+      datasets: [
+        {
+          label: "DO mean",
+          data: overviewRows.map((row) => row.doAvg),
+          borderColor: palette.chart1,
+          backgroundColor: palette.chart1,
+          borderWidth: 2.5,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          spanGaps: true,
+        },
+      ],
+    }),
+    [overviewRows, palette.chart1],
+  )
+
+  const doTrendOptions = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: 0,
+        max: Math.ceil((getMaxNumber(overviewRows.map((row) => row.doAvg)) + 0.5) * 100) / 100,
+        yTitle: "DO (mg/L)",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `DO mean: ${formatMetric(Number(context.parsed.y), 2)} mg/L`,
+          },
+        },
+      }),
+    [overviewRows, palette],
+  )
+
+  const harvestedCageRows = useMemo(
+    () => cageRows.filter((row) => row.totalHarvestKg > 0 && row.crudeFcr != null),
+    [cageRows],
+  )
+
+  const cageFcrData = useMemo<ChartData<any>>(
+    () => ({
+      labels: harvestedCageRows.map((row) => row.label),
+      datasets: [
+        {
+          type: "bar",
+          label: "Crude FCR",
+          data: harvestedCageRows.map((row) => row.crudeFcr),
+          backgroundColor: palette.chart3,
+          yAxisID: "y",
+        },
+        {
+          type: "line",
+          label: "Benchmark 2.0",
+          data: harvestedCageRows.map(() => 2),
+          borderColor: palette.chart2,
+          backgroundColor: palette.chart2,
+          borderDash: [4, 4],
+          borderWidth: 2,
+          pointRadius: 0,
+          yAxisID: "y",
+        },
+      ],
+    }),
+    [harvestedCageRows, palette.chart2, palette.chart3],
+  )
+
+  const cageFcrOptions = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: 0,
+        max: Math.max(
+          2.4,
+          Math.ceil(
+            Math.max(2, getMaxNumber(harvestedCageRows.map((row) => row.crudeFcr))) * 1.15 * 10,
+          ) / 10,
+        ),
+        yTitle: "Crude FCR",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `${context.dataset.label}: ${formatMetric(Number(context.parsed.y), 2)}`,
+          },
+        },
+      }),
+    [harvestedCageRows, palette],
+  )
+
+  const feedInputData = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: overviewRows.map((row) => row.label),
+      datasets: [
+        {
+          label: "Feed",
+          data: overviewRows.map((row) => row.feedKg),
+          backgroundColor: palette.chart1,
+          borderRadius: 6,
+        },
+      ],
+    }),
+    [overviewRows, palette.chart1],
+  )
+
+  const feedInputOptions = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: 0,
+        max: Math.max(1, Math.ceil(getMaxNumber(overviewRows.map((row) => row.feedKg)) * 1.12)),
+        yTitle: "Feed (kg)",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `Feed: ${formatMetric(Number(context.parsed.y), 1)} kg`,
+          },
+        },
+      }),
+    [overviewRows, palette],
+  )
+
+  const responseData = useMemo<ChartData<"doughnut">>(
+    () => ({
+      labels: responseRows.map((row) => row.name),
+      datasets: [
+        {
+          data: responseRows.map((row) => row.value),
+          backgroundColor: responseRows.map((row) => RESPONSE_COLORS[row.name]),
+          borderWidth: 0,
+          hoverOffset: 4,
+        },
+      ],
+    }),
+    [responseRows],
+  )
+
+  const responseOptions = useMemo<ChartOptions<"doughnut">>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "58%",
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          labels: {
+            color: palette.muted,
+            usePointStyle: true,
+            pointStyle: "circle",
+            boxWidth: 10,
+            boxHeight: 10,
+            padding: 14,
+            font: { size: 11, weight: 500 },
+          },
+        },
+        tooltip: {
+          backgroundColor: palette.tooltipBackground,
+          borderColor: palette.tooltipBorder,
+          borderWidth: 1,
+          titleColor: palette.tooltipForeground,
+          bodyColor: palette.tooltipForeground,
+          padding: 12,
+          cornerRadius: 14,
+          usePointStyle: true,
+          callbacks: {
+            label: (context: any) => `${context.label}: ${formatMetric(Number(context.parsed), 0)} sessions`,
+          },
+        },
+      },
+    }),
+    [palette],
+  )
+
+  const feedTypeData = useMemo<ChartData<"bar">>(
+    () => ({
+      labels: feedTypeRows.map((row) => row.label),
+      datasets: [
+        {
+          label: "Feed volume",
+          data: feedTypeRows.map((row) => row.kg),
+          backgroundColor: palette.chart4,
+          borderRadius: 6,
+        },
+      ],
+    }),
+    [feedTypeRows, palette.chart4],
+  )
+
+  const feedTypeOptions = useMemo<ChartOptions<"bar">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        indexAxis: "y",
+        xMin: 0,
+        xMax: Math.max(1, Math.ceil(getMaxNumber(feedTypeRows.map((row) => row.kg)) * 1.12)),
+        xTitle: "Feed volume (kg)",
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `Feed volume: ${formatMetric(Number(context.parsed.x), 1)} kg`,
+          },
+        },
+      }),
+    [feedTypeRows, palette],
+  )
 
   return (
     <>
-      <div className="space-y-4">
-        <div className="flex flex-wrap gap-4 border-b border-border/40 pb-1">
-          {SECTION_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => setSection(option.key)}
-              className={cn(
-                "border-b-2 px-1 pb-3 text-sm font-medium transition-colors",
-                section === option.key
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FeedDashboardTabs section={section} onSectionChange={setSection} />
 
-      {errorMessage ? (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
-          <div className="font-semibold">Unable to load feed analytics</div>
-          <div className="mt-1">{errorMessage}</div>
-          <button type="button" onClick={onRetry} className="mt-3 rounded-md border border-red-500/30 px-3 py-1.5">
-            Retry
-          </button>
-        </div>
-      ) : null}
+      {errorMessage ? <FeedDashboardError errorMessage={errorMessage} onRetry={onRetry} /> : null}
 
       {section === "overview" ? (
-        <div className="space-y-6">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <KpiCard value={`${formatMetric(overviewTotals.totalFeedKg, 0)} kg`} label="Feed input" />
-            <KpiCard value={`${formatMetric(overviewTotals.totalHarvestKg, 0)} kg`} label="Harvested" tone="good" />
-            <KpiCard value={formatMetric(overviewTotals.crudeFcr, 2)} label="Farm eFCR" tone={overviewTotals.crudeFcr != null && overviewTotals.crudeFcr > 2.5 ? "warn" : "good"} />
-            <KpiCard value={`${formatMetric(overviewTotals.totalMortality, 0)} fish`} label="Total mortality" tone={overviewTotals.totalMortality > 100 ? "warn" : "good"} />
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <ChartCard title={`Feed input vs harvest output by ${trendGranularityLabel} (kg)`}>
-              {overviewRows.length === 0 ? (
-                <EmptyChart label="No feed or harvest activity in the selected scope." />
-              ) : (
-                <div className="h-[260px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={overviewRows}>
-                      <CartesianGrid {...chartGridProps} />
-                      <XAxis {...chartXAxisProps} dataKey="label" />
-                      <YAxis {...chartYAxisProps} />
-                      <Tooltip
-                        formatter={(value, name) => [`${formatMetric(Number(value), 1)} kg`, String(name)]}
-                        contentStyle={chartTooltipStyle}
-                        labelStyle={chartTooltipLabelStyle}
-                        itemStyle={chartTooltipItemStyle}
-                      />
-                      <Legend {...chartLegendProps} />
-                      <Bar dataKey="feedKg" name="Feed" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="harvestKg" name="Harvest" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </ChartCard>
-
-            <ChartCard title={`Mortality by ${trendGranularityLabel} (fish)`}>
-              {overviewRows.length === 0 ? (
-                <EmptyChart label="No mortality records in the selected scope." />
-              ) : (
-                <div className="h-[260px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={overviewRows}>
-                      <CartesianGrid {...chartGridProps} />
-                      <XAxis {...chartXAxisProps} dataKey="label" />
-                      <YAxis {...chartYAxisProps} />
-                      <Tooltip
-                        formatter={(value) => [formatMetric(Number(value), 0), "Mortality"]}
-                        contentStyle={chartTooltipStyle}
-                        labelStyle={chartTooltipLabelStyle}
-                        itemStyle={chartTooltipItemStyle}
-                      />
-                      <Bar dataKey="mortalityFish" name="Mortality" radius={[4, 4, 0, 0]}>
-                        {overviewRows.map((row) => (
-                          <Cell
-                            key={row.bucket}
-                            fill={row.mortalityFish > 250 ? "#dc2626" : row.mortalityFish > 50 ? "#f59e0b" : "#16a34a"}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </ChartCard>
-          </div>
-
-          <ChartCard title={`Dissolved oxygen trend (mean mg/L per ${trendGranularityLabel})`}>
-            {overviewRows.every((row) => row.doAvg == null) ? (
-              <EmptyChart label="No dissolved oxygen readings in the selected scope." />
-            ) : (
-              <div className="h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={overviewRows}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis {...chartXAxisProps} dataKey="label" />
-                    <YAxis {...chartYAxisProps} domain={["dataMin - 0.5", "dataMax + 0.5"]} />
-                    <Tooltip
-                      formatter={(value) => [`${formatMetric(Number(value), 2)} mg/L`, "DO mean"]}
-                      contentStyle={chartTooltipStyle}
-                      labelStyle={chartTooltipLabelStyle}
-                      itemStyle={chartTooltipItemStyle}
-                    />
-                    <Line type="monotone" dataKey="doAvg" stroke="var(--color-chart-1)" strokeWidth={2.5} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </ChartCard>
-        </div>
+        <FeedOverviewSection
+          overviewTotals={overviewTotals}
+          overviewRows={overviewRows}
+          trendGranularityLabel={trendGranularityLabel}
+          overviewComparisonData={overviewComparisonData}
+          overviewComparisonOptions={overviewComparisonOptions}
+          overviewMortalityData={overviewMortalityData}
+          overviewMortalityOptions={overviewMortalityOptions}
+          doTrendData={doTrendData}
+          doTrendOptions={doTrendOptions}
+        />
       ) : null}
 
       {section === "cages" ? (
-        <div className="space-y-6">
-          <Callout tone="info">
-            <strong>All-time summary per scoped cage.</strong> Crude FCR is computed from total feed divided by harvested kg where harvest exists. Last ABW uses the latest growth or inventory sample in scope. SGR uses the full observed growth series where possible.
-          </Callout>
-
-          <Card className={chartCardClass}>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/20 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-3 text-left">Cage</th>
-                      <th className="px-4 py-3 text-left">Total feed (kg)</th>
-                      <th className="px-4 py-3 text-left">Harvest (kg)</th>
-                      <th className="px-4 py-3 text-left">Crude FCR</th>
-                      <th className="px-4 py-3 text-left">Last ABW (g)</th>
-                      <th className="px-4 py-3 text-left">SGR (%/day)</th>
-                      <th className="px-4 py-3 text-left">Mortality (fish)</th>
-                      <th className="px-4 py-3 text-left">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cageRows.map((row) => (
-                      <tr key={row.systemId} className="border-t border-border/70 transition-colors hover:bg-muted/20">
-                        <td className="px-4 py-3">
-                          <button type="button" onClick={() => onSelectedHistorySystemIdChange(row.systemId)} className="font-semibold hover:underline">
-                            {row.label}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <span>{formatMetric(row.totalFeedKg, 0)} kg</span>
-                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className="h-1.5 rounded-full bg-[var(--color-chart-1)]"
-                                style={{ width: `${Math.max(8, (row.totalFeedKg / maxCageFeed) * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">{row.totalHarvestKg > 0 ? `${formatMetric(row.totalHarvestKg, 0)} kg` : "--"}</td>
-                        <td className="px-4 py-3">
-                          <span className={cn("inline-flex rounded-md px-2 py-1 text-xs font-semibold", badgeClass(row.crudeFcr != null && row.crudeFcr > 2.5 ? "warn" : "good"))}>
-                            {row.crudeFcr != null ? formatMetric(row.crudeFcr, 2) : "--"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">{row.latestAbw != null ? `${formatMetric(row.latestAbw, 1)} g` : "--"}</td>
-                        <td className="px-4 py-3">
-                          <span className={cn("inline-flex rounded-md px-2 py-1 text-xs font-semibold", badgeClass((row.overallSgr ?? 0) > 1.2 ? "good" : (row.overallSgr ?? 0) > 0.7 ? "warn" : "bad"))}>
-                            {row.overallSgr != null ? formatMetric(row.overallSgr, 3) : "--"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={cn("inline-flex rounded-md px-2 py-1 text-xs font-semibold", badgeClass(row.totalMortality > 200 ? "bad" : row.totalMortality > 50 ? "warn" : "good"))}>
-                            {formatMetric(row.totalMortality, 0)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={cn("inline-flex rounded-md px-2 py-1 text-xs font-semibold", badgeClass(row.status.tone))}>{row.status.label}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          <ChartCard title="Crude FCR by cage vs benchmark">
-            {cageRows.filter((row) => row.totalHarvestKg > 0 && row.crudeFcr != null).length === 0 ? (
-              <EmptyChart label="No harvested cages in the selected scope." />
-            ) : (
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={cageRows.filter((row) => row.totalHarvestKg > 0 && row.crudeFcr != null)}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis {...chartXAxisProps} dataKey="label" />
-                    <YAxis {...chartYAxisProps} />
-                    <Tooltip
-                      formatter={(value) => [formatMetric(Number(value), 2), "Crude FCR"]}
-                      contentStyle={chartTooltipStyle}
-                      labelStyle={chartTooltipLabelStyle}
-                      itemStyle={chartTooltipItemStyle}
-                    />
-                    <Legend {...chartLegendProps} />
-                    <Bar dataKey="crudeFcr" name="Crude FCR" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey={() => 2} name="Benchmark 2.0" stroke="var(--color-chart-2)" strokeDasharray="4 4" dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </ChartCard>
-        </div>
+        <FeedCagesSection
+          cageRows={cageRows}
+          maxCageFeed={maxCageFeed}
+          harvestedCageRows={harvestedCageRows}
+          cageFcrData={cageFcrData}
+          cageFcrOptions={cageFcrOptions}
+          onSelectedHistorySystemIdChange={onSelectedHistorySystemIdChange}
+        />
       ) : null}
 
       {section === "feed" ? (
-        <div className="space-y-6">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <KpiCard value={`${formatMetric(overviewTotals.totalFeedKg, 0)} kg`} label="Feed used" />
-            <KpiCard value={`${formatMetric(overviewTotals.totalHarvestKg, 0)} kg`} label="Harvest yield" tone="good" />
-            <KpiCard value={formatMetric(overviewTotals.crudeFcr, 2)} label="Crude FCR" tone={overviewTotals.crudeFcr != null && overviewTotals.crudeFcr > 2.5 ? "warn" : "good"} />
-            <KpiCard value={feedTabMetrics.feedNotInHarvestPct != null ? `${formatMetric(feedTabMetrics.feedNotInHarvestPct, 0)}%` : "--"} label="Feed not in harvest" tone="warn" />
-          </div>
-
-          <Callout tone="warn">
-            <strong>Feed inventory signal.</strong> The current scope shows {formatMetric(overviewTotals.totalFeedKg, 0)} kg fed against {formatMetric(overviewTotals.totalHarvestKg, 0)} kg harvested. Use the response mix and FCR interval charts below to confirm whether feed conversion, staging, or delayed harvest is driving that gap.
-          </Callout>
-
-          <ChartCard title={`Feed input by ${trendGranularityLabel} (kg)`}>
-            {overviewRows.length === 0 ? (
-              <EmptyChart label="No feed records in the selected scope." />
-            ) : (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={overviewRows}>
-                    <CartesianGrid {...chartGridProps} />
-                    <XAxis {...chartXAxisProps} dataKey="label" />
-                    <YAxis {...chartYAxisProps} />
-                    <Tooltip
-                      formatter={(value) => [`${formatMetric(Number(value), 1)} kg`, "Feed"]}
-                      contentStyle={chartTooltipStyle}
-                      labelStyle={chartTooltipLabelStyle}
-                      itemStyle={chartTooltipItemStyle}
-                    />
-                    <Bar dataKey="feedKg" name="Feed" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </ChartCard>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <ChartCard title="Response breakdown farm-wide">
-              {responseRows.every((row) => row.value === 0) ? (
-                <EmptyChart label="No feeding responses recorded in the selected scope." />
-              ) : (
-                <div className="h-[220px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={responseRows} dataKey="value" nameKey="name" innerRadius={46} outerRadius={74} paddingAngle={2}>
-                        {responseRows.map((row) => (
-                          <Cell key={row.name} fill={RESPONSE_COLORS[row.name]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value) => [formatMetric(Number(value), 0), "Sessions"]}
-                        contentStyle={chartTooltipStyle}
-                        labelStyle={chartTooltipLabelStyle}
-                        itemStyle={chartTooltipItemStyle}
-                      />
-                      <Legend {...chartLegendProps} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </ChartCard>
-
-            <ChartCard title="Feed type diversity (top types by volume)">
-              {feedTypeRows.length === 0 ? (
-                <EmptyChart label="No feed type usage recorded in the selected scope." />
-              ) : (
-                <div className="h-[220px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={feedTypeRows} layout="vertical">
-                      <CartesianGrid {...chartGridProps} />
-                      <XAxis {...chartXAxisProps} type="number" />
-                      <YAxis {...chartYAxisProps} dataKey="label" type="category" width={140} tick={{ ...chartYAxisProps.tick, fontSize: 10.5 }} />
-                      <Tooltip
-                        formatter={(value) => [`${formatMetric(Number(value), 1)} kg`, "Feed volume"]}
-                        contentStyle={chartTooltipStyle}
-                        labelStyle={chartTooltipLabelStyle}
-                        itemStyle={chartTooltipItemStyle}
-                      />
-                      <Bar dataKey="kg" fill="var(--color-chart-4)" radius={[4, 4, 4, 4]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </ChartCard>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <FeedRateSection loading={loading} points={feedRatePoints} systemNameById={systemNameById} />
-            <FeedFcrSection loading={loading} intervals={fcrIntervals} systemNameById={systemNameById} />
-          </div>
-        </div>
+        <FeedAnalyticsSection
+          overviewTotals={overviewTotals}
+          feedTabMetrics={feedTabMetrics}
+          trendGranularityLabel={trendGranularityLabel}
+          overviewRows={overviewRows}
+          feedInputData={feedInputData}
+          feedInputOptions={feedInputOptions}
+          responseRows={responseRows}
+          responseData={responseData}
+          responseOptions={responseOptions}
+          feedTypeRows={feedTypeRows}
+          feedTypeData={feedTypeData}
+          feedTypeOptions={feedTypeOptions}
+          loading={loading}
+          feedRatePoints={feedRatePoints}
+          fcrIntervals={fcrIntervals}
+          systemNameById={systemNameById}
+        />
       ) : null}
 
       {section === "operations" ? (
-        <div className="space-y-6">
-          <Callout tone={operationsSummary.criticalCount > 0 ? "bad" : "info"}>
-            <strong>{operationsSummary.totalCount} operational exceptions in scope.</strong> {operationsSummary.criticalCount > 0 ? `${operationsSummary.criticalCount} are critical and should be investigated first.` : "No critical exceptions are currently open."}
-          </Callout>
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_360px]">
-            <FeedMatrixSection
-              loading={loading}
-              systemIds={scopedSystemIdList}
-              dates={heatmapDates}
-              cells={matrixCells}
-              systemNameById={systemNameById}
-              onSystemSelect={onSelectedHistorySystemIdChange}
-            />
-            <div className="space-y-6">
-              <FeedExceptionsRail loading={loading} items={exceptionItems} onSystemSelect={onSelectedHistorySystemIdChange} />
-              <FeedStockCompact rows={runningStockRows} />
-            </div>
-          </div>
-        </div>
+        <FeedOperationsSection
+          operationsSummary={operationsSummary}
+          loading={loading}
+          scopedSystemIdList={scopedSystemIdList}
+          heatmapDates={heatmapDates}
+          matrixCells={matrixCells}
+          systemNameById={systemNameById}
+          onSelectedHistorySystemIdChange={onSelectedHistorySystemIdChange}
+          exceptionItems={exceptionItems}
+          runningStockRows={runningStockRows}
+        />
       ) : null}
 
       <SystemHistorySheet

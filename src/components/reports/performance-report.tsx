@@ -7,6 +7,7 @@ import { sortByDateAsc } from "@/lib/utils"
 import type { Database, Enums } from "@/lib/types/database"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
+import { computeEfcrFromProductionRows } from "@/features/dashboard/analytics-shared"
 import {
   BenchmarkStatusSection,
   PerformanceRecordsSection,
@@ -81,33 +82,19 @@ export default function PerformanceReport({
     performanceTableQuery.dataUpdatedAt ?? 0,
   )
   const chartRows = useMemo(() => {
-    const byDate = new Map<string, { totalBiomass: number; weightedEfcr: number; efcrWeight: number; efcrFallback: number; efcrCount: number }>()
+    const byDate = new Map<string, { totalBiomass: number; efcrRows: typeof rows }>()
     rows.forEach((row) => {
       if (!row.date) return
-      const current = byDate.get(row.date) ?? { totalBiomass: 0, weightedEfcr: 0, efcrWeight: 0, efcrFallback: 0, efcrCount: 0 }
+      const current = byDate.get(row.date) ?? { totalBiomass: 0, efcrRows: [] }
       current.totalBiomass += row.total_biomass ?? 0
-      if (typeof row.efcr_period === "number") {
-        const weight = row.total_feed_amount_period ?? 0
-        if (weight > 0) {
-          current.weightedEfcr += row.efcr_period * weight
-          current.efcrWeight += weight
-        } else {
-          current.efcrFallback += row.efcr_period
-          current.efcrCount += 1
-        }
-      }
+      current.efcrRows.push(row)
       byDate.set(row.date, current)
     })
 
     return sortByDateAsc(
       Array.from(byDate.entries()).map(([date, current]) => ({
         date,
-        efcr_period:
-          current.efcrWeight > 0
-            ? current.weightedEfcr / current.efcrWeight
-            : current.efcrCount > 0
-              ? current.efcrFallback / current.efcrCount
-              : null,
+        efcr_period: computeEfcrFromProductionRows(current.efcrRows),
         total_biomass: current.totalBiomass,
       })),
       (row) => row.date,

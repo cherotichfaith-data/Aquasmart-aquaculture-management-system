@@ -1,6 +1,7 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { TimeBounds, TimePeriod } from "@/lib/time-period"
+import type { FarmKpisTodayRow } from "@/lib/api/dashboard"
 
 export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
 export type DashboardTimePeriod = TimePeriod
@@ -58,32 +59,7 @@ export type ProductionSummaryMetrics = {
   dateBounds: { start: string | null; end: string | null }
 }
 
-export type DashboardSystemRow = {
-  system_id: number
-  system_name: string | null
-  growth_stage: "nursing" | "grow out" | "grow_out" | string | null
-  input_start_date: string | null
-  input_end_date: string | null
-  as_of_date: string | null
-  sampling_end_date: string | null
-  sample_age_days: number | null
-  efcr: number | null
-  efcr_date: string | null
-  feed_total: number | null
-  abw: number | null
-  feeding_rate: number | null
-  mortality_rate: number | null
-  biomass_density: number | null
-  fish_end: number | null
-  biomass_end: number | null
-  missing_days_count: number | null
-  water_quality_rating_average: "optimal" | "acceptable" | "critical" | "lethal" | string | null
-  water_quality_rating_numeric_average: number | null
-  water_quality_latest_date: string | null
-  worst_parameter: string | null
-  worst_parameter_value: number | null
-  worst_parameter_unit: string | null
-}
+export type DashboardSystemRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 
 export type SystemsTableData = {
   rows: DashboardSystemRow[]
@@ -107,6 +83,7 @@ export type DashboardPageInitialData = {
   bounds: TimeBounds
   systemOptions: QueryResult<DashboardSystemOption>
   batchSystems: QueryResult<{ system_id: number }>
+  farmKpisToday: QueryResult<FarmKpisTodayRow>
   kpiOverview: {
     metrics: KPIOverviewMetric[]
     dateBounds: { start: string | null; end: string | null }

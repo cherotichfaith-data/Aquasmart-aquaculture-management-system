@@ -1,19 +1,11 @@
 "use client"
 
 import { useMemo } from "react"
-import {
-    Area,
-    CartesianGrid,
-    ComposedChart,
-    Line,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from "recharts"
+import type { ChartData, ChartOptions } from "chart.js"
 import type { Enums } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
 import type { DashboardPageInitialData } from "@/features/dashboard/types"
+import { Line } from "@/components/charts/chartjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useProductionTrend } from "@/lib/hooks/use-dashboard"
@@ -21,175 +13,247 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/
 import { LazyRender } from "@/components/shared/lazy-render"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
-import { chartGridProps, chartTooltipStyle, chartXAxisProps, chartYAxisProps } from "@/components/charts/recharts-theme"
+import { computeEfcrFromProductionRows } from "@/features/dashboard/analytics-shared"
+import {
+  buildCartesianOptions,
+  buildDailyDateDomain,
+  buildMetricAxisBounds,
+  getChartPalette,
+  getDateAxisMaxTicks,
+  withAlpha,
+} from "@/components/charts/chartjs-theme"
 
 export default function PopulationOverview({
-    stage,
-    batch,
+  stage,
+  batch,
+  system,
+  timePeriod,
+  scopedSystemIds,
+  dateFrom,
+  dateTo,
+  farmId: initialFarmId,
+  initialData,
+  initialBounds,
+}: {
+  stage?: "all" | Enums<"system_growth_stage"> | null
+  batch?: string
+  system?: string
+  timePeriod: TimePeriod
+  scopedSystemIds?: number[] | null
+  dateFrom?: string
+  dateTo?: string
+  farmId?: string | null
+  initialData?: DashboardPageInitialData["productionTrend"]
+  initialBounds?: DashboardPageInitialData["bounds"]
+}) {
+  const { farmId: activeFarmId } = useActiveFarm()
+  const palette = getChartPalette()
+  const farmId = activeFarmId ?? initialFarmId
+  const canUseInitialData =
+    Boolean(dateFrom && dateTo) && initialBounds?.start === dateFrom && initialBounds?.end === dateTo
+
+  const summaryQuery = useProductionTrend({
+    farmId,
+    stage: stage && stage !== "all" ? stage : undefined,
+    batch: batch ?? "all",
     system,
     timePeriod,
     scopedSystemIds,
-    dateFrom,
-    dateTo,
-    farmId: initialFarmId,
-    initialData,
-    initialBounds,
-}: {
-    stage?: "all" | Enums<"system_growth_stage"> | null
-    batch?: string
-    system?: string
-    timePeriod: TimePeriod
-    scopedSystemIds?: number[] | null
-    dateFrom?: string
-    dateTo?: string
-    farmId?: string | null
-    initialData?: DashboardPageInitialData["productionTrend"]
-    initialBounds?: DashboardPageInitialData["bounds"]
-}) {
-    const { farmId: activeFarmId } = useActiveFarm()
-    const farmId = activeFarmId ?? initialFarmId
-    const boundsReady = Boolean(dateFrom && dateTo)
-    const canUseInitialData =
-        boundsReady && initialBounds?.start === dateFrom && initialBounds?.end === dateTo
-    const summaryQuery = useProductionTrend({
-        farmId,
-        stage: stage && stage !== "all" ? stage : undefined,
-        batch: batch ?? "all",
-        system,
-        timePeriod,
-        scopedSystemIds,
-        dateFrom: dateFrom ?? null,
-        dateTo: dateTo ?? null,
-        initialData: canUseInitialData ? initialData : undefined,
+    dateFrom: dateFrom ?? null,
+    dateTo: dateTo ?? null,
+    initialData: canUseInitialData ? initialData : undefined,
+  })
+
+  const chartRows = useMemo(() => {
+    const rows = summaryQuery.data ?? []
+    const byDate = new Map<string, { mortality: number; efcrRows: typeof rows }>()
+
+    rows.forEach((row) => {
+      if (!row.date) return
+      const current = byDate.get(row.date) ?? {
+        mortality: 0,
+        efcrRows: [],
+      }
+
+      current.mortality += row.daily_mortality_count ?? 0
+      current.efcrRows.push(row)
+
+      byDate.set(row.date, current)
     })
 
-    const chartData = useMemo(() => {
-        const rows = summaryQuery.data ?? []
-        const byDate = new Map<string, { mortality: number; weightedEfcr: number; efcrWeight: number; efcrFallback: number; efcrCount: number }>()
+    return Array.from(byDate.entries())
+      .map(([date, current]) => ({
+        date,
+        efcrPeriod: computeEfcrFromProductionRows(current.efcrRows),
+        mortalityCount: current.mortality,
+      }))
+      .sort((left, right) => left.date.localeCompare(right.date))
+  }, [summaryQuery.data])
 
-        rows.forEach((row) => {
-            if (!row.date) return
-            const current = byDate.get(row.date) ?? { mortality: 0, weightedEfcr: 0, efcrWeight: 0, efcrFallback: 0, efcrCount: 0 }
-            current.mortality += row.daily_mortality_count ?? 0
-            if (typeof row.efcr_period === "number") {
-                const weight = row.total_feed_amount_period ?? 0
-                if (weight > 0) {
-                    current.weightedEfcr += row.efcr_period * weight
-                    current.efcrWeight += weight
-                } else {
-                    current.efcrFallback += row.efcr_period
-                    current.efcrCount += 1
-                }
-            }
-            byDate.set(row.date, current)
-        })
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+  const efcrBounds = useMemo(
+    () => buildMetricAxisBounds(chartRows.map((row) => row.efcrPeriod), { minFloor: 0, targetTicks: 4, trimOutliers: true }),
+    [chartRows],
+  )
+  const mortalityBounds = useMemo(
+    () => buildMetricAxisBounds(chartRows.map((row) => row.mortalityCount), { includeZero: true }),
+    [chartRows],
+  )
 
-        return Array.from(byDate.entries())
-            .map(([date, current]) => ({
-                date,
-                efcr_period:
-                    current.efcrWeight > 0
-                        ? current.weightedEfcr / current.efcrWeight
-                        : current.efcrCount > 0
-                            ? current.efcrFallback / current.efcrCount
-                            : null,
-                daily_mortality_count: current.mortality,
-            }))
-            .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-    }, [summaryQuery.data])
-    const errorMessage = getErrorMessage(summaryQuery.error)
+  const efcrData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "eFCR",
+          data: dateDomain.map((date) => rowsByDate.get(date)?.efcrPeriod ?? null),
+          borderColor: palette.chart1,
+          backgroundColor: withAlpha(palette.chart1, 0.18),
+          borderWidth: 2,
+          fill: true,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointBackgroundColor: palette.chart1,
+          cubicInterpolationMode: "monotone",
+          tension: 0.35,
+          spanGaps: true,
+          clip: 0,
+        },
+      ],
+    }),
+    [dateDomain, palette.chart1, rowsByDate],
+  )
 
-    if (summaryQuery.isError) {
-        return (
-            <DataErrorState
-                title="Unable to load production trends"
-                description={errorMessage ?? "Please retry or check your connection."}
-                onRetry={() => summaryQuery.refetch()}
-            />
-        )
-    }
+  const mortalityData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "Mortality count",
+          data: dateDomain.map((date) => rowsByDate.get(date)?.mortalityCount ?? null),
+          borderColor: palette.destructive,
+          backgroundColor: withAlpha(palette.destructive, 0.2),
+          borderWidth: 2,
+          fill: true,
+          pointHoverRadius: 4,
+          pointBackgroundColor: palette.destructive,
+          cubicInterpolationMode: "monotone",
+          tension: 0.35,
+          spanGaps: true,
+          clip: false,
+        },
+      ],
+    }),
+    [dateDomain, palette.destructive, rowsByDate],
+  )
 
+  const efcrOptions = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: efcrBounds.min,
+        max: efcrBounds.max,
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }),
+        tooltip: {
+          callbacks: {
+            title: (items: any) =>
+              formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? ""), {
+                month: "short",
+                day: "numeric",
+              }),
+            label: (context: any) =>
+              `eFCR: ${formatNumberValue(Number(context.parsed.y), { decimals: 2, minimumDecimals: 2 })}`,
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+      }),
+    [dateDomain, efcrBounds.max, efcrBounds.min, palette, xLimit],
+  )
+
+  const mortalityOptions = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        min: mortalityBounds.min,
+        max: mortalityBounds.max,
+        xMaxTicksLimit: xLimit,
+        yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 0 }),
+        tooltip: {
+          callbacks: {
+            title: (items: any) =>
+              formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? ""), {
+                month: "short",
+                day: "numeric",
+              }),
+            label: (context: any) =>
+              `Mortality: ${formatNumberValue(Number(context.parsed.y), { decimals: 0 })} fish`,
+          },
+        },
+        xTickFormatter: (_value, index) =>
+          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+      }),
+    [dateDomain, mortalityBounds.max, mortalityBounds.min, palette, xLimit],
+  )
+
+  const errorMessage = getErrorMessage(summaryQuery.error)
+
+  if (summaryQuery.isError) {
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-            <Card className="w-full">
-                <CardHeader className="pb-1">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <CardTitle>eFCR Trend</CardTitle>
-                        <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
-                    </div>
-                    <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
-                </CardHeader>
-                <CardContent className="pt-2">
-                    {!boundsReady || summaryQuery.isLoading ? (
-                        <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
-                    ) : chartData.length ? (
-                        <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={chartData}>
-                                <CartesianGrid {...chartGridProps} />
-                                <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={(value: any) => formatChartDate(value, { month: "short", day: "numeric" })} />
-                                <YAxis {...chartYAxisProps} />
-                                <Tooltip
-                                    labelFormatter={(value) => formatChartDate(value, { month: "short", day: "numeric" })}
-                                    formatter={(value, name) => [formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }), String(name)]}
-                                    contentStyle={chartTooltipStyle}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="efcr_period"
-                                    stroke="var(--color-chart-1)"
-                                    fill="var(--color-chart-1)"
-                                    fillOpacity={0.18}
-                                    name="eFCR"
-                                />
-                            </ComposedChart>
-                          </ResponsiveContainer>
-                        </LazyRender>
-                    ) : (
-                        <EmptyState title="No trend data" description="No eFCR data available for the selected range." />
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card className="w-full">
-                <CardHeader className="pb-1">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <CardTitle>Mortality Trend</CardTitle>
-                        <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
-                    </div>
-                    <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
-                </CardHeader>
-                <CardContent className="pt-2">
-                    {!boundsReady || summaryQuery.isLoading ? (
-                        <div className="h-[320px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
-                    ) : chartData.length ? (
-                        <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={chartData}>
-                                <CartesianGrid {...chartGridProps} />
-                                <XAxis {...chartXAxisProps} dataKey="date" tickFormatter={(value: any) => formatChartDate(value, { month: "short", day: "numeric" })} />
-                                <YAxis {...chartYAxisProps} />
-                                <Tooltip
-                                    labelFormatter={(value) => formatChartDate(value, { month: "short", day: "numeric" })}
-                                    formatter={(value, name) => [formatNumberValue(Number(value)), String(name)]}
-                                    contentStyle={chartTooltipStyle}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="daily_mortality_count"
-                                    fill="var(--color-destructive)"
-                                    fillOpacity={0.2}
-                                    stroke="var(--color-destructive)"
-                                    name="Mortality count"
-                                />
-                            </ComposedChart>
-                          </ResponsiveContainer>
-                        </LazyRender>
-                    ) : (
-                        <EmptyState title="No trend data" description="No mortality data available for the selected range." />
-                    )}
-                </CardContent>
-            </Card>
-        </div>
+      <DataErrorState
+        title="Unable to load production trends"
+        description={errorMessage ?? "Please retry or check your connection."}
+        onRetry={() => summaryQuery.refetch()}
+      />
     )
+  }
+
+  return (
+    <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-2">
+      <Card className="w-full">
+        <CardHeader className="border-b border-border">
+          <div className="flex items-center justify-between">
+            <CardTitle>eFCR Trend</CardTitle>
+            <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
+          </div>
+          <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
+        </CardHeader>
+        <CardContent className="pt-4">
+          {summaryQuery.isLoading ? (
+            <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading chart...</div>
+          ) : chartRows.length ? (
+            <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
+              <Line data={efcrData} options={efcrOptions} />
+            </LazyRender>
+          ) : (
+            <EmptyState title="No trend data" description="No eFCR data available for the selected range." />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="w-full">
+        <CardHeader className="border-b border-border">
+          <div className="flex items-center justify-between">
+            <CardTitle>Mortality Trend</CardTitle>
+            <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
+          </div>
+          <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
+        </CardHeader>
+        <CardContent className="pt-4">
+          {summaryQuery.isLoading ? (
+            <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading chart...</div>
+          ) : chartRows.length ? (
+            <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
+              <Line data={mortalityData} options={mortalityOptions} />
+            </LazyRender>
+          ) : (
+            <EmptyState title="No trend data" description="No mortality data available for the selected range." />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
