@@ -18,9 +18,9 @@ import {
   buildCartesianOptions,
   buildDailyDateDomain,
   buildMetricAxisBounds,
+  createVerticalGradient,
   getChartPalette,
   getDateAxisMaxTicks,
-  withAlpha,
 } from "@/components/charts/chartjs-theme"
 
 export default function PopulationOverview({
@@ -110,14 +110,12 @@ export default function PopulationOverview({
           label: "eFCR",
           data: dateDomain.map((date) => rowsByDate.get(date)?.efcrPeriod ?? null),
           borderColor: palette.chart1,
-          backgroundColor: withAlpha(palette.chart1, 0.18),
-          borderWidth: 2,
+          backgroundColor: createVerticalGradient(palette.chart1, 0.38, 0.03),
+          borderWidth: 2.8,
           fill: true,
           pointRadius: 0,
           pointHoverRadius: 4,
           pointBackgroundColor: palette.chart1,
-          cubicInterpolationMode: "monotone",
-          tension: 0.35,
           spanGaps: true,
           clip: 0,
         },
@@ -134,15 +132,14 @@ export default function PopulationOverview({
           label: "Mortality count",
           data: dateDomain.map((date) => rowsByDate.get(date)?.mortalityCount ?? null),
           borderColor: palette.destructive,
-          backgroundColor: withAlpha(palette.destructive, 0.2),
-          borderWidth: 2,
+          backgroundColor: createVerticalGradient(palette.destructive, 0.32, 0.03),
+          borderWidth: 2.8,
           fill: true,
+          pointRadius: 0,
           pointHoverRadius: 4,
           pointBackgroundColor: palette.destructive,
-          cubicInterpolationMode: "monotone",
-          tension: 0.35,
           spanGaps: true,
-          clip: false,
+          clip: 0,
         },
       ],
     }),
@@ -156,6 +153,8 @@ export default function PopulationOverview({
         min: efcrBounds.min,
         max: efcrBounds.max,
         xMaxTicksLimit: xLimit,
+        xTitle: "Date",
+        yTitle: "eFCR",
         yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }),
         tooltip: {
           callbacks: {
@@ -181,6 +180,8 @@ export default function PopulationOverview({
         min: mortalityBounds.min,
         max: mortalityBounds.max,
         xMaxTicksLimit: xLimit,
+        xTitle: "Date",
+        yTitle: "Mortality (fish)",
         yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 0 }),
         tooltip: {
           callbacks: {
@@ -214,20 +215,22 @@ export default function PopulationOverview({
   return (
     <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-2">
       <Card className="w-full">
-        <CardHeader className="border-b border-border">
+        <CardHeader className="pb-1">
           <div className="flex items-center justify-between">
             <CardTitle>eFCR Trend</CardTitle>
             <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
           </div>
           <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="pt-2">
           {summaryQuery.isLoading ? (
-            <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading chart...</div>
+            <div className="flex h-[300px] items-center justify-center text-muted-foreground">Loading chart...</div>
           ) : chartRows.length ? (
-            <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
-              <Line data={efcrData} options={efcrOptions} />
-            </LazyRender>
+            <div className="chart-canvas-shell">
+              <LazyRender className="h-[300px]" fallback={<div className="h-full w-full" />}>
+                <Line data={efcrData} options={efcrOptions} />
+              </LazyRender>
+            </div>
           ) : (
             <EmptyState title="No trend data" description="No eFCR data available for the selected range." />
           )}
@@ -235,20 +238,22 @@ export default function PopulationOverview({
       </Card>
 
       <Card className="w-full">
-        <CardHeader className="border-b border-border">
+        <CardHeader className="pb-1">
           <div className="flex items-center justify-between">
             <CardTitle>Mortality Trend</CardTitle>
             <DataFetchingBadge isFetching={summaryQuery.isFetching} isLoading={summaryQuery.isLoading} />
           </div>
           <DataUpdatedAt updatedAt={summaryQuery.dataUpdatedAt} />
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="pt-2">
           {summaryQuery.isLoading ? (
-            <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading chart...</div>
+            <div className="flex h-[300px] items-center justify-center text-muted-foreground">Loading chart...</div>
           ) : chartRows.length ? (
-            <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
-              <Line data={mortalityData} options={mortalityOptions} />
-            </LazyRender>
+            <div className="chart-canvas-shell">
+              <LazyRender className="h-[300px]" fallback={<div className="h-full w-full" />}>
+                <Line data={mortalityData} options={mortalityOptions} />
+              </LazyRender>
+            </div>
           ) : (
             <EmptyState title="No trend data" description="No mortality data available for the selected range." />
           )}

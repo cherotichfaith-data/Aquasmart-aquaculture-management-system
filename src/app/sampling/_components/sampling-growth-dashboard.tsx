@@ -10,8 +10,10 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   buildCartesianOptions,
+  buildDailyDateDomain,
   createVerticalGradient,
   getChartPalette,
+  getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
 import { formatFullDate, formatWithUnit } from "@/app/sampling/_lib/formatters"
 
@@ -130,6 +132,20 @@ export function SamplingGrowthDashboard({
 }) {
   const palette = getChartPalette()
   const chartColors = [palette.chart1, palette.chart2, palette.chart3, palette.chart4, palette.chart5]
+  const trajectoryDateDomain = useMemo(
+    () => buildDailyDateDomain(bestGrowthTrajectory.map((row) => row.date)),
+    [bestGrowthTrajectory],
+  )
+  const trajectoryRowsByDate = useMemo(
+    () => new Map(bestGrowthTrajectory.map((row) => [row.date, row])),
+    [bestGrowthTrajectory],
+  )
+  const trajectoryXAxisLimit = getDateAxisMaxTicks(trajectoryDateDomain.length)
+  const harvestTimeAxisTitle = useMemo(() => {
+    if (harvestGranularityLabel === "month") return "Month"
+    if (harvestGranularityLabel === "quarter") return "Quarter"
+    return "Date"
+  }, [harvestGranularityLabel])
 
   const trajectoryMax = useMemo(
     () => Math.max(1, Math.ceil(getMaxNumber(bestGrowthTrajectory.map((row) => row.abw)) * 1.12)),
@@ -158,11 +174,11 @@ export function SamplingGrowthDashboard({
 
   const trajectoryData = useMemo<ChartData<"line">>(
     () => ({
-      labels: bestGrowthTrajectory.map((row) => row.label),
+      labels: trajectoryDateDomain,
       datasets: [
         {
           label: "ABW",
-          data: bestGrowthTrajectory.map((row) => row.abw),
+          data: trajectoryDateDomain.map((date) => trajectoryRowsByDate.get(date)?.abw ?? null),
           borderColor: palette.chart1,
           backgroundColor: createVerticalGradient(palette.chart1, 0.36, 0.04),
           borderWidth: 2.6,
@@ -172,7 +188,7 @@ export function SamplingGrowthDashboard({
         },
       ],
     }),
-    [bestGrowthTrajectory, palette.chart1],
+    [palette.chart1, trajectoryDateDomain, trajectoryRowsByDate],
   )
 
   const trajectoryOptions = useMemo<ChartOptions<"line">>(
@@ -181,15 +197,22 @@ export function SamplingGrowthDashboard({
         palette,
         min: 0,
         max: trajectoryMax,
+        xTitle: "Date",
+        xMaxTicksLimit: trajectoryXAxisLimit,
         yTitle: "ABW (g)",
         tooltip: {
           callbacks: {
-            title: (items: any) => formatFullDate(bestGrowthTrajectory[items[0]?.dataIndex ?? 0]?.date ?? ""),
+            title: (items: any) => formatFullDate(trajectoryDateDomain[items[0]?.dataIndex ?? 0] ?? ""),
             label: (context: any) => `ABW: ${Number(context.parsed.y).toFixed(1)} g`,
           },
         },
+        xTickFormatter: (_value, index) => {
+          const parsed = new Date(`${trajectoryDateDomain[index] ?? ""}T00:00:00`)
+          if (Number.isNaN(parsed.getTime())) return trajectoryDateDomain[index] ?? ""
+          return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(parsed)
+        },
       }),
-    [bestGrowthTrajectory, palette, trajectoryMax],
+    [palette, trajectoryDateDomain, trajectoryMax, trajectoryXAxisLimit],
   )
 
   const currentAbwData = useMemo<ChartData<"bar">>(
@@ -213,6 +236,7 @@ export function SamplingGrowthDashboard({
         palette,
         min: 0,
         max: currentAbwMax,
+        xTitle: "Cage",
         yTitle: "ABW (g)",
         tooltip: {
           callbacks: {
@@ -246,6 +270,7 @@ export function SamplingGrowthDashboard({
         palette,
         min: 0,
         max: sgrMax,
+        xTitle: "Cage",
         yTickFormatter: (value) => `${Number(value).toFixed(2)}%`,
         yTitle: "SGR (%/day)",
         tooltip: {
@@ -283,14 +308,16 @@ export function SamplingGrowthDashboard({
         legend: true,
         min: 0,
         max: harvestMax,
+        xTitle: harvestTimeAxisTitle,
         yTitle: "Cumulative harvest (kg)",
+        xTickFormatter: (_value, index) => String(harvestTimelineRows[index]?.label ?? ""),
         tooltip: {
           callbacks: {
             label: (context: any) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} kg`,
           },
         },
       }),
-    [harvestMax, palette],
+    [harvestMax, harvestTimeAxisTitle, harvestTimelineRows, palette],
   )
 
   return (

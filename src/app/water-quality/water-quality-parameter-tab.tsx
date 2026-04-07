@@ -5,7 +5,7 @@ import type { ChartData, ChartOptions } from "chart.js"
 import { Line } from "@/components/charts/chartjs"
 import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
-import { formatTimestamp, type WqParameter } from "./_lib/water-quality-utils"
+import { formatTimestamp, parameterLabels, type WqParameter } from "./_lib/water-quality-utils"
 import type { DiurnalDoPattern, ParameterTrendRow } from "./_lib/water-quality-selectors"
 import {
   buildCartesianOptions,
@@ -233,6 +233,8 @@ export function WaterQualityParameterTab({
         min: parameterAxisDomain.min,
         max: parameterAxisDomain.max,
         xMaxTicksLimit: parameterXAxisLimit,
+        xTitle: "Date",
+        yTitle: parameterLabels[selectedParameter],
         yTickFormatter: (value) =>
           selectedParameter === "pH"
             ? Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -270,6 +272,12 @@ export function WaterQualityParameterTab({
                   max: feedingAxisMax,
                   border: { display: false },
                   grid: { drawOnChartArea: false, drawTicks: false },
+                  title: {
+                    display: true,
+                    text: "Feed fed (kg)",
+                    color: palette.muted,
+                    font: { size: 11, weight: 500 },
+                  },
                   ticks: {
                     color: palette.muted,
                     padding: 10,
@@ -285,11 +293,18 @@ export function WaterQualityParameterTab({
             ? {
                 [showFeedingOverlay ? "y2" : "y1"]: {
                   position: "right",
-                  display: !showFeedingOverlay,
+                  display: true,
+                  offset: showFeedingOverlay,
                   min: 0,
                   max: mortalityAxisMax,
                   border: { display: false },
                   grid: { drawOnChartArea: false, drawTicks: false },
+                  title: {
+                    display: true,
+                    text: "Mortality (fish)",
+                    color: palette.muted,
+                    font: { size: 11, weight: 500 },
+                  },
                   ticks: {
                     color: palette.muted,
                     padding: 10,
@@ -343,6 +358,8 @@ export function WaterQualityParameterTab({
         legend: true,
         min: 0,
         max: diurnalAxisMax,
+        xTitle: "Time of day",
+        yTitle: "Dissolved oxygen (mg/L)",
         tooltip: {
           callbacks: {
             label: (context: any) =>
@@ -391,6 +408,8 @@ export function WaterQualityParameterTab({
         min: dailyTempAxisDomain.min,
         max: dailyTempAxisDomain.max,
         xMaxTicksLimit: dailyTempXAxisLimit,
+        xTitle: "Date",
+        yTitle: "Temperature (deg C)",
         tooltip: {
           callbacks: {
             title: (items: any) => formatTimestamp(`${dailyTempDateDomain[items[0]?.dataIndex ?? 0] ?? ""}T00:00:00`),

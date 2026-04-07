@@ -167,7 +167,7 @@ const FALLBACK_PALETTE: ChartPalette = {
   grid: "rgba(127, 140, 141, 0.18)",
   border: "#dce9f4",
   card: "#ffffff",
-  tooltipBackground: "rgba(44, 62, 80, 0.94)",
+  tooltipBackground: "rgba(44, 62, 80, 0.8)",
   tooltipBorder: "rgba(236, 240, 241, 0.14)",
   tooltipForeground: "#f8fbff",
   primary: "#22c55e",
@@ -235,14 +235,14 @@ export function withAlpha(color: string, alpha: number) {
   return normalized
 }
 
-export function createVerticalGradient(color: string, topOpacity = 0.34, bottomOpacity = 0.03) {
+export function createVerticalGradient(color: string, topOpacity = 0.1, bottomOpacity = 0.02) {
   return (context: ScriptableContext<"line">) => {
     const { chart } = context
     const { ctx, chartArea } = chart
     if (!chartArea) return withAlpha(color, topOpacity)
     const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
     gradient.addColorStop(0, withAlpha(color, topOpacity))
-    gradient.addColorStop(0.65, withAlpha(color, Math.max(bottomOpacity + 0.08, topOpacity / 3)))
+    gradient.addColorStop(0.65, withAlpha(color, Math.max(bottomOpacity + 0.02, topOpacity / 3)))
     gradient.addColorStop(1, withAlpha(color, bottomOpacity))
     return gradient
   }
@@ -259,11 +259,11 @@ export function chartLegendOptions(
       color: palette.muted,
       usePointStyle: true,
       pointStyle: "circle",
-      boxWidth: 10,
-      boxHeight: 10,
-      padding: 14,
+      boxWidth: 15,
+      boxHeight: 12,
+      padding: 12,
       font: {
-        size: 11,
+        size: 12,
         weight: 500,
       },
     },
@@ -281,9 +281,17 @@ export function chartTooltipOptions(
     titleColor: palette.tooltipForeground,
     bodyColor: palette.tooltipForeground,
     padding: 12,
-    cornerRadius: 14,
+    bodySpacing: 6,
+    cornerRadius: 6,
     boxPadding: 6,
     usePointStyle: true,
+    titleFont: {
+      size: 14,
+      weight: "bold",
+    },
+    bodyFont: {
+      size: 13,
+    },
     ...overrides,
   } as any
 }
@@ -291,7 +299,11 @@ export function chartTooltipOptions(
 function baseTickOptions(
   palette: ChartPalette,
   formatter?: (value: number | string, index: number, ticks: Tick[]) => string,
+  options?: {
+    preferTickLabel?: boolean
+  },
 ) {
+  const { preferTickLabel = false } = options ?? {}
   return {
     color: palette.muted,
     padding: 10,
@@ -300,7 +312,10 @@ function baseTickOptions(
       weight: 500,
     },
     callback(value: number | string, index: number, ticks: Tick[]) {
-      return formatter ? formatter(value, index, ticks) : String(value)
+      if (formatter) return formatter(value, index, ticks)
+      const tickLabel = ticks[index]?.label
+      if (tickLabel != null) return String(tickLabel)
+      return preferTickLabel ? "" : String(value)
     },
   }
 }
@@ -369,12 +384,14 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
     },
     elements: {
       line: {
-        tension: 0.35,
+        tension: 0.3,
         borderJoinStyle: "round",
+        borderWidth: 3,
       },
       point: {
-        radius: 0,
-        hoverRadius: 4,
+        radius: 4,
+        hoverRadius: 6,
+        borderWidth: 0,
       },
       bar: {
         borderRadius: 6,
@@ -396,7 +413,7 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
           drawTicks: false,
         },
         ticks: {
-          ...baseTickOptions(palette, xTickFormatter),
+          ...baseTickOptions(palette, xTickFormatter, { preferTickLabel: true }),
           ...(xMaxTicksLimit != null ? { maxTicksLimit: xMaxTicksLimit } : {}),
         },
         title: xTitle
@@ -424,7 +441,7 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
           color: palette.grid,
           drawTicks: false,
         },
-        ticks: baseTickOptions(palette, yTickFormatter),
+        ticks: baseTickOptions(palette, yTickFormatter, { preferTickLabel: false }),
         title: yTitle
           ? {
               display: true,
@@ -450,7 +467,7 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
                 drawOnChartArea: false,
                 drawTicks: false,
               },
-              ticks: baseTickOptions(palette, yRightTickFormatter),
+              ticks: baseTickOptions(palette, yRightTickFormatter, { preferTickLabel: false }),
               title: yRightTitle
                 ? {
                     display: true,

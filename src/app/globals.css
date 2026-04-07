@@ -291,20 +291,8 @@ next-router-prefetch {
   }
 
   .chart-canvas-shell {
-    @apply relative overflow-hidden rounded-[1.2rem] border border-border/70 bg-gradient-to-b from-background via-background to-muted/45 p-3 md:p-4;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.55),
-      0 18px 38px -34px rgba(15, 23, 32, 0.18);
-  }
-
-  .chart-canvas-shell::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--color-primary), var(--color-chart-3), var(--color-chart-5));
-    opacity: 0.9;
-    pointer-events: none;
+    @apply relative overflow-hidden rounded-xl border border-border bg-card p-3 md:p-4;
+    box-shadow: 0 10px 24px -18px rgba(15, 23, 32, 0.18);
   }
 
   .queue-card {
@@ -347,9 +335,7 @@ next-router-prefetch {
   }
 
   .dark .chart-canvas-shell {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 22px 42px -34px rgba(7, 17, 29, 0.48);
+    box-shadow: 0 14px 30px -20px rgba(7, 17, 29, 0.42);
   }
 }
 

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useAuth } from "@/components/providers/auth-provider"
 import FarmSelector from "@/components/shared/farm-selector"
 import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
+import { FilterPopover } from "@/components/shared/filter-popover"
 import { useSharedFilters } from "@/lib/hooks/app/use-shared-filters"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -19,10 +20,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNotifications } from "@/components/notifications/notifications-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { resolveTimePeriod } from "@/lib/time-period"
 import {
   DEFAULT_WQ_PARAMETER,
@@ -30,7 +31,6 @@ import {
   parameterLabels,
   type WqParameter,
 } from "@/app/water-quality/_lib/water-quality-utils"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type PageMeta = {
   title: string
@@ -116,8 +116,9 @@ export default function Header({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [signingOut, setSigningOut] = useState(false)
+  const [isCondensed, setIsCondensed] = useState(false)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
-  const { farm } = useActiveFarm()
   const pageMeta = getPageMeta(pathname, searchParams.get("tab"))
   const showAddData = pathname === "/"
   const isWaterQualityPage = pathname.startsWith("/water-quality")
@@ -153,6 +154,14 @@ export default function Header({
   } = useSharedFilters(defaultPeriod, sharedFilterInitialValues)
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
   const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
+  const waterQualityParameterOptions = useMemo(
+    () =>
+      Object.entries(parameterLabels).map(([key, label]) => ({
+        value: key,
+        label,
+      })),
+    [],
+  )
 
   const replaceFilterParams = (next: {
     selectedBatch?: string
@@ -236,22 +245,52 @@ export default function Header({
     return r.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
   }
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const handleScroll = () => {
+      setIsCondensed(window.scrollY > 72)
+    }
+
+    handleScroll()
+    window.addEventListener("scroll", handleScroll, { passive: true })
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll)
+    }
+  }, [])
+
   return (
-    <header className="sticky top-0 z-20 bg-background/72 shadow-[0_10px_24px_-24px_rgba(15,23,32,0.16)] backdrop-blur-xl dark:shadow-[0_18px_48px_-36px_rgba(15,23,32,0.5)]">
-      <div className="flex flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4 md:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+    <header className="sticky top-3 z-20 px-3 sm:px-4 md:px-6 lg:px-8">
+      <div
+        className={`rounded-[1.5rem] bg-background/78 shadow-[0_18px_44px_-30px_rgba(15,23,32,0.22)] backdrop-blur-xl transition-[border-radius,box-shadow,transform] duration-300 dark:shadow-[0_20px_54px_-34px_rgba(15,23,32,0.52)] ${
+          isCondensed ? "translate-y-0 shadow-[0_16px_34px_-28px_rgba(15,23,32,0.18)]" : ""
+        }`}
+      >
+      <div
+        className={`flex flex-col transition-[gap,padding] duration-300 ${
+          isCondensed
+            ? "gap-2 px-4 py-3 sm:px-5 md:px-6"
+            : "gap-2 px-3 py-3 sm:px-4 sm:py-3 md:px-6"
+        }`}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
             <button onClick={onMenuClick} className="rounded-xl bg-card/55 p-2 text-foreground/85 shadow-[0_12px_28px_-22px_rgba(15,23,32,0.45)] transition-colors hover:bg-accent/70 hover:text-accent-foreground md:hidden">
               <Menu size={20} />
             </button>
-            <div className="min-w-0">
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-                <span className="truncate font-semibold text-foreground">{farm?.name ?? "Aquasmart"}</span>
-              </div>
-            </div>
+            {pageMeta ? (
+              <h1
+                className={`min-w-0 text-balance font-semibold leading-tight tracking-tight text-foreground transition-[font-size] duration-300 ${
+                  isCondensed ? "text-lg sm:text-xl" : "text-xl sm:text-[1.85rem]"
+                }`}
+              >
+                {pageMeta.title}
+              </h1>
+            ) : null}
           </div>
 
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 self-start">
             {/* Role Badge */}
             {role && (
               <Badge
@@ -359,58 +398,62 @@ export default function Header({
         </div>
 
         {showToolbar ? (
-          <div className="page-toolbar">
-            {pageMeta ? (
-              <div className="w-full space-y-1">
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.85rem]">
-                  {pageMeta.title}
-                </h1>
-                {pageMeta.description ? (
-                  <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                    {pageMeta.description}
-                  </p>
-                ) : null}
+          <div className="page-toolbar overflow-visible border-0 bg-transparent px-0 py-0 shadow-none">
+            <div className="flex w-full flex-col gap-2 md:hidden">
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <TimePeriodSelector
+                    selectedPeriod={timePeriod}
+                    onPeriodChange={handleTimePeriodChange}
+                    variant="compact"
+                  />
+                </div>
+                <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="topbar-control h-10 shrink-0 rounded-lg px-3 text-sm font-medium"
+                    >
+                      Filters
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="max-h-[85vh] rounded-t-[1.5rem] border-border/80 px-0">
+                    <SheetHeader className="border-b border-border/70 px-4 pb-3">
+                      <SheetTitle>Filters</SheetTitle>
+                      <SheetDescription>Refine the current view.</SheetDescription>
+                    </SheetHeader>
+                    <div className="space-y-3 overflow-y-auto px-4 py-4">
+                      <FarmSelector
+                        selectedBatch={selectedBatch}
+                        selectedSystem={selectedSystem}
+                        selectedStage={selectedStage}
+                        onBatchChange={handleBatchChange}
+                        onSystemChange={handleSystemChange}
+                        onStageChange={handleStageChange}
+                        showStage
+                        showCounts={false}
+                        variant="compact"
+                        layout="grid"
+                      />
+                      {isWaterQualityPage ? (
+                        <FilterPopover
+                          label="Parameter"
+                          value={selectedParameter}
+                          options={waterQualityParameterOptions}
+                          placeholder="Select parameter"
+                          onChange={handleWaterQualityParameterChange}
+                          triggerClassName="w-full"
+                        />
+                      ) : null}
+                    </div>
+                  </SheetContent>
+                </Sheet>
               </div>
-            ) : null}
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-              <TimePeriodSelector
-                selectedPeriod={timePeriod}
-                onPeriodChange={handleTimePeriodChange}
-                variant="compact"
-              />
-              <FarmSelector
-                selectedBatch={selectedBatch}
-                selectedSystem={selectedSystem}
-                selectedStage={selectedStage}
-                onBatchChange={handleBatchChange}
-                onSystemChange={handleSystemChange}
-                onStageChange={handleStageChange}
-                showStage
-                showCounts={false}
-                variant="compact"
-              />
-              {isWaterQualityPage ? (
-                <Select value={selectedParameter} onValueChange={handleWaterQualityParameterChange}>
-                  <SelectTrigger className="w-full sm:w-[220px]">
-                    <SelectValue placeholder="Select parameter" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(parameterLabels).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
-            </div>
-            <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto sm:flex-wrap sm:justify-end">
-            {showAddData ? (
-              <div className="w-full sm:w-auto">
+              {showAddData ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button className="h-10 w-full rounded-xl px-4 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">
-                      <PlusCircle className="h-4 w-4 mr-2" />
+                    <Button className="h-10 w-full rounded-lg px-4 text-sm font-semibold cursor-pointer bg-primary text-primary-foreground shadow-[0_16px_28px_-22px_rgba(34,197,94,0.4)] hover:bg-primary/90">
+                      <PlusCircle className="mr-2 h-4 w-4" />
                       Add Data
                     </Button>
                   </DropdownMenuTrigger>
@@ -441,11 +484,81 @@ export default function Header({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              ) : null}
+            </div>
+
+            <div className="hidden w-full items-center gap-2 md:flex">
+              <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
+                <TimePeriodSelector
+                  selectedPeriod={timePeriod}
+                  onPeriodChange={handleTimePeriodChange}
+                  variant="compact"
+                />
+                <FarmSelector
+                  selectedBatch={selectedBatch}
+                  selectedSystem={selectedSystem}
+                  selectedStage={selectedStage}
+                  onBatchChange={handleBatchChange}
+                  onSystemChange={handleSystemChange}
+                  onStageChange={handleStageChange}
+                  showStage
+                  showCounts={false}
+                  variant="compact"
+                  layout="row"
+                />
+                {isWaterQualityPage ? (
+                  <FilterPopover
+                    label="Parameter"
+                    value={selectedParameter}
+                    options={waterQualityParameterOptions}
+                    placeholder="Select parameter"
+                    onChange={handleWaterQualityParameterChange}
+                    triggerClassName="w-[170px]"
+                  />
+                ) : null}
               </div>
-            ) : null}
+              {showAddData ? (
+                <div className="ml-auto">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button className="h-10 rounded-lg px-4 text-sm font-semibold cursor-pointer bg-primary text-primary-foreground shadow-[0_16px_28px_-22px_rgba(34,197,94,0.4)] hover:bg-primary/90">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Data
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Quick Entry</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => router.push(`/data-entry?type=feeding${systemParam}${batchParam}`)}
+                      >
+                        <Fish className="mr-2 h-4 w-4" />
+                        Record Feeding
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => router.push(`/data-entry?type=sampling${systemParam}${batchParam}`)}
+                      >
+                        <FlaskConical className="mr-2 h-4 w-4" />
+                        Record Sampling
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => router.push(`/data-entry?type=water_quality${systemParam}`)}
+                      >
+                        <Droplets className="mr-2 h-4 w-4" />
+                        Record Water Quality
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => router.push("/data-entry")}>
+                        View All Entry Types
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
+      </div>
       </div>
     </header>
   )

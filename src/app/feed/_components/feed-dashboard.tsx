@@ -110,6 +110,11 @@ export function FeedDashboard({
   const [section, setSection] = useState<SectionKey>("overview")
   const trendGranularity = useMemo(() => getBucketGranularity(timePeriod), [timePeriod])
   const trendGranularityLabel = useMemo(() => formatGranularityLabel(trendGranularity), [trendGranularity])
+  const overviewTimeAxisTitle = useMemo(() => {
+    if (trendGranularity === "month") return "Month"
+    if (trendGranularity === "quarter") return "Quarter"
+    return "Date"
+  }, [trendGranularity])
 
   const overviewTotals = useMemo(() => {
     const totalFeedKg = feedingRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
@@ -321,14 +326,16 @@ export function FeedDashboard({
             ]) * 1.12,
           ),
         ),
+        xTitle: overviewTimeAxisTitle,
         yTitle: "Weight (kg)",
+        xTickFormatter: (_value, index) => overviewRows[index]?.label ?? "",
         tooltip: {
           callbacks: {
             label: (context: any) => `${context.dataset.label}: ${formatMetric(Number(context.parsed.y), 1)} kg`,
           },
         },
       }),
-    [overviewRows, palette],
+    [overviewRows, overviewTimeAxisTitle, palette],
   )
 
   const overviewMortalityData = useMemo<ChartData<"bar">>(
@@ -354,15 +361,17 @@ export function FeedDashboard({
         palette,
         min: 0,
         max: Math.max(1, Math.ceil(getMaxNumber(overviewRows.map((row) => row.mortalityFish)) * 1.12)),
+        xTitle: overviewTimeAxisTitle,
         yTickFormatter: (value) => Number(value).toLocaleString(),
         yTitle: "Mortality (fish)",
+        xTickFormatter: (_value, index) => overviewRows[index]?.label ?? "",
         tooltip: {
           callbacks: {
             label: (context: any) => `Mortality: ${formatMetric(Number(context.parsed.y), 0)}`,
           },
         },
       }),
-    [overviewRows, palette],
+    [overviewRows, overviewTimeAxisTitle, palette],
   )
 
   const doTrendData = useMemo<ChartData<"line">>(
@@ -390,14 +399,16 @@ export function FeedDashboard({
         palette,
         min: 0,
         max: Math.ceil((getMaxNumber(overviewRows.map((row) => row.doAvg)) + 0.5) * 100) / 100,
+        xTitle: overviewTimeAxisTitle,
         yTitle: "DO (mg/L)",
+        xTickFormatter: (_value, index) => overviewRows[index]?.label ?? "",
         tooltip: {
           callbacks: {
             label: (context: any) => `DO mean: ${formatMetric(Number(context.parsed.y), 2)} mg/L`,
           },
         },
       }),
-    [overviewRows, palette],
+    [overviewRows, overviewTimeAxisTitle, palette],
   )
 
   const harvestedCageRows = useMemo(
@@ -444,6 +455,7 @@ export function FeedDashboard({
             Math.max(2, getMaxNumber(harvestedCageRows.map((row) => row.crudeFcr))) * 1.15 * 10,
           ) / 10,
         ),
+        xTitle: "Cage",
         yTitle: "Crude FCR",
         tooltip: {
           callbacks: {
@@ -475,14 +487,16 @@ export function FeedDashboard({
         palette,
         min: 0,
         max: Math.max(1, Math.ceil(getMaxNumber(overviewRows.map((row) => row.feedKg)) * 1.12)),
+        xTitle: overviewTimeAxisTitle,
         yTitle: "Feed (kg)",
+        xTickFormatter: (_value, index) => overviewRows[index]?.label ?? "",
         tooltip: {
           callbacks: {
             label: (context: any) => `Feed: ${formatMetric(Number(context.parsed.y), 1)} kg`,
           },
         },
       }),
-    [overviewRows, palette],
+    [overviewRows, overviewTimeAxisTitle, palette],
   )
 
   const responseData = useMemo<ChartData<"doughnut">>(
@@ -560,6 +574,7 @@ export function FeedDashboard({
         xMin: 0,
         xMax: Math.max(1, Math.ceil(getMaxNumber(feedTypeRows.map((row) => row.kg)) * 1.12)),
         xTitle: "Feed volume (kg)",
+        yTitle: "Feed type",
         tooltip: {
           callbacks: {
             label: (context: any) => `Feed volume: ${formatMetric(Number(context.parsed.x), 1)} kg`,

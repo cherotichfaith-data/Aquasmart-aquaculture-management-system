@@ -163,10 +163,13 @@ export function PerformanceTrendSection({
         palette,
         legend: true,
         min: efcrBounds.min,
-        max: Math.max(2.2, efcrBounds.max ?? 2.2),
+        max: efcrBounds.max,
         rightMin: biomassBounds.min,
         rightMax: biomassBounds.max,
         xMaxTicksLimit: xLimit,
+        xTitle: "Date",
+        yTitle: "eFCR",
+        yRightTitle: "Biomass (kg)",
         yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }),
         yRightTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`,
         tooltip: {
@@ -238,6 +241,8 @@ export function SystemBiomassComparisonSection({
         legend: true,
         min: 0,
         max: Math.ceil(maxValue * 1.1),
+        xTitle: "System",
+        yTitle: "Biomass (kg)",
         yTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`,
         tooltip: {
           callbacks: {

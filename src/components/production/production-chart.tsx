@@ -82,6 +82,8 @@ export default function ProductionChart({
         min: yBounds.min,
         max: yBounds.max,
         xMaxTicksLimit: xLimit,
+        xTitle: "Date",
+        yTitle: meta.unit ? `${meta.label} (${meta.unit})` : meta.label,
         yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: meta.decimals }),
         tooltip: {
           callbacks: {

@@ -135,6 +135,7 @@ export function MortalityDashboard({
         min: 0,
         max: buildMetricAxisBounds(deathsTrend.map((row) => row.deaths), { includeZero: true }).max,
         xMaxTicksLimit: deathsXAxisLimit,
+        xTitle: "Date",
         yTickFormatter: (value) => Number(value).toLocaleString(),
         yTitle: "Deaths",
         tooltip: {
@@ -187,6 +188,7 @@ export function MortalityDashboard({
         rightMin: 0,
         rightMax: 100,
         xMaxTicksLimit: survivalXAxisLimit,
+        xTitle: "Date",
         yTitle: "Live count",
         yRightTitle: "Survival (%)",
         yTickFormatter: (value) => Number(value).toLocaleString(),
@@ -282,6 +284,7 @@ export function MortalityDashboard({
       rightMin: doBounds.min,
       rightMax: doBounds.max,
       xMaxTicksLimit: driverXAxisLimit,
+      xTitle: "Date",
       yTitle: "Deaths / poor responses",
       yRightTitle: "DO (mg/L)",
       yTickFormatter: (value) => Number(value).toLocaleString(),
@@ -304,11 +307,27 @@ export function MortalityDashboard({
       xTickFormatter: (_value, index) => formatDateLabel(String(driverDateDomain[index] ?? "")),
       extraScales: {
         y2: {
-          display: false,
+          display: true,
+          position: "right",
+          offset: true,
           min: tempMin,
           max: tempMax,
           border: { display: false },
           grid: { drawOnChartArea: false, drawTicks: false },
+          ticks: {
+            color: palette.muted,
+            padding: 10,
+            font: { size: 11, weight: 500 },
+            callback(value: number | string) {
+              return `${Number(value).toFixed(1)} C`
+            },
+          },
+          title: {
+            display: true,
+            text: "Temperature (C)",
+            color: palette.muted,
+            font: { size: 11, weight: 500 },
+          },
         },
       },
     })

@@ -126,6 +126,8 @@ export function FeedByCageSection({
         stacked: true,
         min: 0,
         xMaxTicksLimit: xLimit,
+        xTitle: "Date",
+        yTitle: "Feed fed (kg)",
         yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 }),
         tooltip: {
           callbacks: {
@@ -218,8 +220,10 @@ export function EfcrByCageSection({
         palette,
         legend: true,
         min: yBounds.min,
-        max: Math.max(2.5, yBounds.max ?? 2.5),
+        max: yBounds.max,
         xMaxTicksLimit: xLimit,
+        xTitle: "Date",
+        yTitle: "eFCR",
         yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 2, minimumDecimals: 2 }),
         tooltip: {
           callbacks: {

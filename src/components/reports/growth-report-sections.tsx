@@ -74,6 +74,8 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
         min: yBounds.min,
         max: yBounds.max,
         xMaxTicksLimit: xLimit,
+        xTitle: "Sampling date",
+        yTitle: "ABW (g)",
         yTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} g`,
         tooltip: {
           callbacks: {
@@ -140,6 +142,8 @@ export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean;
         min: yBounds.min,
         max: yBounds.max,
         xMaxTicksLimit: xLimit,
+        xTitle: "Date",
+        yTitle: "Biomass (kg)",
         yTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 1, minimumDecimals: 1 })} kg`,
         tooltip: {
           callbacks: {

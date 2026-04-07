@@ -14,7 +14,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import {
   buildCartesianOptions,
+  buildDailyDateDomain,
   getChartPalette,
+  getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
 import {
   Sheet,
@@ -445,15 +447,33 @@ export default function SystemHistorySheet({
 
   const title = systemLabel ?? summaryRow?.system_name ?? (systemId ? `System ${systemId}` : "System")
   const palette = getChartPalette()
+  const inventoryDateDomain = useMemo(
+    () => buildDailyDateDomain(inventoryTrendRows.map((row) => row.date)),
+    [inventoryTrendRows],
+  )
+  const inventoryRowsByDate = useMemo(
+    () => new Map(inventoryTrendRows.map((row) => [row.date, row])),
+    [inventoryTrendRows],
+  )
+  const inventoryXAxisLimit = getDateAxisMaxTicks(inventoryDateDomain.length)
+  const waterDateDomain = useMemo(
+    () => buildDailyDateDomain(waterTrendRows.map((row) => row.date)),
+    [waterTrendRows],
+  )
+  const waterRowsByDate = useMemo(
+    () => new Map(waterTrendRows.map((row) => [row.date, row])),
+    [waterTrendRows],
+  )
+  const waterXAxisLimit = getDateAxisMaxTicks(waterDateDomain.length)
 
   const inventoryChartData = useMemo<ChartData<any>>(
     () => ({
-      labels: inventoryTrendRows.map((row) => row.label),
+      labels: inventoryDateDomain,
       datasets: [
         {
           type: "bar",
           label: "Feed (kg)",
-          data: inventoryTrendRows.map((row) => row.feed),
+          data: inventoryDateDomain.map((date) => inventoryRowsByDate.get(date)?.feed ?? null),
           backgroundColor: palette.chart3,
           yAxisID: "y",
           order: 3,
@@ -461,7 +481,7 @@ export default function SystemHistorySheet({
         {
           type: "line",
           label: "Biomass (kg)",
-          data: inventoryTrendRows.map((row) => row.biomass),
+          data: inventoryDateDomain.map((date) => inventoryRowsByDate.get(date)?.biomass ?? null),
           borderColor: palette.chart1,
           backgroundColor: palette.chart1,
           borderWidth: 2.4,
@@ -473,7 +493,7 @@ export default function SystemHistorySheet({
         {
           type: "line",
           label: "ABW (g)",
-          data: inventoryTrendRows.map((row) => row.abw),
+          data: inventoryDateDomain.map((date) => inventoryRowsByDate.get(date)?.abw ?? null),
           borderColor: palette.chart2,
           backgroundColor: palette.chart2,
           borderWidth: 2.4,
@@ -484,7 +504,7 @@ export default function SystemHistorySheet({
         },
       ],
     }),
-    [inventoryTrendRows, palette.chart1, palette.chart2, palette.chart3],
+    [inventoryDateDomain, inventoryRowsByDate, palette.chart1, palette.chart2, palette.chart3],
   )
 
   const inventoryChartOptions = useMemo<ChartOptions<"bar">>(() => {
@@ -506,11 +526,13 @@ export default function SystemHistorySheet({
       max: leftMax,
       rightMin: 0,
       rightMax,
+      xTitle: "Date",
+      xMaxTicksLimit: inventoryXAxisLimit,
       yTitle: "Biomass / Feed (kg)",
       yRightTitle: "ABW (g)",
       tooltip: {
         callbacks: {
-          title: (items: any) => formatDateOnly(inventoryTrendRows[items[0]?.dataIndex ?? 0]?.date ?? ""),
+          title: (items: any) => formatDateOnly(inventoryDateDomain[items[0]?.dataIndex ?? 0] ?? ""),
           label: (context: any) => {
             const label = context.dataset.label ?? ""
             const numeric = Number(context.parsed.y)
@@ -519,16 +541,17 @@ export default function SystemHistorySheet({
           },
         },
       },
+      xTickFormatter: (_value, index) => formatCompactDate(inventoryDateDomain[index] ?? ""),
     })
-  }, [inventoryTrendRows, palette])
+  }, [inventoryDateDomain, inventoryTrendRows, inventoryXAxisLimit, palette])
 
   const waterChartData = useMemo<ChartData<"line">>(
     () => ({
-      labels: waterTrendRows.map((row) => row.label),
+      labels: waterDateDomain,
       datasets: [
         {
           label: "DO (mg/L)",
-          data: waterTrendRows.map((row) => row.dissolvedOxygen),
+          data: waterDateDomain.map((date) => waterRowsByDate.get(date)?.dissolvedOxygen ?? null),
           borderColor: palette.chart1,
           backgroundColor: palette.chart1,
           borderWidth: 2.4,
@@ -538,7 +561,7 @@ export default function SystemHistorySheet({
         },
         {
           label: "Temperature (C)",
-          data: waterTrendRows.map((row) => row.temperature),
+          data: waterDateDomain.map((date) => waterRowsByDate.get(date)?.temperature ?? null),
           borderColor: palette.chart4,
           backgroundColor: palette.chart4,
           borderWidth: 2.4,
@@ -548,7 +571,7 @@ export default function SystemHistorySheet({
         },
       ],
     }),
-    [palette.chart1, palette.chart4, waterTrendRows],
+    [palette.chart1, palette.chart4, waterDateDomain, waterRowsByDate],
   )
 
   const waterChartOptions = useMemo<ChartOptions<"line">>(() => {
@@ -561,10 +584,12 @@ export default function SystemHistorySheet({
       legend: true,
       min: 0,
       max: doMax,
+      xTitle: "Date",
+      xMaxTicksLimit: waterXAxisLimit,
       yTitle: "DO (mg/L)",
       tooltip: {
         callbacks: {
-          title: (items: any) => formatDateOnly(waterTrendRows[items[0]?.dataIndex ?? 0]?.date ?? ""),
+          title: (items: any) => formatDateOnly(waterDateDomain[items[0]?.dataIndex ?? 0] ?? ""),
           label: (context: any) => {
             const label = context.dataset.label ?? ""
             const unit = label.includes("DO") ? "mg/L" : "C"
@@ -572,6 +597,7 @@ export default function SystemHistorySheet({
           },
         },
       },
+      xTickFormatter: (_value, index) => formatCompactDate(waterDateDomain[index] ?? ""),
       extraScales: {
         y1: {
           position: "right",
@@ -596,7 +622,7 @@ export default function SystemHistorySheet({
         },
       },
     })
-  }, [palette, waterTrendRows])
+  }, [palette, waterDateDomain, waterTrendRows, waterXAxisLimit])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

@@ -5,6 +5,7 @@ import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
+import { FilterPopover } from "@/components/shared/filter-popover"
 
 type StageFilter = "all" | Enums<"system_growth_stage">
 
@@ -18,6 +19,7 @@ interface FarmSelectorProps {
   showStage?: boolean
   showCounts?: boolean
   variant?: "default" | "compact"
+  layout?: "grid" | "row"
 }
 
 export default function FarmSelector({
@@ -30,6 +32,7 @@ export default function FarmSelector({
   showStage = true,
   showCounts = true,
   variant = "default",
+  layout,
 }: FarmSelectorProps) {
   const { farmId, loading: farmLoading } = useActiveFarm()
   const batchId =
@@ -63,7 +66,7 @@ export default function FarmSelector({
     return stageFiltered.filter((system) => batchSystemIds.has(system.id as number))
   }, [allSystems, batchSystemsQuery.data, selectedBatch, selectedStage])
   const systemCount = systems.length
-  const batchCount = batches.length
+  const resolvedLayout = layout ?? (variant === "compact" ? "row" : "grid")
   const formatStage = (value: StageFilter | string | null | undefined) => {
     if (value === "nursing") return "Nursing"
     if (value === "grow_out") return "Grow-out"
@@ -81,10 +84,50 @@ export default function FarmSelector({
     }
     const ordered = Array.from(stageSet).sort((a, b) => formatStage(a).localeCompare(formatStage(b)))
     return [
-      { value: "all", label: "All Stages" },
-      ...ordered.map((value) => ({ value, label: formatStage(value) })),
+      {
+        value: "all",
+        label: "All Stages",
+      },
+      ...ordered.map((value) => ({
+        value,
+        label: formatStage(value),
+      })),
     ]
   }, [allSystems, selectedStage])
+  const batchOptions = useMemo(
+    () => [
+      {
+        value: "all",
+        label: "All Batches",
+      },
+      ...batches.map((batch) => ({
+        value: String(batch.id),
+        label: batch.label || `Batch ${batch.id}`,
+        keywords: [batch.label ?? "", String(batch.id), batch.date_of_delivery ?? ""],
+      })),
+    ],
+    [batches],
+  )
+  const systemOptions = useMemo(
+    () => [
+      {
+        value: "all",
+        label: "All Cages",
+      },
+      ...systems.map((system) => ({
+        value: String(system.id),
+        label: system.label || `System ${system.id}`,
+        keywords: [
+          system.label ?? "",
+          system.unit ?? "",
+          formatStage(system.growth_stage),
+          String(system.type ?? "").replaceAll("_", " "),
+          String(system.id),
+        ],
+      })),
+    ],
+    [systems],
+  )
 
   useEffect(() => {
     if (!farmId || farmLoading || selectedBatch === "all") return
@@ -119,66 +162,62 @@ export default function FarmSelector({
     systemsQuery.isLoading,
   ])
 
-  const selectClass =
-    variant === "compact"
-      ? "topbar-control h-10 w-full rounded-xl px-3 text-sm font-medium sm:w-auto sm:min-w-[150px]"
-      : "topbar-control rounded-md px-3 py-2 text-sm"
-
   return (
-    <div className={variant === "compact" ? "flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center" : "flex flex-col gap-2 md:flex-row md:items-end"}>
+    <div
+      className={
+        resolvedLayout === "row"
+          ? "flex min-w-0 flex-wrap items-center gap-2"
+          : variant === "compact"
+            ? "grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
+            : "grid gap-2 md:grid-cols-3"
+      }
+    >
       {showStage ? (
-        <select
+        <FilterPopover
+          label="Stage"
           value={selectedStage}
-          onChange={(e) => onStageChange(e.target.value as StageFilter)}
-          className={selectClass}
-          aria-label="Filter by stage"
-        >
-          {stages.map((stage) => (
-            <option key={stage.value} value={stage.value}>
-              {stage.label}
-            </option>
-          ))}
-        </select>
+          options={stages}
+          placeholder="All stages"
+          onChange={(value) => onStageChange(value as StageFilter)}
+          searchable={stages.length > 6}
+          searchPlaceholder="Search stage"
+          emptyMessage="No stages found."
+          triggerClassName={resolvedLayout === "row" ? "w-full sm:w-[150px]" : "w-full sm:min-w-0"}
+        />
       ) : null}
 
-      <select
+      <FilterPopover
+        label="Batch"
         value={selectedBatch}
-        onChange={(e) => onBatchChange(e.target.value)}
-        className={selectClass}
+        options={batchOptions}
+        placeholder={batchesQuery.isLoading ? "Loading batches..." : "All batches"}
+        onChange={onBatchChange}
         disabled={batchesQuery.isLoading}
-        aria-label="Filter by batch"
-      >
-        <option value="all">All Batches</option>
-        {batchesQuery.isLoading ? <option value="" disabled>Loading batches...</option> : null}
-        {!batchesQuery.isLoading && batches.length === 0 ? <option value="" disabled>No batches found</option> : null}
-        {batches.map((batch) => (
-          <option key={batch.id} value={String(batch.id)}>
-            {batch.label || `Batch ${batch.id}`}
-          </option>
-        ))}
-      </select>
+        searchable
+        searchPlaceholder="Search batch"
+        emptyMessage="No batches found."
+        triggerClassName={resolvedLayout === "row" ? "w-full sm:w-[180px]" : "w-full sm:min-w-0"}
+      />
 
-      <select
+      <FilterPopover
+        label="Cage"
         value={selectedSystem}
-        onChange={(e) => onSystemChange(e.target.value)}
-        className={selectClass}
+        options={systemOptions}
+        placeholder={
+          systemsQuery.isLoading || (selectedBatch !== "all" && batchSystemsQuery.isLoading)
+            ? "Loading cages..."
+            : `All cages${showCounts && systemCount ? ` (${systemCount})` : ""}`
+        }
+        onChange={onSystemChange}
         disabled={systemsQuery.isLoading || (selectedBatch !== "all" && batchSystemsQuery.isLoading)}
-        aria-label="Filter by system"
-      >
-        <option value="all">All Systems</option>
-        {systemsQuery.isLoading || (selectedBatch !== "all" && batchSystemsQuery.isLoading) ? <option value="" disabled>Loading systems...</option> : null}
-        {!systemsQuery.isLoading && !(selectedBatch !== "all" && batchSystemsQuery.isLoading) && systems.length === 0 ? <option value="" disabled>No systems found</option> : null}
-        {systems.map((system) => (
-          <option key={system.id} value={String(system.id)}>
-            {system.label || `System ${system.id}`}
-          </option>
-        ))}
-      </select>
-      {showCounts ? (
-        <span className="text-xs text-muted-foreground sm:ml-1">
-          Systems: {systemCount} | Batches: {batchCount}
-        </span>
-      ) : null}
+        searchable
+        searchPlaceholder="Search cage"
+        emptyMessage="No cages found."
+        triggerClassName={
+          resolvedLayout === "row" ? "w-full sm:w-[220px] lg:w-[260px]" : "w-full sm:min-w-0 xl:min-w-[16rem]"
+        }
+        contentClassName="sm:w-[24rem]"
+      />
     </div>
   )
 }

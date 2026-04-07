@@ -77,7 +77,7 @@ export function WaterQualityDepthTab({
         legend: true,
         xGrid: true,
         yReverse: true,
-        xTitle: "Parameter value",
+        xTitle: "Measured value (mg/L or deg C)",
         yTitle: "Depth (m)",
         tooltip: {
           callbacks: {

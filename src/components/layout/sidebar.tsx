@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import {
   Activity,
   AlertTriangle,
@@ -73,6 +74,7 @@ export default function Sidebar({
   const searchParams = useSearchParams()
   const router = useRouter()
   const { signOut } = useAuth()
+  const { farm } = useActiveFarm()
   const [signingOut, setSigningOut] = useState(false)
   const [waterQualityOpen, setWaterQualityOpen] = useState(pathname.startsWith("/water-quality"))
   const [collapsedWaterQualityFlyoutOpen, setCollapsedWaterQualityFlyoutOpen] = useState(false)
@@ -134,7 +136,9 @@ export default function Sidebar({
         <div className="flex items-center justify-between px-4 py-3.5 md:hidden">
           <div>
             <h1 className="font-semibold text-base text-sidebar-foreground">AQ</h1>
-            <p className="text-[11px] text-sidebar-foreground/65">Aquasmart navigation</p>
+            <p className="max-w-[12rem] truncate text-[11px] text-sidebar-foreground/65">
+              {farm?.name ?? "Aquasmart"}
+            </p>
           </div>
           <button onClick={onToggle} className="rounded-xl p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
             <X size={20} />
@@ -149,7 +153,9 @@ export default function Sidebar({
             {!collapsed && (
               <div className="ml-3">
                 <p className="font-semibold leading-none text-sidebar-foreground">Aquasmart</p>
-                <p className="mt-1 text-[11px] text-sidebar-foreground/60">Operations</p>
+                <p className="mt-1 truncate text-[11px] text-sidebar-foreground/60">
+                  {farm?.name ?? "No farm selected"}
+                </p>
               </div>
             )}
             <button

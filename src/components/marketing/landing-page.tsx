@@ -139,7 +139,7 @@ export default function LandingPage() {
         </div>
 
         <header className="absolute inset-x-0 top-0 z-20 px-4 pt-5 md:px-6">
-          <div className="container mx-auto flex items-center justify-between gap-8 py-2 text-white">
+          <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 py-2 text-white">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
                 <Waves className="h-5 w-5" />
@@ -165,42 +165,59 @@ export default function LandingPage() {
 
             <Button
               variant="ghost"
-              className="hidden rounded-full bg-white/10 px-6 text-white hover:bg-white/18 hover:text-white md:inline-flex"
+              className="ml-auto h-9 rounded-full bg-white/10 px-4 text-sm text-white hover:bg-white/18 hover:text-white sm:px-5 md:ml-0 md:h-10 md:px-6"
               onClick={() => router.push("/auth")}
             >
               Sign In
             </Button>
+
+            <nav className="flex w-full flex-wrap items-center gap-2 text-xs font-medium tracking-[0.08em] text-white/82 md:hidden">
+              {navItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => scrollToId(item.href.slice(1))}
+                  className="rounded-full border border-white/15 bg-white/8 px-3 py-1.5 transition-colors hover:bg-white/14 hover:text-white"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
           </div>
         </header>
 
-        <div className="relative z-10 flex min-h-[calc(100vh-84px)] items-center px-4 py-20 md:px-6 md:py-24">
+        <div className="relative z-10 flex min-h-[calc(100svh-84px)] items-center px-4 py-20 md:min-h-[calc(100vh-84px)] md:px-6 md:py-24">
           <div className="container mx-auto">
-            <div className="flex flex-col items-center justify-between gap-16 md:flex-row">
+            <div className="flex flex-col items-center justify-between gap-12 md:flex-row md:gap-16">
               <div className="max-w-2xl text-center text-white md:text-left">
                 <div className="mb-8 inline-flex rounded-full border border-primary/50 bg-white/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/92">
                   SMART FARM MANAGEMENT MADE PRACTICAL
                 </div>
 
-                <h1 className="max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.02] tracking-[-0.04em] md:text-6xl lg:text-[4.5rem]">
-                  Making aquaculture operations smarter with
-                  <br />
+                <h1 className="max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-5xl md:text-6xl lg:text-[4.5rem]">
+                  Making aquaculture operations smarter
+                  <span className="block md:inline"> with </span>
                   <span className="text-primary">AquaSmart</span>
                 </h1>
 
-                <p className="mt-7 max-w-2xl text-base leading-8 text-white/84 md:text-[1.05rem]">
+                <p className="mt-7 max-w-2xl text-sm leading-7 text-white/84 sm:text-base sm:leading-8 md:text-[1.05rem]">
                   Monitor water quality, feeding, biomass, health, and reporting from one modern platform designed for
                   real fish farm workflows.
                 </p>
 
                 <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center md:justify-start">
-                  <Button className="rounded-full px-8 text-base" size="lg" onClick={() => scrollToId("platform")}>
+                  <Button
+                    className="w-full rounded-full px-8 text-base sm:w-auto"
+                    size="lg"
+                    onClick={() => scrollToId("platform")}
+                  >
                     Explore Platform
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="lg"
-                    className="rounded-full border-white/35 bg-transparent px-8 text-base text-white hover:bg-white/10 hover:text-white"
+                    className="w-full rounded-full border-white/35 bg-transparent px-8 text-base text-white hover:bg-white/10 hover:text-white sm:w-auto"
                     onClick={() => scrollToId("modules")}
                   >
                     View Modules
@@ -263,7 +280,7 @@ export default function LandingPage() {
           </h2>
 
           <div className="mt-16 flex flex-col items-center justify-center gap-14 md:flex-row md:gap-16">
-            <div className="space-y-6">
+            <div className="w-full space-y-6">
               {capabilities.slice(0, 2).map((item) => {
                 const Icon = item.icon
                 return (
@@ -280,7 +297,7 @@ export default function LandingPage() {
               })}
             </div>
 
-            <div className="w-full max-w-[320px]">
+            <div className="w-full max-w-[320px] self-center">
               <div className="overflow-hidden rounded-[30px] border border-border/80 bg-card shadow-[0_22px_55px_-36px_rgba(15,23,32,0.45)]">
                 <div className="relative aspect-[4/5] overflow-hidden">
                   <video
@@ -299,7 +316,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="w-full space-y-6">
               {capabilities.slice(2).map((item) => {
                 const Icon = item.icon
                 return (
@@ -337,7 +354,7 @@ export default function LandingPage() {
             <div className="relative">
               <div
                 ref={carouselRef}
-                className="flex snap-x snap-mandatory gap-8 overflow-x-auto pb-4 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 scroll-smooth md:gap-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 onMouseEnter={() => {
                   isCarouselPausedRef.current = true
                 }}
@@ -348,7 +365,7 @@ export default function LandingPage() {
                 {modules.map((module) => (
                   <article
                     key={module.title}
-                    className="min-w-[320px] snap-start rounded-[30px] bg-card p-6 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.45)] md:min-w-[390px]"
+                    className="min-w-[min(100%,18.5rem)] snap-start rounded-[30px] bg-card p-5 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.45)] sm:min-w-[320px] sm:p-6 md:min-w-[390px]"
                   >
                     <div className="relative h-52 overflow-hidden rounded-[24px]">
                       <Image src={module.imageSrc} alt={module.title} fill className="object-cover" />

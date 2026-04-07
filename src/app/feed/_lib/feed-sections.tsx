@@ -11,6 +11,7 @@ import {
   buildCartesianOptions,
   buildDailyDateDomain,
   buildMetricAxisBounds,
+  createVerticalGradient,
   getChartPalette,
   getDateAxisMaxTicks,
   withAlpha,
@@ -87,7 +88,7 @@ function ChartFrame({
     return <div className="h-[340px] flex items-center justify-center text-sm text-muted-foreground">{emptyLabel}</div>
   }
 
-  return <div className="h-[340px] rounded-xl border border-border/80 bg-muted/20 p-2">{children}</div>
+  return <div className="chart-canvas-shell h-[340px]">{children}</div>
 }
 
 export function FeedKpiStrip({
@@ -455,7 +456,7 @@ export function FeedRateSection({
           borderColor: palette.chart2,
           backgroundColor: withAlpha(palette.chart2, 0.08),
           borderDash: [4, 4],
-          borderWidth: 1.6,
+          borderWidth: 1.8,
           pointRadius: 0,
           spanGaps: true,
         },
@@ -463,8 +464,8 @@ export function FeedRateSection({
           label: "Target corridor",
           data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.upperBand)),
           borderColor: withAlpha(palette.chart2, 0.7),
-          backgroundColor: withAlpha(palette.chart2, 0.14),
-          borderWidth: 1.6,
+          backgroundColor: createVerticalGradient(palette.chart2, 0.2, 0.03),
+          borderWidth: 2,
           pointRadius: 0,
           fill: "-1",
           spanGaps: true,
@@ -473,9 +474,10 @@ export function FeedRateSection({
           label: item.label,
           data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.[item.key])),
           borderColor: item.color,
-          backgroundColor: item.color,
-          borderWidth: 2.2,
+          backgroundColor: createVerticalGradient(item.color, 0.22, 0.02),
+          borderWidth: 2.4,
           pointRadius: 0,
+          pointHoverRadius: 4,
           spanGaps: true,
         })),
       ],
@@ -498,6 +500,7 @@ export function FeedRateSection({
       min: yBounds.min,
       max: yBounds.max,
       xMaxTicksLimit: xLimit,
+      xTitle: "Date",
       yTickFormatter: (value) => `${Number(value).toFixed(1)}%`,
       yTitle: "Feed rate (% biomass)",
       tooltip: {
@@ -515,11 +518,11 @@ export function FeedRateSection({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-1">
         <CardTitle>Feed Rate vs Target</CardTitle>
         <CardDescription>Feed offered as percent of biomass against the scoped target corridor.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-2">
         {series.length > 0 ? (
           <div className="mb-4 legend-pills">
             <div className="legend-pill"><span className="legend-pill-swatch bg-chart-2" /> Target corridor</div>
@@ -583,9 +586,9 @@ export function FeedFcrSection({
         label: item.label,
         data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.[item.key])),
         borderColor: item.color,
-        backgroundColor: item.color,
-        borderWidth: 1.8,
-        pointRadius: 2,
+        backgroundColor: createVerticalGradient(item.color, 0.18, 0.02),
+        borderWidth: 2.4,
+        pointRadius: 0,
         pointHoverRadius: 4,
         spanGaps: true,
       })),
@@ -602,8 +605,9 @@ export function FeedFcrSection({
     return buildCartesianOptions({
       palette,
       min: yBounds.min,
-      max: Math.max(1.5, yBounds.max ?? 1.5),
+      max: yBounds.max,
       xMaxTicksLimit: xLimit,
+      xTitle: "Sampling interval end date",
       yTickFormatter: (value) => Number(value).toFixed(2),
       yTitle: "FCR",
       tooltip: {
@@ -621,11 +625,11 @@ export function FeedFcrSection({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-1">
         <CardTitle>FCR Trend</CardTitle>
         <CardDescription>Interval feed efficiency by cage with target checks handled in the exception rail.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-2">
         {series.length > 0 ? (
           <div className="mb-4 legend-pills">
             {series.map((item) => (

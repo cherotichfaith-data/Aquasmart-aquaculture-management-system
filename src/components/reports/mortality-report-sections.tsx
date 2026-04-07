@@ -72,6 +72,8 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
         min: yBounds.min,
         max: yBounds.max,
         xMaxTicksLimit: xLimit,
+        xTitle: "Date",
+        yTitle: "Mortality (fish)",
         yTickFormatter: (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 }),
         tooltip: {
           callbacks: {
@@ -129,6 +131,8 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
         palette,
         min: 0,
         max: Math.ceil(maxValue * 1.1),
+        xTitle: "Cause",
+        yTitle: "Mortality (fish)",
         yTickFormatter: (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 }),
         tooltip: {
           callbacks: {
