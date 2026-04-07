@@ -171,18 +171,6 @@ export default function LandingPage() {
               Sign In
             </Button>
 
-            <nav className="flex w-full flex-wrap items-center gap-2 text-xs font-medium tracking-[0.08em] text-white/82 md:hidden">
-              {navItems.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => scrollToId(item.href.slice(1))}
-                  className="rounded-full border border-white/15 bg-white/8 px-3 py-1.5 transition-colors hover:bg-white/14 hover:text-white"
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
           </div>
         </header>
 

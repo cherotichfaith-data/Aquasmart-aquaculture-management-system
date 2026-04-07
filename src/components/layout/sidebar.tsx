@@ -107,7 +107,7 @@ export default function Sidebar({
   const desktopWidthClass = collapsed ? "md:w-[4.75rem]" : "md:w-[14.5rem] xl:w-[15.5rem]"
   const navItemClass = (active: boolean, compact = false) =>
     `flex items-center rounded-2xl transition-colors ${
-      compact ? "justify-center px-2.5 py-2.5" : "gap-3 px-3 py-2.5"
+      compact ? "gap-3 px-3 py-2.5 md:justify-center md:gap-0 md:px-2.5" : "gap-3 px-3 py-2.5"
     } ${
       active
         ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
@@ -172,39 +172,89 @@ export default function Sidebar({
         <nav className="flex-1 space-y-4 overflow-y-auto px-2.5 py-3 md:px-3 md:py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           {navigationSections.map((section) => (
             <div key={section.title} className="space-y-1.5">
-              {!collapsed ? (
-                <p className="px-3 text-[9px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">
-                  {section.title}
-                </p>
-              ) : null}
+              <p
+                className={`px-3 text-[9px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45 ${
+                  collapsed ? "md:hidden" : ""
+                }`}
+              >
+                {section.title}
+              </p>
               <div className="space-y-1.5">
                 {section.items.map((item) => {
             if (item.href === "/water-quality") {
               const Icon = item.icon
               if (collapsed) {
                 return (
-                  <div
-                    key={item.href}
-                    className="relative"
-                    onMouseEnter={() => setCollapsedWaterQualityFlyoutOpen(true)}
-                    onMouseLeave={() => setCollapsedWaterQualityFlyoutOpen(false)}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setCollapsedWaterQualityFlyoutOpen((prev) => !prev)}
-                      className={navItemClass(waterQualityActive || collapsedWaterQualityFlyoutOpen, true)}
-                      title={item.name}
-                      aria-label="Open water quality navigation"
-                      aria-expanded={collapsedWaterQualityFlyoutOpen}
+                  <div key={item.href}>
+                    <div
+                      className="relative hidden md:block"
+                      onMouseEnter={() => setCollapsedWaterQualityFlyoutOpen(true)}
+                      onMouseLeave={() => setCollapsedWaterQualityFlyoutOpen(false)}
                     >
-                      <Icon className="h-4 w-4" />
-                    </button>
-                    {collapsedWaterQualityFlyoutOpen ? (
-                      <div className="absolute left-[calc(100%+0.65rem)] top-1/2 z-50 hidden w-56 -translate-y-1/2 rounded-[1.15rem] border border-sidebar-border bg-sidebar/95 p-2 shadow-[0_24px_54px_-28px_rgba(15,23,32,0.42)] backdrop-blur-xl md:block">
-                        <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/55">
-                          Water Quality
+                      <button
+                        type="button"
+                        onClick={() => setCollapsedWaterQualityFlyoutOpen((prev) => !prev)}
+                        className={navItemClass(waterQualityActive || collapsedWaterQualityFlyoutOpen, true)}
+                        title={item.name}
+                        aria-label="Open water quality navigation"
+                        aria-expanded={collapsedWaterQualityFlyoutOpen}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                      {collapsedWaterQualityFlyoutOpen ? (
+                        <div className="absolute left-[calc(100%+0.65rem)] top-1/2 z-50 hidden w-56 -translate-y-1/2 rounded-[1.15rem] border border-sidebar-border bg-sidebar/95 p-2 shadow-[0_24px_54px_-28px_rgba(15,23,32,0.42)] backdrop-blur-xl md:block">
+                          <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/55">
+                            Water Quality
+                          </div>
+                          <div className="space-y-1">
+                            {waterQualityLinks.map((link) => {
+                              const isActive =
+                                (link.activeKey === "overview" && overviewActive) ||
+                                (link.activeKey === "parameter" && parameterActive) ||
+                                (link.activeKey === "environment" && environmentActive) ||
+                                (link.activeKey === "depth" && depthProfileActive) ||
+                                (link.activeKey === "alerts" && alertsActive) ||
+                                (link.activeKey === "sensors" && sensorsActive)
+
+                              return (
+                                <Link
+                                  key={link.href}
+                                  href={link.href}
+                                  className={waterQualityLinkClass(isActive)}
+                                  onClick={() => {
+                                    setCollapsedWaterQualityFlyoutOpen(false)
+                                    handleMobileNavigate()
+                                  }}
+                                >
+                                  {link.label}
+                                </Link>
+                              )
+                            })}
+                          </div>
                         </div>
-                        <div className="space-y-1">
+                      ) : null}
+                    </div>
+                    <div className="md:hidden">
+                      <div className={navItemClass(waterQualityActive)}>
+                        <Link href={item.href} onClick={handleMobileNavigate} className="flex items-center gap-3 flex-1">
+                          <Icon className="h-4 w-4" />
+                          <span className="min-w-0 truncate text-sm font-medium">{item.name}</span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            setWaterQualityOpen((prev) => !prev)
+                          }}
+                          className="rounded-xl p-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${waterQualityOpen ? "rotate-180" : ""}`} />
+                        </button>
+                      </div>
+                      {waterQualityOpen && (
+                        <div className="ml-5 mt-1.5 space-y-1">
                           {waterQualityLinks.map((link) => {
                             const isActive =
                               (link.activeKey === "overview" && overviewActive) ||
@@ -218,19 +268,16 @@ export default function Sidebar({
                               <Link
                                 key={link.href}
                                 href={link.href}
+                                onClick={handleMobileNavigate}
                                 className={waterQualityLinkClass(isActive)}
-                                onClick={() => {
-                                  setCollapsedWaterQualityFlyoutOpen(false)
-                                  handleMobileNavigate()
-                                }}
                               >
                                 {link.label}
                               </Link>
                             )
                           })}
                         </div>
-                      </div>
-                    ) : null}
+                      )}
+                    </div>
                   </div>
                 )
               }
@@ -296,7 +343,7 @@ export default function Sidebar({
                 title={collapsed ? item.name : undefined}
               >
                 <Icon className="h-4 w-4" />
-                {!collapsed && <span className="min-w-0 truncate text-sm font-medium">{item.name}</span>}
+                <span className={`min-w-0 truncate text-sm font-medium ${collapsed ? "md:hidden" : ""}`}>{item.name}</span>
               </Link>
             )
                 })}
@@ -322,7 +369,9 @@ export default function Sidebar({
             title={collapsed ? "Log out" : undefined}
           >
             <LogOut className="h-4 w-4" />
-            {!collapsed && <span className="text-sm font-medium">{signingOut ? "Logging out..." : "Log out"}</span>}
+            <span className={`text-sm font-medium ${collapsed ? "md:hidden" : ""}`}>
+              {signingOut ? "Logging out..." : "Log out"}
+            </span>
           </button>
         </div>
       </aside>
