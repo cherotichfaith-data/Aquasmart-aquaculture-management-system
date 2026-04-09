@@ -53,7 +53,7 @@ const modules = [
       "Watch pond and tank conditions in real time and surface threshold breaches before they become production losses.",
     metric: "92%",
     metricLabel: "systems within target range",
-    imageSrc: "https://upload.wikimedia.org/wikipedia/commons/2/2b/Aquaculture_Tank.jpg",
+    imageSrc: "/Multi-region-aquaculture-scaled.webp",
   },
   {
     category: "FEED CONTROL",
@@ -62,7 +62,7 @@ const modules = [
       "Connect feed plans, actual issue records, and performance outcomes so operators can act before waste compounds.",
     metric: "1.42",
     metricLabel: "rolling eFCR",
-    imageSrc: "https://upload.wikimedia.org/wikipedia/commons/1/1e/Burundi_-_Lake_Tanganyika_fisheries.jpg",
+    imageSrc: "/tanga_tilapia4.jpg",
   },
   {
     category: "STOCK HEALTH",
@@ -71,7 +71,7 @@ const modules = [
       "Record abnormal events, suspected causes, and interventions in one structured timeline instead of scattered notes.",
     metric: "14d",
     metricLabel: "trend window",
-    imageSrc: "https://upload.wikimedia.org/wikipedia/commons/3/3f/Tilapia_fish_%2C.jpg",
+    imageSrc: "/cage mapping.png",
   },
   {
     category: "MANAGEMENT VIEW",
@@ -80,7 +80,7 @@ const modules = [
       "Give managers a clear view of biomass, survival, feed efficiency, and operational pressure across the farm.",
     metric: "24/7",
     metricLabel: "operational visibility",
-    imageSrc: "https://upload.wikimedia.org/wikipedia/commons/0/0c/Lake_tanganyika.jpg",
+    imageSrc: "/Multi-region-aquaculture-scaled.webp",
   },
 ]
 

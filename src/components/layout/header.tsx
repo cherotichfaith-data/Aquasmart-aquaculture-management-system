@@ -8,7 +8,7 @@ import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-pe
 import { FilterPopover } from "@/components/shared/filter-popover"
 import { useSharedFilters } from "@/lib/hooks/app/use-shared-filters"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -245,6 +245,18 @@ export default function Header({
     return r.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
   }
 
+  const userInitial = useMemo(() => {
+    const nameCandidate = [
+      user?.user_metadata?.first_name,
+      user?.user_metadata?.full_name,
+      user?.user_metadata?.name,
+      user?.email,
+    ].find((value): value is string => typeof value === "string" && value.trim().length > 0)
+
+    const firstToken = nameCandidate?.trim().split(/[\s@._-]+/).find(Boolean) ?? ""
+    return firstToken.charAt(0).toUpperCase() || "U"
+  }, [user?.email, user?.user_metadata])
+
   useEffect(() => {
     if (typeof window === "undefined") return
 
@@ -308,12 +320,12 @@ export default function Header({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="topbar-control relative h-10 w-10 rounded-2xl cursor-pointer hover:bg-accent/70 hover:text-accent-foreground"
+                  size="icon-lg"
+                  className="topbar-control relative rounded-full p-0 hover:bg-accent/70 hover:text-accent-foreground"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-4 px-1 h-4 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center">
+                    <span className="absolute right-0 top-0 flex h-4 min-w-4 translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] text-destructive-foreground">
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
@@ -361,11 +373,13 @@ export default function Header({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="topbar-control relative h-10 w-10 rounded-2xl cursor-pointer hover:bg-accent/70 hover:text-accent-foreground"
+                  size="icon-lg"
+                  className="topbar-control relative rounded-full p-0 hover:bg-accent/70 hover:text-accent-foreground"
                 >
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src="/avatars/01.png" alt={user?.email || "User"} />
-                    <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                  <Avatar className="size-full">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {userInitial}
+                    </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
