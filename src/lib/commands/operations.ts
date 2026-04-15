@@ -20,7 +20,7 @@ export type SamplingInput = Insert<"fish_sampling_weight">
 export type StockingInput = Insert<"fish_stocking">
 export type TransferInput = Insert<"fish_transfer">
 export type WaterQualityInput = Insert<"water_quality_measurement">[]
-export type FeedInventorySnapshotInput = Insert<"feed_inventory_snapshot">
+export type FeedInventorySnapshotInput = Insert<"feed_incoming">
 export type MortalityInput = Insert<"fish_mortality">
 export type SystemInput = Insert<"system">
 
@@ -45,7 +45,7 @@ export function recordWaterQuality(payload: WaterQualityInput) {
 }
 
 export function recordFeedInventorySnapshot(payload: FeedInventorySnapshotInput) {
-  return postJson<MutationResponse<"feed_inventory_snapshot">, FeedInventorySnapshotInput>(
+  return postJson<MutationResponse<"feed_incoming">, FeedInventorySnapshotInput>(
     "/api/feed-inventory/record",
     payload,
   )

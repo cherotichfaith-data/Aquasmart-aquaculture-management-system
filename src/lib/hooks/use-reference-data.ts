@@ -42,7 +42,9 @@ export function useCreateFingerlingBatch() {
   return useWriteThroughMutation({
     mutationFn: createFingerlingBatch,
     invalidate: ({ queryClient, payload }) =>
-      invalidateReferenceDataQueries(queryClient, { kind: "batches", farmId: payload.farm_id }),
+      payload.farm_id
+        ? invalidateReferenceDataQueries(queryClient, { kind: "batches", farmId: payload.farm_id })
+        : Promise.resolve(),
     successMessage: "Batch created.",
     errorMessage: "Failed to create batch.",
   })

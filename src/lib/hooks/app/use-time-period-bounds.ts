@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import {
   buildTimeBoundsFromAvailableRange,
   fetchTimePeriodBounds,
+  type AnalyticsTimeScope,
   type TimeBounds,
   type TimePeriod,
 } from "@/lib/time-period"
@@ -17,6 +18,7 @@ export function useTimePeriodBounds(params: {
   farmId?: string | null
   timePeriod: TimePeriod
   systemId?: number
+  scope?: AnalyticsTimeScope
   enabled?: boolean
   initialData?: TimeBounds
 }) {
@@ -35,7 +37,7 @@ export function useTimePeriodBounds(params: {
         : fetchTimePeriodBounds(supabase, {
             farmId: params.farmId,
             timePeriod: params.timePeriod,
-            scope: "dashboard",
+            scope: params.scope ?? "dashboard",
             signal,
           }),
     enabled,
@@ -57,9 +59,9 @@ export function useTimePeriodBounds(params: {
       timePeriod: params.timePeriod,
       availableFromDate: timeline.fullStart,
       latestAvailableDate: timeline.fullEnd,
-      anchorScope: "selected_system",
+      anchorScope: `${params.scope ?? "dashboard"}:system`,
     })
-  }, [params.initialData, params.systemId, params.timePeriod, query.data, systemTimelineQuery.data])
+  }, [params.initialData, params.scope, params.systemId, params.timePeriod, query.data, systemTimelineQuery.data])
 
   const start = resolvedBounds.start ?? null
   const end = resolvedBounds.end ?? null

@@ -5,7 +5,7 @@ export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
     const nextParam = searchParams.get('next')
-    const next = nextParam && nextParam.startsWith('/') ? nextParam : '/'
+    const next = nextParam && nextParam.startsWith('/') ? nextParam : '/auth'
 
     const error = searchParams.get('error')
     const errorCode = searchParams.get('error_code')

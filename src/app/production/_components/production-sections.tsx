@@ -41,7 +41,11 @@ export function ProductionSections({
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-none transition-colors hover:bg-muted/35 hover:text-foreground"
+            >
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>

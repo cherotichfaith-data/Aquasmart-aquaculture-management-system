@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/lib/hooks/app/use-toast"
+import { hasPendingSyncMeta } from "@/lib/offline/result"
 import {
   addOptimisticActivity,
   addOptimisticRecentEntry,
@@ -51,15 +52,24 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
       return { previous }
     },
     onSuccess: async (result, payload) => {
-      await config.invalidate?.({ queryClient, payload, result })
-      toast({ title: "Success", description: config.successMessage })
+      const pendingSync = hasPendingSyncMeta(result) && Boolean(result.meta.pendingSync)
+
+      if (!pendingSync) {
+        await config.invalidate?.({ queryClient, payload, result })
+      }
+
+      toast({
+        title: pendingSync ? "Saved Offline" : "Success",
+        description: pendingSync ? "Saved locally and queued for sync." : config.successMessage,
+      })
     },
-    onError: (error: any, _payload, context) => {
+    onError: (error: unknown, _payload, context) => {
       restoreRecentEntries(queryClient, context?.previous)
+      const message = error instanceof Error ? error.message : config.errorMessage
       toast({
         variant: "destructive",
         title: "Error",
-        description: error?.message ?? config.errorMessage,
+        description: message,
       })
     },
   })

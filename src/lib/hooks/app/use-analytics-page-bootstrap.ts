@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import type { TimeBounds } from "@/lib/time-period"
+import type { AnalyticsTimeScope, TimeBounds } from "@/lib/time-period"
 import {
   useSharedFilters,
   type SharedFiltersState,
@@ -36,6 +36,7 @@ export function useAnalyticsPageBootstrap(params: {
   filterOverrides?: SharedFilterOverrides
   initialBounds?: TimeBounds
   boundsEnabled?: boolean
+  boundsScope?: AnalyticsTimeScope
 } = {}) {
   const initialFarmId = normalizeFarmId(params.initialFarmId)
   const activeFarm = useActiveFarm({ initialFarmId })
@@ -91,6 +92,7 @@ export function useAnalyticsPageBootstrap(params: {
     farmId,
     timePeriod: sharedFilters.timePeriod,
     systemId: selectedSystemId,
+    scope: params.boundsScope ?? "dashboard",
     enabled: params.boundsEnabled,
     initialData: params.initialBounds,
   })

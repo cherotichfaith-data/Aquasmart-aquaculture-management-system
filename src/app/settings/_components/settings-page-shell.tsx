@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertCircle, Check } from "lucide-react"
+import Link from "next/link"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataErrorState } from "@/components/shared/data-states"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -95,11 +96,24 @@ export function SettingsPageShell({
           </div>
         ) : null}
         {missingFarmAssignment ? (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-3">
-            <AlertCircle className="text-amber-700 dark:text-amber-300" size={20} />
-            <p className="text-amber-800 dark:text-amber-200 font-medium">
-              No farm workspace exists for this account yet. You should be redirected to the onboarding flow to create one.
-            </p>
+          <div className="rounded-[1.5rem] border border-amber-500/30 bg-amber-500/10 p-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 text-amber-700 dark:text-amber-300" size={20} />
+              <div className="space-y-4">
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-100">Set up or join a farm first</p>
+                  <p className="mt-2 text-sm leading-6 text-amber-800/90 dark:text-amber-200">
+                    AquaSmart settings are only available after you have farm access.
+                  </p>
+                </div>
+                <Link
+                  href="/onboarding"
+                  className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                >
+                  Go to onboarding
+                </Link>
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -111,9 +125,13 @@ export function SettingsPageShell({
               onRetry={onRetryLoad}
             />
           ) : null}
-          <FarmInformationSection settings={settings} handleChange={onChange} />
-          <AlertThresholdsSection settings={settings} handleChange={onChange} />
-          <SaveSettingsButton isSaving={isSaving} disabled={missingFarmAssignment} onSave={onSave} />
+          {missingFarmAssignment ? null : (
+            <>
+              <FarmInformationSection settings={settings} handleChange={onChange} />
+              <AlertThresholdsSection settings={settings} handleChange={onChange} />
+              <SaveSettingsButton isSaving={isSaving} disabled={missingFarmAssignment} onSave={onSave} />
+            </>
+          )}
         </div>
       </div>
     </DashboardLayout>

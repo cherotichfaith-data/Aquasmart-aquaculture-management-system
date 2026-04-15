@@ -11,11 +11,11 @@ export type SettingsFormState = {
 }
 
 export const DEFAULT_SETTINGS: SettingsFormState = {
-  farmName: "AquaSmart Farm 1",
-  location: "Lake Zone - Kimbwela",
-  owner: "John Doe",
-  email: "john@aquafarm.com",
-  phone: "+255 123 456 789",
+  farmName: "",
+  location: "",
+  owner: "",
+  email: "",
+  phone: "",
   role: "farm_manager",
   lowDoThreshold: 5.0,
   highAmmoniaThreshold: 0.05,

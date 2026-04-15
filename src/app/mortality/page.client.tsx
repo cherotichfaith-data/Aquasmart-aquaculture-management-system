@@ -37,6 +37,7 @@ export default function MortalityPage() {
     dateTo,
   } = useAnalyticsPageBootstrap({
     defaultTimePeriod: "quarter",
+    boundsScope: "production",
   })
 
   const todayDate = dateTo ?? new Date().toISOString().slice(0, 10)

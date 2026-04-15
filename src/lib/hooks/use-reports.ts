@@ -7,8 +7,6 @@ import { queryKeys } from "@/lib/cache/query-keys"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
   getBatchSystemIds,
-  getFeedPlans,
-  getFarmKpisToday,
   getFcrTrend,
   getFeedingRecords,
   getGrowthTrend,
@@ -26,6 +24,8 @@ import type {
   FeedingRecordWithType,
 } from "@/lib/api/reports"
 
+const DISABLE_AUTO_REFETCH_IN_DEV = process.env.NODE_ENV !== "production"
+
 function reportsQueryOptions<TResult>(params: {
   queryKey: readonly unknown[]
   queryFn: (context: { signal: AbortSignal }) => Promise<TResult>
@@ -33,6 +33,7 @@ function reportsQueryOptions<TResult>(params: {
   staleTime: number
   initialData?: TResult
   refetchOnWindowFocus?: boolean
+  refetchOnMount?: boolean | "always"
 }) {
   return queryOptions({
     queryKey: params.queryKey,
@@ -40,8 +41,14 @@ function reportsQueryOptions<TResult>(params: {
     enabled: params.enabled,
     staleTime: params.staleTime,
     initialData: params.enabled ? params.initialData : undefined,
-    initialDataUpdatedAt: params.enabled && params.initialData ? 0 : undefined,
+    initialDataUpdatedAt:
+      params.enabled && params.initialData
+        ? DISABLE_AUTO_REFETCH_IN_DEV
+          ? Date.now()
+          : 0
+        : undefined,
     refetchOnWindowFocus: params.refetchOnWindowFocus,
+    refetchOnMount: params.refetchOnMount,
   })
 }
 
@@ -84,23 +91,6 @@ async function collectScopedTrendRows<T>(params: {
   return { status: "success", data }
 }
 
-export function useFarmKpisToday(params?: {
-  farmId?: string | null
-  enabled?: boolean
-}) {
-  const { session } = useAuth()
-  const { farmId } = useActiveFarm()
-  const resolvedFarmId = params?.farmId ?? farmId
-  return useQuery(
-    reportsQueryOptions({
-      queryKey: queryKeys.reports.farmKpisToday(resolvedFarmId),
-      queryFn: ({ signal }) => getFarmKpisToday({ farmId: resolvedFarmId, signal }),
-      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
-      staleTime: 60_000,
-    }),
-  )
-}
-
 export function useRunningStock(params?: {
   farmId?: string | null
   enabled?: boolean
@@ -112,27 +102,6 @@ export function useRunningStock(params?: {
     reportsQueryOptions({
       queryKey: queryKeys.reports.runningStock(resolvedFarmId),
       queryFn: ({ signal }) => getRunningStock({ farmId: resolvedFarmId, signal }),
-      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
-      staleTime: 60_000,
-    }),
-  )
-}
-
-export function useFeedPlans(params?: {
-  farmId?: string | null
-  systemIds?: number[]
-  batchId?: number
-  dateFrom?: string
-  dateTo?: string
-  enabled?: boolean
-}) {
-  const { session } = useAuth()
-  const { farmId } = useActiveFarm()
-  const resolvedFarmId = params?.farmId ?? farmId
-  return useQuery(
-    reportsQueryOptions({
-      queryKey: queryKeys.reports.feedPlans({ ...params, farmId: resolvedFarmId }),
-      queryFn: ({ signal }) => getFeedPlans({ ...params, farmId: resolvedFarmId, signal }),
       enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
       staleTime: 60_000,
     }),
@@ -383,6 +352,7 @@ export function useRecentEntries(params?: {
       queryFn: ({ signal }) => getRecentEntries(resolvedFarmId, signal),
       enabled: Boolean(session) && Boolean(resolvedFarmId),
       staleTime: 5 * 60_000,
+      refetchOnMount: DISABLE_AUTO_REFETCH_IN_DEV ? false : undefined,
       initialData: params?.initialData,
     }),
   )

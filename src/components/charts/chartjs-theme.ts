@@ -162,20 +162,20 @@ type ChartPalette = {
 }
 
 const FALLBACK_PALETTE: ChartPalette = {
-  text: "#18324a",
-  muted: "#5b7389",
-  grid: "rgba(127, 140, 141, 0.18)",
-  border: "#dce9f4",
+  text: "#183646",
+  muted: "#567582",
+  grid: "rgba(78, 112, 124, 0.18)",
+  border: "#cce6eb",
   card: "#ffffff",
-  tooltipBackground: "rgba(44, 62, 80, 0.8)",
-  tooltipBorder: "rgba(236, 240, 241, 0.14)",
-  tooltipForeground: "#f8fbff",
+  tooltipBackground: "rgba(10, 35, 45, 0.8)",
+  tooltipBorder: "rgba(217, 239, 244, 0.2)",
+  tooltipForeground: "#eefbfd",
   primary: "#22c55e",
   chart1: "#22c55e",
   chart2: "#16a34a",
-  chart3: "#2563eb",
-  chart4: "#1d4ed8",
-  chart5: "#1e3a8a",
+  chart3: "#4fd1f5",
+  chart4: "#1d9ed8",
+  chart5: "#123a4b",
   destructive: "#ef4444",
 }
 
@@ -344,6 +344,8 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
   max,
   rightMin,
   rightMax,
+  lockYBounds = false,
+  lockRightYBounds = false,
   extraScales,
 }: {
   palette: ChartPalette
@@ -369,6 +371,8 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
   max?: number
   rightMin?: number
   rightMax?: number
+  lockYBounds?: boolean
+  lockRightYBounds?: boolean
   extraScales?: Record<string, any>
 }): ChartOptions<TType> {
   return {
@@ -453,8 +457,8 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
               },
             }
           : undefined,
-        min,
-        max,
+        min: lockYBounds ? min : undefined,
+        max: lockYBounds ? max : undefined,
       },
       ...(yRightTickFormatter || yRightTitle || rightMin != null || rightMax != null
         ? {
@@ -479,8 +483,8 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
                     },
                   }
                 : undefined,
-              min: rightMin,
-              max: rightMax,
+              min: lockRightYBounds ? rightMin : undefined,
+              max: lockRightYBounds ? rightMax : undefined,
             },
           }
         : {}),

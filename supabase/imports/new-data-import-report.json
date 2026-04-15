@@ -1,0 +1,204 @@
+{
+  "generated_at": "2026-04-09T06:58:35.865Z",
+  "input_dir": "C:\\Users\\Admin\\Downloads\\New data",
+  "assumptions": [
+    "The target Supabase environment already has exactly one farm row. The generated SQL aborts otherwise.",
+    "Historical cage renaming is normalized as C1 -> A1, C4 -> A4, and C6 -> A6 based on the workbook note that a new cage naming system started on March 3, 2026.",
+    "Only data for the new stocking cohort starting on 2026-02-09 is imported.",
+    "Feed inventory open-bag values are treated as grams when entered as integers without a decimal point, then converted to kilograms.",
+    "Rows that explicitly represent no feeding, blank lines, or transfers without weight/ABW are skipped and listed under skipped_rows.",
+    "Rows with missing batch provenance outside stocking events are imported with nullable batch_id, except where a latest stocking batch can be resolved by system and date at insert time."
+  ],
+  "counts": {
+    "systems": 8,
+    "feed_types": 6,
+    "fingerling_suppliers": 2,
+    "fingerling_batches": 5,
+    "feed_inventory_snapshot_rows": 442,
+    "fish_stocking_rows": 5,
+    "feeding_record_rows": 150,
+    "fish_sampling_rows": 9,
+    "fish_mortality_rows": 18,
+    "fish_transfer_rows": 0,
+    "water_quality_rows": 72
+  },
+  "skipped_rows": [
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 213,
+      "reason": "Blank or non-system feed row",
+      "row": [
+        "1/28/26",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 415,
+      "reason": "Missing or non-numeric feeding amount",
+      "row": [
+        "3/12/26",
+        "B",
+        "B1",
+        null,
+        "0.5-1.0mm Aller till pro 44%",
+        null,
+        "No feeding due to mortality issues"
+      ]
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 443,
+      "reason": "Missing or non-numeric feeding amount",
+      "row": [
+        "3/16/26",
+        "B",
+        "B1",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 450,
+      "reason": "Missing or non-numeric feeding amount",
+      "row": [
+        "3/17/26",
+        "B",
+        "B1",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "file": "Mortality (cages) (1).xlsx",
+      "row_number": 127,
+      "reason": "Mortality row missing required values",
+      "row": [
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "file": "Fish Transfer.xlsx",
+      "row_number": 20,
+      "reason": "Transfer row missing date, origin, weight, or ABW",
+      "row": [
+        "12/29/25",
+        "KIPILI FARM",
+        "KIMBWELA  Pond 3 ",
+        "HATCHERY UNIT",
+        "55000",
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "file": "Fish Transfer.xlsx",
+      "row_number": 21,
+      "reason": "Transfer row missing date, origin, weight, or ABW",
+      "row": [
+        "1/5/26",
+        "KIPILI FARM",
+        "KIMBWELA  Pond 3 ",
+        "HATCHERY UNIT",
+        "55000",
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "file": "Fish Transfer.xlsx",
+      "row_number": 22,
+      "reason": "Transfer row missing date, origin, weight, or ABW",
+      "row": [
+        "1/7/26",
+        "C7",
+        "KIMBWELA pond 4",
+        "HATCHERY UNIT",
+        "225",
+        null,
+        null,
+        null
+      ]
+    }
+  ],
+  "inferred_rows": [
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 250,
+      "field": "feeding_response",
+      "inferred_value": "fair",
+      "reason": "Filled from nearest surrounding daily records."
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 265,
+      "field": "feed_type",
+      "inferred_value": "0.9-1mm Aller till pro 44%",
+      "reason": "Filled from adjacent rows for the same system."
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 523,
+      "field": "feeding_response",
+      "inferred_value": "very_good",
+      "reason": "Filled from nearest surrounding daily records."
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 524,
+      "field": "feeding_response",
+      "inferred_value": "very_good",
+      "reason": "Filled from nearest surrounding daily records."
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 527,
+      "field": "feeding_response",
+      "inferred_value": "good",
+      "reason": "Filled from nearest surrounding daily records."
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 528,
+      "field": "feeding_response",
+      "inferred_value": "good",
+      "reason": "Filled from nearest surrounding daily records."
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 529,
+      "field": "feeding_response",
+      "inferred_value": "good",
+      "reason": "Filled from nearest surrounding daily records."
+    },
+    {
+      "file": "Feed record (1).xlsx",
+      "row_number": 530,
+      "field": "feeding_response",
+      "inferred_value": "very_good",
+      "reason": "Filled from nearest surrounding daily records."
+    },
+    {
+      "file": "Mortality (cages) (1).xlsx",
+      "row_number": 112,
+      "field": "system_name/number_of_fish_mortality",
+      "inferred_value": "B1 (HAPA 2) / 1083",
+      "reason": "Recovered from packed mortality cell containing both count and hapa label."
+    }
+  ]
+}

@@ -14,6 +14,7 @@ const harvestSchema = z.object({
   total_weight_harvest: z.number().min(0),
   type_of_harvest: z.enum(["partial", "final"]),
   abw: z.number().min(0),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -41,9 +42,15 @@ export async function POST(request: Request) {
     total_weight_harvest: payload.total_weight_harvest,
     type_of_harvest: payload.type_of_harvest,
     abw: payload.abw,
+    local_id: payload.local_id ?? null,
+    synced_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase.from("fish_harvest").insert(insertPayload).select().single()
+  const { data, error } = await supabase
+    .from("fish_harvest")
+    .upsert(insertPayload, { onConflict: "local_id" })
+    .select()
+    .maybeSingle()
 
   if (error || !data) {
     logSbError("harvest:record:insert", error)

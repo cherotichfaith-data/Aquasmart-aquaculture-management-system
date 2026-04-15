@@ -180,17 +180,9 @@ async function getActivities(
   supabase: ServerClient,
   params: { dateFrom: string; dateTo: string; limit: number },
 ): Promise<WaterQualityActivityRow[]> {
-  const { data, error } = await supabase
-    .from("change_log")
-    .select("*")
-    .eq("table_name", "water_quality_measurement")
-    .gte("change_time", `${params.dateFrom}T00:00:00`)
-    .lte("change_time", `${params.dateTo}T23:59:59`)
-    .order("change_time", { ascending: false })
-    .limit(params.limit)
-
-  if (error) return []
-  return (data ?? []) as WaterQualityActivityRow[]
+  void supabase
+  void params
+  return []
 }
 
 async function loadWaterQualityPageInitialData(

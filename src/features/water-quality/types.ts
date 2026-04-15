@@ -29,7 +29,15 @@ export type WaterQualityRatingRow = Database["public"]["Views"]["api_daily_water
 export type WaterQualityMeasurementViewRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 export type WaterQualityThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 export type WaterQualityOverlayRow = Database["public"]["Functions"]["api_daily_overlay"]["Returns"][number]
-export type WaterQualityActivityRow = Database["public"]["Tables"]["change_log"]["Row"]
+export type WaterQualityActivityRow = {
+  id: string | number
+  table_name: string | null
+  change_type: Enums<"change_type_enum"> | null
+  column_name: string | null
+  change_time: string | null
+  record_id?: string | number | null
+  new_value?: string | null
+}
 export type WaterQualityPageInitialData = {
   bounds: TimeBounds
   systemOptions: QueryResult<WaterQualitySystemOption>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { MortalityForm } from "./mortality-form"
 import { FeedingForm } from "./feeding-form"
@@ -17,6 +17,7 @@ import type { SystemOption } from "@/lib/system-options"
 
 interface DataEntryInterfaceProps {
     farmId: string | null
+    farmRole?: Database["public"]["Tables"]["farm_user"]["Row"]["role"] | null
     systems: SystemOption[]
     feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
@@ -27,7 +28,7 @@ interface DataEntryInterfaceProps {
         transfer: Tables<"fish_transfer">[]
         harvest: Tables<"fish_harvest">[]
         water_quality: Tables<"water_quality_measurement">[]
-        incoming_feed: Tables<"feed_inventory_snapshot">[]
+        incoming_feed: Tables<"feed_incoming">[]
         stocking: Tables<"fish_stocking">[]
         systems: Tables<"system">[]
     }
@@ -50,6 +51,7 @@ const sidebarItems = [
 
 export function DataEntryInterface({
     farmId,
+    farmRole = null,
     systems,
     feeds,
     batches,
@@ -58,18 +60,31 @@ export function DataEntryInterface({
     defaultSystemId = null,
     defaultBatchId = null,
 }: DataEntryInterfaceProps) {
-    const [activeTab, setActiveTab] = useState<(typeof sidebarItems)[number]["id"]>(defaultTab)
+    const canAccessIncomingFeed =
+        farmRole === "admin" || farmRole === "farm_manager" || farmRole === "inventory_storekeeper"
+    const visibleSidebarItems = useMemo(
+        () => sidebarItems.filter((item) => item.id !== "incoming_feed" || canAccessIncomingFeed),
+        [canAccessIncomingFeed],
+    )
+    const resolvedDefaultTab = useMemo(
+        () =>
+            visibleSidebarItems.some((item) => item.id === defaultTab)
+                ? defaultTab
+                : visibleSidebarItems[0]?.id ?? "feeding",
+        [defaultTab, visibleSidebarItems],
+    )
+    const [activeTab, setActiveTab] = useState<(typeof sidebarItems)[number]["id"]>(resolvedDefaultTab)
 
     useEffect(() => {
-        setActiveTab(defaultTab)
-    }, [defaultTab])
+        setActiveTab(resolvedDefaultTab)
+    }, [resolvedDefaultTab])
 
     return (
         <div className="space-y-3 sm:space-y-4 md:space-y-6">
             <div className="overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm">
                 <div className="overflow-x-auto">
-                    <div className="flex min-w-max gap-2 p-2">
-                        {sidebarItems.map((item) => (
+                    <div className="flex min-w-max snap-x snap-mandatory gap-2 p-2">
+                        {visibleSidebarItems.map((item) => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
@@ -136,7 +151,7 @@ export function DataEntryInterface({
                         <RecentEntriesList data={recentEntries.water_quality} type="water_quality" systems={systems} />
                     </>
                 )}
-                {activeTab === "incoming_feed" && (
+                {canAccessIncomingFeed && activeTab === "incoming_feed" && (
                     <>
                         <IncomingFeedForm feeds={feeds} farmId={farmId} />
                         <RecentEntriesList data={recentEntries.incoming_feed} type="incoming_feed" systems={systems} />

@@ -13,6 +13,7 @@ import type { DailyInventoryRow } from "@/features/feed/types"
 import type { TimePeriod } from "@/lib/time-period"
 import { diffDateDays, formatBucketLabel, formatGranularityLabel, getBucketGranularity, getBucketKey } from "@/lib/time-series"
 import SystemHistorySheet from "@/components/systems/system-history-sheet"
+import { getSemanticColor } from "@/lib/theme/semantic-colors"
 import {
   type FeedExceptionItem,
 } from "../_lib/feed-sections"
@@ -45,10 +46,10 @@ type MeasurementRow = {
 }
 
 const RESPONSE_COLORS: Record<string, string> = {
-  Excellent: "#3b82f6",
-  Good: "#16a34a",
-  Fair: "#f59e0b",
-  Poor: "#dc2626",
+  Excellent: getSemanticColor("info"),
+  Good: getSemanticColor("good"),
+  Fair: getSemanticColor("warn"),
+  Poor: getSemanticColor("bad"),
 }
 
 const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
@@ -346,7 +347,11 @@ export function FeedDashboard({
           label: "Mortality",
           data: overviewRows.map((row) => row.mortalityFish),
           backgroundColor: overviewRows.map((row) =>
-            row.mortalityFish > 250 ? "#dc2626" : row.mortalityFish > 50 ? "#f59e0b" : "#16a34a",
+            row.mortalityFish > 250
+              ? getSemanticColor("bad")
+              : row.mortalityFish > 50
+                ? getSemanticColor("warn")
+                : getSemanticColor("good"),
           ),
           borderRadius: 6,
         },

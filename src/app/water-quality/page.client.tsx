@@ -96,6 +96,7 @@ export default function WaterQualityPage({
   } = useAnalyticsPageBootstrap({
     initialFarmId,
     defaultTimePeriod: "month",
+    boundsScope: "water_quality",
     initialFilters,
     initialBounds: initialData?.bounds,
   })

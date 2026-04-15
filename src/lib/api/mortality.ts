@@ -4,7 +4,16 @@ import type { AlertSeverity } from "@/lib/mortality"
 import { postJson } from "@/lib/commands/_utils"
 import { isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 
-type AlertLogRow = Tables<"alert_log">
+export type AlertLogRow = {
+  id: string | number
+  farm_id: string | null
+  system_id: number | null
+  severity: string | null
+  rule_code: string | null
+  message: string | null
+  acknowledged_at: string | null
+  fired_at: string | null
+}
 type MortalityEventRow = Tables<"fish_mortality">
 type SurvivalTrendRow = Database["public"]["Functions"]["get_survival_trend"]["Returns"][number]
 

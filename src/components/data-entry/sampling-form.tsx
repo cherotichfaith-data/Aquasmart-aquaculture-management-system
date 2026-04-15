@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
@@ -17,15 +16,14 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useRecordSampling } from "@/lib/hooks/use-sampling"
-import { useFeedPlans, useSamplingData } from "@/lib/hooks/use-reports"
+import { useSamplingData } from "@/lib/hooks/use-reports"
 import { diffDateDays } from "@/lib/time-series"
 import { logSbError } from "@/lib/supabase/log"
-import { selectApplicableFeedPlan } from "@/app/feed/_lib/feed-analytics"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import {
   InfoPanel,
   InfoStat,
@@ -73,9 +71,8 @@ const projectAbwFromHistory = (
 export function SamplingForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: SamplingFormProps) {
   const { farmId } = useActiveFarm()
   const mutation = useRecordSampling()
-  const router = useRouter()
-  const [feedPlanPromptOpen, setFeedPlanPromptOpen] = useState(false)
-  const [savedAbw, setSavedAbw] = useState<number | null>(null)
+
+
 
   const units = useMemo(() => getSystemUnits(systems), [systems])
   const defaultUnit = findUnitForSystem(systems, defaultSystemId)
@@ -119,14 +116,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
     limit: 10,
     enabled: Number.isFinite(selectedSystemId),
   })
-  const feedPlansQuery = useFeedPlans({
-    farmId,
-    systemIds: Number.isFinite(selectedSystemId) ? [selectedSystemId] : [],
-    batchId: Number.isFinite(selectedBatchId as number) ? selectedBatchId ?? undefined : undefined,
-    dateFrom: selectedDate || undefined,
-    dateTo: selectedDate || undefined,
-    enabled: Boolean(farmId) && Number.isFinite(selectedSystemId),
-  })
 
   const samplingHistory = useMemo(() => {
     const rows = samplingHistoryQuery.data?.status === "success" ? samplingHistoryQuery.data.data : []
@@ -147,17 +136,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
   const abwDeltaPct =
     projectedAbw && computedAbw ? Math.abs((computedAbw - projectedAbw) / projectedAbw) * 100 : null
   const isProjectedOutlier = abwDeltaPct != null && abwDeltaPct > 30
-  const suggestedFeedPlan = useMemo(() => {
-    const rows = feedPlansQuery.data?.status === "success" ? feedPlansQuery.data.data : []
-    if (!selectedDate || !Number.isFinite(selectedSystemId)) return null
-    return selectApplicableFeedPlan(rows, {
-      systemId: selectedSystemId,
-      date: selectedDate,
-      abwG: savedAbw ?? computedAbw,
-      batchId: Number.isFinite(selectedBatchId as number) ? selectedBatchId : null,
-      feedTypeId: null,
-    })
-  }, [computedAbw, feedPlansQuery.data, savedAbw, selectedBatchId, selectedDate, selectedSystemId])
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -174,9 +152,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
         abw,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
-
-      setSavedAbw(abw)
-      setFeedPlanPromptOpen(true)
 
       form.reset({
         date: toIsoDate(new Date()),
@@ -197,6 +172,10 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
       <div className="mb-6">
         <h2 className="text-xl font-semibold tracking-tight">Record Sampling</h2>
         <p className="text-sm text-muted-foreground">Capture total sampled weight in kilograms and flag unrealistic ABW shifts before save.</p>
+      </div>
+
+      <div className="mb-4">
+        <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
@@ -391,36 +370,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
         </div>
       </div>
 
-      <Dialog open={feedPlanPromptOpen} onOpenChange={setFeedPlanPromptOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Feed Plan Target Rate?</DialogTitle>
-            <DialogDescription>
-              New ABW = {savedAbw != null ? `${savedAbw.toFixed(2)} g` : "n/a"}
-              {suggestedFeedPlan?.target_feeding_rate_pct != null
-                ? `; suggested rate ${suggestedFeedPlan.target_feeding_rate_pct.toFixed(2)}% BW/day.`
-                : "; no active feed plan matched this ABW range."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFeedPlanPromptOpen(false)}>
-              Later
-            </Button>
-            <Button
-              onClick={() => {
-                setFeedPlanPromptOpen(false)
-                if (selectedSystemId) {
-                  router.push(`/feed?system=${selectedSystemId}`)
-                } else {
-                  router.push("/feed")
-                }
-              }}
-            >
-              Review Feed Plan
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

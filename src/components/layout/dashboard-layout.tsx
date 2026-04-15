@@ -4,9 +4,13 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { SyncStatusBar } from "@/components/offline/sync-status-bar"
 import Header from "./header"
 import Sidebar from "./sidebar"
 import { ShortcutsHelp } from "@/components/shared/shortcuts-help"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
+import { canAccessDataEntry } from "@/lib/app-entry"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
@@ -23,6 +27,10 @@ export default function DashboardLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
   const router = useRouter()
+  const { farmId } = useActiveFarm()
+  const farmRoleQuery = useActiveFarmRole(farmId)
+  const farmRole = (farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
+  const allowDataEntry = canAccessDataEntry(farmRole)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -68,16 +76,19 @@ export default function DashboardLayout({
         return
       }
       if (key === "n") {
+        if (!allowDataEntry) return
         event.preventDefault()
         router.push("/data-entry")
         return
       }
       if (key === "f" && event.shiftKey) {
+        if (!allowDataEntry) return
         event.preventDefault()
         router.push("/data-entry?type=feeding")
         return
       }
       if (key === "s" && event.shiftKey) {
+        if (!allowDataEntry) return
         event.preventDefault()
         router.push("/data-entry?type=sampling")
       }
@@ -85,7 +96,7 @@ export default function DashboardLayout({
 
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [router])
+  }, [allowDataEntry, router])
 
   return (
     <div className="relative flex min-h-screen bg-background">
@@ -105,10 +116,13 @@ export default function DashboardLayout({
       />
       <div className="relative flex min-w-0 flex-1 flex-col">
         {hideHeader ? null : (
-          <Header
-            onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-            showToolbar={showHeaderToolbar}
-          />
+          <>
+            <Header
+              onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+              showToolbar={showHeaderToolbar}
+            />
+            <SyncStatusBar />
+          </>
         )}
         <main
           className={
@@ -122,7 +136,7 @@ export default function DashboardLayout({
           <div className="mx-auto w-full max-w-[1720px]">{children}</div>
         </main>
       </div>
-      <ShortcutsHelp />
+      <ShortcutsHelp canAccessDataEntry={allowDataEntry} />
       <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
         <DialogContent className="rounded-[1.5rem] border-border/80 bg-card/95 backdrop-blur-xl">
           <DialogHeader>
@@ -133,15 +147,19 @@ export default function DashboardLayout({
             <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/"); }}>
               Go to Dashboard
             </Button>
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry"); }}>
-              New Data Entry
-            </Button>
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry?type=feeding"); }}>
-              Record Feeding
-            </Button>
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry?type=sampling"); }}>
-              Record Sampling
-            </Button>
+            {allowDataEntry ? (
+              <>
+                <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry"); }}>
+                  New Data Entry
+                </Button>
+                <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry?type=feeding"); }}>
+                  Record Feeding
+                </Button>
+                <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry?type=sampling"); }}>
+                  Record Sampling
+                </Button>
+              </>
+            ) : null}
             <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/water-quality"); }}>
               Water Quality Dashboard
             </Button>

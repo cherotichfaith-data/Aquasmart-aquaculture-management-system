@@ -28,9 +28,9 @@ export default function DataEntryPageClient() {
   const defaultTab = useMemo(() => {
     if (!typeParam) {
       const role = activeFarmRoleQuery.data
-      if (role === "system_operator") return "feeding"
-      if (role === "data_analyst") return "sampling"
-      if (role === "viewer") return "feeding"
+      if (role === "farm_technician") return "feeding"
+      if (role === "inventory_storekeeper") return "incoming_feed"
+      if (role === "analyst_planner") return "sampling"
       return "feeding"
     }
     const normalized = typeParam.toLowerCase()
@@ -55,7 +55,8 @@ export default function DataEntryPageClient() {
   }, [batchParam])
 
   const systemsLoading = systemsQuery.isLoading
-  const loading = batchesQuery.isLoading || feedsQuery.isLoading || recentEntriesQuery.isLoading
+  const loading =
+    activeFarmRoleQuery.isLoading || batchesQuery.isLoading || feedsQuery.isLoading || recentEntriesQuery.isLoading
 
   const entryErrors = useMemo(() => {
     const data = recentEntriesQuery.data
@@ -77,6 +78,7 @@ export default function DataEntryPageClient() {
     getQueryResultError(systemsQuery.data),
   ].filter(Boolean) as string[]
   const errorMessages = [
+    getErrorMessage(activeFarmRoleQuery.error),
     getErrorMessage(batchesQuery.error),
     getQueryResultError(batchesQuery.data),
     getErrorMessage(feedsQuery.error),
@@ -160,6 +162,7 @@ export default function DataEntryPageClient() {
         ) : (
           <DataEntryInterface
             farmId={farmId}
+            farmRole={activeFarmRoleQuery.data}
             systems={systems}
             feeds={feeds}
             batches={batches}

@@ -10,6 +10,8 @@ import { getTransferData } from "@/lib/api/reports"
 import type { TimePeriod } from "@/lib/time-period"
 import { resolveScopedSystemIds } from "./shared"
 
+const ENABLE_BACKGROUND_REFETCH = process.env.NODE_ENV === "production"
+
 export function useProductionSummaryMetrics(params: {
   farmId?: string | null
   stage: "all" | Enums<"system_growth_stage">
@@ -144,9 +146,10 @@ export function useProductionSummaryMetrics(params: {
     },
     enabled: Boolean(session) && Boolean(params.farmId) && hasBounds,
     staleTime: 5 * 60_000,
-    refetchInterval: 5 * 60_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: ENABLE_BACKGROUND_REFETCH ? 5 * 60_000 : false,
+    refetchIntervalInBackground: ENABLE_BACKGROUND_REFETCH,
+    refetchOnMount: ENABLE_BACKGROUND_REFETCH ? undefined : false,
     initialData: canUseInitialData ? params.initialData : undefined,
-    initialDataUpdatedAt: canUseInitialData ? 0 : undefined,
+    initialDataUpdatedAt: canUseInitialData ? (ENABLE_BACKGROUND_REFETCH ? 0 : Date.now()) : undefined,
   })
 }

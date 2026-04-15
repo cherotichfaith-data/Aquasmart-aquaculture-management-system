@@ -20,6 +20,7 @@ import type { SystemOption } from "@/lib/system-options"
 import { useRecordMortality } from "@/lib/hooks/use-mortality"
 import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
@@ -109,6 +110,8 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Record Mortality</h2>
       </div>
+
+      <OfflineSaveBadge result={mutation.data} />
 
       {mortalityCount >= 100 ? (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-200">

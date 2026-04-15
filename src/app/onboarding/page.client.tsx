@@ -1,261 +1,147 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { useMemo, useState } from "react"
+import Image from "next/image"
+import { useRouter } from "next/navigation"
+import { Loader2, ArrowLeft } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
-import { DEFAULT_SETTINGS, formatError, type SettingsFormState } from "@/app/settings/settings-utils"
 
 const deriveOwnerName = (email?: string | null) => {
   const localPart = String(email ?? "").split("@")[0]?.trim()
   if (!localPart) return ""
-
   return localPart
     .split(/[._-]+/)
     .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
     .join(" ")
 }
 
-const buildInitialSettings = (email?: string | null): SettingsFormState => ({
-  ...DEFAULT_SETTINGS,
-  farmName: "",
-  location: "",
-  owner: deriveOwnerName(email) || "",
-  email: email ?? "",
-  phone: "",
-  role: "admin",
-})
+const inputCls =
+  "w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
 
 export default function OnboardingPageClient() {
-  const { user } = useAuth()
-  const [settings, setSettings] = useState<SettingsFormState>(() => buildInitialSettings())
+  const router = useRouter()
+  const { user, signOut } = useAuth()
+
+  const [farmName, setFarmName] = useState("")
+  const [location, setLocation] = useState("")
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  const welcomeName = useMemo(() => deriveOwnerName(user?.email) || "there", [user?.email])
-
-  useEffect(() => {
-    setSettings((prev) => ({
-      ...prev,
-      owner: prev.owner.trim() ? prev.owner : deriveOwnerName(user?.email),
-      email: prev.email.trim() ? prev.email : (user?.email ?? ""),
-    }))
-  }, [user?.email])
-
-  const handleChange = (field: keyof SettingsFormState, value: string | number) => {
-    setSettings((prev) => ({ ...prev, [field]: value as never }))
-  }
+  const ownerName = useMemo(() => deriveOwnerName(user?.email) || "there", [user?.email])
+  const ownerEmail = user?.email ?? ""
 
   const handleSubmit = async () => {
-    setIsSaving(true)
     setErrorMsg(null)
+    const name = farmName.trim()
+    const loc  = location.trim()
+    if (!name) { setErrorMsg("Farm name is required."); return }
+    if (!loc)  { setErrorMsg("Location is required."); return }
 
+    setIsSaving(true)
     try {
-      const response = await fetch("/api/onboarding/bootstrap", {
+      const res = await fetch("/api/onboarding/bootstrap", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          farmName: settings.farmName,
-          location: settings.location,
-          owner: settings.owner,
-          email: settings.email,
-          phone: settings.phone,
-          lowDoThreshold: settings.lowDoThreshold,
-          highAmmoniaThreshold: settings.highAmmoniaThreshold,
-          highMortalityThreshold: settings.highMortalityThreshold,
+          farmName: name,
+          location: loc,
+          owner: ownerName,
+          email: ownerEmail,
         }),
       })
-
-      const result = (await response.json()) as {
-        error?: string
-        farmId?: string
-      }
-
-      if (!response.ok || !result.farmId) {
-        throw new Error(result.error || "Unable to create your farm workspace.")
-      }
-
+      const result = (await res.json()) as { error?: string; farmId?: string }
+      if (!res.ok || !result.farmId) throw new Error(result.error || "Unable to create your farm workspace.")
       if (typeof window !== "undefined" && user?.id) {
         window.localStorage.setItem(`aquasmart:${user.id}:activeFarmId`, result.farmId)
         window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId: result.farmId } }))
       }
-
       window.location.assign("/")
-    } catch (error) {
-      setErrorMsg(formatError(error))
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Try again.")
       setIsSaving(false)
-      return
     }
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.18),_transparent_35%),linear-gradient(180deg,_hsl(var(--background)),_color-mix(in_srgb,_hsl(var(--background))_88%,_white))] px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 lg:flex-row">
-        <section className="lg:w-[38%]">
-          <div className="rounded-[2rem] border border-border/70 bg-card/85 p-8 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary/80">Workspace Setup</p>
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground">
-              Build your first farm workspace
-            </h1>
-            <p className="mt-4 text-base leading-7 text-muted-foreground">
-              {welcomeName}, this creates your tenant, assigns you as the first admin, and applies the default alert thresholds so the operational screens are usable immediately.
-            </p>
-
-            <div className="mt-8 space-y-4 rounded-[1.5rem] border border-border/60 bg-background/70 p-5">
-              <div>
-                <p className="text-sm font-semibold text-foreground">What happens next</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  After setup you can add systems, batches, feed references, and start capturing live farm data.
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Account role</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  The first user becomes the farm admin automatically. Team invites can be added later.
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Baseline thresholds</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  These defaults seed water-quality and mortality alerts. You can refine them in Settings after onboarding.
-                </p>
-              </div>
-            </div>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.14),_transparent_40%)] px-4 py-10">
+      {/* Header */}
+      <div className="mb-8 flex w-full max-w-lg items-center justify-between">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-border/70 bg-card/80">
+            <Image src="/use this.png" alt="AquaSmart" width={18} height={18} />
           </div>
-        </section>
+          <span className="text-sm font-semibold tracking-wide">AquaSmart</span>
+        </div>
+        <button
+          type="button"
+          onClick={async () => { await signOut(); router.replace("/auth") }}
+          className="text-sm text-muted-foreground transition hover:text-foreground"
+        >
+          Sign out
+        </button>
+      </div>
 
-        <section className="lg:flex-1">
-          <div className="rounded-[2rem] border border-border/70 bg-card/92 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
-            <div className="mb-8">
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground">Farm details</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Enter the minimum information required to provision a clean, isolated farm workspace.
-              </p>
-            </div>
+      {/* Card */}
+      <div className="w-full max-w-lg rounded-[1.75rem] border border-border/70 bg-card/95 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Create your farm</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Set up a new farm workspace. You will be assigned as admin and can invite your team after.
+        </p>
 
-            {errorMsg ? (
-              <div className="mb-6 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
-                {errorMsg}
-              </div>
-            ) : null}
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Farm name</span>
-                <input
-                  type="text"
-                  value={settings.farmName}
-                  onChange={(event) => handleChange("farmName", event.target.value)}
-                  placeholder="e.g. Lake Harvest Farm"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Location</span>
-                <input
-                  type="text"
-                  value={settings.location}
-                  onChange={(event) => handleChange("location", event.target.value)}
-                  placeholder="e.g. Kisumu, Kenya"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Owner name</span>
-                <input
-                  type="text"
-                  value={settings.owner}
-                  onChange={(event) => handleChange("owner", event.target.value)}
-                  placeholder="e.g. Jane Otieno"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Contact email</span>
-                <input
-                  type="email"
-                  value={settings.email}
-                  onChange={(event) => handleChange("email", event.target.value)}
-                  placeholder="e.g. ops@farm.com"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-foreground/90">Phone</span>
-                <input
-                  type="tel"
-                  value={settings.phone}
-                  onChange={(event) => handleChange("phone", event.target.value)}
-                  placeholder="Optional"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-            </div>
-
-            <div className="mt-10">
-              <h3 className="text-lg font-semibold text-foreground">Default alerts</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                These become the first farm-level thresholds and can be tuned later from Settings.
-              </p>
-            </div>
-
-            <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Low DO alert (mg/L)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.lowDoThreshold}
-                  onChange={(event) => handleChange("lowDoThreshold", Number.parseFloat(event.target.value || "0"))}
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">High ammonia alert (mg/L)</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={settings.highAmmoniaThreshold}
-                  onChange={(event) => handleChange("highAmmoniaThreshold", Number.parseFloat(event.target.value || "0"))}
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">High mortality alert threshold (%/day)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.highMortalityThreshold}
-                  onChange={(event) => handleChange("highMortalityThreshold", Number.parseFloat(event.target.value || "0"))}
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-            </div>
-
-            <div className="mt-10 flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                This action creates your farm workspace and assigns this account as the first admin.
-              </p>
-              <button
-                type="button"
-                onClick={() => void handleSubmit()}
-                disabled={isSaving}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {isSaving ? "Creating workspace..." : "Create Farm Workspace"}
-              </button>
-            </div>
+        {errorMsg && (
+          <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm font-medium text-destructive">
+            {errorMsg}
           </div>
-        </section>
+        )}
+
+        <div className="mt-6 space-y-5">
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-foreground/90">Farm name <span className="text-destructive">*</span></span>
+            <input
+              type="text"
+              value={farmName}
+              onChange={(e) => setFarmName(e.target.value)}
+              placeholder="e.g. Tanganyika Blue Farm"
+              className={inputCls}
+              autoFocus
+            />
+          </label>
+
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-foreground/90">Location <span className="text-destructive">*</span></span>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Kigoma, Tanzania"
+              className={inputCls}
+            />
+          </label>
+
+          {/* Read-only owner info */}
+          <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            Signed in as <span className="font-medium text-foreground">{ownerEmail}</span> — you will be the farm admin.
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={isSaving}
+          className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {isSaving ? "Creating farm..." : "Create Farm"}
+        </button>
       </div>
     </main>
   )

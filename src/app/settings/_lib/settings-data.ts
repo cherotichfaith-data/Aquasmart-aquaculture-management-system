@@ -1,6 +1,7 @@
 "use client"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/lib/types/database"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { getSessionUser } from "@/lib/supabase/session"
 import type { Tables, TablesInsert, TablesUpdate } from "@/lib/types/database"
@@ -17,7 +18,7 @@ export const isAbortLikeError = (err: unknown): boolean => {
 }
 
 export async function loadSettingsData(params: {
-  supabase: SupabaseClient<any, "public", any>
+  supabase: SupabaseClient<Database, "public">
   userId?: string | null
   farmId?: string | null
   thresholdDenied: boolean
@@ -70,7 +71,7 @@ export async function loadSettingsData(params: {
 }
 
 export async function saveSettingsData(params: {
-  supabase: SupabaseClient<any, "public", any>
+  supabase: SupabaseClient<Database, "public">
   userId?: string | null
   farmId?: string | null
   settings: SettingsFormState
@@ -149,22 +150,8 @@ export async function saveSettingsData(params: {
     nextThresholdId = insertedThreshold?.id ?? null
   }
 
-  const farmUserPayload: TablesInsert<"farm_user"> = {
-    farm_id: resolvedFarmId,
-    user_id: userId,
-    role: settings.role,
-  }
-
-  const { error: farmUserError } = await supabase
-    .from("farm_user")
-    .upsert(farmUserPayload, { onConflict: "farm_id,user_id" })
-
-  if (farmUserError) {
-    if (hasActionableSbError(farmUserError)) {
-      logSbError("settings:save:farmUserUpsert", farmUserError)
-    }
-    throw farmUserError
-  }
+  // Role is managed via the Users page (admin only) — never written here.
+  // Writing to farm_user from a regular settings save would violate RLS for non-admin users.
 
   return {
     resolvedFarmId,

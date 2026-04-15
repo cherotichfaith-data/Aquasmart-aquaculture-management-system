@@ -54,16 +54,6 @@ type OperationRow = {
   detail: string
 }
 
-const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
-  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-  return numeric.length ? Math.max(...numeric) : fallback
-}
-
-const getMinNumber = (values: Array<number | null | undefined>, fallback = 0) => {
-  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-  return numeric.length ? Math.min(...numeric) : fallback
-}
-
 const ratingToneClass = (rating: string | null | undefined) => {
   if (rating === "optimal") return "bg-chart-2/15 text-chart-2"
   if (rating === "acceptable") return "bg-chart-3/20 text-chart-3"
@@ -508,24 +498,9 @@ export default function SystemHistorySheet({
   )
 
   const inventoryChartOptions = useMemo<ChartOptions<"bar">>(() => {
-    const leftMax = Math.max(
-      1,
-      Math.ceil(
-        getMaxNumber([
-          ...inventoryTrendRows.map((row) => row.biomass),
-          ...inventoryTrendRows.map((row) => row.feed),
-        ]) * 1.12,
-      ),
-    )
-    const rightMax = Math.max(1, Math.ceil(getMaxNumber(inventoryTrendRows.map((row) => row.abw)) * 1.12))
-
     return buildCartesianOptions({
       palette,
       legend: true,
-      min: 0,
-      max: leftMax,
-      rightMin: 0,
-      rightMax,
       xTitle: "Date",
       xMaxTicksLimit: inventoryXAxisLimit,
       yTitle: "Biomass / Feed (kg)",
@@ -543,7 +518,7 @@ export default function SystemHistorySheet({
       },
       xTickFormatter: (_value, index) => formatCompactDate(inventoryDateDomain[index] ?? ""),
     })
-  }, [inventoryDateDomain, inventoryTrendRows, inventoryXAxisLimit, palette])
+  }, [inventoryDateDomain, inventoryXAxisLimit, palette])
 
   const waterChartData = useMemo<ChartData<"line">>(
     () => ({
@@ -575,15 +550,9 @@ export default function SystemHistorySheet({
   )
 
   const waterChartOptions = useMemo<ChartOptions<"line">>(() => {
-    const doMax = Math.max(1, Math.ceil(getMaxNumber(waterTrendRows.map((row) => row.dissolvedOxygen)) * 1.12))
-    const tempMin = Math.max(0, Math.floor(getMinNumber(waterTrendRows.map((row) => row.temperature)) - 1))
-    const tempMax = Math.ceil(getMaxNumber(waterTrendRows.map((row) => row.temperature)) + 1)
-
     return buildCartesianOptions({
       palette,
       legend: true,
-      min: 0,
-      max: doMax,
       xTitle: "Date",
       xMaxTicksLimit: waterXAxisLimit,
       yTitle: "DO (mg/L)",
@@ -601,8 +570,6 @@ export default function SystemHistorySheet({
       extraScales: {
         y1: {
           position: "right",
-          min: tempMin,
-          max: tempMax,
           border: { display: false },
           grid: { drawOnChartArea: false, drawTicks: false },
           ticks: {
@@ -622,7 +589,7 @@ export default function SystemHistorySheet({
         },
       },
     })
-  }, [palette, waterDateDomain, waterTrendRows, waterXAxisLimit])
+  }, [palette, waterDateDomain, waterXAxisLimit])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -654,22 +621,22 @@ export default function SystemHistorySheet({
 
           {hasResolvedTimeline ? (
             <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Card className="gap-2 py-3">
-              <CardHeader className="px-3"><CardTitle className="text-sm">Live Fish</CardTitle></CardHeader>
-              <CardContent className="px-3"><p className="text-2xl font-semibold">{formatNumberValue(latestInventory?.number_of_fish ?? summaryRow?.fish_end)}</p></CardContent>
+          <div className="kpi-grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Card className="kpi-card">
+              <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Live Fish</CardTitle></CardHeader>
+              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatNumberValue(latestInventory?.number_of_fish ?? summaryRow?.fish_end)}</p></CardContent>
             </Card>
-            <Card className="gap-2 py-3">
-              <CardHeader className="px-3"><CardTitle className="text-sm">Biomass</CardTitle></CardHeader>
-              <CardContent className="px-3"><p className="text-2xl font-semibold">{formatUnitValue(latestInventory?.biomass_last_sampling ?? summaryRow?.biomass_end, 1, "kg")}</p></CardContent>
+            <Card className="kpi-card">
+              <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Biomass</CardTitle></CardHeader>
+              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(latestInventory?.biomass_last_sampling ?? summaryRow?.biomass_end, 1, "kg")}</p></CardContent>
             </Card>
-            <Card className="gap-2 py-3">
-              <CardHeader className="px-3"><CardTitle className="text-sm">ABW</CardTitle></CardHeader>
-              <CardContent className="px-3"><p className="text-2xl font-semibold">{formatUnitValue(latestSampling?.abw ?? latestInventory?.abw_last_sampling ?? summaryRow?.abw, 1, "g")}</p></CardContent>
+            <Card className="kpi-card">
+              <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">ABW</CardTitle></CardHeader>
+              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(latestSampling?.abw ?? latestInventory?.abw_last_sampling ?? summaryRow?.abw, 1, "g")}</p></CardContent>
             </Card>
-            <Card className="gap-2 py-3">
-              <CardHeader className="px-3"><CardTitle className="text-sm">Survival</CardTitle></CardHeader>
-              <CardContent className="px-3"><p className="text-2xl font-semibold">{latestSurvival ? `${formatNumberValue(latestSurvival.survival_pct, { decimals: 1, minimumDecimals: 1 })}%` : "--"}</p></CardContent>
+            <Card className="kpi-card">
+              <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Survival</CardTitle></CardHeader>
+              <CardContent className="kpi-card-content"><p className="kpi-card-value">{latestSurvival ? `${formatNumberValue(latestSurvival.survival_pct, { decimals: 1, minimumDecimals: 1 })}%` : "--"}</p></CardContent>
             </Card>
           </div>
 
@@ -695,21 +662,21 @@ export default function SystemHistorySheet({
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <Card className="gap-2 py-3">
-                  <CardHeader className="px-3">
-                    <CardTitle className="text-sm">Feed In Range</CardTitle>
+              <div className="kpi-grid gap-3 md:grid-cols-3">
+                <Card className="kpi-card">
+                  <CardHeader className="kpi-card-header">
+                    <CardTitle className="kpi-card-title">Feed In Range</CardTitle>
                     <CardDescription>{periodLabel}</CardDescription>
                   </CardHeader>
-                  <CardContent className="px-3"><p className="text-xl font-semibold">{formatUnitValue(totalFeedKg, 1, "kg")}</p></CardContent>
+                  <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(totalFeedKg, 1, "kg")}</p></CardContent>
                 </Card>
-                <Card className="gap-2 py-3">
-                  <CardHeader className="px-3"><CardTitle className="text-sm">Mortality In Range</CardTitle><CardDescription>Recorded losses</CardDescription></CardHeader>
-                  <CardContent className="px-3"><p className="text-xl font-semibold">{formatNumberValue(totalMortality)} fish</p></CardContent>
+                <Card className="kpi-card">
+                  <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Mortality In Range</CardTitle><CardDescription>Recorded losses</CardDescription></CardHeader>
+                  <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatNumberValue(totalMortality)} fish</p></CardContent>
                 </Card>
-                <Card className="gap-2 py-3">
-                  <CardHeader className="px-3"><CardTitle className="text-sm">Harvest In Range</CardTitle><CardDescription>Recorded harvests</CardDescription></CardHeader>
-                  <CardContent className="px-3"><p className="text-xl font-semibold">{formatUnitValue(totalHarvestKg, 1, "kg")}</p></CardContent>
+                <Card className="kpi-card">
+                  <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Harvest In Range</CardTitle><CardDescription>Recorded harvests</CardDescription></CardHeader>
+                  <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(totalHarvestKg, 1, "kg")}</p></CardContent>
                 </Card>
               </div>
 

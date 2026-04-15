@@ -65,18 +65,19 @@ export function FarmInformationSection({
           />
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-foreground/90">Role</label>
-          <select
-            value={settings.role}
-            onChange={(e) => handleChange("role", e.target.value)}
-            className={inputClassName}
-          >
-            <option value="admin">Admin</option>
-            <option value="farm_manager">Farm Manager</option>
-            <option value="system_operator">System Operator</option>
-            <option value="data_analyst">Data Analyst</option>
-            <option value="viewer">Viewer</option>
-          </select>
+          <p className="mb-2 text-sm font-medium text-foreground/90">Role</p>
+          <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5">
+            <span className="text-sm text-foreground">
+              {settings.role === "admin" ? "Admin"
+                : settings.role === "farm_manager" ? "Farm Manager"
+                : settings.role === "farm_technician" ? "Farm Technician"
+                : settings.role === "inventory_storekeeper" ? "Inventory Storekeeper"
+                : settings.role === "analyst_planner" ? "Analyst / Planner"
+                : settings.role === "viewer_auditor" ? "Viewer / Auditor"
+                : settings.role || "—"}
+            </span>
+            <span className="ml-auto text-xs text-muted-foreground">Managed by admin</span>
+          </div>
         </div>
       </div>
     </div>

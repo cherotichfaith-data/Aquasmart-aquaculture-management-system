@@ -14,6 +14,7 @@ import type { Tables } from "@/lib/types/database"
 type AlertThresholdRow = Tables<"alert_threshold">
 type WaterQualityRow = Tables<"water_quality_measurement">
 type DailyInventoryRow = Tables<"daily_fish_inventory_table">
+type SystemRow = Tables<"system">
 
 type NotificationKind = "water_quality" | "mortality"
 type NotificationSeverity = "warning" | "critical"
@@ -86,13 +87,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
       let query = supabase
-        .rpc("api_dashboard_systems", {
-          p_farm_id: farmId!,
-          p_stage: undefined,
-          p_system_id: undefined,
-          p_start_date: undefined,
-          p_end_date: undefined,
-        })
+        .from("system")
+        .select("id, name")
+        .eq("farm_id", farmId!)
+        .eq("is_active", true)
+        .order("name", { ascending: true })
       if (signal) query = query.abortSignal(signal)
       const { data, error } = await query
 
@@ -103,11 +102,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         return [] as Array<{ id: number; label: string | null }>
       }
 
-      const mapped = ((data ?? []) as Array<{ system_id: number | null; system_name: string | null }>)
-        .filter((row) => typeof row.system_id === "number")
+      const mapped = ((data ?? []) as Pick<SystemRow, "id" | "name">[])
+        .filter((row) => typeof row.id === "number")
         .map((row) => ({
-          id: row.system_id as number,
-          label: row.system_name,
+          id: row.id,
+          label: row.name,
         }))
       return mapped
     },

@@ -2,9 +2,9 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/cache/query-keys"
-import type { Database, Enums } from "@/lib/types/database"
+import type { Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import { getRecentActivities } from "@/lib/api/reports"
+import { getRecentActivities, type ChangeLogRow } from "@/lib/api/reports"
 
 export function useRecentActivities(params?: {
   tableName?: string
@@ -13,7 +13,7 @@ export function useRecentActivities(params?: {
   dateTo?: string
   limit?: number
   enabled?: boolean
-  initialData?: QueryResult<Database["public"]["Tables"]["change_log"]["Row"]>
+  initialData?: QueryResult<ChangeLogRow>
 }) {
   const enabled = params?.enabled ?? true
   return useQuery({

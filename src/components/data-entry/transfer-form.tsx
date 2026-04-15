@@ -20,6 +20,7 @@ import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { DependencyBlocker } from "./dependency-blocker"
 import { toIsoDate } from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
@@ -121,7 +122,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
 
       await mutation.mutateAsync({
         origin_system_id: originId,
-        target_system_id: isCountCheck ? originId : targetId,
+        target_system_id: isCountCheck ? originId : targetId ?? originId,
         external_target_name:
           resolvedTransferType === "external_out" ? values.external_target_name?.trim() ?? null : null,
         transfer_type: resolvedTransferType,
@@ -164,6 +165,8 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Record Transfer</h2>
       </div>
+
+      <OfflineSaveBadge result={mutation.data} />
 
       {isExternalOut ? (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">

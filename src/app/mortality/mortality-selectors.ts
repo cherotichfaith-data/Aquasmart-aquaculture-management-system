@@ -1,12 +1,12 @@
 "use client"
 
 import { normalizeFeedingResponse } from "@/app/feed/_lib/feed-analytics"
+import type { AlertLogRow } from "@/lib/api/mortality"
 import type { FeedingRecordWithType } from "@/lib/api/reports"
 import type { Database, Tables } from "@/lib/types/database"
 import { isMortalityCause, type MortalityCause } from "@/lib/mortality"
 
 type SystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
-type AlertLogRow = Tables<"alert_log">
 type MortalityEventRow = Tables<"fish_mortality">
 type SurvivalTrendRow = Database["public"]["Functions"]["get_survival_trend"]["Returns"][number]
 type WaterQualityMeasurementRow = Tables<"api_water_quality_measurements">

@@ -15,7 +15,9 @@ const mortalitySchema = z.object({
   number_of_fish_mortality: z.number().positive(),
   cause: z.enum(MORTALITY_CAUSES),
   avg_dead_wt_g: z.number().min(0).nullable().optional(),
+  is_mass_mortality: z.boolean().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -37,15 +39,20 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("fish_mortality")
-    .insert({
+    .upsert({
       ...payload,
       batch_id: payload.batch_id ?? null,
       avg_dead_wt_g: payload.avg_dead_wt_g ?? null,
+      is_mass_mortality: payload.is_mass_mortality ?? null,
       notes: payload.notes?.trim() ? payload.notes.trim() : null,
       recorded_by: auth.user.id,
+      local_id: payload.local_id ?? null,
+      synced_at: new Date().toISOString(),
+    }, {
+      onConflict: "local_id",
     })
     .select()
-    .single()
+    .maybeSingle()
 
   if (error || !data) {
     logSbError("mortality:record:insert", error)

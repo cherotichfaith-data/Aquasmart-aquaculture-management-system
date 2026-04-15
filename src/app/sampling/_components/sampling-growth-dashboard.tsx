@@ -8,6 +8,7 @@ import {
 } from "@/components/charts/chartjs"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { getSemanticCalloutClass, getSemanticColor } from "@/lib/theme/semantic-colors"
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
@@ -255,7 +256,11 @@ export function SamplingGrowthDashboard({
           label: "SGR",
           data: sgrRows.map((row) => row.sgr),
           backgroundColor: sgrRows.map((row) =>
-            row.sgr > 1.5 ? "#16a34a" : row.sgr > 0.8 ? "#3b82f6" : "#f59e0b",
+            row.sgr > 1.5
+              ? getSemanticColor("good")
+              : row.sgr > 0.8
+                ? getSemanticColor("info")
+                : getSemanticColor("warn"),
           ),
           borderRadius: 6,
         },
@@ -324,29 +329,30 @@ export function SamplingGrowthDashboard({
     <>
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Growth overview</h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Total Samples</p>
-            <p className="mt-1 text-2xl font-bold">{`${filteredRowCount.toLocaleString()} samples`}</p>
+        <div className="kpi-grid md:grid-cols-4">
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">Total Samples</p>
+            <p className="kpi-card-value">{`${filteredRowCount.toLocaleString()} samples`}</p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Latest ABW</p>
-            <p className="mt-1 text-2xl font-bold">{latestAbw != null ? `${latestAbw.toFixed(1)} g` : "N/A"}</p>
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">Latest ABW</p>
+            <p className="kpi-card-value">{latestAbw != null ? `${latestAbw.toFixed(1)} g` : "N/A"}</p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">ABW Trend Volatility (CV over time)</p>
-            <p className="mt-1 text-2xl font-bold">{abwCv != null ? `${abwCv.toFixed(1)}%` : "N/A"}</p>
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">ABW Volatility</p>
+            <p className="kpi-card-value">{abwCv != null ? `${abwCv.toFixed(1)}%` : "N/A"}</p>
+            <p className="kpi-card-meta">CV over time</p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Avg Sample Size</p>
-            <p className="mt-1 text-2xl font-bold">{avgSampleSize != null ? `${avgSampleSize.toFixed(0)} fish/sample` : "N/A"}</p>
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">Avg Sample Size</p>
+            <p className="kpi-card-value">{avgSampleSize != null ? `${avgSampleSize.toFixed(0)} fish/sample` : "N/A"}</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Growth Efficiency</p>
+        <div className="kpi-grid md:grid-cols-3">
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">Growth Efficiency</p>
             <div className="mt-1 flex items-center gap-2">
-              <p className="text-2xl font-bold">
+              <p className="kpi-card-value mt-0">
                 {growthEfficiency != null ? `${growthEfficiency.toFixed(0)}%` : "N/A"}
               </p>
               {efficiencyActionRequired ? (
@@ -355,12 +361,12 @@ export function SamplingGrowthDashboard({
                 </Badge>
               ) : null}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Actual ABW vs target curve</p>
+            <p className="kpi-card-meta">Actual ABW vs target curve</p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">{projectionLabel}</p>
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">{projectionLabel}</p>
             <div className="mt-1 flex items-center gap-2">
-              <p className="text-2xl font-bold">
+              <p className="kpi-card-value mt-0">
                 {projection
                   ? new Intl.DateTimeFormat(undefined, {
                       year: "numeric",
@@ -375,48 +381,48 @@ export function SamplingGrowthDashboard({
                 </Badge>
               ) : null}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="kpi-card-meta">
               {targetWeightG != null
                 ? `Target ${formatWithUnit(targetWeightG, 0, "g")} ${resolvedStage === "nursing" ? "move" : "harvest"}`
                 : "No backend target configured"}
             </p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">SGR (latest)</p>
-            <p className="mt-1 text-2xl font-bold">{projection ? `${projection.sgr.toFixed(2)}%/day` : "N/A"}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Based on last two samples</p>
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">SGR (latest)</p>
+            <p className="kpi-card-value">{projection ? `${projection.sgr.toFixed(2)}%/day` : "N/A"}</p>
+            <p className="kpi-card-meta">Based on last two samples</p>
           </div>
         </div>
       </div>
 
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Capacity Planning</h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Target Density</p>
-            <p className="mt-1 text-2xl font-bold">
+        <div className="kpi-grid md:grid-cols-3">
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">Target Density</p>
+            <p className="kpi-card-value">
               {targetDensityKgM3 != null ? formatWithUnit(targetDensityKgM3, 1, "kg/m3") : "N/A"}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">Capacity planning baseline</p>
+            <p className="kpi-card-meta">Capacity planning baseline</p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Max Fish @ Current ABW</p>
-            <p className="mt-1 text-2xl font-bold">{maxFish != null ? `${Math.round(maxFish).toLocaleString()} fish` : "N/A"}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">Max Fish @ Current ABW</p>
+            <p className="kpi-card-value">{maxFish != null ? `${Math.round(maxFish).toLocaleString()} fish` : "N/A"}</p>
+            <p className="kpi-card-meta">
               {abwForCapacity != null
                 ? `ABW ${formatWithUnit(abwForCapacity, 1, "g")}`
                 : "Select a system to compute capacity"}
             </p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Utilization</p>
+          <div className="kpi-card p-4">
+            <p className="kpi-card-title">Utilization</p>
             <div className="mt-1 flex items-center gap-2">
-              <p className="text-2xl font-bold">{utilizationLabel}</p>
+              <p className="kpi-card-value mt-0">{utilizationLabel}</p>
               <span className={`rounded-full px-2 py-1 text-xs font-semibold ${utilizationTone}`}>
                 {utilizationBadge}
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="kpi-card-meta">
               {currentFish != null ? `${currentFish.toLocaleString()} fish in system` : "No fish count available"}
             </p>
           </div>
@@ -435,7 +441,7 @@ export function SamplingGrowthDashboard({
           Select a system with volume data to compute density capacity and utilization.
         </div>
       )}
-      <div className="rounded-xl border-l-4 border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-800 dark:text-emerald-200">
+      <div className={`rounded-xl border-l-4 px-4 py-3 text-sm leading-6 ${getSemanticCalloutClass("good")}`}>
         <strong>{bestGrowthSystem?.label ?? "No cage"} is the best-documented growth trajectory.</strong>{" "}
         {bestGrowthSystem
           ? `${bestGrowthSystem.samples} growth samples captured in scope`

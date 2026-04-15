@@ -22,7 +22,9 @@ export default function ReportsPage() {
     selectedStage,
     dateFrom: boundsStart,
     dateTo: boundsEnd,
-  } = useAnalyticsPageBootstrap()
+  } = useAnalyticsPageBootstrap({
+    boundsScope: "production",
+  })
   const dateFrom = boundsStart ?? ""
   const dateTo = boundsEnd ?? ""
   const dateRange = { from: dateFrom, to: dateTo }

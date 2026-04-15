@@ -6,12 +6,8 @@ import { countTimeRangeDays } from "@/lib/time-period"
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
-type FeedPlanRow = Database["public"]["Tables"]["feed_plan"]["Row"]
-type FarmKpisTodayRow = Database["public"]["Functions"]["get_farm_kpis_today"]["Returns"][number]
 type FcrTrendRow = Database["public"]["Functions"]["get_fcr_trend"]["Returns"][number]
-type FcrTrendWindowRow = Database["public"]["Functions"]["get_fcr_trend_window"]["Returns"][number]
 type GrowthTrendRow = Database["public"]["Functions"]["get_growth_trend"]["Returns"][number]
-type GrowthTrendWindowRow = Database["public"]["Functions"]["get_growth_trend_window"]["Returns"][number]
 type RunningStockRow = Database["public"]["Functions"]["get_running_stock"]["Returns"][number]
 type FishMortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
 type FeedingRecordRow = Database["public"]["Tables"]["feeding_record"]["Row"]
@@ -19,11 +15,19 @@ type FishSamplingWeightRow = Database["public"]["Tables"]["fish_sampling_weight"
 type FishTransferRow = Database["public"]["Tables"]["fish_transfer"]["Row"]
 type FishHarvestRow = Database["public"]["Tables"]["fish_harvest"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Tables"]["water_quality_measurement"]["Row"]
-type FeedInventorySnapshotRow = Database["public"]["Tables"]["feed_inventory_snapshot"]["Row"]
+type FeedIncomingRow = Database["public"]["Tables"]["feed_incoming"]["Row"]
 type FishStockingRow = Database["public"]["Tables"]["fish_stocking"]["Row"]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
-type ChangeLogRow = Database["public"]["Tables"]["change_log"]["Row"]
 type ChangeType = Database["public"]["Enums"]["change_type_enum"]
+type ChangeLogRow = {
+  id: string | number
+  table_name: string | null
+  change_type: ChangeType | null
+  column_name: string | null
+  change_time: string | null
+  system_id?: number | null
+  batch_id?: number | null
+}
 type RecentRowsTable =
   | "fish_mortality"
   | "feeding_record"
@@ -31,7 +35,7 @@ type RecentRowsTable =
   | "fish_transfer"
   | "fish_harvest"
   | "water_quality_measurement"
-  | "feed_inventory_snapshot"
+  | "feed_incoming"
   | "fish_stocking"
   | "system"
 type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
@@ -103,24 +107,6 @@ async function runRpcRead<Row>(query: PromiseLike<{ data: Row[] | null; error: u
   return (data ?? []) as Row[]
 }
 
-export async function listFarmKpisToday(
-  supabase: ServerSupabaseClient,
-  params: { farmId?: string | null },
-): Promise<FarmKpisTodayRow[]> {
-  if (!params.farmId) return []
-
-  const { data, error } = await supabase.rpc("get_farm_kpis_today", {
-    p_farm_id: params.farmId,
-  })
-
-  if (error) {
-    if (isQuietReadError(error) || isInvalidBigintUuidError(error)) return []
-    throw error
-  }
-
-  return (data ?? []) as FarmKpisTodayRow[]
-}
-
 export async function listRunningStock(
   supabase: ServerSupabaseClient,
   params: { farmId?: string | null },
@@ -148,21 +134,14 @@ export async function listFcrTrend(
     dateFrom?: string
     dateTo?: string
   },
-): Promise<Array<FcrTrendRow | FcrTrendWindowRow>> {
+): Promise<FcrTrendRow[]> {
   if (!params.farmId || !params.systemId) return []
 
-  const query = params.dateFrom
-    ? supabase.rpc("get_fcr_trend_window", {
-        p_farm_id: params.farmId,
-        p_system_id: params.systemId,
-        p_start_date: params.dateFrom,
-        p_end_date: params.dateTo ?? undefined,
-      })
-    : supabase.rpc("get_fcr_trend", {
-        p_farm_id: params.farmId,
-        p_system_id: params.systemId,
-        p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
-      })
+  const query = supabase.rpc("get_fcr_trend", {
+    p_farm_id: params.farmId,
+    p_system_id: params.systemId,
+    p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
+  })
 
   const { data, error } = await query
   if (error) {
@@ -170,7 +149,7 @@ export async function listFcrTrend(
     throw error
   }
 
-  return (data ?? []) as Array<FcrTrendRow | FcrTrendWindowRow>
+  return (data ?? []) as FcrTrendRow[]
 }
 
 export async function listGrowthTrend(
@@ -181,62 +160,15 @@ export async function listGrowthTrend(
     dateFrom?: string
     dateTo?: string
   },
-): Promise<Array<GrowthTrendRow | GrowthTrendWindowRow>> {
+): Promise<GrowthTrendRow[]> {
   if (!params.systemId) return []
 
-  const query = params.dateFrom
-    ? supabase.rpc("get_growth_trend_window", {
-        p_system_id: params.systemId,
-        p_start_date: params.dateFrom,
-        p_end_date: params.dateTo ?? undefined,
-      })
-    : supabase.rpc("get_growth_trend", {
-        p_system_id: params.systemId,
-        p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
-      })
+  const query = supabase.rpc("get_growth_trend", {
+    p_system_id: params.systemId,
+    p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
+  })
 
-  return runRpcRead<GrowthTrendRow | GrowthTrendWindowRow>(query)
-}
-
-export async function listFeedPlans(
-  supabase: ServerSupabaseClient,
-  params: {
-    farmId?: string | null
-    systemIds?: number[]
-    batchId?: number
-    dateFrom?: string
-    dateTo?: string
-  },
-): Promise<FeedPlanRow[]> {
-  const systemIds = (params.systemIds ?? []).filter((value) => Number.isFinite(value))
-  const hasBatchId = Number.isFinite(params.batchId)
-
-  if ((!params.farmId && systemIds.length === 0 && !hasBatchId) || (systemIds.length === 0 && !hasBatchId)) {
-    return []
-  }
-
-  let query = supabase.from("feed_plan").select("*").eq("is_active", true)
-
-  if (systemIds.length > 0) {
-    query = query.in("system_id", systemIds)
-  }
-  if (hasBatchId) {
-    query = query.eq("batch_id", params.batchId as number)
-  }
-  if (params.dateTo) {
-    query = query.lte("effective_from", params.dateTo)
-  }
-  if (params.dateFrom) {
-    query = query.or(`effective_to.is.null,effective_to.gte.${params.dateFrom}`)
-  }
-
-  const { data, error } = await query.order("effective_from", { ascending: false })
-  if (error) {
-    if (isQuietReadError(error)) return []
-    throw error
-  }
-
-  return (data ?? []) as FeedPlanRow[]
+  return runRpcRead<GrowthTrendRow>(query)
 }
 
 export async function listFeedingRecords(
@@ -259,7 +191,7 @@ export async function listFeedingRecords(
       feeding_amount,
       feeding_response,
       system_id,
-      feed_type:feed_type_id (
+      feed_type:feed_type!feeding_record_feed_id_fkey (
         id,
         feed_line,
         crude_protein_percentage,
@@ -429,20 +361,9 @@ export async function listRecentActivities(
     limit?: number
   },
 ): Promise<ChangeLogRow[]> {
-  let query = supabase.from("change_log").select("*")
-  if (params?.tableName) query = query.eq("table_name", params.tableName)
-  if (params?.changeType) query = query.eq("change_type", params.changeType)
-  if (params?.dateFrom) query = query.gte("change_time", params.dateFrom)
-  if (params?.dateTo) query = query.lte("change_time", params.dateTo)
-  if (params?.limit) query = query.limit(params.limit)
-
-  const { data, error } = await query.order("change_time", { ascending: false })
-  if (error) {
-    if (isQuietReadError(error)) return []
-    return []
-  }
-
-  return (data ?? []) as ChangeLogRow[]
+  void supabase
+  void params
+  return []
 }
 
 export async function listBatchSystemIds(
@@ -473,7 +394,7 @@ const emptyRecentEntries = () => ({
   transfer: toQuerySuccess<FishTransferRow>([]),
   harvest: toQuerySuccess<FishHarvestRow>([]),
   water_quality: toQuerySuccess<WaterQualityMeasurementRow>([]),
-  incoming_feed: toQuerySuccess<FeedInventorySnapshotRow>([]),
+  incoming_feed: toQuerySuccess<FeedIncomingRow>([]),
   stocking: toQuerySuccess<FishStockingRow>([]),
   systems: toQuerySuccess<SystemRow>([]),
 })
@@ -510,7 +431,7 @@ async function getRecentRows<T>(
     case "fish_mortality":
       query = query.eq("farm_id", farmId)
       break
-    case "feed_inventory_snapshot":
+    case "feed_incoming":
     case "system":
       query = query.eq("farm_id", farmId)
       break
@@ -565,7 +486,7 @@ export async function listRecentEntries(supabase: ServerSupabaseClient, farmId?:
       farmId,
       farmSystemIds,
     }),
-    getRecentRows<FeedInventorySnapshotRow>(supabase, "feed_inventory_snapshot", "date", {
+    getRecentRows<FeedIncomingRow>(supabase, "feed_incoming", "date", {
       farmId,
       farmSystemIds,
     }),

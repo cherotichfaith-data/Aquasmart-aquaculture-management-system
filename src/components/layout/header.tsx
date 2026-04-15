@@ -24,6 +24,9 @@ import { useEffect, useMemo, useState } from "react"
 import { useNotifications } from "@/components/notifications/notifications-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
+import { canAccessDataEntry } from "@/lib/app-entry"
 import { resolveTimePeriod } from "@/lib/time-period"
 import {
   DEFAULT_WQ_PARAMETER,
@@ -115,12 +118,16 @@ export default function Header({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { farm, farmId } = useActiveFarm()
+  const activeFarmRoleQuery = useActiveFarmRole(farmId)
   const [signingOut, setSigningOut] = useState(false)
   const [isCondensed, setIsCondensed] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
   const pageMeta = getPageMeta(pathname, searchParams.get("tab"))
-  const showAddData = pathname === "/"
+  const canAccessSettings = role === "admin" || role === "farm_manager"
+  const allowDataEntry = canAccessDataEntry((activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0])
+  const showAddData = pathname === "/" && allowDataEntry
   const isWaterQualityPage = pathname.startsWith("/water-quality")
   const defaultPeriod: TimePeriod = (() => {
     if (pathname.startsWith("/feed") || pathname.startsWith("/sampling")) return "quarter"
@@ -256,6 +263,18 @@ export default function Header({
     const firstToken = nameCandidate?.trim().split(/[\s@._-]+/).find(Boolean) ?? ""
     return firstToken.charAt(0).toUpperCase() || "U"
   }, [user?.email, user?.user_metadata])
+  const displayName = useMemo(() => {
+    return (
+      [
+        farm?.owner,
+        user?.user_metadata?.full_name,
+        user?.user_metadata?.name,
+        user?.user_metadata?.first_name,
+      ].find((value): value is string => typeof value === "string" && value.trim().length > 0) ??
+      user?.email ??
+      "User"
+    )
+  }, [farm?.owner, user?.email, user?.user_metadata])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -386,18 +405,25 @@ export default function Header({
               <DropdownMenuContent align="end" className="w-56">
                 <div className="flex items-center justify-start gap-2 p-2">
                   <div className="flex flex-col space-y-1 leading-none">
-                    {user?.email && <p className="font-medium">{user.email}</p>}
+                    <p className="font-medium">{displayName}</p>
+                    {user?.email && displayName !== user.email ? (
+                      <p className="w-[200px] truncate text-xs text-muted-foreground">{user.email}</p>
+                    ) : null}
                     {role && <p className="w-[200px] truncate text-xs text-muted-foreground">{formatRole(role)}</p>}
                   </div>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild className="cursor-pointer">
-                  <Link href="/settings" className="flex items-center">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                {canAccessSettings ? (
+                  <>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link href="/settings" className="flex items-center">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
                 <DropdownMenuItem
                   onClick={handleSignOut}
                   className="text-destructive focus:text-destructive cursor-pointer"

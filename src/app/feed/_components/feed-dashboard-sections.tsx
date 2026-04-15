@@ -13,6 +13,11 @@ import { cn } from "@/lib/utils"
 import { formatNumberValue } from "@/lib/analytics-format"
 import type { FeedRunningStockRow } from "@/lib/api/reports"
 import {
+  getSemanticBadgeClass,
+  getSemanticCalloutClass,
+  getSemanticTextClass,
+} from "@/lib/theme/semantic-colors"
+import {
   FeedExceptionsRail,
   FeedFcrSection,
   FeedMatrixSection,
@@ -76,13 +81,7 @@ function formatMetric(value: number | null | undefined, decimals = 1) {
 }
 
 function badgeClass(tone: StatusTone) {
-  return tone === "good"
-    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-    : tone === "warn"
-      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-      : tone === "bad"
-        ? "bg-red-500/15 text-red-700 dark:text-red-300"
-        : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+  return getSemanticBadgeClass(tone)
 }
 
 function KpiCard({
@@ -94,16 +93,7 @@ function KpiCard({
   label: string
   tone?: "default" | StatusTone
 }) {
-  const toneClass =
-    tone === "good"
-      ? "text-emerald-600"
-      : tone === "warn"
-        ? "text-amber-600"
-        : tone === "bad"
-          ? "text-red-600"
-          : tone === "info"
-            ? "text-sky-600"
-            : "text-foreground"
+  const toneClass = tone === "default" ? "text-foreground" : getSemanticTextClass(tone)
 
   return (
     <div className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4 text-center">
@@ -120,14 +110,7 @@ function Callout({
   tone: StatusTone
   children: ReactNode
 }) {
-  const toneClass =
-    tone === "info"
-      ? "border-sky-500/40 bg-sky-500/10 text-sky-800 dark:text-sky-200"
-      : tone === "warn"
-        ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
-        : tone === "good"
-          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
-          : "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-200"
+  const toneClass = getSemanticCalloutClass(tone)
 
   return <div className={cn("rounded-xl border-l-4 px-4 py-3 text-sm leading-6", toneClass)}>{children}</div>
 }
@@ -194,10 +177,10 @@ export function FeedDashboardError({
   onRetry: () => void
 }) {
   return (
-    <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
+    <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
       <div className="font-semibold">Unable to load feed analytics</div>
       <div className="mt-1">{errorMessage}</div>
-      <button type="button" onClick={onRetry} className="mt-3 rounded-md border border-red-500/30 px-3 py-1.5">
+      <button type="button" onClick={onRetry} className="mt-3 rounded-md border border-destructive/30 px-3 py-1.5">
         Retry
       </button>
     </div>

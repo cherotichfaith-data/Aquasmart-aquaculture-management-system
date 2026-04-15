@@ -135,7 +135,7 @@ export async function invalidateFeedInventoryWriteQueries(
     queryClient.invalidateQueries({
       predicate: ({ queryKey }) => isFarmScopedReportsQuery(queryKey, params.farmId),
     }),
-    invalidateRecentActivityQueries(queryClient, { tableName: "feed_inventory_snapshot", date: params.date }),
+    invalidateRecentActivityQueries(queryClient, { tableName: "feed_incoming", date: params.date }),
   ])
 }
 

@@ -11,6 +11,7 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/s
 import { getErrorMessage } from "@/lib/utils/query-result"
 import { calculateWqi, getWqiLabel, selectThresholdRow, WQI_GOOD_MIN, WQI_MODERATE_MIN } from "@/lib/water-quality-index"
 import type { WaterQualityThresholdRow } from "@/features/water-quality/types"
+import { getSemanticColor } from "@/lib/theme/semantic-colors"
 
 type MeasurementRow = {
   id?: number | null
@@ -260,9 +261,9 @@ export default function WaterQualityIndex({
             <span>{`Good (${WQI_GOOD_MIN}+)`}</span>
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden flex">
-            <div className="h-full bg-red-500" style={{ width: "50%" }} />
-            <div className="h-full bg-amber-500" style={{ width: "20%" }} />
-            <div className="h-full bg-emerald-500" style={{ width: "30%" }} />
+            <div className="h-full" style={{ width: "50%", backgroundColor: getSemanticColor("bad") }} />
+            <div className="h-full" style={{ width: "20%", backgroundColor: getSemanticColor("warn") }} />
+            <div className="h-full" style={{ width: "30%", backgroundColor: getSemanticColor("good") }} />
           </div>
         </div>
       </div>

@@ -50,7 +50,7 @@ async function rpcOrEmpty<Name extends OptionsRpcName>(
 
   return resolveClientReadQuery<OptionsRpcRow<Name>>({
     tag,
-    query: q,
+    query: q as PromiseLike<{ data: OptionsRpcRow<Name>[] | null; error: unknown }>,
     signal,
     quietWhen: isQuietOptionsError,
   })

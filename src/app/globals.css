@@ -16,90 +16,156 @@ next-router-prefetch {
 :root {
   --card: #ffffff;
   --ring: #22c55e;
-  --input: #dcebf4;
-  --muted: #eff7fb;
-  --accent: #dcfce7;
-  --border: #dce9f4;
+  --input: #d6eef2;
+  --muted: #e7f6f8;
+  --accent: #d8f3ef;
+  --border: #cce6eb;
   --radius: 0.5rem;
   --chart-1: #22c55e;
   --chart-2: #16a34a;
-  --chart-3: #2563eb;
-  --chart-4: #1d4ed8;
-  --chart-5: #1e3a8a;
-  --chart-grid: rgba(127, 140, 141, 0.18);
-  --chart-tooltip-bg: rgba(44, 62, 80, 0.94);
-  --chart-tooltip-border: rgba(236, 240, 241, 0.14);
-  --chart-tooltip-foreground: #f8fbff;
+  --chart-3: #4fd1f5;
+  --chart-4: #1d9ed8;
+  --chart-5: #123a4b;
+  --chart-grid: rgba(78, 112, 124, 0.18);
+  --chart-tooltip-bg: rgba(10, 35, 45, 0.94);
+  --chart-tooltip-border: rgba(217, 239, 244, 0.2);
+  --chart-tooltip-foreground: #eefbfd;
   --popover: #ffffff;
   --primary: #22c55e;
-  --sidebar: #e7f1fb;
+  --sidebar: color-mix(in srgb, var(--background) 74%, var(--secondary) 26%);
   --font-mono: "IBM Plex Mono", monospace;
   --font-sans: "DM Sans", sans-serif;
-  --secondary: #e1eefb;
-  --background: #f6fbff;
+  --secondary: #d9eef3;
+  --background: #f2fafc;
   --font-serif: "Lora", serif;
-  --foreground: #18324a;
+  --foreground: #183646;
   --destructive: #ef4444;
+  --success: #22c55e;
+  --warning: #d18a14;
+  --info: #1d9ed8;
   --shadow-blur: 8px;
   --shadow-color: hsl(0 0% 0%);
   --sidebar-ring: #22c55e;
   --shadow-spread: -1px;
   --shadow-opacity: 0.1;
-  --sidebar-accent: #dcfce7;
-  --sidebar-border: #dce9f4;
-  --card-foreground: #18324a;
+  --sidebar-accent: #d8f3ef;
+  --sidebar-border: #cce6eb;
+  --card-foreground: #183646;
   --shadow-offset-x: 0px;
   --shadow-offset-y: 4px;
   --sidebar-primary: #22c55e;
-  --muted-foreground: #5b7389;
-  --accent-foreground: #18324a;
-  --popover-foreground: #18324a;
-  --primary-foreground: #ffffff;
-  --sidebar-foreground: #18324a;
-  --secondary-foreground: #294760;
+  --muted-foreground: #567582;
+  --accent-foreground: #183646;
+  --popover-foreground: #183646;
+  --primary-foreground: #f4fffe;
+  --sidebar-foreground: #183646;
+  --secondary-foreground: #2a5362;
   --destructive-foreground: #ffffff;
-  --sidebar-accent-foreground: #18324a;
-  --sidebar-primary-foreground: #ffffff;
+  --success-foreground: #166534;
+  --warning-foreground: #8d5e09;
+  --sidebar-accent-foreground: #183646;
+  --sidebar-primary-foreground: #f4fffe;
+  --info-foreground: #0c6b99;
+  --sidebar-sheen: rgba(255, 255, 255, 0.03);
+  --sidebar-glow: rgba(79, 209, 245, 0.08);
+  --destructive-soft: color-mix(in srgb, var(--destructive) 12%, transparent);
+  --success-soft: color-mix(in srgb, var(--success) 14%, transparent);
+  --warning-soft: color-mix(in srgb, var(--warning) 14%, transparent);
+  --info-soft: color-mix(in srgb, var(--info) 14%, transparent);
+  --brand-hero-from: rgba(5, 18, 24, 0.78);
+  --brand-hero-mid: rgba(8, 25, 33, 0.66);
+  --brand-hero-to: rgba(16, 63, 75, 0.54);
+  --brand-panel-from: rgba(5, 20, 27, 0.96);
+  --brand-panel-to: rgba(10, 35, 43, 0.94);
+  --brand-panel-shell-from: #0c2530;
+  --brand-panel-shell-to: #123443;
+  --brand-section-from: #102b36;
+  --brand-section-to: #133845;
+  --brand-footer-from: #112833;
+  --brand-footer-to: #0c1d26;
+  --brand-mist-from: rgba(79, 209, 245, 0.18);
+  --brand-mist-to: rgba(34, 197, 94, 0.12);
+  --brand-panel-glow: rgba(79, 209, 245, 0.14);
+  --brand-media-overlay-from: rgba(7, 22, 28, 0.04);
+  --brand-media-overlay-to: rgba(7, 22, 28, 0.52);
+  --brand-card-image-overlay-from: rgba(7, 18, 24, 0.1);
+  --brand-card-image-overlay-to: rgba(7, 18, 24, 0.72);
+  --brand-contrast: rgba(255, 255, 255, 0.94);
+  --brand-contrast-muted: rgba(255, 255, 255, 0.74);
+  --brand-chip: rgba(255, 255, 255, 0.12);
 }
 
 .dark {
-  --card: #0d1c2b;
+  --card: #0e2230;
   --ring: #4ade80;
-  --input: #1d3550;
-  --muted: #0d2135;
-  --accent: #12311f;
-  --border: #18314c;
+  --input: #163947;
+  --muted: #0c2430;
+  --accent: #123736;
+  --border: #194451;
   --radius: 0.5rem;
   --chart-1: #4ade80;
   --chart-2: #22c55e;
-  --chart-3: #3b82f6;
-  --chart-4: #2563eb;
-  --chart-5: #1d4ed8;
-  --chart-grid: rgba(140, 164, 188, 0.24);
-  --chart-tooltip-bg: rgba(7, 17, 29, 0.94);
-  --chart-tooltip-border: rgba(140, 164, 188, 0.18);
-  --chart-tooltip-foreground: #d9e8f8;
-  --popover: #0d1c2b;
+  --chart-3: #4fd1f5;
+  --chart-4: #38bdf8;
+  --chart-5: #9fdfec;
+  --chart-grid: rgba(127, 182, 198, 0.24);
+  --chart-tooltip-bg: rgba(7, 22, 31, 0.96);
+  --chart-tooltip-border: rgba(127, 182, 198, 0.18);
+  --chart-tooltip-foreground: #def1f7;
+  --popover: #0e2230;
   --primary: #4ade80;
-  --sidebar: #0d1c2b;
-  --secondary: #0d2841;
-  --background: #07111d;
-  --foreground: #d9e8f8;
+  --sidebar: color-mix(in srgb, var(--background) 72%, var(--secondary) 28%);
+  --secondary: #0f2f3b;
+  --background: #07141b;
+  --foreground: #d7edf4;
   --destructive: #ef4444;
+  --success: #4ade80;
+  --warning: #f2b544;
+  --info: #58c6f5;
   --sidebar-ring: #4ade80;
-  --sidebar-accent: #12311f;
-  --sidebar-border: #18314c;
-  --card-foreground: #d9e8f8;
+  --sidebar-accent: #123736;
+  --sidebar-border: #194451;
+  --card-foreground: #d7edf4;
   --sidebar-primary: #4ade80;
-  --muted-foreground: #8ca4bc;
-  --accent-foreground: #d9e8f8;
-  --popover-foreground: #d9e8f8;
-  --primary-foreground: #07111d;
-  --sidebar-foreground: #d9e8f8;
-  --secondary-foreground: #afc5dd;
+  --muted-foreground: #90aeba;
+  --accent-foreground: #d7edf4;
+  --popover-foreground: #d7edf4;
+  --primary-foreground: #04161c;
+  --sidebar-foreground: #d7edf4;
+  --secondary-foreground: #b9d8e2;
   --destructive-foreground: #07111d;
-  --sidebar-accent-foreground: #d9e8f8;
-  --sidebar-primary-foreground: #07111d;
+  --success-foreground: #bbf7d0;
+  --warning-foreground: #ffd58a;
+  --sidebar-accent-foreground: #d7edf4;
+  --sidebar-primary-foreground: #04161c;
+  --info-foreground: #a0e4ff;
+  --sidebar-sheen: rgba(255, 255, 255, 0.015);
+  --sidebar-glow: rgba(88, 198, 245, 0.08);
+  --destructive-soft: color-mix(in srgb, var(--destructive) 18%, transparent);
+  --success-soft: color-mix(in srgb, var(--success) 18%, transparent);
+  --warning-soft: color-mix(in srgb, var(--warning) 18%, transparent);
+  --info-soft: color-mix(in srgb, var(--info) 18%, transparent);
+  --brand-hero-from: rgba(3, 15, 21, 0.86);
+  --brand-hero-mid: rgba(6, 28, 36, 0.74);
+  --brand-hero-to: rgba(10, 52, 62, 0.62);
+  --brand-panel-from: rgba(4, 18, 24, 0.94);
+  --brand-panel-to: rgba(8, 33, 40, 0.92);
+  --brand-panel-shell-from: #091b24;
+  --brand-panel-shell-to: #0f2c35;
+  --brand-section-from: #0c2029;
+  --brand-section-to: #12323c;
+  --brand-footer-from: #0a1b22;
+  --brand-footer-to: #08151b;
+  --brand-mist-from: rgba(88, 198, 245, 0.18);
+  --brand-mist-to: rgba(74, 222, 128, 0.12);
+  --brand-panel-glow: rgba(88, 198, 245, 0.12);
+  --brand-media-overlay-from: rgba(5, 18, 24, 0.08);
+  --brand-media-overlay-to: rgba(5, 18, 24, 0.56);
+  --brand-card-image-overlay-from: rgba(5, 16, 22, 0.12);
+  --brand-card-image-overlay-to: rgba(5, 16, 22, 0.74);
+  --brand-contrast: rgba(247, 254, 255, 0.94);
+  --brand-contrast-muted: rgba(222, 241, 247, 0.72);
+  --brand-chip: rgba(247, 254, 255, 0.12);
 }
 
 @theme inline {
@@ -125,6 +191,9 @@ next-router-prefetch {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-shadow-blur: var(--shadow-blur);
   --color-shadow-color: var(--shadow-color);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -143,8 +212,11 @@ next-router-prefetch {
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning-foreground: var(--warning-foreground);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-info-foreground: var(--info-foreground);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -158,7 +230,10 @@ next-router-prefetch {
 
   body {
     @apply bg-background text-foreground font-sans antialiased leading-relaxed;
-    background-image: linear-gradient(180deg, var(--background) 0%, var(--secondary) 100%);
+    background-image:
+      radial-gradient(circle at top left, var(--brand-mist-to), transparent 34%),
+      radial-gradient(circle at top right, var(--brand-mist-from), transparent 30%),
+      linear-gradient(180deg, var(--background) 0%, var(--secondary) 100%);
   }
 
   h1,
@@ -173,7 +248,10 @@ next-router-prefetch {
   }
 
   .dark body {
-    background-image: linear-gradient(180deg, var(--background) 0%, var(--secondary) 100%);
+    background-image:
+      radial-gradient(circle at top left, var(--brand-mist-to), transparent 34%),
+      radial-gradient(circle at top right, var(--brand-mist-from), transparent 30%),
+      linear-gradient(180deg, var(--background) 0%, var(--secondary) 100%);
   }
 
   @media (max-width: 768px) {
@@ -209,8 +287,8 @@ next-router-prefetch {
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(135deg, rgba(36, 91, 132, 0.06), transparent 40%),
-      radial-gradient(circle at top right, rgba(106, 138, 165, 0.08), transparent 24%);
+      linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, transparent), transparent 40%),
+      radial-gradient(circle at top right, var(--brand-mist-from), transparent 24%);
     pointer-events: none;
   }
 
@@ -288,6 +366,34 @@ next-router-prefetch {
   .soft-input-surface {
     @apply rounded-xl border border-border bg-background;
     box-shadow: 0 12px 30px -24px rgba(15, 23, 32, 0.1);
+  }
+
+  .kpi-grid {
+    @apply grid grid-cols-1 gap-4 auto-rows-fr;
+  }
+
+  .kpi-card {
+    @apply h-full rounded-[1.15rem] border border-border/80 bg-card shadow-sm;
+  }
+
+  .kpi-card-header {
+    @apply px-4 pb-2 pt-4;
+  }
+
+  .kpi-card-title {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  .kpi-card-content {
+    @apply flex h-full flex-col px-4 pb-4 pt-0;
+  }
+
+  .kpi-card-value {
+    @apply mt-1 text-2xl font-semibold leading-none tracking-tight text-foreground;
+  }
+
+  .kpi-card-meta {
+    @apply mt-2 text-xs leading-5 text-muted-foreground;
   }
 
   .chart-canvas-shell {

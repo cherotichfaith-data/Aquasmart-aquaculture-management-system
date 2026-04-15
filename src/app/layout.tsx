@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { AuthProvider, ThemeProvider, QueryProvider } from "@/components/providers"
+import { SyncProvider } from "@/components/offline/sync-provider"
 import { FarmOnboardingGate } from "@/components/providers/farm-onboarding-gate"
 import { ToastProvider } from "@/components/shared/toast-provider"
 import { NotificationsProvider } from "@/components/notifications/notifications-provider"
@@ -29,6 +30,7 @@ export const metadata: Metadata = {
     description: "Real-time monitoring and management system for aquaculture farm operations",
     images: ["/use this.png"],
   },
+  manifest: "/manifest.json",
   icons: {
     icon: "/use this.png",
     apple: "/use this.png",
@@ -47,11 +49,13 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <QueryProvider>
-              <ToastProvider>
-                <NotificationsProvider>
-                  <FarmOnboardingGate>{children}</FarmOnboardingGate>
-                </NotificationsProvider>
-              </ToastProvider>
+              <SyncProvider>
+                <ToastProvider>
+                  <NotificationsProvider>
+                    <FarmOnboardingGate>{children}</FarmOnboardingGate>
+                  </NotificationsProvider>
+                </ToastProvider>
+              </SyncProvider>
             </QueryProvider>
           </AuthProvider>
         </ThemeProvider>

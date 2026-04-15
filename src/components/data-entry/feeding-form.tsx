@@ -20,12 +20,12 @@ import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useRecordFeeding } from "@/lib/hooks/use-feeding"
-import { useFeedPlans, useFeedingRecords } from "@/lib/hooks/use-reports"
+import { useFeedingRecords } from "@/lib/hooks/use-reports"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useLatestWaterQualityStatus, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { diffDateDays } from "@/lib/time-series"
 import { logSbError } from "@/lib/supabase/log"
-import { selectApplicableFeedPlan } from "@/app/feed/_lib/feed-analytics"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { DependencyBlocker } from "./dependency-blocker"
 import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import {
@@ -145,14 +145,6 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
     orderAsc: false,
     enabled: Boolean(farmId) && Boolean(selectedDate) && Number.isFinite(selectedSystemId),
   })
-  const feedPlansQuery = useFeedPlans({
-    farmId,
-    systemIds: Number.isFinite(selectedSystemId) ? [selectedSystemId] : [],
-    batchId: Number.isFinite(selectedBatchId as number) ? selectedBatchId ?? undefined : undefined,
-    dateFrom: selectedDate || undefined,
-    dateTo: selectedDate || undefined,
-    enabled: Boolean(farmId) && Boolean(selectedDate) && Number.isFinite(selectedSystemId),
-  })
   const latestWaterStatusQuery = useLatestWaterQualityStatus(
     Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
     { farmId },
@@ -176,31 +168,8 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
   }, [doQuery.data])
   const latestWaterStatus =
     latestWaterStatusQuery.data?.status === "success" ? latestWaterStatusQuery.data.data[0] ?? null : null
-  const matchedFeedPlan = useMemo(() => {
-    const rows = feedPlansQuery.data?.status === "success" ? feedPlansQuery.data.data : []
-    if (!selectedDate || !Number.isFinite(selectedSystemId)) return null
-    return selectApplicableFeedPlan(rows, {
-      systemId: selectedSystemId,
-      date: selectedDate,
-      abwG: latestInventoryRow?.abw_last_sampling ?? null,
-      batchId: Number.isFinite(selectedBatchId as number) ? selectedBatchId : null,
-      feedTypeId: Number.isFinite(selectedFeedId) ? selectedFeedId : null,
-    })
-  }, [
-    feedPlansQuery.data,
-    latestInventoryRow?.abw_last_sampling,
-    selectedBatchId,
-    selectedDate,
-    selectedFeedId,
-    selectedSystemId,
-  ])
-
   const doValue = latestDoReading?.parameter_value ?? null
   const yesterdayFeedAmount = yesterdayRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
-  const targetDailyFeedKg =
-    latestInventoryRow?.biomass_last_sampling != null && matchedFeedPlan?.target_feeding_rate_pct != null
-      ? (latestInventoryRow.biomass_last_sampling * matchedFeedPlan.target_feeding_rate_pct) / 100
-      : null
   const latestDoAge = diffDateDays(latestDoReading?.date, selectedDate)
   const doTone =
     doValue == null
@@ -270,6 +239,10 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
       <div className="mb-6">
         <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
         <p className="text-sm text-muted-foreground">Fast cage-first feeding entry with live feed target context.</p>
+      </div>
+
+      <div className="mb-4">
+        <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
@@ -410,11 +383,6 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                     <FormItem>
                       <FormLabel>
                         Amount (kg)
-                        {targetDailyFeedKg != null ? (
-                          <span className="ml-2 text-xs font-normal text-muted-foreground">
-                            Target: {targetDailyFeedKg.toFixed(2)} kg for current ABW
-                          </span>
-                        ) : null}
                       </FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} />
@@ -532,18 +500,6 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
             <InfoStat
               label="Yesterday's Feed"
               value={previousDate ? `${yesterdayFeedAmount.toFixed(2)} kg on ${previousDate}` : "No prior day"}
-            />
-            <InfoStat
-              label="Current Feed Target"
-              value={
-                matchedFeedPlan?.target_feeding_rate_pct != null
-                  ? `${matchedFeedPlan.target_feeding_rate_pct.toFixed(2)}% BW/day`
-                  : "No active target"
-              }
-            />
-            <InfoStat
-              label="Daily Feed Target"
-              value={targetDailyFeedKg != null ? `${targetDailyFeedKg.toFixed(2)} kg/day` : "No biomass target available"}
             />
             <InfoStat
               label="ABW / Biomass"

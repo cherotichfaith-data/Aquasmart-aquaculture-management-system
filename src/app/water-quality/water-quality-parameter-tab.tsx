@@ -20,19 +20,6 @@ const formatDateLabel = (value: string) => {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(parsed)
 }
 
-const pickNumericValues = (values: Array<number | null | undefined>) =>
-  values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-
-const getObservedMax = (values: Array<number | null | undefined>, fallback = 1) => {
-  const numeric = pickNumericValues(values)
-  return numeric.length ? Math.max(...numeric) : fallback
-}
-
-const getObservedMin = (values: Array<number | null | undefined>, fallback = 0) => {
-  const numeric = pickNumericValues(values)
-  return numeric.length ? Math.min(...numeric) : fallback
-}
-
 export function WaterQualityParameterTab({
   latestUpdatedAt,
   isFetching,
@@ -72,63 +59,6 @@ export function WaterQualityParameterTab({
     [parameterTrendData],
   )
   const parameterXAxisLimit = getDateAxisMaxTicks(parameterDateDomain.length)
-
-  const parameterAxisDomain = useMemo(() => {
-    const primaryValues = [
-      ...parameterTrendData.map((row) => row.mean),
-      ...parameterTrendData.map((row) => row.rolling),
-      ...(selectedParameter === "dissolved_oxygen" ? [lowDoThreshold] : []),
-      ...(selectedParameter === "ammonia" ? [highAmmoniaThreshold] : []),
-    ]
-    const observedMin = getObservedMin(primaryValues)
-    const observedMax = getObservedMax(primaryValues)
-
-    if (selectedParameter === "pH") {
-      return {
-        min: Math.max(0, Math.floor((observedMin - 0.35) * 10) / 10),
-        max: Math.ceil((observedMax + 0.35) * 10) / 10,
-      }
-    }
-
-    if (selectedParameter === "temperature") {
-      return {
-        min: Math.max(0, Math.floor(observedMin - 1)),
-        max: Math.ceil(observedMax + 1),
-      }
-    }
-
-    return {
-      min: 0,
-      max: Math.ceil(observedMax * 1.12 * 100) / 100,
-    }
-  }, [highAmmoniaThreshold, lowDoThreshold, parameterTrendData, selectedParameter])
-
-  const feedingAxisMax = useMemo(
-    () => Math.max(1, Math.ceil(getObservedMax(parameterTrendData.map((row) => row.feeding)) * 1.15)),
-    [parameterTrendData],
-  )
-
-  const mortalityAxisMax = useMemo(
-    () => Math.max(1, Math.ceil(getObservedMax(parameterTrendData.map((row) => row.mortality)) * 1.15)),
-    [parameterTrendData],
-  )
-
-  const diurnalAxisMax = useMemo(() => {
-    const values = diurnalDoPattern.rows.flatMap((row) =>
-      diurnalDoPattern.dateSeries.map((date) => row[date as keyof typeof row] as number | null),
-    )
-    return Math.ceil(getObservedMax(values) * 1.12 * 100) / 100
-  }, [diurnalDoPattern])
-
-  const dailyTempAxisDomain = useMemo(() => {
-    const values = dailyTempAverage.map((row) => row.average)
-    const min = getObservedMin(values)
-    const max = getObservedMax(values)
-    return {
-      min: Math.max(0, Math.floor(min - 1)),
-      max: Math.ceil(max + 1),
-    }
-  }, [dailyTempAverage])
 
   const parameterChartData = useMemo<ChartData<"line">>(() => {
     const datasets: ChartData<"line">["datasets"] = [
@@ -230,8 +160,6 @@ export function WaterQualityParameterTab({
       buildCartesianOptions({
         palette,
         legend: true,
-        min: parameterAxisDomain.min,
-        max: parameterAxisDomain.max,
         xMaxTicksLimit: parameterXAxisLimit,
         xTitle: "Date",
         yTitle: parameterLabels[selectedParameter],
@@ -266,10 +194,8 @@ export function WaterQualityParameterTab({
         extraScales: {
           ...(showFeedingOverlay
             ? {
-              y1: {
+                y1: {
                   position: "right",
-                  min: 0,
-                  max: feedingAxisMax,
                   border: { display: false },
                   grid: { drawOnChartArea: false, drawTicks: false },
                   title: {
@@ -295,8 +221,6 @@ export function WaterQualityParameterTab({
                   position: "right",
                   display: true,
                   offset: showFeedingOverlay,
-                  min: 0,
-                  max: mortalityAxisMax,
                   border: { display: false },
                   grid: { drawOnChartArea: false, drawTicks: false },
                   title: {
@@ -320,12 +244,7 @@ export function WaterQualityParameterTab({
       }),
     [
       palette,
-      feedingAxisMax,
-      mortalityAxisMax,
       parameterDateDomain,
-      parameterAxisDomain.max,
-      parameterAxisDomain.min,
-      parameterTrendData,
       parameterXAxisLimit,
       selectedParameter,
       selectedParameterUnit,
@@ -356,8 +275,6 @@ export function WaterQualityParameterTab({
       buildCartesianOptions({
         palette,
         legend: true,
-        min: 0,
-        max: diurnalAxisMax,
         xTitle: "Time of day",
         yTitle: "Dissolved oxygen (mg/L)",
         tooltip: {
@@ -370,7 +287,7 @@ export function WaterQualityParameterTab({
           },
         },
       }),
-    [diurnalAxisMax, palette],
+    [palette],
   )
 
   const dailyTempData = useMemo<ChartData<"line">>(
@@ -405,8 +322,6 @@ export function WaterQualityParameterTab({
     () =>
       buildCartesianOptions({
         palette,
-        min: dailyTempAxisDomain.min,
-        max: dailyTempAxisDomain.max,
         xMaxTicksLimit: dailyTempXAxisLimit,
         xTitle: "Date",
         yTitle: "Temperature (deg C)",
@@ -423,7 +338,7 @@ export function WaterQualityParameterTab({
         xTickFormatter: (_value, index) =>
           formatDateLabel(dailyTempDateDomain[index] ?? ""),
       }),
-    [dailyTempAxisDomain.max, dailyTempAxisDomain.min, dailyTempDateDomain, dailyTempXAxisLimit, palette],
+    [dailyTempDateDomain, dailyTempXAxisLimit, palette],
   )
 
   return (

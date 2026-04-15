@@ -6,7 +6,6 @@ import { Bar, Line } from "@/components/charts/chartjs"
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
-  buildMetricAxisBounds,
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
@@ -29,11 +28,11 @@ export function MortalitySummaryCards({
   massEventCount: number
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Latest Record</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{latestDate ?? "N/A"}</div><p className="text-xs text-muted-foreground mt-1">Most recent record</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Mortality</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{totalMortality}</div><p className="text-xs text-muted-foreground mt-1">Selected period</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Mortality %</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{mortalityPercent != null ? `${mortalityPercent.toFixed(2)}%` : "N/A"}</div><p className="text-xs text-muted-foreground mt-1">Against inventory baseline</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Mass Events</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{massEventCount}</div><p className="text-xs text-muted-foreground mt-1">Dead count &ge; 100 fish</p></CardContent></Card>
+    <div className="kpi-grid md:grid-cols-4">
+      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Latest Record</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{latestDate ?? "N/A"}</div><p className="kpi-card-meta">Most recent record</p></CardContent></Card>
+      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Total Mortality</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{totalMortality}</div><p className="kpi-card-meta">Selected period</p></CardContent></Card>
+      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Mortality %</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{mortalityPercent != null ? `${mortalityPercent.toFixed(2)}%` : "N/A"}</div><p className="kpi-card-meta">Against inventory baseline</p></CardContent></Card>
+      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Mass Events</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{massEventCount}</div><p className="kpi-card-meta">Dead count &ge; 100 fish</p></CardContent></Card>
     </div>
   )
 }
@@ -42,10 +41,6 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
   const palette = getChartPalette()
   const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
   const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
-  const yBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.dead_count), { includeZero: true }),
-    [chartRows],
-  )
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
   const data = useMemo<ChartData<"line">>(
     () => ({
@@ -69,8 +64,6 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
       buildCartesianOptions({
         palette,
         legend: true,
-        min: yBounds.min,
-        max: yBounds.max,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: "Mortality (fish)",
@@ -84,7 +77,7 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
         xTickFormatter: (_value, index) =>
           formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
       }),
-    [dateDomain, palette, xLimit, yBounds.max, yBounds.min],
+    [dateDomain, palette, xLimit],
   )
 
   return (
@@ -124,13 +117,10 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
     }),
     [causeBreakdown, palette.destructive],
   )
-  const maxValue = Math.max(10, ...causeBreakdown.map((row) => row.count))
   const options = useMemo<ChartOptions<"bar">>(
     () =>
       buildCartesianOptions({
         palette,
-        min: 0,
-        max: Math.ceil(maxValue * 1.1),
         xTitle: "Cause",
         yTitle: "Mortality (fish)",
         yTickFormatter: (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 }),
@@ -140,7 +130,7 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
           },
         },
       }),
-    [maxValue, palette],
+    [palette],
   )
 
   return (

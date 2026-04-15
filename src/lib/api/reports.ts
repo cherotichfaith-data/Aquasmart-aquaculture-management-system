@@ -3,31 +3,33 @@ import type { QueryResult } from "@/lib/supabase-client"
 import { postJson } from "@/lib/commands/_utils"
 import { isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 
-type FeedInventorySnapshotRow = Tables<"feed_inventory_snapshot">
+type FeedIncomingRow = Tables<"feed_incoming">
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
-type FarmKpisTodayRow = Database["public"]["Functions"]["get_farm_kpis_today"]["Returns"][number]
 type FcrTrendRow = Database["public"]["Functions"]["get_fcr_trend"]["Returns"][number]
-type FcrTrendWindowRow = Database["public"]["Functions"]["get_fcr_trend_window"]["Returns"][number]
 type GrowthTrendRow = Database["public"]["Functions"]["get_growth_trend"]["Returns"][number]
-type GrowthTrendWindowRow = Database["public"]["Functions"]["get_growth_trend_window"]["Returns"][number]
 type RunningStockRow = Database["public"]["Functions"]["get_running_stock"]["Returns"][number]
 type FeedingRecordRow = Tables<"feeding_record">
-type FeedPlanRow = Tables<"feed_plan">
 type FishHarvestRow = Tables<"fish_harvest">
 type FishSamplingWeightRow = Tables<"fish_sampling_weight">
 type FishMortalityRow = Tables<"fish_mortality">
-type ChangeLogRow = Tables<"change_log">
 type SystemRow = Tables<"system">
 type WaterQualityMeasurementRow = Tables<"water_quality_measurement">
 type FishTransferRow = Tables<"fish_transfer">
 type FishStockingRow = Tables<"fish_stocking">
+export type ChangeLogRow = {
+  id: string | number
+  table_name: string | null
+  change_type: Enums<"change_type_enum"> | null
+  column_name: string | null
+  change_time: string | null
+  system_id?: number | null
+  batch_id?: number | null
+}
 
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
-type FeedFarmKpisToday = FarmKpisTodayRow
-export type FeedFcrTrendRow = FcrTrendRow | FcrTrendWindowRow
-export type FeedGrowthTrendRow = GrowthTrendRow | GrowthTrendWindowRow
+export type FeedFcrTrendRow = FcrTrendRow
+export type FeedGrowthTrendRow = GrowthTrendRow
 export type FeedRunningStockRow = RunningStockRow
-export type FeedPlan = FeedPlanRow
 
 export async function getFeedingRecords(params?: {
   systemId?: number
@@ -58,27 +60,6 @@ export async function getFeedingRecords(params?: {
   }
 }
 
-export async function getFarmKpisToday(params: {
-  farmId?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedFarmKpisToday>> {
-  if (!params.farmId) {
-    return toQuerySuccess<FeedFarmKpisToday>([])
-  }
-
-  try {
-    const response = await postJson<{ data: FeedFarmKpisToday[] }, Omit<typeof params, "signal">>(
-      "/api/reports/farm-kpis-today/query",
-      { farmId: params.farmId },
-      { signal: params.signal },
-    )
-    return toQuerySuccess<FeedFarmKpisToday>(response.data)
-  } catch (error) {
-    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedFarmKpisToday>([])
-    return toQueryError("getFarmKpisToday", error)
-  }
-}
-
 export async function getRunningStock(params: {
   farmId?: string | null
   signal?: AbortSignal
@@ -100,32 +81,6 @@ export async function getRunningStock(params: {
   }
 }
 
-export async function getFeedPlans(params: {
-  farmId?: string | null
-  systemIds?: number[]
-  batchId?: number
-  dateFrom?: string
-  dateTo?: string
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedPlanRow>> {
-  try {
-    const response = await postJson<{ data: FeedPlanRow[] }, Omit<typeof params, "signal">>(
-      "/api/reports/feed-plans/query",
-      {
-        farmId: params.farmId,
-        systemIds: params.systemIds,
-        batchId: params.batchId,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-      },
-      { signal: params.signal },
-    )
-    return toQuerySuccess<FeedPlanRow>(response.data)
-  } catch (error) {
-    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedPlanRow>([])
-    return toQueryError("getFeedPlans", error)
-  }
-}
 
 export async function getFcrTrend(params: {
   farmId?: string | null
@@ -362,7 +317,7 @@ const emptyRecentEntries = () => ({
   transfer: toQuerySuccess<FishTransferRow>([]),
   harvest: toQuerySuccess<FishHarvestRow>([]),
   water_quality: toQuerySuccess<WaterQualityMeasurementRow>([]),
-  incoming_feed: toQuerySuccess<FeedInventorySnapshotRow>([]),
+  incoming_feed: toQuerySuccess<FeedIncomingRow>([]),
   stocking: toQuerySuccess<FishStockingRow>([]),
   systems: toQuerySuccess<SystemRow>([]),
 })

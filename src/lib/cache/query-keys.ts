@@ -64,28 +64,8 @@ export const queryKeys = {
     },
   },
   reports: {
-    farmKpisToday(farmId?: string | null) {
-      return ["reports", "farm-kpis-today", farmToken(farmId)] as const
-    },
     runningStock(farmId?: string | null) {
       return ["reports", "running-stock", farmToken(farmId)] as const
-    },
-    feedPlans(params?: {
-      farmId?: string | null
-      systemIds?: number[]
-      batchId?: number
-      dateFrom?: string
-      dateTo?: string
-    }) {
-      return [
-        "reports",
-        "feed-plans",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        numberToken(params?.batchId),
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
     },
     feedingRecords(params?: {
       farmId?: string | null
@@ -418,7 +398,13 @@ export const queryKeys = {
   farmUserRole(farmId?: string | null, userId?: string | null) {
     return ["farm-user-role", farmToken(farmId), userId ?? "anon"] as const
   },
-  timePeriodBounds(params: { farmId?: string | null; timePeriod: string; systemId?: number | null }) {
-    return ["time-period-bounds", farmToken(params.farmId), params.timePeriod, numberToken(params.systemId)] as const
+  timePeriodBounds(params: { farmId?: string | null; timePeriod: string; systemId?: number | null; scope?: string | null }) {
+    return [
+      "time-period-bounds",
+      farmToken(params.farmId),
+      params.timePeriod,
+      numberToken(params.systemId),
+      params.scope ?? "dashboard",
+    ] as const
   },
 }

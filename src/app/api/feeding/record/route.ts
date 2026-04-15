@@ -15,6 +15,7 @@ const feedingSchema = z.object({
   feeding_amount: z.number().positive(),
   feeding_response: z.enum(["very_good", "good", "fair", "bad"]),
   notes: z.string().max(500).nullable().optional(),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
   const { data: row, error: insertError } = await supabase
     .from("feeding_record")
-    .insert({
+    .upsert({
       system_id: payload.system_id,
       batch_id: payload.batch_id ?? null,
       date: payload.date,
@@ -57,9 +58,13 @@ export async function POST(request: Request) {
       feeding_amount: payload.feeding_amount,
       feeding_response: payload.feeding_response,
       notes: payload.notes?.trim() ? payload.notes.trim() : null,
+      local_id: payload.local_id ?? null,
+      synced_at: new Date().toISOString(),
+    }, {
+      onConflict: "local_id",
     })
     .select()
-    .single()
+    .maybeSingle()
 
   if (insertError || !row) {
     logSbError("feeding:record:insert", insertError)

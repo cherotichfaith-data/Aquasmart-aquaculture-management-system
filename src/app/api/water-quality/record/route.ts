@@ -24,6 +24,7 @@ const measurementSchema = z.object({
   ]),
   parameter_value: z.number(),
   location_reference: z.string().max(200).nullable().optional(),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -46,9 +47,14 @@ export async function POST(request: Request) {
   const normalized = payload.map((row) => ({
     ...row,
     location_reference: row.location_reference?.trim() ? row.location_reference.trim() : null,
+    local_id: row.local_id ?? null,
+    synced_at: new Date().toISOString(),
   }))
 
-  const { data, error } = await supabase.from("water_quality_measurement").insert(normalized).select()
+  const { data, error } = await supabase
+    .from("water_quality_measurement")
+    .upsert(normalized, { onConflict: "local_id" })
+    .select()
 
   if (error || !data) {
     logSbError("water-quality:record:insert", error)

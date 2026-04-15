@@ -17,7 +17,6 @@ import { computeEfcrFromProductionRows } from "@/features/dashboard/analytics-sh
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
-  buildMetricAxisBounds,
   createVerticalGradient,
   getChartPalette,
   getDateAxisMaxTicks,
@@ -93,15 +92,6 @@ export default function PopulationOverview({
   const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
   const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
-  const efcrBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.efcrPeriod), { minFloor: 0, targetTicks: 4, trimOutliers: true }),
-    [chartRows],
-  )
-  const mortalityBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.mortalityCount), { includeZero: true }),
-    [chartRows],
-  )
-
   const efcrData = useMemo<ChartData<"line">>(
     () => ({
       labels: dateDomain,
@@ -150,8 +140,6 @@ export default function PopulationOverview({
     () =>
       buildCartesianOptions({
         palette,
-        min: efcrBounds.min,
-        max: efcrBounds.max,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: "eFCR",
@@ -170,15 +158,13 @@ export default function PopulationOverview({
         xTickFormatter: (_value, index) =>
           formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
       }),
-    [dateDomain, efcrBounds.max, efcrBounds.min, palette, xLimit],
+    [dateDomain, palette, xLimit],
   )
 
   const mortalityOptions = useMemo<ChartOptions<"line">>(
     () =>
       buildCartesianOptions({
         palette,
-        min: mortalityBounds.min,
-        max: mortalityBounds.max,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: "Mortality (fish)",
@@ -197,7 +183,7 @@ export default function PopulationOverview({
         xTickFormatter: (_value, index) =>
           formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
       }),
-    [dateDomain, mortalityBounds.max, mortalityBounds.min, palette, xLimit],
+    [dateDomain, palette, xLimit],
   )
 
   const errorMessage = getErrorMessage(summaryQuery.error)

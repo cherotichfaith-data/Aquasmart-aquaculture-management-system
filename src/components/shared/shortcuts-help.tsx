@@ -6,12 +6,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 const shortcuts = [
   { label: "Quick actions", keys: ["Ctrl", "K"] },
+]
+
+const dataEntryShortcuts = [
   { label: "New entry", keys: ["Ctrl", "N"] },
   { label: "Record feeding", keys: ["Ctrl", "Shift", "F"] },
   { label: "Record sampling", keys: ["Ctrl", "Shift", "S"] },
 ]
 
-export function ShortcutsHelp() {
+export function ShortcutsHelp({ canAccessDataEntry = true }: { canAccessDataEntry?: boolean }) {
+  const visibleShortcuts = canAccessDataEntry ? [...shortcuts, ...dataEntryShortcuts] : shortcuts
+
   return (
     <div className="fixed bottom-4 right-4 z-40">
       <Popover>
@@ -23,7 +28,7 @@ export function ShortcutsHelp() {
         </PopoverTrigger>
         <PopoverContent className="w-64 p-3">
           <div className="space-y-2">
-            {shortcuts.map((shortcut) => (
+            {visibleShortcuts.map((shortcut) => (
               <div key={shortcut.label} className="flex items-center justify-between text-sm">
                 <span>{shortcut.label}</span>
                 <span className="flex items-center gap-1">

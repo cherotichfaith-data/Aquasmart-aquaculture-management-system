@@ -6,7 +6,6 @@ import { Line } from "@/components/charts/chartjs"
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
-  buildMetricAxisBounds,
   createVerticalGradient,
   getChartPalette,
   getDateAxisMaxTicks,
@@ -31,11 +30,11 @@ type GrowthIntervalRow = {
 
 export function GrowthSummaryCards({ latest }: { latest: any }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Current ABW</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatNumberValue(latest?.average_body_weight, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="mt-1 text-xs text-muted-foreground">Latest sampled ABW in scope</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Biomass Increase</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatNumberValue(latest?.biomass_increase_period, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="mt-1 text-xs text-muted-foreground">Latest period</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Biomass</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatNumberValue(latest?.total_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="mt-1 text-xs text-muted-foreground">Most recent production row in scope</p></CardContent></Card>
-      <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Feed Amount</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatNumberValue(latest?.total_feed_amount_period, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="mt-1 text-xs text-muted-foreground">Latest period</p></CardContent></Card>
+    <div className="kpi-grid md:grid-cols-4">
+      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Current ABW</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{formatNumberValue(latest?.average_body_weight, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="kpi-card-meta">Latest sampled ABW in scope</p></CardContent></Card>
+      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Biomass Increase</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{formatNumberValue(latest?.biomass_increase_period, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="kpi-card-meta">Latest period</p></CardContent></Card>
+      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Total Biomass</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{formatNumberValue(latest?.total_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="kpi-card-meta">Most recent production row in scope</p></CardContent></Card>
+      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Feed Amount</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{formatNumberValue(latest?.total_feed_amount_period, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="kpi-card-meta">Latest period</p></CardContent></Card>
     </div>
   )
 }
@@ -44,10 +43,6 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
   const palette = getChartPalette()
   const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
   const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
-  const yBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.average_body_weight), { minFloor: 0 }),
-    [chartRows],
-  )
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
   const data = useMemo<ChartData<"line">>(
     () => ({
@@ -71,8 +66,6 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
     () =>
       buildCartesianOptions({
         palette,
-        min: yBounds.min,
-        max: yBounds.max,
         xMaxTicksLimit: xLimit,
         xTitle: "Sampling date",
         yTitle: "ABW (g)",
@@ -87,7 +80,7 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
         xTickFormatter: (_value, index) =>
           formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
       }),
-    [dateDomain, palette, xLimit, yBounds.max, yBounds.min],
+    [dateDomain, palette, xLimit],
   )
 
   return (
@@ -112,10 +105,6 @@ export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean;
   const palette = getChartPalette()
   const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
   const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
-  const yBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.total_biomass), { minFloor: 0 }),
-    [chartRows],
-  )
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
   const data = useMemo<ChartData<"line">>(
     () => ({
@@ -139,8 +128,6 @@ export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean;
       buildCartesianOptions({
         palette,
         legend: true,
-        min: yBounds.min,
-        max: yBounds.max,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: "Biomass (kg)",
@@ -155,7 +142,7 @@ export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean;
         xTickFormatter: (_value, index) =>
           formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
       }),
-    [dateDomain, palette, xLimit, yBounds.max, yBounds.min],
+    [dateDomain, palette, xLimit],
   )
 
   return (

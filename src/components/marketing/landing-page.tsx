@@ -135,7 +135,7 @@ export default function LandingPage() {
             priority
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(5,18,24,0.78)_0%,rgba(8,25,33,0.66)_42%,rgba(16,63,75,0.54)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,var(--brand-hero-from)_0%,var(--brand-hero-mid)_42%,var(--brand-hero-to)_100%)]" />
         </div>
 
         <header className="absolute inset-x-0 top-0 z-20 px-4 pt-5 md:px-6">
@@ -197,25 +197,25 @@ export default function LandingPage() {
                   <Button
                     className="w-full rounded-full px-8 text-base sm:w-auto"
                     size="lg"
-                    onClick={() => scrollToId("platform")}
+                    onClick={() => router.push("/auth?mode=signup")}
                   >
-                    Explore Platform
+                    Get started
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="lg"
                     className="w-full rounded-full border-white/35 bg-transparent px-8 text-base text-white hover:bg-white/10 hover:text-white sm:w-auto"
-                    onClick={() => scrollToId("modules")}
+                    onClick={() => router.push("/auth")}
                   >
-                    View Modules
+                    Sign in
                   </Button>
                 </div>
               </div>
 
               <div className="hidden w-[220px] md:flex lg:mr-20 lg:w-[270px]">
-                <div className="relative w-full rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(5,20,27,0.96),rgba(10,35,43,0.94))] p-3 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.7)]">
-                  <div className="overflow-hidden rounded-[22px] bg-[linear-gradient(180deg,#0c2530,#123443)]">
+                <div className="relative w-full rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,var(--brand-panel-from),var(--brand-panel-to))] p-3 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.7)]">
+                  <div className="overflow-hidden rounded-[22px] bg-[linear-gradient(180deg,var(--brand-panel-shell-from),var(--brand-panel-shell-to))]">
                     <div className="flex items-center justify-between bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
                       <span>AquaSmart Live</span>
                       <span>Online</span>
@@ -299,7 +299,7 @@ export default function LandingPage() {
                   >
                     <source src="/fish video.mp4" type="video/mp4" />
                   </video>
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,22,28,0.04),rgba(7,22,28,0.52))]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--brand-media-overlay-from),var(--brand-media-overlay-to))]" />
                 </div>
               </div>
             </div>
@@ -326,7 +326,7 @@ export default function LandingPage() {
 
       <section
         id="modules"
-        className="relative overflow-hidden bg-[linear-gradient(180deg,#102b36_0%,#133845_100%)] py-20 md:py-28"
+        className="relative overflow-hidden bg-[linear-gradient(180deg,var(--brand-section-from)_0%,var(--brand-section-to)_100%)] py-20 md:py-28"
       >
         <div className="container mx-auto px-4 md:px-6">
           <div className="space-y-8">
@@ -357,7 +357,7 @@ export default function LandingPage() {
                   >
                     <div className="relative h-52 overflow-hidden rounded-[24px]">
                       <Image src={module.imageSrc} alt={module.title} fill className="object-cover" />
-                      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,18,24,0.1),rgba(7,18,24,0.72))]" />
+                      <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--brand-card-image-overlay-from),var(--brand-card-image-overlay-to))]" />
                       <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-card/90 p-4 backdrop-blur-sm">
                         <span className="text-xs font-semibold tracking-[0.18em] text-muted-foreground">
                           {module.category}
@@ -401,7 +401,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="bg-[linear-gradient(180deg,#112833_0%,#0c1d26_100%)] px-4 py-16 text-sm text-white/60 md:px-6 md:py-18">
+      <footer className="bg-[linear-gradient(180deg,var(--brand-footer-from)_0%,var(--brand-footer-to)_100%)] px-4 py-16 text-sm text-white/60 md:px-6 md:py-18">
         <div className="container mx-auto flex flex-col gap-4 border-t border-white/10 pt-6 md:flex-row md:items-center md:justify-between">
           <p>&copy; 2026 AquaSmart. Aquaculture operations and analytics platform.</p>
           <div className="flex flex-wrap gap-4 self-start md:self-auto">

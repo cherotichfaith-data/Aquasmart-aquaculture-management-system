@@ -16,10 +16,12 @@ export function addOptimisticActivity(
     change_time: new Date().toISOString(),
   }
 
-  queryClient.setQueriesData({ queryKey: ["recent-activities"] }, (old: any) => {
-    if (!old || old.status !== "success") return old
-    const next = [optimistic, ...(old.data ?? [])].slice(0, 10)
-    return { ...old, data: next }
+  queryClient.setQueriesData({ queryKey: ["recent-activities"] }, (old: unknown) => {
+    if (!old || typeof old !== "object") return old
+    const o = old as { status?: string; data?: unknown[] }
+    if (o.status !== "success") return old
+    const next = [optimistic, ...(o.data ?? [])].slice(0, 10)
+    return { ...o, data: next }
   })
 }
 
@@ -36,7 +38,7 @@ export type RecentEntriesKey =
 
 type RecentEntriesPayload = {
   status: "success" | "error"
-  data: any[]
+  data: Record<string, unknown>[]
   error?: string
 }
 

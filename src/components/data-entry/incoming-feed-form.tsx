@@ -23,19 +23,12 @@ import { DependencyBlocker } from "./dependency-blocker"
 import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import { InfoPanel, InfoStat } from "./form-support"
 
-const SNAPSHOT_TIMES = [
-  { value: "08:00", label: "8:00 AM" },
-  { value: "16:00", label: "4:00 PM" },
-] as const
-
 const formSchema = z.object({
   date: z.string().min(1, "Date is required"),
-  snapshot_time: z.enum(["08:00", "16:00"]),
   feed_id: z.string().min(1, "Feed type is required"),
   bag_weight_kg: z.coerce.number().min(0.01, "Bag weight must be positive"),
   number_of_bags: z.coerce.number().int().min(0, "Amount of bags cannot be negative"),
   open_bags_kg: z.coerce.number().min(0, "Open bag weight cannot be negative"),
-  notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 })
 
 interface IncomingFeedFormProps {
@@ -51,12 +44,10 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
-      snapshot_time: "08:00",
       feed_id: "",
       bag_weight_kg: 25,
       number_of_bags: 0,
       open_bags_kg: 0,
-      notes: "",
     },
   })
 
@@ -74,22 +65,16 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
       await mutation.mutateAsync({
         farm_id: farmId,
         date: values.date,
-        snapshot_time: values.snapshot_time,
         feed_type_id: Number(values.feed_id),
-        bag_weight_kg: values.bag_weight_kg,
-        number_of_bags: values.number_of_bags,
-        open_bags_kg: values.open_bags_kg,
-        notes: values.notes?.trim() ? values.notes.trim() : null,
+        feed_amount: values.bag_weight_kg * values.number_of_bags + values.open_bags_kg,
       })
 
       form.reset({
         date: new Date().toISOString().split("T")[0],
-        snapshot_time: values.snapshot_time,
         feed_id: values.feed_id,
         bag_weight_kg: values.bag_weight_kg,
         number_of_bags: 0,
         open_bags_kg: 0,
-        notes: "",
       })
     } catch (error) {
       logSbError("dataEntry:feedInventory:submit", error)
@@ -112,15 +97,15 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
   return (
     <div className="max-w-6xl">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold tracking-tight">Feed Inventory Snapshot</h2>
-        <p className="text-sm text-muted-foreground">Capture the 8 AM and 4 PM physical stock count, separate from deliveries.</p>
+        <h2 className="text-xl font-semibold tracking-tight">Feed Delivery</h2>
+        <p className="text-sm text-muted-foreground">Record incoming feed volume from deliveries or manual store additions.</p>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
         <div className="space-y-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="date"
@@ -135,30 +120,6 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="snapshot_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Time</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {SNAPSHOT_TIMES.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
                 <FormField
@@ -242,26 +203,6 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
                   )}
                 />
               </div>
-
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Comments</FormLabel>
-                    <FormControl>
-                      <textarea
-                        {...field}
-                        rows={3}
-                        className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        placeholder="Bag damage, expected delivery, reconciliation issue, or store note."
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Submit Entry

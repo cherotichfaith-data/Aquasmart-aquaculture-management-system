@@ -8,7 +8,6 @@ import type { TimePeriod } from "@/lib/time-period"
 type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
-export type FarmKpisTodayRow = Database["public"]["Functions"]["get_farm_kpis_today"]["Returns"][number]
 
 const isMissingRpcError = isMissingObjectError
 
@@ -157,27 +156,6 @@ export async function getDashboardSystems(params?: {
   })
 
   return toQuerySuccess<DashboardSystemRpcRow>(normalized)
-}
-
-export async function getFarmKpisToday(params?: {
-  farmId?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FarmKpisTodayRow>> {
-  if (!params?.farmId) return toQuerySuccess<FarmKpisTodayRow>([])
-
-  const clientResult = await getClientOrError("getFarmKpisToday", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryKpiRpc(supabase, "get_farm_kpis_today", { p_farm_id: params.farmId })
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (params?.signal?.aborted) return toQuerySuccess<FarmKpisTodayRow>([])
-  if (error && isQuietError(error)) return toQuerySuccess<FarmKpisTodayRow>([])
-  if (error) return toQueryError("getFarmKpisToday", error)
-
-  return toQuerySuccess<FarmKpisTodayRow>((data ?? []) as FarmKpisTodayRow[])
 }
 
 export async function getDashboardConsolidated(params?: {

@@ -146,12 +146,12 @@ export function WaterQualityDepthTab({
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Surface DO</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{surfaceDo != null ? surfaceDo.toFixed(2) : "--"}</div><p className="mt-1 text-xs text-muted-foreground">mg/L</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Bottom DO</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{bottomDo != null ? bottomDo.toFixed(2) : "--"}</div><p className="mt-1 text-xs text-muted-foreground">mg/L</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">DO Gradient</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{doGradient != null ? doGradient.toFixed(2) : "--"}</div><p className="mt-1 text-xs text-muted-foreground">Surface - bottom</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Temp Gradient</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{tempGradient != null ? tempGradient.toFixed(2) : "--"}</div><p className="mt-1 text-xs text-muted-foreground">deg C, surface - bottom</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Flag</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{isStratified ? "YES" : "NO"}</div><p className="mt-1 text-xs text-muted-foreground">Rule-based status</p></CardContent></Card>
+          <div className="kpi-grid md:grid-cols-5">
+            <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Surface DO</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{surfaceDo != null ? surfaceDo.toFixed(2) : "--"}</div><p className="kpi-card-meta">mg/L</p></CardContent></Card>
+            <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Bottom DO</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{bottomDo != null ? bottomDo.toFixed(2) : "--"}</div><p className="kpi-card-meta">mg/L</p></CardContent></Card>
+            <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">DO Gradient</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{doGradient != null ? doGradient.toFixed(2) : "--"}</div><p className="kpi-card-meta">Surface - bottom</p></CardContent></Card>
+            <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Temp Gradient</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{tempGradient != null ? tempGradient.toFixed(2) : "--"}</div><p className="kpi-card-meta">deg C, surface - bottom</p></CardContent></Card>
+            <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Flag</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{isStratified ? "YES" : "NO"}</div><p className="kpi-card-meta">Rule-based status</p></CardContent></Card>
           </div>
 
           <Card className="bg-card">

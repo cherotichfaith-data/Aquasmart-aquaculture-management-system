@@ -13,9 +13,11 @@ import {
   getWaterQualityMeasurements,
 } from "@/lib/api/water-quality"
 import { invalidateWaterQualityWriteQueries } from "@/lib/cache/react-query"
-import { recordWaterQuality } from "@/lib/commands/operations"
+import type { WaterQualityInput } from "@/lib/commands/operations"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
-import type { Database } from "@/lib/types/database"
+import { buildOfflinePendingResult } from "@/lib/offline/pending-result"
+import { useOfflineMutation } from "@/lib/offline/use-offline-mutation"
+import type { Database, Tables } from "@/lib/types/database"
 
 function waterQualityQueryOptions<TResult>(params: {
   queryKey: readonly unknown[]
@@ -231,8 +233,69 @@ export function useAlertThresholds(params?: {
 }
 
 export function useRecordWaterQuality() {
+  const { farmId } = useActiveFarm()
+
+  const offlineMutation = useOfflineMutation<
+    WaterQualityInput,
+    {
+      systemId: number
+      date: string
+      measuredAt: string
+      time: string
+      parameterName: WaterQualityInput[number]["parameter_name"]
+      parameterValue: number
+      waterDepth: number
+      locationReference?: string | null
+    },
+    {
+      data: Tables<"water_quality_measurement">[]
+      meta: { farmId: string; systemId: number | null; date: string; pendingSync?: boolean; localIds?: string[] }
+    }
+  >({
+    tableName: "waterQuality",
+    buildRecords: (payload) =>
+      payload.map((entry) => ({
+        systemId: entry.system_id,
+        date: entry.date,
+        measuredAt: entry.measured_at,
+        time: entry.time,
+        parameterName: entry.parameter_name,
+        parameterValue: entry.parameter_value,
+        waterDepth: entry.water_depth,
+        locationReference: entry.location_reference ?? null,
+      })),
+    buildPendingResult: ({ input, localIds }) =>
+      buildOfflinePendingResult({
+        data: [] as Tables<"water_quality_measurement">[],
+        farmId,
+        systemId: input[0]?.system_id ?? null,
+        date: input[0]?.date ?? new Date().toISOString().slice(0, 10),
+        localIds,
+      }),
+    combineSyncedResponses: ({ input, responses, localIds }) => {
+      const normalizedResponses = responses.filter(
+        (
+          response,
+        ): response is {
+          data: Tables<"water_quality_measurement">[]
+          meta: { farmId: string; systemId: number; date: string }
+        } => Boolean(response && typeof response === "object" && "data" in response && "meta" in response),
+      )
+      const firstMeta = normalizedResponses[0]?.meta
+      return {
+        data: normalizedResponses.flatMap((response) => response.data),
+        meta: {
+          farmId: firstMeta?.farmId ?? farmId ?? "",
+          systemId: firstMeta?.systemId ?? input[0]?.system_id ?? null,
+          date: firstMeta?.date ?? input[0]?.date ?? new Date().toISOString().slice(0, 10),
+          localIds,
+        },
+      }
+    },
+  })
+
   return useWriteThroughMutation({
-    mutationFn: recordWaterQuality,
+    mutationFn: offlineMutation.mutate,
     activityTableName: "water_quality_measurement",
     recentEntryKey: "water_quality",
     buildOptimisticEntry: (payload) => {

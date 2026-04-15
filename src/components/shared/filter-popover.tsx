@@ -1,7 +1,7 @@
 "use client"
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react"
-import { Check, ChevronsUpDown, Search } from "lucide-react"
+import { Check, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
@@ -71,7 +71,7 @@ export function FilterPopover({
           type="button"
           disabled={disabled}
           className={cn(
-            "topbar-control group flex h-10 w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-border/80 bg-card/92 px-3 text-left shadow-[0_12px_24px_-22px_rgba(15,23,32,0.18)] transition duration-200 hover:border-primary/24 hover:shadow-[0_16px_26px_-22px_rgba(15,23,32,0.2)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto",
+            "topbar-control group flex h-10 w-full min-w-0 items-center gap-3 rounded-lg border border-border/80 bg-card/92 px-3 text-left shadow-[0_12px_24px_-22px_rgba(15,23,32,0.18)] transition duration-200 hover:border-primary/24 hover:shadow-[0_16px_26px_-22px_rgba(15,23,32,0.2)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto",
             triggerClassName,
           )}
           aria-label={label}
@@ -86,7 +86,6 @@ export function FilterPopover({
               </div>
             </div>
           </div>
-          <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground transition group-hover:text-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent

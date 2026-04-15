@@ -36,7 +36,7 @@ export default function ProductionMetricFilter() {
 
   return (
     <Select value={selected} onValueChange={handleSelectChange}>
-      <SelectTrigger className="min-w-[190px]">
+      <SelectTrigger className="min-w-[190px] border-border/70 bg-background/70 shadow-none transition-colors hover:bg-muted/35 focus:ring-1 focus:ring-ring/30">
         <SelectValue placeholder="Select metric" />
       </SelectTrigger>
       <SelectContent>

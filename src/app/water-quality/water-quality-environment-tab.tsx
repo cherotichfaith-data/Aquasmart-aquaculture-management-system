@@ -10,6 +10,7 @@ import type {
   WaterQualityStatusLabel,
 } from "./_lib/water-quality-selectors"
 import { WQI_GOOD_MIN, WQI_MODERATE_MIN } from "@/lib/water-quality-index"
+import { getSemanticColor, getSemanticTextClass } from "@/lib/theme/semantic-colors"
 
 export function WaterQualityEnvironmentTab({
   wqiValue,
@@ -36,8 +37,8 @@ export function WaterQualityEnvironmentTab({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 shadow-[0_14px_32px_-26px_rgba(16,185,129,0.45)]">
-            <Gauge className="h-5 w-5 text-emerald-500" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/15 shadow-[0_14px_32px_-26px_color-mix(in_srgb,var(--success)_42%,transparent)]">
+            <Gauge className="h-5 w-5 text-success" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground">Environmental Indicators</h2>
@@ -50,7 +51,7 @@ export function WaterQualityEnvironmentTab({
         <Card className="bg-card border border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-cyan-400" />
+              <Gauge className="h-4 w-4 text-info" />
               Water Quality Index
             </CardTitle>
           </CardHeader>
@@ -87,9 +88,9 @@ export function WaterQualityEnvironmentTab({
                 <span>{`Good (${WQI_GOOD_MIN}+)`}</span>
               </div>
               <div className="h-2 rounded-full bg-muted overflow-hidden flex">
-                <div className="h-full bg-red-500" style={{ width: "50%" }} />
-                <div className="h-full bg-amber-500" style={{ width: "20%" }} />
-                <div className="h-full bg-emerald-500" style={{ width: "30%" }} />
+                <div className="h-full" style={{ width: "50%", backgroundColor: getSemanticColor("bad") }} />
+                <div className="h-full" style={{ width: "20%", backgroundColor: getSemanticColor("warn") }} />
+                <div className="h-full" style={{ width: "30%", backgroundColor: getSemanticColor("good") }} />
               </div>
             </div>
           </CardContent>
@@ -98,7 +99,7 @@ export function WaterQualityEnvironmentTab({
         <Card className="bg-card border border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <FlaskConical className="h-4 w-4 text-orange-400" />
+              <FlaskConical className="h-4 w-4 text-warning" />
               Nutrient Load Indicator
             </CardTitle>
           </CardHeader>
@@ -129,7 +130,7 @@ export function WaterQualityEnvironmentTab({
         <Card className="bg-card border border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-green-400" />
+              <Leaf className="h-4 w-4 text-success" />
               Algal Activity Indicator
             </CardTitle>
           </CardHeader>
@@ -147,15 +148,15 @@ export function WaterQualityEnvironmentTab({
             </div>
             <div className="w-full mt-4 space-y-1.5 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-blue-500" />
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: getSemanticColor("info") }} />
                 <span>Low activity</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-emerald-500" />
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: getSemanticColor("good") }} />
                 <span>Moderate activity</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-red-500" />
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: getSemanticColor("bad") }} />
                 <span>Bloom risk</span>
               </div>
             </div>
@@ -173,7 +174,7 @@ export function WaterQualityEnvironmentTab({
               <div
                 key={system.id}
                 className={`p-4 rounded-lg border text-center transition-all cursor-pointer hover:scale-[1.02] ${
-                  String(system.id) === selectedSystemValue ? "border-cyan-500/50 bg-cyan-500/10" : "border-border bg-muted/30"
+                  String(system.id) === selectedSystemValue ? "border-info/35 bg-info/10" : "border-border bg-muted/30"
                 }`}
                 onClick={() => {
                   onSelectSystem(String(system.id))
@@ -181,7 +182,7 @@ export function WaterQualityEnvironmentTab({
                 }}
               >
                 <p className="text-xs text-muted-foreground mb-1">{system.label}</p>
-                <p className="text-2xl font-bold" style={{ color: system.wqiLabel.color }}>
+                <p className={`text-2xl font-bold ${system.wqi != null ? "" : getSemanticTextClass("neutral")}`} style={{ color: system.wqi != null ? system.wqiLabel.color : undefined }}>
                   {system.wqi != null ? Math.round(system.wqi) : "--"}
                 </p>
                 <p className="text-xs mt-1" style={{ color: system.wqiLabel.color }}>

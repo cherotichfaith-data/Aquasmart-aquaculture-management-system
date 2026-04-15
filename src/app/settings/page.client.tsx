@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
+import { resolveAppEntryPath, type AquaSmartRole } from "@/lib/app-entry"
 import { createClient } from "@/lib/supabase/client"
 import { logSbError } from "@/lib/supabase/log"
 import { DEFAULT_SETTINGS, formatError, hasActionableSbError } from "./settings-utils"
@@ -23,9 +25,19 @@ export default function SettingsPage() {
   const [thresholdDenied, setThresholdDenied] = useState(false)
   const { user, profile } = useAuth()
   const { farm, farmId, loading: farmLoading } = useActiveFarm()
+  const farmRoleQuery = useActiveFarmRole(farmId)
+  const farmRole = (farmRoleQuery.data ?? null) as AquaSmartRole
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const missingFarmAssignment = Boolean(user?.id) && !farmLoading && !farmId
   const router = useRouter()
+  // Gate: only admin and farm_manager can access settings
+  const canAccessSettings = !farmRole || farmRole === "admin" || farmRole === "farm_manager"
+  // useEffect-based redirect to avoid calling router during render (React error)
+  useEffect(() => {
+    if (farmRole && !canAccessSettings) {
+      router.replace(resolveAppEntryPath(farmRole))
+    }
+  }, [farmRole, canAccessSettings, router])
   const supabase = useMemo(() => createClient(), [])
   const settingsLoadQuery = useQuery({
     queryKey: ["settings", "load", user?.id ?? "anon", farmId ?? "no-farm", thresholdDenied],
@@ -143,7 +155,7 @@ export default function SettingsPage() {
 
           setSaved(true)
           setTimeout(() => setSaved(false), 3000)
-          router.replace("/")
+          router.replace(resolveAppEntryPath(farmRole))
         } else {
           localStorage.setItem("aqua_settings", JSON.stringify(settings))
           setSaved(true)
@@ -161,6 +173,9 @@ export default function SettingsPage() {
 
     void save()
   }
+
+  // While role is loading or if access is denied, render nothing (useEffect handles redirect)
+  if (farmRole && !canAccessSettings) return null
 
   return (
     <SettingsPageShell

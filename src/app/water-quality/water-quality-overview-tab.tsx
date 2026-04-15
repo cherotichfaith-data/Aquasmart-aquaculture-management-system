@@ -32,61 +32,61 @@ export function WaterQualityOverviewTab({
 }) {
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid sm:grid-cols-2 lg:grid-cols-4">
         <Card
-          className="bg-card border border-border cursor-pointer hover:border-cyan-500/40 transition-all"
+          className="kpi-card cursor-pointer hover:border-cyan-500/40 transition-all"
           onClick={() => onChangeTab("environment")}
         >
-          <CardContent className="p-4">
+          <CardContent className="kpi-card-content pt-4">
             <div className="flex items-center justify-between mb-2">
               <Gauge className="h-5 w-5 text-cyan-400" />
-              <span className="text-xs text-muted-foreground">Avg WQI</span>
+              <span className="kpi-card-title">Avg WQI</span>
             </div>
-            <p className="text-3xl font-bold" style={{ color: averageWqiLabel.color }}>
+            <p className="kpi-card-value" style={{ color: averageWqiLabel.color }}>
               {averageWqi != null ? Math.round(averageWqi) : "--"}
             </p>
-            <p className="text-xs mt-1" style={{ color: averageWqiLabel.color }}>
+            <p className="kpi-card-meta" style={{ color: averageWqiLabel.color }}>
               {averageWqiLabel.label}
             </p>
           </CardContent>
         </Card>
         <Card
-          className="bg-card border border-border cursor-pointer hover:border-red-500/40 transition-all"
+          className="kpi-card cursor-pointer hover:border-red-500/40 transition-all"
           onClick={() => onChangeTab("alerts")}
         >
-          <CardContent className="p-4">
+          <CardContent className="kpi-card-content pt-4">
             <div className="flex items-center justify-between mb-2">
               <Bell className="h-5 w-5 text-red-400" />
-              <span className="text-xs text-muted-foreground">Active Alerts</span>
+              <span className="kpi-card-title">Active Alerts</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{alertItems.length}</p>
-            <p className="text-xs text-red-400 mt-1">{highAlertCount} high priority</p>
+            <p className="kpi-card-value">{alertItems.length}</p>
+            <p className="kpi-card-meta text-red-400">{highAlertCount} high priority</p>
           </CardContent>
         </Card>
         <Card
-          className="bg-card border border-border cursor-pointer hover:border-emerald-500/40 transition-all"
+          className="kpi-card cursor-pointer hover:border-emerald-500/40 transition-all"
           onClick={() => onChangeTab("sensors")}
         >
-          <CardContent className="p-4">
+          <CardContent className="kpi-card-content pt-4">
             <div className="flex items-center justify-between mb-2">
               <Radio className="h-5 w-5 text-emerald-400" />
-              <span className="text-xs text-muted-foreground">Sensors</span>
+              <span className="kpi-card-title">Sensors</span>
             </div>
-            <p className="text-3xl font-bold text-emerald-400">{sensorOnlineCount}</p>
-            <p className="text-xs text-muted-foreground mt-1">of {systemCount} online</p>
+            <p className="kpi-card-value text-emerald-400">{sensorOnlineCount}</p>
+            <p className="kpi-card-meta">of {systemCount} online</p>
           </CardContent>
         </Card>
         <Card
-          className="bg-card border border-border cursor-pointer hover:border-slate-500/40 transition-all"
+          className="kpi-card cursor-pointer hover:border-slate-500/40 transition-all"
           onClick={() => onChangeTab("parameter")}
         >
-          <CardContent className="p-4">
+          <CardContent className="kpi-card-content pt-4">
             <div className="flex items-center justify-between mb-2">
               <Thermometer className="h-5 w-5 text-amber-400" />
-              <span className="text-xs text-muted-foreground">Parameters</span>
+              <span className="kpi-card-title">Parameters</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{Object.keys(parameterLabels).length}</p>
-            <p className="text-xs text-muted-foreground mt-1">monitored</p>
+            <p className="kpi-card-value">{Object.keys(parameterLabels).length}</p>
+            <p className="kpi-card-meta">monitored</p>
           </CardContent>
         </Card>
       </div>

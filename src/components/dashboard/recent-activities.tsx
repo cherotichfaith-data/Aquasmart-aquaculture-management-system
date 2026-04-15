@@ -83,40 +83,40 @@ export default function RecentActivities({
       }))
 
     const merged = [
-      ...normalize(data.mortality?.status === "success" ? data.mortality.data : [], "fish_mortality", (row: any) => ({
-        system_id: row.system_id ?? null,
-        batch_id: row.batch_id ?? null,
+      ...normalize(data.mortality?.status === "success" ? data.mortality.data : [], "fish_mortality", (row: Record<string, unknown>) => ({
+        system_id: (row.system_id as number | null) ?? null,
+        batch_id: (row.batch_id as number | null) ?? null,
       })),
-      ...normalize(data.feeding?.status === "success" ? data.feeding.data : [], "feeding_record", (row: any) => ({
-        system_id: row.system_id ?? null,
-        batch_id: row.batch_id ?? null,
+      ...normalize(data.feeding?.status === "success" ? data.feeding.data : [], "feeding_record", (row: Record<string, unknown>) => ({
+        system_id: (row.system_id as number | null) ?? null,
+        batch_id: (row.batch_id as number | null) ?? null,
       })),
-      ...normalize(data.sampling?.status === "success" ? data.sampling.data : [], "fish_sampling_weight", (row: any) => ({
-        system_id: row.system_id ?? null,
-        batch_id: row.batch_id ?? null,
+      ...normalize(data.sampling?.status === "success" ? data.sampling.data : [], "fish_sampling_weight", (row: Record<string, unknown>) => ({
+        system_id: (row.system_id as number | null) ?? null,
+        batch_id: (row.batch_id as number | null) ?? null,
       })),
-      ...normalize(data.transfer?.status === "success" ? data.transfer.data : [], "fish_transfer", (row: any) => ({
-        system_id: row.origin_system_id ?? null,
-        batch_id: row.batch_id ?? null,
+      ...normalize(data.transfer?.status === "success" ? data.transfer.data : [], "fish_transfer", (row: Record<string, unknown>) => ({
+        system_id: (row.origin_system_id as number | null) ?? null,
+        batch_id: (row.batch_id as number | null) ?? null,
       })),
-      ...normalize(data.harvest?.status === "success" ? data.harvest.data : [], "fish_harvest", (row: any) => ({
-        system_id: row.system_id ?? null,
-        batch_id: row.batch_id ?? null,
+      ...normalize(data.harvest?.status === "success" ? data.harvest.data : [], "fish_harvest", (row: Record<string, unknown>) => ({
+        system_id: (row.system_id as number | null) ?? null,
+        batch_id: (row.batch_id as number | null) ?? null,
       })),
-      ...normalize(data.water_quality?.status === "success" ? data.water_quality.data : [], "water_quality_measurement", (row: any) => ({
-        system_id: row.system_id ?? null,
+      ...normalize(data.water_quality?.status === "success" ? data.water_quality.data : [], "water_quality_measurement", (row: Record<string, unknown>) => ({
+        system_id: (row.system_id as number | null) ?? null,
         batch_id: null,
       })),
-      ...normalize(data.incoming_feed?.status === "success" ? data.incoming_feed.data : [], "feed_inventory_snapshot", (_row: any) => ({
+      ...normalize(data.incoming_feed?.status === "success" ? data.incoming_feed.data : [], "feed_incoming", (_row: Record<string, unknown>) => ({
         system_id: null,
         batch_id: null,
       })),
-      ...normalize(data.stocking?.status === "success" ? data.stocking.data : [], "fish_stocking", (row: any) => ({
-        system_id: row.system_id ?? null,
-        batch_id: row.batch_id ?? null,
+      ...normalize(data.stocking?.status === "success" ? data.stocking.data : [], "fish_stocking", (row: Record<string, unknown>) => ({
+        system_id: (row.system_id as number | null) ?? null,
+        batch_id: (row.batch_id as number | null) ?? null,
       })),
-      ...normalize(data.systems?.status === "success" ? data.systems.data : [], "system", (row: any) => ({
-        system_id: row.id ?? null,
+      ...normalize(data.systems?.status === "success" ? data.systems.data : [], "system", (row: Record<string, unknown>) => ({
+        system_id: (row.id as number | null) ?? null,
         batch_id: null,
       })),
     ]
@@ -161,8 +161,8 @@ export default function RecentActivities({
         return "fish_harvest"
       case "incoming_feed_events":
       case "feed_incoming":
-      case "feed_inventory_snapshot":
-        return "feed_inventory_snapshot"
+      case "feed_incoming":
+        return "feed_incoming"
       case "stocking_events":
       case "fish_stocking":
         return "fish_stocking"
@@ -185,7 +185,7 @@ export default function RecentActivities({
         return <CornerDownRight size={16} />
       case "fish_harvest":
         return <Fish size={16} />
-      case "feed_inventory_snapshot":
+      case "feed_incoming":
         return <Clock size={16} />
       case "fish_stocking":
         return <Fish size={16} />
@@ -208,7 +208,7 @@ export default function RecentActivities({
         return "bg-chart-4/15 text-chart-4"
       case "fish_harvest":
         return "bg-chart-2/15 text-chart-2"
-      case "feed_inventory_snapshot":
+      case "feed_incoming":
         return "bg-chart-3/15 text-chart-3"
       case "fish_stocking":
         return "bg-chart-2/15 text-chart-2"
@@ -231,7 +231,7 @@ export default function RecentActivities({
         return "Transfer"
       case "fish_harvest":
         return "Harvest"
-      case "feed_inventory_snapshot":
+      case "feed_incoming":
         return "Feed inventory"
       case "fish_stocking":
         return "Stocking"

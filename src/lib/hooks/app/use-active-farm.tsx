@@ -1,8 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useFarmOptions } from "@/lib/hooks/use-options"
+import { queryKeys } from "@/lib/cache/query-keys"
+import { createClient } from "@/lib/supabase/client"
 
 type FarmOption = {
   id: string
@@ -32,8 +35,24 @@ const normalizeFarmId = (value?: string | null) => {
 export function useActiveFarm(params?: { initialFarmId?: string | null }) {
   const { user, session, isLoading } = useAuth()
   const [activeFarmId, setActiveFarmId] = useState<string | null>(normalizeFarmId(params?.initialFarmId))
+  const supabase = useMemo(() => createClient(), [])
 
   const farmsQuery = useFarmOptions({ enabled: Boolean(session) })
+  const farmDetailsQuery = useQuery({
+    queryKey: queryKeys.appConfig([`farm-details:${activeFarmId ?? "none"}`], user?.id),
+    enabled: Boolean(session) && Boolean(activeFarmId),
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!activeFarmId) return null
+      const { data, error } = await supabase
+        .from("farm")
+        .select("id, name, location, owner, email, phone")
+        .eq("id", activeFarmId)
+        .maybeSingle()
+      if (error) throw error
+      return data
+    },
+  })
 
   useEffect(() => {
     if (!session) {
@@ -75,28 +94,41 @@ export function useActiveFarm(params?: { initialFarmId?: string | null }) {
   useEffect(() => {
     const handler = (event: Event) => {
       const maybeCustom = event as CustomEvent<{ farmId?: string }>
-      setActiveFarmId(normalizeFarmId(maybeCustom?.detail?.farmId) ?? null)
+      const nextFarmId = normalizeFarmId(maybeCustom?.detail?.farmId) ?? null
+      setActiveFarmId(nextFarmId)
+      void farmsQuery.refetch()
+      void farmDetailsQuery.refetch()
     }
 
     if (typeof window !== "undefined") {
       window.addEventListener("farm-updated", handler)
       return () => window.removeEventListener("farm-updated", handler)
     }
-  }, [])
+  }, [farmDetailsQuery, farmsQuery])
 
   const farm = useMemo<ActiveFarm | null>(() => {
     const farms = (farmsQuery.data?.status === "success" ? farmsQuery.data.data : []) as FarmOption[]
     if (!activeFarmId) return null
     const match = farms.find((row) => row.id === activeFarmId)
-    if (!match) return null
-    return { id: match.id, name: match.label ?? null, location: match.location ?? null }
-  }, [activeFarmId, farmsQuery.data])
+    const details = farmDetailsQuery.data
+    if (!match && !details) return null
+    return {
+      id: details?.id ?? match?.id ?? activeFarmId,
+      name: details?.name ?? match?.label ?? null,
+      location: details?.location ?? match?.location ?? null,
+      owner: details?.owner ?? null,
+      email: details?.email ?? null,
+      phone: details?.phone ?? null,
+    }
+  }, [activeFarmId, farmDetailsQuery.data, farmsQuery.data])
 
   return {
     farm,
     farmId: activeFarmId ?? null,
-    loading: isLoading || (Boolean(session) && farmsQuery.isLoading),
-    error: farmsQuery.error as Error | null,
-    refresh: farmsQuery.refetch,
+    loading: isLoading || (Boolean(session) && (farmsQuery.isLoading || farmDetailsQuery.isLoading)),
+    error: (farmsQuery.error as Error | null) ?? (farmDetailsQuery.error as Error | null),
+    refresh: async () => {
+      await Promise.all([farmsQuery.refetch(), farmDetailsQuery.refetch()])
+    },
   }
 }

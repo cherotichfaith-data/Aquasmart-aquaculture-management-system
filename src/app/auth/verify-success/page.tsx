@@ -11,7 +11,7 @@ export default function VerifySuccessPage() {
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
-            router.replace("/")
+            router.replace("/auth")
         }, 2500)
 
         return () => window.clearTimeout(timer)
@@ -34,7 +34,7 @@ export default function VerifySuccessPage() {
 
                 <div className="flex flex-col gap-2 pt-4">
                     <Button asChild className="w-full" variant="default">
-                        <Link href="/">Go to Dashboard</Link>
+                        <Link href="/auth">Continue</Link>
                     </Button>
                 </div>
             </div>

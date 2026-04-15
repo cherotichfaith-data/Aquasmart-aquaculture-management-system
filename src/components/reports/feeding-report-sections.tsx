@@ -6,7 +6,6 @@ import { Bar, Line } from "@/components/charts/chartjs"
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
-  buildMetricAxisBounds,
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
@@ -58,26 +57,26 @@ export function FeedingSummaryCards({
   avgProtein: number | null
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Feed (kg)</CardTitle></CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatNumberValue(totalKgFed, { decimals: 2, minimumDecimals: 2, fallback: "0.00" })}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Within selected period</p>
+    <div className="kpi-grid md:grid-cols-3">
+      <Card className="kpi-card">
+        <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Total Feed (kg)</CardTitle></CardHeader>
+        <CardContent className="kpi-card-content">
+          <div className="kpi-card-value">{formatNumberValue(totalKgFed, { decimals: 2, minimumDecimals: 2, fallback: "0.00" })}</div>
+          <p className="kpi-card-meta">Within selected period</p>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Average eFCR</CardTitle></CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatNumberValue(avgEfcr, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Weighted from in-period `api_production_summary` eFCR rows</p>
+      <Card className="kpi-card">
+        <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Average eFCR</CardTitle></CardHeader>
+        <CardContent className="kpi-card-content">
+          <div className="kpi-card-value">{formatNumberValue(avgEfcr, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
+          <p className="kpi-card-meta">Weighted from in-period `api_production_summary` eFCR rows</p>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Avg Protein (%)</CardTitle></CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatNumberValue(avgProtein, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Weighted by feed amount using joined `feed_type.crude_protein_percentage`</p>
+      <Card className="kpi-card">
+        <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Avg Protein (%)</CardTitle></CardHeader>
+        <CardContent className="kpi-card-content">
+          <div className="kpi-card-value">{formatNumberValue(avgProtein, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
+          <p className="kpi-card-meta">Weighted by feed amount using joined `feed_type.crude_protein_percentage`</p>
         </CardContent>
       </Card>
     </div>
@@ -183,17 +182,6 @@ export function EfcrByCageSection({
     () => new Map(rows.map((row) => [String(row.date ?? ""), row])),
     [rows],
   )
-  const yBounds = useMemo(
-    () =>
-      buildMetricAxisBounds(
-        rows.flatMap((row) => cageSeries.map((series) => {
-          const value = row[series.key]
-          return value == null ? null : Number(value)
-        })),
-        { minFloor: 0, trimOutliers: true },
-      ),
-    [cageSeries, rows],
-  )
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
   const data = useMemo<ChartData<"line">>(
     () => ({
@@ -219,8 +207,6 @@ export function EfcrByCageSection({
       buildCartesianOptions({
         palette,
         legend: true,
-        min: yBounds.min,
-        max: yBounds.max,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: "eFCR",
@@ -238,7 +224,7 @@ export function EfcrByCageSection({
         xTickFormatter: (_value, index) =>
           formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
       }),
-    [dateDomain, palette, xLimit, yBounds.max, yBounds.min],
+    [dateDomain, palette, xLimit],
   )
 
   return (

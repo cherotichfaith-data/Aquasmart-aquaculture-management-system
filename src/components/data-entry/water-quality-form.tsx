@@ -23,6 +23,7 @@ import { useToast } from "@/lib/hooks/app/use-toast"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
 import { logSbError } from "@/lib/supabase/log"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoPanel, InfoStat } from "./form-support"
 import { SelectedSystemInfo } from "./selection-info"
 
@@ -220,6 +221,10 @@ export function WaterQualityForm({
       <div className="mb-6">
         <h2 className="text-xl font-semibold tracking-tight">Record Water Quality</h2>
         <p className="text-sm text-muted-foreground">Multi-parameter entry with a live dissolved oxygen classification preview.</p>
+      </div>
+
+      <div className="mb-4">
+        <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">

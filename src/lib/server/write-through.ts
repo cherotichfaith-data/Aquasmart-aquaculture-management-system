@@ -2,7 +2,7 @@ import { revalidateTag } from "next/cache"
 import { NextResponse } from "next/server"
 import type { User } from "@supabase/supabase-js"
 import { enforceUserRateLimit, type ApiRateLimitPolicy } from "@/lib/server/rate-limit"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { isSbNetworkError, isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { createClient } from "@/lib/supabase/server"
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
@@ -11,13 +11,23 @@ export async function requireRouteUser(
   supabase: ServerSupabaseClient,
   tag: string,
 ): Promise<{ user: User } | { response: NextResponse }> {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  let user: User | null = null
+  let error: unknown = null
+
+  try {
+    const result = await supabase.auth.getUser()
+    user = result.data.user
+    error = result.error
+  } catch (caught) {
+    error = caught
+  }
 
   if (error || !user) {
     if (error) {
+      if (isSbNetworkError(error)) {
+        logSbError(`${tag}:getUser`, error)
+        return { response: NextResponse.json({ error: "Authentication service unavailable." }, { status: 503 }) }
+      }
       logSbError(`${tag}:getUser`, error)
     }
     return { response: NextResponse.json({ error: "Unauthorized." }, { status: 401 }) }

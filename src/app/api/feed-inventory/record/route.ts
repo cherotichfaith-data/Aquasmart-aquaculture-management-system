@@ -6,15 +6,15 @@ import { requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/w
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 
+const FEED_INVENTORY_ALLOWED_ROLES = new Set(["admin", "farm_manager", "inventory_storekeeper"])
+
 const feedInventorySchema = z.object({
   farm_id: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  snapshot_time: z.string().regex(/^\d{2}:\d{2}$/),
   feed_type_id: z.number().int().positive(),
   bag_weight_kg: z.number().positive(),
   number_of_bags: z.number().int().min(0),
   open_bags_kg: z.number().min(0),
-  notes: z.string().max(500).nullable().optional(),
 })
 
 export async function POST(request: Request) {
@@ -31,23 +31,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
+  const { data: membership, error: membershipError } = await supabase
+    .from("farm_user")
+    .select("role")
+    .eq("farm_id", payload.farm_id)
+    .eq("user_id", auth.user.id)
+    .maybeSingle()
+
+  if (membershipError) {
+    logSbError("feed-inventory:record:membership", membershipError)
+    const status = isSbPermissionDenied(membershipError) ? 403 : 500
+    return NextResponse.json({ error: "Unable to verify feed inventory permissions." }, { status })
+  }
+
+  if (!membership?.role || !FEED_INVENTORY_ALLOWED_ROLES.has(membership.role)) {
+    return NextResponse.json({ error: "You do not have permission to record feed inventory." }, { status: 403 })
+  }
+
   const insertPayload = {
     farm_id: payload.farm_id,
     date: payload.date,
-    snapshot_time: payload.snapshot_time,
     feed_type_id: payload.feed_type_id,
-    bag_weight_kg: payload.bag_weight_kg,
-    number_of_bags: payload.number_of_bags,
-    open_bags_kg: payload.open_bags_kg,
-    notes: payload.notes?.trim() ? payload.notes.trim() : null,
+    feed_amount: payload.bag_weight_kg * payload.number_of_bags + payload.open_bags_kg,
   }
 
-  const { data, error } = await supabase.from("feed_inventory_snapshot").insert(insertPayload).select().single()
+  const { data, error } = await supabase.from("feed_incoming").insert(insertPayload).select().single()
 
   if (error || !data) {
     logSbError("feed-inventory:record:insert", error)
     const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record feed inventory snapshot." }, { status })
+    return NextResponse.json({ error: "Unable to record feed delivery." }, { status })
   }
 
   revalidateWriteTags(feedInventoryWriteTags({ farmId: payload.farm_id }))

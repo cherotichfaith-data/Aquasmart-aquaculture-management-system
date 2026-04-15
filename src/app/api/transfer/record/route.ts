@@ -17,6 +17,7 @@ const transferSchema = z.object({
   total_weight_transfer: z.number().positive(),
   abw: z.number().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -44,16 +45,20 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("fish_transfer")
-    .insert({
+    .upsert({
       ...payload,
-      target_system_id: payload.target_system_id ?? null,
+      target_system_id: payload.target_system_id ?? payload.origin_system_id,
       batch_id: payload.batch_id ?? null,
       abw: payload.abw ?? null,
       external_target_name: payload.external_target_name?.trim() ? payload.external_target_name.trim() : null,
       notes: payload.notes?.trim() ? payload.notes.trim() : null,
+      local_id: payload.local_id ?? null,
+      synced_at: new Date().toISOString(),
+    }, {
+      onConflict: "local_id",
     })
     .select()
-    .single()
+    .maybeSingle()
 
   if (error || !data) {
     logSbError("transfer:record:insert", error)

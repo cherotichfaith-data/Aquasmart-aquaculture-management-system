@@ -1,7 +1,6 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { TimeBounds, TimePeriod } from "@/lib/time-period"
-import type { FarmKpisTodayRow } from "@/lib/api/dashboard"
 
 export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
 export type DashboardTimePeriod = TimePeriod
@@ -17,7 +16,7 @@ export type DashboardRecentEntriesData = {
   transfer: QueryResult<Database["public"]["Tables"]["fish_transfer"]["Row"]>
   harvest: QueryResult<Database["public"]["Tables"]["fish_harvest"]["Row"]>
   water_quality: QueryResult<Database["public"]["Tables"]["water_quality_measurement"]["Row"]>
-  incoming_feed: QueryResult<Database["public"]["Tables"]["feed_inventory_snapshot"]["Row"]>
+  incoming_feed: QueryResult<Database["public"]["Tables"]["feed_incoming"]["Row"]>
   stocking: QueryResult<Database["public"]["Tables"]["fish_stocking"]["Row"]>
   systems: QueryResult<Database["public"]["Tables"]["system"]["Row"]>
 }
@@ -83,7 +82,6 @@ export type DashboardPageInitialData = {
   bounds: TimeBounds
   systemOptions: QueryResult<DashboardSystemOption>
   batchSystems: QueryResult<{ system_id: number }>
-  farmKpisToday: QueryResult<FarmKpisTodayRow>
   kpiOverview: {
     metrics: KPIOverviewMetric[]
     dateBounds: { start: string | null; end: string | null }

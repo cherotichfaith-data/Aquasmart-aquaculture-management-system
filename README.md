@@ -155,11 +155,39 @@ The current product structure follows a simple aquaculture software pattern:
 - `api_dashboard_consolidated`
 - `api_daily_fish_inventory_rpc`
 - `api_production_summary`
-- `api_time_period_bounds`
+- `api_time_period_bounds_scoped`
+- `api_efcr_trend`
+- `api_daily_overlay`
 - `api_latest_water_quality_status`
 - `api_water_quality_sync_status`
-- `analytics_system_day`
-- `production_summary`
+- `analytics_system_day` (view over `analytics_system_day_mv`)
+- `daily_fish_inventory` (view over `daily_fish_inventory_table`)
+- `production_summary` (matview)
+- `efcr_period_last_sampling_view` (matview)
+
+### Refreshing materialized views
+
+Call `public.refresh_all_materialized_views()` to refresh all four matviews in dependency order:
+`daily_fish_inventory_table` → `production_summary` → `analytics_system_day_mv` → `efcr_period_last_sampling_view`
+
+### Regenerating database types
+
+```bash
+# Requires SUPABASE_ACCESS_TOKEN in environment (get from https://supabase.com/dashboard/account/tokens)
+SUPABASE_ACCESS_TOKEN=your_token npm run db:types
+```
+
+Or set `SUPABASE_ACCESS_TOKEN` in `.env.local` (uncomment the placeholder line) and run `npm run db:types`.
+
+### Roles
+
+Valid farm membership roles (enforced by DB CHECK constraint on `farm_user.role`):
+- `admin` — full access
+- `farm_manager` — operational + analytics access
+- `farm_technician` — data entry only (feed, mortality, sampling, harvest, transfer)
+- `inventory_storekeeper` — feed inventory receipt only
+- `analyst_planner` — read-only analytics and reports
+- `viewer_auditor` — read-only dashboard and reports
 
 ## Project Structure
 

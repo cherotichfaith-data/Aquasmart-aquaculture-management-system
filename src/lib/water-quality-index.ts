@@ -1,4 +1,5 @@
 import type { WaterQualityThresholdRow } from "@/features/water-quality/types"
+import { getSemanticColor } from "@/lib/theme/semantic-colors"
 
 export type WaterQualityStatusLabel = {
   label: string
@@ -9,10 +10,10 @@ export const WQI_GOOD_MIN = 70
 export const WQI_MODERATE_MIN = 50
 
 export function getWqiLabel(value: number | null): WaterQualityStatusLabel {
-  if (value == null) return { label: "No data", color: "var(--muted-foreground)" }
-  if (value >= WQI_GOOD_MIN) return { label: "Good", color: "#10B981" }
-  if (value >= WQI_MODERATE_MIN) return { label: "Moderate", color: "#F59E0B" }
-  return { label: "Poor", color: "#EF4444" }
+  if (value == null) return { label: "No data", color: getSemanticColor("neutral") }
+  if (value >= WQI_GOOD_MIN) return { label: "Good", color: getSemanticColor("good") }
+  if (value >= WQI_MODERATE_MIN) return { label: "Moderate", color: getSemanticColor("warn") }
+  return { label: "Poor", color: getSemanticColor("bad") }
 }
 
 function scoreDissolvedOxygen(value: number | null, lowDoThreshold: number) {

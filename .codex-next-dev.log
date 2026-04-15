@@ -1,4 +1,0 @@
-
-> aquasmart@0.1.0 dev
-> dotenv -e .env.local -- next dev --webpack
-

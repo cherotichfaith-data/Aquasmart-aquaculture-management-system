@@ -37,13 +37,7 @@ export async function resolveInitialFarmId(searchFarmId?: string | null) {
 }
 
 export async function requireInitialFarmId(searchFarmId?: string | null) {
-  const context = await resolveInitialFarmId(searchFarmId)
-
-  if (!context.farmId) {
-    redirect("/onboarding")
-  }
-
-  return context
+  return resolveInitialFarmId(searchFarmId)
 }
 
 export async function redirectIfFarmExists() {

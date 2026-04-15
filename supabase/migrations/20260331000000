@@ -583,8 +583,7 @@ begin
         else avg(d.mortality_rate)
       end as mortality_rate,
       avg(d.biomass_last_sampling) as average_biomass,
-      avg(d.biomass_density) as biomass_density,
-      sum(coalesce(d.feeding_amount, 0)) as feed_sum
+      avg(d.biomass_density) as biomass_density
     from cur d
     group by d.system_id
   ),
@@ -602,126 +601,43 @@ begin
         else avg(d.mortality_rate)
       end as mortality_rate,
       avg(d.biomass_last_sampling) as average_biomass,
-      avg(d.biomass_density) as biomass_density,
-      sum(coalesce(d.feeding_amount, 0)) as feed_sum
+      avg(d.biomass_density) as biomass_density
     from prev d
     group by d.system_id
   ),
-  cur_biom as (
-    select
-      s.system_id,
-      (
-        select d.biomass_last_sampling
-        from public.daily_fish_inventory_table d
-        where d.system_id = s.system_id and d.inventory_date = v_start
-      ) as b0,
-      (
-        select d.biomass_last_sampling
-        from public.daily_fish_inventory_table d
-        where d.system_id = s.system_id and d.inventory_date = v_end
-      ) as b1
-    from sys s
-  ),
-  prev_biom as (
-    select
-      s.system_id,
-      (
-        select d.biomass_last_sampling
-        from public.daily_fish_inventory_table d
-        where d.system_id = s.system_id and d.inventory_date = v_prev_start
-      ) as b0,
-      (
-        select d.biomass_last_sampling
-        from public.daily_fish_inventory_table d
-        where d.system_id = s.system_id and d.inventory_date = v_prev_end
-      ) as b1
-    from sys s
-  ),
-  cur_w as (
-    select
-      s.system_id,
-      coalesce((
-        select sum(h.total_weight_harvest)
-        from public.fish_harvest h
-        where h.system_id = s.system_id and h.date > v_start and h.date <= v_end
-      ), 0) as harvest_kg,
-      coalesce((
-        select sum(fs.total_weight_stocking)
-        from public.fish_stocking fs
-        where fs.system_id = s.system_id and fs.date > v_start and fs.date <= v_end
-      ), 0) as stocked_kg,
-      coalesce((
-        select sum(ft.total_weight_transfer)
-        from public.fish_transfer ft
-        where ft.origin_system_id = s.system_id
-          and ft.date > v_start
-          and ft.date <= v_end
-          and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)
-      ), 0) as tout_kg,
-      coalesce((
-        select sum(ft.total_weight_transfer)
-        from public.fish_transfer ft
-        where ft.target_system_id = s.system_id
-          and ft.date > v_start
-          and ft.date <= v_end
-          and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)
-      ), 0) as tin_kg
-    from sys s
-  ),
-  prev_w as (
-    select
-      s.system_id,
-      coalesce((
-        select sum(h.total_weight_harvest)
-        from public.fish_harvest h
-        where h.system_id = s.system_id and h.date > v_prev_start and h.date <= v_prev_end
-      ), 0) as harvest_kg,
-      coalesce((
-        select sum(fs.total_weight_stocking)
-        from public.fish_stocking fs
-        where fs.system_id = s.system_id and fs.date > v_prev_start and fs.date <= v_prev_end
-      ), 0) as stocked_kg,
-      coalesce((
-        select sum(ft.total_weight_transfer)
-        from public.fish_transfer ft
-        where ft.origin_system_id = s.system_id
-          and ft.date > v_prev_start
-          and ft.date <= v_prev_end
-          and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)
-      ), 0) as tout_kg,
-      coalesce((
-        select sum(ft.total_weight_transfer)
-        from public.fish_transfer ft
-        where ft.target_system_id = s.system_id
-          and ft.date > v_prev_start
-          and ft.date <= v_prev_end
-          and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)
-      ), 0) as tin_kg
-    from sys s
-  ),
   cur_efcr as (
     select
-      s.system_id,
-      case when cb.b0 is null or cb.b1 is null then null::double precision
-        else (cb.b1 - cb.b0 + cw.harvest_kg + cw.tout_kg - cw.tin_kg - cw.stocked_kg)
-      end as denom,
-      cm.feed_sum
-    from sys s
-    left join cur_biom cb on cb.system_id = s.system_id
-    left join cur_w cw on cw.system_id = s.system_id
-    left join cur_metrics cm on cm.system_id = s.system_id
+      ps.system_id,
+      sum(coalesce(ps.total_feed_amount_period, 0))::numeric as feed_sum,
+      sum(
+        coalesce(ps.biomass_increase_period, 0)
+        + coalesce(ps.total_weight_transfer_out, 0)
+        - coalesce(ps.total_weight_transfer_in, 0)
+        + coalesce(ps.total_weight_harvested, 0)
+        - coalesce(ps.total_weight_stocked, 0)
+      )::numeric as denom
+    from public.production_summary ps
+    join sys on sys.system_id = ps.system_id
+    where ps.date between v_start and v_end
+      and coalesce(ps.activity_rank, 0) > 1
+    group by ps.system_id
   ),
   prev_efcr as (
     select
-      s.system_id,
-      case when pb.b0 is null or pb.b1 is null then null::double precision
-        else (pb.b1 - pb.b0 + pw.harvest_kg + pw.tout_kg - pw.tin_kg - pw.stocked_kg)
-      end as denom,
-      pm.feed_sum
-    from sys s
-    left join prev_biom pb on pb.system_id = s.system_id
-    left join prev_w pw on pw.system_id = s.system_id
-    left join prev_metrics pm on pm.system_id = s.system_id
+      ps.system_id,
+      sum(coalesce(ps.total_feed_amount_period, 0))::numeric as feed_sum,
+      sum(
+        coalesce(ps.biomass_increase_period, 0)
+        + coalesce(ps.total_weight_transfer_out, 0)
+        - coalesce(ps.total_weight_transfer_in, 0)
+        + coalesce(ps.total_weight_harvested, 0)
+        - coalesce(ps.total_weight_stocked, 0)
+      )::numeric as denom
+    from public.production_summary ps
+    join sys on sys.system_id = ps.system_id
+    where ps.date between v_prev_start and v_prev_end
+      and coalesce(ps.activity_rank, 0) > 1
+    group by ps.system_id
   ),
   cur_wq as (
     select s.system_id, avg(dwr.rating_numeric::numeric) as wq_num
@@ -1986,7 +1902,17 @@ CREATE OR REPLACE FUNCTION "public"."get_fcr_trend"("p_farm_id" "uuid", "p_syste
     LANGUAGE "sql" STABLE
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
-with cycle_rows as (
+with latest_sampling as (
+  select max(ps.date) as latest_sampling_date
+  from public.production_summary ps
+  join public.system s
+    on s.id = ps.system_id
+  where ps.system_id = p_system_id
+    and s.farm_id = p_farm_id
+    and public.is_farm_member(p_farm_id)
+    and ps.activity = 'sampling'
+),
+cycle_rows as (
   select
     ps.cycle_id,
     ps.date as period_end,
@@ -2013,10 +1939,12 @@ with cycle_rows as (
     and public.is_farm_member(p_farm_id)
 ),
 sampling_points as (
-  select *
-  from cycle_rows
-  where activity = 'sampling'
-    and period_end >= current_date - p_days
+  select cr.*
+  from cycle_rows cr
+  cross join latest_sampling ls
+  where cr.activity = 'sampling'
+    and ls.latest_sampling_date is not null
+    and cr.period_end between (ls.latest_sampling_date - (greatest(coalesce(p_days, 180), 1) - 1)) and ls.latest_sampling_date
 )
 select
   period_start,
@@ -2093,32 +2021,40 @@ CREATE OR REPLACE FUNCTION "public"."get_growth_trend"("p_system_id" bigint, "p_
     LANGUAGE "sql" STABLE
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
-SELECT
-  fsw.date AS sample_date,
-  fsw.abw::numeric AS abw_g,
-  (LAG(fsw.abw) OVER w)::numeric AS prev_abw_g,
-  (fsw.abw - (LAG(fsw.abw) OVER w))::numeric AS weight_gain_g,
-  ROUND(
+with latest_sampling as (
+  select max(fsw.date) as latest_sample_date
+  from public.fish_sampling_weight fsw
+  where fsw.system_id = p_system_id
+    and fsw.abw > 0
+)
+select
+  fsw.date as sample_date,
+  fsw.abw::numeric as abw_g,
+  (lag(fsw.abw) over w)::numeric as prev_abw_g,
+  (fsw.abw - (lag(fsw.abw) over w))::numeric as weight_gain_g,
+  round(
     (
-      (fsw.abw - (LAG(fsw.abw) OVER w))
-      / NULLIF((fsw.date - (LAG(fsw.date) OVER w)), 0)
+      (fsw.abw - (lag(fsw.abw) over w))
+      / nullif((fsw.date - (lag(fsw.date) over w)), 0)
     )::numeric,
     3
-  ) AS adg_g_day,
-  ROUND(
+  ) as adg_g_day,
+  round(
     (
-      (LN(fsw.abw) - LN(LAG(fsw.abw) OVER w))
-      / NULLIF((fsw.date - (LAG(fsw.date) OVER w)), 0) * 100
+      (ln(fsw.abw) - ln(lag(fsw.abw) over w))
+      / nullif((fsw.date - (lag(fsw.date) over w)), 0) * 100
     )::numeric,
     4
-  ) AS sgr_pct_day,
-  (fsw.date - (LAG(fsw.date) OVER w))::int AS days_interval
-FROM public.fish_sampling_weight fsw
-WHERE fsw.system_id = p_system_id
-  AND fsw.date >= CURRENT_DATE - p_days
-  AND fsw.abw > 0
-WINDOW w AS (ORDER BY fsw.date)
-ORDER BY fsw.date;
+  ) as sgr_pct_day,
+  (fsw.date - (lag(fsw.date) over w))::int as days_interval
+from public.fish_sampling_weight fsw
+cross join latest_sampling ls
+where fsw.system_id = p_system_id
+  and fsw.abw > 0
+  and ls.latest_sample_date is not null
+  and fsw.date between (ls.latest_sample_date - (greatest(coalesce(p_days, 180), 1) - 1)) and ls.latest_sample_date
+window w as (order by fsw.date)
+order by fsw.date;
 $$;
 
 
@@ -2174,75 +2110,127 @@ CREATE OR REPLACE FUNCTION "public"."get_running_stock"("p_farm_id" "uuid") RETU
     LANGUAGE "sql" STABLE
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
-WITH incoming AS (
-  SELECT
+with incoming as (
+  select
     fi.feed_type_id,
-    SUM(fi.feed_amount)::numeric AS qty_in,
-    MAX(fi.date) AS last_delivery_date
-  FROM public.feed_incoming fi
-  WHERE fi.farm_id = p_farm_id
-  GROUP BY fi.feed_type_id
+    sum(fi.feed_amount)::numeric as qty_in,
+    max(fi.date) as last_delivery_date
+  from public.feed_incoming fi
+  where fi.farm_id = p_farm_id
+  group by fi.feed_type_id
 ),
-usage_all AS (
-  SELECT
+usage_all as (
+  select
     fr.feed_type_id,
-    SUM(fr.feeding_amount)::numeric AS qty_used
-  FROM public.feeding_record fr
-  JOIN public.system s
-    ON s.id = fr.system_id
-  WHERE s.farm_id = p_farm_id
-  GROUP BY fr.feed_type_id
+    sum(fr.feeding_amount)::numeric as qty_used,
+    max(fr.date) as latest_usage_date
+  from public.feeding_record fr
+  join public.system s
+    on s.id = fr.system_id
+  where s.farm_id = p_farm_id
+  group by fr.feed_type_id
 ),
-usage_7d AS (
-  SELECT
+latest_usage_anchor as (
+  select max(ua.latest_usage_date) as latest_usage_date
+  from usage_all ua
+),
+usage_anchored as (
+  select
     fr.feed_type_id,
-    GREATEST(SUM(fr.feeding_amount)::numeric / 7.0, 0.001) AS avg_d
-  FROM public.feeding_record fr
-  JOIN public.system s
-    ON s.id = fr.system_id
-  WHERE s.farm_id = p_farm_id
-    AND fr.date >= CURRENT_DATE - 7
-  GROUP BY fr.feed_type_id
+    greatest(sum(fr.feeding_amount)::numeric / 7.0, 0.001) as avg_d
+  from public.feeding_record fr
+  join public.system s
+    on s.id = fr.system_id
+  cross join latest_usage_anchor lua
+  where s.farm_id = p_farm_id
+    and lua.latest_usage_date is not null
+    and fr.date between (lua.latest_usage_date - 6) and lua.latest_usage_date
+  group by fr.feed_type_id
 ),
-base AS (
-  SELECT
-    ft.id AS feed_type_id,
-    CONCAT_WS(' ',
-      COALESCE(ft.feed_line,''),
+latest_snapshot as (
+  select distinct on (fis.feed_type_id)
+    fis.feed_type_id,
+    fis.date as snapshot_date,
+    fis.snapshot_time,
+    fis.total_stock_kg::numeric as snapshot_stock_kg
+  from public.feed_inventory_snapshot fis
+  where fis.farm_id = p_farm_id
+  order by fis.feed_type_id, fis.date desc, fis.snapshot_time desc, fis.created_at desc, fis.id desc
+),
+incoming_after_snapshot as (
+  select
+    fi.feed_type_id,
+    sum(fi.feed_amount)::numeric as qty_in_after_snapshot
+  from public.feed_incoming fi
+  join latest_snapshot ls
+    on ls.feed_type_id = fi.feed_type_id
+  where fi.farm_id = p_farm_id
+    and fi.date > ls.snapshot_date
+  group by fi.feed_type_id
+),
+usage_after_snapshot as (
+  select
+    fr.feed_type_id,
+    sum(fr.feeding_amount)::numeric as qty_used_after_snapshot
+  from public.feeding_record fr
+  join public.system s
+    on s.id = fr.system_id
+  join latest_snapshot ls
+    on ls.feed_type_id = fr.feed_type_id
+  where s.farm_id = p_farm_id
+    and fr.date > ls.snapshot_date
+  group by fr.feed_type_id
+),
+base as (
+  select
+    ft.id as feed_type_id,
+    concat_ws(' ',
+      coalesce(ft.feed_line,''),
       ft.feed_category::text,
       ft.feed_pellet_size::text,
-      CONCAT('CP', ft.crude_protein_percentage::text)
-    )::text AS feed_type_name,
-    ft.feed_pellet_size::text AS pellet_size,
-    COALESCE(i.qty_in,0) - COALESCE(u.qty_used,0) AS stock_kg,
-    u7.avg_d,
+      concat('CP', ft.crude_protein_percentage::text)
+    )::text as feed_type_name,
+    ft.feed_pellet_size::text as pellet_size,
+    case
+      when ls.feed_type_id is not null then
+        coalesce(ls.snapshot_stock_kg, 0)
+        + coalesce(ias.qty_in_after_snapshot, 0)
+        - coalesce(uas.qty_used_after_snapshot, 0)
+      else coalesce(i.qty_in, 0) - coalesce(u.qty_used, 0)
+    end as stock_kg,
+    ua.avg_d,
     i.last_delivery_date
-  FROM public.feed_type ft
-  LEFT JOIN incoming i ON i.feed_type_id = ft.id
-  LEFT JOIN usage_all u ON u.feed_type_id = ft.id
-  LEFT JOIN usage_7d u7 ON u7.feed_type_id = ft.id
-  WHERE i.feed_type_id IS NOT NULL OR u.feed_type_id IS NOT NULL
+  from public.feed_type ft
+  left join incoming i on i.feed_type_id = ft.id
+  left join usage_all u on u.feed_type_id = ft.id
+  left join usage_anchored ua on ua.feed_type_id = ft.id
+  left join latest_snapshot ls on ls.feed_type_id = ft.id
+  left join incoming_after_snapshot ias on ias.feed_type_id = ft.id
+  left join usage_after_snapshot uas on uas.feed_type_id = ft.id
+  where i.feed_type_id is not null
+     or u.feed_type_id is not null
+     or ls.feed_type_id is not null
 )
-SELECT
+select
   b.feed_type_id,
   b.feed_type_name,
   b.pellet_size,
-  ROUND(b.stock_kg,2),
-  ROUND(COALESCE(b.avg_d,0),2),
-  CASE
-    WHEN COALESCE(b.avg_d,0) > 0 THEN ROUND(b.stock_kg / b.avg_d,1)
-    ELSE NULL
-  END AS days_remaining,
-  CASE
-    WHEN COALESCE(b.avg_d,0) = 0 THEN 'no_data'
-    WHEN b.stock_kg / b.avg_d < 7  THEN 'critical'
-    WHEN b.stock_kg / b.avg_d < 14 THEN 'low'
-    WHEN b.stock_kg / b.avg_d < 30 THEN 'reorder'
-    ELSE 'ok'
-  END AS stock_status,
+  round(b.stock_kg, 2),
+  round(coalesce(b.avg_d, 0), 2),
+  case
+    when coalesce(b.avg_d, 0) > 0 then round(b.stock_kg / b.avg_d, 1)
+    else null
+  end as days_remaining,
+  case
+    when coalesce(b.avg_d, 0) = 0 then 'no_data'
+    when b.stock_kg / b.avg_d < 7 then 'critical'
+    when b.stock_kg / b.avg_d < 14 then 'low'
+    when b.stock_kg / b.avg_d < 30 then 'reorder'
+    else 'ok'
+  end as stock_status,
   b.last_delivery_date
-FROM base b
-ORDER BY b.stock_kg ASC;
+from base b
+order by b.stock_kg asc;
 $$;
 
 
@@ -3738,7 +3726,9 @@ CREATE TABLE IF NOT EXISTS "public"."feeding_record" (
     "date" "date" NOT NULL,
     "feeding_response" "public"."feeding_response" NOT NULL,
     "batch_id" bigint,
-    "notes" "text"
+    "notes" "text",
+    "local_id" "text",
+    "synced_at" timestamp with time zone DEFAULT "now"()
 );
 
 
@@ -3766,7 +3756,9 @@ CREATE TABLE IF NOT EXISTS "public"."fish_harvest" (
     "total_weight_harvest" double precision NOT NULL,
     "abw" double precision NOT NULL,
     "type_of_harvest" "public"."type_of_harvest" NOT NULL,
-    "batch_id" bigint
+    "batch_id" bigint,
+    "local_id" "text",
+    "synced_at" timestamp with time zone DEFAULT "now"()
 );
 
 
@@ -3786,6 +3778,8 @@ CREATE TABLE IF NOT EXISTS "public"."fish_mortality" (
     "notes" "text",
     "recorded_by" "uuid",
     "farm_id" "uuid",
+    "local_id" "text",
+    "synced_at" timestamp with time zone DEFAULT "now"(),
     CONSTRAINT "fish_mortality_cause_check" CHECK (("cause" = ANY (ARRAY['unknown'::"text", 'hypoxia'::"text", 'disease'::"text", 'injury'::"text", 'handling'::"text", 'predator'::"text", 'starvation'::"text", 'temperature'::"text", 'other'::"text"])))
 );
 
@@ -3811,6 +3805,8 @@ CREATE TABLE IF NOT EXISTS "public"."fish_sampling_weight" (
     "abw" double precision NOT NULL,
     "batch_id" bigint,
     "notes" "text",
+    "local_id" "text",
+    "synced_at" timestamp with time zone DEFAULT "now"(),
     CONSTRAINT "fish_sampling_positive_numbers" CHECK ((("number_of_fish_sampling" > 0) AND ("total_weight_sampling" > (0)::double precision) AND ("abw" > (0)::double precision)))
 );
 
@@ -3836,7 +3832,9 @@ CREATE TABLE IF NOT EXISTS "public"."fish_stocking" (
     "abw" double precision NOT NULL,
     "batch_id" bigint NOT NULL,
     "type_of_stocking" "public"."type_of_stocking" NOT NULL,
-    "notes" "text"
+    "notes" "text",
+    "local_id" "text",
+    "synced_at" timestamp with time zone DEFAULT "now"()
 );
 
 
@@ -3855,7 +3853,9 @@ CREATE TABLE IF NOT EXISTS "public"."fish_transfer" (
     "batch_id" bigint,
     "transfer_type" "public"."transfer_type" DEFAULT 'transfer'::"public"."transfer_type" NOT NULL,
     "notes" "text",
-    "external_target_name" "text"
+    "external_target_name" "text",
+    "local_id" "text",
+    "synced_at" timestamp with time zone DEFAULT "now"()
 );
 
 
@@ -3906,7 +3906,9 @@ CREATE TABLE IF NOT EXISTS "public"."water_quality_measurement" (
     "system_id" bigint NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "measured_at" timestamp with time zone NOT NULL,
-    "location_reference" "text"
+    "location_reference" "text",
+    "local_id" "text",
+    "synced_at" timestamp with time zone DEFAULT "now"()
 );
 
 
@@ -4603,6 +4605,23 @@ ALTER TABLE "public"."fish_mortality" ALTER COLUMN "id" ADD GENERATED BY DEFAULT
     CACHE 1
 );
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."offline_push_log" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "farm_id" "text" NOT NULL,
+    "pushed_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "record_count" integer NOT NULL,
+    "table_name" "text" NOT NULL,
+    "local_id" "text" NOT NULL,
+    "status" "text" NOT NULL,
+    "error_msg" "text",
+    CONSTRAINT "offline_push_log_status_check" CHECK (("status" = ANY (ARRAY['ok'::"text", 'conflict'::"text", 'error'::"text"])))
+);
+
+
+ALTER TABLE "public"."offline_push_log" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."production_cycle" (
@@ -5327,6 +5346,11 @@ ALTER TABLE ONLY "public"."feed_type"
 
 
 
+ALTER TABLE ONLY "public"."feeding_record"
+    ADD CONSTRAINT "feeding_record_local_id_key" UNIQUE ("local_id");
+
+
+
 ALTER TABLE ONLY "public"."fingerling_batch"
     ADD CONSTRAINT "fingerling_batch_name_unique" UNIQUE ("name");
 
@@ -5338,7 +5362,32 @@ ALTER TABLE ONLY "public"."fingerling_batch"
 
 
 ALTER TABLE ONLY "public"."fish_harvest"
+    ADD CONSTRAINT "fish_harvest_local_id_key" UNIQUE ("local_id");
+
+
+
+ALTER TABLE ONLY "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."fish_mortality"
+    ADD CONSTRAINT "fish_mortality_local_id_key" UNIQUE ("local_id");
+
+
+
+ALTER TABLE ONLY "public"."fish_sampling_weight"
+    ADD CONSTRAINT "fish_sampling_weight_local_id_key" UNIQUE ("local_id");
+
+
+
+ALTER TABLE ONLY "public"."fish_stocking"
+    ADD CONSTRAINT "fish_stocking_local_id_key" UNIQUE ("local_id");
+
+
+
+ALTER TABLE ONLY "public"."fish_transfer"
+    ADD CONSTRAINT "fish_transfer_local_id_key" UNIQUE ("local_id");
 
 
 
@@ -5349,6 +5398,11 @@ ALTER TABLE ONLY "public"."fish_sampling_weight"
 
 ALTER TABLE ONLY "public"."fish_mortality"
     ADD CONSTRAINT "mortality_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."offline_push_log"
+    ADD CONSTRAINT "offline_push_log_pkey" PRIMARY KEY ("id");
 
 
 
@@ -5404,6 +5458,11 @@ ALTER TABLE ONLY "public"."water_quality_framework"
 
 ALTER TABLE ONLY "public"."water_quality_framework"
     ADD CONSTRAINT "water_quality_framework_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."water_quality_measurement"
+    ADD CONSTRAINT "water_quality_measurement_local_id_key" UNIQUE ("local_id");
 
 
 
@@ -5880,6 +5939,11 @@ ALTER TABLE ONLY "public"."fish_mortality"
 
 
 
+ALTER TABLE ONLY "public"."offline_push_log"
+    ADD CONSTRAINT "offline_push_log_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."production_cycle"
     ADD CONSTRAINT "production_cycle_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
@@ -6249,6 +6313,13 @@ CREATE POLICY "fish_transfer: read if farm member" ON "public"."fish_transfer" F
    FROM ("public"."system" "s"
      JOIN "public"."farm_user" "fu" ON (("fu"."farm_id" = "s"."farm_id")))
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND (("s"."id" = "fish_transfer"."origin_system_id") OR ("s"."id" = "fish_transfer"."target_system_id"))))));
+
+
+
+ALTER TABLE "public"."offline_push_log" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "own_push_log" ON "public"."offline_push_log" USING (("auth"."uid"() = "user_id"));
 
 
 
@@ -7595,6 +7666,10 @@ GRANT ALL ON SEQUENCE "public"."fish_weight_sampling_id_seq" TO "service_role";
 
 
 GRANT ALL ON SEQUENCE "public"."mortality_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."offline_push_log" TO "service_role";
 
 
 

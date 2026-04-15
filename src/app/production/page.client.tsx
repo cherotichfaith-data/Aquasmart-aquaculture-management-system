@@ -23,7 +23,9 @@ function ProductionContent() {
     dateFrom,
     dateTo,
     boundsReady: hasBounds,
-  } = useAnalyticsPageBootstrap()
+  } = useAnalyticsPageBootstrap({
+    boundsScope: "production",
+  })
 
   const filterParam = searchParams.get("filter")
 

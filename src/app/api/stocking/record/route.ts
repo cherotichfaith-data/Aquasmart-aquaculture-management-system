@@ -15,6 +15,7 @@ const stockingSchema = z.object({
   abw: z.number().min(0),
   notes: z.string().max(500).nullable().optional(),
   type_of_stocking: z.enum(["empty", "already_stocked"]),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -43,9 +44,15 @@ export async function POST(request: Request) {
     type_of_stocking: payload.type_of_stocking,
     abw: payload.abw,
     notes: payload.notes?.trim() ? payload.notes.trim() : null,
+    local_id: payload.local_id ?? null,
+    synced_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase.from("fish_stocking").insert(insertPayload).select().single()
+  const { data, error } = await supabase
+    .from("fish_stocking")
+    .upsert(insertPayload, { onConflict: "local_id" })
+    .select()
+    .maybeSingle()
 
   if (error || !data) {
     logSbError("stocking:record:insert", error)

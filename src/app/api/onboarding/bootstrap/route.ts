@@ -12,12 +12,13 @@ const onboardingSchema = z
   .object({
     farmName: z.string().trim().min(2, "Farm name is required."),
     location: z.string().trim().min(2, "Location is required."),
-    owner: z.string().trim().min(2, "Owner name is required."),
-    email: z.string().trim().email("A valid email is required."),
+    owner: z.string().trim().optional().default(""),
+    email: z.string().trim().optional().default(""),
     phone: z.string().trim().optional().default(""),
-    lowDoThreshold: z.number().finite().min(0),
-    highAmmoniaThreshold: z.number().finite().min(0),
-    highMortalityThreshold: z.number().finite().min(0),
+    // Thresholds optional — sensible defaults are seeded automatically
+    lowDoThreshold: z.number().finite().min(0).optional().default(5.0),
+    highAmmoniaThreshold: z.number().finite().min(0).optional().default(0.05),
+    highMortalityThreshold: z.number().finite().min(0).optional().default(2.0),
   })
 
 export async function POST(request: Request) {

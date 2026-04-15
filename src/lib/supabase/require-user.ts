@@ -2,6 +2,10 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 
+function authServiceUnavailable(stage: string): never {
+  throw new Error(`Unable to reach Supabase auth service during ${stage}.`)
+}
+
 export async function requireUser() {
   const supabase = await createClient()
   let user = null
@@ -16,7 +20,10 @@ export async function requireUser() {
   }
 
   if (error || !user) {
-    if (error && !isSbNetworkError(error)) {
+    if (error && isSbNetworkError(error)) {
+      authServiceUnavailable("requireUser")
+    }
+    if (error) {
       logSbError("requireUser", error)
     }
     redirect("/auth")
@@ -39,7 +46,10 @@ export async function requireUserContext() {
   }
 
   if (authError || !user) {
-    if (authError && !isSbNetworkError(authError)) {
+    if (authError && isSbNetworkError(authError)) {
+      authServiceUnavailable("requireUserContext:getUser")
+    }
+    if (authError) {
       logSbError("requireUserContext:getUser", authError)
     }
     redirect("/auth")
@@ -57,7 +67,10 @@ export async function requireUserContext() {
   }
 
   if (sessionError || !accessToken) {
-    if (sessionError && !isSbNetworkError(sessionError)) {
+    if (sessionError && isSbNetworkError(sessionError)) {
+      authServiceUnavailable("requireUserContext:getSession")
+    }
+    if (sessionError) {
       logSbError("requireUserContext:getSession", sessionError)
     }
     redirect("/auth")

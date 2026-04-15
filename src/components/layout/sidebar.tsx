@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import {
   Activity,
   AlertTriangle,
@@ -16,13 +17,15 @@ import {
   LogOut,
   Settings,
   TestTube,
+  Users,
   X,
   PlusCircle,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react"
 
-const navigationSections = [
+// All possible nav items with section grouping
+const ALL_NAV_SECTIONS = [
   {
     title: "Operate",
     items: [
@@ -42,13 +45,57 @@ const navigationSections = [
   },
   {
     title: "Capture",
-    items: [{ name: "Data Capture", href: "/data-entry", icon: PlusCircle }],
+    items: [{ name: "Data Entry", href: "/data-entry", icon: PlusCircle }],
   },
   {
     title: "Configure",
-    items: [{ name: "Settings", href: "/settings", icon: Settings }],
+    items: [
+      { name: "Settings", href: "/settings", icon: Settings },
+      { name: "Users", href: "/settings/users", icon: Users },
+    ],
   },
 ]
+
+// Routes visible per role. null/undefined = show all (admin/farm_manager default)
+const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
+  admin:                 new Set(["/"   , "/feed", "/sampling", "/mortality", "/water-quality", "/production", "/reports", "/data-entry", "/settings", "/settings/users"]),
+  farm_manager:          new Set(["/"   , "/feed", "/sampling", "/mortality", "/water-quality", "/production", "/reports", "/data-entry", "/settings"]),
+  farm_technician:       new Set(["/data-entry", "/feed", "/sampling", "/mortality", "/water-quality"]),
+  inventory_storekeeper: new Set(["/data-entry"]),
+  analyst_planner:       new Set(["/"   , "/production", "/reports"]),
+  viewer_auditor:        new Set(["/"   , "/reports"]),
+}
+
+const ROLE_ITEM_LABELS: Record<string, Record<string, string>> = {
+  inventory_storekeeper: { "/data-entry": "Inventory Entry" },
+}
+
+// For farm_technician the workboard link gets the feed type pre-selected
+const ROLE_ITEM_HREFS: Record<string, Record<string, string>> = {
+  farm_technician:       { "/data-entry": "/data-entry?type=feeding" },
+  inventory_storekeeper: { "/data-entry": "/data-entry?type=incoming_feed" },
+}
+
+function getVisibleSections(role: string | null | undefined) {
+  const allowed = role ? (ROLE_ALLOWED_ROUTES[role] ?? null) : null
+  if (!allowed) return []
+  return ALL_NAV_SECTIONS
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => allowed.has(item.href)),
+    }))
+    .filter((section) => section.items.length > 0)
+}
+
+function resolveItemLabel(role: string | null | undefined, href: string, defaultName: string) {
+  if (!role) return defaultName
+  return ROLE_ITEM_LABELS[role]?.[href] ?? defaultName
+}
+
+function resolveItemHref(role: string | null | undefined, href: string) {
+  if (!role) return href
+  return ROLE_ITEM_HREFS[role]?.[href] ?? href
+}
 
 const waterQualityLinks = [
   { href: "/water-quality", label: "Overview", activeKey: "overview" },
@@ -74,7 +121,10 @@ export default function Sidebar({
   const searchParams = useSearchParams()
   const router = useRouter()
   const { signOut } = useAuth()
-  const { farm } = useActiveFarm()
+  const { farm, farmId } = useActiveFarm()
+  const farmRoleQuery = useActiveFarmRole(farmId)
+  const farmRole = farmRoleQuery.data ?? null
+  const navigationSections = useMemo(() => getVisibleSections(farmRole), [farmRole])
   const [signingOut, setSigningOut] = useState(false)
   const [waterQualityOpen, setWaterQualityOpen] = useState(pathname.startsWith("/water-quality"))
   const [collapsedWaterQualityFlyoutOpen, setCollapsedWaterQualityFlyoutOpen] = useState(false)
@@ -130,7 +180,7 @@ export default function Sidebar({
           }`}
         style={{
           backgroundImage:
-            "linear-gradient(180deg, rgba(255,255,255,0.02), transparent 18%), radial-gradient(circle at top right, rgba(94,234,212,0.12), transparent 28%)",
+            "linear-gradient(180deg, var(--sidebar-sheen), transparent 18%), radial-gradient(circle at top right, var(--sidebar-glow), transparent 28%)",
         }}
       >
         <div className="flex items-center justify-between px-4 py-3.5 md:hidden">
@@ -332,18 +382,22 @@ export default function Sidebar({
               )
             }
 
-            const isActive = pathname === item.href
+            const resolvedHref = resolveItemHref(farmRole, item.href)
+            const resolvedLabel = resolveItemLabel(farmRole, item.href, item.name)
+            const isActive = pathname === item.href ||
+              pathname === resolvedHref.split("?")[0] ||
+              (item.href !== "/" && pathname.startsWith(item.href + "/"))
             const Icon = item.icon
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={resolvedHref}
                 onClick={handleMobileNavigate}
                 className={navItemClass(isActive, collapsed)}
-                title={collapsed ? item.name : undefined}
+                title={collapsed ? resolvedLabel : undefined}
               >
                 <Icon className="h-4 w-4" />
-                <span className={`min-w-0 truncate text-sm font-medium ${collapsed ? "md:hidden" : ""}`}>{item.name}</span>
+                <span className={`min-w-0 truncate text-sm font-medium ${collapsed ? "md:hidden" : ""}`}>{resolvedLabel}</span>
               </Link>
             )
                 })}

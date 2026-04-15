@@ -6,7 +6,6 @@ import { Bar, Line } from "@/components/charts/chartjs"
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
-  buildMetricAxisBounds,
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
@@ -29,60 +28,60 @@ export function PerformanceSummaryCards({
   } | null
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Cycle eFCR</CardTitle>
+    <div className="kpi-grid md:grid-cols-5">
+      <Card className="kpi-card">
+        <CardHeader className="kpi-card-header">
+          <CardTitle className="kpi-card-title">Cycle eFCR</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
+        <CardContent className="kpi-card-content">
+          <div className="kpi-card-value">
             {formatNumberValue(summary?.efcr_aggregated_consolidated, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">Last in-period row per cycle from `api_production_summary`</p>
+          <p className="kpi-card-meta">Last in-period row per cycle from `api_production_summary`</p>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Survival Rate</CardTitle>
+      <Card className="kpi-card">
+        <CardHeader className="kpi-card-header">
+          <CardTitle className="kpi-card-title">Survival Rate</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
+        <CardContent className="kpi-card-content">
+          <div className="kpi-card-value">
             {summary?.survival_rate_pct != null
               ? `${formatNumberValue(summary.survival_rate_pct, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}%`
               : "N/A"}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">(stocked - cumulative mortality - transfers out) / stocked</p>
+          <p className="kpi-card-meta">(stocked - cumulative mortality - transfers out) / stocked</p>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Total Harvest</CardTitle>
+      <Card className="kpi-card">
+        <CardHeader className="kpi-card-header">
+          <CardTitle className="kpi-card-title">Total Harvest</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
+        <CardContent className="kpi-card-content">
+          <div className="kpi-card-value">
             {formatNumberValue(summary?.total_harvest_kg, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="kpi-card-meta">
             {formatNumberValue(summary?.total_harvest_fish, { decimals: 0, fallback: "N/A" })} fish
           </p>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Farm Biomass</CardTitle>
+      <Card className="kpi-card">
+        <CardHeader className="kpi-card-header">
+          <CardTitle className="kpi-card-title">Farm Biomass</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatNumberValue(summary?.average_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Latest total biomass across in-scope cycles</p>
+        <CardContent className="kpi-card-content">
+          <div className="kpi-card-value">{formatNumberValue(summary?.average_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div>
+          <p className="kpi-card-meta">Latest total biomass across in-scope cycles</p>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Farm Mortality</CardTitle>
+      <Card className="kpi-card">
+        <CardHeader className="kpi-card-header">
+          <CardTitle className="kpi-card-title">Farm Mortality</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatPercentRateValue(summary?.mortality_rate, 2, "%/day", "N/A")}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Latest daily mortality ratio across in-scope cycles</p>
+        <CardContent className="kpi-card-content">
+          <div className="kpi-card-value">{formatPercentRateValue(summary?.mortality_rate, 2, "%/day", "N/A")}</div>
+          <p className="kpi-card-meta">Latest daily mortality ratio across in-scope cycles</p>
         </CardContent>
       </Card>
     </div>
@@ -99,14 +98,6 @@ export function PerformanceTrendSection({
   const palette = getChartPalette()
   const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
   const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
-  const efcrBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.efcr_period), { minFloor: 0, trimOutliers: true }),
-    [chartRows],
-  )
-  const biomassBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.total_biomass), { minFloor: 0 }),
-    [chartRows],
-  )
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
   const data = useMemo<ChartData<"line">>(
     () => ({
@@ -162,10 +153,6 @@ export function PerformanceTrendSection({
       buildCartesianOptions({
         palette,
         legend: true,
-        min: efcrBounds.min,
-        max: efcrBounds.max,
-        rightMin: biomassBounds.min,
-        rightMax: biomassBounds.max,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: "eFCR",
@@ -186,7 +173,7 @@ export function PerformanceTrendSection({
         xTickFormatter: (_value, index) =>
           formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
       }),
-    [biomassBounds.max, biomassBounds.min, dateDomain, efcrBounds.max, efcrBounds.min, palette, xLimit],
+    [dateDomain, palette, xLimit],
   )
 
   return (

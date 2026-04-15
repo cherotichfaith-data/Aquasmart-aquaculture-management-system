@@ -1,8 +1,10 @@
 import type { Metadata } from "next"
+import { redirect } from "next/navigation"
 import RootPageClient from "./page.client"
 import { createClient } from "@/lib/supabase/server"
-import { requireInitialFarmId } from "@/features/farm/queries.server"
+import { resolveInitialFarmId } from "@/features/farm/queries.server"
 import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
+import { resolveAppEntryPath } from "@/lib/app-entry"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 
 export const metadata: Metadata = {
@@ -77,7 +79,28 @@ export default async function Page({
   const resolvedSearchParams = (await searchParams) ?? {}
   const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
   const initialFilters = parseDashboardPageFilters(resolvedSearchParams)
-  const { farmId } = await requireInitialFarmId(searchFarmId)
+  const { farmId } = await resolveInitialFarmId(searchFarmId)
+
+  if (!farmId) {
+    redirect("/onboarding")
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("farm_user")
+    .select("role")
+    .eq("farm_id", farmId)
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (membershipError && !isSbNetworkError(membershipError)) {
+    logSbError("app:page:getFarmRole", membershipError)
+  }
+
+  const entryPath = resolveAppEntryPath((membership?.role ?? null) as Parameters<typeof resolveAppEntryPath>[0])
+  if (entryPath !== "/") {
+    redirect(entryPath)
+  }
+
   const initialData = await getDashboardPageInitialData({
     farmId,
     filters: initialFilters,

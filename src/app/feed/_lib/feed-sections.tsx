@@ -596,16 +596,10 @@ export function FeedFcrSection({
     [dateDomain, rowsByDate, series],
   )
 
-  const chartOptions = useMemo<ChartOptions<"line">>(() => {
-    const yBounds = buildMetricAxisBounds(
-      chartRows.flatMap((row) => series.map((item) => getValueOrNull(row[item.key]))),
-      { minFloor: 0, trimOutliers: true },
-    )
-
-    return buildCartesianOptions({
+  const chartOptions = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
       palette,
-      min: yBounds.min,
-      max: yBounds.max,
       xMaxTicksLimit: xLimit,
       xTitle: "Sampling interval end date",
       yTickFormatter: (value) => Number(value).toFixed(2),
@@ -620,8 +614,9 @@ export function FeedFcrSection({
         new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
           new Date(`${String(dateDomain[index] ?? "")}T00:00:00`),
         ),
-    })
-  }, [chartRows, dateDomain, palette, series, xLimit])
+      }),
+    [dateDomain, palette, xLimit],
+  )
 
   return (
     <Card>

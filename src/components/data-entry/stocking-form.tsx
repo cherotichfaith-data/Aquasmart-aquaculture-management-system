@@ -20,6 +20,7 @@ import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useRecordStocking } from "@/lib/hooks/use-stocking"
 import { logSbError } from "@/lib/supabase/log"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { BatchQuickCreate } from "./batch-quick-create"
 import { DependencyBlocker } from "./dependency-blocker"
 import {
@@ -143,6 +144,8 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Record Stocking</h2>
       </div>
+
+      <OfflineSaveBadge result={mutation.data} />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

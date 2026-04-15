@@ -15,10 +15,10 @@ import { EmptyState } from "@/components/shared/data-states"
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
-  buildMetricAxisBounds,
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
+import type { AlertLogRow } from "@/lib/api/mortality"
 import type { Tables } from "@/lib/types/database"
 import { isMortalityCause, MORTALITY_CAUSES } from "@/lib/mortality"
 import { cn } from "@/lib/utils"
@@ -41,7 +41,6 @@ import {
   trendLabel,
 } from "../_lib/presentation"
 
-type AlertLogRow = Tables<"alert_log">
 type MortalityEventRow = Tables<"fish_mortality">
 
 type SurvivalTrendPoint = {
@@ -57,16 +56,6 @@ type DeathsTrendPoint = {
 
 type LatestReading = {
   doValue: number | null
-}
-
-const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
-  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-  return numeric.length ? Math.max(...numeric) : fallback
-}
-
-const getMinNumber = (values: Array<number | null | undefined>, fallback = 0) => {
-  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-  return numeric.length ? Math.min(...numeric) : fallback
 }
 
 export function MortalityDashboard({
@@ -132,8 +121,6 @@ export function MortalityDashboard({
     () =>
       buildCartesianOptions({
         palette,
-        min: 0,
-        max: buildMetricAxisBounds(deathsTrend.map((row) => row.deaths), { includeZero: true }).max,
         xMaxTicksLimit: deathsXAxisLimit,
         xTitle: "Date",
         yTickFormatter: (value) => Number(value).toLocaleString(),
@@ -183,10 +170,9 @@ export function MortalityDashboard({
       buildCartesianOptions({
         palette,
         legend: true,
-        min: buildMetricAxisBounds(survivalTrend.map((row) => row.liveCount), { minFloor: 0 }).min,
-        max: buildMetricAxisBounds(survivalTrend.map((row) => row.liveCount), { minFloor: 0 }).max,
         rightMin: 0,
         rightMax: 100,
+        lockRightYBounds: true,
         xMaxTicksLimit: survivalXAxisLimit,
         xTitle: "Date",
         yTitle: "Live count",
@@ -265,24 +251,9 @@ export function MortalityDashboard({
   )
 
   const driverOptions = useMemo<ChartOptions<"bar">>(() => {
-    const countBounds = buildMetricAxisBounds(
-      [
-        ...driverTrend.map((row) => row.deaths),
-        ...driverTrend.map((row) => row.poorResponses),
-      ],
-      { includeZero: true },
-    )
-    const doBounds = buildMetricAxisBounds(driverTrend.map((row) => row.avgDo), { minFloor: 0 })
-    const tempMin = Math.max(0, Math.floor(getMinNumber(driverTrend.map((row) => row.avgTemperature)) - 1))
-    const tempMax = Math.ceil(getMaxNumber(driverTrend.map((row) => row.avgTemperature)) + 1)
-
     return buildCartesianOptions({
       palette,
       legend: true,
-      min: countBounds.min,
-      max: countBounds.max,
-      rightMin: doBounds.min,
-      rightMax: doBounds.max,
       xMaxTicksLimit: driverXAxisLimit,
       xTitle: "Date",
       yTitle: "Deaths / poor responses",
@@ -310,8 +281,6 @@ export function MortalityDashboard({
           display: true,
           position: "right",
           offset: true,
-          min: tempMin,
-          max: tempMax,
           border: { display: false },
           grid: { drawOnChartArea: false, drawTicks: false },
           ticks: {
@@ -335,61 +304,61 @@ export function MortalityDashboard({
 
   return (
     <>
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Deaths today</CardTitle>
+      <section className="kpi-grid md:grid-cols-2 xl:grid-cols-6">
+        <Card className="kpi-card">
+          <CardHeader className="kpi-card-header">
+            <CardTitle className="kpi-card-title">Deaths today</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.deathsToday.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Across scoped systems</p>
+          <CardContent className="kpi-card-content">
+            <div className="kpi-card-value">{kpis.deathsToday.toLocaleString()}</div>
+            <p className="kpi-card-meta">Across scoped systems</p>
           </CardContent>
         </Card>
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">7-day deaths</CardTitle>
+        <Card className="kpi-card">
+          <CardHeader className="kpi-card-header">
+            <CardTitle className="kpi-card-title">7-day deaths</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.deaths7d.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Repeat-loss window</p>
+          <CardContent className="kpi-card-content">
+            <div className="kpi-card-value">{kpis.deaths7d.toLocaleString()}</div>
+            <p className="kpi-card-meta">Repeat-loss window</p>
           </CardContent>
         </Card>
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Open alerts</CardTitle>
+        <Card className="kpi-card">
+          <CardHeader className="kpi-card-header">
+            <CardTitle className="kpi-card-title">Open alerts</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.openAlerts}</div>
-            <p className="text-xs text-muted-foreground">Unacknowledged mortality alerts</p>
+          <CardContent className="kpi-card-content">
+            <div className="kpi-card-value">{kpis.openAlerts}</div>
+            <p className="kpi-card-meta">Unacknowledged mortality alerts</p>
           </CardContent>
         </Card>
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Worst survival</CardTitle>
+        <Card className="kpi-card">
+          <CardHeader className="kpi-card-header">
+            <CardTitle className="kpi-card-title">Worst survival</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="kpi-card-content">
+            <div className="kpi-card-value">
               {kpis.worstSurvival == null ? "N/A" : `${formatNumber(kpis.worstSurvival, 1)}%`}
             </div>
-            <p className="text-xs text-muted-foreground">Lowest live survival in scope</p>
+            <p className="kpi-card-meta">Lowest live survival in scope</p>
           </CardContent>
         </Card>
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Systems at risk</CardTitle>
+        <Card className="kpi-card">
+          <CardHeader className="kpi-card-header">
+            <CardTitle className="kpi-card-title">Systems at risk</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.systemsAtRisk}</div>
-            <p className="text-xs text-muted-foreground">Risk score 4 or higher</p>
+          <CardContent className="kpi-card-content">
+            <div className="kpi-card-value">{kpis.systemsAtRisk}</div>
+            <p className="kpi-card-meta">Risk score 4 or higher</p>
           </CardContent>
         </Card>
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Unexplained losses</CardTitle>
+        <Card className="kpi-card">
+          <CardHeader className="kpi-card-header">
+            <CardTitle className="kpi-card-title">Unexplained losses</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.unexplainedLosses.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Unknown or other cause in 7 days</p>
+          <CardContent className="kpi-card-content">
+            <div className="kpi-card-value">{kpis.unexplainedLosses.toLocaleString()}</div>
+            <p className="kpi-card-meta">Unknown or other cause in 7 days</p>
           </CardContent>
         </Card>
       </section>
@@ -535,10 +504,10 @@ export function MortalityDashboard({
                   .map((alert) => (
                     <div key={alert.id} className="rounded-lg border border-border/80 bg-muted/20 p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <Badge variant={severityVariant(alert.severity)}>{alert.severity}</Badge>
-                        <span className="text-[11px] text-muted-foreground">{alert.rule_code}</span>
+                        <Badge variant={severityVariant(alert.severity ?? "open")}>{alert.severity ?? "open"}</Badge>
+                        <span className="text-[11px] text-muted-foreground">{alert.rule_code ?? "-"}</span>
                       </div>
-                      <p className="mt-2 text-sm font-medium">{alert.message}</p>
+                      <p className="mt-2 text-sm font-medium">{alert.message ?? "Alert triggered."}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {alert.system_id != null ? (
                           <button
@@ -551,7 +520,7 @@ export function MortalityDashboard({
                         ) : (
                           "Farm-wide"
                         )}{" "}
-                        | {formatDateTime(alert.fired_at)}
+                        | {formatDateTime(alert.fired_at ?? "")}
                       </p>
                     </div>
                   ))

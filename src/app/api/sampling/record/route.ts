@@ -14,6 +14,7 @@ const samplingSchema = z.object({
   total_weight_sampling: z.number().positive(),
   abw: z.number().min(0),
   notes: z.string().max(500).nullable().optional(),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -41,9 +42,15 @@ export async function POST(request: Request) {
     total_weight_sampling: payload.total_weight_sampling,
     abw: payload.abw,
     notes: payload.notes?.trim() ? payload.notes.trim() : null,
+    local_id: payload.local_id ?? null,
+    synced_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase.from("fish_sampling_weight").insert(insertPayload).select().single()
+  const { data, error } = await supabase
+    .from("fish_sampling_weight")
+    .upsert(insertPayload, { onConflict: "local_id" })
+    .select()
+    .maybeSingle()
 
   if (error || !data) {
     logSbError("sampling:record:insert", error)

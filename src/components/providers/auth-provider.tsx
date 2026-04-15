@@ -1,11 +1,18 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log";
 
-type UserRole = "admin" | "farm_manager" | "system_operator" | "data_analyst" | "viewer" | null;
+type UserRole =
+    | "admin"
+    | "farm_manager"
+    | "farm_technician"
+    | "inventory_storekeeper"
+    | "analyst_planner"
+    | "viewer_auditor"
+    | null;
 
 interface AuthContextType {
     user: User | null;
@@ -25,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [profile, setProfile] = useState<Record<string, any> | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const deriveRole = (authUser: User | null): UserRole => {
         const raw = authUser?.user_metadata?.role ?? authUser?.app_metadata?.role ?? null;
         return (typeof raw === "string" ? raw : null) as UserRole;

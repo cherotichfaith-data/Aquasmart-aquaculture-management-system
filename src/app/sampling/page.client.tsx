@@ -13,6 +13,7 @@ import { DataErrorState } from "@/components/shared/data-states"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
 import { useAppConfig, useSystemVolumes } from "@/lib/hooks/use-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
+import { getSemanticBadgeClass } from "@/lib/theme/semantic-colors"
 import {
   DEFAULT_TARGET_DENSITY,
   formatDayLabel,
@@ -34,6 +35,7 @@ export default function SamplingPage() {
     boundsReady: hasBounds,
   } = useAnalyticsPageBootstrap({
     defaultTimePeriod: "quarter",
+    boundsScope: "production",
   })
 
   const {
@@ -496,7 +498,13 @@ export default function SamplingPage() {
       ? "N/A"
       : `${Math.round(utilization * 100)}%`
   const utilizationTone =
-    utilization == null ? "bg-muted/20 text-muted-foreground" : utilization >= 1 ? "bg-chart-4/15 text-chart-4" : utilization >= 0.9 ? "bg-chart-3/20 text-chart-3" : "bg-chart-2/15 text-chart-2"
+    utilization == null
+      ? "bg-muted/20 text-muted-foreground"
+      : utilization >= 1
+        ? getSemanticBadgeClass("bad")
+        : utilization >= 0.9
+          ? getSemanticBadgeClass("warn")
+          : getSemanticBadgeClass("good")
   const utilizationBadge =
     utilization == null ? "Unknown" : utilization >= 1 ? "Grade now" : utilization >= 0.9 ? "Grade soon" : "OK"
 

@@ -46,10 +46,7 @@ export type TimeBounds = {
   isTruncated?: boolean | null
 }
 
-type TimePeriodBoundsRpc = Extract<
-  Database["public"]["Functions"]["api_time_period_bounds"],
-  { Args: { p_scope?: string } }
->
+type TimePeriodBoundsRpc = Database["public"]["Functions"]["api_time_period_bounds_scoped"]
 type TimePeriodBoundsRpcArgs = TimePeriodBoundsRpc["Args"]
 type TimePeriodBoundsRpcRow = TimePeriodBoundsRpc["Returns"][number]
 type TimePeriodBoundsRpcResult = {
@@ -60,7 +57,7 @@ type TimePeriodBoundsRpcQuery = PromiseLike<TimePeriodBoundsRpcResult> & {
   abortSignal?: (signal: AbortSignal) => TimePeriodBoundsRpcQuery
 }
 type RpcClient = {
-  rpc: (fn: "api_time_period_bounds", args: TimePeriodBoundsRpcArgs) => {
+  rpc: (fn: "api_time_period_bounds_scoped", args: TimePeriodBoundsRpcArgs) => {
     maybeSingle: () => TimePeriodBoundsRpcQuery
   }
 }
@@ -173,7 +170,7 @@ export async function fetchTimePeriodBounds(
   const rpcTimePeriod: BaseTimePeriod = params.timePeriod === "all history" ? "day" : params.timePeriod
   const query = withAbortSignal(
     supabase
-      .rpc("api_time_period_bounds", {
+      .rpc("api_time_period_bounds_scoped", {
         p_farm_id: params.farmId,
         p_time_period: rpcTimePeriod,
         p_anchor_date: params.anchorDate ?? undefined,

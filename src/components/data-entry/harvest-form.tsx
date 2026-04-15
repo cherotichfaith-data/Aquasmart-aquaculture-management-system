@@ -7,6 +7,7 @@ import * as z from "zod"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import {
     Dialog,
     DialogContent,
@@ -241,6 +242,9 @@ export function HarvestForm({
                 <div className="max-w-2xl">
                     <div className="mb-6">
                         <h2 className="text-xl font-semibold tracking-tight">Record Harvest</h2>
+                    </div>
+                    <div className="mb-4">
+                        <OfflineSaveBadge result={mutation.data} />
                     </div>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

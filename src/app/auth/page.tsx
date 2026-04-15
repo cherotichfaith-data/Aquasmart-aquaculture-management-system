@@ -2,27 +2,27 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
-import { Moon, Sun } from "lucide-react"
-import { useTheme } from "next-themes"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useRef, useState } from "react"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { createClient } from "@/lib/supabase/client"
 
-export default function AuthPage() {
+function AuthPageContent() {
   const supabase = createClient()
   const router = useRouter()
-  const { resolvedTheme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+  const searchParams = useSearchParams()
+  const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin")
+  const [authMode, setAuthMode] = useState<"signin" | "signup">(
+    searchParams.get("mode") === "signup" ? "signup" : "signin"
+  )
   const [loadingButton, setLoadingButton] = useState<"continue" | null>(null)
   const [toasts, setToasts] = useState<
     Array<{ id: number; title?: string; description?: string; variant?: "success" | "error" | "warning" }>
   >([])
   const isLoading = loadingButton !== null
   const toastId = useRef(0)
-  const isDark = mounted && resolvedTheme === "dark"
 
   const addToast = (toast: { title?: string; description?: string; variant?: "success" | "error" | "warning" }) => {
     toastId.current += 1
@@ -34,6 +34,7 @@ export default function AuthPage() {
   }
 
   const validateEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  const validateFullName = (value: string) => value.trim().length >= 2
   const validatePassword = (value: string) => value.length >= 8
   const withTimeout = async <T,>(promise: Promise<T>, ms = 15000): Promise<T> => {
     return await Promise.race([
@@ -46,8 +47,14 @@ export default function AuthPage() {
 
   const handlePasswordAuth = async () => {
     if (isLoading) return
+    const trimmedFullName = fullName.trim()
     const trimmedEmail = email.trim()
     const trimmedPassword = password.trim()
+
+    if (authMode === "signup" && !validateFullName(trimmedFullName)) {
+      addToast({ title: "Full name required", description: "Enter your full name to create your account.", variant: "warning" })
+      return
+    }
 
     if (!validateEmail(trimmedEmail)) {
       addToast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "error" })
@@ -91,8 +98,8 @@ export default function AuthPage() {
           return
         }
 
-        addToast({ title: "Signed in", description: "Redirecting to your dashboard.", variant: "success" })
-        router.replace("/")
+        addToast({ title: "Signed in", description: "Redirecting to your workspace.", variant: "success" })
+        router.replace("/auth")
         return
       }
 
@@ -100,12 +107,18 @@ export default function AuthPage() {
         process.env.NEXT_PUBLIC_SITE_URL ??
         process.env.NEXT_PUBLIC_APP_URL ??
         window.location.origin
-      const redirectTo = `${baseUrl}/auth/callback?next=/onboarding`
+      const redirectTo = `${baseUrl}/auth/callback?next=/auth`
       const { data, error } = await withTimeout(
         supabase.auth.signUp({
           email: trimmedEmail,
           password: trimmedPassword,
-          options: { emailRedirectTo: redirectTo },
+          options: {
+            emailRedirectTo: redirectTo,
+            data: {
+              full_name: trimmedFullName,
+              name: trimmedFullName,
+            },
+          },
         }),
       )
       if (error) {
@@ -119,7 +132,7 @@ export default function AuthPage() {
           description: "You are signed in and will be redirected.",
           variant: "success",
         })
-        router.replace("/")
+        router.replace("/auth")
         return
       }
 
@@ -139,6 +152,7 @@ export default function AuthPage() {
         description: "Check inbox/spam for the confirmation email.",
         variant: "success",
       })
+      router.replace(`/auth/check-email?email=${encodeURIComponent(trimmedEmail)}`)
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Try again."
       addToast({ title: "Unexpected Error", description: errorMessage, variant: "error" })
@@ -147,23 +161,12 @@ export default function AuthPage() {
     }
   }
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
   return (
     <div className="auth-page">
-      <button
-        type="button"
-        className="theme-toggle-btn"
-        onClick={() => setTheme(isDark ? "light" : "dark")}
-        aria-label={mounted ? (isDark ? "Switch to light mode" : "Switch to dark mode") : "Toggle theme"}
-      >
-        {isDark ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
+      <div className="auth-theme-toggle">
+        <ThemeToggle />
+      </div>
       <style jsx global>{`
-        @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-
         .auth-page,
         .auth-page * {
           box-sizing: border-box;
@@ -172,14 +175,15 @@ export default function AuthPage() {
         }
 
         .auth-page {
-          font-family: "Inter", sans-serif;
+          font-family: var(--font-sans);
           min-height: 100vh;
           overflow: hidden;
           background:
             linear-gradient(
               135deg,
-              color-mix(in srgb, var(--chart-5) 70%, transparent),
-              color-mix(in srgb, var(--chart-3) 46%, transparent)
+              var(--brand-hero-from),
+              var(--brand-hero-mid),
+              var(--brand-hero-to)
             ),
             url("/Multi-region-aquaculture-scaled.webp") center / cover no-repeat;
           color: var(--foreground);
@@ -192,8 +196,8 @@ export default function AuthPage() {
           inset: 0;
           background: linear-gradient(
             180deg,
-            color-mix(in srgb, var(--background) 14%, transparent),
-            color-mix(in srgb, var(--chart-5) 24%, transparent)
+            color-mix(in srgb, var(--background) 12%, transparent),
+            color-mix(in srgb, var(--brand-panel-shell-from) 32%, transparent)
           );
           pointer-events: none;
         }
@@ -216,28 +220,22 @@ export default function AuthPage() {
           width: 100%;
         }
 
-        .theme-toggle-btn {
+        .auth-theme-toggle {
           position: fixed;
           top: 1rem;
           right: 1rem;
           z-index: 1200;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 2.25rem;
-          height: 2.25rem;
-          border-radius: 999px;
-          border: 1px solid color-mix(in srgb, var(--card) 22%, transparent);
-          background: color-mix(in srgb, var(--card) 20%, transparent);
-          color: var(--card-foreground);
-          cursor: pointer;
-          backdrop-filter: blur(14px);
-          transition: all 0.2s ease;
         }
 
-        .theme-toggle-btn:hover {
-          background: color-mix(in srgb, var(--accent) 32%, transparent);
+        .auth-theme-toggle .topbar-control {
+          backdrop-filter: blur(14px);
+          background: color-mix(in srgb, var(--card) 22%, transparent);
+          border-color: color-mix(in srgb, var(--card) 30%, transparent);
           color: var(--card-foreground);
+        }
+
+        .auth-theme-toggle .topbar-control:hover {
+          background: color-mix(in srgb, var(--accent) 32%, transparent);
         }
 
         .toast-container {
@@ -408,6 +406,7 @@ export default function AuthPage() {
           font-weight: 800;
           color: var(--primary);
           letter-spacing: -0.6px;
+          font-family: var(--font-serif);
         }
 
         .login-header h2 {
@@ -586,6 +585,24 @@ export default function AuthPage() {
                 void handlePasswordAuth()
               }}
             >
+              {authMode === "signup" ? (
+                <div className="form-group">
+                  <label htmlFor="fullName" className="form-label">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    id="fullName"
+                    className="form-input"
+                    placeholder="Jane Otieno"
+                    required
+                    autoComplete="name"
+                    value={fullName}
+                    onChange={(event) => setFullName(event.target.value)}
+                  />
+                </div>
+              ) : null}
+
               <div className="form-group">
                 <label htmlFor="email" className="form-label">
                   Email
@@ -644,9 +661,9 @@ export default function AuthPage() {
                     Create your account
                   </button>
                 </>
-              ) : (
-                <>
-                  Already have an account?{" "}
+                ) : (
+                  <>
+                    Already have an account?{" "}
                   <button type="button" className="link-btn" onClick={() => setAuthMode("signin")}>
                     Sign in instead
                   </button>
@@ -657,6 +674,14 @@ export default function AuthPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuthPageContent />
+    </Suspense>
   )
 }
 

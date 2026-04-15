@@ -11,7 +11,6 @@ import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
-  buildMetricAxisBounds,
   createVerticalGradient,
   getChartPalette,
   getDateAxisMaxTicks,
@@ -44,15 +43,6 @@ export default function ProductionChart({
   const palette = getChartPalette()
   const dateDomain = useMemo(() => buildDailyDateDomain(rows.map((row) => row.date)), [rows])
   const rowsByDate = useMemo(() => new Map(rows.map((row) => [row.date, row])), [rows])
-  const yBounds = useMemo(
-    () =>
-      buildMetricAxisBounds(rows.map((row) => row.value), {
-        includeZero: metric === "mortality",
-        minFloor: 0,
-        trimOutliers: metric === "efcr_periodic" || metric === "efcr_aggregated",
-      }),
-    [metric, rows],
-  )
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
 
   const data = useMemo<ChartData<"line">>(
@@ -66,8 +56,9 @@ export default function ProductionChart({
           backgroundColor: createVerticalGradient(palette.chart2, 0.42, 0.03),
           borderWidth: 2.8,
           fill: true,
-          pointHoverRadius: 4,
-          pointBackgroundColor: palette.chart2,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          pointHitRadius: 10,
           spanGaps: true,
         },
       ],
@@ -79,8 +70,6 @@ export default function ProductionChart({
     () =>
       buildCartesianOptions({
         palette,
-        min: yBounds.min,
-        max: yBounds.max,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: meta.unit ? `${meta.label} (${meta.unit})` : meta.label,
@@ -101,7 +90,7 @@ export default function ProductionChart({
         xTickFormatter: (_value, index) =>
           formatChartDate(dateDomain[index] ?? "", { month: "short", day: "numeric" }),
       }),
-    [dateDomain, meta.decimals, meta.label, meta.unit, palette, xLimit, yBounds.max, yBounds.min],
+    [dateDomain, meta.decimals, meta.label, meta.unit, palette, xLimit],
   )
 
   if (error) {
