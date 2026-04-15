@@ -19,13 +19,19 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
   const farmsQuery = useFarmOptions({ enabled: Boolean(session) })
   const { farmId, loading: activeFarmLoading } = useActiveFarm()
   const activeFarmRoleQuery = useActiveFarmRole(farmId)
+  const farmsResult = farmsQuery.data
 
   const authRoute = isAuthRoute(pathname)
   const onboardingRoute = isOnboardingRoute(pathname)
   const publicRoute = isPublicRoute(pathname)
-  const farms = farmsQuery.data?.status === "success" ? farmsQuery.data.data : []
+  const membershipStatus = farmsResult?.status ?? null
+  const membershipError =
+    farmsResult?.status === "error" ? String(farmsResult.error ?? "") : ""
+  const farms = farmsResult?.status === "success" ? farmsResult.data : []
   const hasFarmMembership = farms.length > 0
-  const checkingMembership = Boolean(user) && (farmsQuery.isLoading || farmsQuery.isFetching)
+  const checkingMembership =
+    Boolean(user) &&
+    (farmsQuery.isLoading || farmsQuery.isFetching || membershipStatus !== "success")
   const checkingEntryPath =
     Boolean(user) &&
     hasFarmMembership &&
@@ -44,6 +50,14 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
       return () => window.removeEventListener("farm-memberships-updated", handleMembershipSync)
     }
   }, [farmsQuery.refetch])
+
+  useEffect(() => {
+    if (!user || !session) return
+    if (membershipStatus !== "error") return
+    if (!/no active session/i.test(membershipError)) return
+
+    void farmsQuery.refetch()
+  }, [farmsQuery.refetch, membershipError, membershipStatus, session, user])
 
   useEffect(() => {
     if (isLoading) return

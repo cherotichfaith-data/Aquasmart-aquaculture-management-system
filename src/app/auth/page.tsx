@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useRef, useState } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { claimFarmMembershipsByEmail } from "@/lib/auth/claim-farm-memberships"
 import { createClient } from "@/lib/supabase/client"
 
 function AuthPageContent() {
@@ -87,7 +88,7 @@ function AuthPageContent() {
       }
 
       if (authMode === "signin") {
-        const { error } = await withTimeout(
+        const { data, error } = await withTimeout(
           supabase.auth.signInWithPassword({
             email: trimmedEmail,
             password: trimmedPassword,
@@ -98,8 +99,12 @@ function AuthPageContent() {
           return
         }
 
+        if (data.session) {
+          await claimFarmMembershipsByEmail(supabase)
+        }
+
         addToast({ title: "Signed in", description: "Redirecting to your workspace.", variant: "success" })
-        router.replace("/")
+        router.replace("/auth")
         return
       }
 
@@ -127,12 +132,13 @@ function AuthPageContent() {
       }
 
       if (data.session) {
+        await claimFarmMembershipsByEmail(supabase)
         addToast({
           title: "Account created",
           description: "You are signed in and will be redirected.",
           variant: "success",
         })
-        router.replace("/")
+        router.replace("/auth")
         return
       }
 
