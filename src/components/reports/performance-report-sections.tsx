@@ -37,7 +37,7 @@ export function PerformanceSummaryCards({
           <div className="kpi-card-value">
             {formatNumberValue(summary?.efcr_aggregated_consolidated, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}
           </div>
-          <p className="kpi-card-meta">Last in-period row per cycle from `api_production_summary`</p>
+          <p className="kpi-card-meta">Latest production cycle snapshot for the selected scope</p>
         </CardContent>
       </Card>
       <Card className="kpi-card">
@@ -104,7 +104,7 @@ export function PerformanceTrendSection({
       labels: dateDomain,
       datasets: [
         {
-          label: "App target 1.5",
+          label: "Good FCR (1.5)",
           data: dateDomain.map(() => 1.5),
           borderColor: palette.chart4,
           backgroundColor: palette.chart4,
@@ -114,7 +114,7 @@ export function PerformanceTrendSection({
           yAxisID: "y",
         },
         {
-          label: "Industry 2.0",
+          label: "Avg FCR (2.0)",
           data: dateDomain.map(() => 2),
           borderColor: palette.chart5,
           backgroundColor: palette.chart5,
@@ -244,7 +244,7 @@ export function SystemBiomassComparisonSection({
     <Card>
       <CardHeader>
         <CardTitle>System Biomass Comparison</CardTitle>
-        <CardDescription>Most recent `api_production_summary` row per in-scope system</CardDescription>
+        <CardDescription>Latest performance snapshot per system</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -395,7 +395,7 @@ export function PerformanceRecordsSection({
                   row[6],
                   row[7],
                 ]),
-                commentary: "Generated from the last in-period `api_production_summary` row per cycle.",
+                commentary: "Generated from the latest production cycle data per system.",
               })
             }
           />

@@ -69,7 +69,7 @@ export function FeedingSummaryCards({
         <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Average eFCR</CardTitle></CardHeader>
         <CardContent className="kpi-card-content">
           <div className="kpi-card-value">{formatNumberValue(avgEfcr, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
-          <p className="kpi-card-meta">Weighted from in-period `api_production_summary` eFCR rows</p>
+          <p className="kpi-card-meta">Weighted from in-period eFCR data for the selected scope</p>
         </CardContent>
       </Card>
       <Card className="kpi-card">
@@ -231,7 +231,7 @@ export function EfcrByCageSection({
     <Card>
       <CardHeader>
         <CardTitle>eFCR Trend by Cage</CardTitle>
-        <CardDescription>Per-cage line trend from in-period `api_production_summary` rows.</CardDescription>
+        <CardDescription>Per-cage eFCR trend for the selected time window.</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (

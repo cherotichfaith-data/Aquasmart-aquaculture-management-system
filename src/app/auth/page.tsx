@@ -104,7 +104,8 @@ function AuthPageContent() {
         }
 
         addToast({ title: "Signed in", description: "Redirecting to your workspace.", variant: "success" })
-        router.replace("/auth")
+        // Full reload so React Query cache re-initialises with the authenticated session
+        window.location.assign("/")
         return
       }
 
@@ -138,7 +139,7 @@ function AuthPageContent() {
           description: "You are signed in and will be redirected.",
           variant: "success",
         })
-        router.replace("/auth")
+        window.location.assign("/")
         return
       }
 

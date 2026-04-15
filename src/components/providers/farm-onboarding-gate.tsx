@@ -98,13 +98,12 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
     user,
   ])
 
+  // While auth is loading: always show children (SSR has already rendered the right content)
   if (isLoading) {
-    if (pathname === "/") {
-      return <GateLoadingScreen />
-    }
     return <>{children}</>
   }
 
+  // Not authenticated: show children on public/auth routes, blank shield on protected ones
   if (!user) {
     if (!publicRoute && !authRoute) {
       return <GateLoadingScreen />
@@ -112,14 +111,13 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
     return <>{children}</>
   }
 
-  if (checkingMembership) {
-    return <GateLoadingScreen />
+  // Authenticated but still checking membership or role — show children while async resolves.
+  // This prevents blank flash: SSR already rendered the right page, don't hide it.
+  if (checkingMembership || checkingEntryPath) {
+    return <>{children}</>
   }
 
-  if (checkingEntryPath) {
-    return <GateLoadingScreen />
-  }
-
+  // No farm membership — hide content while redirecting to onboarding
   if (!hasFarmMembership) {
     if (!onboardingRoute) {
       return <GateLoadingScreen />
@@ -127,10 +125,12 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
     return <>{children}</>
   }
 
+  // On auth/onboarding routes while already having farm → redirect happening
   if (authRoute || onboardingRoute) {
     return <GateLoadingScreen />
   }
 
+  // On root "/" but role-based entry is a different path → redirect happening
   if (pathname === "/" && entryPath !== "/") {
     return <GateLoadingScreen />
   }

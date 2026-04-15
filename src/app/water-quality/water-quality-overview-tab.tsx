@@ -70,10 +70,10 @@ export function WaterQualityOverviewTab({
           <CardContent className="kpi-card-content pt-4">
             <div className="flex items-center justify-between mb-2">
               <Radio className="h-5 w-5 text-emerald-400" />
-              <span className="kpi-card-title">Sensors</span>
+              <span className="kpi-card-title">Active Systems</span>
             </div>
             <p className="kpi-card-value text-emerald-400">{sensorOnlineCount}</p>
-            <p className="kpi-card-meta">of {systemCount} online</p>
+            <p className="kpi-card-meta">of {systemCount} with recent readings</p>
           </CardContent>
         </Card>
         <Card

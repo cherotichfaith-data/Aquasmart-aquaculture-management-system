@@ -83,7 +83,7 @@ export default function ProductionTable({
         ) : (
           <EmptyState
             title="No production records"
-            description="No `api_production_summary` rows matched the selected filters. Systems without a trustworthy production timeline are left empty instead of being assigned fake cycle dates."
+            description="No production records matched the selected filters. Systems need at least one stocking event with a completed production cycle to appear here."
           />
         )}
       </CardContent>

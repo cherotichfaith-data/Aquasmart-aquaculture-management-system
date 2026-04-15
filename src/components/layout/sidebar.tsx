@@ -103,7 +103,7 @@ const waterQualityLinks = [
   { href: "/water-quality?tab=environment", label: "Environmental Indicators", activeKey: "environment" },
   { href: "/water-quality?tab=depth", label: "Stratification Analysis", activeKey: "depth" },
   { href: "/water-quality?tab=alerts", label: "Alerts", activeKey: "alerts" },
-  { href: "/water-quality?tab=sensors", label: "Sensor Activity", activeKey: "sensors" },
+  { href: "/water-quality?tab=sensors", label: "System Coverage", activeKey: "sensors" },
 ] as const
 
 export default function Sidebar({
