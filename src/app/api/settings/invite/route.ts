@@ -3,7 +3,7 @@ import { z } from "zod"
 import { apiRateLimits } from "@/lib/server/rate-limit"
 import { requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { isSbMissingFunction, isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 
 const VALID_ROLES = [
   "farm_manager",
@@ -47,6 +47,12 @@ export async function POST(request: Request) {
   })
 
   if (error) {
+    if (isSbMissingFunction(error, "create_farm_user_invitation")) {
+      return NextResponse.json(
+        { error: "Team invitations are not available on this deployment yet." },
+        { status: 503 },
+      )
+    }
     if (isSbPermissionDenied(error)) {
       return NextResponse.json(
         { error: "You do not have permission to invite users to this farm." },

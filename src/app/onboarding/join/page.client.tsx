@@ -2,14 +2,14 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Loader2, MailCheck, Building2, ArrowLeft } from "lucide-react"
 import { OnboardingShell } from "@/components/onboarding/onboarding-shell"
 import { createClient } from "@/lib/supabase/client"
+import { isSbMissingFunction } from "@/lib/supabase/log"
 
 export default function JoinFarmPageClient() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const supabase = createClient()
 
   const invitedFarm = searchParams.get("farm")
@@ -36,7 +36,11 @@ export default function JoinFarmPageClient() {
       // re-fetches farm membership and routes correctly
       setTimeout(() => { window.location.assign("/") }, 1500)
     } catch (err) {
-      setClaimError(err instanceof Error ? err.message : "Failed to accept invitation. Try again.")
+      if (isSbMissingFunction(err, "claim_my_farm_user_invitations")) {
+        setClaimError("Invitations are not available in this deployment yet. Ask your admin to add you directly.")
+      } else {
+        setClaimError(err instanceof Error ? err.message : "Failed to accept invitation. Try again.")
+      }
     } finally {
       setIsClaiming(false)
     }

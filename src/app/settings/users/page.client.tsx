@@ -9,6 +9,7 @@ import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { resolveAppEntryPath } from "@/lib/app-entry"
 import { useRouter } from "next/navigation"
 import type { AquaSmartRole } from "@/lib/app-entry"
+import { isSbMissingFunction } from "@/lib/supabase/log"
 
 type Invitation = {
   id: string
@@ -24,7 +25,6 @@ type FarmMember = {
   user_id: string
   role: string
   created_at: string
-  email?: string | null
   full_name?: string | null
 }
 
@@ -57,6 +57,7 @@ export default function UsersPageClient() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState(false)
   const [revoking, setRevoking] = useState<string | null>(null)
+  const [invitationsUnavailable, setInvitationsUnavailable] = useState(false)
 
   const canManage = farmRole === "admin" || farmRole === "farm_manager"
 
@@ -70,6 +71,7 @@ export default function UsersPageClient() {
   const loadData = async () => {
     if (!farmId) return
     setLoading(true)
+    setInviteError(null)
     try {
       // Load current members
       const { data: membersData } = await supabase
@@ -94,8 +96,21 @@ export default function UsersPageClient() {
       })))
 
       // Load invitations
-      const { data: invData } = await supabase.rpc("api_farm_user_invitations", { p_farm_id: farmId })
-      setInvitations((invData ?? []) as Invitation[])
+      const { data: invData, error: invError } = await supabase.rpc("api_farm_user_invitations", { p_farm_id: farmId })
+      if (invError) {
+        if (isSbMissingFunction(invError, "api_farm_user_invitations")) {
+          setInvitationsUnavailable(true)
+          setInvitations([])
+        } else {
+          throw invError
+        }
+      } else {
+        setInvitationsUnavailable(false)
+        setInvitations((invData ?? []) as Invitation[])
+      }
+    } catch (error) {
+      setInvitations([])
+      setInviteError(error instanceof Error ? error.message : "Unable to load team access settings.")
     } finally {
       setLoading(false)
     }
@@ -105,6 +120,10 @@ export default function UsersPageClient() {
 
   const handleInvite = async () => {
     if (!inviteEmail.trim() || !farmId) return
+    if (invitationsUnavailable) {
+      setInviteError("Team invitations are not available on this deployment yet.")
+      return
+    }
     setInviteError(null)
     setInviting(true)
     try {
@@ -127,18 +146,30 @@ export default function UsersPageClient() {
   }
 
   const handleRevoke = async (invitationId: string) => {
+    if (invitationsUnavailable) {
+      setInviteError("Team invitations are not available on this deployment yet.")
+      return
+    }
     setRevoking(invitationId)
     try {
-      await supabase.rpc("revoke_farm_user_invitation", { p_invitation_id: invitationId })
+      const { error } = await supabase.rpc("revoke_farm_user_invitation", { p_invitation_id: invitationId })
+      if (error) {
+        if (isSbMissingFunction(error, "revoke_farm_user_invitation")) {
+          setInvitationsUnavailable(true)
+          setInviteError("Team invitations are not available on this deployment yet.")
+          return
+        }
+        throw error
+      }
       loadData()
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : "Unable to revoke invitation.")
     } finally {
       setRevoking(null)
     }
   }
 
   const pendingInvitations = invitations.filter(i => !i.accepted_at && !i.revoked_at)
-  const acceptedInvitations = invitations.filter(i => i.accepted_at)
-
   if (farmRole && !canManage) return null
 
   return (
@@ -155,6 +186,12 @@ export default function UsersPageClient() {
             <UserPlus className="h-5 w-5 text-primary" />
             <h2 className="text-base font-semibold">Invite a team member</h2>
           </div>
+
+          {invitationsUnavailable && (
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+              Team invitations are not available on this deployment yet because the linked database schema is behind the app.
+            </div>
+          )}
 
           {inviteError && (
             <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive">{inviteError}</div>
@@ -173,17 +210,18 @@ export default function UsersPageClient() {
                 placeholder="colleague@example.com"
                 className={inputCls}
                 onKeyDown={e => e.key === "Enter" && handleInvite()}
+                disabled={invitationsUnavailable}
               />
             </div>
             <div className="w-full sm:w-52 space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Role</label>
-              <select value={inviteRole} onChange={e => setInviteRole(e.target.value)} className={inputCls}>
+              <select value={inviteRole} onChange={e => setInviteRole(e.target.value)} className={inputCls} disabled={invitationsUnavailable}>
                 {Object.entries(ROLE_LABELS).filter(([k]) => k !== "admin").map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
                 ))}
               </select>
             </div>
-            <button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} className={btnPrimary}>
+            <button onClick={handleInvite} disabled={inviting || !inviteEmail.trim() || invitationsUnavailable} className={btnPrimary}>
               {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
               Send invite
             </button>

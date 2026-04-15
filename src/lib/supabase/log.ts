@@ -101,3 +101,22 @@ export function isSbNetworkError(err: unknown) {
     safeErr.name === "AuthRetryableFetchError"
   )
 }
+
+export function isSbMissingFunction(err: unknown, functionName?: string) {
+  const safeErr = asSbErrorLike(err)
+  const message = String(safeErr.message ?? "")
+  const details = String(safeErr.details ?? "")
+  const haystack = `${message}\n${details}`
+
+  if (safeErr.code === "PGRST202" || safeErr.status === 404) {
+    if (!functionName) return true
+    return haystack.toLowerCase().includes(functionName.toLowerCase())
+  }
+
+  if (/could not find the function/i.test(haystack) || /schema cache/i.test(haystack)) {
+    if (!functionName) return true
+    return haystack.toLowerCase().includes(functionName.toLowerCase())
+  }
+
+  return false
+}
