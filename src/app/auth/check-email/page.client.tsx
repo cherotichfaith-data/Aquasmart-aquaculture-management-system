@@ -17,7 +17,7 @@ export default function CheckEmailPageClient({ email }: { email: string }) {
     setStatus(null)
     try {
       const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin
-      const redirectTo = `${baseUrl}/auth/callback?next=/auth`
+      const redirectTo = `${baseUrl}/auth/callback?next=/`
       const { error } = await supabase.auth.resend({
         type: "signup",
         email,

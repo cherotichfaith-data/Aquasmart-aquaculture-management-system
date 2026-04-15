@@ -35,6 +35,17 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
   )
 
   useEffect(() => {
+    const handleMembershipSync = () => {
+      void farmsQuery.refetch()
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("farm-memberships-updated", handleMembershipSync)
+      return () => window.removeEventListener("farm-memberships-updated", handleMembershipSync)
+    }
+  }, [farmsQuery.refetch])
+
+  useEffect(() => {
     if (isLoading) return
 
     if (!user) {

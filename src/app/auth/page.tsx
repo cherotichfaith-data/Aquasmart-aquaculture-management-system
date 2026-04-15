@@ -99,7 +99,7 @@ function AuthPageContent() {
         }
 
         addToast({ title: "Signed in", description: "Redirecting to your workspace.", variant: "success" })
-        router.replace("/auth")
+        router.replace("/")
         return
       }
 
@@ -107,7 +107,7 @@ function AuthPageContent() {
         process.env.NEXT_PUBLIC_SITE_URL ??
         process.env.NEXT_PUBLIC_APP_URL ??
         window.location.origin
-      const redirectTo = `${baseUrl}/auth/callback?next=/auth`
+      const redirectTo = `${baseUrl}/auth/callback?next=/`
       const { data, error } = await withTimeout(
         supabase.auth.signUp({
           email: trimmedEmail,
@@ -132,7 +132,7 @@ function AuthPageContent() {
           description: "You are signed in and will be redirected.",
           variant: "success",
         })
-        router.replace("/auth")
+        router.replace("/")
         return
       }
 

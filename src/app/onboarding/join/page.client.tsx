@@ -132,12 +132,12 @@ export default function JoinFarmPageClient() {
             Waiting for an invite?
           </h2>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Your farm admin needs to send you an invitation from AquaSmart Settings → Users. Open the invite link on this device and you will be brought back here to confirm.
+            Your farm admin needs to send you an invitation from AquaSmart. Open the invite link on this device and you will be brought back here to confirm.
           </p>
           <ul className="mt-5 space-y-2.5 text-sm leading-6 text-muted-foreground">
             <li className="flex items-start gap-2">
               <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">1</span>
-              Ask your farm admin to invite you from Settings → Users.
+              Ask your farm admin to invite you.
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">2</span>

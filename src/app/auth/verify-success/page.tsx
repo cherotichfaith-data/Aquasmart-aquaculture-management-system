@@ -11,7 +11,7 @@ export default function VerifySuccessPage() {
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
-            router.replace("/auth")
+            router.replace("/")
         }, 2500)
 
         return () => window.clearTimeout(timer)
@@ -28,13 +28,13 @@ export default function VerifySuccessPage() {
                         Email Verified
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        You're signed in. Redirecting you to the dashboard...
+                        You're signed in. Redirecting you to your workspace...
                     </p>
                 </div>
 
                 <div className="flex flex-col gap-2 pt-4">
                     <Button asChild className="w-full" variant="default">
-                        <Link href="/auth">Continue</Link>
+                        <Link href="/">Continue</Link>
                     </Button>
                 </div>
             </div>

@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log";
+import { claimFarmMembershipsByEmail } from "@/lib/auth/claim-farm-memberships";
 
 type UserRole =
     | "admin"
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     const supabase = useMemo(() => createClient(), []);
+    const claimedMembershipsRef = useRef<string | null>(null);
     const deriveRole = (authUser: User | null): UserRole => {
         const raw = authUser?.user_metadata?.role ?? authUser?.app_metadata?.role ?? null;
         return (typeof raw === "string" ? raw : null) as UserRole;
@@ -46,6 +48,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     };
 
+    const syncFarmMemberships = useCallback(async (currentSession: Session | null) => {
+        const currentUser = currentSession?.user ?? null;
+
+        if (!currentSession || !currentUser) {
+            claimedMembershipsRef.current = null;
+            return;
+        }
+
+        if (claimedMembershipsRef.current === currentUser.id) {
+            return;
+        }
+
+        try {
+            const { error } = await claimFarmMembershipsByEmail(supabase);
+            if (error) {
+                if (!isSbNetworkError(error)) {
+                    logSbError("authProvider:claimFarmMemberships", error);
+                }
+                return;
+            }
+
+            claimedMembershipsRef.current = currentUser.id;
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("farm-memberships-updated"));
+            }
+        } catch (error) {
+            if (!isSbNetworkError(error)) {
+                logSbError("authProvider:claimFarmMemberships:catch", error);
+            }
+        }
+    }, [supabase]);
+
     useEffect(() => {
         const fetchSession = async () => {
             setIsLoading(true);
@@ -58,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
                 const currentSession = data?.session ?? null;
                 const currentUser = currentSession?.user ?? null;
+                await syncFarmMemberships(currentSession);
                 setSession(currentSession);
                 setUser(currentUser);
                 setRole(deriveRole(currentUser));
@@ -76,6 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+            setIsLoading(true);
+            await syncFarmMemberships(newSession);
             setSession(newSession);
             const nextUser = newSession?.user ?? null;
             setUser(nextUser);
@@ -85,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => subscription.unsubscribe();
-    }, [supabase]);
+    }, [supabase, syncFarmMemberships]);
 
     useEffect(() => {
         // Listen for profile updates that may have changed user metadata.
@@ -107,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
         setRole(null);
         setProfile(null);
+        claimedMembershipsRef.current = null;
 
         try {
             const timeout = new Promise<never>((_, reject) =>
