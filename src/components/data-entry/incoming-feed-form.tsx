@@ -4,7 +4,7 @@ import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 import { Loader2 } from "lucide-react"
 import {
   Form,
@@ -13,15 +13,16 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
 import { useRecordFeedInventorySnapshot } from "@/lib/hooks/use-incoming-feed"
 import { logSbError } from "@/lib/supabase/log"
 import { DependencyBlocker } from "./dependency-blocker"
 import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import { InfoPanel, InfoStat } from "./form-support"
+import { calculateFeedAmount, parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
 
 const formSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -54,19 +55,18 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
   const bagWeightKg = form.watch("bag_weight_kg")
   const numberOfBags = form.watch("number_of_bags")
   const openBagsKg = form.watch("open_bags_kg")
-  const totalStockKg = (bagWeightKg || 0) * (numberOfBags || 0) + (openBagsKg || 0)
+  const totalStockKg = calculateFeedAmount(bagWeightKg, numberOfBags, openBagsKg)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      if (!farmId) {
-        throw new Error("No active farm selected")
-      }
+      const resolvedFarmId = requireActiveFarmId(farmId)
+      const feedTypeId = parseRequiredNumericId(values.feed_id, "Feed type")
 
       await mutation.mutateAsync({
-        farm_id: farmId,
+        farm_id: resolvedFarmId,
         date: values.date,
-        feed_type_id: Number(values.feed_id),
-        feed_amount: values.bag_weight_kg * values.number_of_bags + values.open_bags_kg,
+        feed_type_id: feedTypeId,
+        feed_amount: calculateFeedAmount(values.bag_weight_kg, values.number_of_bags, values.open_bags_kg),
       })
 
       form.reset({
@@ -95,8 +95,8 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
   }
 
   return (
-    <div className="max-w-6xl">
-      <div className="mb-6">
+    <div>
+      <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Feed Delivery</h2>
         <p className="text-sm text-muted-foreground">Record incoming feed volume from deliveries or manual store additions.</p>
       </div>
@@ -128,10 +128,9 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Feed Type</FormLabel>
-                      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="w-full sm:flex-1">
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="w-full sm:flex-1">
                             <SelectValue placeholder="Select feed" />
                           </SelectTrigger>
                         </FormControl>
@@ -143,24 +142,12 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
                           ))}
                         </SelectContent>
                       </Select>
-                        <Button
-                          type="button"
-                          variant={showQuickCreate ? "secondary" : "outline"}
-                          size="sm"
-                          className="w-full sm:w-auto"
-                          onClick={() => setShowQuickCreate((current) => !current)}
-                        >
-                          {showQuickCreate ? "Hide new feed type" : "Add new feed type"}
-                      </Button>
-                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {showQuickCreate ? <FeedTypeQuickCreate onCreated={() => setShowQuickCreate(false)} /> : null}
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="data-entry-compact-grid md:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="bag_weight_kg"
@@ -203,16 +190,16 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
                   )}
                 />
               </div>
-              <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Submit Entry
+                Record Feed Inventory
               </Button>
             </form>
           </Form>
         </div>
 
         <InfoPanel title="Snapshot Totals">
-          <InfoStat label="Bagged Stock" value={`${((bagWeightKg || 0) * (numberOfBags || 0)).toFixed(2)} kg`} />
+          <InfoStat label="Bagged Stock" value={`${calculateFeedAmount(bagWeightKg, numberOfBags, 0).toFixed(2)} kg`} />
           <InfoStat label="Open Bags" value={`${(openBagsKg || 0).toFixed(2)} kg`} />
           <InfoStat label="Total Stock" tone="success" value={`${totalStockKg.toFixed(2)} kg`} />
         </InfoPanel>
@@ -220,3 +207,4 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
     </div>
   )
 }
+

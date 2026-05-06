@@ -12,8 +12,32 @@ import { useRecentEntries } from "@/lib/hooks/use-reports"
 import { DataErrorState } from "@/components/shared/data-states"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
-export default function DataEntryPageClient() {
-  const { farmId } = useActiveFarm()
+const dataEntryTabs = [
+  "feeding",
+  "mortality",
+  "sampling",
+  "water_quality",
+  "harvest",
+  "transfer",
+  "stocking",
+  "incoming_feed",
+  "system",
+] as const
+
+type DataEntryTab = (typeof dataEntryTabs)[number]
+
+function resolveDataEntryTab(value: string | null): DataEntryTab {
+  return dataEntryTabs.includes(value as DataEntryTab) ? (value as DataEntryTab) : "feeding"
+}
+
+export default function DataEntryPageClient({
+  initialFarmId,
+  initialFarmName,
+}: {
+  initialFarmId?: string | null
+  initialFarmName?: string | null
+}) {
+  const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const activeFarmRoleQuery = useActiveFarmRole(farmId)
 
   const systemsQuery = useSystemOptions({ farmId })
@@ -25,26 +49,7 @@ export default function DataEntryPageClient() {
   const systemParam = searchParams.get("system")
   const batchParam = searchParams.get("batch")
 
-  const defaultTab = useMemo(() => {
-    if (!typeParam) {
-      const role = activeFarmRoleQuery.data
-      if (role === "farm_technician") return "feeding"
-      if (role === "inventory_storekeeper") return "incoming_feed"
-      if (role === "analyst_planner") return "sampling"
-      return "feeding"
-    }
-    const normalized = typeParam.toLowerCase()
-    if (normalized === "system") return "system"
-    if (normalized === "stocking") return "stocking"
-    if (normalized === "mortality") return "mortality"
-    if (normalized === "feeding") return "feeding"
-    if (normalized === "sampling") return "sampling"
-    if (normalized === "transfer") return "transfer"
-    if (normalized === "harvest") return "harvest"
-    if (normalized === "incoming_feed" || normalized === "incoming-feed") return "incoming_feed"
-    if (normalized === "water_quality" || normalized === "water-quality") return "water_quality"
-    return "feeding"
-  }, [activeFarmRoleQuery.data, typeParam])
+  const tab = useMemo(() => resolveDataEntryTab(typeParam), [typeParam])
   const defaultSystemId = useMemo(() => {
     const parsed = Number(systemParam)
     return Number.isFinite(parsed) ? parsed : null
@@ -122,8 +127,8 @@ export default function DataEntryPageClient() {
   )
 
   return (
-    <DashboardLayout showHeaderToolbar={false}>
-      <div className="container mx-auto py-0 sm:py-0">
+    <DashboardLayout hideHeader initialFarmId={initialFarmId} initialFarmName={initialFarmName}>
+      <div className="data-entry-page-shell container mx-auto py-0 sm:py-0">
         {systemsErrorMessages.length > 0 ? (
           <DataErrorState
             title="Unable to load systems"
@@ -167,7 +172,7 @@ export default function DataEntryPageClient() {
             feeds={feeds}
             batches={batches}
             recentEntries={recentEntries}
-            defaultTab={defaultTab}
+            tab={tab}
             defaultSystemId={defaultSystemId}
             defaultBatchId={defaultBatchId}
           />

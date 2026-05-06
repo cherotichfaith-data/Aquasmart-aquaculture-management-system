@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo } from "react"
+import Box from "@mui/material/Box"
 import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
@@ -10,6 +11,7 @@ import { FilterPopover } from "@/components/shared/filter-popover"
 type StageFilter = "all" | Enums<"system_growth_stage">
 
 interface FarmSelectorProps {
+  initialFarmId?: string | null
   selectedBatch: string
   selectedSystem: string
   selectedStage: StageFilter
@@ -20,9 +22,13 @@ interface FarmSelectorProps {
   showCounts?: boolean
   variant?: "default" | "compact"
   layout?: "grid" | "row"
+  systemLabel?: string
+  allSystemsLabel?: string
+  wrap?: boolean
 }
 
 export default function FarmSelector({
+  initialFarmId,
   selectedBatch,
   selectedSystem,
   selectedStage,
@@ -33,8 +39,11 @@ export default function FarmSelector({
   showCounts = true,
   variant = "default",
   layout,
+  systemLabel = "Cage",
+  allSystemsLabel = "All Cages",
+  wrap = true,
 }: FarmSelectorProps) {
-  const { farmId, loading: farmLoading } = useActiveFarm()
+  const { farmId, loading: farmLoading } = useActiveFarm({ initialFarmId })
   const batchId =
     selectedBatch !== "all" && Number.isFinite(Number(selectedBatch)) ? Number(selectedBatch) : undefined
 
@@ -112,7 +121,7 @@ export default function FarmSelector({
     () => [
       {
         value: "all",
-        label: "All Cages",
+        label: allSystemsLabel,
       },
       ...systems.map((system) => ({
         value: String(system.id),
@@ -126,7 +135,7 @@ export default function FarmSelector({
         ],
       })),
     ],
-    [systems],
+    [allSystemsLabel, systems],
   )
 
   useEffect(() => {
@@ -163,13 +172,34 @@ export default function FarmSelector({
   ])
 
   return (
-    <div
-      className={
+    <Box
+      sx={
         resolvedLayout === "row"
-          ? "flex min-w-0 flex-wrap items-center gap-2"
+          ? {
+              display: "flex",
+              minWidth: 0,
+              alignItems: "center",
+              gap: 1,
+              flexWrap: wrap ? "wrap" : "nowrap",
+            }
           : variant === "compact"
-            ? "grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
-            : "grid gap-2 md:grid-cols-3"
+            ? {
+                display: "grid",
+                gap: 1,
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  xl: "repeat(3, minmax(0, 1fr))",
+                },
+              }
+            : {
+                display: "grid",
+                gap: 1,
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "repeat(3, minmax(0, 1fr))",
+                },
+              }
       }
     >
       {showStage ? (
@@ -182,7 +212,7 @@ export default function FarmSelector({
           searchable={stages.length > 6}
           searchPlaceholder="Search stage"
           emptyMessage="No stages found."
-          triggerClassName={resolvedLayout === "row" ? "w-full sm:w-[150px]" : "w-full sm:min-w-0"}
+          triggerSx={resolvedLayout === "row" ? { width: { xs: "100%", sm: 150 } } : { width: "100%", minWidth: 0 }}
         />
       ) : null}
 
@@ -196,28 +226,34 @@ export default function FarmSelector({
         searchable
         searchPlaceholder="Search batch"
         emptyMessage="No batches found."
-        triggerClassName={resolvedLayout === "row" ? "w-full sm:w-[180px]" : "w-full sm:min-w-0"}
+        triggerSx={resolvedLayout === "row" ? { width: { xs: "100%", sm: 180 } } : { width: "100%", minWidth: 0 }}
       />
 
       <FilterPopover
-        label="Cage"
+        label={systemLabel}
         value={selectedSystem}
         options={systemOptions}
         placeholder={
           systemsQuery.isLoading || (selectedBatch !== "all" && batchSystemsQuery.isLoading)
             ? "Loading cages..."
-            : `All cages${showCounts && systemCount ? ` (${systemCount})` : ""}`
+            : `${allSystemsLabel}${showCounts && systemCount ? ` (${systemCount})` : ""}`
         }
         onChange={onSystemChange}
         disabled={systemsQuery.isLoading || (selectedBatch !== "all" && batchSystemsQuery.isLoading)}
         searchable
         searchPlaceholder="Search cage"
         emptyMessage="No cages found."
-        triggerClassName={
-          resolvedLayout === "row" ? "w-full sm:w-[220px] lg:w-[260px]" : "w-full sm:min-w-0 xl:min-w-[16rem]"
+        triggerSx={
+          resolvedLayout === "row"
+            ? { width: { xs: "100%", sm: 220, lg: 260 } }
+            : { width: "100%", minWidth: { xs: 0, xl: "16rem" } }
         }
-        contentClassName="sm:w-[24rem]"
+        contentSx={
+          resolvedLayout === "row"
+            ? { width: { xs: "min(24rem, calc(100vw - 24px))", sm: 320, lg: 384 } }
+            : { width: { xs: "min(24rem, calc(100vw - 24px))", sm: 384 } }
+        }
       />
-    </div>
+    </Box>
   )
 }

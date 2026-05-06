@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react"
 import { useMortalityEvents } from "@/lib/hooks/use-mortality"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
@@ -28,17 +27,18 @@ const CAUSE_LABELS: Record<MortalityCause, string> = {
 }
 
 export default function MortalityReport({
+  farmId,
   dateRange,
   systemId,
   batchId,
   farmName,
 }: {
+  farmId?: string | null
   dateRange?: { from: string; to: string }
   systemId?: number
   batchId?: number
   farmName?: string | null
 }) {
-  const { farmId } = useActiveFarm()
   const chartLimit = 2000
   const [tableLimit, setTableLimit] = useState("100")
   const [showMortalityRecords, setShowMortalityRecords] = useState(false)

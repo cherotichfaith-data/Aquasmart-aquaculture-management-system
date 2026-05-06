@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react"
 import { useFeedingRecords } from "@/lib/hooks/use-reports"
 import { useProductionSummary } from "@/lib/hooks/use-production"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
@@ -16,33 +15,35 @@ import {
 } from "./feeding-report-sections"
 
 const CHART_COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
+  "var(--primary)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--destructive)",
+  "var(--muted-foreground)",
 ]
 
 const systemKey = (systemId: number) => `system_${systemId}`
 
 export default function FeedingReport({
+  farmId,
   dateRange,
   systemId,
   batchId,
   farmName,
 }: {
+  farmId?: string | null
   dateRange?: { from: string; to: string }
   systemId?: number
   batchId?: number
   farmName?: string | null
 }) {
-  const { farmId } = useActiveFarm()
   const chartLimit = 5000
   const [tableLimit, setTableLimit] = useState("100")
   const [showFeedingRecords, setShowFeedingRecords] = useState(false)
   const boundsReady = Boolean(dateRange?.from && dateRange?.to)
 
   const feedingRecordsQuery = useFeedingRecords({
+    farmId,
     systemId,
     batchId,
     limit: chartLimit,
@@ -60,6 +61,7 @@ export default function FeedingReport({
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
   const feedingTableQuery = useFeedingRecords({
+    farmId,
     systemId,
     batchId,
     limit: tableLimitValue,

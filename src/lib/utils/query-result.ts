@@ -1,4 +1,5 @@
-﻿import type { QueryResult } from "@/lib/supabase-client"
+import { getErrorMessage as getApiErrorMessage } from "@/lib/api/_utils"
+import type { QueryResult } from "@/lib/supabase-client"
 
 export function getQueryResultError(result?: QueryResult<unknown> | null): string | null {
   if (!result) return null
@@ -10,9 +11,7 @@ export function getQueryResultError(result?: QueryResult<unknown> | null): strin
 
 export function getErrorMessage(error: unknown): string | null {
   if (!error) return null
-  if (error instanceof Error) return error.message
-  if (typeof error === "string") return error
-  return null
+  return getApiErrorMessage(error)
 }
 
 export function getCombinedQueryMessages(

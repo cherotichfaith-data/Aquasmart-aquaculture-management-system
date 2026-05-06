@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/cache/query-keys"
-import { invalidateFeedingWriteQueries } from "@/lib/cache/react-query"
+import { invalidateAfterWrite } from "@/lib/cache/react-query"
 import type { FeedingInsertInput } from "@/lib/commands/feeding"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useToast } from "@/lib/hooks/app/use-toast"
@@ -24,6 +24,7 @@ export function useRecordFeeding() {
   const offlineMutation = useOfflineMutation<
     FeedingInsertInput,
     {
+      farmId?: string | null
       systemId: number
       batchId?: number | null
       date: string
@@ -40,6 +41,7 @@ export function useRecordFeeding() {
     tableName: "feeding",
     buildRecords: (payload) => [
       {
+        farmId: payload.farm_id ?? farmId,
         systemId: payload.system_id,
         batchId: payload.batch_id ?? null,
         date: payload.date,
@@ -52,7 +54,7 @@ export function useRecordFeeding() {
     buildPendingResult: ({ input, localIds }) =>
       buildOfflinePendingResult({
         data: { id: 0 } as Tables<"feeding_record">,
-        farmId,
+        farmId: input.farm_id ?? farmId,
         systemId: input.system_id,
         date: input.date,
         localIds,
@@ -99,7 +101,8 @@ export function useRecordFeeding() {
         return { ...o, feeding: { ...feeding, data: nextFeeding } }
       })
 
-      await invalidateFeedingWriteQueries(queryClient, {
+      await invalidateAfterWrite(queryClient, {
+        type: "feeding",
         farmId: meta.farmId,
         date: meta.date,
       })

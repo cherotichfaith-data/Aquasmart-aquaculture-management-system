@@ -9,12 +9,20 @@ import {
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { EmptyState } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate } from "@/lib/analytics-format"
-import { ReportRecordsHiddenState, ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
+import {
+  REPORT_CHART_SHELL_CLASS,
+  REPORT_SURFACE_CARD_CLASS,
+  REPORT_TABLE_SHELL_CLASS,
+  ReportMetricCard,
+  ReportRecordsHiddenState,
+  ReportRecordsToolbar,
+  ReportSectionHeader,
+} from "./report-shared"
 
 export function MortalitySummaryCards({
   latestDate,
@@ -28,11 +36,15 @@ export function MortalitySummaryCards({
   massEventCount: number
 }) {
   return (
-    <div className="kpi-grid md:grid-cols-4">
-      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Latest Record</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{latestDate ?? "N/A"}</div><p className="kpi-card-meta">Most recent record</p></CardContent></Card>
-      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Total Mortality</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{totalMortality}</div><p className="kpi-card-meta">Selected period</p></CardContent></Card>
-      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Mortality %</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{mortalityPercent != null ? `${mortalityPercent.toFixed(2)}%` : "N/A"}</div><p className="kpi-card-meta">Against inventory baseline</p></CardContent></Card>
-      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Mass Events</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{massEventCount}</div><p className="kpi-card-meta">Dead count &ge; 100 fish</p></CardContent></Card>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <ReportMetricCard title="Latest Record" value={latestDate ?? "N/A"} meta="Most recent mortality record in scope." />
+      <ReportMetricCard title="Total Mortality" value={totalMortality.toLocaleString()} meta="Total fish lost in the selected period." />
+      <ReportMetricCard
+        title="Mortality %"
+        value={mortalityPercent != null ? `${mortalityPercent.toFixed(2)}%` : "N/A"}
+        meta="Mortality measured against the available inventory baseline."
+      />
+      <ReportMetricCard title="Mass Events" value={massEventCount.toLocaleString()} meta="Events with dead count at or above 100 fish." />
     </div>
   )
 }
@@ -81,7 +93,7 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
   )
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader><CardTitle>Mortality Trend</CardTitle><CardDescription>Daily mortality counts from mortality records</CardDescription></CardHeader>
       <CardContent>
         {loading ? (
@@ -89,7 +101,7 @@ export function MortalityTrendSection({ loading, chartRows }: { loading: boolean
         ) : chartRows.length === 0 ? (
           <EmptyState title="No mortality records" description="No mortality records fall within the selected range." />
         ) : (
-          <div className="chart-canvas-shell h-[300px]">
+          <div className={REPORT_CHART_SHELL_CLASS}>
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <Line data={data} options={options} />
             </LazyRender>
@@ -135,19 +147,19 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_1fr]">
-      <Card>
+      <Card className={REPORT_SURFACE_CARD_CLASS}>
         <CardHeader><CardTitle>Cause Breakdown</CardTitle><CardDescription>Actual mortality causes captured on mortality records</CardDescription></CardHeader>
         <CardContent>
           {causeBreakdown.length === 0 ? (
             <EmptyState title="No cause data" description="New mortality records with cause tags will appear here." />
           ) : (
-            <div className="chart-canvas-shell h-[280px]">
+            <div className={REPORT_CHART_SHELL_CLASS}>
               <Bar data={data} options={options} />
             </div>
           )}
         </CardContent>
       </Card>
-      <Card>
+      <Card className={REPORT_SURFACE_CARD_CLASS}>
         <CardHeader><CardTitle>Cause Summary</CardTitle><CardDescription>Count of fish lost per reported cause</CardDescription></CardHeader>
         <CardContent>
           {causeBreakdown.length === 0 ? (
@@ -155,7 +167,7 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
           ) : (
             <div className="space-y-2">
               {causeBreakdown.map((row) => (
-                <div key={row.cause} className="soft-panel-subtle flex justify-between px-3 py-2 text-sm">
+                <div key={row.cause} className="flex justify-between rounded-[1rem] border border-border/60 bg-background px-3 py-2 text-sm">
                   <span>{row.label}</span><span className="font-medium">{row.count.toLocaleString()}</span>
                 </div>
               ))}
@@ -207,7 +219,7 @@ export function MortalityRecordsSection({
     row.notes ?? "",
   ])
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <ReportSectionHeader
         title="Mortality Records"
         actions={
@@ -240,7 +252,7 @@ export function MortalityRecordsSection({
       />
       <CardContent>
         {showMortalityRecords ? (
-          <div className="soft-table-shell">
+          <div className={REPORT_TABLE_SHELL_CLASS}>
             <table className="w-full min-w-[720px] text-sm">
               <thead><tr className="border-b border-border bg-muted/60"><th className="px-4 py-2 text-left font-semibold text-foreground">Date</th><th className="px-4 py-2 text-left font-semibold text-foreground">System</th><th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th><th className="px-4 py-2 text-left font-semibold text-foreground">Fish Dead</th><th className="px-4 py-2 text-left font-semibold text-foreground">Cause</th><th className="px-4 py-2 text-left font-semibold text-foreground">Notes</th></tr></thead>
               <tbody>
@@ -265,3 +277,4 @@ export function MortalityRecordsSection({
     </Card>
   )
 }
+

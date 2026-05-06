@@ -32,6 +32,7 @@ export type FeedGrowthTrendRow = GrowthTrendRow
 export type FeedRunningStockRow = RunningStockRow
 
 export async function getFeedingRecords(params?: {
+  farmId?: string | null
   systemId?: number
   systemIds?: number[]
   batchId?: number
@@ -44,6 +45,7 @@ export async function getFeedingRecords(params?: {
     const response = await postJson<{ data: FeedingRecordWithType[] }, Omit<NonNullable<typeof params>, "signal">>(
       "/api/reports/feeding-records/query",
       {
+        farmId: params?.farmId,
         systemId: params?.systemId,
         systemIds: params?.systemIds,
         batchId: params?.batchId,
@@ -172,6 +174,7 @@ export async function getHarvests(params?: {
 }
 
 export async function getStockings(params?: {
+  farmId?: string | null
   systemId?: number
   systemIds?: number[]
   batchId?: number
@@ -184,6 +187,7 @@ export async function getStockings(params?: {
     const response = await postJson<{ data: FishStockingRow[] }, Omit<NonNullable<typeof params>, "signal">>(
       "/api/reports/stockings/query",
       {
+        farmId: params?.farmId,
         systemId: params?.systemId,
         systemIds: params?.systemIds,
         batchId: params?.batchId,
@@ -201,6 +205,7 @@ export async function getStockings(params?: {
 }
 
 export async function getSamplingData(params?: {
+  farmId?: string | null
   systemId?: number
   systemIds?: number[]
   batchId?: number
@@ -213,6 +218,7 @@ export async function getSamplingData(params?: {
     const response = await postJson<{ data: FishSamplingWeightRow[] }, Omit<NonNullable<typeof params>, "signal">>(
       "/api/reports/sampling/query",
       {
+        farmId: params?.farmId,
         systemId: params?.systemId,
         systemIds: params?.systemIds,
         batchId: params?.batchId,
@@ -230,6 +236,7 @@ export async function getSamplingData(params?: {
 }
 
 export async function getMortalityData(params?: {
+  farmId?: string | null
   systemId?: number
   systemIds?: number[]
   batchId?: number
@@ -242,6 +249,7 @@ export async function getMortalityData(params?: {
     const response = await postJson<{ data: FishMortalityRow[] }, Omit<NonNullable<typeof params>, "signal">>(
       "/api/reports/mortality/query",
       {
+        farmId: params?.farmId,
         systemId: params?.systemId,
         systemIds: params?.systemIds,
         batchId: params?.batchId,
@@ -259,6 +267,7 @@ export async function getMortalityData(params?: {
 }
 
 export async function getTransferData(params?: {
+  farmId?: string | null
   batchId?: number
   dateFrom?: string
   dateTo?: string
@@ -269,6 +278,7 @@ export async function getTransferData(params?: {
     const response = await postJson<{ data: FishTransferRow[] }, Omit<NonNullable<typeof params>, "signal">>(
       "/api/reports/transfer/query",
       {
+        farmId: params?.farmId,
         batchId: params?.batchId,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
@@ -284,6 +294,7 @@ export async function getTransferData(params?: {
 }
 
 export async function getRecentActivities(params?: {
+  farmId?: string | null
   tableName?: string
   changeType?: Enums<"change_type_enum">
   dateFrom?: string
@@ -295,6 +306,7 @@ export async function getRecentActivities(params?: {
     const response = await postJson<{ data: ChangeLogRow[] }, Omit<NonNullable<typeof params>, "signal">>(
       "/api/reports/recent-activities/query",
       {
+        farmId: params?.farmId,
         tableName: params?.tableName,
         changeType: params?.changeType,
         dateFrom: params?.dateFrom,

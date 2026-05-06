@@ -2,16 +2,18 @@
 
 import { invalidateReferenceDataQueries } from "@/lib/cache/react-query"
 import {
-  createFeedSupplier,
-  createFeedType,
-  createFingerlingBatch,
-  createFingerlingSupplier,
-} from "@/lib/commands/reference-data"
+  createFeedSupplierAction,
+  createFeedTypeAction,
+} from "@/features/feed/mutations.server"
+import {
+  createFingerlingBatchAction,
+  createFingerlingSupplierAction,
+} from "@/features/farm/mutations.server"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 
 export function useCreateFeedSupplier() {
   return useWriteThroughMutation({
-    mutationFn: createFeedSupplier,
+    mutationFn: createFeedSupplierAction,
     invalidate: ({ queryClient }) =>
       invalidateReferenceDataQueries(queryClient, { kind: "feed-suppliers" }),
     successMessage: "Feed supplier created.",
@@ -21,7 +23,7 @@ export function useCreateFeedSupplier() {
 
 export function useCreateFeedType() {
   return useWriteThroughMutation({
-    mutationFn: createFeedType,
+    mutationFn: createFeedTypeAction,
     invalidate: ({ queryClient }) => invalidateReferenceDataQueries(queryClient, { kind: "feed-types" }),
     successMessage: "Feed type created.",
     errorMessage: "Failed to create feed type.",
@@ -30,7 +32,7 @@ export function useCreateFeedType() {
 
 export function useCreateFingerlingSupplier() {
   return useWriteThroughMutation({
-    mutationFn: createFingerlingSupplier,
+    mutationFn: createFingerlingSupplierAction,
     invalidate: ({ queryClient }) =>
       invalidateReferenceDataQueries(queryClient, { kind: "fingerling-suppliers" }),
     successMessage: "Fingerling supplier created.",
@@ -40,7 +42,7 @@ export function useCreateFingerlingSupplier() {
 
 export function useCreateFingerlingBatch() {
   return useWriteThroughMutation({
-    mutationFn: createFingerlingBatch,
+    mutationFn: createFingerlingBatchAction,
     invalidate: ({ queryClient, payload }) =>
       payload.farm_id
         ? invalidateReferenceDataQueries(queryClient, { kind: "batches", farmId: payload.farm_id })

@@ -1,23 +1,30 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/app-ui/card"
+import { Input } from "@/components/app-ui/input"
 import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { formatNumberValue } from "@/lib/analytics-format"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
-import { ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
+import {
+  REPORT_SURFACE_CARD_CLASS,
+  REPORT_TABLE_SHELL_CLASS,
+  ReportMetricCard,
+  ReportRecordsToolbar,
+  ReportSectionHeader,
+} from "./report-shared"
 import { buildComplianceRows, buildExcursionLogRows } from "./report-selectors"
 
 type Props = {
+  farmId?: string | null
   dateRange?: { from: string; to: string }
   systemId?: number
   farmName?: string | null
 }
 
-export default function WaterQualityComplianceReport({ dateRange, systemId, farmName }: Props) {
+export default function WaterQualityComplianceReport({ farmId, dateRange, systemId, farmName }: Props) {
   const [reportDateFrom, setReportDateFrom] = useState(dateRange?.from ?? "")
   const [reportDateTo, setReportDateTo] = useState(dateRange?.to ?? "")
   const boundsReady = Boolean(reportDateFrom && reportDateTo)
@@ -28,13 +35,14 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
   }, [dateRange?.from, dateRange?.to])
 
   const measurementsQuery = useWaterQualityMeasurements({
+    farmId,
     systemId,
     dateFrom: reportDateFrom,
     dateTo: reportDateTo,
     requireSystem: false,
     enabled: boundsReady,
   })
-  const thresholdsQuery = useAlertThresholds()
+  const thresholdsQuery = useAlertThresholds({ farmId })
 
   const rows = measurementsQuery.data?.status === "success" ? measurementsQuery.data.data : []
   const thresholdRows = thresholdsQuery.data?.status === "success" ? thresholdsQuery.data.data : []
@@ -61,34 +69,22 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
       isFetching={measurementsQuery.isFetching || thresholdsQuery.isFetching}
       isLoading={loading}
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Compliance Summary</CardTitle>
-          <CardDescription>Excursions resolve thresholds per system, then farm, then default.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="soft-panel-subtle p-3">
-              <p className="text-xs text-muted-foreground">Readings in report window</p>
-              <p className="text-xl font-semibold">{enrichedRows.length}</p>
-            </div>
-            <div className="soft-panel-subtle p-3">
-              <p className="text-xs text-muted-foreground">Excursion episodes</p>
-              <p className="text-xl font-semibold">{excursionLogRows.length}</p>
-            </div>
-            <div className="soft-panel-subtle p-3">
-              <p className="text-xs text-muted-foreground">Report start</p>
-              <p className="text-xl font-semibold">{reportDateFrom || "N/A"}</p>
-            </div>
-            <div className="soft-panel-subtle p-3">
-              <p className="text-xs text-muted-foreground">Report end</p>
-              <p className="text-xl font-semibold">{reportDateTo || "N/A"}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-2">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">Compliance Summary</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Excursions resolve thresholds per system, then farm, then default.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <ReportMetricCard title="Readings" value={enrichedRows.length.toLocaleString()} meta="Water-quality measurements inside the report window." />
+          <ReportMetricCard title="Excursion Episodes" value={excursionLogRows.length.toLocaleString()} meta="Resolved dissolved-oxygen or ammonia threshold breaches." />
+          <ReportMetricCard title="Report Start" value={reportDateFrom || "N/A"} meta="Inclusive lower bound for the current report." />
+          <ReportMetricCard title="Report End" value={reportDateTo || "N/A"} meta="Inclusive upper bound for the current report." />
+        </div>
+      </div>
 
-      <Card>
+      <Card className={REPORT_SURFACE_CARD_CLASS}>
         <ReportSectionHeader
           title="DO Excursion Log"
           description="All resolved dissolved-oxygen and ammonia excursion episodes in the report window."
@@ -133,7 +129,7 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
           }
         />
         <CardContent>
-          <div className="soft-table-shell">
+          <div className={REPORT_TABLE_SHELL_CLASS}>
             <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">
@@ -176,3 +172,4 @@ export default function WaterQualityComplianceReport({ dateRange, systemId, farm
     </AnalyticsSection>
   )
 }
+

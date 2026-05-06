@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 import { Loader2 } from "lucide-react"
 import {
     Form,
@@ -12,9 +12,9 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useCreateSystem } from "@/lib/hooks/use-system"
 import type { Database } from "@/lib/types/database"
@@ -99,8 +99,8 @@ export function SystemForm() {
     const type = form.watch("type")
 
     return (
-        <div className="max-w-2xl">
-            <div className="mb-6">
+        <div>
+            <div className="data-entry-form-intro">
                 <h2 className="text-xl font-semibold tracking-tight">Add New System</h2>
                 <p className="text-sm text-muted-foreground">Register a new cage, pond, or tank.</p>
             </div>
@@ -274,14 +274,15 @@ export function SystemForm() {
                         />
                     )}
 
-                    <Button type="submit" disabled={createSystem.isPending}>
+                    <Button type="submit" className="data-entry-action" disabled={createSystem.isPending}>
                         {createSystem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Create System
+                        Record System
                     </Button>
                 </form>
             </Form>
         </div>
     )
 }
+
 
 

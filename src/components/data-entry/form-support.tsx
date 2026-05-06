@@ -14,7 +14,7 @@ export function InfoPanel({
   className?: string
 }) {
   return (
-    <div className={cn("rounded-lg border border-border/80 bg-muted/20 p-4", className)}>
+    <div className={cn("data-entry-context-panel p-4", className)}>
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <div className="mt-3 space-y-3">{children}</div>
     </div>
@@ -32,15 +32,15 @@ export function InfoStat({
 }) {
   const toneClass =
     tone === "critical"
-      ? "border-red-500/30 bg-red-500/10"
+      ? "border-destructive/30 bg-destructive/10"
       : tone === "warning"
-        ? "border-amber-500/30 bg-amber-500/10"
+        ? "border-warning/30 bg-warning/10"
         : tone === "success"
-          ? "border-emerald-500/30 bg-emerald-500/10"
+          ? "border-success/30 bg-success/10"
           : "border-border/60 bg-background/70"
 
   return (
-    <div className={cn("rounded-md border px-3 py-2", toneClass)}>
+    <div className={cn("data-entry-note-card rounded-md border px-3 py-2", toneClass)}>
       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-medium text-foreground">{value}</div>
     </div>

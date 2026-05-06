@@ -1,18 +1,20 @@
 import type React from "react"
+import { Suspense } from "react"
 import type { Metadata } from "next"
-import { AuthProvider, ThemeProvider, QueryProvider } from "@/components/providers"
+import { AuthProvider, ThemeProvider, MuiProvider } from "@/components/providers"
 import { SyncProvider } from "@/components/offline/sync-provider"
 import { FarmOnboardingGate } from "@/components/providers/farm-onboarding-gate"
 import { ToastProvider } from "@/components/shared/toast-provider"
 import { NotificationsProvider } from "@/components/notifications/notifications-provider"
+import { ReactQueryProvider } from "@/lib/react-query-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Aquasmart - Aquaculture Management Dashboard",
+  title: "AquaSmart - Aquaculture Management Dashboard",
   description: "Real-time monitoring and management system for aquaculture farm operations",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://aquasmart.app"),
   openGraph: {
-    title: "Aquasmart - Aquaculture Management Dashboard",
+    title: "AquaSmart - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
     type: "website",
     images: [
@@ -26,7 +28,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Aquasmart - Aquaculture Management Dashboard",
+    title: "AquaSmart - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
     images: ["/use this.png"],
   },
@@ -46,18 +48,22 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className={`font-sans antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AuthProvider>
-            <QueryProvider>
+        <ThemeProvider>
+          <MuiProvider>
+          <ReactQueryProvider>
+            <AuthProvider>
               <SyncProvider>
                 <ToastProvider>
                   <NotificationsProvider>
-                    <FarmOnboardingGate>{children}</FarmOnboardingGate>
+                    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                      <FarmOnboardingGate>{children}</FarmOnboardingGate>
+                    </Suspense>
                   </NotificationsProvider>
                 </ToastProvider>
               </SyncProvider>
-            </QueryProvider>
-          </AuthProvider>
+            </AuthProvider>
+          </ReactQueryProvider>
+          </MuiProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -31,7 +31,6 @@ function reportsQueryOptions<TResult>(params: {
   queryFn: (context: { signal: AbortSignal }) => Promise<TResult>
   enabled: boolean
   staleTime: number
-  initialData?: TResult
   refetchOnWindowFocus?: boolean
   refetchOnMount?: boolean | "always"
 }) {
@@ -40,13 +39,6 @@ function reportsQueryOptions<TResult>(params: {
     queryFn: params.queryFn,
     enabled: params.enabled,
     staleTime: params.staleTime,
-    initialData: params.enabled ? params.initialData : undefined,
-    initialDataUpdatedAt:
-      params.enabled && params.initialData
-        ? DISABLE_AUTO_REFETCH_IN_DEV
-          ? Date.now()
-          : 0
-        : undefined,
     refetchOnWindowFocus: params.refetchOnWindowFocus,
     refetchOnMount: params.refetchOnMount,
   })
@@ -117,7 +109,6 @@ export function useFeedingRecords(params?: {
   limit?: number
   enabled?: boolean
   farmId?: string | null
-  initialData?: QueryResult<FeedingRecordWithType>
 }) {
   const { session } = useAuth()
   const { farmId } = useActiveFarm()
@@ -125,10 +116,9 @@ export function useFeedingRecords(params?: {
   return useQuery({
     ...reportsQueryOptions({
       queryKey: queryKeys.reports.feedingRecords({ ...params, farmId: resolvedFarmId }),
-      queryFn: ({ signal }) => getFeedingRecords({ ...params, signal }),
+      queryFn: ({ signal }) => getFeedingRecords({ ...params, farmId: resolvedFarmId, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
-      initialData: params?.initialData,
     }),
     placeholderData: (previous) => previous,
   })
@@ -148,7 +138,7 @@ export function useSamplingData(params?: {
   return useQuery(
     reportsQueryOptions({
       queryKey: queryKeys.reports.sampling({ ...params, farmId }),
-      queryFn: ({ signal }) => getSamplingData({ ...params, signal }),
+      queryFn: ({ signal }) => getSamplingData({ ...params, farmId, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
     }),
@@ -169,7 +159,7 @@ export function useStockingData(params?: {
   return useQuery(
     reportsQueryOptions({
       queryKey: queryKeys.reports.stocking({ ...params, farmId }),
-      queryFn: ({ signal }) => getStockings({ ...params, signal }),
+      queryFn: ({ signal }) => getStockings({ ...params, farmId, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
     }),
@@ -311,7 +301,7 @@ export function useTransferData(params?: {
   return useQuery(
     reportsQueryOptions({
       queryKey: queryKeys.reports.transfer({ ...params, farmId }),
-      queryFn: ({ signal }) => getTransferData({ ...params, signal }),
+      queryFn: ({ signal }) => getTransferData({ ...params, farmId, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
     }),
@@ -332,7 +322,7 @@ export function useMortalityData(params?: {
   return useQuery(
     reportsQueryOptions({
       queryKey: queryKeys.reports.mortality({ ...params, farmId }),
-      queryFn: ({ signal }) => getMortalityData({ ...params, signal }),
+      queryFn: ({ signal }) => getMortalityData({ ...params, farmId, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
     }),
@@ -341,19 +331,17 @@ export function useMortalityData(params?: {
 
 export function useRecentEntries(params?: {
   farmId?: string | null
-  initialData?: Awaited<ReturnType<typeof getRecentEntries>>
 }) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   const { farmId } = useActiveFarm()
   const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
       queryKey: queryKeys.reports.recentEntries(resolvedFarmId),
       queryFn: ({ signal }) => getRecentEntries(resolvedFarmId, signal),
-      enabled: Boolean(session) && Boolean(resolvedFarmId),
+      enabled: (Boolean(session) || Boolean(user)) && Boolean(resolvedFarmId),
       staleTime: 5 * 60_000,
       refetchOnMount: DISABLE_AUTO_REFETCH_IN_DEV ? false : undefined,
-      initialData: params?.initialData,
     }),
   )
 }
@@ -362,7 +350,6 @@ export function useBatchSystemIds(params?: {
   batchId?: number
   farmId?: string | null
   enabled?: boolean
-  initialData?: QueryResult<{ system_id: number }>
 }) {
   const { session } = useAuth()
   const { farmId } = useActiveFarm()
@@ -378,7 +365,6 @@ export function useBatchSystemIds(params?: {
       },
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && (params?.enabled ?? true),
-      initialData: params?.initialData,
     }),
   )
 }

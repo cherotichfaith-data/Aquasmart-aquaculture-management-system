@@ -2,6 +2,10 @@
 
 AquaSmart is a Next.js + Supabase aquaculture operations platform. It supports daily farm workflows around water quality, feeding, fish sampling, mortality, stocking, harvest, transfers, embedded inventory tracking, and reporting.
 
+Comprehensive product and system documentation lives in `docs/AQUASMART.md`.
+
+Current route-by-route and backend flow documentation lives in `docs/FLOW_LOGIC.md`.
+
 The current product structure follows a simple aquaculture software pattern:
 
 - `Operate`: dashboard, feed, growth, mortality, water quality
@@ -32,32 +36,38 @@ The current product structure follows a simple aquaculture software pattern:
 - Sign-in and auth flow entry
 - Includes auth callback, error, and verification-success routes
 
-### `/feed`
+### Canonical dashboard routes
+
+- Primary in-app navigation lives under `/dashboard/*`
+- Legacy root routes such as `/feed` and `/sampling` are handled centrally by `src/proxy.ts`
+- Canonical route implementations live in `src/app/dashboard/*`
+
+### `/dashboard/feed`
 
 - Feed control-tower for ration variance, feed-rate trend, FCR trend, cage exceptions, and stock coverage
 
-### `/sampling`
+### `/dashboard/sampling`
 
 - Sampling and growth-focused analysis
 - Weight/growth presentation based on production and sampling data
 
-### `/water-quality`
+### `/dashboard/water-quality`
 
 - Water-quality status, thresholds, measurements, overlays, and alerts
 - Daily ratings and latest status views
 - Period-based filtering now resolves against water-quality data freshness, not inventory freshness
 
-### `/reports`
+### `/dashboard/reports`
 
 - Performance, feeding, growth, mortality, and water-quality report screens
 - Export-oriented report presentation
 
-### `/settings`
+### `/dashboard/settings`
 
 - Farm profile management
 - Alert-threshold management
 
-### `/data-entry`
+### `/dashboard/data-entry`
 
 - Operational forms for:
   - systems
@@ -77,6 +87,7 @@ The current product structure follows a simple aquaculture software pattern:
 
 - Dashboard filters, server queries, and dashboard-specific data shaping
 - Drives KPI, systems, health, recommendation, and recent-activity presentation
+- Dashboard-only UI now lives in `src/features/dashboard/components`
 
 ### `src/features/feed`
 
@@ -93,7 +104,7 @@ The current product structure follows a simple aquaculture software pattern:
 
 ## UI Modules
 
-### `src/components/dashboard`
+### `src/features/dashboard/components`
 
 - KPI overview
 - Population/production overview
@@ -119,9 +130,18 @@ The current product structure follows a simple aquaculture software pattern:
 ### Frontend Data Path
 
 - App Router pages load server data from `src/features/*/queries.server.ts`
+- Canonical dashboard route handlers live in `src/app/dashboard/*`
+- Legacy root route aliases redirect into `/dashboard/*` via `src/proxy.ts`
 - Shared API access lives in `src/lib/api/*`
 - React Query hooks live in `src/lib/hooks/*`
 - Supabase is the backend for auth, RLS, tables, views, RPCs, and materialized views
+
+### Project Conventions
+
+- Proxy lives at `src/proxy.ts`
+- Feature-specific dashboard UI lives inside `src/features/dashboard/components`
+- Shared analytics types live in `src/lib/types/insights.ts`
+- Supabase edge functions under `supabase/functions` are maintained separately from the Next.js app TypeScript project
 
 ### Current Analytics Read Model
 
@@ -173,11 +193,17 @@ Call `public.refresh_all_materialized_views()` to refresh all four matviews in d
 ### Regenerating database types
 
 ```bash
-# Requires SUPABASE_ACCESS_TOKEN in environment (get from https://supabase.com/dashboard/account/tokens)
+# Bash / zsh
 SUPABASE_ACCESS_TOKEN=your_token npm run db:types
 ```
 
-Or set `SUPABASE_ACCESS_TOKEN` in `.env.local` (uncomment the placeholder line) and run `npm run db:types`.
+```powershell
+# PowerShell
+$env:SUPABASE_ACCESS_TOKEN="your_token"
+npm run db:types
+```
+
+`npm run db:types` also loads `.env.local`, so you can set `SUPABASE_ACCESS_TOKEN` there and run the script directly.
 
 ### Roles
 

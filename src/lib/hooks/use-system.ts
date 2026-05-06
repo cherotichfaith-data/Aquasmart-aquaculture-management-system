@@ -1,7 +1,7 @@
 "use client"
 
-import { invalidateSystemWriteQueries } from "@/lib/cache/react-query"
-import { createSystem } from "@/lib/commands/operations"
+import { invalidateAfterWrite } from "@/lib/cache/react-query"
+import { createSystemAction } from "@/features/farm/mutations.server"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 import type { Database } from "@/lib/types/database"
 
@@ -11,7 +11,7 @@ type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
 
 export function useCreateSystem() {
   return useWriteThroughMutation({
-    mutationFn: createSystem,
+    mutationFn: createSystemAction,
     activityTableName: "system",
     recentEntryKey: "systems",
     buildOptimisticEntry: (payload) => {
@@ -28,7 +28,8 @@ export function useCreateSystem() {
       }
     },
     invalidate: async ({ queryClient, result }) =>
-      invalidateSystemWriteQueries(queryClient, {
+      invalidateAfterWrite(queryClient, {
+        type: "system",
         farmId: result.meta.farmId,
         date: result.meta.date,
       }),

@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 import { Loader2 } from "lucide-react"
 import {
   Form,
@@ -12,9 +12,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useRecordMortality } from "@/lib/hooks/use-mortality"
@@ -22,6 +22,7 @@ import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+import { parseOptionalNumericId, parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
 
 const formSchema = z.object({
   system_id: z.string().min(1, "Cage number is required"),
@@ -74,20 +75,18 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      if (!farmId) {
-        throw new Error("No active farm selected.")
-      }
-
-      const systemId = Number(values.system_id)
-      const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+      const resolvedFarmId = requireActiveFarmId(farmId)
+      const systemId = parseRequiredNumericId(values.system_id, "Cage number")
+      const batchId = parseOptionalNumericId(values.batch_id)
 
       await mutation.mutateAsync({
-        farm_id: farmId,
+        farm_id: resolvedFarmId,
         system_id: systemId,
-        batch_id: Number.isFinite(batchId as number) ? batchId : null,
+        batch_id: batchId,
         date: values.date,
         number_of_fish_mortality: values.number_of_fish,
         cause: values.cause,
+        is_mass_mortality: values.number_of_fish >= 100,
         avg_dead_wt_g: values.avg_dead_wt_g ?? null,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
@@ -106,22 +105,24 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
-      <div>
+    <div className="space-y-6">
+      <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Mortality</h2>
       </div>
 
-      <OfflineSaveBadge result={mutation.data} />
+      <div className="data-entry-status">
+        <OfflineSaveBadge result={mutation.data} />
+      </div>
 
-      {mortalityCount >= 100 ? (
-        <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-200">
-          Mass mortality threshold exceeded. An alert will fire. Complete a DO and water-quality check for this cage as part of the response.
-        </div>
-      ) : null}
+        {mortalityCount >= 100 ? (
+        <div className="data-entry-callout-alert rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
+            Mass mortality threshold exceeded. An alert will fire. Complete a DO and water-quality check for this cage as part of the response.
+          </div>
+        ) : null}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="data-entry-secondary-grid">
             <FormField
               control={form.control}
               name="date"
@@ -202,7 +203,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="data-entry-secondary-grid">
             <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
             <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
           </div>
@@ -256,7 +257,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                   <textarea
                     {...field}
                     rows={3}
-                    className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="data-entry-textarea"
                     placeholder="Observed signs, handling issue, water condition, or follow-up action."
                   />
                 </FormControl>
@@ -265,12 +266,13 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
             )}
           />
 
-          <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
             {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Entry
+            Record Mortality
           </Button>
         </form>
       </Form>
     </div>
   )
 }
+

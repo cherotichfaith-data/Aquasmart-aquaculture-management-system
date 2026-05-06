@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 import { Loader2 } from "lucide-react"
 import {
   Form,
@@ -13,9 +13,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useRecordStocking } from "@/lib/hooks/use-stocking"
@@ -28,10 +28,17 @@ import {
   getSystemUnits,
   getSystemsForUnit,
 } from "./form-support"
-import { toIsoDate } from "./form-utils"
+import {
+  calculateAbw,
+  calculateAbwOrZero,
+  parseRequiredNumericId,
+  requireActiveFarmId,
+  toIsoDate,
+} from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 type StockingInsertWithNotes = Database["public"]["Tables"]["fish_stocking"]["Insert"] & {
+  farm_id?: string | null
   notes?: string | null
 }
 
@@ -47,13 +54,14 @@ const formSchema = z.object({
 })
 
 interface StockingFormProps {
+  farmId: string | null
   systems: SystemOption[]
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
 }
 
-export function StockingForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: StockingFormProps) {
+export function StockingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: StockingFormProps) {
   const mutation = useRecordStocking()
   const [showBatchCreate, setShowBatchCreate] = useState(false)
 
@@ -79,7 +87,7 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
   const selectedBatchId = form.watch("batch_id")
   const numberOfFish = form.watch("number_of_fish")
   const totalWeightKg = form.watch("total_weight_kg")
-  const computedAbw = numberOfFish > 0 && totalWeightKg > 0 ? (totalWeightKg * 1000) / numberOfFish : null
+  const computedAbw = calculateAbw(totalWeightKg, numberOfFish)
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
 
   useEffect(() => {
@@ -94,11 +102,13 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const systemId = Number(values.system_id)
-      const batchId = Number(values.batch_id)
-      const abw = values.number_of_fish > 0 ? (values.total_weight_kg * 1000) / values.number_of_fish : 0
+      const resolvedFarmId = requireActiveFarmId(farmId)
+      const systemId = parseRequiredNumericId(values.system_id, "Cage number")
+      const batchId = parseRequiredNumericId(values.batch_id, "Batch")
+      const abw = calculateAbwOrZero(values.total_weight_kg, values.number_of_fish)
 
       const payload: StockingInsertWithNotes = {
+        farm_id: resolvedFarmId,
         system_id: systemId,
         batch_id: batchId,
         date: values.stocking_date,
@@ -140,12 +150,14 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
   }
 
   return (
-    <div className="max-w-6xl space-y-6">
-      <div>
+    <div className="space-y-6">
+      <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Stocking</h2>
       </div>
 
-      <OfflineSaveBadge result={mutation.data} />
+      <div className="data-entry-status">
+        <OfflineSaveBadge result={mutation.data} />
+      </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -215,13 +227,8 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
             />
 
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-foreground">Batch Number</div>
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowBatchCreate((current) => !current)}>
-                  {showBatchCreate ? "Hide batch form" : "Create new batch"}
-                </Button>
+              <div>
+                <div className="text-sm font-semibold text-foreground">Batch Number</div>
               </div>
               <div className="mt-3">
                 <FormField
@@ -251,14 +258,12 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
             </div>
           </div>
 
-          {showBatchCreate ? <BatchQuickCreate onCreated={() => setShowBatchCreate(false)} /> : null}
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="data-entry-secondary-grid">
             <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
             <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="data-entry-secondary-grid">
             <FormField
               control={form.control}
               name="number_of_fish"
@@ -288,7 +293,7 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
             />
           </div>
 
-          <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+          <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm text-muted-foreground">
             Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter quantity and total weight"}
           </div>
 
@@ -324,7 +329,7 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
                   <textarea
                     {...field}
                     rows={3}
-                    className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="data-entry-textarea"
                     placeholder="Source condition, acclimation detail, or any exception."
                   />
                 </FormControl>
@@ -333,12 +338,13 @@ export function StockingForm({ systems, batches, defaultSystemId = null, default
             )}
           />
 
-          <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
             {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Entry
+            Record Stocking
           </Button>
         </form>
       </Form>
     </div>
   )
 }
+

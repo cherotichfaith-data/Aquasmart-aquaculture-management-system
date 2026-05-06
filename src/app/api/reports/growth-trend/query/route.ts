@@ -7,6 +7,7 @@ import { listGrowthTrend } from "@/lib/server/report-reads"
 import { logSbError } from "@/lib/supabase/log"
 
 const growthTrendSchema = z.object({
+  farmId: z.string().uuid().optional(),
   systemId: z.number().int().positive().optional(),
   days: z.number().int().positive().optional(),
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

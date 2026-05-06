@@ -1,33 +1,38 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import Box from "@mui/material/Box"
+import Button from "@mui/material/Button"
+import { Dialog } from "@/components/app-ui/dialog"
 import { SyncStatusBar } from "@/components/offline/sync-status-bar"
-import Header from "./header"
-import Sidebar from "./sidebar"
-import { ShortcutsHelp } from "@/components/shared/shortcuts-help"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
-import { canAccessDataEntry } from "@/lib/app-entry"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import { canAccessDataEntry, DATA_ENTRY_PATH, toDashboardPath } from "@/lib/app-entry"
+import Header from "./header"
+import Sidebar, { DASHBOARD_SIDEBAR_COLLAPSED_WIDTH, DASHBOARD_SIDEBAR_WIDTH } from "./sidebar"
 
 export default function DashboardLayout({
   children,
   hideHeader = false,
   showHeaderToolbar = true,
+  initialFarmId,
+  initialFarmName,
 }: {
   children: React.ReactNode
   hideHeader?: boolean
   showHeaderToolbar?: boolean
+  initialFarmId?: string | null
+  initialFarmName?: string | null
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
   const router = useRouter()
-  const { farmId } = useActiveFarm()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const farmRoleQuery = useActiveFarmRole(farmId)
   const farmRole = (farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const allowDataEntry = canAccessDataEntry(farmRole)
@@ -36,6 +41,7 @@ export default function DashboardLayout({
     if (typeof window === "undefined") return
 
     const storedCollapsed = window.localStorage.getItem("dashboard:sidebar-collapsed")
+
     const applyResponsiveSidebarState = () => {
       const isDesktop = window.innerWidth >= 768
       setSidebarOpen(isDesktop)
@@ -50,10 +56,7 @@ export default function DashboardLayout({
 
     applyResponsiveSidebarState()
     window.addEventListener("resize", applyResponsiveSidebarState)
-
-    return () => {
-      window.removeEventListener("resize", applyResponsiveSidebarState)
-    }
+    return () => window.removeEventListener("resize", applyResponsiveSidebarState)
   }, [])
 
   useEffect(() => {
@@ -78,19 +81,19 @@ export default function DashboardLayout({
       if (key === "n") {
         if (!allowDataEntry) return
         event.preventDefault()
-        router.push("/data-entry")
+        router.push(DATA_ENTRY_PATH)
         return
       }
       if (key === "f" && event.shiftKey) {
         if (!allowDataEntry) return
         event.preventDefault()
-        router.push("/data-entry?type=feeding")
+        router.push(`${DATA_ENTRY_PATH}?type=feeding`)
         return
       }
       if (key === "s" && event.shiftKey) {
         if (!allowDataEntry) return
         event.preventDefault()
-        router.push("/data-entry?type=sampling")
+        router.push(`${DATA_ENTRY_PATH}?type=sampling`)
       }
     }
 
@@ -98,12 +101,21 @@ export default function DashboardLayout({
     return () => window.removeEventListener("keydown", handler)
   }, [allowDataEntry, router])
 
+  useEffect(() => {
+    setCommandOpen(false)
+    setSidebarOpen((prev) => (typeof window !== "undefined" && window.innerWidth >= 768 ? prev : false))
+  }, [pathname, searchParams])
+
+  const desktopOffset = sidebarCollapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH
+
   return (
-    <div className="relative flex min-h-screen bg-background">
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
       <Sidebar
+        initialFarmId={initialFarmId}
+        initialFarmName={initialFarmName}
         open={sidebarOpen}
         collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onToggle={() => setSidebarOpen((prev) => !prev)}
         onCollapseToggle={() =>
           setSidebarCollapsed((prev) => {
             const next = !prev
@@ -114,58 +126,102 @@ export default function DashboardLayout({
           })
         }
       />
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          overflowX: "hidden",
+          ml: { md: `${desktopOffset}px` },
+          transition: (theme) =>
+            theme.transitions.create("margin-left", {
+              duration: theme.transitions.duration.standard,
+            }),
+        }}
+        id="app-scroll-root"
+      >
         {hideHeader ? null : (
           <>
             <Header
-              onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+              initialFarmId={initialFarmId}
+              initialFarmName={initialFarmName}
+              onMenuClick={() => setSidebarOpen((prev) => !prev)}
               showToolbar={showHeaderToolbar}
             />
             <SyncStatusBar />
           </>
         )}
-        <main
-          className={
-            hideHeader
-              ? "flex-1 overflow-x-hidden px-3 pb-8 pt-3 sm:px-4 md:px-6 md:pb-10 md:pt-4 lg:px-10 animate-in fade-in-0 duration-300"
-              : showHeaderToolbar
-                ? "flex-1 overflow-x-hidden px-3 pb-8 pt-4 sm:px-4 md:px-6 md:pb-10 md:pt-5 lg:px-10 animate-in fade-in-0 duration-300"
-                : "flex-1 overflow-x-hidden px-3 pb-8 pt-0 sm:px-4 md:px-6 md:pb-10 md:pt-0 lg:px-10 animate-in fade-in-0 duration-300"
-          }
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            overflowX: "hidden",
+            px: { xs: 1, sm: 1.5, md: 2, lg: 3 },
+            pb: { xs: 3, md: 4 },
+            pt: hideHeader ? { xs: 0.5, md: 0.75 } : showHeaderToolbar ? { xs: 0.5, md: 0.75 } : 0,
+          }}
         >
-          <div className="mx-auto w-full max-w-[1720px]">{children}</div>
-        </main>
-      </div>
-      <ShortcutsHelp canAccessDataEntry={allowDataEntry} />
-      <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
-        <DialogContent className="rounded-[1.5rem] border-border/80 bg-card/95 backdrop-blur-xl">
-          <DialogHeader>
-            <DialogTitle>Quick Actions</DialogTitle>
-            <DialogDescription>Jump straight to common tasks.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2">
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/"); }}>
-              Go to Dashboard
-            </Button>
-            {allowDataEntry ? (
-              <>
-                <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry"); }}>
-                  New Data Entry
-                </Button>
-                <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry?type=feeding"); }}>
-                  Record Feeding
-                </Button>
-                <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry?type=sampling"); }}>
-                  Record Sampling
-                </Button>
-              </>
-            ) : null}
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/water-quality"); }}>
-              Water Quality Dashboard
-            </Button>
-          </div>
-        </DialogContent>
+          <Box sx={{ mx: "auto", width: "100%", maxWidth: 1640 }}>{children}</Box>
+        </Box>
+      </Box>
+      <Dialog
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        title="Quick Actions"
+        description="Jump straight to common tasks."
+      >
+        <Box sx={{ display: "grid", gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => {
+              setCommandOpen(false)
+              router.push(toDashboardPath("/"))
+            }}
+          >
+            Go to Dashboard
+          </Button>
+          {allowDataEntry ? (
+            <>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setCommandOpen(false)
+                  router.push(DATA_ENTRY_PATH)
+                }}
+              >
+                New Data Entry
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setCommandOpen(false)
+                  router.push(`${DATA_ENTRY_PATH}?type=feeding`)
+                }}
+              >
+                Record Feeding
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setCommandOpen(false)
+                  router.push(`${DATA_ENTRY_PATH}?type=sampling`)
+                }}
+              >
+                Record Sampling
+              </Button>
+            </>
+          ) : null}
+          <Button
+            variant="outlined"
+            onClick={() => {
+              setCommandOpen(false)
+              router.push(toDashboardPath("/water-quality"))
+            }}
+          >
+            Water Quality Dashboard
+          </Button>
+        </Box>
       </Dialog>
-    </div>
+    </Box>
   )
 }

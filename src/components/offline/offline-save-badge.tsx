@@ -1,7 +1,10 @@
 "use client"
 
+import Alert from "@mui/material/Alert"
+import Chip from "@mui/material/Chip"
+import Typography from "@mui/material/Typography"
+import { alpha } from "@mui/material/styles"
 import { HardDriveDownload } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { hasPendingSyncMeta } from "@/lib/offline/result"
 
 export function OfflineSaveBadge({ result }: { result: unknown }) {
@@ -10,16 +13,40 @@ export function OfflineSaveBadge({ result }: { result: unknown }) {
   }
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+    <Alert
+      severity="warning"
+      icon={false}
+      sx={{
+        borderRadius: 2,
+        border: (theme) => `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+        bgcolor: (theme) => alpha(theme.palette.warning.main, 0.1),
+        color: "#8d5e09",
+        "& .MuiAlert-message": {
+          width: "100%",
+        },
+      }}
+    >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-            <HardDriveDownload className="h-3 w-3" />
-            Saved Offline
-          </Badge>
-          <span className="text-xs sm:text-sm">This submission is stored on the device and queued for sync.</span>
+          <Chip
+            size="small"
+            icon={<HardDriveDownload size={12} />}
+            label="Saved Offline"
+            variant="outlined"
+            sx={{
+              borderColor: (theme) => alpha(theme.palette.warning.main, 0.4),
+              bgcolor: (theme) => alpha(theme.palette.warning.main, 0.14),
+              color: "inherit",
+              "& .MuiChip-icon": {
+                color: "inherit",
+              },
+            }}
+          />
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>
+            This submission is stored on the device and queued for sync.
+          </Typography>
         </div>
       </div>
-    </div>
+    </Alert>
   )
 }

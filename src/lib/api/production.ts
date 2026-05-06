@@ -9,8 +9,8 @@ import {
   toQuerySuccess,
 } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-
-type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+import { toProductionTrendRows } from "@/features/dashboard/production-trend"
+import type { ProductionTrendRpcRow } from "@/features/dashboard/types"
 
 type ProductionRpcArgs = {
   p_farm_id: string
@@ -44,8 +44,8 @@ export async function getProductionSummary(params?: {
   limit?: number
   farmId?: string | null
   signal?: AbortSignal
-}): Promise<QueryResult<ProductionSummaryRow>> {
-  if (!params?.farmId) return empty<ProductionSummaryRow>()
+}): Promise<QueryResult<ProductionTrendRpcRow & { feeding_rate: number | null }>> {
+  if (!params?.farmId) return empty<ProductionTrendRpcRow & { feeding_rate: number | null }>()
 
   const clientResult = await getClientOrError("getProductionSummary", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
@@ -65,11 +65,13 @@ export async function getProductionSummary(params?: {
 
   const { data, error } = await query
   if (error) {
-    if (isQuietError(error) || isInvalidBigintUuidError(error)) return empty<ProductionSummaryRow>()
+    if (isQuietError(error) || isInvalidBigintUuidError(error)) {
+      return empty<ProductionTrendRpcRow & { feeding_rate: number | null }>()
+    }
     return toQueryError("getProductionSummary", error)
   }
 
-  let rows = ((data ?? []) as ProductionSummaryRow[])
+  let rows = toProductionTrendRows((data ?? []) as ProductionTrendRpcRow[])
     .slice()
     .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
 

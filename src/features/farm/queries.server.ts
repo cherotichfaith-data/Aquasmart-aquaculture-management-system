@@ -1,13 +1,12 @@
 import { runServerReadThrough } from "@/lib/cache/server"
 import { cacheTags } from "@/lib/cache/tags"
-import { resolveAppEntryPath } from "@/lib/app-entry"
-import { claimFarmMembershipsByEmail } from "@/lib/auth/claim-farm-memberships"
+import { ONBOARDING_PATH, resolveAppEntryPath, WORKSPACE_SELECT_PATH } from "@/lib/app-entry"
 import { createAccessTokenClient } from "@/lib/supabase/server"
-import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import type { Database } from "@/lib/types/database"
-import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
+import { ACTIVE_FARM_COOKIE, normalizeContextValue } from "@/lib/context"
 
 export type FarmOption = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
 
@@ -30,42 +29,24 @@ export async function listFarmOptions(): Promise<FarmOption[]> {
 }
 
 export async function resolveInitialFarmId(searchFarmId?: string | null) {
-  const { user, accessToken } = await requireUserContext()
-  await claimPendingFarmMemberships(user.id, accessToken)
+  await requireUserContext()
   const farms = await listFarmOptions()
   const farmIds = new Set(farms.map((farm) => farm.id))
-  const farmId = searchFarmId && farmIds.has(searchFarmId) ? searchFarmId : (farms[0]?.id ?? null)
+  const cookieStore = await cookies()
+  const cookieFarmId = normalizeContextValue(cookieStore.get(ACTIVE_FARM_COOKIE)?.value)
+  const requestedFarmId = normalizeContextValue(searchFarmId) ?? cookieFarmId
+  const farmId = requestedFarmId && farmIds.has(requestedFarmId) ? requestedFarmId : null
+  const farm = farmId ? farms.find((row) => row.id === farmId) ?? null : null
 
   return {
     farmId,
+    farmName: farm?.label ?? null,
     farms,
   }
 }
 
 export async function requireInitialFarmId(searchFarmId?: string | null) {
   return resolveInitialFarmId(searchFarmId)
-}
-
-async function claimPendingFarmMemberships(userId: string, accessToken: string) {
-  const supabase = createAccessTokenClient(accessToken)
-
-  try {
-    const { data, error } = await claimFarmMembershipsByEmail(supabase)
-    if (error) {
-      if (!isSbNetworkError(error)) {
-        logSbError("farmQueries:claimFarmMemberships", error)
-      }
-      return
-    }
-
-    if ((data ?? 0) > 0) {
-      revalidateTag(cacheTags.farmOptions(userId), "max")
-    }
-  } catch (error) {
-    if (!isSbNetworkError(error)) {
-      logSbError("farmQueries:claimFarmMemberships:catch", error)
-    }
-  }
 }
 
 export async function redirectIfFarmExists() {
@@ -85,7 +66,7 @@ export async function resolveExistingFarmEntryPath(searchFarmId?: string | null)
       farmId: null,
       farms,
       role: null as Parameters<typeof resolveAppEntryPath>[0],
-      entryPath: "/onboarding",
+      entryPath: farms.length > 0 ? WORKSPACE_SELECT_PATH : ONBOARDING_PATH,
     }
   }
 
@@ -103,6 +84,6 @@ export async function resolveExistingFarmEntryPath(searchFarmId?: string | null)
     farmId,
     farms,
     role,
-    entryPath: resolveAppEntryPath(role),
+    entryPath: `${resolveAppEntryPath(role)}?farmId=${encodeURIComponent(farmId)}`,
   }
 }

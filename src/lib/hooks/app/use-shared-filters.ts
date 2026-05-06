@@ -1,10 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import type { Enums } from "@/lib/types/database"
 import { DEFAULT_TIME_PERIOD, isTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { normalizeStageFilter, type StageFilter } from "@/lib/stage-filter"
 
-export type StageFilter = "all" | Enums<"system_growth_stage">
 export type { TimePeriod } from "@/lib/time-period"
 
 export type SharedFiltersState = {
@@ -16,7 +15,6 @@ export type SharedFiltersState = {
 
 const STORAGE_KEY = "aquasmart:shared-filters:v1"
 const EVENT_NAME = "aquasmart:shared-filters"
-const STAGES: StageFilter[] = ["all", "nursing", "grow_out"]
 
 const hasMeaningfulInitialValues = (
   initialValues: Partial<SharedFiltersState> | undefined,
@@ -30,14 +28,17 @@ const hasMeaningfulInitialValues = (
         (initialValues.timePeriod !== undefined && initialValues.timePeriod !== defaultTimePeriod)),
   )
 
-const isStage = (value: unknown): value is StageFilter =>
-  typeof value === "string" && STAGES.includes(value as StageFilter)
-
 export function useSharedFilters(
   defaultTimePeriod: TimePeriod = DEFAULT_TIME_PERIOD,
   initialValues?: Partial<SharedFiltersState>,
+  options?: {
+    authoritativeInitialValues?: boolean
+    resetKey?: string | null
+  },
 ) {
-  const hasInitialValues = hasMeaningfulInitialValues(initialValues, defaultTimePeriod)
+  const hasInitialValues = options?.authoritativeInitialValues
+    ? Boolean(initialValues)
+    : hasMeaningfulInitialValues(initialValues, defaultTimePeriod)
   const initialBatch = initialValues?.selectedBatch ?? "all"
   const initialSystem = initialValues?.selectedSystem ?? "all"
   const initialStage = initialValues?.selectedStage ?? "all"
@@ -60,7 +61,7 @@ export function useSharedFilters(
         const parsed = JSON.parse(raw) as Partial<SharedFiltersState>
         setSelectedBatch(typeof parsed.selectedBatch === "string" ? parsed.selectedBatch : "all")
         setSelectedSystem(typeof parsed.selectedSystem === "string" ? parsed.selectedSystem : "all")
-        setSelectedStage(isStage(parsed.selectedStage) ? parsed.selectedStage : "all")
+        setSelectedStage(normalizeStageFilter(parsed.selectedStage))
         setTimePeriod(isTimePeriod(parsed.timePeriod) ? parsed.timePeriod : fallbackPeriod)
       } else if (!hasInitialValues) {
         setTimePeriod(fallbackPeriod)
@@ -79,7 +80,7 @@ export function useSharedFilters(
 
         if (paramSystem) setSelectedSystem(paramSystem)
         if (paramBatch) setSelectedBatch(paramBatch)
-        if (isStage(paramStage)) setSelectedStage(paramStage)
+        setSelectedStage(normalizeStageFilter(paramStage))
         if (isTimePeriod(paramPeriod)) setTimePeriod(paramPeriod)
       }
       setHydrated(true)
@@ -94,7 +95,7 @@ export function useSharedFilters(
     setSelectedStage(initialStage)
     setTimePeriod(initialPeriod)
     setHydrated(true)
-  }, [hasInitialValues, initialBatch, initialPeriod, initialStage, initialSystem])
+  }, [hasInitialValues, initialBatch, initialPeriod, initialStage, initialSystem, options?.resetKey])
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return

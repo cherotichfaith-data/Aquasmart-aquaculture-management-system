@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/app-ui/button"
+import { Input } from "@/components/app-ui/input"
+import { Label } from "@/components/app-ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useFeedSupplierOptions } from "@/lib/hooks/use-options"
 import { useCreateFeedSupplier, useCreateFeedType } from "@/lib/hooks/use-reference-data"
 import type { Enums } from "@/lib/types/database"
@@ -258,3 +258,4 @@ export function FeedTypeQuickCreate({
     </div>
   )
 }
+

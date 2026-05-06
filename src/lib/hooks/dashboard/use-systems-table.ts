@@ -19,14 +19,10 @@ export function useSystemsTable(params: {
   dateTo?: string | null
   includeIncomplete?: boolean
   scopedSystemIds?: number[] | null
-  initialData?: SystemsTableData
 }) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   const hasBounds = Boolean(params.dateFrom) && Boolean(params.dateTo)
-  const canUseInitialData =
-    hasBounds &&
-    params.initialData?.meta.start === params.dateFrom &&
-    params.initialData?.meta.end === params.dateTo
+  const debugEnabled = process.env.NEXT_PUBLIC_DEBUG === "true"
 
   return useQuery({
     queryKey: queryKeys.dashboard.systemsTable(params),
@@ -62,6 +58,17 @@ export function useSystemsTable(params: {
         signal,
         scopedSystemIds: params.scopedSystemIds,
       })
+      if (debugEnabled) {
+        console.debug("[dashboard][useSystemsTable]", {
+          farmId,
+          dateFrom: startDate,
+          dateTo: endDate,
+          stage: params.stage,
+          batch: params.batch ?? "all",
+          system: params.system ?? "all",
+          scopedSystemIds,
+        })
+      }
       if (scopedSystemIds === null) {
         return {
           rows: [] as DashboardSystemRow[],
@@ -91,20 +98,27 @@ export function useSystemsTable(params: {
         }
       }
 
+      const rows = ((result.data ?? []) as DashboardSystemRow[]).filter((row) => {
+        if (Array.isArray(scopedSystemIds) && !scopedSystemIds.includes(row.system_id)) return false
+        if (params.includeIncomplete) return true
+        return hasCompleteSystemMetrics(row)
+      })
+
+      if (debugEnabled) {
+        console.debug("[dashboard][useSystemsTable][rows]", {
+          resultCount: result.data?.length ?? 0,
+          filteredCount: rows.length,
+        })
+      }
+
       return {
-        rows: ((result.data ?? []) as DashboardSystemRow[]).filter((row) => {
-          if (Array.isArray(scopedSystemIds) && !scopedSystemIds.includes(row.system_id)) return false
-          if (params.includeIncomplete) return true
-          return hasCompleteSystemMetrics(row)
-        }),
+        rows,
         meta: { source: "api_dashboard_systems", start: startDate, end: endDate },
       }
     },
-    enabled: Boolean(session) && Boolean(params.farmId) && hasBounds,
+    enabled: (Boolean(session) || Boolean(user)) && Boolean(params.farmId) && hasBounds,
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: true,
-    initialData: canUseInitialData ? params.initialData : undefined,
-    initialDataUpdatedAt: canUseInitialData ? 0 : undefined,
   })
 }

@@ -1,10 +1,12 @@
 import type { Database } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
+import { getMe } from "@/lib/api"
 import { createClient } from "@/lib/supabase/client"
+import { createAccessTokenClient } from "@/lib/supabase/access-token-client"
 import { isSbAuthMissing, isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { getSessionUser } from "@/lib/supabase/session"
 
-type SupabaseClient = ReturnType<typeof createClient>
+type SupabaseClient = ReturnType<typeof createClient> | ReturnType<typeof createAccessTokenClient>
 type PublicFunctions = Database["public"]["Functions"]
 
 /**
@@ -26,6 +28,16 @@ export type KpiRpcName =
   | "get_growth_trend"
   | "get_running_stock"
   | "get_survival_trend"
+  // Analytics layer RPCs
+  | "api_system_health_score"
+  | "api_harvest_forecast"
+  | "api_feed_demand_forecast"
+  | "api_cycle_benchmarks"
+  // Compute layer RPCs
+  | "api_recommended_actions"
+  | "api_feed_fcr_intervals"
+  | "api_feed_rate_analysis"
+  | "api_kpi_coverage"
 
 /**
  * Option RPCs (replacing PostgREST option views where possible).
@@ -145,9 +157,21 @@ export async function getClientOrError(
 
   if (requireSession) {
     const sessionUser = await getSessionUser(supabase, `api:${tag}:getSession`)
-    if (!sessionUser) {
-      return { error: { status: "error", data: null, error: "No active session" } }
+    if (sessionUser) {
+      return { supabase }
     }
+
+    try {
+      const me = await getMe()
+      if (typeof me.token === "string" && me.token.trim().length > 0) {
+        return { supabase: createAccessTokenClient(me.token) }
+      }
+    } catch {
+    }
+  }
+
+  if (requireSession) {
+    return { error: { status: "error", data: null, error: "No active session" } }
   }
 
   return { supabase }

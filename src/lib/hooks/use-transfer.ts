@@ -1,6 +1,6 @@
 "use client"
 
-import { invalidateInventoryWriteQueries } from "@/lib/cache/react-query"
+import { invalidateAfterWrite } from "@/lib/cache/react-query"
 import type { TransferInput } from "@/lib/commands/operations"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
@@ -14,6 +14,7 @@ export function useRecordTransfer() {
   const offlineMutation = useOfflineMutation<
     TransferInput,
     {
+      farmId?: string | null
       originSystemId: number
       targetSystemId?: number | null
       externalTargetName?: string | null
@@ -33,6 +34,7 @@ export function useRecordTransfer() {
     tableName: "transfer",
     buildRecords: (payload) => [
       {
+        farmId: payload.farm_id ?? farmId,
         originSystemId: payload.origin_system_id,
         targetSystemId: payload.target_system_id ?? null,
         externalTargetName: payload.external_target_name ?? null,
@@ -48,7 +50,7 @@ export function useRecordTransfer() {
     buildPendingResult: ({ input, localIds }) =>
       buildOfflinePendingResult({
         data: { id: 0 } as Tables<"fish_transfer">,
-        farmId,
+        farmId: input.farm_id ?? farmId,
         systemId: input.origin_system_id,
         date: input.date,
         localIds,
@@ -75,11 +77,10 @@ export function useRecordTransfer() {
       status: "pending",
     }),
     invalidate: async ({ queryClient, result }) =>
-      invalidateInventoryWriteQueries(queryClient, {
+      invalidateAfterWrite(queryClient, {
+        type: "transfer",
         farmId: result.meta.farmId,
         date: result.meta.date,
-        tableName: "fish_transfer",
-        includeProductionQueries: true,
       }),
     successMessage: "Transfer recorded.",
     errorMessage: "Failed to record transfer.",

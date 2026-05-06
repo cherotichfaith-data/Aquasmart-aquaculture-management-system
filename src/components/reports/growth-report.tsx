@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useScopedGrowthTrend } from "@/lib/hooks/use-reports"
 import { useAppConfig, useSystemOptions } from "@/lib/hooks/use-options"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { countTimeRangeDays } from "@/lib/time-period"
 import type { Enums } from "@/lib/types/database"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
@@ -18,17 +17,18 @@ import {
 import { buildGrowthAbwChartRows, buildGrowthChartRows, projectDaysToHarvest } from "./report-selectors"
 
 export default function GrowthReport({
+  farmId,
   dateRange,
   systemId,
   stage,
   farmName,
 }: {
+  farmId?: string | null
   dateRange?: { from: string; to: string }
   systemId?: number
   stage?: "all" | Enums<"system_growth_stage">
   farmName?: string | null
 }) {
-  const { farmId } = useActiveFarm()
   const boundsReady = Boolean(dateRange?.from && dateRange?.to)
   const [showGrowthRecords, setShowGrowthRecords] = useState(false)
 

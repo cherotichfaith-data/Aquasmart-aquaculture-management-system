@@ -1,46 +1,113 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { User, Session } from "@supabase/supabase-js";
+import { getMe } from "@/lib/api";
+import { normalizeRole, type AquaSmartRole } from "@/lib/app-entry";
+import { redirectBrowserAfterSignOut } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
-import { isSbNetworkError, logSbError } from "@/lib/supabase/log";
-import { claimFarmMembershipsByEmail } from "@/lib/auth/claim-farm-memberships";
+import { clearBrowserWorkspaceContext } from "@/lib/context";
+import { isSbAuthMissing, isSbInvalidRefreshToken, isSbNetworkError, isSbPermissionDenied, logSbError } from "@/lib/supabase/log";
+import { getSessionIdentity } from "@/lib/supabase/session";
+import { mergeUserContext } from "@/lib/user-context";
 
-type UserRole =
-    | "admin"
-    | "farm_manager"
-    | "farm_technician"
-    | "inventory_storekeeper"
-    | "analyst_planner"
-    | "viewer_auditor"
-    | null;
+type UserRole = AquaSmartRole;
+type AuthProfile = Record<string, any> | null;
+type AuthSettings = Record<string, any> | null;
 
 interface AuthContextType {
     user: User | null;
     session: Session | null;
     role: UserRole;
-    profile: Record<string, any> | null;
+    profile: AuthProfile;
+    settings: AuthSettings;
+    hasProfile: boolean;
     isLoading: boolean;
+    signInWithPassword: (email: string, password: string) => Promise<void>;
+    signUpWithPassword: (params: { firstName: string; lastName: string; email: string; password: string }) => Promise<void>;
+    resetPasswordForEmail: (email: string) => Promise<void>;
     signOut: () => Promise<void>;
+    refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function isSupabaseAuthCookie(name: string) {
+    return name.startsWith("sb-") && (name.includes("-auth-token") || name.includes("-auth-token-code-verifier"));
+}
+
+function clearSupabaseBrowserCookies() {
+    if (typeof document === "undefined") return;
+
+    document.cookie
+        .split(";")
+        .map((cookie) => cookie.split("=")[0]?.trim())
+        .filter((name): name is string => Boolean(name && isSupabaseAuthCookie(name)))
+        .forEach((name) => {
+            document.cookie = `${name}=; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+        });
+}
+
+function buildServerBackedSession(user: User, accessToken: string): Session {
+    const issuedAtSeconds = Math.floor(Date.now() / 1000);
+
+    return {
+        access_token: accessToken,
+        token_type: "bearer",
+        expires_in: 3600,
+        expires_at: issuedAtSeconds + 3600,
+        refresh_token: "",
+        user,
+    };
+}
+
+function sanitizeSession(nextSession: Session | null): Session | null {
+    if (!nextSession?.access_token) return nextSession;
+
+    const identity = getSessionIdentity(nextSession.access_token);
+    if (!identity) return nextSession;
+
+    return {
+        ...nextSession,
+        user: {
+            id: identity.userId,
+            email: identity.email ?? undefined,
+            user_metadata: identity.userMetadata,
+            app_metadata: identity.appMetadata,
+        } as User,
+    };
+}
+
+async function clearSupabaseServerCookies() {
+    if (typeof window === "undefined") return;
+
+    await fetch("/api/auth/sign-out", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "include",
+    });
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [role, setRole] = useState<UserRole>(null);
-    const [profile, setProfile] = useState<Record<string, any> | null>(null);
+    const [profile, setProfile] = useState<AuthProfile>(null);
+    const [settings, setSettings] = useState<AuthSettings>(null);
+    const [hasProfile, setHasProfile] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     const supabase = useMemo(() => createClient(), []);
-    const claimedMembershipsRef = useRef<string | null>(null);
+    const queryClient = useQueryClient();
+    const previousUserIdRef = useRef<string | null>(null);
+    const userContextRequestRef = useRef(0);
     const deriveRole = (authUser: User | null): UserRole => {
         const raw = authUser?.user_metadata?.role ?? authUser?.app_metadata?.role ?? null;
-        return (typeof raw === "string" ? raw : null) as UserRole;
+        return normalizeRole(typeof raw === "string" ? raw : null);
     };
 
-    const deriveProfile = (authUser: User | null) => {
+    const deriveFallbackProfile = (authUser: User | null) => {
         if (!authUser) return null;
         return {
             email: authUser.email ?? null,
@@ -48,59 +115,198 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     };
 
-    const syncFarmMemberships = useCallback(async (currentSession: Session | null) => {
-        const currentUser = currentSession?.user ?? null;
+    const loadUserContext = useCallback(async (authUser: User | null) => {
+        if (!authUser) {
+            return {
+                resolvedRole: null as UserRole,
+                resolvedProfile: null as AuthProfile,
+                resolvedSettings: null as AuthSettings,
+                hasProfileRow: false,
+            };
+        }
 
-        if (!currentSession || !currentUser) {
-            claimedMembershipsRef.current = null;
+        const fallbackProfile = deriveFallbackProfile(authUser);
+
+        const [profileResult, settingsResult, membershipResult] = await Promise.all([
+            supabase
+                .from("user_profile")
+                .select("user_id, full_name, role, notifications_enabled, organization_id, farm_id, created_at, updated_at")
+                .eq("user_id", authUser.id)
+                .maybeSingle(),
+            supabase
+                .from("user_settings")
+                .select("user_id, theme, default_views, alert_thresholds, created_at, updated_at")
+                .eq("user_id", authUser.id)
+                .maybeSingle(),
+            supabase
+                .from("farm_user")
+                .select("role")
+                .eq("user_id", authUser.id)
+                .order("created_at", { ascending: true })
+                .limit(1)
+                .maybeSingle(),
+        ]);
+
+        if (profileResult.error && !isSbNetworkError(profileResult.error) && !isSbPermissionDenied(profileResult.error) && !isSbAuthMissing(profileResult.error)) {
+            logSbError("authProvider:loadProfile", profileResult.error);
+        }
+
+        if (settingsResult.error && !isSbNetworkError(settingsResult.error) && !isSbPermissionDenied(settingsResult.error) && !isSbAuthMissing(settingsResult.error)) {
+            logSbError("authProvider:loadSettings", settingsResult.error);
+        }
+
+        if (membershipResult.error && !isSbNetworkError(membershipResult.error) && !isSbPermissionDenied(membershipResult.error) && !isSbAuthMissing(membershipResult.error)) {
+            logSbError("authProvider:loadFarmRole", membershipResult.error);
+        }
+
+        const profileRow = profileResult.data ?? null;
+        const settingsRow = settingsResult.data ?? null;
+        const membershipRole = membershipResult.data?.role ?? null;
+        const mergedContext = mergeUserContext({
+            profile: profileRow
+                ? {
+                    ...profileRow,
+                    email: authUser.email ?? null,
+                }
+                : null,
+            settings: settingsRow,
+            fallback: fallbackProfile,
+        });
+        const resolvedProfile = mergedContext.profile ?? fallbackProfile;
+        const resolvedSettings = mergedContext.settings;
+        const resolvedRole = normalizeRole(membershipRole ?? profileRow?.role ?? deriveRole(authUser));
+
+        return {
+            resolvedRole,
+            resolvedProfile,
+            resolvedSettings,
+            hasProfileRow: Boolean(profileRow),
+        };
+    }, [supabase]);
+
+    const resetClientStateForUser = useCallback((nextUserId: string | null) => {
+        if (previousUserIdRef.current === nextUserId) {
             return;
         }
 
-        if (claimedMembershipsRef.current === currentUser.id) {
+        if (previousUserIdRef.current === null) {
+            previousUserIdRef.current = nextUserId;
             return;
         }
+
+        previousUserIdRef.current = nextUserId;
+        queryClient.clear();
+    }, [queryClient]);
+
+    const applyUserContext = useCallback(async (nextSession: Session | null) => {
+        const safeSession = sanitizeSession(nextSession);
+        const nextUser = safeSession?.user ?? null;
+        resetClientStateForUser(nextUser?.id ?? null);
+        setSession(safeSession);
+        setUser(nextUser);
+        setRole(deriveRole(nextUser));
+        setProfile(deriveFallbackProfile(nextUser));
+        setSettings(null);
+        setHasProfile(false);
+
+        const requestId = ++userContextRequestRef.current;
+        const { resolvedRole, resolvedProfile, resolvedSettings, hasProfileRow } = await loadUserContext(nextUser);
+
+        if (userContextRequestRef.current !== requestId) {
+            return;
+        }
+
+        setRole(resolvedRole);
+        setProfile(resolvedProfile);
+        setSettings(resolvedSettings);
+        setHasProfile(hasProfileRow);
+    }, [loadUserContext, resetClientStateForUser]);
+
+    const refreshProfile = useCallback(async () => {
+        const currentUser = session?.user ?? user ?? null;
+        const { resolvedRole, resolvedProfile, resolvedSettings, hasProfileRow } = await loadUserContext(currentUser);
+        setRole(resolvedRole);
+        setProfile(resolvedProfile);
+        setSettings(resolvedSettings);
+        setHasProfile(hasProfileRow);
+    }, [loadUserContext, session, user]);
+
+    const clearInvalidSession = useCallback(async () => {
+        try {
+            await clearSupabaseServerCookies();
+        } catch {
+        }
+
+        clearSupabaseBrowserCookies();
+        clearBrowserWorkspaceContext();
 
         try {
-            const { error } = await claimFarmMembershipsByEmail(supabase);
-            if (error) {
-                if (!isSbNetworkError(error)) {
-                    logSbError("authProvider:claimFarmMemberships", error);
-                }
-                return;
+            await supabase.auth.signOut({ scope: "local" });
+        } catch {
+        }
+
+        await applyUserContext(null);
+    }, [applyUserContext, supabase]);
+
+    const resolveServerBackedSession = useCallback(async () => {
+        try {
+            const result = await getMe();
+            const serverUser = (result.user ?? null) as unknown as User | null;
+            const accessToken = typeof result.token === "string" ? result.token : null;
+
+            if (!serverUser || !accessToken) {
+                return null;
             }
 
-            claimedMembershipsRef.current = currentUser.id;
-            if (typeof window !== "undefined") {
-                window.dispatchEvent(new Event("farm-memberships-updated"));
-            }
-        } catch (error) {
-            if (!isSbNetworkError(error)) {
-                logSbError("authProvider:claimFarmMemberships:catch", error);
-            }
+            return buildServerBackedSession(serverUser, accessToken);
+        } catch {
+            return null;
         }
-    }, [supabase]);
+    }, []);
+
+    const resolvePreferredSession = useCallback(
+        async (candidate: Session | null | undefined) => {
+            if (candidate?.access_token) {
+                return candidate;
+            }
+
+            return resolveServerBackedSession();
+        },
+        [resolveServerBackedSession],
+    );
 
     useEffect(() => {
         const fetchSession = async () => {
             setIsLoading(true);
             try {
+                const serverBackedSession = await resolveServerBackedSession();
+                if (serverBackedSession) {
+                    await applyUserContext(serverBackedSession);
+                    return;
+                }
+
                 const { data, error } = await supabase.auth.getSession();
                 if (error) {
+                    if (isSbInvalidRefreshToken(error)) {
+                        await clearInvalidSession();
+                        return;
+                    }
                     if (!isSbNetworkError(error)) {
                         logSbError("authProvider:getSession", error);
                     }
                 }
-                const currentSession = data?.session ?? null;
-                const currentUser = currentSession?.user ?? null;
-                await syncFarmMemberships(currentSession);
-                setSession(currentSession);
-                setUser(currentUser);
-                setRole(deriveRole(currentUser));
-                setProfile(deriveProfile(currentUser));
+                const currentSession = await resolvePreferredSession(data?.session);
+                await applyUserContext(currentSession);
             } catch (error) {
+                if (isSbInvalidRefreshToken(error)) {
+                    await clearInvalidSession();
+                    return;
+                }
                 if (!isSbNetworkError(error)) {
                     logSbError("authProvider:getSession:catch", error);
                 }
+                const fallbackSession = await resolvePreferredSession(null);
+                await applyUserContext(fallbackSession);
             } finally {
                 setIsLoading(false);
             }
@@ -110,33 +316,88 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+        } = supabase.auth.onAuthStateChange(async (event, newSession) => {
             setIsLoading(true);
-            await syncFarmMemberships(newSession);
-            setSession(newSession);
-            const nextUser = newSession?.user ?? null;
-            setUser(nextUser);
-            setRole(deriveRole(nextUser));
-            setProfile(deriveProfile(nextUser));
-            setIsLoading(false);
+            try {
+                if (event === "SIGNED_OUT") {
+                    await applyUserContext(null);
+                    return;
+                }
+
+                const resolvedSession = await resolvePreferredSession(newSession);
+                await applyUserContext(resolvedSession);
+            } finally {
+                setIsLoading(false);
+            }
         });
 
         return () => subscription.unsubscribe();
-    }, [supabase, syncFarmMemberships]);
+    }, [applyUserContext, clearInvalidSession, resolvePreferredSession, supabase]);
 
     useEffect(() => {
-        // Listen for profile updates that may have changed user metadata.
         const handler = () => {
-            setRole(deriveRole(user ?? null));
-            setProfile(deriveProfile(user ?? null));
+            void refreshProfile();
         };
 
         if (typeof window !== 'undefined') {
             window.addEventListener('profile-updated', handler);
             return () => window.removeEventListener('profile-updated', handler);
         }
-    }, [user]);
+    }, [refreshProfile]);
     
+
+    const signInWithPassword = useCallback(async (email: string, password: string) => {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+        });
+
+        if (error) {
+            throw error;
+        }
+
+        await applyUserContext(data.session ?? null);
+    }, [applyUserContext, supabase]);
+
+    const signUpWithPassword = useCallback(async (params: {
+        firstName: string;
+        lastName: string;
+        email: string;
+        password: string;
+    }) => {
+        const firstName = params.firstName.trim();
+        const lastName = params.lastName.trim();
+        const fullName = [firstName, lastName].filter(Boolean).join(" ");
+        const { data, error } = await supabase.auth.signUp({
+            email: params.email.trim(),
+            password: params.password,
+            options: {
+                data: {
+                    first_name: firstName,
+                    last_name: lastName,
+                    full_name: fullName,
+                    name: fullName,
+                    role: "admin",
+                },
+            },
+        });
+
+        if (error) {
+            throw error;
+        }
+
+        await applyUserContext(data.session ?? null);
+    }, [applyUserContext, supabase]);
+
+    const resetPasswordForEmail = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+            redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth` : undefined,
+        });
+
+        if (error) {
+            throw error;
+        }
+    }, [supabase]);
 
     const signOut = async () => {
         // Clear local state immediately so UI responds quickly, even if network is slow.
@@ -144,20 +405,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
         setRole(null);
         setProfile(null);
-        claimedMembershipsRef.current = null;
+        setSettings(null);
+        setHasProfile(false);
+        resetClientStateForUser(null);
+
+        try {
+            await clearSupabaseServerCookies();
+        } catch (err) {
+            console.warn("Server sign out cleanup failed:", err);
+        } finally {
+            clearSupabaseBrowserCookies();
+            clearBrowserWorkspaceContext();
+        }
 
         try {
             const timeout = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("Sign out timed out")), 4000)
+                setTimeout(() => reject(new Error("Local sign out timed out")), 1000)
             );
-            await Promise.race([supabase.auth.signOut(), timeout]);
+            await Promise.race([supabase.auth.signOut({ scope: "local" }), timeout]);
         } catch (err) {
-            console.warn("Sign out request failed or timed out:", err);
+            console.warn("Local sign out failed:", err);
+        } finally {
+            try {
+                await applyUserContext(null);
+            } catch {
+            }
+            redirectBrowserAfterSignOut();
         }
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, role, profile, isLoading, signOut }}>
+        <AuthContext.Provider
+            value={{
+                user,
+                session,
+                role,
+                profile,
+                settings,
+                hasProfile,
+                isLoading,
+                signInWithPassword,
+                signUpWithPassword,
+                resetPasswordForEmail,
+                signOut,
+                refreshProfile,
+            }}
+        >
             {children}
         </AuthContext.Provider>
     );

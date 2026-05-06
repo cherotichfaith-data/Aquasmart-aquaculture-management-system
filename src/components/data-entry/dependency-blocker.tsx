@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 
 interface DependencyBlockerProps {
   title: string
@@ -35,3 +35,4 @@ export function DependencyBlocker({
     </div>
   )
 }
+

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 import { Loader2 } from "lucide-react"
 import {
   Form,
@@ -13,9 +13,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { createClient } from "@/lib/supabase/client"
@@ -25,6 +25,7 @@ import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoPanel, InfoStat } from "./form-support"
+import { parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
 import { SelectedSystemInfo } from "./selection-info"
 
 const optionalNumber = z.preprocess(
@@ -160,7 +161,8 @@ export function WaterQualityForm({
         return
       }
 
-      const systemId = Number(values.system_id)
+      const resolvedFarmId = requireActiveFarmId(farmId)
+      const systemId = parseRequiredNumericId(values.system_id, "System")
       const measurements: Array<{
         parameter_name: MeasurementParameter
         parameter_value: number
@@ -180,6 +182,7 @@ export function WaterQualityForm({
       }
 
       const payload = measurements.map((measurement) => ({
+        farm_id: resolvedFarmId,
         system_id: systemId,
         date: values.date,
         time: values.time,
@@ -217,23 +220,23 @@ export function WaterQualityForm({
   }
 
   return (
-    <div className="max-w-7xl">
-      <div className="mb-6">
+    <div>
+      <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Water Quality</h2>
         <p className="text-sm text-muted-foreground">Multi-parameter entry with a live dissolved oxygen classification preview.</p>
       </div>
 
-      <div className="mb-4">
+      <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
-          {selectedTime < "12:00" ? (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-              Morning measurement logged. Remember to return for the PM measurement as well.
-            </div>
-          ) : null}
+            {selectedTime < "12:00" ? (
+              <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
+                Morning measurement logged. Remember to return for the PM measurement as well.
+              </div>
+            ) : null}
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -325,7 +328,7 @@ export function WaterQualityForm({
 
               <SelectedSystemInfo systems={selectableSystems} systemId={selectedSystemId} />
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="data-entry-compact-grid sm:grid-cols-2 lg:grid-cols-4">
                 <FormField
                   control={form.control}
                   name="temperature"
@@ -432,9 +435,9 @@ export function WaterQualityForm({
                 />
               </div>
 
-              <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Submit Entry
+                Record Water Quality
               </Button>
             </form>
           </Form>
@@ -464,3 +467,4 @@ export function WaterQualityForm({
     </div>
   )
 }
+

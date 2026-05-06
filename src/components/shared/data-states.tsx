@@ -1,9 +1,14 @@
-﻿"use client"
+"use client"
 
 import type React from "react"
+import { useEffect, useState } from "react"
+import Alert from "@mui/material/Alert"
+import Box from "@mui/material/Box"
+import Button from "@mui/material/Button"
+import Chip from "@mui/material/Chip"
+import Typography from "@mui/material/Typography"
+import { alpha } from "@mui/material/styles"
 import { AlertTriangle, Inbox, RefreshCw } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { formatDistanceToNow } from "date-fns"
 
 export function DataFetchingBadge({
@@ -14,18 +19,56 @@ export function DataFetchingBadge({
   isLoading?: boolean
 }) {
   if (!isFetching || isLoading) return null
+
   return (
-    <Badge variant="secondary" className="gap-1 rounded-full bg-background/70 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] shadow-[0_12px_28px_-24px_rgba(15,23,32,0.3)] animate-pulse">
-      <RefreshCw className="h-3 w-3 animate-spin" />
-      Refreshing
-    </Badge>
+    <Chip
+      size="small"
+      icon={<RefreshCw size={12} className="animate-spin" />}
+      label="Refreshing"
+      sx={{
+        borderRadius: 999,
+        bgcolor: (theme) => alpha(theme.palette.background.paper, 0.12),
+        px: 0.5,
+        fontSize: "0.65625rem",
+        fontWeight: 700,
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "& .MuiChip-icon": {
+          color: "inherit",
+          ml: 0.75,
+        },
+      }}
+    />
   )
 }
 
 export function DataUpdatedAt({ updatedAt }: { updatedAt?: number | null }) {
-  if (!updatedAt) return null
-  const label = formatDistanceToNow(updatedAt, { addSuffix: true })
-  return <span className="text-[11px] font-medium tracking-[0.02em] text-muted-foreground">Updated {label}</span>
+  const [label, setLabel] = useState<string | null>(null)
+  const [ageMs, setAgeMs] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!updatedAt) {
+      setLabel(null)
+      setAgeMs(null)
+      return
+    }
+
+    setLabel(formatDistanceToNow(updatedAt, { addSuffix: true }))
+    setAgeMs(Date.now() - updatedAt)
+  }, [updatedAt])
+
+  if (!updatedAt || !label || ageMs == null) return null
+
+  const ageMin = ageMs / 60_000
+  const color =
+    ageMin < 5 ? "text.secondary" : ageMin < 60 ? "warning.main" : "error.main"
+
+  return (
+    <Typography variant="caption" sx={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.02em", color }}>
+      Updated {label}
+    </Typography>
+  )
 }
 
 export function DataErrorState({
@@ -38,24 +81,38 @@ export function DataErrorState({
   onRetry?: () => void
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-destructive/40 bg-destructive/5 p-5 text-sm text-destructive shadow-sm">
-      <div className="flex items-center gap-2 font-semibold">
-        <AlertTriangle className="h-4 w-4" />
-        <span>{title}</span>
-      </div>
-      <p className="mt-2 text-xs text-destructive/90">{description}</p>
+    <Alert
+      severity="error"
+      icon={<AlertTriangle size={16} />}
+      sx={{
+        alignItems: "flex-start",
+        borderRadius: 3,
+        border: (theme) => `1px solid ${alpha(theme.palette.error.main, 0.35)}`,
+        bgcolor: (theme) => alpha(theme.palette.error.main, 0.06),
+        "& .MuiAlert-message": {
+          width: "100%",
+        },
+      }}
+    >
+      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+        {title}
+      </Typography>
+      <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: "#991b1b" }}>
+        {description}
+      </Typography>
       {onRetry ? (
         <Button
           type="button"
-          variant="outline"
-          size="sm"
+          variant="outlined"
+          size="small"
+          color="error"
           onClick={onRetry}
-          className="mt-3 border-destructive/40 text-destructive hover:bg-destructive/10"
+          sx={{ mt: 1.5, borderRadius: 2 }}
         >
           Try Again
         </Button>
       ) : null}
-    </div>
+    </Alert>
   )
 }
 
@@ -71,13 +128,38 @@ export function EmptyState({
   action?: React.ReactNode
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-dashed border-border bg-muted/20 p-6 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+    <Box
+      sx={{
+        borderRadius: 3,
+        border: (theme) => `1px dashed ${theme.palette.divider}`,
+        bgcolor: (theme) => alpha(theme.palette.text.primary, 0.03),
+        p: 3,
+        textAlign: "center",
+      }}
+    >
+      <Box
+        sx={{
+          mx: "auto",
+          display: "flex",
+          width: 48,
+          height: 48,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 2.5,
+          bgcolor: "action.hover",
+        }}
+      >
         <Icon className="h-5 w-5 text-muted-foreground" />
-      </div>
-      <h3 className="mt-3 text-sm font-semibold text-foreground">{title}</h3>
-      {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
-      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
-    </div>
+      </Box>
+      <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 700 }}>
+        {title}
+      </Typography>
+      {description ? (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+          {description}
+        </Typography>
+      ) : null}
+      {action ? <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>{action}</Box> : null}
+    </Box>
   )
 }

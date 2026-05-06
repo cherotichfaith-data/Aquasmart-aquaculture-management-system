@@ -6,6 +6,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { useFarmOptions } from "@/lib/hooks/use-options"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createClient } from "@/lib/supabase/client"
+import { ACTIVE_FARM_COOKIE, setBrowserWorkspaceContext } from "@/lib/context"
 
 type FarmOption = {
   id: string
@@ -32,7 +33,18 @@ const normalizeFarmId = (value?: string | null) => {
   return trimmed
 }
 
-export function useActiveFarm(params?: { initialFarmId?: string | null }) {
+const readBrowserCookie = (name: string) => {
+  if (typeof document === "undefined") return null
+  const prefix = `${name}=`
+  const match = document.cookie
+    .split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(prefix))
+  if (!match) return null
+  return match.slice(prefix.length) || null
+}
+
+export function useActiveFarm(params?: { initialFarmId?: string | null; initialFarmName?: string | null }) {
   const { user, session, isLoading } = useAuth()
   const [activeFarmId, setActiveFarmId] = useState<string | null>(normalizeFarmId(params?.initialFarmId))
   const supabase = useMemo(() => createClient(), [])
@@ -46,7 +58,7 @@ export function useActiveFarm(params?: { initialFarmId?: string | null }) {
       if (!activeFarmId) return null
       const { data, error } = await supabase
         .from("farm")
-        .select("id, name, location, owner, email, phone")
+        .select("id, name, location")
         .eq("id", activeFarmId)
         .maybeSingle()
       if (error) throw error
@@ -55,6 +67,15 @@ export function useActiveFarm(params?: { initialFarmId?: string | null }) {
   })
 
   useEffect(() => {
+    if (params?.initialFarmId === undefined) return
+    setActiveFarmId(normalizeFarmId(params.initialFarmId))
+  }, [params?.initialFarmId, user?.id])
+
+  useEffect(() => {
+    if (isLoading) {
+      return
+    }
+
     if (!session) {
       setActiveFarmId(null)
       return
@@ -77,19 +98,23 @@ export function useActiveFarm(params?: { initialFarmId?: string | null }) {
       storedFarmId = normalizeFarmId(window.localStorage.getItem(getStorageKey(user.id)))
     }
 
+    const cookieFarmId = normalizeFarmId(readBrowserCookie(ACTIVE_FARM_COOKIE))
+
     const farmIds = farms.map((row) => row.id)
     const resolvedFarmId =
       (urlFarmId && farmIds.includes(urlFarmId) ? urlFarmId : null) ??
       (storedFarmId && farmIds.includes(storedFarmId) ? storedFarmId : null) ??
+      (cookieFarmId && farmIds.includes(cookieFarmId) ? cookieFarmId : null) ??
       farmIds[0] ??
       null
 
     if (resolvedFarmId && user?.id && typeof window !== "undefined") {
       window.localStorage.setItem(getStorageKey(user.id), resolvedFarmId)
+      setBrowserWorkspaceContext({ farmId: resolvedFarmId })
     }
 
     setActiveFarmId(resolvedFarmId)
-  }, [farmsQuery.data, session, user?.id])
+  }, [farmsQuery.data, isLoading, session, user?.id])
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -111,16 +136,17 @@ export function useActiveFarm(params?: { initialFarmId?: string | null }) {
     if (!activeFarmId) return null
     const match = farms.find((row) => row.id === activeFarmId)
     const details = farmDetailsQuery.data
-    if (!match && !details) return null
+    const initialFarmName = params?.initialFarmName?.trim() || null
+    if (!match && !details && !initialFarmName) return null
     return {
       id: details?.id ?? match?.id ?? activeFarmId,
-      name: details?.name ?? match?.label ?? null,
+      name: details?.name ?? match?.label ?? initialFarmName,
       location: details?.location ?? match?.location ?? null,
-      owner: details?.owner ?? null,
-      email: details?.email ?? null,
-      phone: details?.phone ?? null,
+      owner: null,
+      email: null,
+      phone: null,
     }
-  }, [activeFarmId, farmDetailsQuery.data, farmsQuery.data])
+  }, [activeFarmId, farmDetailsQuery.data, farmsQuery.data, params?.initialFarmName])
 
   return {
     farm,

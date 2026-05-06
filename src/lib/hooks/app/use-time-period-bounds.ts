@@ -20,7 +20,6 @@ export function useTimePeriodBounds(params: {
   systemId?: number
   scope?: AnalyticsTimeScope
   enabled?: boolean
-  initialData?: TimeBounds
 }) {
   const supabase = useMemo(() => createClient(), [])
   const enabled = Boolean(params.farmId) && (params.enabled ?? true)
@@ -34,7 +33,7 @@ export function useTimePeriodBounds(params: {
     queryFn: ({ signal }) =>
       !params.farmId
         ? Promise.resolve<TimeBounds>({ start: null, end: null })
-        : fetchTimePeriodBounds(supabase, {
+        : fetchTimePeriodBounds(supabase as never, {
             farmId: params.farmId,
             timePeriod: params.timePeriod,
             scope: params.scope ?? "dashboard",
@@ -42,12 +41,10 @@ export function useTimePeriodBounds(params: {
           }),
     enabled,
     staleTime: 5 * 60_000,
-    initialData: params.initialData,
-    initialDataUpdatedAt: params.initialData ? 0 : undefined,
   })
 
   const resolvedBounds = useMemo(() => {
-    const baseBounds = query.data ?? params.initialData ?? { start: null, end: null }
+    const baseBounds = query.data ?? { start: null, end: null }
     if (!params.systemId) return baseBounds
 
     const timelineRow =
@@ -61,7 +58,7 @@ export function useTimePeriodBounds(params: {
       latestAvailableDate: timeline.fullEnd,
       anchorScope: `${params.scope ?? "dashboard"}:system`,
     })
-  }, [params.initialData, params.scope, params.systemId, params.timePeriod, query.data, systemTimelineQuery.data])
+  }, [params.scope, params.systemId, params.timePeriod, query.data, systemTimelineQuery.data])
 
   const start = resolvedBounds.start ?? null
   const end = resolvedBounds.end ?? null

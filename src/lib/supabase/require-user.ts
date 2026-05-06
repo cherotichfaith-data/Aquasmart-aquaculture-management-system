@@ -1,80 +1,64 @@
+import type { User } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import { sanitizeNextPath } from "@/lib/app-entry"
+import { logSbError } from "@/lib/supabase/log"
+import { getSessionIdentity, isSessionTokenExpired } from "@/lib/supabase/session"
 
-function authServiceUnavailable(stage: string): never {
-  throw new Error(`Unable to reach Supabase auth service during ${stage}.`)
+function redirectToAuth(nextPath?: string | null): never {
+  const safeNextPath = sanitizeNextPath(nextPath, "/dashboard")
+  redirect(`/auth?next=${encodeURIComponent(safeNextPath)}`)
 }
 
-export async function requireUser() {
+/**
+ * Reads the auth session from the cookie WITHOUT making a network call to
+ * Supabase's auth server. getSession() decodes the JWT locally; getUser()
+ * (which we no longer use here) verifies it remotely — that fails on machines
+ * where the server process can't reach Supabase's edge network.
+ */
+export async function requireUserContext(nextPath?: string | null) {
   const supabase = await createClient()
-  let user = null
-  let error: unknown = null
-
-  try {
-    const result = await supabase.auth.getUser()
-    user = result.data.user
-    error = result.error
-  } catch (caught) {
-    error = caught
-  }
-
-  if (error || !user) {
-    if (error && isSbNetworkError(error)) {
-      authServiceUnavailable("requireUser")
-    }
-    if (error) {
-      logSbError("requireUser", error)
-    }
-    redirect("/auth")
-  }
-
-  return user
-}
-
-export async function requireUserContext() {
-  const supabase = await createClient()
-  let user = null
-  let authError: unknown = null
-
-  try {
-    const result = await supabase.auth.getUser()
-    user = result.data.user
-    authError = result.error
-  } catch (caught) {
-    authError = caught
-  }
-
-  if (authError || !user) {
-    if (authError && isSbNetworkError(authError)) {
-      authServiceUnavailable("requireUserContext:getUser")
-    }
-    if (authError) {
-      logSbError("requireUserContext:getUser", authError)
-    }
-    redirect("/auth")
-  }
-
-  let accessToken: string | null = null
+  let session = null
   let sessionError: unknown = null
 
   try {
     const result = await supabase.auth.getSession()
-    accessToken = result.data.session?.access_token ?? null
+    session = result.data.session
     sessionError = result.error
   } catch (caught) {
     sessionError = caught
   }
 
-  if (sessionError || !accessToken) {
-    if (sessionError && isSbNetworkError(sessionError)) {
-      authServiceUnavailable("requireUserContext:getSession")
+  if (session?.access_token && isSessionTokenExpired(session.access_token)) {
+    try {
+      const refreshed = await supabase.auth.refreshSession()
+      session = refreshed.data.session
+      sessionError = refreshed.error
+    } catch (caught) {
+      sessionError = caught
     }
+  }
+
+  const identity = getSessionIdentity(session?.access_token)
+
+  if (sessionError || !session?.access_token || !identity) {
     if (sessionError) {
       logSbError("requireUserContext:getSession", sessionError)
     }
-    redirect("/auth")
+    redirectToAuth(nextPath)
   }
 
-  return { user, accessToken }
+  const user: Pick<User, "id" | "email" | "user_metadata" | "app_metadata"> = {
+    id: identity.userId,
+    email: identity.email ?? undefined,
+    user_metadata: identity.userMetadata,
+    app_metadata: identity.appMetadata,
+  }
+
+  return { user, accessToken: session!.access_token }
+}
+
+export async function requireUser(nextPath?: string | null) {
+  const { user } = await requireUserContext(nextPath)
+  return user
 }

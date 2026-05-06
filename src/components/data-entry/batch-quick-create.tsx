@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/app-ui/button"
+import { Input } from "@/components/app-ui/input"
+import { Label } from "@/components/app-ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useFingerlingSupplierOptions } from "@/lib/hooks/use-options"
 import { useCreateFingerlingBatch, useCreateFingerlingSupplier } from "@/lib/hooks/use-reference-data"
 
@@ -197,3 +197,4 @@ export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
     </div>
   )
 }
+

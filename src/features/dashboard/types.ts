@@ -5,7 +5,12 @@ import type { TimeBounds, TimePeriod } from "@/lib/time-period"
 export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
 export type DashboardTimePeriod = TimePeriod
 
-export type ProductionTrendRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+export type ProductionTrendRpcRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+export type ProductionTrendRow = ProductionTrendRpcRow & {
+  feeding_rate: number | null
+}
+export type DashboardUserProfile = Database["public"]["Tables"]["user_profile"]["Row"]
+export type DashboardUserSettings = Database["public"]["Tables"]["user_settings"]["Row"]
 export type DashboardSystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
 export type DashboardWaterQualityMeasurement = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 export type DashboardAlertThreshold = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
@@ -48,17 +53,20 @@ export type RecommendedAction = {
   due: string
 }
 
-export type ProductionSummaryMetrics = {
-  totalStockedFish: number
-  cumulativeMortality: number
-  transferInFish: number
-  transferOutFish: number
-  totalHarvestedFish: number
-  totalHarvestedKg: number
-  dateBounds: { start: string | null; end: string | null }
-}
-
 export type DashboardSystemRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
+
+export type SystemsOverviewRow = {
+  system_id: number
+  system_name: string
+  abw: number | null
+  abw_trend: "up" | "down" | "flat"
+  mortality_rate: number | null
+  efcr: number | null
+  feeding_rate: number | null
+  water_quality_rating: string | null
+  last_sample_date: string | null
+  summaryRow: DashboardSystemRow
+}
 
 export type SystemsTableData = {
   rows: DashboardSystemRow[]
@@ -86,10 +94,8 @@ export type DashboardPageInitialData = {
     metrics: KPIOverviewMetric[]
     dateBounds: { start: string | null; end: string | null }
   }
-  productionTrend: ProductionTrendRow[]
   systemsTable: SystemsTableData
-  productionSummaryMetrics: ProductionSummaryMetrics
-  recentEntries: DashboardRecentEntriesData
+  productionTrend: ProductionTrendRow[]
   waterQualityMeasurements: QueryResult<DashboardWaterQualityMeasurement>
   alertThresholds: QueryResult<DashboardAlertThreshold>
   recommendedActions: RecommendedAction[]

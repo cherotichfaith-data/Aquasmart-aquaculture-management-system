@@ -31,15 +31,15 @@ const normalizeFarmId = (value?: string | null) => {
 
 export function useAnalyticsPageBootstrap(params: {
   initialFarmId?: string | null
+  initialFarmName?: string | null
   defaultTimePeriod?: TimePeriod
   initialFilters?: SharedFilterOverrides
   filterOverrides?: SharedFilterOverrides
-  initialBounds?: TimeBounds
   boundsEnabled?: boolean
   boundsScope?: AnalyticsTimeScope
 } = {}) {
   const initialFarmId = normalizeFarmId(params.initialFarmId)
-  const activeFarm = useActiveFarm({ initialFarmId })
+  const activeFarm = useActiveFarm({ initialFarmId, initialFarmName: params.initialFarmName })
   const farmId = activeFarm.farmId ?? initialFarmId ?? null
 
   const sharedFilterInitialValues = useMemo(() => {
@@ -94,7 +94,6 @@ export function useAnalyticsPageBootstrap(params: {
     systemId: selectedSystemId,
     scope: params.boundsScope ?? "dashboard",
     enabled: params.boundsEnabled,
-    initialData: params.initialBounds,
   })
 
   return {

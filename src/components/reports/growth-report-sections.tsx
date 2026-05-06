@@ -10,11 +10,19 @@ import {
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
-import { ReportRecordsHiddenState, ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
+import {
+  REPORT_CHART_SHELL_CLASS,
+  REPORT_SURFACE_CARD_CLASS,
+  REPORT_TABLE_SHELL_CLASS,
+  ReportMetricCard,
+  ReportRecordsHiddenState,
+  ReportRecordsToolbar,
+  ReportSectionHeader,
+} from "./report-shared"
 
 type GrowthIntervalRow = {
   system_id: number
@@ -30,11 +38,27 @@ type GrowthIntervalRow = {
 
 export function GrowthSummaryCards({ latest }: { latest: any }) {
   return (
-    <div className="kpi-grid md:grid-cols-4">
-      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Current ABW</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{formatNumberValue(latest?.average_body_weight, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="kpi-card-meta">Latest sampled ABW in scope</p></CardContent></Card>
-      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Biomass Increase</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{formatNumberValue(latest?.biomass_increase_period, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="kpi-card-meta">Latest period</p></CardContent></Card>
-      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Total Biomass</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{formatNumberValue(latest?.total_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="kpi-card-meta">Most recent production row in scope</p></CardContent></Card>
-      <Card className="kpi-card"><CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Feed Amount</CardTitle></CardHeader><CardContent className="kpi-card-content"><div className="kpi-card-value">{formatNumberValue(latest?.total_feed_amount_period, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div><p className="kpi-card-meta">Latest period</p></CardContent></Card>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <ReportMetricCard
+        title="Current ABW"
+        value={`${formatNumberValue(latest?.average_body_weight, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} g`}
+        meta="Latest sampled average body weight in scope."
+      />
+      <ReportMetricCard
+        title="Biomass Increase"
+        value={`${formatNumberValue(latest?.biomass_increase_period, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg`}
+        meta="Most recent reported period."
+      />
+      <ReportMetricCard
+        title="Total Biomass"
+        value={`${formatNumberValue(latest?.total_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg`}
+        meta="Most recent production row in scope."
+      />
+      <ReportMetricCard
+        title="Feed Amount"
+        value={`${formatNumberValue(latest?.total_feed_amount_period, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg`}
+        meta="Feed total for the latest period."
+      />
     </div>
   )
 }
@@ -66,6 +90,7 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
     () =>
       buildCartesianOptions({
         palette,
+        xGrid: true,
         xMaxTicksLimit: xLimit,
         xTitle: "Sampling date",
         yTitle: "ABW (g)",
@@ -84,13 +109,15 @@ export function GrowthAbwSection({ loading, chartRows }: { loading: boolean; cha
   )
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader><CardTitle>Average Body Weight (ABW)</CardTitle><CardDescription>ABW progression over time</CardDescription></CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex h-[300px] items-center justify-center text-muted-foreground">Loading...</div>
+        ) : chartRows.length === 0 ? (
+          <div className="flex h-[300px] items-center justify-center text-muted-foreground">No ABW data available for the selected period.</div>
         ) : (
-          <div className="chart-canvas-shell h-[300px]">
+          <div className={REPORT_CHART_SHELL_CLASS}>
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <Line data={data} options={options} />
             </LazyRender>
@@ -128,6 +155,7 @@ export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean;
       buildCartesianOptions({
         palette,
         legend: true,
+        xGrid: true,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: "Biomass (kg)",
@@ -146,13 +174,15 @@ export function GrowthBiomassSection({ loading, chartRows }: { loading: boolean;
   )
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader><CardTitle>Biomass Trend</CardTitle><CardDescription>Total biomass per date</CardDescription></CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex h-[300px] items-center justify-center text-muted-foreground">Loading...</div>
+        ) : chartRows.length === 0 ? (
+          <div className="flex h-[300px] items-center justify-center text-muted-foreground">No biomass data available for the selected period.</div>
         ) : (
-          <div className="chart-canvas-shell h-[300px]">
+          <div className={REPORT_CHART_SHELL_CLASS}>
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <Line data={data} options={options} />
             </LazyRender>
@@ -183,7 +213,7 @@ export function GrowthRecordsSection({
   targetHarvestWeightG: number | null
 }) {
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <ReportSectionHeader
         title="ABW and Growth by Cage"
         description="Per-sampling-interval growth rows from `get_growth_trend_window(system_id)` within the selected report window."
@@ -227,7 +257,7 @@ export function GrowthRecordsSection({
       />
       <CardContent>
         {showGrowthRecords ? (
-          <div className="soft-table-shell">
+          <div className={REPORT_TABLE_SHELL_CLASS}>
             <table className="w-full min-w-[1040px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">
@@ -270,3 +300,4 @@ export function GrowthRecordsSection({
     </Card>
   )
 }
+

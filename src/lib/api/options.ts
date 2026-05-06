@@ -2,6 +2,7 @@ import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
   getClientOrError,
+  getErrorMessage,
   isAbortLikeError,
   queryOptionsRpc,
   resolveClientReadQuery,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/api/_utils"
 import { mapSystemRowToOption, type SystemOption, type SystemOptionSource } from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
+import type { WorkspaceContext } from "@/lib/context"
 
 type SystemListItem = SystemOption
 type BatchListItem = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
@@ -19,6 +21,7 @@ type FeedSupplierRow = Database["public"]["Tables"]["feed_supplier"]["Row"]
 type FingerlingSupplierRow = Database["public"]["Tables"]["fingerling_supplier"]["Row"]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
+type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
 type OptionsRpcRow<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Returns"][number]
 type OptionsRpcArgs<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Args"]
 
@@ -117,6 +120,36 @@ export async function getBatchOptions(params?: {
   return toQuerySuccess<BatchListItem>(rows)
 }
 
+export async function getDashboardTimePeriodOptions(params?: {
+  signal?: AbortSignal
+}): Promise<QueryResult<{ time_period: Database["public"]["Enums"]["time_period"] | "all history"; days_since_start: number | null }>> {
+  const clientResult = await getClientOrError("getDashboardTimePeriodOptions", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase
+    .from("dashboard_time_period")
+    .select("time_period, days_since_start")
+    .order("days_since_start", { ascending: true })
+  if (params?.signal) query = query.abortSignal(params.signal)
+
+  const result = await resolveClientReadQuery<DashboardTimePeriodRow>({
+    tag: "getDashboardTimePeriodOptions",
+    query,
+    signal: params?.signal,
+    quietWhen: isQuietTableError,
+  })
+  if (result.status !== "success") return result
+
+  return toQuerySuccess([
+    ...result.data,
+    {
+      time_period: "all history",
+      days_since_start: null,
+    },
+  ])
+}
+
 export async function getFeedTypeOptions(params?: {
   limit?: number
   signal?: AbortSignal
@@ -173,16 +206,42 @@ export async function getFarmOptions(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FarmOptionRow>> {
-  const res = await rpcOrEmpty(
-    "getFarmOptions",
-    "api_farm_options_rpc",
-    undefined,
-    params?.signal,
-  )
-  if (res.status !== "success") return res
+  try {
+    const response = await fetch("/api/context", {
+      credentials: "include",
+      cache: "no-store",
+      signal: params?.signal,
+    })
 
-  const rows = res.data.slice().sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
-  return toQuerySuccess<FarmOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
+    if (!response.ok) {
+      const body = response.headers.get("content-type")?.includes("application/json")
+        ? ((await response.json()) as { error?: string })
+        : null
+      return { status: "error", data: null, error: body?.error ?? `Request failed (${response.status})` }
+    }
+
+    const body = (await response.json()) as WorkspaceContext
+    const rows = body.farms
+      .map((farm) => ({
+        id: farm.id,
+        label: farm.name,
+        location: farm.location ?? "",
+      }))
+      .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
+
+    return toQuerySuccess<FarmOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
+  } catch (error) {
+    if (
+      params?.signal?.aborted ||
+      isAbortLikeError(error) ||
+      isSbPermissionDenied(error) ||
+      isSbAuthMissing(error)
+    ) {
+      return empty<FarmOptionRow>()
+    }
+
+    return { status: "error", data: null, error: getErrorMessage(error) }
+  }
 }
 
 export async function getSystemVolumes(params?: {

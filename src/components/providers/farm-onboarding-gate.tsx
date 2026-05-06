@@ -1,12 +1,18 @@
 "use client"
 
 import { useEffect } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useFarmOptions } from "@/lib/hooks/use-options"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
-import { isAuthRoute, isOnboardingRoute, isPublicRoute, resolveAppEntryPath } from "@/lib/app-entry"
+import {
+  ONBOARDING_PATH,
+  isOnboardingRoute,
+  isWorkspaceSelectionRoute,
+  sanitizeNextPath,
+  WORKSPACE_SELECT_PATH,
+} from "@/lib/app-entry"
 
 function GateLoadingScreen() {
   return <div className="min-h-screen bg-background" />
@@ -15,18 +21,19 @@ function GateLoadingScreen() {
 export function FarmOnboardingGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, role, session, isLoading } = useAuth()
+  const searchParams = useSearchParams()
+  const { user, session, isLoading } = useAuth()
   const farmsQuery = useFarmOptions({ enabled: Boolean(session) })
   const { farmId, loading: activeFarmLoading } = useActiveFarm()
   const activeFarmRoleQuery = useActiveFarmRole(farmId)
   const farmsResult = farmsQuery.data
 
-  const authRoute = isAuthRoute(pathname)
   const onboardingRoute = isOnboardingRoute(pathname)
-  const publicRoute = isPublicRoute(pathname)
+  const workspaceSelectionRoute = isWorkspaceSelectionRoute(pathname)
+  const search = searchParams.toString()
+  const currentPath = sanitizeNextPath(`${pathname}${search ? `?${search}` : ""}`, "/dashboard")
   const membershipStatus = farmsResult?.status ?? null
-  const membershipError =
-    farmsResult?.status === "error" ? String(farmsResult.error ?? "") : ""
+  const membershipError = farmsResult?.status === "error" ? String(farmsResult.error ?? "") : ""
   const farms = farmsResult?.status === "success" ? farmsResult.data : []
   const hasFarmMembership = farms.length > 0
   const checkingMembership =
@@ -36,9 +43,6 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
     Boolean(user) &&
     hasFarmMembership &&
     (activeFarmLoading || activeFarmRoleQuery.isLoading || activeFarmRoleQuery.isFetching)
-  const entryPath = resolveAppEntryPath(
-    (activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof resolveAppEntryPath>[0],
-  )
 
   useEffect(() => {
     const handleMembershipSync = () => {
@@ -61,77 +65,51 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (isLoading) return
-
-    if (!user) {
-      if (!publicRoute && !onboardingRoute) {
-        router.replace("/auth")
-      } else if (onboardingRoute) {
-        router.replace("/auth")
-      }
-      return
-    }
-
+    if (!user) return
     if (checkingMembership || checkingEntryPath) return
 
     if (!hasFarmMembership) {
-      if (!onboardingRoute) {
-        router.replace("/onboarding")
+      if (!onboardingRoute && !workspaceSelectionRoute) {
+        router.replace(`${ONBOARDING_PATH}?next=${encodeURIComponent(currentPath)}`)
       }
       return
     }
 
-    if ((authRoute || onboardingRoute) || (pathname === "/" && entryPath !== "/")) {
-      router.replace(entryPath)
+    if (onboardingRoute && !workspaceSelectionRoute) {
+      router.replace(`${WORKSPACE_SELECT_PATH}?next=${encodeURIComponent(currentPath)}`)
     }
   }, [
-    authRoute,
     checkingEntryPath,
     checkingMembership,
-    entryPath,
+    currentPath,
     hasFarmMembership,
     isLoading,
     onboardingRoute,
-    pathname,
-    publicRoute,
-    role,
     router,
     user,
+    workspaceSelectionRoute,
   ])
 
-  // While auth is loading: always show children (SSR has already rendered the right content)
   if (isLoading) {
     return <>{children}</>
   }
 
-  // Not authenticated: show children on public/auth routes, blank shield on protected ones
   if (!user) {
-    if (!publicRoute && !authRoute) {
-      return <GateLoadingScreen />
-    }
     return <>{children}</>
   }
 
-  // Authenticated but still checking membership or role — show children while async resolves.
-  // This prevents blank flash: SSR already rendered the right page, don't hide it.
   if (checkingMembership || checkingEntryPath) {
     return <>{children}</>
   }
 
-  // No farm membership — hide content while redirecting to onboarding
   if (!hasFarmMembership) {
-    if (!onboardingRoute) {
+    if (!onboardingRoute && !workspaceSelectionRoute) {
       return <GateLoadingScreen />
     }
     return <>{children}</>
   }
 
-  // On auth/onboarding routes while already having farm → redirect happening
-  if (authRoute || onboardingRoute) {
-    return <GateLoadingScreen />
-  }
-
-  // On root "/" but role-based entry is a different path → redirect happening
-  if (pathname === "/" && entryPath !== "/") {
+  if (onboardingRoute && !workspaceSelectionRoute) {
     return <GateLoadingScreen />
   }
 

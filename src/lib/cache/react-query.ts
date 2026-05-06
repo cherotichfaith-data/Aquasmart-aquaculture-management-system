@@ -4,9 +4,9 @@ import type { QueryClient } from "@tanstack/react-query"
 
 const DASHBOARD_ROOTS = new Set([
   "systems-table",
+  "systems-overview",
   "kpi-overview",
   "recommended-actions",
-  "production-summary-metrics",
   "production-trend",
 ])
 
@@ -20,6 +20,20 @@ const isFarmScopedReportsQuery = (queryKey: readonly unknown[], farmId: string) 
 
 const isFarmScopedDashboardQuery = (queryKey: readonly unknown[], farmId: string) =>
   DASHBOARD_ROOTS.has(toStringValue(queryKey[0])) && toStringValue(queryKey[1]) === farmId
+
+const isFarmScopedAnalyticsQuery = (queryKey: readonly unknown[], farmId: string) =>
+  toStringValue(queryKey[0]) === "analytics" && toStringValue(queryKey[2]) === farmId
+
+const isFarmScopedProductionQuery = (queryKey: readonly unknown[], farmId: string) =>
+  toStringValue(queryKey[0]) === "production" && toStringValue(queryKey[2]) === farmId
+
+const isFarmScopedTimePeriodQuery = (queryKey: readonly unknown[], farmId: string) =>
+  toStringValue(queryKey[0]) === "time-period-bounds" && toStringValue(queryKey[1]) === farmId
+
+const isFarmScopedDashboardFeedbackQuery = (queryKey: readonly unknown[], farmId: string) =>
+  isFarmScopedDashboardQuery(queryKey, farmId) ||
+  isFarmScopedAnalyticsQuery(queryKey, farmId) ||
+  isFarmScopedTimePeriodQuery(queryKey, farmId)
 
 const overlapsDate = (from: unknown, to: unknown, date: string) => {
   const start = toStringValue(from)
@@ -48,7 +62,7 @@ async function invalidateRecentActivityQueries(
   })
 }
 
-export async function invalidateFeedingWriteQueries(
+async function invalidateFeedingWriteQueries(
   queryClient: QueryClient,
   params: { farmId: string; date: string },
 ) {
@@ -61,13 +75,16 @@ export async function invalidateFeedingWriteQueries(
       predicate: ({ queryKey }) => isFarmScopedReportsQuery(queryKey, params.farmId),
     }),
     queryClient.invalidateQueries({
-      predicate: ({ queryKey }) => isFarmScopedDashboardQuery(queryKey, params.farmId),
+      predicate: ({ queryKey }) => isFarmScopedDashboardFeedbackQuery(queryKey, params.farmId),
+    }),
+    queryClient.invalidateQueries({
+      predicate: ({ queryKey }) => isFarmScopedProductionQuery(queryKey, params.farmId),
     }),
     invalidateRecentActivityQueries(queryClient, { tableName: "feeding_record", date: params.date }),
   ])
 }
 
-export async function invalidateInventoryWriteQueries(
+async function invalidateInventoryWriteQueries(
   queryClient: QueryClient,
   params: {
     farmId: string
@@ -85,7 +102,7 @@ export async function invalidateInventoryWriteQueries(
       predicate: ({ queryKey }) => isFarmScopedReportsQuery(queryKey, params.farmId),
     }),
     queryClient.invalidateQueries({
-      predicate: ({ queryKey }) => isFarmScopedDashboardQuery(queryKey, params.farmId),
+      predicate: ({ queryKey }) => isFarmScopedDashboardFeedbackQuery(queryKey, params.farmId),
     }),
     invalidateRecentActivityQueries(queryClient, { tableName: params.tableName, date: params.date }),
   ]
@@ -93,8 +110,7 @@ export async function invalidateInventoryWriteQueries(
   if (params.includeProductionQueries) {
     tasks.push(
       queryClient.invalidateQueries({
-        predicate: ({ queryKey }) =>
-          toStringValue(queryKey[0]) === "production" && toStringValue(queryKey[2]) === params.farmId,
+        predicate: ({ queryKey }) => isFarmScopedProductionQuery(queryKey, params.farmId),
       }),
     )
   }
@@ -102,13 +118,13 @@ export async function invalidateInventoryWriteQueries(
   await Promise.all(tasks)
 }
 
-export async function invalidateWaterQualityWriteQueries(
+async function invalidateWaterQualityWriteQueries(
   queryClient: QueryClient,
   params: { farmId: string; date: string },
 ) {
   await Promise.all([
     queryClient.invalidateQueries({
-      predicate: ({ queryKey }) => isFarmScopedDashboardQuery(queryKey, params.farmId),
+      predicate: ({ queryKey }) => isFarmScopedDashboardFeedbackQuery(queryKey, params.farmId),
     }),
     queryClient.invalidateQueries({
       predicate: ({ queryKey }) => toStringValue(queryKey[0]) === "wq" && toStringValue(queryKey[2]) === params.farmId,
@@ -120,13 +136,13 @@ export async function invalidateWaterQualityWriteQueries(
   ])
 }
 
-export async function invalidateFeedInventoryWriteQueries(
+async function invalidateFeedInventoryWriteQueries(
   queryClient: QueryClient,
   params: { farmId: string; date: string },
 ) {
   await Promise.all([
     queryClient.invalidateQueries({
-      predicate: ({ queryKey }) => isFarmScopedDashboardQuery(queryKey, params.farmId),
+      predicate: ({ queryKey }) => isFarmScopedDashboardFeedbackQuery(queryKey, params.farmId),
     }),
     queryClient.invalidateQueries({
       predicate: ({ queryKey }) =>
@@ -139,7 +155,7 @@ export async function invalidateFeedInventoryWriteQueries(
   ])
 }
 
-export async function invalidateMortalityWriteQueries(
+async function invalidateMortalityWriteQueries(
   queryClient: QueryClient,
   params: { farmId: string; systemId: number; date: string },
 ) {
@@ -163,13 +179,13 @@ export async function invalidateMortalityWriteQueries(
   ])
 }
 
-export async function invalidateSystemWriteQueries(
+async function invalidateSystemWriteQueries(
   queryClient: QueryClient,
   params: { farmId: string; date: string },
 ) {
   await Promise.all([
     queryClient.invalidateQueries({
-      predicate: ({ queryKey }) => isFarmScopedDashboardQuery(queryKey, params.farmId),
+      predicate: ({ queryKey }) => isFarmScopedDashboardFeedbackQuery(queryKey, params.farmId),
     }),
     queryClient.invalidateQueries({
       predicate: ({ queryKey }) =>
@@ -188,6 +204,72 @@ export async function invalidateSystemWriteQueries(
     }),
     invalidateRecentActivityQueries(queryClient, { tableName: "system", date: params.date }),
   ])
+}
+
+export type DataEntryWriteType =
+  | "feeding"
+  | "mortality"
+  | "sampling"
+  | "waterQuality"
+  | "harvest"
+  | "transfer"
+  | "stocking"
+  | "incomingFeed"
+  | "system"
+
+export async function invalidateAfterWrite(
+  queryClient: QueryClient,
+  params: {
+    type: DataEntryWriteType
+    farmId: string
+    date: string
+    systemId?: number | null
+  },
+) {
+  switch (params.type) {
+    case "feeding":
+      return invalidateFeedingWriteQueries(queryClient, { farmId: params.farmId, date: params.date })
+    case "mortality":
+      return invalidateMortalityWriteQueries(queryClient, {
+        farmId: params.farmId,
+        systemId: params.systemId ?? 0,
+        date: params.date,
+      })
+    case "waterQuality":
+      return invalidateWaterQualityWriteQueries(queryClient, { farmId: params.farmId, date: params.date })
+    case "incomingFeed":
+      return invalidateFeedInventoryWriteQueries(queryClient, { farmId: params.farmId, date: params.date })
+    case "system":
+      return invalidateSystemWriteQueries(queryClient, { farmId: params.farmId, date: params.date })
+    case "sampling":
+      return invalidateInventoryWriteQueries(queryClient, {
+        farmId: params.farmId,
+        date: params.date,
+        tableName: "fish_sampling_weight",
+        includeProductionQueries: true,
+      })
+    case "harvest":
+      return invalidateInventoryWriteQueries(queryClient, {
+        farmId: params.farmId,
+        date: params.date,
+        tableName: "fish_harvest",
+        includeProductionQueries: true,
+      })
+    case "transfer":
+      return invalidateInventoryWriteQueries(queryClient, {
+        farmId: params.farmId,
+        date: params.date,
+        tableName: "fish_transfer",
+        includeProductionQueries: true,
+      })
+    case "stocking":
+      return invalidateInventoryWriteQueries(queryClient, {
+        farmId: params.farmId,
+        date: params.date,
+        tableName: "fish_stocking",
+        includeProductionQueries: true,
+      })
+  }
 }
 
 export async function invalidateReferenceDataQueries(

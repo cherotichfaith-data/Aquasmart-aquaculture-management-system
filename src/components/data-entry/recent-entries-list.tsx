@@ -3,15 +3,7 @@
 import { useLiveQuery } from "dexie-react-hooks"
 import { format } from "date-fns"
 import { Clock3, Loader2 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Badge } from "@/components/app-ui/badge"
 import { offlineDB } from "@/lib/offline/db"
 import type { SystemOption } from "@/lib/system-options"
 import type { Tables } from "@/lib/types/database"
@@ -45,16 +37,22 @@ type RecentEntriesListProps =
   | { type: "stocking"; data: StockingRow[]; systems: SystemOption[] }
   | { type: "system"; data: SystemEntryRow[]; systems: SystemOption[] }
 
+type RecentCard = {
+  key: string
+  title: string
+  subtitle: string
+  meta: string
+  pending?: boolean
+  details: Array<{ label: string; value: string }>
+}
+
 const formatCreatedAt = (createdAt: string | null) =>
   createdAt ? format(new Date(createdAt), "MMM d, HH:mm") : "-"
 
 const formatDate = (date: string | null) => date ?? "N/A"
 
-const recentTableClassName = "min-w-[640px] text-xs sm:text-sm"
-const recentSystemTableClassName = "min-w-[720px] text-xs sm:text-sm"
-
 const PendingIcon = ({ pending }: { pending?: boolean }) =>
-  pending ? <Loader2 className="mr-2 h-3 w-3 animate-spin text-muted-foreground" /> : null
+  pending ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null
 
 function toCreatedAt(createdAtLocal: number) {
   return new Date(createdAtLocal).toISOString()
@@ -182,32 +180,61 @@ function mergeRecentEntries<T extends { created_at: string | null; status?: "pen
 
   return [...combined]
     .sort((left, right) => new Date(right.created_at ?? 0).getTime() - new Date(left.created_at ?? 0).getTime())
-    .slice(0, 10)
+    .slice(0, 5)
 }
 
 function EntriesSection({
-  children,
+  cards,
   pendingCount,
 }: {
-  children: React.ReactNode
+  cards: RecentCard[]
   pendingCount: number
 }) {
   return (
-    <div className="mt-8 rounded-lg border p-3 sm:p-4">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="data-entry-recent-panel">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold">Recent Entries</h3>
-          <p className="text-xs text-muted-foreground">Latest saved records, including queued offline submissions.</p>
+          <h3 className="text-sm font-semibold text-foreground">Recent Entries</h3>
+          <p className="text-xs text-muted-foreground">Latest saved records for this entry type.</p>
         </div>
         {pendingCount > 0 ? (
-          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            <Clock3 className="h-3 w-3" />
-            {pendingCount} queued offline
+          <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
+              <Clock3 className="h-3 w-3" />
+              {pendingCount} queued
           </Badge>
         ) : null}
       </div>
-      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">{children}</div>
-      <p className="mt-3 text-[11px] text-muted-foreground sm:hidden">Swipe horizontally to view all columns.</p>
+
+      {cards.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border/70 bg-background/70 px-3 py-4 text-sm text-muted-foreground">
+          No recent entries found.
+        </div>
+      ) : (
+        <div className="data-entry-recent-list">
+          {cards.map((card) => (
+            <article key={card.key} className={`data-entry-recent-item ${card.pending ? "opacity-70" : ""}`}>
+              <div className="data-entry-recent-item-header">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <PendingIcon pending={card.pending} />
+                    <h4 className="data-entry-recent-item-title">{card.title}</h4>
+                  </div>
+                  <p className="data-entry-recent-item-subtitle">{card.subtitle}</p>
+                </div>
+                <span className="data-entry-recent-meta">{card.meta}</span>
+              </div>
+              <div className="data-entry-recent-grid">
+                {card.details.map((detail) => (
+                  <div key={`${card.key}-${detail.label}`} className="data-entry-recent-detail">
+                    <span className="data-entry-recent-detail-label">{detail.label}</span>
+                    <span className="data-entry-recent-detail-value">{detail.value}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -219,304 +246,128 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
   const formatSystemName = (systemId: number | null | undefined) =>
     systemId == null ? "-" : systemNameById.get(systemId) ?? `System ${systemId}`
 
+  let cards: RecentCard[] = []
+  let pendingCount = 0
+
   if (type === "mortality") {
     const rows = mergeRecentEntries(data, pendingEntries as MortalityRow[])
-    if (rows.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-    return (
-      <EntriesSection pendingCount={(pendingEntries as MortalityRow[]).length}>
-        <Table className={recentTableClassName}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>System</TableHead>
-              <TableHead>Count</TableHead>
-              <TableHead className="text-right">Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-                <TableCell className="flex items-center">
-                  <PendingIcon pending={row.status === "pending"} />
-                  {formatDate(row.date)}
-                </TableCell>
-                <TableCell>{formatSystemName(row.system_id)}</TableCell>
-                <TableCell>{row.number_of_fish_mortality}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </EntriesSection>
-    )
-  }
-
-  if (type === "feeding") {
+    pendingCount = (pendingEntries as MortalityRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [{ label: "Dead Fish", value: String(row.number_of_fish_mortality) }],
+    }))
+  } else if (type === "feeding") {
     const rows = mergeRecentEntries(data, pendingEntries as FeedingRow[])
-    if (rows.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-    return (
-      <EntriesSection pendingCount={(pendingEntries as FeedingRow[]).length}>
-        <Table className={recentTableClassName}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>System</TableHead>
-              <TableHead>Feed</TableHead>
-              <TableHead>Amount (kg)</TableHead>
-              <TableHead className="text-right">Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-                <TableCell className="flex items-center">
-                  <PendingIcon pending={row.status === "pending"} />
-                  {formatDate(row.date)}
-                </TableCell>
-                <TableCell>{formatSystemName(row.system_id)}</TableCell>
-                <TableCell>{row.feed_type_id}</TableCell>
-                <TableCell>{row.feeding_amount}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </EntriesSection>
-    )
-  }
-
-  if (type === "sampling") {
+    pendingCount = (pendingEntries as FeedingRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Feed Type", value: String(row.feed_type_id) },
+        { label: "Amount", value: `${row.feeding_amount} kg` },
+      ],
+    }))
+  } else if (type === "sampling") {
     const rows = mergeRecentEntries(data, pendingEntries as SamplingRow[])
-    if (rows.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-    return (
-      <EntriesSection pendingCount={(pendingEntries as SamplingRow[]).length}>
-        <Table className={recentTableClassName}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>System</TableHead>
-              <TableHead>Count</TableHead>
-              <TableHead>Avg Wt (g)</TableHead>
-              <TableHead className="text-right">Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-                <TableCell className="flex items-center">
-                  <PendingIcon pending={row.status === "pending"} />
-                  {formatDate(row.date)}
-                </TableCell>
-                <TableCell>{formatSystemName(row.system_id)}</TableCell>
-                <TableCell>{row.number_of_fish_sampling}</TableCell>
-                <TableCell>{row.abw}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </EntriesSection>
-    )
-  }
-
-  if (type === "transfer") {
+    pendingCount = (pendingEntries as SamplingRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Sampled", value: String(row.number_of_fish_sampling) },
+        { label: "ABW", value: row.abw != null ? `${row.abw} g` : "-" },
+      ],
+    }))
+  } else if (type === "transfer") {
     const rows = mergeRecentEntries(data, pendingEntries as TransferRow[])
-    if (rows.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-    return (
-      <EntriesSection pendingCount={(pendingEntries as TransferRow[]).length}>
-        <Table className={recentTableClassName}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Origin</TableHead>
-              <TableHead>Dest</TableHead>
-              <TableHead>Count</TableHead>
-              <TableHead className="text-right">Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-                <TableCell className="flex items-center">
-                  <PendingIcon pending={row.status === "pending"} />
-                  {formatDate(row.date)}
-                </TableCell>
-                <TableCell>{formatSystemName(row.origin_system_id)}</TableCell>
-                <TableCell>{row.external_target_name?.trim() || formatSystemName(row.target_system_id)}</TableCell>
-                <TableCell>{row.number_of_fish_transfer}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </EntriesSection>
-    )
-  }
-
-  if (type === "harvest") {
+    pendingCount = (pendingEntries as TransferRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.origin_system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Destination", value: row.external_target_name?.trim() || formatSystemName(row.target_system_id) },
+        { label: "Count", value: String(row.number_of_fish_transfer) },
+      ],
+    }))
+  } else if (type === "harvest") {
     const rows = mergeRecentEntries(data, pendingEntries as HarvestRow[])
-    if (rows.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-    return (
-      <EntriesSection pendingCount={(pendingEntries as HarvestRow[]).length}>
-        <Table className={recentTableClassName}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>System</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Weight (kg)</TableHead>
-              <TableHead className="text-right">Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-                <TableCell className="flex items-center">
-                  <PendingIcon pending={row.status === "pending"} />
-                  {formatDate(row.date)}
-                </TableCell>
-                <TableCell>{formatSystemName(row.system_id)}</TableCell>
-                <TableCell>{row.type_of_harvest}</TableCell>
-                <TableCell>{row.total_weight_harvest}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </EntriesSection>
-    )
-  }
-
-  if (type === "water_quality") {
+    pendingCount = (pendingEntries as HarvestRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Harvest", value: String(row.type_of_harvest) },
+        { label: "Weight", value: `${row.total_weight_harvest} kg` },
+      ],
+    }))
+  } else if (type === "water_quality") {
     const rows = mergeRecentEntries(data, pendingEntries as WaterQualityRow[])
-    if (rows.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-    return (
-      <EntriesSection pendingCount={(pendingEntries as WaterQualityRow[]).length}>
-        <Table className={recentTableClassName}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>System</TableHead>
-              <TableHead>Parameter</TableHead>
-              <TableHead>Value</TableHead>
-              <TableHead className="text-right">Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-                <TableCell className="flex items-center">
-                  <PendingIcon pending={row.status === "pending"} />
-                  {formatDate(row.date)}
-                </TableCell>
-                <TableCell>{formatSystemName(row.system_id)}</TableCell>
-                <TableCell>{row.parameter_name}</TableCell>
-                <TableCell>{row.parameter_value}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </EntriesSection>
-    )
-  }
-
-  if (type === "incoming_feed") {
-    if (data.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-    return (
-      <EntriesSection pendingCount={0}>
-        <Table className={recentTableClassName}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Feed</TableHead>
-              <TableHead>Amount (kg)</TableHead>
-              <TableHead className="text-right">Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((row, index) => (
-              <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-                <TableCell className="flex items-center">
-                  <PendingIcon pending={row.status === "pending"} />
-                  {formatDate(row.date)}
-                </TableCell>
-                <TableCell>{row.feed_type_id}</TableCell>
-                <TableCell>{row.feed_amount}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </EntriesSection>
-    )
-  }
-
-  if (type === "stocking") {
+    pendingCount = (pendingEntries as WaterQualityRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Parameter", value: String(row.parameter_name) },
+        { label: "Value", value: String(row.parameter_value) },
+      ],
+    }))
+  } else if (type === "incoming_feed") {
+    cards = data.slice(0, 5).map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: `Feed ${row.feed_type_id}`,
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [{ label: "Amount", value: `${row.feed_amount} kg` }],
+    }))
+  } else if (type === "stocking") {
     const rows = mergeRecentEntries(data, pendingEntries as StockingRow[])
-    if (rows.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-    return (
-      <EntriesSection pendingCount={(pendingEntries as StockingRow[]).length}>
-        <Table className={recentTableClassName}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>System</TableHead>
-              <TableHead>Count</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="text-right">Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-                <TableCell className="flex items-center">
-                  <PendingIcon pending={row.status === "pending"} />
-                  {formatDate(row.date)}
-                </TableCell>
-                <TableCell>{formatSystemName(row.system_id)}</TableCell>
-                <TableCell>{row.number_of_fish_stocking}</TableCell>
-                <TableCell>{row.type_of_stocking}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </EntriesSection>
-    )
+    pendingCount = (pendingEntries as StockingRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Count", value: String(row.number_of_fish_stocking) },
+        { label: "Type", value: String(row.type_of_stocking) },
+      ],
+    }))
+  } else {
+    cards = data.slice(0, 5).map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: row.name,
+      subtitle: formatDate(row.commissioned_at),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Unit", value: row.unit ?? "-" },
+        { label: "Type", value: row.type },
+        { label: "Stage", value: row.growth_stage },
+      ],
+    }))
   }
 
-  if (data.length === 0) return <div className="mt-4 text-sm text-muted-foreground">No recent entries found.</div>
-
-  return (
-    <EntriesSection pendingCount={0}>
-      <Table className={recentSystemTableClassName}>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Cage Unit</TableHead>
-            <TableHead>Cage/System</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Stage</TableHead>
-            <TableHead className="text-right">Created At</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((row, index) => (
-            <TableRow key={row.localId ?? row.id ?? index} className={row.status === "pending" ? "opacity-70" : ""}>
-              <TableCell className="flex items-center">
-                <PendingIcon pending={row.status === "pending"} />
-                {formatDate(row.commissioned_at)}
-              </TableCell>
-              <TableCell>{row.unit ?? "-"}</TableCell>
-              <TableCell>{row.name}</TableCell>
-              <TableCell>{row.type}</TableCell>
-              <TableCell>{row.growth_stage}</TableCell>
-              <TableCell className="text-right text-xs text-muted-foreground">{formatCreatedAt(row.created_at)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </EntriesSection>
-  )
+  return <EntriesSection cards={cards} pendingCount={pendingCount} />
 }
+

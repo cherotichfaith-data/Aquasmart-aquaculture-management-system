@@ -3,7 +3,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import type { QueryResult } from "@/lib/supabase-client"
+import { queryKeys } from "@/lib/cache/query-keys"
 import {
   getAlertThresholds,
   getDailyOverlay,
@@ -12,27 +12,24 @@ import {
   getWaterQualitySyncStatus,
   getWaterQualityMeasurements,
 } from "@/lib/api/water-quality"
-import { invalidateWaterQualityWriteQueries } from "@/lib/cache/react-query"
+import { invalidateAfterWrite } from "@/lib/cache/react-query"
 import type { WaterQualityInput } from "@/lib/commands/operations"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 import { buildOfflinePendingResult } from "@/lib/offline/pending-result"
 import { useOfflineMutation } from "@/lib/offline/use-offline-mutation"
-import type { Database, Tables } from "@/lib/types/database"
+import type { Tables } from "@/lib/types/database"
 
 function waterQualityQueryOptions<TResult>(params: {
   queryKey: readonly unknown[]
   queryFn: (context: { signal: AbortSignal }) => Promise<TResult>
   enabled: boolean
   staleTime: number
-  initialData?: TResult
 }) {
   return queryOptions({
     queryKey: params.queryKey,
     enabled: params.enabled,
     queryFn: params.queryFn,
     staleTime: params.staleTime,
-    initialData: params.enabled ? params.initialData : undefined,
-    initialDataUpdatedAt: params.enabled && params.initialData ? 0 : undefined,
   })
 }
 
@@ -40,20 +37,17 @@ export function useLatestWaterQualityStatus(
   systemId?: number,
   options?: {
     farmId?: string | null
-    initialData?: QueryResult<Database["public"]["Functions"]["api_latest_water_quality_status"]["Returns"][number]>
   },
 ) {
   return useLatestWaterQualityStatusWithInitial({
     systemId,
     farmId: options?.farmId,
-    initialData: options?.initialData,
   })
 }
 
 function useLatestWaterQualityStatusWithInitial(params?: {
   systemId?: number
   farmId?: string | null
-  initialData?: QueryResult<Database["public"]["Functions"]["api_latest_water_quality_status"]["Returns"][number]>
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
@@ -61,19 +55,17 @@ function useLatestWaterQualityStatusWithInitial(params?: {
   const enabled = Boolean(session) && Boolean(resolvedFarmId)
   return useQuery(
     waterQualityQueryOptions({
-      queryKey: ["wq", "latest_status", resolvedFarmId, params?.systemId ?? null],
+      queryKey: queryKeys.waterQuality.latestStatus({ farmId: resolvedFarmId, systemId: params?.systemId }),
       enabled,
       queryFn: ({ signal }) =>
         getLatestWaterQualityStatus({ farmId: resolvedFarmId!, systemId: params?.systemId, signal }),
       staleTime: 30_000,
-      initialData: params?.initialData,
     }),
   )
 }
 
 export function useWaterQualitySyncStatus(params?: {
   farmId?: string | null
-  initialData?: QueryResult<Database["public"]["Functions"]["api_water_quality_sync_status"]["Returns"][number]>
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
@@ -81,11 +73,10 @@ export function useWaterQualitySyncStatus(params?: {
   const enabled = Boolean(session) && Boolean(resolvedFarmId)
   return useQuery(
     waterQualityQueryOptions({
-      queryKey: ["wq", "sync_status", resolvedFarmId],
+      queryKey: queryKeys.waterQuality.syncStatus(resolvedFarmId),
       enabled,
       queryFn: ({ signal }) => getWaterQualitySyncStatus({ farmId: resolvedFarmId!, signal }),
       staleTime: 30_000,
-      initialData: params?.initialData,
     }),
   )
 }
@@ -100,7 +91,6 @@ export function useWaterQualityMeasurements(params: {
   requireSystem?: boolean
   enabled?: boolean
   farmId?: string | null
-  initialData?: QueryResult<Database["public"]["Views"]["api_water_quality_measurements"]["Row"]>
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
@@ -110,16 +100,14 @@ export function useWaterQualityMeasurements(params: {
   const enabled = Boolean(params.enabled ?? true) && (params.requireSystem ? enabledSystem : enabledBase)
   return useQuery(
     waterQualityQueryOptions({
-      queryKey: [
-        "wq",
-        "measurements",
-        resolvedFarmId,
-        params.systemId ?? null,
-        params.dateFrom ?? null,
-        params.dateTo ?? null,
-        params.parameterName ?? params.parameter ?? null,
-        params.limit ?? null,
-      ],
+      queryKey: queryKeys.waterQuality.measurements({
+        farmId: resolvedFarmId,
+        systemId: params.systemId,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+        parameterName: params.parameterName ?? params.parameter,
+        limit: params.limit,
+      }),
       enabled,
       queryFn: ({ signal }) =>
         getWaterQualityMeasurements({
@@ -132,7 +120,6 @@ export function useWaterQualityMeasurements(params: {
           signal,
         }),
       staleTime: 60_000,
-      initialData: params.initialData,
     }),
   )
 }
@@ -145,7 +132,6 @@ export function useDailyWaterQualityRating(params: {
   limit?: number
   enabled?: boolean
   farmId?: string | null
-  initialData?: QueryResult<Database["public"]["Views"]["api_daily_water_quality_rating"]["Row"]>
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
@@ -155,15 +141,13 @@ export function useDailyWaterQualityRating(params: {
   const enabled = Boolean(params.enabled ?? true) && (params.requireSystem ? enabledSystem : enabledBase)
   return useQuery(
     waterQualityQueryOptions({
-      queryKey: [
-        "wq",
-        "daily_rating",
-        resolvedFarmId,
-        params.systemId ?? null,
-        params.dateFrom ?? null,
-        params.dateTo ?? null,
-        params.limit ?? null,
-      ],
+      queryKey: queryKeys.waterQuality.dailyRating({
+        farmId: resolvedFarmId,
+        systemId: params.systemId,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+        limit: params.limit,
+      }),
       enabled,
       queryFn: ({ signal }) =>
         getDailyWaterQualityRating({
@@ -175,7 +159,6 @@ export function useDailyWaterQualityRating(params: {
           signal,
         }),
       staleTime: 60_000,
-      initialData: params.initialData,
     }),
   )
 }
@@ -187,7 +170,6 @@ export function useWaterQualityOverlay(params: {
   requireSystem?: boolean
   enabled?: boolean
   farmId?: string | null
-  initialData?: QueryResult<Database["public"]["Functions"]["api_daily_overlay"]["Returns"][number]>
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
@@ -197,7 +179,12 @@ export function useWaterQualityOverlay(params: {
   const enabled = Boolean(params.enabled ?? true) && (params.requireSystem ? enabledSystem : enabledBase)
   return useQuery(
     waterQualityQueryOptions({
-      queryKey: ["wq", "overlay", resolvedFarmId, params.systemId ?? null, params.dateFrom ?? null, params.dateTo ?? null],
+      queryKey: queryKeys.waterQuality.overlay({
+        farmId: resolvedFarmId,
+        systemId: params.systemId,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+      }),
       enabled,
       queryFn: ({ signal }) =>
         getDailyOverlay({
@@ -208,14 +195,12 @@ export function useWaterQualityOverlay(params: {
           signal,
         }),
       staleTime: 60_000,
-      initialData: params.initialData,
     }),
   )
 }
 
 export function useAlertThresholds(params?: {
   farmId?: string | null
-  initialData?: QueryResult<Database["public"]["Views"]["api_alert_thresholds"]["Row"]>
 }) {
   const { farmId } = useActiveFarm()
   const { session } = useAuth()
@@ -223,11 +208,10 @@ export function useAlertThresholds(params?: {
   const enabled = Boolean(session) && Boolean(resolvedFarmId)
   return useQuery(
     waterQualityQueryOptions({
-      queryKey: ["wq", "thresholds", resolvedFarmId],
+      queryKey: queryKeys.waterQuality.thresholds(resolvedFarmId),
       enabled,
       queryFn: ({ signal }) => getAlertThresholds({ farmId: resolvedFarmId!, signal }),
       staleTime: 60_000,
-      initialData: params?.initialData,
     }),
   )
 }
@@ -238,6 +222,7 @@ export function useRecordWaterQuality() {
   const offlineMutation = useOfflineMutation<
     WaterQualityInput,
     {
+      farmId?: string | null
       systemId: number
       date: string
       measuredAt: string
@@ -255,6 +240,7 @@ export function useRecordWaterQuality() {
     tableName: "waterQuality",
     buildRecords: (payload) =>
       payload.map((entry) => ({
+        farmId: entry.farm_id ?? farmId,
         systemId: entry.system_id,
         date: entry.date,
         measuredAt: entry.measured_at,
@@ -267,7 +253,7 @@ export function useRecordWaterQuality() {
     buildPendingResult: ({ input, localIds }) =>
       buildOfflinePendingResult({
         data: [] as Tables<"water_quality_measurement">[],
-        farmId,
+        farmId: input[0]?.farm_id ?? farmId,
         systemId: input[0]?.system_id ?? null,
         date: input[0]?.date ?? new Date().toISOString().slice(0, 10),
         localIds,
@@ -285,7 +271,7 @@ export function useRecordWaterQuality() {
       return {
         data: normalizedResponses.flatMap((response) => response.data),
         meta: {
-          farmId: firstMeta?.farmId ?? farmId ?? "",
+          farmId: firstMeta?.farmId ?? input[0]?.farm_id ?? farmId ?? "",
           systemId: firstMeta?.systemId ?? input[0]?.system_id ?? null,
           date: firstMeta?.date ?? input[0]?.date ?? new Date().toISOString().slice(0, 10),
           localIds,
@@ -316,7 +302,8 @@ export function useRecordWaterQuality() {
       return null
     },
     invalidate: async ({ queryClient, result }) =>
-      invalidateWaterQualityWriteQueries(queryClient, {
+      invalidateAfterWrite(queryClient, {
+        type: "waterQuality",
         farmId: result.meta.farmId,
         date: result.meta.date,
       }),
