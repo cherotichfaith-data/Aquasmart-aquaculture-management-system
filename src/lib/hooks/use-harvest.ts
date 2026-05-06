@@ -1,6 +1,6 @@
 "use client"
 
-import { invalidateInventoryWriteQueries } from "@/lib/cache/react-query"
+import { invalidateAfterWrite } from "@/lib/cache/react-query"
 import type { HarvestInput } from "@/lib/commands/operations"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
@@ -14,6 +14,7 @@ export function useRecordHarvest() {
   const offlineMutation = useOfflineMutation<
     HarvestInput,
     {
+      farmId?: string | null
       systemId: number
       batchId?: number | null
       date: string
@@ -30,6 +31,7 @@ export function useRecordHarvest() {
     tableName: "harvest",
     buildRecords: (payload) => [
       {
+        farmId: payload.farm_id ?? farmId,
         systemId: payload.system_id,
         batchId: payload.batch_id ?? null,
         date: payload.date,
@@ -42,7 +44,7 @@ export function useRecordHarvest() {
     buildPendingResult: ({ input, localIds }) =>
       buildOfflinePendingResult({
         data: { id: 0 } as Tables<"fish_harvest">,
-        farmId,
+        farmId: input.farm_id ?? farmId,
         systemId: input.system_id,
         date: input.date,
         localIds,
@@ -66,11 +68,10 @@ export function useRecordHarvest() {
       status: "pending",
     }),
     invalidate: async ({ queryClient, result }) =>
-      invalidateInventoryWriteQueries(queryClient, {
+      invalidateAfterWrite(queryClient, {
+        type: "harvest",
         farmId: result.meta.farmId,
         date: result.meta.date,
-        tableName: "fish_harvest",
-        includeProductionQueries: true,
       }),
     successMessage: "Harvest recorded.",
     errorMessage: "Failed to record harvest.",

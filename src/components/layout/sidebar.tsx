@@ -1,11 +1,30 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type MouseEvent } from "react"
+import Box from "@mui/material/Box"
+import Button from "@mui/material/Button"
+import Collapse from "@mui/material/Collapse"
+import Divider from "@mui/material/Divider"
+import Drawer from "@mui/material/Drawer"
+import IconButton from "@mui/material/IconButton"
+import List from "@mui/material/List"
+import ListItemButton from "@mui/material/ListItemButton"
+import ListItemIcon from "@mui/material/ListItemIcon"
+import ListItemText from "@mui/material/ListItemText"
+import Menu from "@mui/material/Menu"
+import MenuItem from "@mui/material/MenuItem"
+import Paper from "@mui/material/Paper"
+import Skeleton from "@mui/material/Skeleton"
+import Tooltip from "@mui/material/Tooltip"
+import Typography from "@mui/material/Typography"
+import { alpha } from "@mui/material/styles"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
+import { DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
 import {
   Activity,
   AlertTriangle,
@@ -15,76 +34,111 @@ import {
   Fish,
   LayoutDashboard,
   LogOut,
+  Menu as MenuIcon,
+  PlusCircle,
   Settings,
   TestTube,
   Users,
   X,
-  PlusCircle,
-  ChevronsLeft,
-  ChevronsRight,
 } from "lucide-react"
 
-// All possible nav items with section grouping
+export const DASHBOARD_SIDEBAR_WIDTH = 248
+export const DASHBOARD_SIDEBAR_COLLAPSED_WIDTH = 88
+
 const ALL_NAV_SECTIONS = [
   {
     title: "Operate",
     items: [
-      { name: "Dashboard", href: "/", icon: LayoutDashboard },
-      { name: "Feed", href: "/feed", icon: Fish },
-      { name: "Growth", href: "/sampling", icon: TestTube },
-      { name: "Mortality", href: "/mortality", icon: AlertTriangle },
-      { name: "Water Quality", href: "/water-quality", icon: Droplets },
+      { name: "Dashboard", href: toDashboardPath("/"), icon: LayoutDashboard },
+      { name: "Feed", href: toDashboardPath("/feed"), icon: Fish },
+      { name: "Growth", href: toDashboardPath("/sampling"), icon: TestTube },
+      { name: "Mortality", href: toDashboardPath("/mortality"), icon: AlertTriangle },
+      { name: "Water Quality", href: toDashboardPath("/water-quality"), icon: Droplets },
     ],
   },
   {
     title: "Analyze",
     items: [
-      { name: "Production", href: "/production", icon: BarChart3 },
-      { name: "Reports", href: "/reports", icon: Activity },
+      { name: "Production", href: toDashboardPath("/production"), icon: BarChart3 },
+      { name: "Reports", href: toDashboardPath("/reports"), icon: Activity },
     ],
   },
   {
     title: "Capture",
-    items: [{ name: "Data Entry", href: "/data-entry", icon: PlusCircle }],
+    items: [{ name: "Data Entry", href: DATA_ENTRY_PATH, icon: PlusCircle }],
   },
   {
     title: "Configure",
     items: [
-      { name: "Settings", href: "/settings", icon: Settings },
-      { name: "Users", href: "/settings/users", icon: Users },
+      { name: "Settings", href: toDashboardPath("/settings"), icon: Settings },
+      { name: "Users", href: "/users", icon: Users },
     ],
   },
-]
+] as const
 
-// Routes visible per role. null/undefined = show all (admin/farm_manager default)
 const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
-  admin:                 new Set(["/"   , "/feed", "/sampling", "/mortality", "/water-quality", "/production", "/reports", "/data-entry", "/settings", "/settings/users"]),
-  farm_manager:          new Set(["/"   , "/feed", "/sampling", "/mortality", "/water-quality", "/production", "/reports", "/data-entry", "/settings"]),
-  farm_technician:       new Set(["/data-entry", "/feed", "/sampling", "/mortality", "/water-quality"]),
-  inventory_storekeeper: new Set(["/data-entry"]),
-  analyst_planner:       new Set(["/"   , "/production", "/reports"]),
-  viewer_auditor:        new Set(["/"   , "/reports"]),
+  admin: new Set([
+    toDashboardPath("/"),
+    toDashboardPath("/feed"),
+    toDashboardPath("/sampling"),
+    toDashboardPath("/mortality"),
+    toDashboardPath("/water-quality"),
+    toDashboardPath("/production"),
+    toDashboardPath("/reports"),
+    DATA_ENTRY_PATH,
+    toDashboardPath("/settings"),
+    "/users",
+  ]),
+  farm_manager: new Set([
+    toDashboardPath("/"),
+    toDashboardPath("/feed"),
+    toDashboardPath("/sampling"),
+    toDashboardPath("/mortality"),
+    toDashboardPath("/water-quality"),
+    toDashboardPath("/production"),
+    toDashboardPath("/reports"),
+    DATA_ENTRY_PATH,
+    toDashboardPath("/settings"),
+  ]),
+  system_operator: new Set([
+    DATA_ENTRY_PATH,
+    toDashboardPath("/feed"),
+    toDashboardPath("/sampling"),
+    toDashboardPath("/mortality"),
+    toDashboardPath("/water-quality"),
+  ]),
+  data_analyst: new Set([toDashboardPath("/"), toDashboardPath("/production"), toDashboardPath("/reports")]),
+  viewer: new Set([toDashboardPath("/"), toDashboardPath("/reports")]),
 }
 
 const ROLE_ITEM_LABELS: Record<string, Record<string, string>> = {
-  inventory_storekeeper: { "/data-entry": "Inventory Entry" },
+  system_operator: { [DATA_ENTRY_PATH]: "Data Entry" },
 }
 
-// For farm_technician the workboard link gets the feed type pre-selected
 const ROLE_ITEM_HREFS: Record<string, Record<string, string>> = {
-  farm_technician:       { "/data-entry": "/data-entry?type=feeding" },
-  inventory_storekeeper: { "/data-entry": "/data-entry?type=incoming_feed" },
+  system_operator: { [DATA_ENTRY_PATH]: `${DATA_ENTRY_PATH}?type=feeding` },
 }
+
+const waterQualityLinks = [
+  { href: toDashboardPath("/water-quality"), label: "Overview", activeKey: "overview" },
+  { href: `${toDashboardPath("/water-quality")}?tab=parameter`, label: "Parameter Analysis", activeKey: "parameter" },
+  {
+    href: `${toDashboardPath("/water-quality")}?tab=environment`,
+    label: "Environmental Indicators",
+    activeKey: "environment",
+  },
+  { href: `${toDashboardPath("/water-quality")}?tab=depth`, label: "Stratification Analysis", activeKey: "depth" },
+  { href: `${toDashboardPath("/water-quality")}?tab=alerts`, label: "Alerts", activeKey: "alerts" },
+  { href: `${toDashboardPath("/water-quality")}?tab=sensors`, label: "System Coverage", activeKey: "sensors" },
+] as const
 
 function getVisibleSections(role: string | null | undefined) {
   const allowed = role ? (ROLE_ALLOWED_ROUTES[role] ?? null) : null
   if (!allowed) return []
-  return ALL_NAV_SECTIONS
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => allowed.has(item.href)),
-    }))
-    .filter((section) => section.items.length > 0)
+  return ALL_NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => allowed.has(item.href)),
+  })).filter((section) => section.items.length > 0)
 }
 
 function resolveItemLabel(role: string | null | undefined, href: string, defaultName: string) {
@@ -97,46 +151,104 @@ function resolveItemHref(role: string | null | undefined, href: string) {
   return ROLE_ITEM_HREFS[role]?.[href] ?? href
 }
 
-const waterQualityLinks = [
-  { href: "/water-quality", label: "Overview", activeKey: "overview" },
-  { href: "/water-quality?tab=parameter", label: "Parameter Analysis", activeKey: "parameter" },
-  { href: "/water-quality?tab=environment", label: "Environmental Indicators", activeKey: "environment" },
-  { href: "/water-quality?tab=depth", label: "Stratification Analysis", activeKey: "depth" },
-  { href: "/water-quality?tab=alerts", label: "Alerts", activeKey: "alerts" },
-  { href: "/water-quality?tab=sensors", label: "System Coverage", activeKey: "sensors" },
-] as const
+type SidebarContentProps = {
+  collapsed: boolean
+  onClose: () => void
+  onCollapseToggle: () => void
+  mobile: boolean
+  initialFarmId?: string | null
+  initialFarmName?: string | null
+}
 
-export default function Sidebar({
-  open,
+function LogoBlock({
   collapsed,
-  onToggle,
+  mobile,
+  onClose,
   onCollapseToggle,
 }: {
-  open: boolean
   collapsed: boolean
-  onToggle: () => void
+  mobile: boolean
+  onClose: () => void
   onCollapseToggle: () => void
 }) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        minHeight: 72,
+        px: collapsed && !mobile ? 1.5 : 2.5,
+        py: 1.5,
+      }}
+    >
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Link
+          href={toDashboardPath("/")}
+          className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90"
+          onClick={mobile ? onClose : undefined}
+        >
+          <Image src="/use this.png" alt="AquaSmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
+          {!collapsed || mobile ? (
+            <Typography variant="h6" sx={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--color-sidebar-foreground)" }}>
+              <Box component="span" sx={{ color: "inherit" }}>
+                Aqua
+              </Box>
+              <Box component="span" sx={{ color: "var(--color-sidebar-primary)" }}>
+                Smart
+              </Box>
+            </Typography>
+          ) : null}
+        </Link>
+      </Box>
+      {mobile ? (
+        <IconButton
+          onClick={onClose}
+          aria-label="Close navigation"
+          sx={{
+            color: "var(--color-sidebar-foreground)",
+            bgcolor: "transparent",
+          }}
+        >
+          <X size={18} />
+        </IconButton>
+      ) : (
+        <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+          <IconButton
+            onClick={onCollapseToggle}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            sx={{
+              color: "var(--color-sidebar-foreground)",
+              bgcolor: "transparent",
+            }}
+          >
+            <MenuIcon size={18} />
+          </IconButton>
+        </Tooltip>
+      )}
+    </Box>
+  )
+}
+
+function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialFarmId, initialFarmName }: SidebarContentProps) {
   const pathname = usePathname()
+  const appPathname = stripDashboardPath(pathname)
   const searchParams = useSearchParams()
   const router = useRouter()
   const { signOut } = useAuth()
-  const { farm, farmId } = useActiveFarm()
+  const { farm, farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const farmRoleQuery = useActiveFarmRole(farmId)
   const farmRole = farmRoleQuery.data ?? null
+  const isRoleLoading = farmRoleQuery.isLoading
   const navigationSections = useMemo(() => getVisibleSections(farmRole), [farmRole])
   const [signingOut, setSigningOut] = useState(false)
-  const [waterQualityOpen, setWaterQualityOpen] = useState(pathname.startsWith("/water-quality"))
-  const [collapsedWaterQualityFlyoutOpen, setCollapsedWaterQualityFlyoutOpen] = useState(false)
+  const [waterQualityOpen, setWaterQualityOpen] = useState(appPathname.startsWith("/water-quality"))
+  const [waterQualityMenuAnchor, setWaterQualityMenuAnchor] = useState<HTMLElement | null>(null)
 
-  const waterQualityActive = pathname === "/water-quality"
+  const farmName = farm?.name ?? initialFarmName ?? null
+  const waterQualityActive = appPathname === "/water-quality"
   const tabParam = searchParams.get("tab")
-  const overviewActive = waterQualityActive && (!tabParam || tabParam === "overview")
-  const parameterActive = waterQualityActive && tabParam === "parameter"
-  const alertsActive = waterQualityActive && tabParam === "alerts"
-  const sensorsActive = waterQualityActive && tabParam === "sensors"
-  const environmentActive = waterQualityActive && tabParam === "environment"
-  const depthProfileActive = waterQualityActive && tabParam === "depth"
+  const activeWaterQualityKey = !tabParam || tabParam === "overview" ? "overview" : tabParam
 
   useEffect(() => {
     if (waterQualityActive) setWaterQualityOpen(true)
@@ -144,291 +256,395 @@ export default function Sidebar({
 
   useEffect(() => {
     if (!collapsed) {
-      setCollapsedWaterQualityFlyoutOpen(false)
+      setWaterQualityMenuAnchor(null)
     }
-  }, [collapsed, pathname])
+  }, [collapsed])
 
-  const handleMobileNavigate = () => {
-    if (typeof window !== "undefined" && window.innerWidth < 768 && open) {
-      onToggle()
+  const closeAfterNavigate = () => {
+    setWaterQualityMenuAnchor(null)
+    if (mobile) {
+      onClose()
     }
   }
 
-  const desktopWidthClass = collapsed ? "md:w-[4.75rem]" : "md:w-[14.5rem] xl:w-[15.5rem]"
-  const navItemClass = (active: boolean, compact = false) =>
-    `flex items-center rounded-2xl transition-colors ${
-      compact ? "gap-3 px-3 py-2.5 md:justify-center md:gap-0 md:px-2.5" : "gap-3 px-3 py-2.5"
-    } ${
-      active
-        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-    }`
-
-  const waterQualityLinkClass = (active: boolean) =>
-    `block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
-      active
-        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-        : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-    }`
+  const renderWaterQualityMenuItems = (dense = false) =>
+    waterQualityLinks.map((link) => {
+      const isActive = link.activeKey === activeWaterQualityKey
+      return (
+        <MenuItem
+          key={link.href}
+          component={Link}
+          href={link.href}
+          selected={isActive}
+          onClick={closeAfterNavigate}
+          dense={dense}
+          sx={{
+            borderRadius: 2,
+            mx: 1,
+            my: 0.25,
+            fontSize: dense ? "0.75rem" : "0.8125rem",
+            whiteSpace: "normal",
+          }}
+        >
+          {link.label}
+        </MenuItem>
+      )
+    })
 
   return (
-    <>
-      {open && <div className="fixed inset-0 bg-black/50 md:hidden z-30" onClick={onToggle} />}
-
-      <aside
-        className={`fixed md:sticky top-0 left-0 h-screen bg-sidebar shadow-[0_24px_54px_-40px_rgba(15,23,32,0.52)] transform transition-[width,transform] duration-300 z-40 flex flex-col ${desktopWidthClass} w-[min(82vw,17rem)] ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-          }`}
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg, var(--sidebar-sheen), transparent 18%), radial-gradient(circle at top right, var(--sidebar-glow), transparent 28%)",
-        }}
-      >
-        <div className="flex items-center justify-between px-4 py-3.5 md:hidden">
-          <div>
-            <h1 className="font-semibold text-base text-sidebar-foreground">AQ</h1>
-            <p className="max-w-[12rem] truncate text-[11px] text-sidebar-foreground/65">
-              {farm?.name ?? "Aquasmart"}
-            </p>
-          </div>
-          <button onClick={onToggle} className="rounded-xl p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="hidden px-3 py-4 md:flex md:flex-col md:items-stretch md:gap-3">
-          <div className="flex items-center">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary shadow-sm">
-            <span className="text-sm font-semibold text-sidebar-primary-foreground">AQ</span>
-            </div>
-            {!collapsed && (
-              <div className="ml-3">
-                <p className="font-semibold leading-none text-sidebar-foreground">Aquasmart</p>
-                <p className="mt-1 truncate text-[11px] text-sidebar-foreground/60">
-                  {farm?.name ?? "No farm selected"}
-                </p>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={onCollapseToggle}
-              className="ml-auto rounded-xl p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+    <Paper
+      square
+      elevation={0}
+      sx={{
+        display: "flex",
+        height: "100%",
+        width: "100%",
+        flexDirection: "column",
+        borderRadius: 0,
+        borderRight: "1px solid var(--color-sidebar-border)",
+        backgroundColor: "var(--color-sidebar)",
+        backgroundImage: "none",
+        boxShadow: "none",
+        color: "var(--color-sidebar-foreground)",
+        overflowY: "auto",
+        overflowX: "hidden",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        "&::-webkit-scrollbar": {
+          display: "none",
+        },
+      }}
+    >
+      <LogoBlock collapsed={collapsed} mobile={mobile} onClose={onClose} onCollapseToggle={onCollapseToggle} />
+      {farmId && farmName && (!collapsed || mobile) ? (
+        <>
+          <Box sx={{ px: 2, py: 1.5 }}>
+            <Box
+              title={farmName}
+              sx={{
+                display: "flex",
+                gap: 1,
+                alignItems: "center",
+                border: "1px solid var(--color-sidebar-border)",
+                borderRadius: 2.5,
+                px: 1.5,
+                py: 1.25,
+                bgcolor: "color-mix(in srgb, var(--color-sidebar-accent) 82%, white 18%)",
+              }}
             >
-              {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
-        <nav className="flex-1 space-y-4 overflow-y-auto px-2.5 py-3 md:px-3 md:py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          {navigationSections.map((section) => (
-            <div key={section.title} className="space-y-1.5">
-              <p
-                className={`px-3 text-[9px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45 ${
-                  collapsed ? "md:hidden" : ""
-                }`}
+              <Box
+                aria-hidden
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  bgcolor: "primary.main",
+                  flexShrink: 0,
+                }}
+              />
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Farm:
+              </Typography>
+              <Typography variant="body2" sx={{ minWidth: 0 }} noWrap>
+                {farmName}
+              </Typography>
+            </Box>
+          </Box>
+        </>
+      ) : null}
+      <Box sx={{ flex: 1, px: 1.25, py: 1.5 }}>
+        {isRoleLoading ? (
+          <Box sx={{ display: "grid", gap: 0.5, px: 0.5 }}>
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} variant="rounded" height={44} sx={{ borderRadius: 2.5 }} />
+            ))}
+          </Box>
+        ) : navigationSections.map((section) => (
+          <Box key={section.title} sx={{ mb: 2.5 }}>
+            {!collapsed || mobile ? (
+              <Typography
+                variant="overline"
+                sx={{
+                  display: "block",
+                  px: 1.5,
+                  pb: 0.5,
+                  color: "var(--color-sidebar-accent-foreground)",
+                  opacity: 0.8,
+                }}
               >
                 {section.title}
-              </p>
-              <div className="space-y-1.5">
-                {section.items.map((item) => {
-            if (item.href === "/water-quality") {
-              const Icon = item.icon
-              if (collapsed) {
-                return (
-                  <div key={item.href}>
-                    <div
-                      className="relative hidden md:block"
-                      onMouseEnter={() => setCollapsedWaterQualityFlyoutOpen(true)}
-                      onMouseLeave={() => setCollapsedWaterQualityFlyoutOpen(false)}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setCollapsedWaterQualityFlyoutOpen((prev) => !prev)}
-                        className={navItemClass(waterQualityActive || collapsedWaterQualityFlyoutOpen, true)}
-                        title={item.name}
-                        aria-label="Open water quality navigation"
-                        aria-expanded={collapsedWaterQualityFlyoutOpen}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </button>
-                      {collapsedWaterQualityFlyoutOpen ? (
-                        <div className="absolute left-[calc(100%+0.65rem)] top-1/2 z-50 hidden w-56 -translate-y-1/2 rounded-[1.15rem] border border-sidebar-border bg-sidebar/95 p-2 shadow-[0_24px_54px_-28px_rgba(15,23,32,0.42)] backdrop-blur-xl md:block">
-                          <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/55">
-                            Water Quality
-                          </div>
-                          <div className="space-y-1">
-                            {waterQualityLinks.map((link) => {
-                              const isActive =
-                                (link.activeKey === "overview" && overviewActive) ||
-                                (link.activeKey === "parameter" && parameterActive) ||
-                                (link.activeKey === "environment" && environmentActive) ||
-                                (link.activeKey === "depth" && depthProfileActive) ||
-                                (link.activeKey === "alerts" && alertsActive) ||
-                                (link.activeKey === "sensors" && sensorsActive)
+              </Typography>
+            ) : null}
+            <List disablePadding sx={{ display: "grid", gap: 0.5 }}>
+              {section.items.map((item) => {
+                if (item.href === toDashboardPath("/water-quality")) {
+                  const Icon = item.icon
 
-                              return (
-                                <Link
-                                  key={link.href}
-                                  href={link.href}
-                                  className={waterQualityLinkClass(isActive)}
-                                  onClick={() => {
-                                    setCollapsedWaterQualityFlyoutOpen(false)
-                                    handleMobileNavigate()
-                                  }}
-                                >
-                                  {link.label}
-                                </Link>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="md:hidden">
-                      <div className={navItemClass(waterQualityActive)}>
-                        <Link href={item.href} onClick={handleMobileNavigate} className="flex items-center gap-3 flex-1">
-                          <Icon className="h-4 w-4" />
-                          <span className="min-w-0 truncate text-sm font-medium">{item.name}</span>
-                        </Link>
-                        <button
-                          type="button"
+                  if (collapsed && !mobile) {
+                    return (
+                      <Box key={item.href}>
+                        <Tooltip title="Water Quality" placement="right">
+                          <ListItemButton
+                            onClick={(event: MouseEvent<HTMLElement>) => setWaterQualityMenuAnchor(event.currentTarget)}
+                            selected={waterQualityActive}
+                            sx={{
+                              minHeight: 48,
+                              justifyContent: "center",
+                              borderRadius: 2.5,
+                              px: 1.5,
+                            }}
+                          >
+                            <ListItemIcon sx={{ minWidth: 0, color: "inherit" }}>
+                              <Icon size={18} />
+                            </ListItemIcon>
+                          </ListItemButton>
+                        </Tooltip>
+                        <Menu
+                          anchorEl={waterQualityMenuAnchor}
+                          open={Boolean(waterQualityMenuAnchor)}
+                          onClose={() => setWaterQualityMenuAnchor(null)}
+                          anchorOrigin={{ vertical: "center", horizontal: "right" }}
+                          transformOrigin={{ vertical: "center", horizontal: "left" }}
+                          slotProps={{ list: { dense: true } }}
+                        >
+                          {renderWaterQualityMenuItems(true)}
+                        </Menu>
+                      </Box>
+                    )
+                  }
+
+                  return (
+                    <Box key={item.href}>
+                      <ListItemButton
+                        selected={waterQualityActive}
+                        sx={{
+                          minHeight: 48,
+                          borderRadius: 2.5,
+                          px: 1.5,
+                        }}
+                      >
+                        <Box
+                          component={Link}
+                          href={item.href}
+                          onClick={closeAfterNavigate}
+                          sx={{
+                            display: "flex",
+                            minWidth: 0,
+                            flex: 1,
+                            alignItems: "center",
+                            gap: 1.5,
+                            color: "inherit",
+                            textDecoration: "none",
+                          }}
+                        >
+                          <Icon size={18} />
+                          <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                            {item.name}
+                          </Typography>
+                        </Box>
+                        <IconButton
+                          size="small"
                           onClick={(event) => {
                             event.preventDefault()
                             event.stopPropagation()
                             setWaterQualityOpen((prev) => !prev)
                           }}
-                          className="rounded-xl p-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
+                          sx={{ color: "inherit" }}
                         >
-                          <ChevronDown className={`h-4 w-4 transition-transform ${waterQualityOpen ? "rotate-180" : ""}`} />
-                        </button>
-                      </div>
-                      {waterQualityOpen && (
-                        <div className="ml-5 mt-1.5 space-y-1">
-                          {waterQualityLinks.map((link) => {
-                            const isActive =
-                              (link.activeKey === "overview" && overviewActive) ||
-                              (link.activeKey === "parameter" && parameterActive) ||
-                              (link.activeKey === "environment" && environmentActive) ||
-                              (link.activeKey === "depth" && depthProfileActive) ||
-                              (link.activeKey === "alerts" && alertsActive) ||
-                              (link.activeKey === "sensors" && sensorsActive)
+                          <ChevronDown
+                            size={16}
+                            style={{
+                              transform: waterQualityOpen ? "rotate(180deg)" : "rotate(0deg)",
+                              transition: "transform 0.2s ease",
+                            }}
+                          />
+                        </IconButton>
+                      </ListItemButton>
+                      <Collapse in={waterQualityOpen} timeout="auto" unmountOnExit>
+                        <List disablePadding sx={{ mt: 0.5, ml: 2, display: "grid", gap: 0.25 }}>
+                          {waterQualityLinks.map((link) => (
+                            <ListItemButton
+                              key={link.href}
+                              component={Link}
+                              href={link.href}
+                              selected={link.activeKey === activeWaterQualityKey}
+                              onClick={closeAfterNavigate}
+                              sx={{
+                                minHeight: 38,
+                                borderRadius: 2,
+                                px: 1.5,
+                              }}
+                            >
+                              <ListItemText
+                                primary={<Typography variant="caption" sx={{ fontWeight: 600 }}>{link.label}</Typography>}
+                              />
+                            </ListItemButton>
+                          ))}
+                        </List>
+                      </Collapse>
+                    </Box>
+                  )
+                }
 
-                            return (
-                              <Link
-                                key={link.href}
-                                href={link.href}
-                                onClick={handleMobileNavigate}
-                                className={waterQualityLinkClass(isActive)}
-                              >
-                                {link.label}
-                              </Link>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              }
+                const resolvedHref = resolveItemHref(farmRole, item.href)
+                const resolvedLabel = resolveItemLabel(farmRole, item.href, item.name)
+                const itemBasePath = stripDashboardPath(item.href)
+                const resolvedBasePath = stripDashboardPath(resolvedHref.split("?")[0] ?? resolvedHref)
+                const isActive =
+                  appPathname === itemBasePath ||
+                  appPathname === resolvedBasePath ||
+                  (itemBasePath !== "/" && appPathname.startsWith(`${itemBasePath}/`))
+                const Icon = item.icon
 
-              return (
-                <div key={item.href}>
-                  <div
-                    className={navItemClass(waterQualityActive)}
+                return (
+                  <Tooltip
+                    key={item.href}
+                    title={collapsed && !mobile ? resolvedLabel : ""}
+                    placement="right"
+                    disableHoverListener={!collapsed || mobile}
                   >
-                    <Link href={item.href} onClick={handleMobileNavigate} className="flex items-center gap-3 flex-1">
-                      <Icon className="h-4 w-4" />
-                      <span className="min-w-0 truncate text-sm font-medium">{item.name}</span>
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        setWaterQualityOpen((prev) => !prev)
+                    <ListItemButton
+                      component={Link}
+                      href={resolvedHref}
+                      selected={isActive}
+                      onClick={closeAfterNavigate}
+                      sx={{
+                        minHeight: 48,
+                        justifyContent: collapsed && !mobile ? "center" : "flex-start",
+                        borderRadius: 2.5,
+                        px: collapsed && !mobile ? 1.5 : 1.75,
                       }}
-                      className="rounded-xl p-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
                     >
-                      <ChevronDown className={`h-4 w-4 transition-transform ${waterQualityOpen ? "rotate-180" : ""}`} />
-                    </button>
-                  </div>
-                  {waterQualityOpen && (
-                    <div className="ml-5 mt-1.5 space-y-1">
-                      {waterQualityLinks.map((link) => {
-                        const isActive =
-                          (link.activeKey === "overview" && overviewActive) ||
-                          (link.activeKey === "parameter" && parameterActive) ||
-                          (link.activeKey === "environment" && environmentActive) ||
-                          (link.activeKey === "depth" && depthProfileActive) ||
-                          (link.activeKey === "alerts" && alertsActive) ||
-                          (link.activeKey === "sensors" && sensorsActive)
-
-                        return (
-                          <Link
-                            key={link.href}
-                            href={link.href}
-                            onClick={handleMobileNavigate}
-                            className={waterQualityLinkClass(isActive)}
-                          >
-                            {link.label}
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
+                      <ListItemIcon
+                        sx={{
+                          minWidth: collapsed && !mobile ? 0 : 34,
+                          color: "inherit",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Icon size={18} />
+                      </ListItemIcon>
+                      {!collapsed || mobile ? (
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                              {resolvedLabel}
+                            </Typography>
+                          }
+                        />
+                      ) : null}
+                    </ListItemButton>
+                  </Tooltip>
+                )
+              })}
+            </List>
+          </Box>
+        ))}
+      </Box>
+      <Box sx={{ p: 1.5 }}>
+        <Button
+          fullWidth
+          color="inherit"
+          variant="text"
+          startIcon={<LogOut size={16} />}
+          disabled={signingOut}
+          onClick={async () => {
+            if (signingOut) return
+            setSigningOut(true)
+            try {
+              await signOut()
+            } finally {
+              setSigningOut(false)
             }
+          }}
+          sx={{
+            justifyContent: collapsed && !mobile ? "center" : "flex-start",
+            minHeight: 48,
+            borderRadius: 2.5,
+            px: collapsed && !mobile ? 1.5 : 1.75,
+          }}
+        >
+          {!collapsed || mobile ? (signingOut ? "Logging out..." : "Log out") : null}
+        </Button>
+      </Box>
+    </Paper>
+  )
+}
 
-            const resolvedHref = resolveItemHref(farmRole, item.href)
-            const resolvedLabel = resolveItemLabel(farmRole, item.href, item.name)
-            const isActive = pathname === item.href ||
-              pathname === resolvedHref.split("?")[0] ||
-              (item.href !== "/" && pathname.startsWith(item.href + "/"))
-            const Icon = item.icon
-            return (
-              <Link
-                key={item.href}
-                href={resolvedHref}
-                onClick={handleMobileNavigate}
-                className={navItemClass(isActive, collapsed)}
-                title={collapsed ? resolvedLabel : undefined}
-              >
-                <Icon className="h-4 w-4" />
-                <span className={`min-w-0 truncate text-sm font-medium ${collapsed ? "md:hidden" : ""}`}>{resolvedLabel}</span>
-              </Link>
-            )
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
+export default function Sidebar({
+  initialFarmId,
+  initialFarmName,
+  open,
+  collapsed,
+  onToggle,
+  onCollapseToggle,
+}: {
+  initialFarmId?: string | null
+  initialFarmName?: string | null
+  open: boolean
+  collapsed: boolean
+  onToggle: () => void
+  onCollapseToggle: () => void
+}) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 768
 
-        <div className="p-3 md:p-3.5">
-          <button
-            onClick={async () => {
-              if (signingOut) return
-              setSigningOut(true)
-              try {
-                await signOut()
-              } finally {
-                router.push("/auth")
-                setSigningOut(false)
-              }
-            }}
-            className={`flex w-full items-center rounded-2xl px-3 py-2.5 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-60 ${collapsed ? "justify-center" : "gap-3"}`}
-            disabled={signingOut}
-            title={collapsed ? "Log out" : undefined}
-          >
-            <LogOut className="h-4 w-4" />
-            <span className={`text-sm font-medium ${collapsed ? "md:hidden" : ""}`}>
-              {signingOut ? "Logging out..." : "Log out"}
-            </span>
-          </button>
-        </div>
-      </aside>
+  useEffect(() => {
+    if (!isDesktop && open) {
+      onToggle()
+    }
+  }, [isDesktop, onToggle, open, pathname, searchParams])
+
+  return (
+    <>
+      <Drawer
+        open={open}
+        onClose={onToggle}
+        variant="temporary"
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": {
+            width: Math.min(DASHBOARD_SIDEBAR_WIDTH, 320),
+            boxSizing: "border-box",
+          },
+        }}
+      >
+        <SidebarContent
+          initialFarmId={initialFarmId}
+          initialFarmName={initialFarmName}
+          collapsed={false}
+          onClose={onToggle}
+          onCollapseToggle={onCollapseToggle}
+          mobile
+        />
+      </Drawer>
+      <Box
+        sx={{
+          display: { xs: "none", md: "block" },
+          position: "fixed",
+          top: 0,
+          left: 0,
+          zIndex: (theme) => theme.zIndex.drawer,
+          width: collapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH,
+          height: "100vh",
+          transition: (theme) =>
+            theme.transitions.create("width", {
+              duration: theme.transitions.duration.standard,
+            }),
+        }}
+      >
+        <SidebarContent
+          initialFarmId={initialFarmId}
+          initialFarmName={initialFarmName}
+          collapsed={collapsed}
+          onClose={onToggle}
+          onCollapseToggle={onCollapseToggle}
+          mobile={false}
+        />
+      </Box>
     </>
   )
 }

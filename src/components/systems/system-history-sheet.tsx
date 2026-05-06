@@ -9,24 +9,17 @@ import {
   Line,
 } from "@/components/charts/chartjs"
 import { Fish, Skull, TestTube, TrendingUp } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/app-ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
+import { Badge } from "@/components/app-ui/badge"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/app-ui/sheet"
 import {
   buildCartesianOptions,
   buildDailyDateDomain,
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/app-ui/tabs"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useMortalityData, useFeedingRecords, useSamplingData, useStockingData, useTransferData } from "@/lib/hooks/use-reports"
@@ -35,8 +28,10 @@ import { useSystemTimelineBounds } from "@/lib/hooks/use-system-timeline"
 import { useDailyWaterQualityRating, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { getHarvests } from "@/lib/api/reports"
 import type { DashboardSystemRow } from "@/features/dashboard/types"
+import type { SystemTimelineBoundsRow } from "@/lib/api/system-timeline"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import { resolveSystemTimelineWindow } from "@/lib/system-timeline-window"
+import { DATA_ENTRY_PATH } from "@/lib/app-entry"
 import {
   formatCompactDate,
   formatDateOnly,
@@ -55,9 +50,9 @@ type OperationRow = {
 }
 
 const ratingToneClass = (rating: string | null | undefined) => {
-  if (rating === "optimal") return "bg-chart-2/15 text-chart-2"
-  if (rating === "acceptable") return "bg-chart-3/20 text-chart-3"
-  if (rating === "critical") return "bg-chart-4/15 text-chart-4"
+  if (rating === "optimal") return "bg-success/15 text-success"
+  if (rating === "acceptable") return "bg-warning/15 text-warning"
+  if (rating === "critical") return "bg-warning/15 text-warning"
   if (rating === "lethal") return "bg-destructive/15 text-destructive"
   return "bg-muted text-muted-foreground"
 }
@@ -71,6 +66,7 @@ export default function SystemHistorySheet({
   dateFrom,
   dateTo,
   summaryRow,
+  initialTimelineRow,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -80,6 +76,7 @@ export default function SystemHistorySheet({
   dateFrom?: string
   dateTo?: string
   summaryRow?: DashboardSystemRow | null
+  initialTimelineRow?: SystemTimelineBoundsRow | null
 }) {
   const router = useRouter()
   const enabled = open && Boolean(farmId) && Boolean(systemId)
@@ -91,8 +88,8 @@ export default function SystemHistorySheet({
   })
 
   const timeline = useMemo(
-    () => (timelineQuery.data?.status === "success" ? timelineQuery.data.data[0] ?? null : null),
-    [timelineQuery.data],
+    () => initialTimelineRow ?? (timelineQuery.data?.status === "success" ? timelineQuery.data.data[0] ?? null : null),
+    [initialTimelineRow, timelineQuery.data],
   )
   const effectiveTimeline = useMemo(
     () =>
@@ -593,7 +590,7 @@ export default function SystemHistorySheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-[760px] overflow-y-auto">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-[760px]">
         <SheetHeader>
           <div className="flex items-start justify-between gap-3 pr-8">
             <div>
@@ -606,13 +603,13 @@ export default function SystemHistorySheet({
 
         <div className="space-y-4 px-4 pb-4">
           {errorMessages.length > 0 ? <DataErrorState title="Unable to load system history" description={errorMessages[0]} /> : null}
-          {!hasAnyTimeline && errorMessages.length === 0 ? (
+          {!loading && !hasAnyTimeline && errorMessages.length === 0 ? (
             <DataErrorState
               title="No production timeline"
               description="This system does not have enough stocking or observed activity data to resolve an honest production period yet."
             />
           ) : null}
-          {hasAnyTimeline && !hasResolvedTimeline && errorMessages.length === 0 ? (
+          {!loading && hasAnyTimeline && !hasResolvedTimeline && errorMessages.length === 0 ? (
             <DataErrorState
               title="No production data in selected period"
               description="This system has a production timeline, but it does not overlap the currently selected time period."
@@ -793,15 +790,15 @@ export default function SystemHistorySheet({
         </div>
 
         <SheetFooter className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Button variant="outline" onClick={() => router.push(`/data-entry?type=feeding&system=${systemId ?? ""}`)} className="cursor-pointer">
+          <Button variant="outline" onClick={() => router.push(`${DATA_ENTRY_PATH}?type=feeding&system=${systemId ?? ""}`)} className="cursor-pointer">
             <Fish className="mr-2 h-4 w-4" />
             Record Feeding
           </Button>
-          <Button variant="outline" onClick={() => router.push(`/data-entry?type=sampling&system=${systemId ?? ""}`)} className="cursor-pointer">
+          <Button variant="outline" onClick={() => router.push(`${DATA_ENTRY_PATH}?type=sampling&system=${systemId ?? ""}`)} className="cursor-pointer">
             <TrendingUp className="mr-2 h-4 w-4" />
             Record Sampling
           </Button>
-          <Button variant="outline" onClick={() => router.push(`/data-entry?type=mortality&system=${systemId ?? ""}`)} className="cursor-pointer">
+          <Button variant="outline" onClick={() => router.push(`${DATA_ENTRY_PATH}?type=mortality&system=${systemId ?? ""}`)} className="cursor-pointer">
             <Skull className="mr-2 h-4 w-4" />
             Record Mortality
           </Button>
@@ -810,4 +807,5 @@ export default function SystemHistorySheet({
     </Sheet>
   )
 }
+
 

@@ -1,10 +1,15 @@
 "use client"
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react"
-import { Check, Search } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
+import type { SxProps, Theme } from "@mui/material/styles"
+import { alpha } from "@mui/material/styles"
+import Box from "@mui/material/Box"
+import ButtonBase from "@mui/material/ButtonBase"
+import InputAdornment from "@mui/material/InputAdornment"
+import OutlinedInput from "@mui/material/OutlinedInput"
+import Popover from "@mui/material/Popover"
+import Typography from "@mui/material/Typography"
+import { Check, ChevronDown, Search } from "lucide-react"
 
 export type FilterPopoverOption = {
   value: string
@@ -23,8 +28,8 @@ type FilterPopoverProps = {
   emptyMessage?: string
   disabled?: boolean
   searchable?: boolean
-  triggerClassName?: string
-  contentClassName?: string
+  triggerSx?: SxProps<Theme>
+  contentSx?: SxProps<Theme>
 }
 
 const normalize = (value: string) => value.trim().toLowerCase()
@@ -39,14 +44,16 @@ export function FilterPopover({
   emptyMessage = "No matching options found.",
   disabled = false,
   searchable = false,
-  triggerClassName,
-  contentClassName,
+  triggerSx,
+  contentSx,
 }: FilterPopoverProps) {
-  const [open, setOpen] = useState(false)
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
   const selectedOption = useMemo(() => options.find((option) => option.value === value) ?? null, [options, value])
   const showSearch = searchable || options.length > 8
+  const open = Boolean(anchorEl)
+
   const filteredOptions = useMemo(() => {
     const normalizedQuery = normalize(deferredQuery)
     if (!normalizedQuery) return options
@@ -65,93 +72,209 @@ export function FilterPopover({
   }, [open])
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={disabled}
-          className={cn(
-            "topbar-control group flex h-10 w-full min-w-0 items-center gap-3 rounded-lg border border-border/80 bg-card/92 px-3 text-left shadow-[0_12px_24px_-22px_rgba(15,23,32,0.18)] transition duration-200 hover:border-primary/24 hover:shadow-[0_16px_26px_-22px_rgba(15,23,32,0.2)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto",
-            triggerClassName,
-          )}
-          aria-label={label}
-        >
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {label}
-              </div>
-              <div className="truncate text-sm font-medium text-foreground">
-                {selectedOption?.label ?? placeholder}
-              </div>
-            </div>
-          </div>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        sideOffset={10}
-        className={cn(
-          "w-[min(24rem,calc(100vw-1.5rem))] rounded-xl border-border/80 bg-card/98 p-2 shadow-[0_24px_44px_-32px_rgba(15,23,32,0.32)] backdrop-blur-xl",
-          contentClassName,
-        )}
+    <>
+      <ButtonBase
+        type="button"
+        disabled={disabled}
+        aria-label={label}
+        onClick={(event) => setAnchorEl(event.currentTarget)}
+        sx={{
+          display: "flex",
+          minHeight: 40,
+          width: "100%",
+          minWidth: 0,
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1.5,
+          border: (theme) => `1px solid ${theme.palette.divider}`,
+          borderRadius: 1.5,
+          bgcolor: "background.paper",
+          px: 1.5,
+          py: 1,
+          textAlign: "left",
+          transition: (theme) =>
+            theme.transitions.create(["border-color", "background-color"], {
+              duration: theme.transitions.duration.shorter,
+            }),
+          "&:hover": {
+            borderColor: "primary.main",
+            bgcolor: "background.paper",
+          },
+          "&:focus-visible": {
+            outline: "none",
+            borderColor: "primary.main",
+            bgcolor: "background.paper",
+          },
+          "&.Mui-disabled": {
+            opacity: 0.6,
+          },
+          ...(Array.isArray(triggerSx) ? {} : triggerSx),
+        }}
       >
-        <div className="space-y-2">
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography
+            variant="overline"
+            sx={{
+              display: "block",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              color: "text.secondary",
+              lineHeight: 1.1,
+            }}
+          >
+            {label}
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              mt: 0.35,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontWeight: 600,
+              color: "text.primary",
+            }}
+          >
+            {selectedOption?.label ?? placeholder}
+          </Typography>
+        </Box>
+        <ChevronDown size={16} />
+      </ButtonBase>
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 1.25,
+              width: "min(24rem, calc(100vw - 24px))",
+              borderRadius: 2,
+              border: (theme) => `1px solid ${theme.palette.divider}`,
+              bgcolor: "background.paper",
+              p: 1,
+              boxShadow: "none",
+              ...(Array.isArray(contentSx) ? {} : contentSx),
+            },
+          },
+        }}
+      >
+        <Box sx={{ display: "grid", gap: 1 }}>
           {showSearch ? (
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={searchPlaceholder}
-                className="soft-input-surface h-10 rounded-lg border-border/70 bg-background pl-9"
-              />
-            </div>
+            <OutlinedInput
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={searchPlaceholder}
+              fullWidth
+              size="small"
+              startAdornment={
+                <InputAdornment position="start">
+                  <Search size={16} />
+                </InputAdornment>
+              }
+              sx={{
+                bgcolor: "background.paper",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "divider",
+                },
+                "&.Mui-focused": {
+                  bgcolor: "background.paper",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "primary.main",
+                },
+              }}
+            />
           ) : null}
 
-          <div className="max-h-80 space-y-1 overflow-y-auto pr-1">
+          <Box sx={{ display: "grid", gap: 0.75, maxHeight: 320, overflowY: "auto", pr: 0.25 }}>
             {filteredOptions.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/70 bg-muted/35 px-4 py-6 text-sm text-muted-foreground">
-                {emptyMessage}
-              </div>
+              <Box
+                sx={{
+                  border: (theme) => `1px dashed ${theme.palette.divider}`,
+                  borderRadius: 2,
+                  bgcolor: (theme) => alpha(theme.palette.text.primary, 0.03),
+                  px: 2,
+                  py: 3,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  {emptyMessage}
+                </Typography>
+              </Box>
             ) : (
               filteredOptions.map((option) => {
                 const isSelected = option.value === value
+
                 return (
-                  <button
+                  <ButtonBase
                     key={option.value}
-                    type="button"
                     onClick={() => {
                       onChange(option.value)
-                      setOpen(false)
+                      setAnchorEl(null)
                     }}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition duration-200",
-                      isSelected
-                        ? "border-primary/30 bg-accent/70"
-                        : "border-transparent bg-background/70 hover:border-border/60 hover:bg-muted/70",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                    sx={{
+                      display: "flex",
+                      width: "100%",
+                      alignItems: "center",
+                      gap: 1.25,
+                  border: (theme) =>
+                    isSelected
+                      ? `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
+                      : "1px solid transparent",
+                      borderRadius: 1.5,
+                      bgcolor: (theme) =>
                         isSelected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border/80 bg-card text-transparent",
-                      )}
+                          ? alpha(theme.palette.primary.main, 0.08)
+                          : theme.palette.background.paper,
+                      px: 1.5,
+                      py: 1.25,
+                      textAlign: "left",
+                      justifyContent: "flex-start",
+                      "&:hover": {
+                        borderColor: "divider",
+                        bgcolor: "background.default",
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        width: 20,
+                        height: 20,
+                        flexShrink: 0,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: (theme) =>
+                          `1px solid ${isSelected ? theme.palette.primary.main : alpha(theme.palette.divider, 0.9)}`,
+                        borderRadius: "50%",
+                        bgcolor: isSelected ? "primary.main" : "background.paper",
+                        color: isSelected ? "primary.contrastText" : "transparent",
+                      }}
                     >
-                      <Check className="size-3.5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-foreground">{option.label}</span>
-                    </span>
-                  </button>
+                      <Check size={13} />
+                    </Box>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                        {option.label}
+                      </Typography>
+                      {option.description ? (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+                          {option.description}
+                        </Typography>
+                      ) : null}
+                    </Box>
+                  </ButtonBase>
                 )
               })
             )}
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+          </Box>
+        </Box>
+      </Popover>
+    </>
   )
 }

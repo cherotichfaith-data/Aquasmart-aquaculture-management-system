@@ -9,11 +9,19 @@ import {
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue, formatPercentRateValue } from "@/lib/analytics-format"
-import { ReportRecordsHiddenState, ReportRecordsToolbar, ReportSectionHeader } from "./report-shared"
+import {
+  REPORT_CHART_SHELL_CLASS,
+  REPORT_SURFACE_CARD_CLASS,
+  REPORT_TABLE_SHELL_CLASS,
+  ReportMetricCard,
+  ReportRecordsHiddenState,
+  ReportRecordsToolbar,
+  ReportSectionHeader,
+} from "./report-shared"
 
 export function PerformanceSummaryCards({
   summary,
@@ -28,62 +36,36 @@ export function PerformanceSummaryCards({
   } | null
 }) {
   return (
-    <div className="kpi-grid md:grid-cols-5">
-      <Card className="kpi-card">
-        <CardHeader className="kpi-card-header">
-          <CardTitle className="kpi-card-title">Cycle eFCR</CardTitle>
-        </CardHeader>
-        <CardContent className="kpi-card-content">
-          <div className="kpi-card-value">
-            {formatNumberValue(summary?.efcr_aggregated_consolidated, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}
-          </div>
-          <p className="kpi-card-meta">Latest production cycle snapshot for the selected scope</p>
-        </CardContent>
-      </Card>
-      <Card className="kpi-card">
-        <CardHeader className="kpi-card-header">
-          <CardTitle className="kpi-card-title">Survival Rate</CardTitle>
-        </CardHeader>
-        <CardContent className="kpi-card-content">
-          <div className="kpi-card-value">
-            {summary?.survival_rate_pct != null
-              ? `${formatNumberValue(summary.survival_rate_pct, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}%`
-              : "N/A"}
-          </div>
-          <p className="kpi-card-meta">(stocked - cumulative mortality - transfers out) / stocked</p>
-        </CardContent>
-      </Card>
-      <Card className="kpi-card">
-        <CardHeader className="kpi-card-header">
-          <CardTitle className="kpi-card-title">Total Harvest</CardTitle>
-        </CardHeader>
-        <CardContent className="kpi-card-content">
-          <div className="kpi-card-value">
-            {formatNumberValue(summary?.total_harvest_kg, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg
-          </div>
-          <p className="kpi-card-meta">
-            {formatNumberValue(summary?.total_harvest_fish, { decimals: 0, fallback: "N/A" })} fish
-          </p>
-        </CardContent>
-      </Card>
-      <Card className="kpi-card">
-        <CardHeader className="kpi-card-header">
-          <CardTitle className="kpi-card-title">Farm Biomass</CardTitle>
-        </CardHeader>
-        <CardContent className="kpi-card-content">
-          <div className="kpi-card-value">{formatNumberValue(summary?.average_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })}</div>
-          <p className="kpi-card-meta">Latest total biomass across in-scope cycles</p>
-        </CardContent>
-      </Card>
-      <Card className="kpi-card">
-        <CardHeader className="kpi-card-header">
-          <CardTitle className="kpi-card-title">Farm Mortality</CardTitle>
-        </CardHeader>
-        <CardContent className="kpi-card-content">
-          <div className="kpi-card-value">{formatPercentRateValue(summary?.mortality_rate, 2, "%/day", "N/A")}</div>
-          <p className="kpi-card-meta">Latest daily mortality ratio across in-scope cycles</p>
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <ReportMetricCard
+        title="Cycle eFCR"
+        value={formatNumberValue(summary?.efcr_aggregated_consolidated, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}
+        meta="Latest production cycle snapshot for the selected scope"
+      />
+      <ReportMetricCard
+        title="Survival Rate"
+        value={
+          summary?.survival_rate_pct != null
+            ? `${formatNumberValue(summary.survival_rate_pct, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}%`
+            : "N/A"
+        }
+        meta="Stocked fish less cumulative mortality and transfers out, divided by stocked fish."
+      />
+      <ReportMetricCard
+        title="Total Harvest"
+        value={`${formatNumberValue(summary?.total_harvest_kg, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg`}
+        meta={`${formatNumberValue(summary?.total_harvest_fish, { decimals: 0, fallback: "N/A" })} fish`}
+      />
+      <ReportMetricCard
+        title="Farm Biomass"
+        value={`${formatNumberValue(summary?.average_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg`}
+        meta="Latest total biomass across all in-scope cycles."
+      />
+      <ReportMetricCard
+        title="Farm Mortality"
+        value={formatPercentRateValue(summary?.mortality_rate, 2, "%/day", "N/A")}
+        meta="Latest daily mortality ratio across in-scope cycles."
+      />
     </div>
   )
 }
@@ -153,6 +135,7 @@ export function PerformanceTrendSection({
       buildCartesianOptions({
         palette,
         legend: true,
+        xGrid: true,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: "eFCR",
@@ -177,7 +160,7 @@ export function PerformanceTrendSection({
   )
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader>
         <CardTitle>Performance Trend</CardTitle>
         <CardDescription>eFCR and biomass over time</CardDescription>
@@ -186,7 +169,7 @@ export function PerformanceTrendSection({
         {loading ? (
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="chart-canvas-shell h-[300px]">
+          <div className={REPORT_CHART_SHELL_CLASS}>
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <Line data={data} options={options} />
             </LazyRender>
@@ -241,7 +224,7 @@ export function SystemBiomassComparisonSection({
   )
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader>
         <CardTitle>System Biomass Comparison</CardTitle>
         <CardDescription>Latest performance snapshot per system</CardDescription>
@@ -250,7 +233,7 @@ export function SystemBiomassComparisonSection({
         {loading ? (
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <div className="chart-canvas-shell h-[300px]">
+          <div className={REPORT_CHART_SHELL_CLASS}>
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <Bar data={data} options={options} />
             </LazyRender>
@@ -267,7 +250,7 @@ export function BenchmarkStatusSection({
   benchmarkCards: Array<{ metric: string; actual: number | null; benchmark: number; status: string; tone: string }>
 }) {
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader>
         <CardTitle>Benchmark Status</CardTitle>
         <CardDescription>Hardcoded historical benchmarks for eFCR and mortality.</CardDescription>
@@ -285,11 +268,11 @@ export function BenchmarkStatusSection({
             const benchmark = isMortality ? `${(item.benchmark * 100).toFixed(2)}%` : item.benchmark.toFixed(2)
             const toneClass =
               item.tone === "good"
-                ? "bg-chart-2/10 border-chart-2/25 text-chart-2"
-                : "bg-chart-4/10 border-chart-4/25 text-chart-4"
+                ? "bg-success/10 border-success/25 text-success"
+                : "bg-warning/10 border-warning/25 text-warning"
 
             return (
-              <div key={item.metric} className="soft-panel-subtle p-3">
+              <div key={item.metric} className="rounded-[1rem] border border-border/60 bg-background p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold">{item.metric}</p>
                   <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${toneClass}`}>
@@ -355,7 +338,7 @@ export function PerformanceRecordsSection({
   ])
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <ReportSectionHeader
         title="Performance Records"
         actions={
@@ -403,7 +386,7 @@ export function PerformanceRecordsSection({
       />
       <CardContent>
         {showPerformanceRecords ? (
-          <div className="soft-table-shell">
+          <div className={REPORT_TABLE_SHELL_CLASS}>
             <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">
@@ -461,3 +444,4 @@ export function PerformanceRecordsSection({
     </Card>
   )
 }
+

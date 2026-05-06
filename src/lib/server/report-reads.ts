@@ -155,13 +155,36 @@ export async function listFcrTrend(
 export async function listGrowthTrend(
   supabase: ServerSupabaseClient,
   params: {
+    farmId?: string | null
     systemId?: number
     days?: number
     dateFrom?: string
     dateTo?: string
   },
 ): Promise<GrowthTrendRow[]> {
-  if (!params.systemId) return []
+  // G-08 fix: when no systemId is given but farmId is, aggregate across all farm systems
+  if (!params.systemId) {
+    if (!params.farmId) return []
+    const { data: systems, error: sysErr } = await supabase
+      .from("system")
+      .select("id")
+      .eq("farm_id", params.farmId)
+      .eq("is_active", true)
+    if (sysErr || !systems?.length) return []
+    const results = await Promise.all(
+      systems
+        .filter((s): s is { id: number } => typeof s.id === "number")
+        .map((s) =>
+          runRpcRead<GrowthTrendRow>(
+            supabase.rpc("get_growth_trend", {
+              p_system_id: s.id,
+              p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
+            }),
+          ),
+        ),
+    )
+    return results.flat()
+  }
 
   const query = supabase.rpc("get_growth_trend", {
     p_system_id: params.systemId,
@@ -191,7 +214,7 @@ export async function listFeedingRecords(
       feeding_amount,
       feeding_response,
       system_id,
-      feed_type:feed_type!feeding_record_feed_id_fkey (
+      feed_type:feed_type (
         id,
         feed_line,
         crude_protein_percentage,
@@ -351,19 +374,92 @@ export async function listTransferData(
   return runTableRead<FishTransferRow>(query.order("date", { ascending: false }))
 }
 
+/**
+ * Returns a unified activity feed by querying the most recent events
+ * across all transactional tables for the given farm.
+ * Each row is normalised into the ChangeLogRow shape consumed by the Reports page.
+ */
 export async function listRecentActivities(
   supabase: ServerSupabaseClient,
   params?: {
+    farmId?: string | null
     tableName?: string
-    changeType?: ChangeType
     dateFrom?: string
     dateTo?: string
     limit?: number
   },
 ): Promise<ChangeLogRow[]> {
-  void supabase
-  void params
-  return []
+  if (!params?.farmId) return []
+
+  const limit = params.limit ?? 50
+  const dateFrom = params.dateFrom
+  const dateTo = params.dateTo
+  const filterTable = params.tableName
+
+  // Resolve all system IDs for this farm so we can scope per-system tables
+  const { data: systems, error: sysErr } = await supabase
+    .from("system")
+    .select("id")
+    .eq("farm_id", params.farmId)
+  if (sysErr) {
+    if (isQuietReadError(sysErr)) return []
+    throw sysErr
+  }
+  const systemIds = (systems ?? []).map((s) => s.id).filter((id): id is number => typeof id === "number")
+  if (systemIds.length === 0) return []
+
+  type RawEvent = { id: number | string; date: string | null; system_id?: number | null; batch_id?: number | null }
+
+  async function fetchTable<T extends RawEvent>(
+    table: RecentRowsTable,
+    tableName: string,
+    changeType: ChangeType,
+    useFarmId: boolean,
+  ): Promise<ChangeLogRow[]> {
+    if (filterTable && filterTable !== "all" && filterTable !== tableName) return []
+
+    let q = supabase.from(table).select("id, date, system_id, batch_id").order("date", { ascending: false }).limit(limit)
+
+    if (useFarmId) {
+      q = q.eq("farm_id", params!.farmId!)
+    } else {
+      if (systemIds.length === 0) return []
+      q = q.in("system_id", systemIds)
+    }
+    if (dateFrom) q = q.gte("date", dateFrom)
+    if (dateTo) q = q.lte("date", dateTo)
+
+    const { data, error } = await q
+    if (error) {
+      if (isQuietReadError(error)) return []
+      return []
+    }
+    return (data ?? []).map((row: any) => ({
+      id: row.id,
+      table_name: tableName,
+      change_type: changeType,
+      column_name: null,
+      change_time: row.date ?? null,
+      system_id: row.system_id ?? null,
+      batch_id: row.batch_id ?? null,
+    }))
+  }
+
+  const results = await Promise.all([
+    fetchTable("feeding_record",         "feeding_record",         "INSERT", false),
+    fetchTable("fish_mortality",          "fish_mortality",         "INSERT", true),
+    fetchTable("fish_sampling_weight",    "fish_sampling_weight",   "INSERT", false),
+    fetchTable("fish_stocking",           "fish_stocking",          "INSERT", false),
+    fetchTable("fish_harvest",            "fish_harvest",           "INSERT", false),
+    fetchTable("fish_transfer",           "fish_transfer",          "INSERT", false),
+    fetchTable("water_quality_measurement","water_quality_measurement","INSERT",false),
+    fetchTable("feed_incoming",           "feed_incoming",          "INSERT", true),
+  ])
+
+  return results
+    .flat()
+    .sort((a, b) => String(b.change_time ?? "").localeCompare(String(a.change_time ?? "")))
+    .slice(0, limit)
 }
 
 export async function listBatchSystemIds(

@@ -1,9 +1,16 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 
-const REPORT_ACTION_BUTTON_CLASS = "px-3 py-2 rounded-xl bg-background/72 text-sm font-medium shadow-[0_14px_32px_-26px_rgba(15,23,32,0.36)] transition-colors hover:bg-muted/35"
+const REPORT_ACTION_BUTTON_CLASS =
+  "min-h-10 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/35"
+export const REPORT_SURFACE_CARD_CLASS =
+  "rounded-[1.35rem] border-border/70 shadow-none hover:-translate-y-0"
+export const REPORT_CHART_SHELL_CLASS =
+  "h-full overflow-hidden rounded-[1rem] border border-border/60 bg-background p-3 md:p-4"
+export const REPORT_TABLE_SHELL_CLASS =
+  "overflow-x-auto rounded-[1rem] border border-border/60 bg-background"
 
 export function ReportSectionHeader({
   title,
@@ -33,7 +40,7 @@ export function ReportRecordsHiddenState({
   label: string
 }) {
   return (
-    <div className="soft-panel-subtle p-4 text-sm text-muted-foreground">
+    <div className="rounded-[1rem] bg-muted/20 p-4 text-sm text-muted-foreground">
       Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {label}.
     </div>
   )
@@ -52,6 +59,32 @@ export function ReportActionButton({
     <button type="button" className={className} onClick={onClick}>
       {children}
     </button>
+  )
+}
+
+export function ReportMetricCard({
+  title,
+  value,
+  meta,
+}: {
+  title: string
+  value: ReactNode
+  meta?: ReactNode
+}) {
+  return (
+    <Card className="kpi-card min-h-[156px] rounded-[1.2rem] overflow-hidden hover:-translate-y-0">
+      <CardHeader className="kpi-card-header pb-1">
+        <CardTitle className="kpi-card-title">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="kpi-card-content justify-between gap-3">
+        <div className="min-h-0">
+          <div className="kpi-card-value break-words text-xl sm:text-2xl">
+            {value}
+          </div>
+        </div>
+        {meta ? <p className="kpi-card-meta text-xs leading-5">{meta}</p> : null}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -98,7 +131,7 @@ export function ReportRecordsToolbar({
   compact?: boolean
 }) {
   const buttonClass = compact
-    ? "h-10 w-full rounded-xl bg-background/72 px-3 text-sm font-medium shadow-[0_14px_32px_-26px_rgba(15,23,32,0.36)] transition-colors hover:bg-muted/35 sm:w-auto"
+    ? "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/35 sm:w-auto"
     : REPORT_ACTION_BUTTON_CLASS
   const selectClass = compact
     ? "soft-input-surface h-10 w-full px-3 text-sm font-medium sm:w-auto"
@@ -123,3 +156,4 @@ export function ReportRecordsToolbar({
     </div>
   )
 }
+

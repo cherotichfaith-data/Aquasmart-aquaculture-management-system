@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { AlertCircle } from "lucide-react"
 
 export default function AuthErrorPage() {
@@ -18,7 +18,7 @@ export default function AuthErrorPage() {
   }, [router])
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-muted/40">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -36,4 +36,5 @@ export default function AuthErrorPage() {
     </div>
   )
 }
+
 

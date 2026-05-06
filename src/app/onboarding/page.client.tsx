@@ -1,148 +1,245 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { Loader2, ArrowLeft } from "lucide-react"
+import Link from "next/link"
+import { useEffect, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Building2, CheckCircle2, UserRound } from "lucide-react"
+import { OnboardingShell } from "@/components/onboarding/onboarding-shell"
 import { useAuth } from "@/components/providers/auth-provider"
-
-const deriveOwnerName = (email?: string | null) => {
-  const localPart = String(email ?? "").split("@")[0]?.trim()
-  if (!localPart) return ""
-  return localPart
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(" ")
-}
+import { completeOnboardingProfileAction } from "@/features/onboarding/mutations.server"
+import type { OnboardingPageInitialData } from "@/features/onboarding/queries.server"
+import {
+  AQUASMART_ROLE_OPTIONS,
+  ONBOARDING_CREATE_WORKSPACE_PATH,
+  normalizeRole,
+  resolveAppEntryPath,
+  sanitizeNextPath,
+  type AquaSmartRole,
+} from "@/lib/app-entry"
+import { queryKeys } from "@/lib/cache/query-keys"
 
 const inputCls =
   "w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
 
+type MembershipState = {
+  farmId: string | null
+  role: AquaSmartRole
+  source: "active" | "invite" | "none"
+}
+
 export default function OnboardingPageClient() {
   const router = useRouter()
-  const { user, signOut } = useAuth()
+  const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
+  const { user, refreshProfile } = useAuth()
+  const linkedFarmId =
+    typeof searchParams.get("farmId") === "string" && (searchParams.get("farmId") ?? "").trim().length > 0
+      ? searchParams.get("farmId")
+      : null
+  const onboardingState = queryClient.getQueryData<OnboardingPageInitialData>(
+    queryKeys.onboarding.state(user?.id ?? null, linkedFarmId),
+  )
 
-  const [farmName, setFarmName] = useState("")
-  const [location, setLocation] = useState("")
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [fullName, setFullName] = useState(() => onboardingState?.fullName ?? "")
+  const [role, setRole] = useState<Exclude<AquaSmartRole, null>>(() => {
+    const seededRole = normalizeRole(onboardingState?.membership.role)
+    return seededRole && seededRole !== "admin" ? seededRole : "system_operator"
+  })
+  const [membership, setMembership] = useState<MembershipState>(() => ({
+    farmId: onboardingState?.membership.farmId ?? linkedFarmId,
+    role: normalizeRole(onboardingState?.membership.role),
+    source: onboardingState?.membership.source ?? "none",
+  }))
   const [isSaving, setIsSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null)
+  const assignedRole = membership.role
+  const effectiveRole = (assignedRole ?? role) as Exclude<AquaSmartRole, null>
+  const canChooseRole = !assignedRole
+  const nextPath = sanitizeNextPath(searchParams.get("next"), resolveAppEntryPath(effectiveRole))
+  const createWorkspaceHref = `${ONBOARDING_CREATE_WORKSPACE_PATH}?next=${encodeURIComponent(nextPath)}`
 
-  const ownerName = useMemo(() => deriveOwnerName(user?.email) || "there", [user?.email])
-  const ownerEmail = user?.email ?? ""
+  useEffect(() => {
+    if (!onboardingState) {
+      return
+    }
+
+    setFullName((current) => current || onboardingState.fullName)
+    setMembership({
+      farmId: onboardingState.membership.farmId,
+      role: normalizeRole(onboardingState.membership.role),
+      source: onboardingState.membership.source,
+    })
+
+    const normalizedMembershipRole = normalizeRole(onboardingState.membership.role)
+    if (normalizedMembershipRole && normalizedMembershipRole !== "admin") {
+      setRole(normalizedMembershipRole)
+    }
+  }, [onboardingState])
+
+  const displayEmail = user?.email?.trim() || onboardingState?.displayEmail || ""
+  const effectiveNoticeMessage = noticeMessage ?? onboardingState?.notice ?? null
 
   const handleSubmit = async () => {
-    setErrorMsg(null)
-    const name = farmName.trim()
-    const loc  = location.trim()
-    if (!name) { setErrorMsg("Farm name is required."); return }
-    if (!loc)  { setErrorMsg("Location is required."); return }
+    const trimmedFullName = fullName.trim()
+    if (trimmedFullName.length < 2) {
+      setErrorMessage("Enter your full name to continue.")
+      return
+    }
 
     setIsSaving(true)
+    setErrorMessage(null)
+    setNoticeMessage(null)
+
     try {
-      const res = await fetch("/api/onboarding/bootstrap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          farmName: name,
-          location: loc,
-          owner: ownerName,
-          email: ownerEmail,
-        }),
+      const selectedRole = (assignedRole ?? role) as Exclude<AquaSmartRole, null>
+
+      const result = await completeOnboardingProfileAction({
+        fullName: trimmedFullName,
+        role: selectedRole,
       })
-      const result = (await res.json()) as { error?: string; farmId?: string }
-      if (!res.ok || !result.farmId) throw new Error(result.error || "Unable to create your farm workspace.")
-      if (typeof window !== "undefined" && user?.id) {
-        window.localStorage.setItem(`aquasmart:${user.id}:activeFarmId`, result.farmId)
-        window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId: result.farmId } }))
+
+      const currentUserId = user?.id ?? null
+      const farmId = result?.farmId ?? membership.farmId ?? null
+
+      await refreshProfile()
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("profile-updated"))
+        window.dispatchEvent(new Event("farm-memberships-updated"))
+        if (farmId && currentUserId) {
+          window.localStorage.setItem(`aquasmart:${currentUserId}:activeFarmId`, farmId)
+          window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId } }))
+        }
       }
-      window.location.assign("/")
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Try again.")
+
+      if (!result?.membershipAssigned || !farmId) {
+        setNoticeMessage(
+          result?.notice ?? "Profile saved. Create a workspace or ask your farm admin for an invite before continuing.",
+        )
+        setIsSaving(false)
+        return
+      }
+
+      router.replace(`${resolveAppEntryPath(result.role)}?farmId=${encodeURIComponent(farmId)}`)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to complete onboarding.")
       setIsSaving(false)
+      return
     }
+
+    setIsSaving(false)
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.14),_transparent_40%)] px-4 py-10">
-      {/* Header */}
-      <div className="mb-8 flex w-full max-w-lg items-center justify-between">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </button>
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-border/70 bg-card/80">
-            <Image src="/use this.png" alt="AquaSmart" width={18} height={18} />
+    <OnboardingShell
+      title="Welcome to AquaSmart"
+      description="Use onboarding as the single place to confirm your profile, accept assigned access, or create a new farm workspace."
+    >
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="rounded-[1.75rem] border border-border/70 bg-card/95 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">Your account details</h2>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Signed in as <span className="font-medium text-foreground">{displayEmail || "Unknown user"}</span>
+            </p>
           </div>
-          <span className="text-sm font-semibold tracking-wide">AquaSmart</span>
-        </div>
-        <button
-          type="button"
-          onClick={async () => { await signOut(); router.replace("/auth") }}
-          className="text-sm text-muted-foreground transition hover:text-foreground"
-        >
-          Sign out
-        </button>
+
+          {errorMessage ? (
+            <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          {effectiveNoticeMessage ? (
+            <div className="mt-5 rounded-xl border border-border/70 bg-background/80 px-4 py-3 text-sm text-muted-foreground">
+              {effectiveNoticeMessage}
+            </div>
+          ) : null}
+
+          <div className="mt-8 space-y-5">
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-foreground">Full name</span>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                placeholder="Enter your full name"
+                className={inputCls}
+                autoComplete="name"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-foreground">Role</span>
+              <select
+                value={effectiveRole}
+                onChange={(event) => setRole(event.target.value as Exclude<AquaSmartRole, null>)}
+                disabled={!canChooseRole}
+                className={inputCls}
+              >
+                {assignedRole === "admin" ? <option value="admin">Admin</option> : null}
+                {AQUASMART_ROLE_OPTIONS.filter((option) => option.value !== "admin").map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={isSaving}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-70"
+            >
+              {isSaving ? "Saving profile..." : membership.source === "invite" ? "Accept role and continue" : "Continue"}
+            </button>
+
+            {membership.source === "none" ? (
+              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+                <p className="text-sm font-medium text-foreground">Need a farm workspace?</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Join an existing farm with an admin invite, or create a new workspace if you are setting one up for the first time.
+                </p>
+                <Link
+                  href={createWorkspaceHref}
+                  className="mt-4 inline-flex items-center justify-center rounded-xl border border-border/70 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent"
+                >
+                  Create new workspace
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <aside className="space-y-4">
+          <div className="rounded-[1.75rem] border border-border/70 bg-card/92 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
+            <h3 className="text-base font-semibold text-foreground">Your onboarding state</h3>
+            <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
+              <div className="flex items-start gap-3">
+                <UserRound className="mt-0.5 h-4 w-4 text-primary" />
+                <span>Profile collection always starts here with your name and role.</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                <span>
+                  {membership.source === "invite"
+                    ? "Your role was assigned by invitation and will be applied when you continue."
+                    : membership.source === "active"
+                      ? "You already have farm access. This step just confirms your profile."
+                      : "You do not have farm membership yet, so you can create a workspace or wait for an invite."}
+                </span>
+              </div>
+              <div className="flex items-start gap-3">
+                <Building2 className="mt-0.5 h-4 w-4 text-primary" />
+                <span>Multi-farm users continue through workspace selection after onboarding when needed.</span>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
-
-      {/* Card */}
-      <div className="w-full max-w-lg rounded-[1.75rem] border border-border/70 bg-card/95 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Create your farm</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Set up a new farm workspace. You will be assigned as admin and can invite your team after.
-        </p>
-
-        {errorMsg && (
-          <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm font-medium text-destructive">
-            {errorMsg}
-          </div>
-        )}
-
-        <div className="mt-6 space-y-5">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-foreground/90">Farm name <span className="text-destructive">*</span></span>
-            <input
-              type="text"
-              value={farmName}
-              onChange={(e) => setFarmName(e.target.value)}
-              placeholder="e.g. Tanganyika Blue Farm"
-              className={inputCls}
-              autoFocus
-            />
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-foreground/90">Location <span className="text-destructive">*</span></span>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. Kigoma, Tanzania"
-              className={inputCls}
-            />
-          </label>
-
-          {/* Read-only owner info */}
-          <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            Signed in as <span className="font-medium text-foreground">{ownerEmail}</span> — you will be the farm admin.
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={isSaving}
-          className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {isSaving ? "Creating farm..." : "Create Farm"}
-        </button>
-      </div>
-    </main>
+    </OnboardingShell>
   )
 }

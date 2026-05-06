@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 import { Loader2 } from "lucide-react"
 import {
   Form,
@@ -13,9 +13,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
@@ -36,10 +36,11 @@ import {
   getSystemUnits,
   getSystemsForUnit,
 } from "./form-support"
-import { toIsoDate } from "./form-utils"
+import { parseOptionalNumericId, parseRequiredNumericId, requireActiveFarmId, toIsoDate } from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
+  farm_id?: string | null
   feeding_response: "very_good" | "good" | "fair" | "bad"
 }
 
@@ -122,39 +123,41 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
     }
   }, [form, selectedUnit, systemsForUnit])
 
+  const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
+
   const duplicateQuery = useFeedingRecords({
-    systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
     limit: 20,
-    enabled: Boolean(selectedDate) && Number.isFinite(selectedSystemId),
+    enabled: Boolean(selectedDate) && hasValidSystemId,
   })
   const yesterdayFeedQuery = useFeedingRecords({
-    systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
     dateFrom: previousDate,
     dateTo: previousDate,
     limit: 20,
-    enabled: Boolean(previousDate) && Number.isFinite(selectedSystemId),
+    enabled: Boolean(previousDate) && hasValidSystemId,
   })
   const inventoryQuery = useDailyFishInventory({
     farmId,
-    systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
     limit: 7,
     orderAsc: false,
-    enabled: Boolean(farmId) && Boolean(selectedDate) && Number.isFinite(selectedSystemId),
+    enabled: Boolean(farmId) && Boolean(selectedDate) && hasValidSystemId,
   })
   const latestWaterStatusQuery = useLatestWaterQualityStatus(
-    Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
+    hasValidSystemId ? selectedSystemId : undefined,
     { farmId },
   )
   const doQuery = useWaterQualityMeasurements({
-    systemId: Number.isFinite(selectedSystemId) ? selectedSystemId : undefined,
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
     parameterName: "dissolved_oxygen",
     limit: 10,
     requireSystem: true,
-    enabled: Number.isFinite(selectedSystemId),
+    enabled: hasValidSystemId,
   })
 
   const existingDailyRecords = duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []
@@ -182,17 +185,19 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const systemId = Number(values.system_id)
-      const feedTypeId = Number(values.feed_id)
-      const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+      const resolvedFarmId = requireActiveFarmId(farmId)
+      const systemId = parseRequiredNumericId(values.system_id, "Cage number")
+      const feedTypeId = parseRequiredNumericId(values.feed_id, "Feed type")
+      const batchId = parseOptionalNumericId(values.batch_id)
       const existingTotal = existingDailyRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
       const dailyTotal = existingTotal + values.amount_kg
       const biomassKg = latestInventoryRow?.biomass_last_sampling ?? null
       const feedRatePct = biomassKg && biomassKg > 0 ? (dailyTotal / biomassKg) * 100 : null
 
       const payload = {
+        farm_id: resolvedFarmId,
         system_id: systemId,
-        batch_id: Number.isFinite(batchId as number) ? batchId : null,
+        batch_id: batchId,
         date: values.date,
         feed_type_id: feedTypeId,
         feeding_amount: values.amount_kg,
@@ -235,32 +240,32 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
   }
 
   return (
-    <div className="max-w-7xl">
-      <div className="mb-6">
+    <div>
+      <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
         <p className="text-sm text-muted-foreground">Fast cage-first feeding entry with live feed target context.</p>
       </div>
 
-      <div className="mb-4">
+      <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
           {existingDailyRecords.length > 0 ? (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+            <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
               Feeding is already recorded for {selectedSystem?.label ?? "this cage"} on {selectedDate}. Confirm this is an additional feed event before saving.
             </div>
           ) : null}
           {submissionSummary ? (
-            <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
+            <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
               {submissionSummary}
             </div>
           ) : null}
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="data-entry-secondary-grid">
                 <FormField
                   control={form.control}
                   name="date"
@@ -337,45 +342,32 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Feed Type</FormLabel>
-                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select feed" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {feeds.map((feed) => (
-                              <SelectItem key={feed.id} value={String(feed.id)}>
-                                {feed.label ?? feed.feed_line ?? `Feed ${feed.id}`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant={showQuickCreate ? "secondary" : "outline"}
-                          size="sm"
-                          className="w-full md:w-auto md:min-w-[11rem]"
-                          onClick={() => setShowQuickCreate((current) => !current)}
-                        >
-                          {showQuickCreate ? "Hide new feed type" : "Add new feed type"}
-                        </Button>
-                      </div>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select feed" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {feeds.map((feed) => (
+                            <SelectItem key={feed.id} value={String(feed.id)}>
+                              {feed.label ?? feed.feed_line ?? `Feed ${feed.id}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
-              {showQuickCreate ? <FeedTypeQuickCreate onCreated={() => setShowQuickCreate(false)} allowSupplierCreate={false} /> : null}
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="data-entry-secondary-grid">
                 <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
                 <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchValue} />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="data-entry-secondary-grid">
                 <FormField
                   control={form.control}
                   name="amount_kg"
@@ -428,7 +420,7 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                       <textarea
                         {...field}
                         rows={3}
-                        className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="data-entry-textarea"
                         placeholder="Feed behaviour, weather, missed appetite, or any exception."
                       />
                     </FormControl>
@@ -478,9 +470,9 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                 ) : null}
               </div>
 
-              <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Submit Entry
+                Record Feeding
               </Button>
             </form>
           </Form>
@@ -527,3 +519,4 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
     </div>
   )
 }
+

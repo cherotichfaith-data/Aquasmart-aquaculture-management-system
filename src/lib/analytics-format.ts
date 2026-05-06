@@ -117,5 +117,6 @@ export const timelineSourceLabel = (source: string | null | undefined) => {
   if (source === "cycle_ongoing") return "Cycle"
   if (source === "planned_cycle") return "Planned cycle"
   if (source === "observed_activity") return "Observed activity"
+  if (source === "observed_summary") return "Observed summary"
   return null
 }

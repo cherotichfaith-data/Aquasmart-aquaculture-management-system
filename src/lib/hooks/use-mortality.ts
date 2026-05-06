@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { useAuth } from "@/components/providers/auth-provider"
 import { getAlertLog, getMortalityEvents, getSurvivalTrend } from "@/lib/api/mortality"
-import { invalidateMortalityWriteQueries } from "@/lib/cache/react-query"
+import { invalidateAfterWrite } from "@/lib/cache/react-query"
 import type { MortalityInput } from "@/lib/commands/operations"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
@@ -127,7 +127,8 @@ export function useRecordMortality() {
       status: "pending",
     }),
     invalidate: async ({ queryClient, result }) => {
-      await invalidateMortalityWriteQueries(queryClient, {
+      await invalidateAfterWrite(queryClient, {
+        type: "mortality",
         farmId: result.meta.farmId,
         systemId: result.meta.systemId ?? 0,
         date: result.meta.date,

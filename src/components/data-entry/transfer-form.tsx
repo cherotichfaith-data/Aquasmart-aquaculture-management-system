@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 import { Loader2 } from "lucide-react"
 import {
   Form,
@@ -13,17 +13,24 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { DependencyBlocker } from "./dependency-blocker"
-import { toIsoDate } from "./form-utils"
+import {
+  calculateAbw,
+  parseOptionalNumericId,
+  parseRequiredNumericId,
+  requireActiveFarmId,
+  toIsoDate,
+} from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+import { DATA_ENTRY_PATH } from "@/lib/app-entry"
 
 const EXTERNAL_DESTINATION = "__external__"
 
@@ -68,13 +75,14 @@ const TRANSFER_TYPE_OPTIONS = [
 ] as const
 
 interface TransferFormProps {
+  farmId: string | null
   systems: SystemOption[]
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
 }
 
-export function TransferForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: TransferFormProps) {
+export function TransferForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: TransferFormProps) {
   const mutation = useRecordTransfer()
   const router = useRouter()
 
@@ -100,11 +108,12 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
   const numberOfFish = form.watch("number_of_fish")
   const totalWeightKg = form.watch("total_weight_kg")
   const externalTargetName = form.watch("external_target_name")
-  const computedAbw = numberOfFish > 0 && totalWeightKg > 0 ? (totalWeightKg * 1000) / numberOfFish : null
+  const computedAbw = calculateAbw(totalWeightKg, numberOfFish)
   const isExternalOut = transferType === "external_out"
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      const resolvedFarmId = requireActiveFarmId(farmId)
       const isCountCheck = values.transfer_type === "count_check"
       const isExternalTransfer = values.transfer_type === "external_out"
       if (!isExternalTransfer && !isCountCheck && values.origin_system_id === values.target_system_id) {
@@ -112,25 +121,27 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
         return
       }
 
-      const originId = Number(values.origin_system_id)
+      const originId = parseRequiredNumericId(values.origin_system_id, "Origin cage")
       const targetId =
         values.target_system_id && values.target_system_id !== EXTERNAL_DESTINATION
-          ? Number(values.target_system_id)
+          ? parseRequiredNumericId(values.target_system_id, "Destination cage")
           : null
-      const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+      const batchId = parseOptionalNumericId(values.batch_id)
       const resolvedTransferType = isExternalTransfer ? "external_out" : values.transfer_type
+      const abw = calculateAbw(values.total_weight_kg, values.number_of_fish)
 
       await mutation.mutateAsync({
+        farm_id: resolvedFarmId,
         origin_system_id: originId,
         target_system_id: isCountCheck ? originId : targetId ?? originId,
         external_target_name:
           resolvedTransferType === "external_out" ? values.external_target_name?.trim() ?? null : null,
         transfer_type: resolvedTransferType,
-        batch_id: Number.isFinite(batchId as number) ? batchId : null,
+        batch_id: batchId,
         date: values.date,
         number_of_fish_transfer: values.number_of_fish,
         total_weight_transfer: values.total_weight_kg,
-        abw: values.number_of_fish > 0 ? (values.total_weight_kg * 1000) / values.number_of_fish : null,
+        abw,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
 
@@ -155,24 +166,26 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
       <DependencyBlocker
         title="Add another system to record transfers."
         actionLabel="Add system"
-        onAction={() => router.push("/data-entry?type=system")}
+        onAction={() => router.push(`${DATA_ENTRY_PATH}?type=system`)}
       />
     )
   }
 
   return (
-    <div className="max-w-6xl space-y-6">
-      <div>
+    <div className="space-y-6">
+      <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Transfer</h2>
       </div>
 
-      <OfflineSaveBadge result={mutation.data} />
+      <div className="data-entry-status">
+        <OfflineSaveBadge result={mutation.data} />
+      </div>
 
-      {isExternalOut ? (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-          Destination not in the system list. This transfer will be recorded as <span className="font-semibold">external_out</span>.
-        </div>
-      ) : null}
+        {isExternalOut ? (
+          <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
+            Destination not in the system list. This transfer will be recorded as <span className="font-semibold">external_out</span>.
+          </div>
+        ) : null}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -190,7 +203,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
             )}
           />
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="data-entry-secondary-grid">
             <FormField
               control={form.control}
               name="origin_system_id"
@@ -268,7 +281,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="data-entry-secondary-grid">
             <FormField
               control={form.control}
               name="transfer_type"
@@ -339,7 +352,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SelectedSystemInfo systems={systems} systemId={originSystemId} title="Origin System" />
             {isExternalOut ? (
-              <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm">
+              <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
                 <div className="font-medium">Destination</div>
                 <div className="text-muted-foreground">{externalTargetName?.trim() || "External location"}</div>
               </div>
@@ -350,7 +363,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
 
           <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="data-entry-secondary-grid">
             <FormField
               control={form.control}
               name="number_of_fish"
@@ -380,7 +393,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
             />
           </div>
 
-          <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+          <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm text-muted-foreground">
             Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter count and total weight"}
           </div>
 
@@ -394,7 +407,7 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
                   <textarea
                     {...field}
                     rows={3}
-                    className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="data-entry-textarea"
                     placeholder="Reason for movement, handling detail, or receiving location note."
                   />
                 </FormControl>
@@ -403,12 +416,13 @@ export function TransferForm({ systems, batches, defaultSystemId = null, default
             )}
           />
 
-          <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
             {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Entry
+            Record Transfer
           </Button>
         </form>
       </Form>
     </div>
   )
 }
+

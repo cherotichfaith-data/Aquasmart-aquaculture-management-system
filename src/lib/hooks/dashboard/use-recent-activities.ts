@@ -7,19 +7,20 @@ import type { QueryResult } from "@/lib/supabase-client"
 import { getRecentActivities, type ChangeLogRow } from "@/lib/api/reports"
 
 export function useRecentActivities(params?: {
+  farmId?: string | null
   tableName?: string
   changeType?: Enums<"change_type_enum">
   dateFrom?: string
   dateTo?: string
   limit?: number
   enabled?: boolean
-  initialData?: QueryResult<ChangeLogRow>
 }) {
   const enabled = params?.enabled ?? true
   return useQuery({
     queryKey: queryKeys.activity.recentActivities(params),
     queryFn: ({ signal }) =>
       getRecentActivities({
+        farmId: params?.farmId,
         tableName: params?.tableName,
         changeType: params?.changeType,
         dateFrom: params?.dateFrom,
@@ -27,11 +28,9 @@ export function useRecentActivities(params?: {
         limit: params?.limit ?? 5,
         signal,
       }),
-    enabled,
+    enabled: enabled && Boolean(params?.farmId),
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: 5 * 60_000,
-    initialData: enabled ? params?.initialData : undefined,
-    initialDataUpdatedAt: enabled && params?.initialData ? 0 : undefined,
   })
 }

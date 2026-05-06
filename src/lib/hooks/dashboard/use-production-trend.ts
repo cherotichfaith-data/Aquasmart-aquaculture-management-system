@@ -19,9 +19,8 @@ export function useProductionTrend(params: {
   dateFrom?: string | null
   dateTo?: string | null
   scopedSystemIds?: number[] | null
-  initialData?: ProductionTrendRow[]
 }) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   const hasBounds = Boolean(params.dateFrom) && Boolean(params.dateTo)
 
   return useQuery({
@@ -58,9 +57,7 @@ export function useProductionTrend(params: {
         : summaryResult.data
       return sortByDateAsc(filtered, (row) => row.date)
     },
-    enabled: Boolean(session) && Boolean(params.farmId) && hasBounds,
+    enabled: (Boolean(session) || Boolean(user)) && Boolean(params.farmId) && hasBounds,
     staleTime: 5 * 60_000,
-    initialData: hasBounds ? params.initialData : undefined,
-    initialDataUpdatedAt: hasBounds && params.initialData ? 0 : undefined,
   })
 }

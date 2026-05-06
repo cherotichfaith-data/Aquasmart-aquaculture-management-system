@@ -9,6 +9,8 @@ import {
   toQuerySuccess,
 } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
+import { getSessionUser } from "@/lib/supabase/session"
+import { parseAlertThresholdSettings } from "@/lib/alert-thresholds"
 
 type OverlayRow = Database["public"]["Functions"]["api_daily_overlay"]["Returns"][number]
 type LatestStatusRow = Database["public"]["Functions"]["api_latest_water_quality_status"]["Returns"][number]
@@ -146,17 +148,35 @@ export async function getAlertThresholds(params: {
   const clientResult = await getClientOrError("getAlertThresholds", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
+  const sessionUser = await getSessionUser(supabase as any, "getAlertThresholds:getSession")
+  const [{ data: settingsRow, error: settingsError }, fallbackResult] = await Promise.all([
+    sessionUser
+      ? supabase.from("user_settings").select("alert_thresholds").eq("user_id", sessionUser.id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    (() => {
+      let q = supabase.from("alert_threshold").select("*").or(`farm_id.eq.${params.farmId},scope.eq.default`)
+      if (params.signal) q = q.abortSignal(params.signal)
+      return q
+    })(),
+  ])
 
-  let q = queryOptionsView(supabase, "api_alert_thresholds").select("*").eq("farm_id", params.farmId)
-  if (params.signal) q = q.abortSignal(params.signal)
+  if (settingsError) {
+    if (params.signal?.aborted || isQuietError(settingsError)) return empty<ThresholdRow>()
+    return toQueryError("getAlertThresholds:settings", settingsError)
+  }
 
-  const { data, error } = await q
+  const settingsThresholds = parseAlertThresholdSettings(settingsRow?.alert_thresholds ?? null, params.farmId)
+  if (settingsThresholds.length > 0) {
+    return toQuerySuccess<ThresholdRow>(settingsThresholds as unknown as ThresholdRow[])
+  }
+
+  const { data, error } = fallbackResult
   if (error) {
     if (params.signal?.aborted || isQuietError(error)) return empty<ThresholdRow>()
     return toQueryError("getAlertThresholds", error)
   }
 
-  return toQuerySuccess<ThresholdRow>((data ?? []) as ThresholdRow[])
+  return toQuerySuccess<ThresholdRow>(((data ?? []) as unknown as ThresholdRow[]))
 }
 
 /** KPI RPC: daily overlay (feed + mortality series) */

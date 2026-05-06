@@ -1,0 +1,158 @@
+import { createAdminClient } from "@/lib/supabase/admin"
+
+export type SettingsFarmMember = {
+  user_id: string
+  full_name: string | null
+  email: string | null
+  role: string
+  created_at: string
+}
+
+export type PendingFarmInvitation = {
+  id: string
+  email: string
+  role: string
+  status: string
+  invited_by: string | null
+  created_at: string
+  updated_at: string
+  last_sent_at: string | null
+}
+
+function isPrivateSchemaUnavailable(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const maybe = error as { code?: string; message?: string }
+  return maybe.code === "PGRST106" || /Invalid schema:\s*private/i.test(String(maybe.message ?? ""))
+}
+
+function resolveAuthUserName(user: {
+  user_metadata?: Record<string, unknown> | null
+  email?: string | null
+}) {
+  const metadata = user.user_metadata ?? {}
+  const candidates = [
+    metadata.full_name,
+    metadata.name,
+    metadata.first_name,
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim()
+    }
+  }
+
+  return null
+}
+
+async function listAuthUsersByIds(userIds: string[]) {
+  const admin = createAdminClient()
+  const remaining = new Set(userIds)
+  const usersById = new Map<string, { email: string | null; full_name: string | null }>()
+  let page = 1
+  const perPage = 200
+
+  while (page <= 20 && remaining.size > 0) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+
+    if (error) throw error
+
+    const users = data.users ?? []
+    for (const user of users) {
+      if (!remaining.has(user.id)) continue
+      usersById.set(user.id, {
+        email: user.email ?? null,
+        full_name: resolveAuthUserName(user),
+      })
+      remaining.delete(user.id)
+    }
+
+    if (users.length < perPage) break
+    page += 1
+  }
+
+  return usersById
+}
+
+export async function listFarmMembersForFarm(farmId: string): Promise<SettingsFarmMember[]> {
+  const admin = createAdminClient()
+  const { data: membersData, error: membersError } = await admin
+    .from("farm_user")
+    .select("user_id, role, created_at")
+    .eq("farm_id", farmId)
+    .order("created_at")
+
+  if (membersError) throw membersError
+
+  const userIds = (membersData ?? []).map((member) => member.user_id)
+  const [{ data: profiles, error: profilesError }, authUsersById] = await Promise.all([
+    userIds.length > 0
+      ? admin.from("user_profile").select("user_id, full_name").in("user_id", userIds)
+      : Promise.resolve({ data: [], error: null }),
+    userIds.length > 0
+      ? listAuthUsersByIds(userIds)
+      : Promise.resolve(new Map<string, { email: string | null; full_name: string | null }>()),
+  ])
+
+  if (profilesError) throw profilesError
+
+  const profileMap = new Map((profiles ?? []).map((profile) => [profile.user_id, profile.full_name ?? null]))
+
+  return (membersData ?? []).map((member) => ({
+    user_id: member.user_id,
+    full_name: profileMap.get(member.user_id) ?? authUsersById.get(member.user_id)?.full_name ?? null,
+    email: authUsersById.get(member.user_id)?.email ?? null,
+    role: member.role,
+    created_at: member.created_at ?? new Date().toISOString(),
+  }))
+}
+
+export async function listPendingFarmInvitationsForFarm(farmId: string): Promise<PendingFarmInvitation[]> {
+  const admin = createAdminClient()
+  const privateAdmin = admin as typeof admin & {
+    schema: (schema: string) => {
+      from: (table: string) => {
+        select: (columns: string) => {
+          eq: (column: string, value: string) => {
+            eq: (column: string, value: string) => {
+              is: (column: string, value: null) => {
+                is: (column: string, value: null) => {
+                  order: (column: string, options: { ascending: boolean }) => Promise<{
+                    data: Array<Record<string, string | null>> | null
+                    error: { message?: string } | null
+                  }>
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  const { data, error } = await privateAdmin
+    .schema("private")
+    .from("farm_user_invitation")
+    .select("id, email, role, status, invited_by, created_at, updated_at, last_sent_at")
+    .eq("farm_id", farmId)
+    .eq("status", "pending")
+    .is("revoked_at", null)
+    .is("accepted_at", null)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    if (isPrivateSchemaUnavailable(error)) return []
+    throw error
+  }
+  return (data ?? [])
+    .filter((invite) => invite.id && invite.email && invite.role && invite.status)
+    .map((invite) => ({
+    id: invite.id!,
+    email: invite.email!,
+    role: invite.role!,
+    status: invite.status!,
+    invited_by: invite.invited_by,
+    created_at: invite.created_at ?? new Date().toISOString(),
+    updated_at: invite.updated_at ?? invite.created_at ?? new Date().toISOString(),
+    last_sent_at: invite.last_sent_at ?? null,
+  }))
+}

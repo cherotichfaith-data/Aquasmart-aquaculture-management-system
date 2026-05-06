@@ -135,20 +135,36 @@ begin
     scope,
     low_do_threshold,
     high_ammonia_threshold,
-    high_mortality_threshold
+    high_mortality_threshold,
+    low_sgr_threshold,
+    low_survival_pct,
+    critical_survival_pct
   )
   values (
     v_farm_id,
     'farm',
-    4.2,
-    0.12,
-    1.8
+    4.0,   -- Brief: <4 mg/L at feeding time → reduce feed
+    1.0,   -- Brief: TAN warning level ≥1.0 mg/L
+    1.0,   -- Brief: ≥1%/day single-cage deaths = mass mortality event
+    1.0,   -- Brief: SGR <1%/day triggers warning (farm-level default; fingerlings ≥3, grow-out ≥1)
+    80.0,  -- Brief: cumulative survival <80% → investigate
+    70.0   -- Brief: cumulative survival <70% → critical
   );
 
   insert into public.app_config (key, value)
   values ('default_farm_id', v_farm_id::text)
   on conflict (key) do update
     set value = excluded.value;
+
+  -- Growth / sampling targets used by the Growth & Sampling page charts.
+  -- Values are research-brief defaults; farms can override via the settings UI.
+  insert into public.app_config (key, value)
+  values
+    ('target_density_kg_m3',    '25'),    -- Brief: optimal stocking density 20–30 kg/m³
+    ('target_harvest_weight_g', '500'),   -- Brief: typical marketable weight 400–600 g
+    ('target_move_weight_g',    '20'),    -- Brief: typical nursing → grow-out transfer weight ~20 g
+    ('growth_curve_points',     '[{"day":0,"abw_g":0.1},{"day":30,"abw_g":2},{"day":60,"abw_g":15},{"day":90,"abw_g":80},{"day":120,"abw_g":220},{"day":150,"abw_g":380},{"day":180,"abw_g":500}]')
+  on conflict (key) do nothing;  -- do not overwrite farm-customised values
 
   insert into public.water_quality_framework (
     parameter_name,
@@ -159,14 +175,47 @@ begin
     parameter_lethal
   )
   values
-    ('dissolved_oxygen', 'mg/l', '{"min": 5.5}', '{"min": 4.5}', '{"min": 3.5}', '{"max": 3.49}'),
-    ('temperature', 'mg/l', '{"min": 24, "max": 30}', '{"min": 22, "max": 32}', '{"min": 20, "max": 34}', '{"min": 0, "max": 50}'),
-    ('pH', 'pH', '{"min": 6.5, "max": 8.5}', '{"min": 6.0, "max": 9.0}', '{"min": 5.5, "max": 9.5}', '{"min": 0, "max": 14}'),
-    ('ammonia', 'mg/l', '{"max": 0.05}', '{"max": 0.10}', '{"max": 0.20}', '{"min": 0.201}'),
-    ('nitrite', 'mg/l', '{"max": 0.05}', '{"max": 0.10}', '{"max": 0.20}', '{"min": 0.201}'),
-    ('nitrate', 'mg/l', '{"max": 2.0}', '{"max": 5.0}', '{"max": 10.0}', '{"min": 10.01}'),
-    ('salinity', 'ppt', '{"min": 0.0, "max": 1.0}', '{"min": 0.0, "max": 2.0}', '{"min": 0.0, "max": 5.0}', '{"min": 5.01}'),
-    ('secchi_disk_depth', 'm', '{"min": 0.35, "max": 0.60}', '{"min": 0.25, "max": 0.70}', '{"min": 0.15, "max": 0.80}', '{"max": 0.149}')
+    -- Thresholds aligned to: Aquaculture KPIs Metrics Research Brief (Mar 2026)
+    ('dissolved_oxygen', 'mg/l',   -- enum value must be lowercase 'mg/l'
+      '{"min": 5.0}',                  -- optimal:    ≥5 mg/L
+      '{"min": 3.0, "max": 5.0}',      -- acceptable: 3–5 mg/L (warning zone)
+      '{"min": 1.0, "max": 3.0}',      -- critical:   1–3 mg/L (hypoxia)
+      '{"max": 1.0}'),                  -- lethal:     <1 mg/L
+    ('temperature', '°C',              -- unit was incorrectly 'mg/l'
+      '{"min": 25, "max": 30}',        -- optimal:    25–30°C
+      '{"min": 20, "max": 35}',        -- acceptable: 20–35°C
+      '{"min": 15, "max": 37}',        -- critical:   15–37°C
+      '{"min": 0,  "max": 50}'),        -- lethal:     <15 or >37°C (broad catch-all)
+    ('pH', 'pH',
+      '{"min": 7.0, "max": 8.5}',      -- optimal:    7.0–8.5 (was 6.5–8.5, lower bound corrected)
+      '{"min": 6.0, "max": 9.0}',      -- acceptable: 6.0–9.0
+      '{"min": 5.5, "max": 9.5}',      -- critical:   5.5–9.5
+      '{"min": 0,   "max": 14}'),       -- lethal:     absolute range
+    ('ammonia', 'mg/l',                -- treated as Total Ammonia Nitrogen (TAN)
+      '{"max": 1.0}',                  -- optimal:    TAN <1.0 mg/L
+      '{"max": 2.0}',                  -- acceptable: TAN 1.0–2.0 mg/L (warning)
+      '{"max": 5.0}',                  -- critical:   TAN 2.0–5.0 mg/L (toxic)
+      '{"min": 5.0}'),                  -- lethal:     TAN >5.0 mg/L
+    ('nitrite', 'mg/l',
+      '{"max": 0.1}',                  -- optimal:    <0.1 mg/L
+      '{"max": 0.5}',                  -- acceptable: 0.1–0.5 mg/L (warning)
+      '{"max": 1.0}',                  -- critical:   0.5–1.0 mg/L
+      '{"min": 1.0}'),                  -- lethal:     >1.0 mg/L
+    ('nitrate', 'mg/l',
+      '{"max": 20}',                   -- optimal:    <20 mg/L  (was 2.0 — 10× error corrected)
+      '{"max": 40}',                   -- acceptable: 20–40 mg/L
+      '{"max": 100}',                  -- critical:   40–100 mg/L
+      '{"min": 100}'),                  -- lethal:     ≥100 mg/L
+    ('salinity', 'ppt',
+      '{"min": 0.0, "max": 0.5}',      -- optimal:    freshwater 0–0.5 ppt
+      '{"min": 0.0, "max": 1.0}',      -- acceptable: 0–1.0 ppt
+      '{"min": 0.0, "max": 5.0}',      -- critical:   0–5.0 ppt
+      '{"min": 5.01}'),                 -- lethal:     >5 ppt
+    ('secchi_disk_depth', 'm',
+      '{"min": 0.30, "max": 0.40}',    -- optimal:    30–40 cm  (was 35–60 cm, corrected)
+      '{"min": 0.20, "max": 0.60}',    -- acceptable: 20–60 cm
+      '{"min": 0.10, "max": 0.80}',    -- critical:   10–80 cm
+      '{"max": 0.10}')
   on conflict (parameter_name) do update
     set
       unit = excluded.unit,

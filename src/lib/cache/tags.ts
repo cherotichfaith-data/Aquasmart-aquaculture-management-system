@@ -20,6 +20,7 @@ export function feedingWriteTags(params: { farmId: string; systemId: number }) {
     cacheTags.systems(params.farmId),
     cacheTags.inventory(params.farmId),
     cacheTags.dashboard(params.farmId),
+    cacheTags.waterQuality(params.farmId),
     cacheTags.feeding(params.farmId),
     cacheTags.feeding(params.farmId, params.systemId),
     cacheTags.reports(params.farmId, "feeding"),
@@ -44,6 +45,7 @@ export function waterQualityWriteTags(params: { farmId: string }) {
   return [
     cacheTags.farm(params.farmId),
     cacheTags.systems(params.farmId),
+    cacheTags.inventory(params.farmId),
     cacheTags.dashboard(params.farmId),
     cacheTags.waterQuality(params.farmId),
     cacheTags.reports(params.farmId, "recent-entries"),

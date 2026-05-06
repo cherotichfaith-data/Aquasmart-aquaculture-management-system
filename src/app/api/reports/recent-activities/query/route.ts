@@ -7,6 +7,7 @@ import { listRecentActivities } from "@/lib/server/report-reads"
 import { logSbError } from "@/lib/supabase/log"
 
 const recentActivitiesSchema = z.object({
+  farmId: z.string().uuid().nullable().optional(),
   tableName: z.string().trim().min(1).optional(),
   changeType: z.enum(["INSERT", "UPDATE", "DELETE"]).optional(),
   dateFrom: z.string().optional(),

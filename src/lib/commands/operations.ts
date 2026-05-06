@@ -3,6 +3,9 @@ import { postJson } from "@/lib/commands/_utils"
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
 type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"]
+type WithFarmId<T> = T & {
+  farm_id?: string | null
+}
 
 type MutationMeta = {
   farmId: string
@@ -15,14 +18,12 @@ type MutationResponse<T extends keyof Database["public"]["Tables"]> = {
   meta: MutationMeta
 }
 
-export type HarvestInput = Insert<"fish_harvest">
-export type SamplingInput = Insert<"fish_sampling_weight">
-export type StockingInput = Insert<"fish_stocking">
-export type TransferInput = Insert<"fish_transfer">
-export type WaterQualityInput = Insert<"water_quality_measurement">[]
-export type FeedInventorySnapshotInput = Insert<"feed_incoming">
+export type HarvestInput = WithFarmId<Insert<"fish_harvest">>
+export type SamplingInput = WithFarmId<Insert<"fish_sampling_weight">>
+export type StockingInput = WithFarmId<Insert<"fish_stocking">>
+export type TransferInput = WithFarmId<Insert<"fish_transfer">>
+export type WaterQualityInput = Array<WithFarmId<Insert<"water_quality_measurement">>>
 export type MortalityInput = Insert<"fish_mortality">
-export type SystemInput = Insert<"system">
 
 export function recordHarvest(payload: HarvestInput) {
   return postJson<MutationResponse<"fish_harvest">, HarvestInput>("/api/harvest/record", payload)
@@ -44,17 +45,6 @@ export function recordWaterQuality(payload: WaterQualityInput) {
   return postJson<MutationResponse<"water_quality_measurement">, WaterQualityInput>("/api/water-quality/record", payload)
 }
 
-export function recordFeedInventorySnapshot(payload: FeedInventorySnapshotInput) {
-  return postJson<MutationResponse<"feed_incoming">, FeedInventorySnapshotInput>(
-    "/api/feed-inventory/record",
-    payload,
-  )
-}
-
 export function recordMortality(payload: MortalityInput) {
   return postJson<MutationResponse<"fish_mortality">, MortalityInput>("/api/mortality/record", payload)
-}
-
-export function createSystem(payload: SystemInput) {
-  return postJson<MutationResponse<"system">, SystemInput>("/api/system/create", payload)
 }

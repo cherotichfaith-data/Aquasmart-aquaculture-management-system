@@ -2,14 +2,17 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import Button from "@mui/material/Button"
 import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/lib/hooks/app/use-toast"
-import { ToastAction } from "@/components/ui/toast"
 import { useRouter } from "next/navigation"
+import { toDashboardPath } from "@/lib/app-entry"
+import { formatNumberValue } from "@/lib/analytics-format"
 import type { Tables } from "@/lib/types/database"
+import { parseAlertThresholdSettings } from "@/lib/alert-thresholds"
 
 type AlertThresholdRow = Tables<"alert_threshold">
 type WaterQualityRow = Tables<"water_quality_measurement">
@@ -44,8 +47,8 @@ const NotificationsContext = createContext<NotificationsContextValue | undefined
 
 const MAX_NOTIFICATIONS = 50
 
-const formatNumber = (value: number, decimals = 2) => Number(value.toFixed(decimals))
-const formatPercent = (value: number, decimals = 2) => formatNumber(value * 100, decimals)
+const formatPercent = (value: number, decimals = 2) =>
+  formatNumberValue(value * 100, { decimals, minimumDecimals: decimals, fallback: "0" })
 
 const isAbortLikeError = (err: unknown): boolean => {
   if (!err) return false
@@ -74,8 +77,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const queryClient = useQueryClient()
   const router = useRouter()
   const { farmId } = useActiveFarm()
-  const { profile, session } = useAuth()
+  const { profile, session, user } = useAuth()
   const { toast } = useToast()
+  const userId = user?.id ?? null
   const [notifications, setNotifications] = useState<AlertNotification[]>([])
   const seenIds = useRef<Set<string>>(new Set())
   const storageKey = farmId ? `aqua_alert_history_${farmId}` : "aqua_alert_history"
@@ -116,13 +120,33 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     enabled: Boolean(session) && Boolean(farmId),
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
-      let query = supabase
-        .from("alert_threshold")
-        .select("*")
-        .eq("farm_id", farmId!)
-      if (signal) query = query.abortSignal(signal)
-      const { data, error } = await query
+      const [{ data: settingsRow, error: settingsError }, fallbackResult] = await Promise.all([
+        userId
+          ? supabase.from("user_settings").select("alert_thresholds").eq("user_id", userId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        (() => {
+          let query = supabase
+            .from("alert_threshold")
+            .select("*")
+            .or(`farm_id.eq.${farmId!},scope.eq.default`)
+          if (signal) query = query.abortSignal(signal)
+          return query
+        })(),
+      ])
 
+      if (settingsError) {
+        if (!signal?.aborted && !isAbortLikeError(settingsError) && !isSbPermissionDenied(settingsError)) {
+          logSbError("notifications:settingsThresholds", settingsError)
+        }
+        return [] as AlertThresholdRow[]
+      }
+
+      const settingsThresholds = parseAlertThresholdSettings(settingsRow?.alert_thresholds ?? null, farmId)
+      if (settingsThresholds.length > 0) {
+        return settingsThresholds
+      }
+
+      const { data, error } = fallbackResult
       if (error) {
         if (!signal?.aborted && !isAbortLikeError(error) && !isSbPermissionDenied(error)) {
           logSbError("notifications:thresholds", error)
@@ -159,9 +183,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           description: notification.description,
           variant: notification.severity === "critical" ? "destructive" : "default",
           action: notification.href ? (
-            <ToastAction altText={notification.actionLabel ?? "View details"} onClick={() => router.push(notification.href!)}>
+            <Button size="small" color="inherit" onClick={() => router.push(notification.href!)}>
               {notification.actionLabel ?? "View"}
-            </ToastAction>
+            </Button>
           ) : undefined,
         })
       }
@@ -220,7 +244,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [notifications, storageKey])
 
   useEffect(() => {
-    if (!farmId || !session) return
+    if (!farmId || !session || !userId) return
 
     const thresholdChannel = supabase
       .channel(`alerts-thresholds-${farmId}`)
@@ -232,20 +256,42 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         },
       )
       .subscribe()
+    const userSettingsChannel = supabase
+      .channel(`alerts-user-settings-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_settings", filter: `user_id=eq.${userId}` },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ["notifications", "thresholds", farmId] })
+        },
+      )
+      .subscribe()
 
     return () => {
       supabase.removeChannel(thresholdChannel)
+      supabase.removeChannel(userSettingsChannel)
     }
-  }, [farmId, queryClient, session, supabase])
+  }, [farmId, queryClient, session, supabase, userId])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
+
+    // Only subscribe to system_ids that belong to this farm.
+    // Neither water_quality_measurement nor daily_fish_inventory_table has a direct
+    // farm_id column, so we filter by the known set of system IDs instead.
+    const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
+    if (!farmSystemIds.length) return
 
     const qualityChannel = supabase
       .channel(`alerts-water-quality-${farmId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "water_quality_measurement" },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "water_quality_measurement",
+          filter: `system_id=in.(${farmSystemIds.join(",")})`,
+        },
         (payload) => {
           const row = payload.new as WaterQualityRow
           if (!row?.system_id) return
@@ -260,15 +306,16 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               addNotification({
                 id: `wq-do-${row.id}`,
                 title: "Low Dissolved Oxygen",
-                description: `${systemLabel} DO is ${formatNumber(row.parameter_value)} mg/L (threshold ${formatNumber(
+                description: `${systemLabel} DO is ${formatNumberValue(row.parameter_value, { decimals: 2, minimumDecimals: 2, fallback: "0" })} mg/L (threshold ${formatNumberValue(
                   threshold.low_do_threshold,
+                  { decimals: 2, minimumDecimals: 2, fallback: "0" },
                 )}).`,
                 createdAt: row.created_at ?? new Date().toISOString(),
                 systemId: row.system_id,
                 kind: "water_quality",
                 severity: "critical",
                 read: false,
-                href: `/water-quality?system=${row.system_id}`,
+                href: `${toDashboardPath("/water-quality")}?system=${row.system_id}`,
                 actionLabel: "View water quality",
               })
             }
@@ -279,15 +326,16 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               addNotification({
                 id: `wq-ammonia-${row.id}`,
                 title: "High Ammonia Detected",
-                description: `${systemLabel} ammonia is ${formatNumber(row.parameter_value)} mg/L (threshold ${formatNumber(
+                description: `${systemLabel} ammonia is ${formatNumberValue(row.parameter_value, { decimals: 2, minimumDecimals: 2, fallback: "0" })} mg/L (threshold ${formatNumberValue(
                   threshold.high_ammonia_threshold,
+                  { decimals: 2, minimumDecimals: 2, fallback: "0" },
                 )}).`,
                 createdAt: row.created_at ?? new Date().toISOString(),
                 systemId: row.system_id,
                 kind: "water_quality",
                 severity: "critical",
                 read: false,
-                href: `/water-quality?system=${row.system_id}`,
+                href: `${toDashboardPath("/water-quality")}?system=${row.system_id}`,
                 actionLabel: "View water quality",
               })
             }
@@ -299,16 +347,24 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(qualityChannel)
     }
-  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, thresholdsLoaded, thresholds])
+  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
+
+    const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
+    if (!farmSystemIds.length) return
 
     const mortalityChannel = supabase
       .channel(`alerts-mortality-${farmId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "daily_fish_inventory_table" },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "daily_fish_inventory_table",
+          filter: `system_id=in.(${farmSystemIds.join(",")})`,
+        },
         (payload) => {
           const row = payload.new as DailyInventoryRow
           if (!row?.system_id) return
@@ -324,15 +380,16 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               addNotification({
                 id: `mortality-${row.id}`,
                 title: "High Mortality Rate",
-                description: `${systemLabel} mortality is ${formatPercent(row.mortality_rate)}%/day (threshold ${formatNumber(
+                description: `${systemLabel} mortality is ${formatPercent(row.mortality_rate)}%/day (threshold ${formatNumberValue(
                   threshold.high_mortality_threshold,
+                  { decimals: 2, minimumDecimals: 2, fallback: "0" },
                 )}%/day).`,
                 createdAt: row.inventory_date ?? new Date().toISOString(),
                 systemId: row.system_id,
                 kind: "mortality",
                 severity: "critical",
                 read: false,
-                href: `/reports?tab=mortality&system=${row.system_id}`,
+                href: `${toDashboardPath("/reports")}?tab=mortality&system=${row.system_id}`,
                 actionLabel: "View mortality",
               })
             }
@@ -344,7 +401,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(mortalityChannel)
     }
-  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, thresholdsLoaded, thresholds])
+  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
 
   const value = useMemo(
     () => ({ notifications, unreadCount, markAllRead, markRead, clearAll }),

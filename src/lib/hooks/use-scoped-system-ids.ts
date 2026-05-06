@@ -4,8 +4,6 @@ import { useMemo } from "react"
 import type { Enums } from "@/lib/types/database"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
-import type { QueryResult } from "@/lib/supabase-client"
-import type { Database } from "@/lib/types/database"
 
 type Params = {
   farmId?: string | null
@@ -13,8 +11,6 @@ type Params = {
   selectedBatch: string
   selectedSystem: string
   enabled?: boolean
-  initialSystemsData?: QueryResult<Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]>
-  initialBatchSystemsData?: QueryResult<{ system_id: number }>
 }
 
 export function useScopedSystemIds(params: Params) {
@@ -27,14 +23,12 @@ export function useScopedSystemIds(params: Params) {
     stage: params.selectedStage,
     activeOnly: false,
     enabled: params.enabled,
-    initialData: params.initialSystemsData,
   })
 
   const batchSystemsQuery = useBatchSystemIds({
     batchId: Number.isFinite(batchId) ? batchId : undefined,
     farmId: params.farmId,
     enabled: params.enabled,
-    initialData: params.initialBatchSystemsData,
   })
 
   const hasScopeFilters = hasSystem || params.selectedStage !== "all" || params.selectedBatch !== "all"

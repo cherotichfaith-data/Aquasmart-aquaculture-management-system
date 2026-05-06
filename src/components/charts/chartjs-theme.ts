@@ -1,6 +1,7 @@
 "use client"
 
-import type { ChartOptions, ScriptableContext, Tick } from "chart.js"
+import type { ChartOptions, ScriptableContext, ScriptableScaleContext, Tick } from "chart.js"
+import { lightTheme } from "@/theme"
 
 export function formatCompactTick(value: number | string) {
   const numeric = Number(value)
@@ -162,21 +163,21 @@ type ChartPalette = {
 }
 
 const FALLBACK_PALETTE: ChartPalette = {
-  text: "#183646",
-  muted: "#567582",
-  grid: "rgba(78, 112, 124, 0.18)",
-  border: "#cce6eb",
-  card: "#ffffff",
-  tooltipBackground: "rgba(10, 35, 45, 0.8)",
-  tooltipBorder: "rgba(217, 239, 244, 0.2)",
-  tooltipForeground: "#eefbfd",
-  primary: "#22c55e",
-  chart1: "#22c55e",
-  chart2: "#16a34a",
-  chart3: "#4fd1f5",
-  chart4: "#1d9ed8",
-  chart5: "#123a4b",
-  destructive: "#ef4444",
+  text: lightTheme.palette.text.primary,
+  muted: lightTheme.palette.text.secondary,
+  grid: "rgba(94, 122, 134, 0.18)",
+  border: lightTheme.palette.divider,
+  card: lightTheme.palette.background.paper,
+  tooltipBackground: "rgba(15, 76, 129, 0.96)",
+  tooltipBorder: "rgba(215, 231, 236, 0.24)",
+  tooltipForeground: "#f8fbff",
+  primary: lightTheme.palette.primary.main,
+  chart1: lightTheme.palette.primary.main,
+  chart2: lightTheme.palette.secondary.main,
+  chart3: lightTheme.palette.info.main,
+  chart4: lightTheme.palette.warning.main,
+  chart5: lightTheme.palette.error.main,
+  destructive: lightTheme.palette.error.main,
 }
 
 function readVar(name: string, fallback: string) {
@@ -301,9 +302,10 @@ function baseTickOptions(
   formatter?: (value: number | string, index: number, ticks: Tick[]) => string,
   options?: {
     preferTickLabel?: boolean
+    horizontal?: boolean
   },
 ) {
-  const { preferTickLabel = false } = options ?? {}
+  const { preferTickLabel = false, horizontal = false } = options ?? {}
   return {
     color: palette.muted,
     padding: 10,
@@ -311,6 +313,10 @@ function baseTickOptions(
       size: 11,
       weight: 500,
     },
+    autoSkip: horizontal,
+    autoSkipPadding: horizontal ? 12 : 6,
+    maxRotation: horizontal ? 0 : undefined,
+    minRotation: horizontal ? 0 : undefined,
     callback(value: number | string, index: number, ticks: Tick[]) {
       if (formatter) return formatter(value, index, ticks)
       const tickLabel = ticks[index]?.label
@@ -375,9 +381,15 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
   lockRightYBounds?: boolean
   extraScales?: Record<string, any>
 }): ChartOptions<TType> {
+  const horizontal = indexAxis === "x"
+  const xGridColor = withAlpha(palette.grid, xGrid ? 0.12 : 0)
+  const yGridColor = withAlpha(palette.grid, 0.2)
+  const zeroLineColor = withAlpha(palette.border, 0.9)
+
   return {
     responsive: true,
     maintainAspectRatio: false,
+    alignToPixels: true,
     indexAxis,
     interaction: {
       mode: "index",
@@ -413,11 +425,12 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
         },
         grid: {
           display: xGrid,
-          color: palette.grid,
+          color: xGridColor,
           drawTicks: false,
+          lineWidth: 1,
         },
         ticks: {
-          ...baseTickOptions(palette, xTickFormatter, { preferTickLabel: true }),
+          ...baseTickOptions(palette, xTickFormatter, { preferTickLabel: true, horizontal }),
           ...(xMaxTicksLimit != null ? { maxTicksLimit: xMaxTicksLimit } : {}),
         },
         title: xTitle
@@ -442,10 +455,11 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
         },
         grid: {
           display: yGrid,
-          color: palette.grid,
+          color: (context: ScriptableScaleContext) => (context.tick?.value === 0 ? zeroLineColor : yGridColor),
           drawTicks: false,
+          lineWidth: (context: ScriptableScaleContext) => (context.tick?.value === 0 ? 1.25 : 1),
         },
-        ticks: baseTickOptions(palette, yTickFormatter, { preferTickLabel: false }),
+        ticks: baseTickOptions(palette, yTickFormatter, { preferTickLabel: false, horizontal: false }),
         title: yTitle
           ? {
               display: true,
@@ -470,8 +484,9 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
               grid: {
                 drawOnChartArea: false,
                 drawTicks: false,
+                color: withAlpha(palette.grid, 0.12),
               },
-              ticks: baseTickOptions(palette, yRightTickFormatter, { preferTickLabel: false }),
+              ticks: baseTickOptions(palette, yRightTickFormatter, { preferTickLabel: false, horizontal: false }),
               title: yRightTitle
                 ? {
                     display: true,

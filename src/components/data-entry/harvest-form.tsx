@@ -5,17 +5,11 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Box from "@mui/material/Box"
+import { Button } from "@/components/app-ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
+import { Dialog } from "@/components/app-ui/dialog"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
 import {
     Form,
     FormControl,
@@ -23,9 +17,9 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
 import { useProductionSummary } from "@/lib/hooks/use-production"
@@ -34,7 +28,14 @@ import { logSbError } from "@/lib/supabase/log"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
-import { parseNumericId } from "./form-utils"
+import {
+    calculateAbw,
+    calculateAbwOrZero,
+    parseNumericId,
+    parseOptionalNumericId,
+    parseRequiredNumericId,
+    requireActiveFarmId,
+} from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
@@ -184,20 +185,22 @@ export function HarvestForm({
         selectedSystem?.unit?.trim() ||
         selectedSystem?.label ||
         (resolvedSystemId ? `System ${resolvedSystemId}` : "this system")
-    const computedAbw = numberOfFish > 0 && amountKg > 0 ? (amountKg * 1000) / numberOfFish : null
+    const computedAbw = calculateAbw(amountKg, numberOfFish)
 
     async function submitHarvest(values: z.infer<typeof formSchema>) {
-        const systemId = Number(values.system_id)
-        const batchId = values.batch_id && values.batch_id !== "none" ? Number(values.batch_id) : null
+        const resolvedFarmId = requireActiveFarmId(farmId)
+        const systemId = parseRequiredNumericId(values.system_id, "System")
+        const batchId = parseOptionalNumericId(values.batch_id)
 
         await mutation.mutateAsync({
+            farm_id: resolvedFarmId,
             system_id: systemId,
-            batch_id: Number.isFinite(batchId as number) ? batchId : null,
+            batch_id: batchId,
             date: values.date,
             number_of_fish_harvest: values.number_of_fish,
             total_weight_harvest: values.amount_kg,
             type_of_harvest: values.type_of_harvest,
-            abw: values.number_of_fish > 0 ? (values.amount_kg * 1000) / values.number_of_fish : 0,
+            abw: calculateAbwOrZero(values.amount_kg, values.number_of_fish),
         })
 
         form.reset({
@@ -239,16 +242,16 @@ export function HarvestForm({
     return (
         <>
             <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-                <div className="max-w-2xl">
-                    <div className="mb-6">
+                <div>
+                    <div className="data-entry-form-intro">
                         <h2 className="text-xl font-semibold tracking-tight">Record Harvest</h2>
                     </div>
-                    <div className="mb-4">
+                    <div className="data-entry-status">
                         <OfflineSaveBadge result={mutation.data} />
                     </div>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="data-entry-secondary-grid">
                                 <FormField
                                     control={form.control}
                                     name="system_id"
@@ -288,12 +291,12 @@ export function HarvestForm({
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="data-entry-secondary-grid">
                                 <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
                                 <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="data-entry-secondary-grid">
                                 <FormField
                                     control={form.control}
                                     name="number_of_fish"
@@ -322,7 +325,7 @@ export function HarvestForm({
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="data-entry-secondary-grid">
                                 <FormField
                                     control={form.control}
                                     name="type_of_harvest"
@@ -372,7 +375,7 @@ export function HarvestForm({
                             </div>
 
                             {harvestType === "final" ? (
-                                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm">
+                                <div className="data-entry-callout-alert rounded-md border border-destructive/30 bg-destructive/5 text-sm">
                                     <p className="font-medium text-foreground">Final harvest will close this cycle.</p>
                                     <p className="mt-1 text-muted-foreground">
                                         This will close the production cycle for {selectedCageLabel}. All subsequent
@@ -381,14 +384,14 @@ export function HarvestForm({
                                 </div>
                             ) : null}
 
-                            <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                            <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm text-muted-foreground">
                                 Computed ABW (weight x 1000 / fish count):{" "}
                                 {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter count and weight"}
                             </div>
 
-                            <Button type="submit" disabled={form.formState.isSubmitting || mutation.isPending}>
+                            <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
                                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Submit Entry
+                                Record Harvest
                             </Button>
                         </form>
                     </Form>
@@ -404,20 +407,16 @@ export function HarvestForm({
 
             <Dialog
                 open={confirmOpen}
-                onOpenChange={(open) => {
-                    setConfirmOpen(open)
-                    if (!open) setPendingConfirmation(null)
+                onClose={() => {
+                    setConfirmOpen(false)
+                    setPendingConfirmation(null)
                 }}
+                title="Confirm Final Harvest"
+                description={`This will close the production cycle for ${selectedCageLabel}. All subsequent events will start a new cycle. Continue?`}
+                maxWidth="sm"
             >
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Confirm Final Harvest</DialogTitle>
-                        <DialogDescription>
-                            This will close the production cycle for {selectedCageLabel}. All subsequent events will
-                            start a new cycle. Continue?
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
+                <Box className="max-w-md">
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, pt: 1 }}>
                         <Button
                             type="button"
                             variant="outline"
@@ -433,9 +432,10 @@ export function HarvestForm({
                             {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Continue
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
+                    </Box>
+                </Box>
             </Dialog>
         </>
     )
 }
+

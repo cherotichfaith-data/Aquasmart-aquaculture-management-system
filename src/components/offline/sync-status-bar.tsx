@@ -1,9 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Alert from "@mui/material/Alert"
+import Box from "@mui/material/Box"
+import Button from "@mui/material/Button"
+import Typography from "@mui/material/Typography"
+import { alpha } from "@mui/material/styles"
 import { formatDistanceToNow } from "date-fns"
 import { AlertTriangle, CheckCircle2, Loader2, WifiOff } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { useSyncStore } from "@/lib/offline/sync-store"
 
 export function SyncStatusBar() {
@@ -31,54 +35,74 @@ export function SyncStatusBar() {
 
   const canSyncNow = Boolean(manualSync) && isOnline && !isSyncing && pendingCount > 0
   const syncButton = canSyncNow ? (
-    <Button size="sm" variant="outline" className="h-7 rounded-full px-3 text-[11px]" onClick={() => void manualSync?.()}>
+    <Button size="small" variant="outlined" onClick={() => void manualSync?.()} sx={{ minHeight: 28, borderRadius: 999, px: 1.5, fontSize: "0.6875rem" }}>
       Sync now
     </Button>
   ) : null
 
+  const barSx = {
+    borderRadius: 0,
+    borderTop: 0,
+    borderLeft: 0,
+    borderRight: 0,
+    px: 2,
+    py: 1,
+    alignItems: "center",
+    "& .MuiAlert-message": {
+      width: "100%",
+    },
+  } as const
+
   if (syncError) {
     return (
-      <div className="flex flex-col gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-3.5 w-3.5" />
-          <span>{syncError}</span>
-        </div>
-        {syncButton}
-      </div>
+      <Alert severity="error" icon={<AlertTriangle size={14} />} sx={barSx}>
+        <Box sx={{ display: "flex", gap: 1, flexDirection: { xs: "column", sm: "row" }, alignItems: { sm: "center" }, justifyContent: "space-between" }}>
+          <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
+            {syncError}
+          </Typography>
+          {syncButton}
+        </Box>
+      </Alert>
     )
   }
 
   if (isSyncing) {
     return (
-      <div className="flex flex-col gap-2 border-b border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span>Syncing to server...</span>
-        </div>
-      </div>
+      <Alert severity="info" icon={<Loader2 size={14} className="animate-spin" />} sx={barSx}>
+        <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
+          Syncing to server...
+        </Typography>
+      </Alert>
     )
   }
 
   if (pendingCount > 0) {
     return (
-      <div className="flex flex-col gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <WifiOff className="h-3.5 w-3.5" />
-          <span>
+      <Alert severity="warning" icon={<WifiOff size={14} />} sx={barSx}>
+        <Box sx={{ display: "flex", gap: 1, flexDirection: { xs: "column", sm: "row" }, alignItems: { sm: "center" }, justifyContent: "space-between" }}>
+          <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
             {pendingCount} record{pendingCount > 1 ? "s" : ""} pending upload and saved locally.
-          </span>
-        </div>
-        {syncButton}
-      </div>
+          </Typography>
+          {syncButton}
+        </Box>
+      </Alert>
     )
   }
 
   if (lastSyncedAt) {
     return (
-      <div className="flex items-center gap-2 border-b border-green-200 bg-green-50 px-4 py-1.5 text-xs text-green-700">
-        <CheckCircle2 className="h-3.5 w-3.5" />
-        <span>All synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
-      </div>
+      <Alert
+        severity="success"
+        icon={<CheckCircle2 size={14} />}
+        sx={{
+          ...barSx,
+          bgcolor: (theme) => alpha(theme.palette.success.main, 0.08),
+        }}
+      >
+        <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
+          All synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}
+        </Typography>
+      </Alert>
     )
   }
 

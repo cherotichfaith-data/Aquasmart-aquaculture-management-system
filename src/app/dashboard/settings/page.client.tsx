@@ -1,0 +1,206 @@
+"use client"
+
+import { useState, useEffect, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/components/providers/auth-provider"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
+import { queryKeys } from "@/lib/cache/query-keys"
+import { normalizeRole, resolveAppEntryPath, type AquaSmartRole } from "@/lib/app-entry"
+import { createClient } from "@/lib/supabase/client"
+import { logSbError } from "@/lib/supabase/log"
+import { DEFAULT_SETTINGS, formatError, hasActionableSbError } from "./settings-utils"
+import { getErrorMessage } from "@/lib/utils/query-result"
+import { SettingsPageShell } from "./_components/settings-page-shell"
+import { loadSettingsData, saveSettingsData } from "./_lib/settings-data"
+
+export default function SettingsPage({
+  initialFarmId,
+  initialFarmName,
+  initialUserId,
+}: {
+  initialFarmId?: string | null
+  initialFarmName?: string | null
+  initialUserId?: string | null
+}) {
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+
+  const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
+  const [thresholdId, setThresholdId] = useState<string | null>(null)
+  const [thresholdDenied, setThresholdDenied] = useState(false)
+  const { user, profile } = useAuth()
+  const resolvedUserId = user?.id ?? initialUserId ?? null
+  const { farm, farmId, loading: farmLoading } = useActiveFarm({ initialFarmId, initialFarmName })
+  const farmRoleQuery = useActiveFarmRole(farmId)
+  const farmRole = (farmRoleQuery.data ?? null) as AquaSmartRole
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const missingFarmAssignment = Boolean(resolvedUserId) && !farmLoading && !farmId
+  const router = useRouter()
+  // Gate: only admin and farm_manager can access settings
+  const canAccessSettings = !farmRole || farmRole === "admin" || farmRole === "farm_manager"
+  // useEffect-based redirect to avoid calling router during render (React error)
+  useEffect(() => {
+    if (farmRole && !canAccessSettings) {
+      router.replace(resolveAppEntryPath(farmRole))
+    }
+  }, [farmRole, canAccessSettings, router])
+  const supabase = useMemo(() => createClient(), [])
+  const settingsLoadQuery = useQuery({
+    queryKey: queryKeys.settings.load(resolvedUserId, farmId, thresholdDenied),
+    enabled: Boolean(resolvedUserId) && !farmLoading && !hasLoadedSettings,
+    queryFn: ({ signal }) =>
+      loadSettingsData({
+        supabase,
+        userId: resolvedUserId,
+        farmId,
+        thresholdDenied,
+        signal,
+      }),
+    staleTime: 60_000,
+  })
+  const settingsLoadData = settingsLoadQuery.data
+  const settingsLoadLoading = settingsLoadQuery.isLoading
+  const settingsLoadSuccess = settingsLoadQuery.isSuccess
+  const settingsLoadFetched = settingsLoadQuery.isFetched
+  const settingsLoadError = getErrorMessage(settingsLoadQuery.error)
+
+  useEffect(() => {
+    if (!resolvedUserId) return
+    setHasLoadedSettings(false)
+    setThresholdDenied(false)
+    setThresholdId(null)
+    setSaved(false)
+    setErrorMsg(null)
+    setSettings(DEFAULT_SETTINGS)
+    setLoading(true)
+  }, [farmId, resolvedUserId])
+
+  useEffect(() => {
+    if (!resolvedUserId) return
+    if (farmLoading) return
+    if (hasLoadedSettings) return
+
+    setLoading(settingsLoadLoading)
+    if (!settingsLoadSuccess) {
+      if (settingsLoadFetched) {
+        setLoading(false)
+      }
+      return
+    }
+    if (!settingsLoadData) {
+      setLoading(false)
+      return
+    }
+
+    const farmRow = farm ?? null
+    const {
+      thresholdRow,
+      nextThresholdDenied,
+    } = settingsLoadData
+
+    if (nextThresholdDenied) setThresholdDenied(true)
+    setThresholdId(thresholdRow?.id ?? null)
+    setSettings((prev) => ({
+      ...prev,
+      farmName: farmRow?.name ?? profile?.farm_name ?? prev.farmName,
+      location: farmRow?.location ?? profile?.location ?? prev.location,
+      owner: farmRow?.owner ?? profile?.owner ?? prev.owner,
+      email: farmRow?.email ?? profile?.email ?? prev.email,
+      phone: farmRow?.phone ?? profile?.phone ?? prev.phone,
+      role: normalizeRole(profile?.role) ?? prev.role,
+      lowDoThreshold: thresholdRow?.low_do_threshold ?? prev.lowDoThreshold,
+      highAmmoniaThreshold: thresholdRow?.high_ammonia_threshold ?? prev.highAmmoniaThreshold,
+      highMortalityThreshold: thresholdRow?.high_mortality_threshold ?? prev.highMortalityThreshold,
+    }))
+    setHasLoadedSettings(true)
+    setLoading(false)
+  }, [farm, farmLoading, hasLoadedSettings, profile, resolvedUserId, settingsLoadData, settingsLoadFetched, settingsLoadLoading, settingsLoadSuccess])
+
+  useEffect(() => {
+    if (resolvedUserId) return
+    const savedSettings = localStorage.getItem("aqua_settings")
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings))
+      } catch {
+        // ignore malformed local cache
+      }
+    }
+    setLoading(false)
+  }, [resolvedUserId])
+
+  const handleChange = (field: string, value: string | number) => {
+    setSettings((prev) => ({ ...prev, [field]: value }))
+    setSaved(false)
+  }
+
+  const handleSave = () => {
+    const save = async () => {
+      setIsSaving(true)
+      setErrorMsg(null)
+      try {
+        if (user?.id) {
+          const result = await saveSettingsData({
+            supabase,
+            userId: user.id,
+            farmId,
+            settings,
+            thresholdId,
+          })
+          if (result.errorMessage) {
+            setErrorMsg(result.errorMessage)
+            setIsSaving(false)
+            return
+          }
+          setThresholdId(result.thresholdId ?? null)
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId: result.resolvedFarmId } }))
+            window.dispatchEvent(new Event("profile-updated"))
+          }
+
+          setSaved(true)
+          setTimeout(() => setSaved(false), 3000)
+          router.replace(resolveAppEntryPath(farmRole))
+        } else {
+          localStorage.setItem("aqua_settings", JSON.stringify(settings))
+          setSaved(true)
+          setTimeout(() => setSaved(false), 3000)
+        }
+      } catch (err) {
+        if (hasActionableSbError(err)) {
+          logSbError("settings:save", err)
+        }
+        setErrorMsg(formatError(err))
+      } finally {
+        setIsSaving(false)
+      }
+    }
+
+    void save()
+  }
+
+  // While role is loading or if access is denied, render nothing (useEffect handles redirect)
+  if (farmRole && !canAccessSettings) return null
+
+  return (
+    <SettingsPageShell
+      initialFarmId={initialFarmId}
+      initialFarmName={initialFarmName}
+      loading={loading}
+      saved={saved}
+      errorMsg={errorMsg}
+      settingsLoadError={settingsLoadQuery.isError ? (settingsLoadError ?? "Please retry or check your connection.") : null}
+      missingFarmAssignment={missingFarmAssignment}
+      onRetryLoad={() => settingsLoadQuery.refetch()}
+      settings={settings}
+      onChange={handleChange}
+      isSaving={isSaving}
+      onSave={handleSave}
+    />
+  )
+}

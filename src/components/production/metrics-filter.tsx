@@ -2,14 +2,6 @@
 
 import { useCallback } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { PRODUCTION_METRIC_OPTIONS, parseProductionMetric } from "@/components/production/metrics"
 
 export default function ProductionMetricFilter() {
@@ -35,19 +27,17 @@ export default function ProductionMetricFilter() {
   }
 
   return (
-    <Select value={selected} onValueChange={handleSelectChange}>
-      <SelectTrigger className="min-w-[190px] border-border/70 bg-background/70 shadow-none transition-colors hover:bg-muted/35 focus:ring-1 focus:ring-ring/30">
-        <SelectValue placeholder="Select metric" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {PRODUCTION_METRIC_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+    <select
+      id="production-metric-filter"
+      value={selected}
+      onChange={(event) => handleSelectChange(event.target.value)}
+      className="soft-input-surface h-11 w-full max-w-[260px] rounded-xl px-3 text-sm font-medium text-foreground"
+    >
+      {PRODUCTION_METRIC_OPTIONS.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   )
 }

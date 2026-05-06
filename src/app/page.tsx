@@ -1,11 +1,7 @@
-import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import RootPageClient from "./page.client"
-import { createClient } from "@/lib/supabase/server"
-import { resolveInitialFarmId } from "@/features/farm/queries.server"
-import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
-import { resolveAppEntryPath } from "@/lib/app-entry"
-import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import type { Metadata } from "next"
+import LandingPage from "@/components/marketing/landing-page"
+import { WORKSPACE_SELECT_PATH } from "@/lib/app-entry"
 
 export const metadata: Metadata = {
   title: "AquaSmart | Aquaculture Management Software",
@@ -60,58 +56,26 @@ export default async function Page({
 }: {
   searchParams?: Promise<SearchParams>
 }) {
-  const supabase = await createClient()
-  let user = null
-
-  try {
-    const result = await supabase.auth.getUser()
-    user = result.data.user
-  } catch (error) {
-    if (!isSbNetworkError(error)) {
-      logSbError("app:page:getUser", error)
-    }
-  }
-
-  if (!user) {
-    return <RootPageClient initialView="landing" />
-  }
-
   const resolvedSearchParams = (await searchParams) ?? {}
-  const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
-  const initialFilters = parseDashboardPageFilters(resolvedSearchParams)
-  const { farmId } = await resolveInitialFarmId(searchFarmId)
+  const callbackParams = new URLSearchParams()
 
-  if (!farmId) {
-    redirect("/onboarding")
-  }
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("farm_user")
-    .select("role")
-    .eq("farm_id", farmId)
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (membershipError && !isSbNetworkError(membershipError)) {
-    logSbError("app:page:getFarmRole", membershipError)
-  }
-
-  const entryPath = resolveAppEntryPath((membership?.role ?? null) as Parameters<typeof resolveAppEntryPath>[0])
-  if (entryPath !== "/") {
-    redirect(entryPath)
-  }
-
-  const initialData = await getDashboardPageInitialData({
-    farmId,
-    filters: initialFilters,
+  Object.entries(resolvedSearchParams).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      callbackParams.set(key, value)
+    }
   })
 
-  return (
-    <RootPageClient
-      initialView="dashboard"
-      initialFarmId={farmId}
-      initialFilters={initialFilters}
-      initialData={initialData}
-    />
-  )
+  if (
+    callbackParams.has("code") ||
+    callbackParams.has("access_token") ||
+    callbackParams.has("refresh_token") ||
+    callbackParams.has("error")
+  ) {
+    if (!callbackParams.has("next")) {
+      callbackParams.set("next", WORKSPACE_SELECT_PATH)
+    }
+    redirect(`/auth/callback?${callbackParams.toString()}`)
+  }
+
+  return <LandingPage />
 }

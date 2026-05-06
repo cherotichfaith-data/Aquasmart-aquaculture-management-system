@@ -47,7 +47,6 @@ export type TimeBounds = {
 }
 
 type TimePeriodBoundsRpc = Database["public"]["Functions"]["api_time_period_bounds_scoped"]
-type TimePeriodBoundsRpcArgs = TimePeriodBoundsRpc["Args"]
 type TimePeriodBoundsRpcRow = TimePeriodBoundsRpc["Returns"][number]
 type TimePeriodBoundsRpcResult = {
   data: TimePeriodBoundsRpcRow | null
@@ -57,7 +56,7 @@ type TimePeriodBoundsRpcQuery = PromiseLike<TimePeriodBoundsRpcResult> & {
   abortSignal?: (signal: AbortSignal) => TimePeriodBoundsRpcQuery
 }
 type RpcClient = {
-  rpc: (fn: "api_time_period_bounds_scoped", args: TimePeriodBoundsRpcArgs) => {
+  rpc: (fn: string, args: Record<string, unknown>) => {
     maybeSingle: () => TimePeriodBoundsRpcQuery
   }
 }

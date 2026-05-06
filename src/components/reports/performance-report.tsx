@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from "react"
 import { useProductionSummary } from "@/lib/hooks/use-production"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { sortByDateAsc } from "@/lib/utils"
 import type { Database, Enums } from "@/lib/types/database"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
-import { computeEfcrFromProductionRows } from "@/features/dashboard/analytics-shared"
+import { computeEfcrFromProductionRows } from "@/features/production/analytics"
 import {
   BenchmarkStatusSection,
   PerformanceRecordsSection,
@@ -33,17 +32,18 @@ const selectLatestRowsPerCycle = (rows: ProductionSummaryRow[]) => {
 }
 
 export default function PerformanceReport({
+  farmId,
   dateRange,
   systemId,
   stage,
   farmName,
 }: {
+  farmId?: string | null
   dateRange?: { from: string; to: string }
   systemId?: number
   stage?: "all" | Enums<"system_growth_stage">
   farmName?: string | null
 }) {
-  const { farmId } = useActiveFarm()
   const chartLimit = 5000
   const [tableLimit, setTableLimit] = useState("100")
   const [showPerformanceRecords, setShowPerformanceRecords] = useState(false)

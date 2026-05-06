@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/types/database"
 
 export type FeedingInsertInput = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
+  farm_id?: string | null
   feeding_response: "very_good" | "good" | "fair" | "bad"
 }
 

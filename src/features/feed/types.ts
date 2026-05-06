@@ -2,6 +2,7 @@ import type { Database } from "@/lib/types/database"
 import type { FeedingRecordWithType } from "@/lib/api/reports"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { TimeBounds, TimePeriod } from "@/lib/time-period"
+import type { FeedRateRow } from "@/lib/types/insights"
 
 export type StageFilter = "all" | Database["public"]["Enums"]["system_growth_stage"]
 export type SystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
@@ -22,4 +23,6 @@ export type FeedPageInitialData = {
   feedTypes: QueryResult<FeedTypeOption>
   feedingRecords: QueryResult<FeedingRecordWithType>
   inventory: QueryResult<DailyInventoryRow>
+  /** G-03: pre-fetched feed rate analysis rows to hydrate charts on first render */
+  feedRateSummary: QueryResult<FeedRateRow>
 }

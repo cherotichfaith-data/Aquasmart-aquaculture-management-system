@@ -12,65 +12,41 @@ import {
   getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
+import {
+  listAlertThresholdRows,
+} from "@/features/shared/query-seed.server"
 import type {
   DashboardPageInitialData,
   DashboardPageInitialFilters,
-  DashboardRecentEntriesData,
   DashboardSystemRow,
-  KPIOverviewMetric,
-  ProductionSummaryMetrics,
+  ProductionTrendRpcRow,
   ProductionTrendRow,
-  SystemsTableData,
 } from "./types"
-import { toQuerySuccess } from "@/lib/api/_utils"
-import { scaleFractionToPercent } from "@/lib/analytics-format"
+import { isMissingObjectError, toQuerySuccess } from "@/lib/api/_utils"
+import { normalizeStageFilter } from "@/lib/stage-filter"
 import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
-import {
-  aggregateInventoryMetrics,
-  buildKpiTrustMap,
-  buildRecommendedActionsFromAnalytics,
-  computeEfcrFromProductionRows,
-  computeMortalityRateFromProduction,
-  toTrendDelta,
-} from "./analytics-shared"
-
+import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics-rpc-shared"
+import { toProductionTrendRows } from "./production-trend"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
-type DailyInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
-type DailyRatingRow = Database["public"]["Views"]["api_daily_water_quality_rating"]["Row"]
-type FishTransferRow = Database["public"]["Tables"]["fish_transfer"]["Row"]
+type KpiCoverageRow = Database["public"]["Functions"]["api_kpi_coverage"]["Returns"][number]
+type RecommendedActionRow = Database["public"]["Functions"]["api_recommended_actions"]["Returns"][number]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
-type WaterQualityEntryRow = Database["public"]["Tables"]["water_quality_measurement"]["Row"]
-type FishMortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
-type FeedingRecordRow = Database["public"]["Tables"]["feeding_record"]["Row"]
-type FishSamplingWeightRow = Database["public"]["Tables"]["fish_sampling_weight"]["Row"]
-type FishHarvestRow = Database["public"]["Tables"]["fish_harvest"]["Row"]
-type FeedIncomingRow = Database["public"]["Tables"]["feed_incoming"]["Row"]
-type FishStockingRow = Database["public"]["Tables"]["fish_stocking"]["Row"]
-type SystemRow = Database["public"]["Tables"]["system"]["Row"]
+const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "month"
 
-const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "2 weeks"
-const VALID_STAGES: DashboardPageInitialFilters["selectedStage"][] = ["all", "nursing", "grow_out"]
-
-function emptyRecentEntries(): DashboardRecentEntriesData {
-  return {
-    mortality: toQuerySuccess<FishMortalityRow>([]),
-    feeding: toQuerySuccess<FeedingRecordRow>([]),
-    sampling: toQuerySuccess<FishSamplingWeightRow>([]),
-    transfer: toQuerySuccess<FishTransferRow>([]),
-    harvest: toQuerySuccess<FishHarvestRow>([]),
-    water_quality: toQuerySuccess<WaterQualityEntryRow>([]),
-    incoming_feed: toQuerySuccess<FeedIncomingRow>([]),
-    stocking: toQuerySuccess<FishStockingRow>([]),
-    systems: toQuerySuccess<SystemRow>([]),
-  }
-}
-
-async function withNetworkFallback<T>(tag: string, fallback: T, loader: () => Promise<T>): Promise<T> {
+async function withNetworkFallback<T>(
+  tag: string,
+  fallback: T,
+  loader: () => Promise<T>,
+  options?: { allowMissingObject?: boolean },
+): Promise<T> {
   try {
     return await loader()
   } catch (error) {
+    if (options?.allowMissingObject && isMissingObjectError(error)) {
+      return fallback
+    }
     if (!isSbNetworkError(error)) throw error
     logSbError(tag, error)
     return fallback
@@ -87,11 +63,7 @@ export function parseDashboardPageFilters(
 
   const selectedBatch = typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all"
   const selectedSystem = typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all"
-  const selectedStage =
-    typeof selectedStageRaw === "string" &&
-    VALID_STAGES.includes(selectedStageRaw as DashboardPageInitialFilters["selectedStage"])
-      ? (selectedStageRaw as DashboardPageInitialFilters["selectedStage"])
-      : "all"
+  const selectedStage = normalizeStageFilter(selectedStageRaw)
   const timePeriod =
     typeof timePeriodRaw === "string" && isTimePeriod(timePeriodRaw)
       ? (timePeriodRaw as TimePeriod)
@@ -148,7 +120,7 @@ async function getDashboardSystemsRaw(
   })
 
   if (error) {
-    throw new Error(error.message)
+    throw error
   }
 
   return (data ?? []) as DashboardSystemRow[]
@@ -176,65 +148,10 @@ async function getProductionSummaryRows(
   })
 
   if (error) {
-    throw new Error(error.message)
+    throw error
   }
 
-  return (data ?? []) as ProductionTrendRow[]
-}
-
-async function getDailyInventoryRows(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    systemId?: number
-    dateFrom?: string | null
-    dateTo?: string | null
-    limit?: number
-  },
-): Promise<DailyInventoryRow[]> {
-  const { data, error } = await supabase.rpc("api_daily_fish_inventory_rpc", {
-    p_farm_id: params.farmId,
-    p_system_id: params.systemId,
-    p_start_date: params.dateFrom ?? undefined,
-    p_end_date: params.dateTo ?? undefined,
-    p_order_asc: true,
-    p_limit: params.limit ?? 5000,
-  })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (data ?? []) as DailyInventoryRow[]
-}
-
-async function getWaterQualityRatings(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    systemId?: number
-    dateFrom?: string | null
-    dateTo?: string | null
-    limit?: number
-  },
-): Promise<DailyRatingRow[]> {
-  let query = supabase
-    .from("api_daily_water_quality_rating")
-    .select("*")
-    .eq("farm_id", params.farmId)
-    .order("rating_date", { ascending: true })
-
-  if (params.systemId) query = query.eq("system_id", params.systemId)
-  if (params.dateFrom) query = query.gte("rating_date", params.dateFrom)
-  if (params.dateTo) query = query.lte("rating_date", params.dateTo)
-  if (params.limit) query = query.limit(params.limit)
-
-  const { data, error } = await query
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (data ?? []) as DailyRatingRow[]
+  return toProductionTrendRows((data ?? []) as ProductionTrendRpcRow[])
 }
 
 async function getWaterQualityMeasurements(
@@ -261,26 +178,13 @@ async function getWaterQualityMeasurements(
 
   const { data, error } = await query
   if (error) {
-    throw new Error(error.message)
+    throw error
   }
 
   return (data ?? []) as WaterQualityMeasurementRow[]
 }
 
-async function getAlertThresholds(supabase: ServerClient, farmId: string): Promise<AlertThresholdRow[]> {
-  const { data, error } = await supabase
-    .from("api_alert_thresholds")
-    .select("*")
-    .eq("farm_id", farmId)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (data ?? []) as AlertThresholdRow[]
-}
-
-async function getDashboardConsolidated(
+async function getDashboardConsolidatedRows(
   supabase: ServerClient,
   params: {
     farmId: string
@@ -288,9 +192,7 @@ async function getDashboardConsolidated(
     dateFrom?: string | null
     dateTo?: string | null
   },
-): Promise<DashboardConsolidatedRow | null> {
-  if (!params.systemId) return null
-
+): Promise<DashboardConsolidatedRow[]> {
   const { data, error } = await supabase.rpc("api_dashboard_consolidated", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
@@ -299,118 +201,43 @@ async function getDashboardConsolidated(
   })
 
   if (error) {
-    return null
+    throw error
   }
 
-  return ((data ?? []) as DashboardConsolidatedRow[])[0] ?? null
+  return (data ?? []) as DashboardConsolidatedRow[]
 }
 
-async function getTransferRows(
+async function getKpiCoverageRows(
   supabase: ServerClient,
-  params: { batchId?: number; dateFrom?: string | null; dateTo?: string | null; limit?: number },
-): Promise<FishTransferRow[]> {
-  let query = supabase.from("fish_transfer").select("*").order("date", { ascending: false })
-  if (params.batchId) query = query.eq("batch_id", params.batchId)
-  if (params.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params.dateTo) query = query.lte("date", params.dateTo)
-  if (params.limit) query = query.limit(params.limit)
-
-  const { data, error } = await query
+  params: { farmId: string; dateFrom?: string | null; dateTo?: string | null },
+): Promise<KpiCoverageRow[]> {
+  const { data, error } = await supabase.rpc("api_kpi_coverage", {
+    p_farm_id: params.farmId,
+    ...(params.dateFrom ? { p_date_from: params.dateFrom } : {}),
+    ...(params.dateTo   ? { p_date_to:   params.dateTo   } : {}),
+  })
   if (error) {
-    throw new Error(error.message)
+    if (isMissingObjectError(error)) return []
+    logSbError("dashboard:getKpiCoverageRows", error)
+    return []
   }
-
-  return (data ?? []) as FishTransferRow[]
+  return (data ?? []) as KpiCoverageRow[]
 }
 
-async function getFarmSystemIdsForRecent(supabase: ServerClient, farmId: string): Promise<number[]> {
-  const { data, error } = await supabase.from("system").select("id").eq("farm_id", farmId)
-  if (error) {
-    throw new Error(error.message)
-  }
-  return Array.from(
-    new Set((data ?? []).map((row) => row.id).filter((id): id is number => typeof id === "number" && Number.isFinite(id))),
-  )
-}
-
-async function getRecentRows<T>(
+async function getRecommendedActionRows(
   supabase: ServerClient,
-  table: "fish_mortality" | "feeding_record" | "fish_sampling_weight" | "fish_transfer" | "fish_harvest" | "water_quality_measurement" | "feed_incoming" | "fish_stocking" | "system",
-  orderColumn: string,
-  farmId: string,
-  farmSystemIds: number[],
-  limit = 5,
-): Promise<T[]> {
-  let query = supabase.from(table).select("*")
-  switch (table) {
-    case "fish_mortality":
-      query = query.eq("farm_id", farmId)
-      break
-    case "feed_incoming":
-    case "system":
-      query = query.eq("farm_id", farmId)
-      break
-    case "fish_transfer": {
-      if (farmSystemIds.length === 0) return []
-      const systemList = farmSystemIds.join(",")
-      query = query.or(`origin_system_id.in.(${systemList}),target_system_id.in.(${systemList})`)
-      break
-    }
-    default:
-      if (farmSystemIds.length === 0) return []
-      query = query.in("system_id", farmSystemIds)
-      break
-  }
+  params: { farmId: string; systemId?: number },
+): Promise<RecommendedActionRow[]> {
+  const { data, error } = await supabase.rpc("api_recommended_actions", {
+    p_farm_id: params.farmId,
+    p_system_id: params.systemId,
+  })
 
-  query = query.order(orderColumn, { ascending: false }).limit(limit)
-  const { data, error } = await query
   if (error) {
-    throw new Error(error.message)
+    throw error
   }
-  return (data ?? []) as T[]
-}
 
-async function getRecentEntries(supabase: ServerClient, farmId: string): Promise<DashboardRecentEntriesData> {
-  const farmSystemIds = await getFarmSystemIdsForRecent(supabase, farmId)
-  const [
-    mortality,
-    feeding,
-    sampling,
-    transfer,
-    harvest,
-    waterQuality,
-    incomingFeed,
-    stocking,
-    systems,
-  ] = await Promise.all([
-    getRecentRows<FishMortalityRow>(supabase, "fish_mortality", "date", farmId, farmSystemIds),
-    getRecentRows<FeedingRecordRow>(supabase, "feeding_record", "date", farmId, farmSystemIds),
-    getRecentRows<FishSamplingWeightRow>(supabase, "fish_sampling_weight", "date", farmId, farmSystemIds),
-    getRecentRows<FishTransferRow>(supabase, "fish_transfer", "date", farmId, farmSystemIds),
-    getRecentRows<FishHarvestRow>(supabase, "fish_harvest", "date", farmId, farmSystemIds),
-    getRecentRows<WaterQualityEntryRow>(
-      supabase,
-      "water_quality_measurement",
-      "date",
-      farmId,
-      farmSystemIds,
-    ),
-    getRecentRows<FeedIncomingRow>(supabase, "feed_incoming", "date", farmId, farmSystemIds),
-    getRecentRows<FishStockingRow>(supabase, "fish_stocking", "date", farmId, farmSystemIds),
-    getRecentRows<SystemRow>(supabase, "system", "created_at", farmId, farmSystemIds),
-  ])
-
-  return {
-    mortality: toQuerySuccess(mortality),
-    feeding: toQuerySuccess(feeding),
-    sampling: toQuerySuccess(sampling),
-    transfer: toQuerySuccess(transfer),
-    harvest: toQuerySuccess(harvest),
-    water_quality: toQuerySuccess(waterQuality),
-    incoming_feed: toQuerySuccess(incomingFeed),
-    stocking: toQuerySuccess(stocking),
-    systems: toQuerySuccess(systems),
-  }
+  return (data ?? []) as RecommendedActionRow[]
 }
 
 async function resolveScopedSystemIds(params: {
@@ -441,262 +268,20 @@ async function resolveScopedSystemIds(params: {
 
 function buildKpiOverview(params: {
   scopedSystemIds: number[]
-  inventoryRows: DailyInventoryRow[]
-  productionRows: ProductionTrendRow[]
-  waterQualityRows: DailyRatingRow[]
-  consolidatedRow: DashboardConsolidatedRow | null
+  consolidatedRows: DashboardConsolidatedRow[]
+  systemRows: DashboardSystemRow[]
+  coverageRows: KpiCoverageRow[]
   dateFrom: string
   dateTo: string
 }): DashboardPageInitialData["kpiOverview"] {
-  const ratingToneMap: Record<string, { tone: KPIOverviewMetric["tone"]; badge: string }> = {
-    optimal: { tone: "good", badge: "Optimal" },
-    acceptable: { tone: "warn", badge: "Acceptable" },
-    critical: { tone: "bad", badge: "Critical" },
-    lethal: { tone: "bad", badge: "Lethal" },
-  }
-
-  if (params.scopedSystemIds.length === 0) {
-    return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }
-  }
-
-  const inventoryRows = params.inventoryRows.filter(
-    (row) => row.system_id != null && params.scopedSystemIds.includes(row.system_id),
-  )
-  const productionRows = params.productionRows.filter(
-    (row) => row.system_id != null && params.scopedSystemIds.includes(row.system_id),
-  )
-  const wqRows = params.waterQualityRows.filter(
-    (row) => row.system_id != null && params.scopedSystemIds.includes(row.system_id),
-  )
-  const inventoryMetrics = aggregateInventoryMetrics(inventoryRows)
-  const efcr = computeEfcrFromProductionRows(productionRows)
-  const mortalityRateFromProduction = computeMortalityRateFromProduction(
-    productionRows.map((row) => ({
-      number_of_fish_inventory: row.number_of_fish_inventory,
-      daily_mortality_count: row.daily_mortality_count,
-    })),
-  )
-  const mortalityRate = inventoryMetrics.mortalityRate ?? mortalityRateFromProduction
-
-  const resolvedEfcr = params.consolidatedRow?.efcr_period_consolidated ?? efcr
-  const resolvedMortalityRate = params.consolidatedRow?.mortality_rate ?? mortalityRate
-  const resolvedAvgBiomass = params.consolidatedRow?.average_biomass ?? inventoryMetrics.averageBiomass
-  const resolvedBiomassDensity = params.consolidatedRow?.biomass_density ?? inventoryMetrics.biomassDensity
-  const resolvedFeedingRate = params.consolidatedRow?.feeding_rate ?? inventoryMetrics.feedingRate
-  const resolvedAbw = params.consolidatedRow?.abw_asof_end ?? inventoryMetrics.abwAsOfEnd
-  const displayedMortalityRate = scaleFractionToPercent(resolvedMortalityRate)
-  const displayedFeedingRate = scaleFractionToPercent(resolvedFeedingRate)
-  const resolvedWqAverage =
-    wqRows.length > 0
-      ? wqRows.reduce((sum, row) => sum + (row.rating_numeric ?? 0), 0) / wqRows.length
-      : null
-  const wqRounded = resolvedWqAverage === null ? null : Math.round(resolvedWqAverage)
-  const wqLabel =
-    wqRounded === null
-      ? null
-      : wqRounded === 0
-        ? "lethal"
-        : wqRounded === 1
-          ? "critical"
-          : wqRounded === 2
-            ? "acceptable"
-            : "optimal"
-  const wqTone = wqLabel ? ratingToneMap[wqLabel]?.tone ?? "neutral" : "neutral"
-  const wqBadge = wqLabel ? ratingToneMap[wqLabel]?.badge ?? "Monitoring" : "Monitoring"
-
-  const trendByKey: Record<string, number | null> = params.consolidatedRow
-    ? {
-        efcr: toTrendDelta(params.consolidatedRow.efcr_period_consolidated_delta),
-        mortality: scaleFractionToPercent(toTrendDelta(params.consolidatedRow.mortality_rate_delta)),
-        biomass: toTrendDelta(params.consolidatedRow.average_biomass_delta),
-        biomass_density: toTrendDelta(params.consolidatedRow.biomass_density_delta),
-        feeding: scaleFractionToPercent(toTrendDelta(params.consolidatedRow.feeding_rate_delta)),
-        abw: toTrendDelta(params.consolidatedRow.abw_asof_end_delta),
-        water_quality: null,
-      }
-    : {}
-
-  const trustByKey = buildKpiTrustMap({
-    totalSystems: params.scopedSystemIds.length,
-    inventoryRows,
-    productionRows,
-    waterQualityRows: wqRows,
+  return buildKpiOverviewFromRpc({
+    scopedSystemIds: params.scopedSystemIds,
+    consolidatedRows: params.consolidatedRows,
+    systemRows: params.systemRows,
+    coverageRows: params.coverageRows,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
   })
-
-  const metrics: KPIOverviewMetric[] = [
-    {
-      key: "efcr",
-      label: "eFCR",
-      value: resolvedEfcr,
-      decimals: 2,
-      trend: trendByKey.efcr ?? null,
-      trendFormat: "delta",
-      trendDecimals: 2,
-      invertTrend: true,
-      trust: trustByKey.efcr,
-    },
-    {
-      key: "mortality",
-      label: "Mortality Rate",
-      value: displayedMortalityRate,
-      unit: "%/day",
-      decimals: 2,
-      trend: trendByKey.mortality ?? null,
-      trendFormat: "delta",
-      trendDecimals: 2,
-      trendUnit: "%/day",
-      invertTrend: true,
-      trust: trustByKey.mortality,
-    },
-    {
-      key: "abw",
-      label: "Avg Body Weight",
-      value: resolvedAbw,
-      unit: "g",
-      decimals: 1,
-      trend: trendByKey.abw ?? null,
-      trendFormat: "delta",
-      trendDecimals: 1,
-      trendUnit: "g",
-      invertTrend: false,
-      trust: trustByKey.abw,
-    },
-    {
-      key: "biomass",
-      label: "Avg Biomass",
-      value: resolvedAvgBiomass,
-      unit: "kg",
-      decimals: 1,
-      trend: trendByKey.biomass ?? null,
-      trendFormat: "delta",
-      trendDecimals: 1,
-      trendUnit: "kg",
-      invertTrend: false,
-      trust: trustByKey.biomass,
-    },
-    {
-      key: "biomass_density",
-      label: "Biomass Density",
-      value: resolvedBiomassDensity,
-      unit: "kg/m3",
-      decimals: 2,
-      trend: trendByKey.biomass_density ?? null,
-      trendFormat: "delta",
-      trendDecimals: 2,
-      trendUnit: "kg/m3",
-      invertTrend: false,
-      trust: trustByKey.biomass_density,
-    },
-    {
-      key: "feeding",
-      label: "Feeding Rate",
-      value: displayedFeedingRate,
-      unit: "% BW/day",
-      decimals: 2,
-      trend: trendByKey.feeding ?? null,
-      trendFormat: "delta",
-      trendDecimals: 2,
-      trendUnit: "% BW/day",
-      invertTrend: false,
-      trust: trustByKey.feeding,
-    },
-    {
-      key: "water_quality",
-      label: "Water Quality",
-      value: resolvedWqAverage,
-      decimals: 1,
-      trend: trendByKey.water_quality ?? null,
-      invertTrend: false,
-      tone: wqTone,
-      badge: wqBadge,
-      trust: trustByKey.water_quality,
-    },
-  ]
-
-  return {
-    metrics,
-    dateBounds: { start: params.dateFrom, end: params.dateTo },
-  }
-}
-
-function buildProductionSummaryMetrics(params: {
-  scopedSystemIds: number[]
-  productionRows: ProductionTrendRow[]
-  transferRows: FishTransferRow[]
-  dateFrom: string
-  dateTo: string
-}): ProductionSummaryMetrics {
-  const empty: ProductionSummaryMetrics = {
-    totalStockedFish: 0,
-    cumulativeMortality: 0,
-    transferInFish: 0,
-    transferOutFish: 0,
-    totalHarvestedFish: 0,
-    totalHarvestedKg: 0,
-    dateBounds: { start: params.dateFrom, end: params.dateTo },
-  }
-
-  if (params.scopedSystemIds.length === 0) return empty
-
-  const filtered = params.productionRows.filter(
-    (row) => row.system_id != null && params.scopedSystemIds.includes(row.system_id),
-  )
-  const scopedSet = new Set(params.scopedSystemIds)
-
-  let totalStockedFish = 0
-  let cumulativeMortality = 0
-  let totalHarvestedFish = 0
-  let totalHarvestedKg = 0
-  let transferInFish = 0
-  let transferOutFish = 0
-
-  filtered.forEach((row) => {
-    totalStockedFish += row.number_of_fish_stocked ?? 0
-    cumulativeMortality += row.daily_mortality_count ?? 0
-    totalHarvestedFish += row.number_of_fish_harvested ?? 0
-    totalHarvestedKg += row.total_weight_harvested ?? 0
-  })
-
-  params.transferRows.forEach((row) => {
-    const count = row.number_of_fish_transfer ?? 0
-    const originInScope = scopedSet.has(row.origin_system_id)
-    const targetInScope = row.target_system_id != null && scopedSet.has(row.target_system_id)
-
-    if (targetInScope && !originInScope) {
-      transferInFish += count
-    } else if (originInScope && !targetInScope) {
-      transferOutFish += count
-    }
-  })
-
-  return {
-    totalStockedFish,
-    cumulativeMortality,
-    transferInFish,
-    transferOutFish,
-    totalHarvestedFish,
-    totalHarvestedKg,
-    dateBounds: { start: params.dateFrom, end: params.dateTo },
-  }
-}
-
-function buildSystemsTable(params: {
-  scopedSystemIds: number[]
-  dashboardSystems: DashboardSystemRow[]
-  dateFrom: string
-  dateTo: string
-}): SystemsTableData {
-  if (params.scopedSystemIds.length === 0) {
-    return {
-      rows: [],
-      meta: { reason: "No scoped systems", start: params.dateFrom, end: params.dateTo },
-    }
-  }
-
-  return {
-    rows: params.dashboardSystems.filter((row) => params.scopedSystemIds.includes(row.system_id)),
-    meta: { source: "api_dashboard_systems", start: params.dateFrom, end: params.dateTo },
-  }
 }
 
 function buildEmptyDashboardPageInitialData(): DashboardPageInitialData {
@@ -705,28 +290,8 @@ function buildEmptyDashboardPageInitialData(): DashboardPageInitialData {
     systemOptions: toQuerySuccess([]),
     batchSystems: toQuerySuccess([]),
     kpiOverview: { metrics: [], dateBounds: { start: null, end: null } },
+    systemsTable: { rows: [], meta: { reason: "Missing time bounds", start: null, end: null } },
     productionTrend: [],
-    systemsTable: { rows: [], meta: { reason: "Missing farmId", start: null, end: null } },
-    productionSummaryMetrics: {
-      totalStockedFish: 0,
-      cumulativeMortality: 0,
-      transferInFish: 0,
-      transferOutFish: 0,
-      totalHarvestedFish: 0,
-      totalHarvestedKg: 0,
-      dateBounds: { start: null, end: null },
-    },
-    recentEntries: {
-      mortality: toQuerySuccess([]),
-      feeding: toQuerySuccess([]),
-      sampling: toQuerySuccess([]),
-      transfer: toQuerySuccess([]),
-      harvest: toQuerySuccess([]),
-      water_quality: toQuerySuccess([]),
-      incoming_feed: toQuerySuccess([]),
-      stocking: toQuerySuccess([]),
-      systems: toQuerySuccess([]),
-    },
     waterQualityMeasurements: toQuerySuccess([]),
     alertThresholds: toQuerySuccess([]),
     recommendedActions: [],
@@ -764,13 +329,9 @@ async function loadDashboardPageInitialData(
       ),
       kpiOverview: { metrics: [], dateBounds: bounds },
       systemsTable: { rows: [], meta: { reason: "Missing time bounds", start: bounds.start, end: bounds.end } },
-      productionSummaryMetrics: { ...empty.productionSummaryMetrics, dateBounds: bounds },
-      recentEntries: await withNetworkFallback("dashboard:getRecentEntries:missing-bounds", emptyRecentEntries(), () =>
-        getRecentEntries(supabase, farmId),
-      ),
       alertThresholds: toQuerySuccess(
         await withNetworkFallback("dashboard:getAlertThresholds:missing-bounds", [], () =>
-          getAlertThresholds(supabase, farmId),
+          listAlertThresholdRows(supabase, farmId),
         ),
       ),
     }
@@ -783,22 +344,25 @@ async function loadDashboardPageInitialData(
   const startDate = bounds.start!
   const endDate = bounds.end!
 
-  const [systemOptions, batchSystems, dashboardSystems, recentEntries, alertThresholds] = await Promise.all([
+  const [systemOptions, batchSystems, dashboardSystems, alertThresholds] = await Promise.all([
     withNetworkFallback("dashboard:getScopedSystemOptions", [], () =>
       getScopedSystemOptions(supabase, farmId, params.filters.selectedStage),
     ),
     withNetworkFallback("dashboard:getScopedBatchSystems", [], () => getScopedBatchSystems(supabase, batchId)),
-    withNetworkFallback("dashboard:getDashboardSystemsRaw", [], () =>
-      getDashboardSystemsRaw(supabase, {
-        farmId,
-        stage: params.filters.selectedStage,
-        systemId: selectedSystemId,
-        dateFrom: startDate,
-        dateTo: endDate,
-      }),
+    withNetworkFallback(
+      "dashboard:getDashboardSystemsRaw",
+      [],
+      () =>
+        getDashboardSystemsRaw(supabase, {
+          farmId,
+          stage: params.filters.selectedStage,
+          systemId: selectedSystemId,
+          dateFrom: startDate,
+          dateTo: endDate,
+        }),
+      { allowMissingObject: true },
     ),
-    withNetworkFallback("dashboard:getRecentEntries", emptyRecentEntries(), () => getRecentEntries(supabase, farmId)),
-    withNetworkFallback("dashboard:getAlertThresholds", [], () => getAlertThresholds(supabase, farmId)),
+    withNetworkFallback("dashboard:getAlertThresholds", [], () => listAlertThresholdRows(supabase, farmId)),
   ])
 
   const scopedSystemIds = await resolveScopedSystemIds({
@@ -809,17 +373,12 @@ async function loadDashboardPageInitialData(
   })
 
   const singleSystemId = scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
-  const [inventoryRows, productionRows, waterQualityRows, consolidatedRow, transferRows, waterQualityMeasurements] =
+  const useFarmWideRecommendedActions =
+    params.filters.selectedStage === "all" &&
+    params.filters.selectedBatch === "all" &&
+    params.filters.selectedSystem === "all"
+  const [productionRows, consolidatedRows, kpiCoverageRows, recommendedActionRows, waterQualityMeasurements] =
     await Promise.all([
-      withNetworkFallback("dashboard:getDailyInventoryRows", [], () =>
-        getDailyInventoryRows(supabase, {
-          farmId,
-          systemId: singleSystemId,
-          dateFrom: startDate,
-          dateTo: endDate,
-          limit: 5000,
-        }),
-      ),
       withNetworkFallback("dashboard:getProductionSummaryRows", [], () =>
         getProductionSummaryRows(supabase, {
           farmId,
@@ -828,30 +387,43 @@ async function loadDashboardPageInitialData(
           dateTo: endDate,
         }),
       ),
-      withNetworkFallback("dashboard:getWaterQualityRatings", [], () =>
-        getWaterQualityRatings(supabase, {
-          farmId,
-          systemId: singleSystemId,
-          dateFrom: startDate,
-          dateTo: endDate,
-          limit: 2000,
-        }),
-      ),
-      withNetworkFallback("dashboard:getDashboardConsolidated", null, () =>
-        getDashboardConsolidated(supabase, {
+      withNetworkFallback(
+        "dashboard:getDashboardConsolidatedRows",
+        [],
+        () =>
+        getDashboardConsolidatedRows(supabase, {
           farmId,
           systemId: singleSystemId,
           dateFrom: startDate,
           dateTo: endDate,
         }),
+        { allowMissingObject: true },
       ),
-      withNetworkFallback("dashboard:getTransferRows", [], () =>
-        getTransferRows(supabase, {
-          batchId,
-          dateFrom: startDate,
-          dateTo: endDate,
-          limit: 5000,
-        }),
+      withNetworkFallback(
+        "dashboard:getKpiCoverageRows",
+        [],
+        () =>
+          getKpiCoverageRows(supabase, {
+            farmId,
+            dateFrom: startDate,
+            dateTo: endDate,
+          }),
+        { allowMissingObject: true },
+      ),
+      withNetworkFallback<RecommendedActionRow[]>(
+        "dashboard:getRecommendedActionRows",
+        [],
+        async () => {
+          if (scopedSystemIds.length === 0) return []
+          if (useFarmWideRecommendedActions) {
+            return getRecommendedActionRows(supabase, { farmId })
+          }
+          const rows: RecommendedActionRow[][] = await Promise.all(
+            scopedSystemIds.map((systemId) => getRecommendedActionRows(supabase, { farmId, systemId })),
+          )
+          return rows.flat()
+        },
+        { allowMissingObject: true },
       ),
       withNetworkFallback("dashboard:getWaterQualityMeasurements", [], () =>
         getWaterQualityMeasurements(supabase, {
@@ -871,54 +443,62 @@ async function loadDashboardPageInitialData(
       scopedSystemIds.includes(row.system_id),
   )
 
+  const systemsTableRows = dashboardSystems.filter((row) => {
+    if (params.filters.selectedStage !== "all" && row.growth_stage !== params.filters.selectedStage) return false
+    if (!scopedSystemIds.includes(row.system_id)) return false
+    return true
+  })
+
+  if (process.env.NEXT_PUBLIC_DEBUG === "true") {
+    console.debug("[dashboard][server]", {
+      farmId,
+      dateFrom: startDate,
+      dateTo: endDate,
+      selectedStage: params.filters.selectedStage,
+      selectedBatch: params.filters.selectedBatch,
+      selectedSystem: params.filters.selectedSystem,
+      scopedSystemIds,
+      dashboardSystemsCount: dashboardSystems.length,
+      systemsTableRowsCount: systemsTableRows.length,
+    })
+  }
+
   return {
     bounds,
     systemOptions: toQuerySuccess(systemOptions),
     batchSystems: toQuerySuccess(batchSystems),
     kpiOverview: buildKpiOverview({
       scopedSystemIds,
-      inventoryRows,
-      productionRows,
-      waterQualityRows,
-      consolidatedRow,
+      consolidatedRows,
+      systemRows: dashboardSystems,
+      coverageRows: kpiCoverageRows,
       dateFrom: startDate,
       dateTo: endDate,
     }),
+    systemsTable: {
+      rows: systemsTableRows,
+      meta: {
+        source: "api_dashboard_systems",
+        start: startDate,
+        end: endDate,
+        reason: scopedSystemIds.length === 0 ? "No scoped systems" : undefined,
+      },
+    },
     productionTrend: sortByDateAsc(filteredProductionRows, (row) => row.date),
-    systemsTable: buildSystemsTable({
-      scopedSystemIds,
-      dashboardSystems,
-      dateFrom: startDate,
-      dateTo: endDate,
-    }),
-    productionSummaryMetrics: buildProductionSummaryMetrics({
-      scopedSystemIds,
-      productionRows,
-      transferRows,
-      dateFrom: startDate,
-      dateTo: endDate,
-    }),
-    recentEntries,
     waterQualityMeasurements: toQuerySuccess(waterQualityMeasurements),
     alertThresholds: toQuerySuccess(alertThresholds),
-    recommendedActions: buildRecommendedActionsFromAnalytics({
-      scopedSystemIds,
-      inventoryRows,
-      waterQualityRows,
-    }),
+    recommendedActions: mergeRecommendedActionRows(recommendedActionRows),
   }
 }
 
 export async function getDashboardPageInitialData(params: {
   farmId: string | null
   filters: DashboardPageInitialFilters
+  accessToken: string
 }): Promise<DashboardPageInitialData> {
-  const { user, accessToken } = await requireUserContext()
-
   return runServerReadThrough({
     keyParts: [
       "dashboard-page",
-      user.id,
       params.farmId,
       params.filters.selectedBatch,
       params.filters.selectedSystem,
@@ -935,6 +515,6 @@ export async function getDashboardPageInitialData(params: {
           cacheTags.reports(params.farmId, "recent-entries"),
         ]
       : [],
-    loader: () => loadDashboardPageInitialData(createAccessTokenClient(accessToken), params),
+    loader: () => loadDashboardPageInitialData(createAccessTokenClient(params.accessToken), params),
   })
 }

@@ -2,8 +2,8 @@
 
 import { useMemo } from "react"
 import type { ChartData, ChartOptions } from "chart.js"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
+import { DataErrorState, EmptyState } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { Line } from "@/components/charts/chartjs"
 import { PRODUCTION_METRICS, type ProductionMetric } from "@/components/production/metrics"
@@ -22,12 +22,16 @@ export type ProductionChartRow = {
   value: number | null
 }
 
+const PRODUCTION_CHART_STYLE = {
+  color: "#52b35f",
+  fill: true,
+  gradient: [0.16, 0.02] as [number, number],
+}
+
 export default function ProductionChart({
   metric,
   rows,
   isLoading,
-  isFetching,
-  updatedAt,
   error,
   onRetry,
 }: {
@@ -52,24 +56,32 @@ export default function ProductionChart({
         {
           label: meta.label,
           data: dateDomain.map((date) => rowsByDate.get(date)?.value ?? null),
-          borderColor: palette.chart2,
-          backgroundColor: createVerticalGradient(palette.chart2, 0.42, 0.03),
-          borderWidth: 2.8,
-          fill: true,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          pointHitRadius: 10,
+          borderColor: PRODUCTION_CHART_STYLE.color,
+          backgroundColor: createVerticalGradient(
+            PRODUCTION_CHART_STYLE.color,
+            PRODUCTION_CHART_STYLE.gradient[0],
+            PRODUCTION_CHART_STYLE.gradient[1],
+          ),
+          borderWidth: 2.6,
+          fill: PRODUCTION_CHART_STYLE.fill,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          pointHitRadius: 12,
+          pointBackgroundColor: PRODUCTION_CHART_STYLE.color,
+          pointBorderWidth: 0,
           spanGaps: true,
+          clip: 0,
         },
       ],
     }),
-    [dateDomain, meta.label, palette.chart2, rowsByDate],
+    [dateDomain, meta.label, rowsByDate],
   )
 
   const options = useMemo<ChartOptions<"line">>(
     () =>
       buildCartesianOptions({
         palette,
+        xGrid: true,
         xMaxTicksLimit: xLimit,
         xTitle: "Date",
         yTitle: meta.unit ? `${meta.label} (${meta.unit})` : meta.label,
@@ -106,11 +118,7 @@ export default function ProductionChart({
   return (
     <Card>
       <CardHeader className="pb-1">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle>{meta.label}</CardTitle>
-          <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
-        </div>
-        <DataUpdatedAt updatedAt={updatedAt} />
+        <CardTitle>{meta.label}</CardTitle>
       </CardHeader>
       <CardContent className="pt-2">
         {isLoading ? (
@@ -118,11 +126,9 @@ export default function ProductionChart({
             Loading chart...
           </div>
         ) : rows.length ? (
-          <div className="chart-canvas-shell">
-            <LazyRender className="h-[300px]" fallback={<div className="h-full w-full" />}>
-              <Line data={data} options={options} />
-            </LazyRender>
-          </div>
+          <LazyRender className="h-[300px]" fallback={<div className="h-full w-full" />}>
+            <Line data={data} options={options} />
+          </LazyRender>
         ) : (
           <EmptyState
             title="No production data"
@@ -133,3 +139,4 @@ export default function ProductionChart({
     </Card>
   )
 }
+

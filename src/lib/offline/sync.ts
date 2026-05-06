@@ -1,4 +1,12 @@
-import { offlineDB, type OfflineTableName } from "@/lib/offline/db"
+import { offlineDB, MAX_SYNC_RETRIES, type OfflineTableName } from "@/lib/offline/db"
+
+/**
+ * Exponential backoff delay (ms) for the given retry count.
+ * Retries: 1→30s, 2→60s, 3→2min, 4→4min, 5→8min (capped at 8 minutes).
+ */
+function backoffDelayMs(retryCount: number): number {
+  return Math.min(30_000 * Math.pow(2, retryCount - 1), 8 * 60_000)
+}
 
 type SyncResult = {
   pushed: number
@@ -18,10 +26,21 @@ type SyncConfig = {
   buildBody: (record: any) => unknown
 }
 
+export const syncTargets = {
+  feeding: "/api/feeding/record",
+  mortality: "/api/mortality/record",
+  sampling: "/api/sampling/record",
+  waterQuality: "/api/water-quality/record",
+  harvest: "/api/harvest/record",
+  transfer: "/api/transfer/record",
+  stocking: "/api/stocking/record",
+} satisfies Record<OfflineTableName, string>
+
 const syncConfigs: Record<OfflineTableName, SyncConfig> = {
   feeding: {
-    apiPath: "/api/feeding/record",
+    apiPath: syncTargets.feeding,
     buildBody: (record) => ({
+      farm_id: record.farmId ?? null,
       system_id: record.systemId,
       batch_id: record.batchId ?? null,
       date: record.date,
@@ -33,7 +52,7 @@ const syncConfigs: Record<OfflineTableName, SyncConfig> = {
     }),
   },
   mortality: {
-    apiPath: "/api/mortality/record",
+    apiPath: syncTargets.mortality,
     buildBody: (record) => ({
       farm_id: record.farmId ?? null,
       system_id: record.systemId,
@@ -48,9 +67,10 @@ const syncConfigs: Record<OfflineTableName, SyncConfig> = {
     }),
   },
   waterQuality: {
-    apiPath: "/api/water-quality/record",
+    apiPath: syncTargets.waterQuality,
     buildBody: (record) => [
       {
+        farm_id: record.farmId ?? null,
         system_id: record.systemId,
         date: record.date,
         measured_at: record.measuredAt,
@@ -64,8 +84,9 @@ const syncConfigs: Record<OfflineTableName, SyncConfig> = {
     ],
   },
   sampling: {
-    apiPath: "/api/sampling/record",
+    apiPath: syncTargets.sampling,
     buildBody: (record) => ({
+      farm_id: record.farmId ?? null,
       system_id: record.systemId,
       batch_id: record.batchId ?? null,
       date: record.date,
@@ -77,8 +98,9 @@ const syncConfigs: Record<OfflineTableName, SyncConfig> = {
     }),
   },
   stocking: {
-    apiPath: "/api/stocking/record",
+    apiPath: syncTargets.stocking,
     buildBody: (record) => ({
+      farm_id: record.farmId ?? null,
       system_id: record.systemId,
       batch_id: record.batchId,
       date: record.date,
@@ -91,8 +113,9 @@ const syncConfigs: Record<OfflineTableName, SyncConfig> = {
     }),
   },
   harvest: {
-    apiPath: "/api/harvest/record",
+    apiPath: syncTargets.harvest,
     buildBody: (record) => ({
+      farm_id: record.farmId ?? null,
       system_id: record.systemId,
       batch_id: record.batchId ?? null,
       date: record.date,
@@ -104,8 +127,9 @@ const syncConfigs: Record<OfflineTableName, SyncConfig> = {
     }),
   },
   transfer: {
-    apiPath: "/api/transfer/record",
+    apiPath: syncTargets.transfer,
     buildBody: (record) => ({
+      farm_id: record.farmId ?? null,
       origin_system_id: record.originSystemId,
       target_system_id: record.targetSystemId ?? null,
       external_target_name: record.externalTargetName ?? null,
@@ -144,6 +168,12 @@ export async function pushPendingRecordById(tableName: OfflineTableName, localId
     return { status: "missing" }
   }
 
+  // Respect exponential backoff: skip records that are cooling down after a failure
+  const now = Date.now()
+  if (record.retryAfter && record.retryAfter > now) {
+    return { status: "error" }
+  }
+
   const config = syncConfigs[tableName]
 
   try {
@@ -159,23 +189,46 @@ export async function pushPendingRecordById(tableName: OfflineTableName, localId
       await table.update(localId, {
         syncStatus: "synced",
         serverId: extractServerId(body),
+        retryCount: 0,
+        retryAfter: undefined,
       })
       return { status: "pushed", response: body }
     }
 
     if (response.status === 409) {
-      await table.update(localId, { syncStatus: "synced" })
+      await table.update(localId, { syncStatus: "synced", retryCount: 0, retryAfter: undefined })
       return { status: "conflict", response: body }
     }
 
+    // Server error: apply exponential backoff and mark as failed after MAX_SYNC_RETRIES
+    const nextRetryCount = (record.retryCount ?? 0) + 1
+    if (nextRetryCount >= MAX_SYNC_RETRIES) {
+      await table.update(localId, {
+        syncStatus: "failed",
+        retryCount: nextRetryCount,
+        retryAfter: undefined,
+      })
+    } else {
+      await table.update(localId, {
+        retryCount: nextRetryCount,
+        retryAfter: now + backoffDelayMs(nextRetryCount),
+      })
+    }
     return { status: "error", response: body }
   } catch {
+    // Network error: apply backoff but don't increment retryCount as it might be offline
+    const nextRetryCount = (record.retryCount ?? 0) + 1
+    await table.update(localId, {
+      retryCount: nextRetryCount,
+      retryAfter: now + backoffDelayMs(nextRetryCount),
+    })
     return { status: "error" }
   }
 }
 
 async function pushTable(tableName: OfflineTableName): Promise<SyncResult> {
   const table = offlineDB.table<any, string>(tableName)
+  // Only attempt records that are still 'pending' (not 'failed', 'synced', or 'conflict')
   const pendingRecords = await table.where("syncStatus").equals("pending").toArray()
 
   let pushed = 0

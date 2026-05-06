@@ -9,12 +9,19 @@ import {
   getChartPalette,
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
-import { ReportRecordsHiddenState, ReportRecordsToolbar } from "./report-shared"
+import {
+  REPORT_CHART_SHELL_CLASS,
+  REPORT_SURFACE_CARD_CLASS,
+  REPORT_TABLE_SHELL_CLASS,
+  ReportMetricCard,
+  ReportRecordsHiddenState,
+  ReportRecordsToolbar,
+} from "./report-shared"
 
 type CageSeries = {
   key: string
@@ -57,28 +64,22 @@ export function FeedingSummaryCards({
   avgProtein: number | null
 }) {
   return (
-    <div className="kpi-grid md:grid-cols-3">
-      <Card className="kpi-card">
-        <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Total Feed (kg)</CardTitle></CardHeader>
-        <CardContent className="kpi-card-content">
-          <div className="kpi-card-value">{formatNumberValue(totalKgFed, { decimals: 2, minimumDecimals: 2, fallback: "0.00" })}</div>
-          <p className="kpi-card-meta">Within selected period</p>
-        </CardContent>
-      </Card>
-      <Card className="kpi-card">
-        <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Average eFCR</CardTitle></CardHeader>
-        <CardContent className="kpi-card-content">
-          <div className="kpi-card-value">{formatNumberValue(avgEfcr, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
-          <p className="kpi-card-meta">Weighted from in-period eFCR data for the selected scope</p>
-        </CardContent>
-      </Card>
-      <Card className="kpi-card">
-        <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Avg Protein (%)</CardTitle></CardHeader>
-        <CardContent className="kpi-card-content">
-          <div className="kpi-card-value">{formatNumberValue(avgProtein, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}</div>
-          <p className="kpi-card-meta">Weighted by feed amount using joined `feed_type.crude_protein_percentage`</p>
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <ReportMetricCard
+        title="Total Feed"
+        value={`${formatNumberValue(totalKgFed, { decimals: 2, minimumDecimals: 2, fallback: "0.00" })} kg`}
+        meta="Feed issued within the selected report period."
+      />
+      <ReportMetricCard
+        title="Average eFCR"
+        value={formatNumberValue(avgEfcr, { decimals: 2, minimumDecimals: 2, fallback: "N/A" })}
+        meta="Weighted from in-period eFCR data for the selected scope."
+      />
+      <ReportMetricCard
+        title="Avg Protein"
+        value={avgProtein != null ? `${formatNumberValue(avgProtein, { decimals: 2, minimumDecimals: 2 })}%` : "N/A"}
+        meta="Weighted by feed amount using joined feed-type protein values."
+      />
     </div>
   )
 }
@@ -145,7 +146,7 @@ export function FeedByCageSection({
   )
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader>
         <CardTitle>Feed by Cage Over Time</CardTitle>
         <CardDescription>Stacked feed kilograms by date bucket and cage.</CardDescription>
@@ -156,7 +157,7 @@ export function FeedByCageSection({
         ) : rows.length === 0 ? (
           <EmptyChartState label="No feeding rows found for the selected period." />
         ) : (
-          <div className="chart-canvas-shell h-[320px]">
+          <div className={REPORT_CHART_SHELL_CLASS}>
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <Bar data={data} options={options} />
             </LazyRender>
@@ -228,7 +229,7 @@ export function EfcrByCageSection({
   )
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader>
         <CardTitle>eFCR Trend by Cage</CardTitle>
         <CardDescription>Per-cage eFCR trend for the selected time window.</CardDescription>
@@ -239,7 +240,7 @@ export function EfcrByCageSection({
         ) : rows.length === 0 ? (
           <EmptyChartState label="No eFCR rows found for the selected period." />
         ) : (
-          <div className="chart-canvas-shell h-[320px]">
+          <div className={REPORT_CHART_SHELL_CLASS}>
             <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
               <Line data={data} options={options} />
             </LazyRender>
@@ -256,10 +257,10 @@ export function FeedingBreakdownSection({
   rows: Array<{ systemId: number; systemLabel: string; totalKg: number; entries: number; avgProtein: number | null; lastDate: string | null }>
 }) {
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader><CardTitle>Per-Cage Feed Breakdown</CardTitle><CardDescription>Total feed, entry count, and weighted protein by cage in the selected period.</CardDescription></CardHeader>
       <CardContent>
-        <div className="dense-table-shell">
+        <div className={REPORT_TABLE_SHELL_CLASS}>
           <table className="dense-table">
             <thead><tr className="border-b border-border"><th>Cage</th><th>Total Feed (kg)</th><th>Entries</th><th>Avg Protein (%)</th><th>Last Feed Date</th></tr></thead>
             <tbody>
@@ -322,7 +323,7 @@ export function FeedingRecordsSection({
   ])
 
   return (
-    <Card>
+    <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader><CardTitle>Feeding Records</CardTitle><CardDescription>Operational detail rows and export controls for the selected scope.</CardDescription></CardHeader>
       <CardContent className="space-y-4">
         <div className="filter-bar">
@@ -362,7 +363,7 @@ export function FeedingRecordsSection({
           />
         </div>
         {showFeedingRecords ? (
-          <div className="dense-table-shell">
+          <div className={REPORT_TABLE_SHELL_CLASS}>
             <table className="dense-table">
               <thead><tr className="border-b border-border"><th>Date</th><th>System</th><th>Batch</th><th>Feed Type</th><th>Amount (kg)</th><th>Response</th></tr></thead>
               <tbody>
@@ -387,3 +388,4 @@ export function FeedingRecordsSection({
     </Card>
   )
 }
+

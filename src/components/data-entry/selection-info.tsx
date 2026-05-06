@@ -23,7 +23,7 @@ export function SelectedSystemInfo({
   if (!selectedSystem) return null
 
   return (
-    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm">
+    <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
       <div className="font-medium">{title}</div>
       <div className="text-muted-foreground">Cage Unit: {selectedSystem.unit?.trim() || "Not set"}</div>
       <div className="text-muted-foreground">System: {selectedSystem.label ?? `System ${selectedSystem.id}`}</div>
@@ -51,7 +51,7 @@ export function SelectedBatchSupplierInfo({
   if (!selectedBatch) return null
 
   return (
-    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm">
+    <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
       <div className="font-medium">Selected Batch</div>
       <div className="text-muted-foreground">Batch: {selectedBatch.label || `Batch ${selectedBatch.id}`}</div>
       <div className="text-muted-foreground">

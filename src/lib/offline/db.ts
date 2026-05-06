@@ -1,7 +1,10 @@
 import Dexie, { type Table } from "dexie"
 import type { Database } from "@/lib/types/database"
 
-export type SyncStatus = "pending" | "synced" | "conflict"
+export type SyncStatus = "pending" | "synced" | "conflict" | "failed"
+
+/** Maximum number of consecutive failures before a record is marked 'failed'. */
+export const MAX_SYNC_RETRIES = 5
 
 type FeedingResponse = Database["public"]["Enums"]["feeding_response"]
 type WaterQualityParameter = Database["public"]["Enums"]["water_quality_parameters"]
@@ -14,9 +17,14 @@ type OfflineBaseRecord = {
   syncStatus: SyncStatus
   serverId?: number
   createdAtLocal: number
+  /** Number of consecutive failed sync attempts. Used for exponential backoff. */
+  retryCount?: number
+  /** Timestamp (ms) before which the next sync attempt should not be made. */
+  retryAfter?: number
 }
 
 export interface OfflineFeedingRecord extends OfflineBaseRecord {
+  farmId?: string | null
   systemId: number
   batchId?: number | null
   date: string
@@ -39,6 +47,7 @@ export interface OfflineMortalityRecord extends OfflineBaseRecord {
 }
 
 export interface OfflineWaterQualityRecord extends OfflineBaseRecord {
+  farmId?: string | null
   systemId: number
   date: string
   measuredAt: string
@@ -50,6 +59,7 @@ export interface OfflineWaterQualityRecord extends OfflineBaseRecord {
 }
 
 export interface OfflineSamplingRecord extends OfflineBaseRecord {
+  farmId?: string | null
   systemId: number
   batchId?: number | null
   date: string
@@ -60,6 +70,7 @@ export interface OfflineSamplingRecord extends OfflineBaseRecord {
 }
 
 export interface OfflineStockingRecord extends OfflineBaseRecord {
+  farmId?: string | null
   systemId: number
   batchId: number
   date: string
@@ -71,6 +82,7 @@ export interface OfflineStockingRecord extends OfflineBaseRecord {
 }
 
 export interface OfflineHarvestRecord extends OfflineBaseRecord {
+  farmId?: string | null
   systemId: number
   batchId?: number | null
   date: string
@@ -81,6 +93,7 @@ export interface OfflineHarvestRecord extends OfflineBaseRecord {
 }
 
 export interface OfflineTransferRecord extends OfflineBaseRecord {
+  farmId?: string | null
   originSystemId: number
   targetSystemId?: number | null
   externalTargetName?: string | null
@@ -113,7 +126,18 @@ export class AquaSmartOfflineDB extends Dexie {
 
   constructor() {
     super("aquasmart-offline")
+    // v1 — original schema
     this.version(1).stores({
+      feeding: "localId, syncStatus, systemId, createdAtLocal",
+      mortality: "localId, syncStatus, systemId, createdAtLocal",
+      waterQuality: "localId, syncStatus, systemId, createdAtLocal",
+      sampling: "localId, syncStatus, systemId, createdAtLocal",
+      stocking: "localId, syncStatus, systemId, createdAtLocal",
+      harvest: "localId, syncStatus, systemId, createdAtLocal",
+      transfer: "localId, syncStatus, originSystemId, createdAtLocal",
+    })
+    // v2 — add retryCount and retryAfter fields (non-indexed; schema string unchanged)
+    this.version(2).stores({
       feeding: "localId, syncStatus, systemId, createdAtLocal",
       mortality: "localId, syncStatus, systemId, createdAtLocal",
       waterQuality: "localId, syncStatus, systemId, createdAtLocal",

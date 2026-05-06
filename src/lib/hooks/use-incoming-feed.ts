@@ -1,12 +1,12 @@
 "use client"
 
-import { invalidateFeedInventoryWriteQueries } from "@/lib/cache/react-query"
-import { recordFeedInventorySnapshot } from "@/lib/commands/operations"
+import { invalidateAfterWrite } from "@/lib/cache/react-query"
+import { recordFeedInventorySnapshotAction } from "@/features/feed/mutations.server"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 
 export function useRecordFeedInventorySnapshot() {
   return useWriteThroughMutation({
-    mutationFn: recordFeedInventorySnapshot,
+    mutationFn: recordFeedInventorySnapshotAction,
     activityTableName: "feed_incoming",
     recentEntryKey: "incoming_feed",
     buildOptimisticEntry: (payload) => {
@@ -21,7 +21,8 @@ export function useRecordFeedInventorySnapshot() {
       }
     },
     invalidate: async ({ queryClient, result }) =>
-      invalidateFeedInventoryWriteQueries(queryClient, {
+      invalidateAfterWrite(queryClient, {
+        type: "incomingFeed",
         farmId: result.meta.farmId,
         date: result.meta.date,
       }),

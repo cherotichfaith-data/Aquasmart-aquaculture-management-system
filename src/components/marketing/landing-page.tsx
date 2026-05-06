@@ -15,7 +15,7 @@ import {
   Waves,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 
 const navItems = [
   { label: "Platform", href: "#platform" },
@@ -421,3 +421,4 @@ export default function LandingPage() {
     </main>
   )
 }
+

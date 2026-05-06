@@ -24,7 +24,7 @@ export async function getScopedTimeBounds(
   scope: Parameters<typeof fetchTimePeriodBounds>[1]["scope"],
   systemId?: number,
 ) {
-  const farmBounds = await fetchTimePeriodBounds(supabase, {
+  const farmBounds = await fetchTimePeriodBounds(supabase as never, {
     farmId,
     timePeriod,
     scope,
@@ -38,7 +38,7 @@ export async function getScopedTimeBounds(
   })
 
   if (error) {
-    throw new Error(error.message)
+    throw error
   }
 
   const timelineRow = ((data ?? []) as Database["public"]["Functions"]["api_system_timeline_bounds"]["Returns"])[0] ?? null
@@ -71,7 +71,7 @@ export async function getScopedSystemOptions(
   const { data, error } = await query.order("name", { ascending: true })
 
   if (error) {
-    throw new Error(error.message)
+    throw error
   }
 
   return ((data ?? []) as unknown as SystemOptionSource[])
@@ -92,7 +92,7 @@ export async function getScopedBatchSystems(
     .not("system_id", "is", null)
 
   if (error) {
-    throw new Error(error.message)
+    throw error
   }
 
   const ids = Array.from(
