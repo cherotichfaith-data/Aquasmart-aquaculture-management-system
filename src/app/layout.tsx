@@ -9,10 +9,29 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
 import { ReactQueryProvider } from "@/lib/react-query-provider"
 import "./globals.css"
 
+function resolveMetadataBase() {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  const fallback = "https://aquasmart.app"
+
+  if (!configuredUrl) {
+    return new URL(fallback)
+  }
+
+  const normalized = /^https?:\/\//i.test(configuredUrl)
+    ? configuredUrl
+    : `https://${configuredUrl}`
+
+  try {
+    return new URL(normalized)
+  } catch {
+    return new URL(fallback)
+  }
+}
+
 export const metadata: Metadata = {
   title: "AquaSmart - Aquaculture Management Dashboard",
   description: "Real-time monitoring and management system for aquaculture farm operations",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://aquasmart.app"),
+  metadataBase: resolveMetadataBase(),
   openGraph: {
     title: "AquaSmart - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
