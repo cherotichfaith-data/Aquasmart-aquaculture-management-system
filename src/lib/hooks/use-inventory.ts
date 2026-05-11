@@ -14,6 +14,7 @@ export function useDailyFishInventory(params?: {
   farmId?: string | null
   orderAsc?: boolean
   enabled?: boolean
+  staleTime?: number
 }) {
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
@@ -21,6 +22,6 @@ export function useDailyFishInventory(params?: {
     queryKey: queryKeys.inventory.daily(params),
     queryFn: ({ signal }) => getDailyFishInventory({ ...params, signal }),
     enabled,
-    staleTime: 5 * 60_000,
+    staleTime: params?.staleTime ?? 5 * 60_000,
   })
 }

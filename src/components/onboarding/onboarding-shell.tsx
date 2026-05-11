@@ -16,16 +16,16 @@ export function OnboardingShell({
   const { signOut } = useAuth()
 
   return (
-    <main className="min-h-screen bg-background px-4 py-5 sm:px-5 lg:px-6">
+    <main className="min-h-screen bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_78%,white),color-mix(in_srgb,var(--color-primary)_14%,white))] px-4 py-5 sm:px-5 lg:px-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-7">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-white/78">
               <Image src="/use this.png" alt="AquaSmart logo" width={28} height={28} />
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em]">
-                <span className="text-[var(--secondary)]">Aqua</span>
+                <span className="text-primary">Aqua</span>
                 <span className="text-primary">Smart</span>
               </p>
               <p className="text-sm text-muted-foreground">Farm workspace setup</p>
@@ -36,7 +36,7 @@ export function OnboardingShell({
             onClick={async () => {
               await signOut()
             }}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+            className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-white/78 px-3 py-2 text-sm font-medium text-foreground transition hover:bg-primary/10"
           >
             <LogOut className="h-4 w-4" />
             Log out

@@ -326,7 +326,7 @@ export default function UsersPageClient({
 
           <section className="rounded-[1.5rem] border border-border/70 bg-card p-6 shadow-sm">
             <div className="mb-5 flex items-start gap-3">
-              <div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-600">
+              <div className="rounded-2xl bg-primary/10 p-3 text-primary">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>

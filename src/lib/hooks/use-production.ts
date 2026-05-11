@@ -14,6 +14,7 @@ export function useProductionSummary(params?: {
   limit?: number
   farmId?: string | null
   enabled?: boolean
+  staleTime?: number
 }) {
   const { session } = useAuth()
   const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
@@ -21,6 +22,6 @@ export function useProductionSummary(params?: {
     queryKey: queryKeys.production.summary(params),
     queryFn: ({ signal }) => getProductionSummary({ ...params, signal }),
     enabled,
-    staleTime: 5 * 60_000,
+    staleTime: params?.staleTime ?? 5 * 60_000,
   })
 }

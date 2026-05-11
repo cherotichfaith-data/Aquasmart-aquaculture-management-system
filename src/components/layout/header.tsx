@@ -18,7 +18,6 @@ import MenuItem from "@mui/material/MenuItem"
 import Paper from "@mui/material/Paper"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
-import { alpha } from "@mui/material/styles"
 import {
   Bell,
   Droplets,
@@ -138,7 +137,7 @@ function FilterChip({
       deleteIcon={<X size={12} />}
       sx={{
         borderRadius: 999,
-        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+        bgcolor: "color-mix(in srgb, var(--color-primary) 10%, transparent)",
         color: "primary.main",
         "& .MuiChip-deleteIcon": {
           color: "inherit",
@@ -632,9 +631,10 @@ export default function Header({
                   mx: 1,
                   my: 0.25,
                   borderRadius: 2,
-                  border: (theme) =>
-                    note.read ? `1px solid ${alpha(theme.palette.divider, 0.5)}` : `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
-                  bgcolor: (theme) => (note.read ? "transparent" : alpha(theme.palette.primary.main, 0.05)),
+                  border: note.read
+                    ? "1px solid color-mix(in srgb, var(--color-border) 50%, transparent)"
+                    : "1px solid color-mix(in srgb, var(--color-primary) 35%, transparent)",
+                  bgcolor: note.read ? "transparent" : "color-mix(in srgb, var(--color-primary) 5%, transparent)",
                 }}
               >
                 <Box>

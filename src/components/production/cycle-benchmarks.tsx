@@ -9,7 +9,7 @@ import type { BenchmarkLabel, CycleBenchmarkRow } from "@/lib/types/insights"
 // ── Benchmark label badge ─────────────────────────────────────────────────────
 
 const benchmarkStyles: Record<BenchmarkLabel, { label: string; bg: string; text: string }> = {
-  best_ever:  { label: "Best Ever",   bg: "bg-success/12",     text: "text-success" },
+  best_ever:  { label: "Best Ever",   bg: "bg-primary/12",     text: "text-primary" },
   above_avg:  { label: "Above Avg",   bg: "bg-primary/12",     text: "text-primary" },
   average:    { label: "Average",     bg: "bg-muted/40",       text: "text-muted-foreground" },
   below_avg:  { label: "Below Avg",   bg: "bg-warning/12",     text: "text-warning" },
@@ -31,7 +31,7 @@ function DeltaChip({
   const positive = delta > 0
   const good = invert ? !positive : positive
   const sign = positive ? "+" : ""
-  const colorClass = good ? "text-success" : "text-destructive"
+  const colorClass = good ? "text-primary" : "text-destructive"
   return (
     <span className={`text-xs font-semibold ${colorClass}`}>
       {sign}{delta.toFixed(2)}{unit}

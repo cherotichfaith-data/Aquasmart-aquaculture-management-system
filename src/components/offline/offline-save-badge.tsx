@@ -3,7 +3,6 @@
 import Alert from "@mui/material/Alert"
 import Chip from "@mui/material/Chip"
 import Typography from "@mui/material/Typography"
-import { alpha } from "@mui/material/styles"
 import { HardDriveDownload } from "lucide-react"
 import { hasPendingSyncMeta } from "@/lib/offline/result"
 
@@ -18,9 +17,9 @@ export function OfflineSaveBadge({ result }: { result: unknown }) {
       icon={false}
       sx={{
         borderRadius: 2,
-        border: (theme) => `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
-        bgcolor: (theme) => alpha(theme.palette.warning.main, 0.1),
-        color: "#8d5e09",
+        border: "1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)",
+        bgcolor: "color-mix(in srgb, var(--color-warning) 10%, transparent)",
+        color: "var(--warning-foreground)",
         "& .MuiAlert-message": {
           width: "100%",
         },
@@ -34,8 +33,8 @@ export function OfflineSaveBadge({ result }: { result: unknown }) {
             label="Saved Offline"
             variant="outlined"
             sx={{
-              borderColor: (theme) => alpha(theme.palette.warning.main, 0.4),
-              bgcolor: (theme) => alpha(theme.palette.warning.main, 0.14),
+              borderColor: "color-mix(in srgb, var(--color-warning) 40%, transparent)",
+              bgcolor: "color-mix(in srgb, var(--color-warning) 14%, transparent)",
               color: "inherit",
               "& .MuiChip-icon": {
                 color: "inherit",

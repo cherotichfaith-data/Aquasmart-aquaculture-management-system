@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -1696,6 +1696,23 @@ export type Database = {
           location: string
         }[]
       }
+      api_farm_user_invitations: {
+        Args: { p_farm_id: string }
+        Returns: {
+          accepted_at: string
+          created_at: string
+          email: string
+          farm_id: string
+          id: string
+          invited_by: string
+          invited_user_id: string
+          last_sent_at: string
+          revoked_at: string
+          role: string
+          status: string
+          updated_at: string
+        }[]
+      }
       api_feed_demand_forecast: {
         Args: { p_days_ahead?: number; p_farm_id: string }
         Returns: {
@@ -1957,6 +1974,7 @@ export type Database = {
           latest_rating_date: string
         }[]
       }
+      claim_my_farm_user_invitations: { Args: never; Returns: number }
       classify_water_quality_measurement: {
         Args: {
           p_acceptable: Json
@@ -1969,6 +1987,24 @@ export type Database = {
           distance_from_next_better_band: number
           measurement_rating: Database["public"]["Enums"]["water_quality_rating"]
           severity_rank: number
+        }[]
+      }
+      create_farm_user_invitation: {
+        Args: { p_email: string; p_farm_id: string; p_role?: string }
+        Returns: {
+          accepted_at: string
+          created_at: string
+          email: string
+          farm_id: string
+          id: string
+          invited_by: string
+          invited_user_id: string
+          last_sent_at: string
+          revoked_at: string
+          role: string
+          should_send_auth_invite: boolean
+          status: string
+          updated_at: string
         }[]
       }
       get_fcr_trend: {
@@ -2121,7 +2157,7 @@ export type Database = {
         | "external_out"
       type_of_harvest: "partial" | "final"
       type_of_stocking: "empty" | "already_stocked"
-      units: "m" | "mg/l" | "ppt" | "┬░C" | "pH" | "NTU" | "┬╡S/cm"
+      units: "m" | "mg/l" | "ppt" | "°C" | "pH" | "NTU" | "µS/cm"
       water_quality_parameters:
         | "pH"
         | "temperature"
@@ -2338,7 +2374,7 @@ export const Constants = {
       ],
       type_of_harvest: ["partial", "final"],
       type_of_stocking: ["empty", "already_stocked"],
-      units: ["m", "mg/l", "ppt", "┬░C", "pH", "NTU", "┬╡S/cm"],
+      units: ["m", "mg/l", "ppt", "°C", "pH", "NTU", "µS/cm"],
       water_quality_parameters: [
         "pH",
         "temperature",

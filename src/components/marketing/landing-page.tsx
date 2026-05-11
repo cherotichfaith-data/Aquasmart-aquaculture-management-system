@@ -136,6 +136,7 @@ export default function LandingPage() {
             className="object-cover"
           />
           <div className="absolute inset-0 bg-[linear-gradient(135deg,var(--brand-hero-from)_0%,var(--brand-hero-mid)_42%,var(--brand-hero-to)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-primary)_42%,black)_0%,color-mix(in_srgb,var(--color-primary)_12%,transparent)_46%,transparent_100%)]" />
         </div>
 
         <header className="absolute inset-x-0 top-0 z-20 px-4 pt-5 md:px-6">
@@ -197,6 +198,14 @@ export default function LandingPage() {
                   <Button
                     className="w-full rounded-full px-8 text-base sm:w-auto"
                     size="lg"
+                    sx={{
+                      backgroundColor: "var(--color-primary)",
+                      color: "var(--color-on-primary)",
+                      "&:hover": {
+                        backgroundColor: "var(--color-primary-hover)",
+                        color: "var(--color-on-primary)",
+                      },
+                    }}
                     onClick={() => router.push("/auth?mode=signup")}
                   >
                     Get started
@@ -206,6 +215,16 @@ export default function LandingPage() {
                     variant="outline"
                     size="lg"
                     className="w-full rounded-full border-white/35 bg-transparent px-8 text-base text-white hover:bg-white/10 hover:text-white sm:w-auto"
+                    sx={{
+                      borderColor: "color-mix(in srgb, var(--color-primary) 72%, transparent)",
+                      color: "var(--color-on-primary)",
+                      backgroundColor: "color-mix(in srgb, var(--color-primary) 16%, transparent)",
+                      "&:hover": {
+                        borderColor: "var(--color-primary)",
+                        backgroundColor: "color-mix(in srgb, var(--color-primary) 30%, transparent)",
+                        color: "var(--color-on-primary)",
+                      },
+                    }}
                     onClick={() => router.push("/auth")}
                   >
                     Sign in
@@ -234,7 +253,7 @@ export default function LandingPage() {
                           {[34, 48, 42, 62, 70, 78].map((height) => (
                             <div
                               key={height}
-                              className="w-full rounded-t-full bg-gradient-to-t from-chart-3 to-chart-2"
+                              className="w-full rounded-t-full bg-gradient-to-t from-[var(--color-primary-hover)] to-primary"
                               style={{ height: `${height}px` }}
                             />
                           ))}
@@ -255,7 +274,7 @@ export default function LandingPage() {
 
       <section
         id="platform"
-        className="bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_74%,white),color-mix(in_srgb,var(--secondary)_68%,white))] py-20 md:py-28"
+        className="bg-[linear-gradient(180deg,var(--background)_0%,color-mix(in_srgb,var(--color-primary)_8%,var(--background))_100%)] py-20 md:py-28"
       >
         <div className="container mx-auto px-4 md:px-6">
           <div className="mx-auto mb-5 w-fit rounded-full bg-card px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground shadow-sm">

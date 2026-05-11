@@ -23,7 +23,6 @@ export type ProductionChartRow = {
 }
 
 const PRODUCTION_CHART_STYLE = {
-  color: "#52b35f",
   fill: true,
   gradient: [0.16, 0.02] as [number, number],
 }
@@ -45,6 +44,7 @@ export default function ProductionChart({
 }) {
   const meta = PRODUCTION_METRICS[metric]
   const palette = getChartPalette()
+  const chartColor = palette.primary
   const dateDomain = useMemo(() => buildDailyDateDomain(rows.map((row) => row.date)), [rows])
   const rowsByDate = useMemo(() => new Map(rows.map((row) => [row.date, row])), [rows])
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
@@ -56,9 +56,9 @@ export default function ProductionChart({
         {
           label: meta.label,
           data: dateDomain.map((date) => rowsByDate.get(date)?.value ?? null),
-          borderColor: PRODUCTION_CHART_STYLE.color,
+          borderColor: chartColor,
           backgroundColor: createVerticalGradient(
-            PRODUCTION_CHART_STYLE.color,
+            chartColor,
             PRODUCTION_CHART_STYLE.gradient[0],
             PRODUCTION_CHART_STYLE.gradient[1],
           ),
@@ -67,14 +67,14 @@ export default function ProductionChart({
           pointRadius: 3,
           pointHoverRadius: 5,
           pointHitRadius: 12,
-          pointBackgroundColor: PRODUCTION_CHART_STYLE.color,
+          pointBackgroundColor: chartColor,
           pointBorderWidth: 0,
           spanGaps: true,
           clip: 0,
         },
       ],
     }),
-    [dateDomain, meta.label, rowsByDate],
+    [chartColor, dateDomain, meta.label, rowsByDate],
   )
 
   const options = useMemo<ChartOptions<"line">>(

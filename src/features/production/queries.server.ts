@@ -1,11 +1,8 @@
-import { runServerReadThrough } from "@/lib/cache/server"
-import { cacheTags } from "@/lib/cache/tags"
 import { toQuerySuccess } from "@/lib/api/_utils"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { getScopedBatchSystems, getScopedSystemOptions, getScopedTimeBounds, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { listDailyFishInventoryRows, listProductionSummaryRows } from "@/features/shared/query-seed.server"
-import { listMortalityEvents } from "@/lib/server/mortality-reads"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import type { Database, Enums } from "@/lib/types/database"
 import { isTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
@@ -23,7 +20,6 @@ export type ProductionPageInitialData = {
   batchSystems: ReturnType<typeof toQuerySuccess<{ system_id: number }>>
   productionSummary: ReturnType<typeof toQuerySuccess<Database["public"]["Functions"]["api_production_summary"]["Returns"][number]>>
   inventory: ReturnType<typeof toQuerySuccess<Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]>>
-  mortalityEvents: ReturnType<typeof toQuerySuccess<Database["public"]["Tables"]["fish_mortality"]["Row"]>>
 }
 
 const DEFAULT_TIME_PERIOD: ProductionPageFilters["timePeriod"] = "quarter"
@@ -56,7 +52,6 @@ async function loadProductionPageInitialData(
     batchSystems: toQuerySuccess([]),
     productionSummary: toQuerySuccess([]),
     inventory: toQuerySuccess([]),
-    mortalityEvents: toQuerySuccess([]),
   }
 
   if (!params.farmId) return empty
@@ -78,7 +73,7 @@ async function loadProductionPageInitialData(
     }
   }
 
-  const [productionSummary, inventory, mortalityEvents] = await Promise.all([
+  const [productionSummary, inventory] = await Promise.all([
     listProductionSummaryRows(supabase, {
       farmId: params.farmId,
       systemId,
@@ -97,14 +92,6 @@ async function loadProductionPageInitialData(
           orderAsc: true,
         })
       : Promise.resolve([]),
-    // G-12: include mortality events so survival chart is available on first render
-    listMortalityEvents(supabase, {
-      farmId: params.farmId,
-      systemId,
-      dateFrom: bounds.start,
-      dateTo: bounds.end,
-      limit: 2000,
-    }),
   ])
 
   return {
@@ -113,7 +100,6 @@ async function loadProductionPageInitialData(
     batchSystems: toQuerySuccess(batchSystems),
     productionSummary: toQuerySuccess(productionSummary),
     inventory: toQuerySuccess(inventory),
-    mortalityEvents: toQuerySuccess(mortalityEvents),
   }
 }
 
@@ -122,22 +108,7 @@ export async function getProductionPageInitialData(params: {
   filters: ProductionPageFilters
   includeInventory: boolean
 }) {
-  const { user, accessToken } = await requireUserContext()
+  const { accessToken } = await requireUserContext()
 
-  return runServerReadThrough({
-    keyParts: [
-      "production-page",
-      user.id,
-      params.farmId,
-      params.filters.selectedBatch,
-      params.filters.selectedSystem,
-      params.filters.selectedStage,
-      params.filters.timePeriod,
-      params.includeInventory,
-    ],
-    tags: params.farmId
-      ? [cacheTags.farm(params.farmId), cacheTags.systems(params.farmId), cacheTags.inventory(params.farmId)]
-      : [],
-    loader: () => loadProductionPageInitialData(createAccessTokenClient(accessToken), params),
-  })
+  return loadProductionPageInitialData(createAccessTokenClient(accessToken), params)
 }
