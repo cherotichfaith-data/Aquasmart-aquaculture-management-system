@@ -5,7 +5,6 @@ import Alert from "@mui/material/Alert"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Typography from "@mui/material/Typography"
-import { alpha } from "@mui/material/styles"
 import { formatDistanceToNow } from "date-fns"
 import { AlertTriangle, CheckCircle2, Loader2, WifiOff } from "lucide-react"
 import { useSyncStore } from "@/lib/offline/sync-store"
@@ -96,7 +95,7 @@ export function SyncStatusBar() {
         icon={<CheckCircle2 size={14} />}
         sx={{
           ...barSx,
-          bgcolor: (theme) => alpha(theme.palette.success.main, 0.08),
+          bgcolor: "color-mix(in srgb, var(--color-success) 8%, transparent)",
         }}
       >
         <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>

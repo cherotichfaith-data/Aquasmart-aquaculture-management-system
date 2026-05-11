@@ -14,6 +14,8 @@ import { ProductionSections } from "./_components/production-sections"
 import { buildProductionChartRows } from "./_lib/production-page"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
 
+const LIVE_PRODUCTION_STALE_TIME_MS = 0
+
 function ProductionContent({
   initialFarmId,
   initialFarmName,
@@ -69,6 +71,7 @@ function ProductionContent({
     dateTo: dateRange.endDate || undefined,
     limit: 2500,
     enabled: rangeEnabled,
+    staleTime: LIVE_PRODUCTION_STALE_TIME_MS,
   })
 
   const inventoryEnabled = metricMeta.source === "inventory"
@@ -80,6 +83,7 @@ function ProductionContent({
     limit: 5000,
     orderAsc: true,
     enabled: inventoryEnabled && rangeEnabled,
+    staleTime: LIVE_PRODUCTION_STALE_TIME_MS,
   })
 
   const stageSystemIds = useMemo(() => {

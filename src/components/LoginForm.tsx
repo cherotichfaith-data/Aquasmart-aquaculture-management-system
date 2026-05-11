@@ -153,6 +153,9 @@ export default function LoginForm() {
         }
 
         .auth-page {
+          --auth-accent: var(--color-primary);
+          --auth-accent-hover: var(--color-primary-hover);
+          --auth-accent-soft: color-mix(in srgb, var(--color-primary) 16%, transparent);
           min-height: 100vh;
           font-family: var(--font-sans);
           color: var(--foreground);
@@ -173,9 +176,10 @@ export default function LoginForm() {
           position: absolute;
           inset: 0;
           background: linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--background) 12%, transparent),
-            color-mix(in srgb, var(--brand-panel-shell-from) 32%, transparent)
+            135deg,
+            color-mix(in srgb, var(--color-primary) 42%, black),
+            color-mix(in srgb, var(--color-primary) 12%, transparent) 46%,
+            transparent 100%
           );
           pointer-events: none;
         }
@@ -205,8 +209,8 @@ export default function LoginForm() {
         }
 
         .auth-back-link a:hover {
-          background: color-mix(in srgb, var(--accent) 32%, transparent);
-          border-color: color-mix(in srgb, var(--primary) 36%, transparent);
+          background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+          border-color: color-mix(in srgb, var(--color-primary) 38%, transparent);
           transform: translateY(-1px);
         }
 
@@ -250,11 +254,11 @@ export default function LoginForm() {
         }
 
         .logo-text-aqua {
-          color: var(--secondary);
+          color: var(--auth-accent);
         }
 
         .logo-text-smart {
-          color: var(--primary);
+          color: var(--auth-accent);
         }
 
         .login-header h1 {
@@ -304,13 +308,13 @@ export default function LoginForm() {
         }
 
         .form-input:hover:not(:focus) {
-          border-color: var(--primary);
+          border-color: var(--auth-accent);
         }
 
         .form-input:focus {
           outline: none;
-          border-color: var(--primary);
-          box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+          border-color: var(--auth-accent);
+          box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 18%, transparent);
           background: color-mix(in srgb, var(--card) 92%, transparent);
         }
 
@@ -372,19 +376,19 @@ export default function LoginForm() {
           margin-top: 0.4rem;
           border: none;
           border-radius: 12px;
-          background: var(--primary);
-          color: var(--primary-foreground);
+          background: var(--auth-accent);
+          color: var(--color-on-primary);
           font-size: 1rem;
           font-weight: 800;
           cursor: pointer;
           transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-          box-shadow: 0 12px 28px color-mix(in srgb, var(--primary) 40%, transparent);
+          box-shadow: 0 12px 28px color-mix(in srgb, var(--color-primary) 36%, transparent);
         }
 
         .submit-button:hover:not(:disabled) {
-          background: color-mix(in srgb, var(--primary) 90%, transparent);
+          background: var(--auth-accent-hover);
           transform: translateY(-2px);
-          box-shadow: 0 18px 36px color-mix(in srgb, var(--primary) 45%, transparent);
+          box-shadow: 0 18px 36px color-mix(in srgb, var(--color-primary) 42%, transparent);
         }
 
         .submit-button:disabled {
@@ -423,12 +427,13 @@ export default function LoginForm() {
         }
 
         .secondary-link-row {
-          margin-top: 0.85rem;
+          margin-top: -0.35rem;
+          margin-bottom: 1rem;
           text-align: right;
         }
 
         .secondary-link {
-          color: var(--primary);
+          color: var(--auth-accent);
           font-size: 0.88rem;
           font-weight: 700;
           text-decoration: underline;
@@ -438,7 +443,7 @@ export default function LoginForm() {
         .link-btn {
           border: none;
           background: transparent;
-          color: var(--primary);
+          color: var(--auth-accent);
           font: inherit;
           font-weight: 700;
           cursor: pointer;
@@ -571,6 +576,14 @@ export default function LoginForm() {
               ) : null}
             </div>
 
+            {authMode === "signin" ? (
+              <div className="secondary-link-row">
+                <Link href="/forgot-password" className="secondary-link">
+                  Forgot password?
+                </Link>
+              </div>
+            ) : null}
+
             {formError ? (
               <div className="form-error" role="alert">
                 {formError}
@@ -592,14 +605,6 @@ export default function LoginForm() {
               </span>
             </button>
           </form>
-
-          {authMode === "signin" ? (
-            <div className="secondary-link-row">
-              <Link href="/forgot-password" className="secondary-link">
-                Forgot password?
-              </Link>
-            </div>
-          ) : null}
 
           <div className="helper-row">
             {authMode === "signin" ? (

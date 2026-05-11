@@ -1,15 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
 import Alert from "@mui/material/Alert"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
-import Chip from "@mui/material/Chip"
 import Typography from "@mui/material/Typography"
-import { alpha } from "@mui/material/styles"
-import { AlertTriangle, Inbox, RefreshCw } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { AlertTriangle, Inbox } from "lucide-react"
 
 export function DataFetchingBadge({
   isFetching,
@@ -18,57 +14,14 @@ export function DataFetchingBadge({
   isFetching: boolean
   isLoading?: boolean
 }) {
-  if (!isFetching || isLoading) return null
-
-  return (
-    <Chip
-      size="small"
-      icon={<RefreshCw size={12} className="animate-spin" />}
-      label="Refreshing"
-      sx={{
-        borderRadius: 999,
-        bgcolor: (theme) => alpha(theme.palette.background.paper, 0.12),
-        px: 0.5,
-        fontSize: "0.65625rem",
-        fontWeight: 700,
-        letterSpacing: "0.14em",
-        textTransform: "uppercase",
-        animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "& .MuiChip-icon": {
-          color: "inherit",
-          ml: 0.75,
-        },
-      }}
-    />
-  )
+  void isFetching
+  void isLoading
+  return null
 }
 
 export function DataUpdatedAt({ updatedAt }: { updatedAt?: number | null }) {
-  const [label, setLabel] = useState<string | null>(null)
-  const [ageMs, setAgeMs] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!updatedAt) {
-      setLabel(null)
-      setAgeMs(null)
-      return
-    }
-
-    setLabel(formatDistanceToNow(updatedAt, { addSuffix: true }))
-    setAgeMs(Date.now() - updatedAt)
-  }, [updatedAt])
-
-  if (!updatedAt || !label || ageMs == null) return null
-
-  const ageMin = ageMs / 60_000
-  const color =
-    ageMin < 5 ? "text.secondary" : ageMin < 60 ? "warning.main" : "error.main"
-
-  return (
-    <Typography variant="caption" sx={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.02em", color }}>
-      Updated {label}
-    </Typography>
-  )
+  void updatedAt
+  return null
 }
 
 export function DataErrorState({
@@ -87,8 +40,8 @@ export function DataErrorState({
       sx={{
         alignItems: "flex-start",
         borderRadius: 3,
-        border: (theme) => `1px solid ${alpha(theme.palette.error.main, 0.35)}`,
-        bgcolor: (theme) => alpha(theme.palette.error.main, 0.06),
+        border: "1px solid color-mix(in srgb, var(--color-destructive) 35%, transparent)",
+        bgcolor: "color-mix(in srgb, var(--color-destructive) 6%, transparent)",
         "& .MuiAlert-message": {
           width: "100%",
         },
@@ -131,8 +84,8 @@ export function EmptyState({
     <Box
       sx={{
         borderRadius: 3,
-        border: (theme) => `1px dashed ${theme.palette.divider}`,
-        bgcolor: (theme) => alpha(theme.palette.text.primary, 0.03),
+          border: "1px dashed var(--color-border)",
+          bgcolor: "color-mix(in srgb, var(--color-foreground) 3%, transparent)",
         p: 3,
         textAlign: "center",
       }}

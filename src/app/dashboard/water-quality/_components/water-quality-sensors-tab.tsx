@@ -25,7 +25,7 @@ export function WaterQualitySensorsTab({
         </div>
         <div>
           <h2 className="text-xl font-bold text-foreground">Sensor Activity</h2>
-          <p className="text-sm text-muted-foreground">System connectivity and data freshness tracking.</p>
+          <p className="text-sm text-muted-foreground">System connectivity and sensor coverage.</p>
         </div>
       </div>
 

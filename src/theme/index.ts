@@ -11,60 +11,60 @@ const borderRadius = 6
 const lightPalette: PaletteOptions = {
   mode: "light",
   primary: {
-    main: "#22c55e",
-    contrastText: "#f4fffe",
+    main: "var(--color-primary)",
+    contrastText: "var(--color-on-primary)",
   },
   secondary: {
-    main: "#0F4C81",
-    contrastText: "#f8fbff",
+    main: "var(--color-secondary)",
+    contrastText: "var(--color-on-secondary)",
   },
   error: {
-    main: "#ef4444",
-    contrastText: "#ffffff",
+    main: "var(--color-destructive)",
+    contrastText: "var(--color-on-destructive)",
   },
   warning: {
-    main: "#d18a14",
-    contrastText: "#ffffff",
+    main: "var(--color-warning)",
+    contrastText: "var(--color-on-warning)",
   },
   info: {
-    main: "#0ea5e9",
-    contrastText: "#f8fbff",
+    main: "var(--color-info)",
+    contrastText: "var(--color-on-info)",
   },
   success: {
-    main: "#22c55e",
-    contrastText: "#166534",
+    main: "var(--color-success)",
+    contrastText: "var(--color-on-success)",
   },
   background: {
-    default: "#f6fbfc",
-    paper: "#ffffff",
+    default: "var(--color-background)",
+    paper: "var(--color-surface)",
   },
   text: {
-    primary: "#16313d",
-    secondary: "#5e7a86",
+    primary: "var(--color-foreground)",
+    secondary: "var(--color-muted-foreground)",
   },
-  divider: "#d7e7ec",
+  divider: "var(--color-border)",
 }
 
 export const lightTheme = createTheme({
-  cssVariables: true,
+  cssVariables: { nativeColor: true },
   palette: lightPalette,
   shape: { borderRadius },
   typography: {
     fontFamily: fontSans,
-    fontWeightRegular: 400,
-    fontWeightMedium: 500,
-    fontWeightBold: 700,
-    h1: { fontFamily: fontSans, fontWeight: 700 },
-    h2: { fontFamily: fontSans, fontWeight: 700 },
-    h3: { fontFamily: fontSans, fontWeight: 600 },
-    h4: { fontFamily: fontSans, fontWeight: 600 },
-    h5: { fontFamily: fontSans, fontWeight: 600 },
-    h6: { fontFamily: fontSans, fontWeight: 600 },
-    body1: { fontFamily: fontSans, fontSize: "0.9375rem" },
-    body2: { fontFamily: fontSans, fontSize: "0.875rem" },
-    caption: { fontFamily: fontSans, fontSize: "0.75rem" },
-    button: { fontFamily: fontSans, fontWeight: 500, textTransform: "none" },
-    overline: { fontFamily: fontMono, fontSize: "0.6875rem", letterSpacing: "0.08em" },
+    fontWeightRegular: "var(--font-weight-regular)",
+    fontWeightMedium: "var(--font-weight-medium)",
+    fontWeightBold: "var(--font-weight-bold)",
+    h1: { fontFamily: fontSans, fontWeight: "var(--font-weight-bold)" },
+    h2: { fontFamily: fontSans, fontWeight: "var(--font-weight-bold)" },
+    h3: { fontFamily: fontSans, fontWeight: "var(--font-weight-semibold)" },
+    h4: { fontFamily: fontSans, fontWeight: "var(--font-weight-semibold)" },
+    h5: { fontFamily: fontSans, fontWeight: "var(--font-weight-semibold)" },
+    h6: { fontFamily: fontSans, fontWeight: "var(--font-weight-semibold)" },
+    body1: { fontFamily: fontSans, fontSize: "var(--font-size-body1)" },
+    body2: { fontFamily: fontSans, fontSize: "var(--font-size-body2)" },
+    caption: { fontFamily: fontSans, fontSize: "var(--font-size-caption)" },
+    button: { fontFamily: fontSans, fontWeight: "var(--font-weight-medium)", textTransform: "none" },
+    overline: { fontFamily: fontMono, fontSize: "var(--font-size-caption)", letterSpacing: "0.08em" },
   },
   components: {
     MuiCssBaseline: {
@@ -80,7 +80,7 @@ export const lightTheme = createTheme({
           boxShadow: "none",
           "&:hover": { boxShadow: "none" },
         },
-        contained: { fontWeight: 600 },
+        contained: { fontWeight: "var(--font-weight-semibold)" },
       },
       defaultProps: { disableElevation: true },
     },
@@ -88,8 +88,8 @@ export const lightTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius,
-          border: "1px solid #d7e7ec",
-          backgroundColor: "#ffffff",
+          border: "1px solid var(--color-border)",
+          backgroundColor: "var(--color-surface)",
           boxShadow: "none",
         },
       },
@@ -97,19 +97,19 @@ export const lightTheme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: { borderRadius, backgroundImage: "none" },
-        outlined: { borderColor: "#d7e7ec" },
+        outlined: { borderColor: "var(--color-border)" },
       },
     },
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderBottomColor: "#d7e7ec",
-          fontSize: "0.875rem",
+          borderBottomColor: "var(--color-border)",
+          fontSize: "var(--font-size-body2)",
           padding: "10px 16px",
         },
         head: {
-          fontWeight: 600,
-          fontSize: "0.75rem",
+          fontWeight: "var(--font-weight-semibold)",
+          fontSize: "var(--font-size-caption)",
           textTransform: "uppercase",
           letterSpacing: "0.05em",
         },
@@ -118,43 +118,43 @@ export const lightTheme = createTheme({
     MuiTableHead: {
       styleOverrides: {
         root: {
-          backgroundColor: "#eaf4fb",
+          backgroundColor: "var(--color-accent)",
         },
       },
     },
     MuiDialogTitle: {
-      styleOverrides: { root: { fontWeight: 600, fontSize: "1rem" } },
+      styleOverrides: { root: { fontWeight: "var(--font-weight-semibold)", fontSize: "var(--font-size-title)" } },
     },
     MuiDialogContent: {
       styleOverrides: { root: { paddingTop: "12px !important" } },
     },
     MuiTab: {
       styleOverrides: {
-        root: { textTransform: "none", fontWeight: 500, minWidth: 80 },
+        root: { textTransform: "none", fontWeight: "var(--font-weight-medium)", minWidth: 80 },
       },
     },
     MuiChip: {
       styleOverrides: {
-        root: { borderRadius: 6, fontWeight: 500, fontSize: "0.75rem" },
+        root: { borderRadius: 6, fontWeight: "var(--font-weight-medium)", fontSize: "var(--font-size-caption)" },
       },
     },
     MuiInputBase: {
       styleOverrides: {
-        root: { fontSize: "0.875rem" },
+        root: { fontSize: "var(--font-size-body2)" },
       },
     },
     MuiOutlinedInput: {
       styleOverrides: {
-        notchedOutline: { borderColor: "#d7e7ec" },
+        notchedOutline: { borderColor: "var(--color-border)" },
         root: { borderRadius },
       },
     },
     MuiTooltip: {
       styleOverrides: {
         tooltip: {
-          fontSize: "0.75rem",
-          backgroundColor: "rgba(15, 76, 129, 0.96)",
-          color: "#f8fbff",
+          fontSize: "var(--font-size-caption)",
+          backgroundColor: "var(--chart-tooltip-bg)",
+          color: "var(--chart-tooltip-foreground)",
         },
       },
     },

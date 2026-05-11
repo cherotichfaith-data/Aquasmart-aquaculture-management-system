@@ -2,7 +2,6 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import type { SxProps, Theme } from "@mui/material/styles"
-import { alpha } from "@mui/material/styles"
 import Box from "@mui/material/Box"
 import ButtonBase from "@mui/material/ButtonBase"
 import InputAdornment from "@mui/material/InputAdornment"
@@ -197,7 +196,7 @@ export function FilterPopover({
                 sx={{
                   border: (theme) => `1px dashed ${theme.palette.divider}`,
                   borderRadius: 2,
-                  bgcolor: (theme) => alpha(theme.palette.text.primary, 0.03),
+                  bgcolor: "color-mix(in srgb, var(--color-foreground) 3%, transparent)",
                   px: 2,
                   py: 3,
                 }}
@@ -222,15 +221,13 @@ export function FilterPopover({
                       width: "100%",
                       alignItems: "center",
                       gap: 1.25,
-                  border: (theme) =>
-                    isSelected
-                      ? `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
-                      : "1px solid transparent",
+                      border: isSelected
+                        ? "1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)"
+                        : "1px solid transparent",
                       borderRadius: 1.5,
-                      bgcolor: (theme) =>
-                        isSelected
-                          ? alpha(theme.palette.primary.main, 0.08)
-                          : theme.palette.background.paper,
+                      bgcolor: isSelected
+                        ? "color-mix(in srgb, var(--color-primary) 8%, transparent)"
+                        : "var(--color-surface)",
                       px: 1.5,
                       py: 1.25,
                       textAlign: "left",
@@ -249,8 +246,9 @@ export function FilterPopover({
                         flexShrink: 0,
                         alignItems: "center",
                         justifyContent: "center",
-                        border: (theme) =>
-                          `1px solid ${isSelected ? theme.palette.primary.main : alpha(theme.palette.divider, 0.9)}`,
+                        border: isSelected
+                          ? "1px solid var(--color-primary)"
+                          : "1px solid color-mix(in srgb, var(--color-border) 90%, transparent)",
                         borderRadius: "50%",
                         bgcolor: isSelected ? "primary.main" : "background.paper",
                         color: isSelected ? "primary.contrastText" : "transparent",
