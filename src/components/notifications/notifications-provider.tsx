@@ -9,14 +9,15 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/lib/hooks/app/use-toast"
 import { useRouter } from "next/navigation"
-import { toDashboardPath } from "@/lib/app-entry"
+import { DATA_ENTRY_PATH, toDashboardPath } from "@/lib/app-entry"
 import { formatNumberValue } from "@/lib/analytics-format"
 import type { Tables } from "@/lib/types/database"
 import { parseAlertThresholdSettings } from "@/lib/alert-thresholds"
+import { formatCageLabel } from "@/lib/system-options"
 
 type AlertThresholdRow = Tables<"alert_threshold">
 type WaterQualityRow = Tables<"water_quality_measurement">
-type DailyInventoryRow = Tables<"daily_fish_inventory_table">
+type MortalityRow = Tables<"fish_mortality">
 type SystemRow = Tables<"system">
 
 type NotificationKind = "water_quality" | "mortality"
@@ -60,8 +61,10 @@ const isAbortLikeError = (err: unknown): boolean => {
 
 const buildSystemLabel = (systemMap: Record<number, string>, systemId?: number) => {
   if (!systemId) return "System"
-  return systemMap[systemId] ?? `System ${systemId}`
+  return systemMap[systemId] ?? "Missing cage name"
 }
+
+const hasMissingSystemName = (system: { name?: string | null }) => !system.name?.trim()
 
 const resolveThreshold = (thresholds: AlertThresholdRow[], systemId?: number | null) => {
   if (!thresholds.length) return null
@@ -162,7 +165,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const systemMap = useMemo(() => {
     const map: Record<number, string> = {}
     ;(systemsQuery.data ?? []).forEach((row) => {
-      map[row.id] = row.label ?? `System ${row.id}`
+      map[row.id] = formatCageLabel({ id: row.id, label: row.label, unit: null })
     })
     return map
   }, [systemsQuery.data])
@@ -212,6 +215,27 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const systemsLoaded = systemsQuery.isSuccess
   const thresholdsLoaded = thresholdsQuery.isSuccess
+
+  useEffect(() => {
+    if (!session || !farmId || !systemsLoaded) return
+
+    ;(systemsQuery.data ?? []).forEach((system) => {
+      if (!hasMissingSystemName({ name: system.label })) return
+
+      addNotification({
+        id: `system-missing-name-${system.id}`,
+        title: "Cage Name Missing",
+        description: "An active cage is missing its name. Update system setup before recording more farm activity.",
+        createdAt: new Date().toISOString(),
+        systemId: system.id,
+        kind: "water_quality",
+        severity: "warning",
+        read: false,
+        href: DATA_ENTRY_PATH + "?type=system",
+        actionLabel: "Update",
+      })
+    })
+  }, [addNotification, farmId, session, systemsLoaded, systemsQuery.data])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -277,8 +301,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
 
     // Only subscribe to system_ids that belong to this farm.
-    // Neither water_quality_measurement nor daily_fish_inventory_table has a direct
-    // farm_id column, so we filter by the known set of system IDs instead.
+    // water_quality_measurement has no direct farm_id column, so we filter by
+    // the known set of system IDs instead.
     const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
     if (!farmSystemIds.length) return
 
@@ -362,11 +386,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         {
           event: "INSERT",
           schema: "public",
-          table: "daily_fish_inventory_table",
+          table: "fish_mortality",
           filter: `system_id=in.(${farmSystemIds.join(",")})`,
         },
         (payload) => {
-          const row = payload.new as DailyInventoryRow
+          const row = payload.new as MortalityRow
           if (!row?.system_id) return
           if (!systemMap[row.system_id]) return
 
@@ -374,25 +398,23 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           if (!threshold) return
 
           const systemLabel = buildSystemLabel(systemMap, row.system_id)
-          if (threshold.high_mortality_threshold != null && row.mortality_rate != null) {
-            const mortalityPercent = row.mortality_rate * 100
-            if (mortalityPercent > threshold.high_mortality_threshold) {
+          if (row.is_mass_mortality || row.number_of_fish_mortality > 0) {
               addNotification({
                 id: `mortality-${row.id}`,
-                title: "High Mortality Rate",
-                description: `${systemLabel} mortality is ${formatPercent(row.mortality_rate)}%/day (threshold ${formatNumberValue(
-                  threshold.high_mortality_threshold,
-                  { decimals: 2, minimumDecimals: 2, fallback: "0" },
-                )}%/day).`,
-                createdAt: row.inventory_date ?? new Date().toISOString(),
+                title: row.is_mass_mortality ? "Mass Mortality Recorded" : "Mortality Recorded",
+                description: `${systemLabel} recorded ${formatNumberValue(row.number_of_fish_mortality, {
+                  decimals: 0,
+                  minimumDecimals: 0,
+                  fallback: "0",
+                })} mortality event(s).`,
+                createdAt: row.created_at ?? new Date().toISOString(),
                 systemId: row.system_id,
                 kind: "mortality",
-                severity: "critical",
+                severity: row.is_mass_mortality ? "critical" : "warning",
                 read: false,
                 href: `${toDashboardPath("/reports")}?tab=mortality&system=${row.system_id}`,
                 actionLabel: "View mortality",
               })
-            }
           }
         },
       )

@@ -46,10 +46,11 @@ type MeasurementRow = {
 }
 
 const RESPONSE_COLORS: Record<string, string> = {
-  Excellent: getSemanticColor("info"),
-  Good: getSemanticColor("good"),
-  Fair: getSemanticColor("warn"),
-  Poor: getSemanticColor("bad"),
+  "No Response": getSemanticColor("bad"),
+  "Low Appetite": getSemanticColor("warn"),
+  "Ideal Appetite": getSemanticColor("good"),
+  "Good Appetite": getSemanticColor("info"),
+  "Aggressive Appetite": getSemanticColor("neutral"),
 }
 
 const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
@@ -255,7 +256,7 @@ export function FeedDashboard({
       if (!normalized) return
       counts.set(normalized, (counts.get(normalized) ?? 0) + 1)
     })
-    return ["Excellent", "Good", "Fair", "Poor"].map((label) => ({
+    return ["No Response", "Low Appetite", "Ideal Appetite", "Good Appetite", "Aggressive Appetite"].map((label) => ({
       name: label,
       value: counts.get(label) ?? 0,
     }))

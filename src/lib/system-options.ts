@@ -25,7 +25,28 @@ export function formatSystemOptionLabel(system: Pick<SystemOptionSource, "id" | 
   if (unit && name) return `${unit} - ${name}`
   if (name) return name
   if (unit) return unit
-  return `System ${system.id}`
+  return "Missing cage name"
+}
+
+export function formatCageLabel(
+  system: { id: number; label?: string | null; unit?: string | null } | null | undefined,
+): string {
+  const label = system?.label?.trim()
+  if (label) return label
+
+  const unit = system?.unit?.trim()
+  if (unit) return unit
+
+  return "Missing cage name"
+}
+
+export function createSystemLabelResolver(systems: Array<{ id: number; label?: string | null; unit?: string | null }>) {
+  const systemsById = new Map(systems.map((system) => [system.id, system]))
+
+  return (systemId: number | null | undefined) => {
+    if (systemId == null || !Number.isFinite(systemId)) return "-"
+    return formatCageLabel(systemsById.get(systemId))
+  }
 }
 
 export function mapSystemRowToOption(system: SystemOptionSource): SystemOption {

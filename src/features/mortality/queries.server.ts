@@ -8,6 +8,7 @@ import {
   getScopedSystemOptions,
   getScopedTimeBounds,
   parseSelectedNumericId,
+  resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
 import { listAlertLog, listMortalityEvents, listSurvivalTrend } from "@/lib/server/mortality-reads"
 import { listFeedingRecords, listSamplingData } from "@/lib/server/report-reads"
@@ -23,7 +24,7 @@ type MortalitySystemOption = Database["public"]["Functions"]["api_system_options
 type MortalityEventRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
 type SamplingRow = Database["public"]["Tables"]["fish_sampling_weight"]["Row"]
 type MeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
-type SurvivalTrendRow = Database["public"]["Functions"]["get_survival_trend"]["Returns"][number] & { system_id: number }
+type SurvivalTrendRow = Database["public"]["Functions"]["api_survival_trend"]["Returns"][number] & { system_id: number }
 
 export type MortalityPageInitialFilters = {
   selectedBatch: string
@@ -99,11 +100,13 @@ async function getMeasurements(
 
 async function getScopedSurvivalTrend(
   supabase: ServerClient,
-  params: { systemIds: number[]; dateFrom: string; dateTo?: string },
+  params: { farmId: string | null; systemIds: number[]; dateFrom: string; dateTo?: string },
 ): Promise<SurvivalTrendRow[]> {
+  if (!params.farmId) return []
   const rows = await Promise.all(
     params.systemIds.map(async (systemId) => {
       const result = await listSurvivalTrend(supabase, {
+        farmId: params.farmId,
         systemId,
         dateFrom: params.dateFrom,
         dateTo: params.dateTo,
@@ -133,13 +136,13 @@ async function loadMortalityPageInitialData(
 
   if (!params.farmId) return empty
 
-  const selectedSystemId = parseSelectedNumericId(params.filters.selectedSystem)
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
-  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", selectedSystemId)
   const [systems, batchSystems] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage),
     getScopedBatchSystems(supabase, batchId),
   ])
+  const selectedSystemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systems)
+  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", selectedSystemId)
 
   if (!bounds.start || !bounds.end) {
     return {
@@ -172,6 +175,7 @@ async function loadMortalityPageInitialData(
     }),
     scopedSystemIds.length > 0
       ? getScopedSurvivalTrend(supabase, {
+          farmId: params.farmId,
           systemIds: scopedSystemIds,
           dateFrom: bounds.start,
           dateTo: bounds.end,

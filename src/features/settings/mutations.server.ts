@@ -48,6 +48,29 @@ const revokeInviteSchema = z.object({
 
 const ACCESS_GRANT_ALLOWED_ROLES = new Set(["admin"])
 
+type InviteActionResult = {
+  assigned: true
+  pendingInvite?: boolean
+  inviteSent?: boolean
+}
+
+function getAppOrigin() {
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.VERCEL_URL?.trim()
+
+  if (!configured) return "http://localhost:3000"
+  return configured.startsWith("http") ? configured : `https://${configured}`
+}
+
+function buildInviteRedirectUrl() {
+  const origin = getAppOrigin().replace(/\/$/, "")
+  const setupUrl = new URL("/auth/set-password", origin)
+  setupUrl.searchParams.set("next", "/onboarding")
+  return setupUrl.toString()
+}
+
 function isPrivateSchemaUnavailable(error: unknown) {
   if (!error || typeof error !== "object") return false
   const maybe = error as { code?: string; message?: string }
@@ -107,7 +130,7 @@ async function findExistingUserByEmail(email: string): Promise<User | null> {
 
 export async function grantFarmAccessAction(
   input: z.infer<typeof inviteSchema>,
-): Promise<{ assigned: true; pendingInvite?: boolean }> {
+): Promise<InviteActionResult> {
   const { supabase, user } = await requireMutationActionUser("settings:invite")
 
   let payload: z.infer<typeof inviteSchema>
@@ -134,29 +157,11 @@ export async function grantFarmAccessAction(
   }
 
   if (!targetUser?.id) {
-    const admin = createAdminClient()
-    const privateAdmin = admin as typeof admin & {
-      schema: (schema: string) => {
-        from: (table: string) => {
-          upsert: (
-            values: Record<string, string>,
-            options: { onConflict: string },
-          ) => Promise<{ error: { message?: string } | null }>
-        }
-      }
-    }
-    const { error } = await privateAdmin.schema("private").from("farm_user_invitation").upsert(
-      {
-        farm_id: payload.farmId,
-        email: payload.email.trim().toLowerCase(),
-        role: payload.role,
-        status: "pending",
-        invited_by: user.id,
-      },
-      {
-        onConflict: "farm_id,email",
-      },
-    )
+    const { data: invitationRows, error } = await supabase.rpc("create_farm_user_invitation", {
+      p_farm_id: payload.farmId,
+      p_email: payload.email.trim().toLowerCase(),
+      p_role: payload.role,
+    })
 
     if (error) {
       logSbError("settings:invite:createPendingInvite", error)
@@ -166,7 +171,33 @@ export async function grantFarmAccessAction(
       throw new Error("Unable to save the pending invitation.")
     }
 
-    return { assigned: true, pendingInvite: true }
+    const invitationId = invitationRows?.[0]?.id ?? null
+    const admin = createAdminClient()
+    const normalizedEmail = payload.email.trim().toLowerCase()
+    const inviteOptions = {
+      redirectTo: buildInviteRedirectUrl(),
+      data: {
+        invited_farm_id: payload.farmId,
+        invited_role: payload.role,
+      },
+    }
+    const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, inviteOptions)
+
+    if (inviteError) {
+      logSbError("settings:invite:sendAuthInvite", inviteError)
+      throw new Error(`Invitation was saved, but Supabase could not send the invite email: ${inviteError.message}`)
+    }
+
+    if (invitationId) {
+      const { error: markSentError } = await supabase.rpc("mark_farm_user_invitation_sent", {
+        p_invitation_id: invitationId,
+      })
+      if (markSentError) {
+        logSbError("settings:invite:markSent", markSentError)
+      }
+    }
+
+    return { assigned: true, pendingInvite: true, inviteSent: true }
   }
 
   const admin = createAdminClient()
@@ -261,10 +292,10 @@ export async function removeFarmMemberAction(input: z.infer<typeof removeMemberS
 export async function listPendingFarmInvitesAction(
   input: z.infer<typeof memberListSchema>,
 ): Promise<PendingFarmInvitation[]> {
-  const { user } = await requireMutationActionUser("settings:listPendingInvites")
+  const { supabase, user } = await requireMutationActionUser("settings:listPendingInvites")
   const payload = memberListSchema.parse(input)
   await assertAdminMembership(payload.farmId, user.id)
-  return listPendingFarmInvitationsForFarm(payload.farmId)
+  return listPendingFarmInvitationsForFarm(payload.farmId, supabase)
 }
 
 export async function revokePendingFarmInviteAction(
@@ -274,14 +305,14 @@ export async function revokePendingFarmInviteAction(
   const payload = revokeInviteSchema.parse(input)
   await assertAdminMembership(payload.farmId, user.id)
 
-  const { error } = await supabase.rpc("revoke_farm_user_invitation", {
+  const { data, error } = await supabase.rpc("revoke_farm_user_invitation", {
     p_invitation_id: payload.invitationId,
   })
 
-  if (error) {
+  if (error || !data) {
     logSbError("settings:revokeInvite", error)
     throw new Error("Unable to revoke the pending invitation.")
   }
 
-  return listPendingFarmInvitationsForFarm(payload.farmId)
+  return listPendingFarmInvitationsForFarm(payload.farmId, supabase)
 }

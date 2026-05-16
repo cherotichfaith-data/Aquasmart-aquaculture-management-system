@@ -11,14 +11,26 @@ export const queryKeys = {
     }) {
       return ["options", "systems", farmToken(params?.farmId), params?.stage ?? "all", params?.activeOnly ?? false] as const
     },
-    batches(farmId?: string | null) {
-      return ["options", "batches", farmToken(farmId)] as const
+    batches(params?: { farmId?: string | null; activeOnly?: boolean }) {
+      return ["options", "batches", farmToken(params?.farmId), params?.activeOnly ?? true] as const
     },
     timePeriods() {
       return ["options", "time-periods"] as const
     },
-    feeds(userId?: string | null) {
-      return ["options", "feeds", userId ?? "anon"] as const
+    feeds(
+      farmId?: string | null,
+      userId?: string | null,
+      scope?: { dateFrom?: string | null; dateTo?: string | null; inventoryOnly?: boolean },
+    ) {
+      return [
+        "options",
+        "feeds",
+        farmToken(farmId),
+        userId ?? "anon",
+        scope?.inventoryOnly ? "inventory-week" : "all",
+        stringToken(scope?.dateFrom),
+        stringToken(scope?.dateTo),
+      ] as const
     },
     feedSuppliers(userId?: string | null) {
       return ["options", "feed-suppliers", userId ?? "anon"] as const
@@ -196,6 +208,7 @@ export const queryKeys = {
       ] as const
     },
     growthTrend(params?: {
+      farmId?: string | null
       systemIds?: number[]
       dateFrom?: string
       dateTo?: string
@@ -204,6 +217,7 @@ export const queryKeys = {
       return [
         "reports",
         "growth-trend",
+        farmToken(params?.farmId),
         params?.systemIds?.join(",") ?? "",
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),
@@ -211,6 +225,7 @@ export const queryKeys = {
       ] as const
     },
     survivalTrendScoped(params?: {
+      farmId?: string | null
       systemIds?: number[]
       dateFrom?: string
       dateTo?: string
@@ -218,6 +233,7 @@ export const queryKeys = {
       return [
         "reports",
         "survival-trend-scoped",
+        farmToken(params?.farmId),
         params?.systemIds?.join(",") ?? "",
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),
@@ -303,12 +319,14 @@ export const queryKeys = {
       ] as const
     },
     survivalTrend(params: {
+      farmId?: string | null
       systemId?: number
       dateFrom?: string
       dateTo?: string
     }) {
       return [
         "survival-trend",
+        farmToken(params.farmId),
         numberToken(params.systemId),
         stringToken(params.dateFrom),
         stringToken(params.dateTo),

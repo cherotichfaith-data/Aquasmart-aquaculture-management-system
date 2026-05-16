@@ -1,4 +1,3 @@
-import { scaleFractionToPercent } from "@/lib/analytics-format"
 import type { Database } from "@/lib/types/database"
 import type { KpiCoverageRow } from "@/lib/types/insights"
 import type { DashboardPageInitialData, KPIOverviewMetric, RecommendedAction } from "./types"
@@ -64,6 +63,16 @@ const weightedAverage = (
 }
 
 const buildCoverageLabel = (covered: number, total: number) => `${covered}/${total} ${total === 1 ? "system" : "systems"}`
+
+const buildSystemRowsTrust = (
+  key: keyof typeof TRUST_FALLBACKS,
+  covered: number,
+  total: number,
+): NonNullable<KPIOverviewMetric["trust"]> => ({
+  source: "Dashboard system status",
+  basis: key === "biomass" ? "As-of-end biomass" : "As-of-end period metrics",
+  coverage: buildCoverageLabel(covered, total),
+})
 
 const getRoundedWaterQualityLabel = (value: number | null) => {
   if (!isFiniteNumber(value)) return null
@@ -132,7 +141,127 @@ export function buildKpiOverviewFromRpc(params: {
   const systemRows = params.systemRows.filter((row) => scopedSet.has(row.system_id))
 
   if (!consolidatedRows.length) {
-    return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }
+    if (!systemRows.length) {
+      return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }
+    }
+
+    const totalSystems = params.scopedSystemIds.length
+    const mortality = weightedAverage(
+      systemRows.map((row) => ({
+        value: row.mortality_rate,
+        weight: row.fish_end,
+      })),
+    )
+    const abw = weightedAverage(
+      systemRows.map((row) => ({
+        value: row.abw,
+        weight: row.fish_end,
+      })),
+    )
+    const biomass = average(systemRows.map((row) => row.biomass_end))
+    const biomassDensity = average(systemRows.map((row) => row.biomass_density))
+    const feeding = weightedAverage(
+      systemRows.map((row) => ({
+        value: row.feeding_rate,
+        weight: row.biomass_end,
+      })),
+    )
+    const waterQuality = average(systemRows.map((row) => row.water_quality_rating_numeric_average))
+    const waterQualityLabel = getRoundedWaterQualityLabel(waterQuality)
+    const waterQualityDisplay = waterQualityLabel ? WATER_QUALITY_BADGES[waterQualityLabel] : null
+
+    return {
+      metrics: [
+        {
+          key: "efcr",
+          label: "eFCR",
+          value: average(systemRows.map((row) => row.efcr)),
+          decimals: 2,
+          trend: null,
+          trendFormat: "delta",
+          trendDecimals: 2,
+          invertTrend: true,
+          trust: buildSystemRowsTrust("efcr", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).efcr)), totalSystems),
+        },
+        {
+          key: "mortality",
+          label: "Mortality Rate",
+          value: mortality,
+          unit: "%/day",
+          decimals: 2,
+          trend: null,
+          trendFormat: "delta",
+          trendDecimals: 2,
+          trendUnit: "%/day",
+          invertTrend: true,
+          trust: buildSystemRowsTrust("mortality", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).mortality_rate)), totalSystems),
+        },
+        {
+          key: "abw",
+          label: "Avg Body Weight",
+          value: abw,
+          unit: "g",
+          decimals: 1,
+          trend: null,
+          trendFormat: "delta",
+          trendDecimals: 1,
+          trendUnit: "g",
+          invertTrend: false,
+          trust: buildSystemRowsTrust("abw", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).abw)), totalSystems),
+        },
+        {
+          key: "biomass",
+          label: "Avg Biomass",
+          value: biomass,
+          unit: "kg",
+          decimals: 1,
+          trend: null,
+          trendFormat: "delta",
+          trendDecimals: 1,
+          trendUnit: "kg",
+          invertTrend: false,
+          trust: buildSystemRowsTrust("biomass", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).biomass_end)), totalSystems),
+        },
+        {
+          key: "biomass_density",
+          label: "Biomass Density",
+          value: biomassDensity,
+          unit: "kg/m3",
+          decimals: 2,
+          trend: null,
+          trendFormat: "delta",
+          trendDecimals: 2,
+          trendUnit: "kg/m3",
+          invertTrend: false,
+          trust: buildSystemRowsTrust("biomass_density", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).biomass_density)), totalSystems),
+        },
+        {
+          key: "feeding",
+          label: "Feeding Rate",
+          value: feeding,
+          unit: "% BW/day",
+          decimals: 2,
+          trend: null,
+          trendFormat: "delta",
+          trendDecimals: 2,
+          trendUnit: "% BW/day",
+          invertTrend: false,
+          trust: buildSystemRowsTrust("feeding", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).feeding_rate)), totalSystems),
+        },
+        {
+          key: "water_quality",
+          label: "Water Quality",
+          value: waterQuality,
+          decimals: 1,
+          trend: null,
+          invertTrend: false,
+          tone: waterQualityDisplay?.tone ?? "neutral",
+          badge: waterQualityDisplay?.badge ?? "Monitoring",
+          trust: buildSystemRowsTrust("water_quality", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).water_quality_rating_numeric_average)), totalSystems),
+        },
+      ],
+      dateBounds: { start: params.dateFrom, end: params.dateTo },
+    }
   }
 
   const systemRowsById = new Map(systemRows.map((row) => [row.system_id, row]))
@@ -160,7 +289,7 @@ export function buildKpiOverviewFromRpc(params: {
   const efcr = average(consolidatedRows.map((row) => row.efcr_period_consolidated))
   const mortality = weightedAverage(
     consolidatedRows.map((row) => ({
-      value: scaleFractionToPercent(row.mortality_rate),
+      value: row.mortality_rate,
       weight: mortalityWeight(row.system_id),
     })),
   )
@@ -174,7 +303,7 @@ export function buildKpiOverviewFromRpc(params: {
   const biomassDensity = average(consolidatedRows.map((row) => row.biomass_density))
   const feeding = weightedAverage(
     consolidatedRows.map((row) => ({
-      value: scaleFractionToPercent(row.feeding_rate),
+      value: row.feeding_rate,
       weight: row.average_biomass,
     })),
   )
@@ -203,7 +332,7 @@ export function buildKpiOverviewFromRpc(params: {
       decimals: 2,
       trend: weightedAverage(
         consolidatedRows.map((row) => ({
-          value: scaleFractionToPercent(row.mortality_rate_delta),
+          value: row.mortality_rate_delta,
           weight: mortalityWeight(row.system_id),
         })),
       ),
@@ -265,7 +394,7 @@ export function buildKpiOverviewFromRpc(params: {
       decimals: 2,
       trend: weightedAverage(
         consolidatedRows.map((row) => ({
-          value: scaleFractionToPercent(row.feeding_rate_delta),
+          value: row.feeding_rate_delta,
           weight: row.average_biomass,
         })),
       ),

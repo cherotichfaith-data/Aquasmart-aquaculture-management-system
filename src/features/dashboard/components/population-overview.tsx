@@ -1,13 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { ChartData, ChartOptions } from "chart.js"
 import { Activity, Fish, Leaf } from "lucide-react"
 import ButtonBase from "@mui/material/ButtonBase"
 import CardContent from "@mui/material/CardContent"
 import type { Enums } from "@/lib/types/database"
 import type { TimePeriod } from "@/components/shared/time-period-selector"
-import { Line } from "@/components/charts/chartjs"
+import { Chart } from "@/components/charts/chartjs"
 import { Card } from "@/components/app-ui/card"
 import Select from "@mui/material/Select"
 import MenuItem from "@mui/material/MenuItem"
@@ -24,7 +24,9 @@ import {
   createVerticalGradient,
   getChartPalette,
   getDateAxisMaxTicks,
+  withAlpha,
 } from "@/components/charts/chartjs-theme"
+import { formatBucketLabel, getBucketGranularity, getBucketKey } from "@/lib/time-series"
 
 function weightedAverage(values: Array<{ value: number | null | undefined; weight: number | null | undefined }>) {
   let weightedSum = 0
@@ -49,32 +51,17 @@ function weightedAverage(values: Array<{ value: number | null | undefined; weigh
   return null
 }
 
-function getTimePeriodLabel(value: TimePeriod) {
-  switch (value) {
-    case "week":
-      return "Last 7 Days"
-    case "2 weeks":
-      return "Last 14 Days"
-    case "month":
-      return "Last 30 Days"
-    case "quarter":
-      return "Last 90 Days"
-    case "year":
-      return "Last 12 Months"
-    default:
-      return "Custom Range"
-  }
-}
-
-const CHART_PERIODS: TimePeriod[] = ["week", "2 weeks", "month", "quarter"]
+const CHART_PERIODS: TimePeriod[] = ["week", "2 weeks", "month", "quarter", "6 months", "year"]
 const CHART_PERIOD_LABELS: Partial<Record<TimePeriod, string>> = {
   week: "Last 7 Days",
   "2 weeks": "Last 14 Days",
   month: "Last 30 Days",
   quarter: "Last 90 Days",
+  "6 months": "Last 6 Months",
+  year: "Last 12 Months",
 }
 
-type TrendMetricKey = "feedRate" | "mortality" | "abw"
+type TrendMetricKey = "feedAmount" | "mortality" | "abw"
 
 const TREND_METRICS: Array<{
   key: TrendMetricKey
@@ -82,7 +69,7 @@ const TREND_METRICS: Array<{
   icon: typeof Leaf
   paletteKey: "chart1" | "chart5" | "chart2"
 }> = [
-  { key: "feedRate", label: "Feed Rate", icon: Leaf, paletteKey: "chart1" },
+  { key: "feedAmount", label: "Feed", icon: Leaf, paletteKey: "chart1" },
   { key: "mortality", label: "Mortality", icon: Activity, paletteKey: "chart5" },
   { key: "abw", label: "ABW", icon: Fish, paletteKey: "chart2" },
 ]
@@ -115,13 +102,19 @@ export default function PopulationOverview({
   const { farmId: activeFarmId } = useActiveFarm()
   const [localTimePeriod, setLocalTimePeriod] = useState<TimePeriod>(initialTimePeriod)
   const [activeMetrics, setActiveMetrics] = useState<Record<TrendMetricKey, boolean>>({
-    feedRate: true,
+    feedAmount: true,
     mortality: true,
     abw: true,
   })
+
+  useEffect(() => {
+    setLocalTimePeriod(initialTimePeriod)
+  }, [initialTimePeriod])
+
   const timePeriod = localTimePeriod
   const palette = getChartPalette()
   const farmId = activeFarmId ?? initialFarmId
+  const granularity = getBucketGranularity(timePeriod)
   const summaryQuery = useProductionTrend({
     farmId,
     stage: stage && stage !== "all" ? stage : undefined,
@@ -135,31 +128,33 @@ export default function PopulationOverview({
 
   const chartRows = useMemo(() => {
     const rows = summaryQuery.data ?? []
-    const byDate = new Map<string, { mortality: number; feedRateRows: typeof rows; abwRows: typeof rows }>()
+    const byBucket = new Map<
+      string,
+      { label: string; mortality: number; feedAmount: number; abwRows: typeof rows }
+    >()
 
     rows.forEach((row) => {
       if (!row.date) return
-      const current = byDate.get(row.date) ?? {
+      const key = getBucketKey(row.date, granularity)
+      if (!key) return
+      const current = byBucket.get(key) ?? {
+        label: formatBucketLabel(key, granularity),
         mortality: 0,
-        feedRateRows: [],
+        feedAmount: 0,
         abwRows: [],
       }
 
       current.mortality += row.daily_mortality_count ?? 0
-      current.feedRateRows.push(row)
+      current.feedAmount += row.total_feed_amount_period ?? 0
       current.abwRows.push(row)
-      byDate.set(row.date, current)
+      byBucket.set(key, current)
     })
 
-    return Array.from(byDate.entries())
-      .map(([date, current]) => ({
-        date,
-        feedRate: weightedAverage(
-          current.feedRateRows.map((row) => ({
-            value: row.feeding_rate,
-            weight: row.total_biomass,
-          })),
-        ),
+    return Array.from(byBucket.entries())
+      .map(([bucket, current]) => ({
+        bucket,
+        label: current.label,
+        feedAmount: current.feedAmount,
         averageBodyWeight: weightedAverage(
           current.abwRows.map((row) => ({
             value: row.average_body_weight,
@@ -168,14 +163,17 @@ export default function PopulationOverview({
         ),
         mortalityCount: current.mortality,
       }))
-      .sort((left, right) => left.date.localeCompare(right.date))
-  }, [summaryQuery.data])
+      .sort((left, right) => left.bucket.localeCompare(right.bucket))
+  }, [granularity, summaryQuery.data])
 
-  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
-  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
-  const xLimit = getDateAxisMaxTicks(dateDomain.length)
-  const feedRateBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.feedRate), { minFloor: 0, includeZero: true }),
+  const domain = useMemo(() => {
+    if (granularity === "day") return buildDailyDateDomain(chartRows.map((row) => row.bucket))
+    return chartRows.map((row) => row.bucket)
+  }, [chartRows, granularity])
+  const rowsByBucket = useMemo(() => new Map(chartRows.map((row) => [row.bucket, row])), [chartRows])
+  const xLimit = granularity === "day" ? getDateAxisMaxTicks(domain.length) : Math.min(Math.max(domain.length, 4), 8)
+  const feedAmountBounds = useMemo(
+    () => buildMetricAxisBounds(chartRows.map((row) => row.feedAmount), { minFloor: 0, includeZero: true }),
     [chartRows],
   )
   const abwBounds = useMemo(
@@ -186,90 +184,84 @@ export default function PopulationOverview({
     () => buildMetricAxisBounds(chartRows.map((row) => row.mortalityCount), { minFloor: 0, includeZero: true }),
     [chartRows],
   )
-
-  const combinedData = useMemo<ChartData<"line">>(
+  const combinedData = useMemo<ChartData<"bar">>(
     () => ({
-      labels: dateDomain,
+      labels: domain.map((bucket) => (granularity === "day" ? bucket : formatBucketLabel(bucket, granularity))),
       datasets: [
         {
-          label: "Feed Rate",
-          data: dateDomain.map((date) => rowsByDate.get(date)?.feedRate ?? null),
-          borderColor: palette.chart1,
-          backgroundColor: createVerticalGradient(palette.chart1, 0.16, 0.02),
-          borderWidth: 2.6,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          pointBackgroundColor: palette.chart1,
-          pointBorderWidth: 0,
-          spanGaps: true,
-          clip: 0,
+          type: "bar",
+          label: "Feed",
+          data: domain.map((bucket) => rowsByBucket.get(bucket)?.feedAmount ?? null),
+          borderColor: "#4472C4",
+          backgroundColor: "#4472C4",
+          borderWidth: 1,
+          borderRadius: 0,
+          borderSkipped: false,
+          categoryPercentage: 0.76,
+          barPercentage: activeMetrics.mortality ? 0.46 : 0.62,
+          maxBarThickness: 28,
+          order: 3,
           yAxisID: "y",
-          hidden: !activeMetrics.feedRate,
+          hidden: !activeMetrics.feedAmount,
         },
         {
+          type: "bar",
           label: "Mortality",
-          data: dateDomain.map((date) => rowsByDate.get(date)?.mortalityCount ?? null),
-          borderColor: palette.chart5,
-          backgroundColor: "transparent",
-          borderWidth: 2.4,
-          fill: false,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          pointBackgroundColor: palette.chart5,
-          pointBorderWidth: 0,
-          spanGaps: true,
-          clip: 0,
+          data: domain.map((bucket) => rowsByBucket.get(bucket)?.mortalityCount ?? null),
+          borderColor: "#ED7D31",
+          backgroundColor: "#ED7D31",
+          borderWidth: 1,
+          borderRadius: 0,
+          borderSkipped: false,
+          categoryPercentage: 0.76,
+          barPercentage: 0.46,
+          maxBarThickness: 28,
+          order: 3,
           yAxisID: "y2",
           hidden: !activeMetrics.mortality,
         },
         {
+          type: "line",
           label: "ABW",
-          data: dateDomain.map((date) => rowsByDate.get(date)?.averageBodyWeight ?? null),
-          borderColor: palette.chart2,
+          data: domain.map((bucket) => rowsByBucket.get(bucket)?.averageBodyWeight ?? null),
+          borderColor: "#70AD47",
           backgroundColor: "transparent",
-          borderWidth: 2.6,
+          borderWidth: 2,
           fill: false,
           pointRadius: 3,
-          pointHoverRadius: 5,
-          pointBackgroundColor: palette.chart2,
-          pointBorderWidth: 0,
+          pointHoverRadius: 4,
+          pointBackgroundColor: "#70AD47",
+          pointBorderColor: "#70AD47",
+          pointBorderWidth: 1,
           spanGaps: true,
           clip: 0,
-          yAxisID: "y1",
+          order: 1,
+          yAxisID: "yAbw",
           hidden: !activeMetrics.abw,
         },
       ],
-    }),
-    [activeMetrics.abw, activeMetrics.feedRate, activeMetrics.mortality, dateDomain, palette.chart1, palette.chart2, palette.chart5, rowsByDate],
+    }) as ChartData<"bar">,
+    [activeMetrics.abw, activeMetrics.feedAmount, activeMetrics.mortality, domain, granularity, palette.chart1, palette.chart2, palette.chart5, rowsByBucket],
   )
 
-  const combinedOptions = useMemo<ChartOptions<"line">>(
+  const combinedOptions = useMemo<ChartOptions<"bar">>(
     () =>
-      buildCartesianOptions({
+      buildCartesianOptions<"bar">({
         palette,
-        min: feedRateBounds.min,
-        max: feedRateBounds.max,
-        rightMin: abwBounds.min,
-        rightMax: abwBounds.max,
+        min: feedAmountBounds.min,
+        max: feedAmountBounds.max,
         lockYBounds: true,
-        lockRightYBounds: true,
         xMaxTicksLimit: xLimit,
-        yTitle: "% BW/Day",
-        yRightTitle: "ABW (g)",
-        yTickFormatter: (value) => formatNumberValue(Number(value) * 100, { decimals: 0 }),
-        yRightTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 0 }),
+        yTitle: "Feed (kg)",
+        yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 0 }),
         tooltip: {
           callbacks: {
             title: (items: any) =>
-              formatChartDate(String(dateDomain[items[0]?.dataIndex ?? 0] ?? ""), {
-                month: "short",
-                day: "numeric",
-              }),
+              String(items[0]?.label ?? ""),
             label: (context: any) => {
               const label = String(context.dataset.label ?? "")
-              if (label === "Feed Rate") {
-                return `Feed Rate: ${formatNumberValue(Number(context.parsed.y) * 100, { decimals: 1, minimumDecimals: 1 })}% BW/day`
+              if (label === "Feed") {
+                return `Feed: ${formatNumberValue(Number(context.parsed.y), { decimals: 1 })} kg`
               }
               if (label === "ABW") {
                 return `ABW: ${formatNumberValue(Number(context.parsed.y), { decimals: 0 })} g`
@@ -279,11 +271,13 @@ export default function PopulationOverview({
           },
         },
         xTickFormatter: (_value, index) =>
-          formatChartDate(String(dateDomain[index] ?? ""), { month: "short", day: "numeric" }),
+          granularity === "day"
+            ? formatChartDate(String(domain[index] ?? ""), { month: "short", day: "numeric" })
+            : formatBucketLabel(String(domain[index] ?? ""), granularity),
         extraScales: {
           y2: {
             position: "right",
-            display: false,
+            display: activeMetrics.mortality,
             min: mortalityBounds.min,
             max: mortalityBounds.max,
             grid: {
@@ -293,10 +287,60 @@ export default function PopulationOverview({
             border: {
               display: false,
             },
+            ticks: {
+              color: palette.muted,
+              padding: 8,
+              font: {
+                size: 11,
+                weight: 500,
+              },
+              callback: (value: number | string) => formatNumberValue(Number(value), { decimals: 0 }),
+            },
+            title: {
+              display: true,
+              text: "Mortality",
+              color: palette.muted,
+              font: {
+                size: 11,
+                weight: 500,
+              },
+            },
+          },
+          yAbw: {
+            position: "right",
+            display: activeMetrics.abw,
+            min: abwBounds.min,
+            max: abwBounds.max,
+            offset: true,
+            grid: {
+              drawOnChartArea: false,
+              drawTicks: false,
+            },
+            border: {
+              display: false,
+            },
+            ticks: {
+              color: palette.muted,
+              padding: activeMetrics.mortality ? 34 : 8,
+              font: {
+                size: 11,
+                weight: 500,
+              },
+              callback: (value: number | string) => formatNumberValue(Number(value), { decimals: 0 }),
+            },
+            title: {
+              display: true,
+              text: "ABW (g)",
+              color: palette.muted,
+              font: {
+                size: 11,
+                weight: 500,
+              },
+            },
           },
         },
       }),
-    [abwBounds.max, abwBounds.min, dateDomain, feedRateBounds.max, feedRateBounds.min, mortalityBounds.max, mortalityBounds.min, palette, xLimit],
+    [abwBounds.max, abwBounds.min, activeMetrics.abw, activeMetrics.mortality, domain, feedAmountBounds.max, feedAmountBounds.min, granularity, mortalityBounds.max, mortalityBounds.min, palette, xLimit],
   )
 
   const errorMessage = getErrorMessage(summaryQuery.error)
@@ -392,16 +436,16 @@ export default function PopulationOverview({
             )
           })}
         </div>
-        {summaryQuery.isLoading ? (
+        {summaryQuery.isLoading || (summaryQuery.isFetching && !chartRows.length) ? (
           <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading chart...</div>
         ) : chartRows.length ? (
-          <div className="chart-canvas-shell rounded-[1rem] border border-border/60 bg-background px-2 py-3">
-            <LazyRender className="h-[320px]" fallback={<div className="h-full w-full" />}>
-              <Line data={combinedData} options={combinedOptions} />
+            <div className="border border-border bg-background px-2 py-3">
+            <LazyRender className="h-[360px]" fallback={<div className="h-full w-full" />}>
+              <Chart type="bar" data={combinedData} options={combinedOptions} />
             </LazyRender>
           </div>
         ) : (
-          <EmptyState title="No trend data" description="No feed, ABW, or mortality data available for the selected range." />
+          <EmptyState title="No trend data" description="No feed, ABW, or mortality rows match this filter." />
         )}
       </CardContent>
     </Card>

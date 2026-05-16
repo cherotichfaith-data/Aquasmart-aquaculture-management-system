@@ -48,7 +48,7 @@ export type SystemHealthRow = {
   health_grade: HealthGrade
   wq_score: number             // 0–3
   mortality_score: number      // 0–3
-  fcr_score: number            // 0–2
+  fcr_score: number            // 0-2 feed/appetite score retained under the legacy RPC field name
   growth_score: number         // 0–2
   // Raw inputs
   wq_rating_avg: number | null

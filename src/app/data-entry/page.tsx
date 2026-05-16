@@ -66,8 +66,8 @@ export default async function DataEntryPage({
 
   queryClient.setQueryData(queryKeys.farmUserRole(farmId, user.id), role)
   queryClient.setQueryData(queryKeys.options.systems({ farmId }), prefetch.systems)
-  queryClient.setQueryData(queryKeys.options.batches(farmId), prefetch.batches)
-  queryClient.setQueryData(queryKeys.options.feeds(user.id), prefetch.feedTypes)
+  queryClient.setQueryData(queryKeys.options.batches({ farmId }), prefetch.batches)
+  queryClient.setQueryData(queryKeys.options.feeds(farmId, user.id), prefetch.feedTypes)
   queryClient.setQueryData(queryKeys.reports.recentEntries(farmId), prefetch.recentEntries)
 
   return (

@@ -1,4 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import type { Database } from "@/lib/types/database"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 export type SettingsFarmMember = {
   user_id: string
@@ -18,6 +20,8 @@ export type PendingFarmInvitation = {
   updated_at: string
   last_sent_at: string | null
 }
+
+type AppSupabaseClient = SupabaseClient<Database>
 
 function isPrivateSchemaUnavailable(error: unknown) {
   if (!error || typeof error !== "object") return false
@@ -107,37 +111,11 @@ export async function listFarmMembersForFarm(farmId: string): Promise<SettingsFa
   }))
 }
 
-export async function listPendingFarmInvitationsForFarm(farmId: string): Promise<PendingFarmInvitation[]> {
-  const admin = createAdminClient()
-  const privateAdmin = admin as typeof admin & {
-    schema: (schema: string) => {
-      from: (table: string) => {
-        select: (columns: string) => {
-          eq: (column: string, value: string) => {
-            eq: (column: string, value: string) => {
-              is: (column: string, value: null) => {
-                is: (column: string, value: null) => {
-                  order: (column: string, options: { ascending: boolean }) => Promise<{
-                    data: Array<Record<string, string | null>> | null
-                    error: { message?: string } | null
-                  }>
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  const { data, error } = await privateAdmin
-    .schema("private")
-    .from("farm_user_invitation")
-    .select("id, email, role, status, invited_by, created_at, updated_at, last_sent_at")
-    .eq("farm_id", farmId)
-    .eq("status", "pending")
-    .is("revoked_at", null)
-    .is("accepted_at", null)
-    .order("created_at", { ascending: false })
+export async function listPendingFarmInvitationsForFarm(
+  farmId: string,
+  supabase: AppSupabaseClient,
+): Promise<PendingFarmInvitation[]> {
+  const { data, error } = await supabase.rpc("api_farm_user_invitations", { p_farm_id: farmId })
 
   if (error) {
     if (isPrivateSchemaUnavailable(error)) return []

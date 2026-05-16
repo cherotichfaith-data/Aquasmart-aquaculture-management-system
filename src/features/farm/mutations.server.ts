@@ -6,6 +6,7 @@ import { requireMutationActionUser } from "@/lib/server/mutation-actions"
 import { revalidateWriteTags } from "@/lib/server/write-through"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { BIOLOGICAL_GROWTH_STAGE_VALUES } from "@/lib/stage-filter"
 import type { Database } from "@/lib/types/database"
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
@@ -27,7 +28,7 @@ const systemSchema = z.object({
   unit: z.string().max(120).nullable().optional(),
   name: z.string().min(1).max(120),
   type: z.enum(["rectangular_cage", "circular_cage", "pond", "tank"]),
-  growth_stage: z.enum(["nursing", "grow_out"]),
+  growth_stage: z.enum(BIOLOGICAL_GROWTH_STAGE_VALUES),
   volume: z.number().min(0).nullable().optional(),
   depth: z.number().min(0).nullable().optional(),
   length: z.number().min(0).nullable().optional(),

@@ -26,7 +26,7 @@ import { useProductionSummary } from "@/lib/hooks/use-production"
 import { countTimeRangeDays } from "@/lib/time-period"
 import { logSbError } from "@/lib/supabase/log"
 import type { Database } from "@/lib/types/database"
-import type { SystemOption } from "@/lib/system-options"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import {
     calculateAbw,
@@ -83,7 +83,7 @@ function HarvestCycleSummary({
     const cycleStartDate = cycleRows[cycleRows.length - 1]?.date ?? latestCycleRow?.date ?? null
     const cycleDays = countTimeRangeDays(cycleStartDate, latestCycleRow?.date ?? null)
     const queryError = getErrorMessage(summaryQuery.error) ?? getQueryResultError(summaryQuery.data)
-    const summaryLabel = system?.label ?? (systemId ? `System ${systemId}` : "Selected system")
+    const summaryLabel = systemId ? formatCageLabel(system) : "Selected system"
     const asOfDate = latestCycleRow?.date ?? null
 
     return (
@@ -181,10 +181,7 @@ export function HarvestForm({
         () => systems.find((system) => system.id === resolvedSystemId) ?? null,
         [resolvedSystemId, systems],
     )
-    const selectedCageLabel =
-        selectedSystem?.unit?.trim() ||
-        selectedSystem?.label ||
-        (resolvedSystemId ? `System ${resolvedSystemId}` : "this system")
+    const selectedCageLabel = resolvedSystemId ? formatCageLabel(selectedSystem) : "this system"
     const computedAbw = calculateAbw(amountKg, numberOfFish)
 
     async function submitHarvest(values: z.infer<typeof formSchema>) {
@@ -267,7 +264,7 @@ export function HarvestForm({
                                                 <SelectContent>
                                                     {systems.map((system) => (
                                                         <SelectItem key={system.id} value={String(system.id)}>
-                                                            {system.label ?? `System ${system.id}`}
+                                                            {formatCageLabel(system)}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>

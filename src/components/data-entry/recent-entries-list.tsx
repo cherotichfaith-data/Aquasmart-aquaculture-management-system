@@ -5,7 +5,7 @@ import { format } from "date-fns"
 import { Clock3, Loader2 } from "lucide-react"
 import { Badge } from "@/components/app-ui/badge"
 import { offlineDB } from "@/lib/offline/db"
-import type { SystemOption } from "@/lib/system-options"
+import { createSystemLabelResolver, type SystemOption } from "@/lib/system-options"
 import type { Tables } from "@/lib/types/database"
 
 type PendingMeta = {
@@ -183,6 +183,10 @@ function mergeRecentEntries<T extends { created_at: string | null; status?: "pen
     .slice(0, 5)
 }
 
+function cageDetail(formatSystemName: (systemId: number | null | undefined) => string, systemId: number | null | undefined) {
+  return { label: "Cage", value: formatSystemName(systemId) }
+}
+
 function EntriesSection({
   cards,
   pendingCount,
@@ -242,9 +246,7 @@ function EntriesSection({
 export function RecentEntriesList(props: RecentEntriesListProps) {
   const { data, type, systems } = props
   const pendingEntries = usePendingOfflineEntries(type)
-  const systemNameById = new Map(systems.map((system) => [system.id, system.label]))
-  const formatSystemName = (systemId: number | null | undefined) =>
-    systemId == null ? "-" : systemNameById.get(systemId) ?? `System ${systemId}`
+  const formatSystemName = createSystemLabelResolver(systems)
 
   let cards: RecentCard[] = []
   let pendingCount = 0
@@ -258,7 +260,10 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       subtitle: formatDate(row.date),
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
-      details: [{ label: "Dead Fish", value: String(row.number_of_fish_mortality) }],
+      details: [
+        cageDetail(formatSystemName, row.system_id),
+        { label: "Dead Fish", value: String(row.number_of_fish_mortality) },
+      ],
     }))
   } else if (type === "feeding") {
     const rows = mergeRecentEntries(data, pendingEntries as FeedingRow[])
@@ -270,6 +275,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
+        cageDetail(formatSystemName, row.system_id),
         { label: "Feed Type", value: String(row.feed_type_id) },
         { label: "Amount", value: `${row.feeding_amount} kg` },
       ],
@@ -284,6 +290,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
+        cageDetail(formatSystemName, row.system_id),
         { label: "Sampled", value: String(row.number_of_fish_sampling) },
         { label: "ABW", value: row.abw != null ? `${row.abw} g` : "-" },
       ],
@@ -298,6 +305,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
+        { label: "Origin", value: formatSystemName(row.origin_system_id) },
         { label: "Destination", value: row.external_target_name?.trim() || formatSystemName(row.target_system_id) },
         { label: "Count", value: String(row.number_of_fish_transfer) },
       ],
@@ -312,6 +320,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
+        cageDetail(formatSystemName, row.system_id),
         { label: "Harvest", value: String(row.type_of_harvest) },
         { label: "Weight", value: `${row.total_weight_harvest} kg` },
       ],
@@ -326,6 +335,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
+        cageDetail(formatSystemName, row.system_id),
         { label: "Parameter", value: String(row.parameter_name) },
         { label: "Value", value: String(row.parameter_value) },
       ],
@@ -349,6 +359,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
+        cageDetail(formatSystemName, row.system_id),
         { label: "Count", value: String(row.number_of_fish_stocking) },
         { label: "Type", value: String(row.type_of_stocking) },
       ],

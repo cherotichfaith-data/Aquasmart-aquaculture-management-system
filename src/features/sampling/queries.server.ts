@@ -3,7 +3,13 @@ import { cacheTags } from "@/lib/cache/tags"
 import { toQuerySuccess } from "@/lib/api/_utils"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
-import { getScopedBatchSystems, getScopedSystemOptions, getScopedTimeBounds, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
+import {
+  getScopedBatchSystems,
+  getScopedSystemOptions,
+  getScopedTimeBounds,
+  parseSelectedNumericId,
+  resolveScopedSelectedSystemId,
+} from "@/features/shared/scoped-analytics.server"
 import {
   listAppConfigRows,
   listDashboardSystemsRows,
@@ -92,10 +98,8 @@ async function loadSamplingPageInitialData(
 
   if (!params.farmId) return empty
 
-  const systemId = parseSelectedNumericId(params.filters.selectedSystem)
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
-  const [bounds, systems, batchSystems, systemVolumes, appConfig] = await Promise.all([
-    getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId),
+  const [systems, batchSystems, systemVolumes, appConfig] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage),
     getScopedBatchSystems(supabase, batchId),
     listSystemVolumeRows(supabase, { farmId: params.farmId, stage: params.filters.selectedStage, activeOnly: true }),
@@ -108,6 +112,8 @@ async function loadSamplingPageInitialData(
       ],
     }),
   ])
+  const systemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systems)
+  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId)
 
   if (!bounds.start || !bounds.end) {
     return {

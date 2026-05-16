@@ -31,11 +31,13 @@ const FEED_PELLET_SIZES: Enums<"feed_pellet_size">[] = [
 ]
 
 interface FeedTypeQuickCreateProps {
+  farmId: string | null
   onCreated?: () => void
   allowSupplierCreate?: boolean
 }
 
 export function FeedTypeQuickCreate({
+  farmId,
   onCreated,
   allowSupplierCreate = true,
 }: FeedTypeQuickCreateProps) {
@@ -86,6 +88,11 @@ export function FeedTypeQuickCreate({
   }
 
   async function handleCreateFeedType() {
+    if (!farmId) {
+      setError("Select a farm before creating a feed type.")
+      return
+    }
+
     if (!supplierId) {
       setError("Select a supplier before creating a feed type.")
       return
@@ -105,6 +112,7 @@ export function FeedTypeQuickCreate({
 
     setError(null)
     await createFeedType.mutateAsync({
+      farm_id: farmId,
       feed_line: feedLine.trim() || null,
       feed_category: feedCategory,
       feed_pellet_size: pelletSize,

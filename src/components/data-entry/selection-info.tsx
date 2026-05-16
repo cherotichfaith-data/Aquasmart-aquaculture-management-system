@@ -2,8 +2,9 @@
 
 import { useMemo } from "react"
 import type { Database } from "@/lib/types/database"
-import type { SystemOption } from "@/lib/system-options"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useFingerlingSupplierOptions } from "@/lib/hooks/use-options"
+import { formatGrowthStage } from "@/lib/stage-filter"
 import { parseNumericId } from "./form-utils"
 
 type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
@@ -25,8 +26,13 @@ export function SelectedSystemInfo({
   return (
     <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
       <div className="font-medium">{title}</div>
-      <div className="text-muted-foreground">Cage Unit: {selectedSystem.unit?.trim() || "Not set"}</div>
-      <div className="text-muted-foreground">System: {selectedSystem.label ?? `System ${selectedSystem.id}`}</div>
+      <div className="text-muted-foreground">Cage: {formatCageLabel(selectedSystem)}</div>
+      <div className="text-muted-foreground">Unit: {selectedSystem.unit?.trim() || "Not set"}</div>
+      <div className="text-muted-foreground">
+        Type: {String(selectedSystem.type ?? "").replaceAll("_", " ") || "Not set"}
+      </div>
+      <div className="text-muted-foreground">Stage: {formatGrowthStage(selectedSystem.growth_stage)}</div>
+      <div className="text-muted-foreground">Status: {selectedSystem.is_active ? "Active" : "Inactive"}</div>
     </div>
   )
 }

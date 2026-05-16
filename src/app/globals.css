@@ -17,13 +17,13 @@ next-router-prefetch {
   --color-on-primary: #f8fbff;
   --color-secondary: #0f4c81;
   --color-on-secondary: #f8fbff;
-  --color-background: #f6fbfc;
+  --color-background: #f7f8fa;
   --color-surface: #ffffff;
   --color-foreground: #16313d;
-  --color-muted-foreground: #5e7a86;
-  --color-border: #d7e7ec;
-  --color-muted: #eef4f6;
-  --color-accent: #eaf4fb;
+  --color-muted-foreground: #5f6f7a;
+  --color-border: #d8dee6;
+  --color-muted: #eef1f4;
+  --color-accent: #edf2f7;
   --color-on-accent: #16313d;
   --color-destructive: #ef4444;
   --color-on-destructive: #ffffff;
@@ -31,7 +31,7 @@ next-router-prefetch {
   --color-on-success: #166534;
   --color-warning: #d18a14;
   --color-on-warning: #ffffff;
-  --color-info: #0ea5e9;
+  --color-info: #3b6ea8;
   --color-on-info: #f8fbff;
   --card: var(--color-surface);
   --ring: var(--color-primary);
@@ -40,14 +40,14 @@ next-router-prefetch {
   --accent: var(--color-accent);
   --border: var(--color-border);
   --radius: 0.5rem;
-  --chart-1: var(--mui-palette-primary-main);
-  --chart-2: var(--mui-palette-secondary-main);
-  --chart-3: var(--mui-palette-info-main);
-  --chart-4: var(--mui-palette-warning-main);
-  --chart-5: var(--mui-palette-error-main);
-  --chart-grid: rgba(94, 122, 134, 0.18);
-  --chart-tooltip-bg: rgba(15, 76, 129, 0.96);
-  --chart-tooltip-border: rgba(215, 231, 236, 0.24);
+  --chart-1: #4472c4;
+  --chart-2: #ed7d31;
+  --chart-3: #a5a5a5;
+  --chart-4: #ffc000;
+  --chart-5: #c00000;
+  --chart-grid: rgba(95, 111, 122, 0.22);
+  --chart-tooltip-bg: rgba(38, 46, 56, 0.96);
+  --chart-tooltip-border: rgba(216, 222, 230, 0.34);
   --chart-tooltip-foreground: #f8fbff;
   --popover: var(--color-surface);
   --primary: var(--color-primary);
@@ -94,7 +94,7 @@ next-router-prefetch {
   --sidebar-primary-foreground: var(--color-on-primary);
   --info-foreground: var(--color-on-info);
   --sidebar-sheen: rgba(255, 255, 255, 0.22);
-  --sidebar-glow: rgba(14, 165, 233, 0.16);
+  --sidebar-glow: rgba(255, 255, 255, 0.06);
   --destructive-soft: color-mix(in srgb, var(--destructive) 12%, transparent);
   --success-soft: color-mix(in srgb, var(--success) 14%, transparent);
   --warning-soft: color-mix(in srgb, var(--warning) 14%, transparent);
@@ -110,9 +110,9 @@ next-router-prefetch {
   --brand-section-to: color-mix(in srgb, var(--color-primary) 54%, black);
   --brand-footer-from: var(--brand-section-to);
   --brand-footer-to: color-mix(in srgb, var(--color-primary) 30%, black);
-  --brand-mist-from: rgba(79, 209, 245, 0.18);
+  --brand-mist-from: rgba(68, 114, 196, 0.12);
   --brand-mist-to: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  --brand-panel-glow: rgba(79, 209, 245, 0.14);
+  --brand-panel-glow: rgba(68, 114, 196, 0.1);
   --brand-media-overlay-from: rgba(7, 22, 28, 0.04);
   --brand-media-overlay-to: rgba(7, 22, 28, 0.52);
   --brand-card-image-overlay-from: rgba(7, 18, 24, 0.1);
@@ -381,27 +381,52 @@ next-router-prefetch {
   }
 
   .data-entry-layout {
-    @apply space-y-3.5 md:space-y-5;
+    @apply space-y-0;
   }
 
   .data-entry-page-shell {
-    @apply max-w-[1240px];
+    @apply max-w-[1240px] px-3 sm:px-4 lg:px-5;
   }
 
   .data-entry-board {
-    @apply overflow-hidden rounded-[10px] border border-border/80 bg-card;
+    @apply overflow-hidden rounded-lg border border-border/70 bg-card;
+    box-shadow: none;
+  }
+
+  .data-entry-header {
+    @apply flex flex-col gap-2 border-b border-border/55 bg-card px-4 py-3.5 sm:px-5 md:flex-row md:items-center md:justify-between;
+  }
+
+  .data-entry-required-note {
+    @apply text-[12px] leading-5 text-muted-foreground;
   }
 
   .data-entry-tabs-shell {
-    @apply border-b border-border/70 bg-muted/30 pb-0;
+    @apply border-b border-border/55 bg-muted/20 px-3 py-2 sm:px-4;
+  }
+
+  .data-entry-tabs-list {
+    @apply flex min-w-max gap-1;
+  }
+
+  .data-entry-tab {
+    @apply inline-flex shrink-0 items-center rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors;
+  }
+
+  .data-entry-tab-active {
+    @apply bg-card text-foreground ring-1 ring-border/70;
+  }
+
+  .data-entry-tab-idle {
+    @apply text-foreground/70 hover:bg-card hover:text-foreground;
   }
 
   .data-entry-workspace {
-    @apply grid gap-0 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start;
+    @apply grid gap-0 bg-background/35 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start;
   }
 
   .data-entry-canvas {
-    @apply min-w-0 p-3.5 md:p-4;
+    @apply min-w-0 p-4 sm:p-5;
   }
 
   .data-entry-canvas > div {
@@ -409,7 +434,7 @@ next-router-prefetch {
   }
 
   .data-entry-workspace > aside {
-    @apply border-t border-border/70 xl:border-t-0 xl:border-l;
+    @apply border-t border-border/55 bg-card/70 xl:border-t-0 xl:border-l;
   }
 
   .data-entry-canvas h2 {
@@ -421,19 +446,19 @@ next-router-prefetch {
   }
 
   .data-entry-canvas form {
-    @apply space-y-3;
+    @apply space-y-4;
   }
 
   .data-entry-form-intro {
-    @apply mb-3 space-y-1;
+    @apply mb-3 space-y-1.5;
   }
 
   .data-entry-status {
-    @apply mb-3;
+    @apply mb-3 flex flex-wrap items-center gap-2;
   }
 
   .data-entry-callout-alert {
-    @apply rounded-lg border px-3 py-2.5 text-sm;
+    @apply rounded-lg border px-3.5 py-3 text-sm leading-6;
     box-shadow: none;
   }
 
@@ -442,11 +467,11 @@ next-router-prefetch {
   }
 
   .data-entry-secondary-grid {
-    @apply grid grid-cols-1 gap-3 md:grid-cols-2;
+    @apply grid grid-cols-1 gap-4 md:grid-cols-2;
   }
 
   .data-entry-compact-grid {
-    @apply grid grid-cols-1 gap-3;
+    @apply grid grid-cols-1 gap-4;
   }
 
   .data-entry-compact-grid [data-slot="form-item"] {
@@ -467,18 +492,18 @@ next-router-prefetch {
   }
 
   .data-entry-canvas form [data-slot="form-item"] {
-    @apply gap-1.5 py-2;
+    @apply gap-1.5 py-0;
   }
 
   .data-entry-canvas form [data-slot="form-label"] {
-    @apply text-[12px] font-semibold tracking-[0.02em] text-foreground/78;
+    @apply text-[12px] font-semibold leading-5 tracking-[0.02em] text-foreground/80;
   }
 
   .data-entry-canvas form [data-slot="input"] .MuiOutlinedInput-root,
   .data-entry-canvas form [data-slot="select-trigger"] .MuiOutlinedInput-root,
   .data-entry-canvas form textarea {
     border-radius: 10px;
-    background: color-mix(in srgb, var(--background) 96%, var(--muted) 4%);
+    background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
     box-shadow: none;
   }
 
@@ -499,6 +524,7 @@ next-router-prefetch {
   .data-entry-canvas form textarea:focus-visible {
     border-color: color-mix(in srgb, var(--primary) 72%, white 28%);
     border-width: 1px;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
   }
 
   .data-entry-canvas form textarea {
@@ -509,25 +535,14 @@ next-router-prefetch {
     @apply text-[12px] leading-5;
   }
 
-  .data-entry-canvas form > [data-slot="form-item"],
-  .data-entry-canvas form > div:not(:last-child),
   .data-entry-canvas form > button:last-child {
-    border-color: color-mix(in srgb, var(--border) 75%, transparent);
-  }
-
-  .data-entry-canvas form > [data-slot="form-item"],
-  .data-entry-canvas form > div {
-    @apply border-b;
-  }
-
-  .data-entry-canvas form > button:last-child {
-    @apply mt-4 border-0;
+    @apply mt-4;
   }
 
   .data-entry-context-panel,
   .data-entry-note-card,
   .data-entry-recent-panel {
-    @apply rounded-xl border border-border/70 bg-muted/10;
+    @apply rounded-lg border border-border/55 bg-card;
     box-shadow: none;
   }
 
@@ -537,11 +552,11 @@ next-router-prefetch {
   }
 
   .data-entry-action {
-    @apply min-w-[170px] rounded-lg px-4;
+    @apply min-h-10 min-w-[170px] rounded-lg px-4;
   }
 
   .data-entry-recent-panel {
-    @apply h-full rounded-none border-0 p-3.5;
+    @apply h-full rounded-none border-0 p-4;
   }
 
   .data-entry-recent-list {
@@ -549,7 +564,7 @@ next-router-prefetch {
   }
 
   .data-entry-recent-item {
-    @apply rounded-lg border border-border/65 bg-background/80 p-3;
+    @apply rounded-lg border border-border/55 bg-background/75 p-3;
   }
 
   .data-entry-recent-item-header {
@@ -587,9 +602,9 @@ next-router-prefetch {
   @media (min-width: 768px) {
     .data-entry-canvas form [data-slot="form-item"] {
       display: grid;
-      grid-template-columns: minmax(132px, 176px) minmax(0, 1fr);
-      align-items: center;
-      column-gap: 1rem;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+      row-gap: 0.4rem;
     }
 
     .data-entry-canvas form [data-slot="form-item"] [data-slot="form-label"] {
@@ -599,7 +614,7 @@ next-router-prefetch {
 
     .data-entry-canvas form [data-slot="form-item"] [data-slot="form-control"],
     .data-entry-canvas form [data-slot="form-item"] [data-slot="form-message"] {
-      grid-column: 2;
+      grid-column: 1;
     }
 
     .data-entry-canvas form .data-entry-compact-grid [data-slot="form-item"] {

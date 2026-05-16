@@ -238,14 +238,9 @@ export function withAlpha(color: string, alpha: number) {
 
 export function createVerticalGradient(color: string, topOpacity = 0.1, bottomOpacity = 0.02) {
   return (context: ScriptableContext<"line">) => {
-    const { chart } = context
-    const { ctx, chartArea } = chart
-    if (!chartArea) return withAlpha(color, topOpacity)
-    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
-    gradient.addColorStop(0, withAlpha(color, topOpacity))
-    gradient.addColorStop(0.65, withAlpha(color, Math.max(bottomOpacity + 0.02, topOpacity / 3)))
-    gradient.addColorStop(1, withAlpha(color, bottomOpacity))
-    return gradient
+    void context
+    void bottomOpacity
+    return withAlpha(color, topOpacity)
   }
 }
 
@@ -410,7 +405,7 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
         borderWidth: 0,
       },
       bar: {
-        borderRadius: 6,
+        borderRadius: 0,
       },
     },
     plugins: {

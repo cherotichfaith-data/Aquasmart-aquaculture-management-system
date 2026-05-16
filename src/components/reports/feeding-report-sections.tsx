@@ -14,6 +14,7 @@ import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-state
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
+import { formatFeedingResponseLevel } from "@/lib/feeding-response"
 import {
   REPORT_CHART_SHELL_CLASS,
   REPORT_SURFACE_CARD_CLASS,
@@ -318,7 +319,7 @@ export function FeedingRecordsSection({
     row.batch_id,
     row.feed_type?.feed_line ?? row.feed_type_id,
     row.feeding_amount,
-    row.feeding_response,
+    formatFeedingResponseLevel(row.feeding_response),
     row.feed_type?.crude_protein_percentage,
   ])
 
@@ -372,7 +373,7 @@ export function FeedingRecordsSection({
                 ) : tableRecords.length > 0 ? (
                   tableRecords.map((row) => (
                     <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
-                      <td className="font-medium">{row.date}</td><td>{row.system_id}</td><td>{row.batch_id ?? "-"}</td><td>{row.feed_type?.feed_line ?? row.feed_type_id}</td><td>{row.feeding_amount}</td><td>{row.feeding_response}</td>
+                      <td className="font-medium">{row.date}</td><td>{row.system_id}</td><td>{row.batch_id ?? "-"}</td><td>{row.feed_type?.feed_line ?? row.feed_type_id}</td><td>{row.feeding_amount}</td><td>{formatFeedingResponseLevel(row.feeding_response)}</td>
                     </tr>
                   ))
                 ) : (

@@ -7,7 +7,7 @@ import DashboardLayout from "@/components/layout/dashboard-layout"
 import { QueryHydration } from "@/components/providers/query-hydration"
 import { WORKSPACE_SELECT_PATH, resolveAppEntryPath, sanitizeNextPath } from "@/lib/app-entry"
 import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
-import { parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
+import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { listBatchOptionRows, listDashboardTimePeriodRows, listSystemHealthScoreRows } from "@/features/shared/query-seed.server"
 import { loadWorkspaceContextForUser } from "@/lib/server/workspace"
 import { requireUserContext } from "@/lib/supabase/require-user"
@@ -79,6 +79,10 @@ export default async function DashboardPage({
     filters: initialFilters,
     accessToken,
   })
+  const effectiveFilters =
+    initialData.systemOptions.status === "success"
+      ? cleanScopedFilterState(initialFilters, initialData.systemOptions.data)
+      : initialFilters
   const [systemHealthScores, batchOptions, timePeriodOptions] = await Promise.all([
     listSystemHealthScoreRows(analyticsSupabase, { farmId }),
     listBatchOptionRows(analyticsSupabase, { farmId }),
@@ -86,16 +90,16 @@ export default async function DashboardPage({
   ])
   const { data: farmRow } = await analyticsSupabase.from("farm").select("name").eq("id", farmId).maybeSingle()
   const initialFarmName = farmRow?.name ?? null
-  const selectedSystemId = parseSelectedNumericId(initialFilters.selectedSystem)
-  const batchId = parseSelectedNumericId(initialFilters.selectedBatch)
+  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
+  const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
   const queryClient = createQueryClient()
 
   if (initialData.bounds.start && initialData.bounds.end) {
     queryClient.setQueryData(
       queryKeys.timePeriodBounds({
         farmId,
-        timePeriod: initialFilters.timePeriod,
-        systemId: selectedSystemId,
+        timePeriod: effectiveFilters.timePeriod,
+        systemId: undefined,
         scope: "dashboard",
       }),
       initialData.bounds,
@@ -104,7 +108,7 @@ export default async function DashboardPage({
   queryClient.setQueryData(
     queryKeys.options.systems({
       farmId,
-      stage: initialFilters.selectedStage,
+      stage: effectiveFilters.selectedStage,
       activeOnly: false,
     }),
     initialData.systemOptions,
@@ -120,7 +124,7 @@ export default async function DashboardPage({
         : [],
     ),
   )
-  queryClient.setQueryData(queryKeys.options.batches(farmId), toQuerySuccess(batchOptions))
+  queryClient.setQueryData(queryKeys.options.batches({ farmId }), toQuerySuccess(batchOptions))
   queryClient.setQueryData(queryKeys.options.timePeriods(), toQuerySuccess(timePeriodOptions))
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)
   queryClient.setQueryData(queryKeys.waterQuality.thresholds(farmId), initialData.alertThresholds)
@@ -131,10 +135,10 @@ export default async function DashboardPage({
     queryClient.setQueryData(
       queryKeys.dashboard.kpiOverview({
         farmId,
-        stage: initialFilters.selectedStage,
-        timePeriod: initialFilters.timePeriod,
-        batch: initialFilters.selectedBatch,
-        system: initialFilters.selectedSystem,
+        stage: effectiveFilters.selectedStage,
+        timePeriod: effectiveFilters.timePeriod,
+        batch: effectiveFilters.selectedBatch,
+        system: effectiveFilters.selectedSystem,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
       }),
@@ -143,35 +147,37 @@ export default async function DashboardPage({
     queryClient.setQueryData(
       queryKeys.dashboard.systemsTable({
         farmId,
-        stage: initialFilters.selectedStage,
-        batch: initialFilters.selectedBatch,
-        system: initialFilters.selectedSystem,
-        timePeriod: initialFilters.timePeriod,
+        stage: effectiveFilters.selectedStage,
+        batch: effectiveFilters.selectedBatch,
+        system: effectiveFilters.selectedSystem,
+        timePeriod: effectiveFilters.timePeriod,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
         includeIncomplete: true,
       }),
       initialData.systemsTable,
     )
-    queryClient.setQueryData(
-      queryKeys.dashboard.productionTrend({
-        farmId,
-        stage: initialFilters.selectedStage,
-        batch: initialFilters.selectedBatch,
-        system: initialFilters.selectedSystem,
-        timePeriod: initialFilters.timePeriod,
-        dateFrom: initialData.bounds.start,
-        dateTo: initialData.bounds.end,
-      }),
-      initialData.productionTrend,
-    )
+    if (initialData.productionTrend.length > 0) {
+      queryClient.setQueryData(
+        queryKeys.dashboard.productionTrend({
+          farmId,
+          stage: effectiveFilters.selectedStage,
+          batch: effectiveFilters.selectedBatch,
+          system: effectiveFilters.selectedSystem,
+          timePeriod: effectiveFilters.timePeriod,
+          dateFrom: initialData.bounds.start,
+          dateTo: initialData.bounds.end,
+        }),
+        initialData.productionTrend,
+      )
+    }
     queryClient.setQueryData(
       queryKeys.dashboard.recommendedActions({
         farmId,
-        stage: initialFilters.selectedStage,
-        batch: initialFilters.selectedBatch,
-        system: initialFilters.selectedSystem,
-        timePeriod: initialFilters.timePeriod,
+        stage: effectiveFilters.selectedStage,
+        batch: effectiveFilters.selectedBatch,
+        system: effectiveFilters.selectedSystem,
+        timePeriod: effectiveFilters.timePeriod,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
       }),
@@ -192,7 +198,11 @@ export default async function DashboardPage({
   return (
     <QueryHydration state={dehydrate(queryClient)}>
       <DashboardLayout initialFarmId={farmId} initialFarmName={initialFarmName}>
-        <DashboardPageClient initialFarmId={farmId} initialFarmName={initialFarmName} initialFilters={initialFilters} />
+        <DashboardPageClient
+          initialFarmId={farmId}
+          initialFarmName={initialFarmName}
+          initialFilters={effectiveFilters}
+        />
       </DashboardLayout>
     </QueryHydration>
   )

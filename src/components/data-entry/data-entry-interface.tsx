@@ -126,6 +126,7 @@ export function DataEntryInterface({
     }
 
     const recentEntryProps = getRecentEntriesForTab(recentEntries, activeTab)
+    const activeItem = visibleSidebarItems.find((item) => item.id === activeTab) ?? visibleSidebarItems[0]
     const form = (() => {
         switch (activeTab) {
             case "mortality":
@@ -141,6 +142,7 @@ export function DataEntryInterface({
             case "feeding":
                 return (
                     <FeedingForm
+                        farmId={farmId}
                         systems={systems}
                         feeds={feeds}
                         batches={batches}
@@ -198,9 +200,23 @@ export function DataEntryInterface({
 
     return (
         <div className="data-entry-layout data-entry-board">
+            <div className="data-entry-header">
+                <div className="min-w-0">
+                    <h1 className="text-xl font-semibold leading-tight tracking-tight text-foreground">
+                        Data Entry
+                    </h1>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        {activeItem?.label ?? "Farm"} records
+                    </p>
+                </div>
+                <p className="data-entry-required-note">
+                    Required fields must be completed before saving.
+                </p>
+            </div>
+
             <div className="data-entry-tabs-shell">
                 <div className="relative overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <div className="flex min-w-max gap-0 px-1.5 pt-1.5">
+                    <div className="data-entry-tabs-list" role="tablist" aria-label="Data entry forms">
                         {visibleSidebarItems.map((item) => {
                             const isActive = activeTab === item.id
                             return (
@@ -208,10 +224,10 @@ export function DataEntryInterface({
                                     key={item.id}
                                     href={`${DATA_ENTRY_PATH}?type=${item.id}`}
                                     className={cn(
-                                        "flex shrink-0 items-center border border-b-0 border-transparent px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors cursor-pointer",
+                                        "data-entry-tab",
                                         isActive
-                                            ? "rounded-t-md border-border/80 bg-background text-foreground"
-                                            : "text-foreground/70 hover:text-foreground"
+                                            ? "data-entry-tab-active"
+                                            : "data-entry-tab-idle"
                                     )}
                                     aria-selected={isActive}
                                     role="tab"
@@ -221,8 +237,7 @@ export function DataEntryInterface({
                             )
                         })}
                     </div>
-                    {/* Fade-out scroll hint on the right */}
-                    <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-card to-transparent" />
+                    <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-muted/50 to-transparent" />
                 </div>
             </div>
 

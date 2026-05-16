@@ -132,7 +132,11 @@ export default function UsersPageClient({
       if (result.pendingInvite) {
         const nextPendingInvites = await listPendingFarmInvitesAction({ farmId })
         setPendingInvites(nextPendingInvites)
-        showSuccess("Invitation saved. The teammate will appear under Pending Invites until they join.")
+        showSuccess(
+          result.inviteSent
+            ? "Invitation email sent. The teammate will appear under Pending Invites until they join."
+            : "Invitation saved. The teammate will appear under Pending Invites until they join.",
+        )
       } else {
         const nextMembers = await listFarmMembersAction({ farmId })
         setMembers(nextMembers)

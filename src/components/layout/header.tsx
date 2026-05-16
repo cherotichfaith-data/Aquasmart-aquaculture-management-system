@@ -33,6 +33,7 @@ import { useNotifications } from "@/components/notifications/notifications-provi
 import { useAuth } from "@/components/providers/auth-provider"
 import FarmSelector from "@/components/shared/farm-selector"
 import { FilterPopover } from "@/components/shared/filter-popover"
+import { createSystemLabelResolver } from "@/lib/system-options"
 import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
 import {
   DEFAULT_WQ_PARAMETER,
@@ -47,7 +48,7 @@ import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPat
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { useBatchOptions, useDashboardTimePeriodOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { formatStableDateTime } from "@/lib/deterministic-format"
-import { normalizeStageFilter } from "@/lib/stage-filter"
+import { formatGrowthStage, normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveTimePeriod } from "@/lib/time-period"
 
 type PageMeta = {
@@ -232,8 +233,7 @@ export default function Header({
 
   const activeSystemLabel = useMemo(() => {
     if (selectedSystem === "all") return null
-    const system = allSystemsForChips.find((item) => String(item.id) === selectedSystem)
-    return system?.label || `System ${selectedSystem}`
+    return createSystemLabelResolver(allSystemsForChips)(Number(selectedSystem))
   }, [allSystemsForChips, selectedSystem])
 
   const activeBatchLabel = useMemo(() => {
@@ -244,9 +244,7 @@ export default function Header({
 
   const activeStageLabel = useMemo(() => {
     if (selectedStage === "all") return null
-    if (selectedStage === "nursing") return "Nursing"
-    if (selectedStage === "grow_out") return "Grow-out"
-    return null
+    return formatGrowthStage(selectedStage)
   }, [selectedStage])
 
   const activeParameterLabel = useMemo(() => {

@@ -17,12 +17,13 @@ import {
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
-import type { SystemOption } from "@/lib/system-options"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { FEEDING_RESPONSE_LEVELS, type FeedingResponseLevel } from "@/lib/feeding-response"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useRecordFeeding } from "@/lib/hooks/use-feeding"
 import { useFeedingRecords } from "@/lib/hooks/use-reports"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useLatestWaterQualityStatus, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
+import { useFeedTypeOptions } from "@/lib/hooks/use-options"
 import { diffDateDays } from "@/lib/time-series"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
@@ -41,15 +42,8 @@ import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
   farm_id?: string | null
-  feeding_response: "very_good" | "good" | "fair" | "bad"
+  feeding_response: FeedingResponseLevel
 }
-
-const FEEDING_RESPONSE_OPTIONS = [
-  { value: "very_good", label: "Excellent" },
-  { value: "good", label: "Good" },
-  { value: "fair", label: "Fair" },
-  { value: "bad", label: "Poor" },
-] as const
 
 const formSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -57,12 +51,13 @@ const formSchema = z.object({
   system_id: z.string().min(1, "Cage number is required"),
   feed_id: z.string().min(1, "Feed type is required"),
   amount_kg: z.coerce.number().min(0.01, "Amount must be positive"),
-  feeding_response: z.enum(["very_good", "good", "fair", "bad"]),
+  feeding_response: z.coerce.number().int().min(1).max(5),
   batch_id: z.string().optional(),
   notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 })
 
 interface FeedingFormProps {
+  farmId: string | null
   systems: SystemOption[]
   feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
@@ -76,8 +71,29 @@ const shiftDate = (dateString: string, days: number) => {
   return toIsoDate(next)
 }
 
-export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, defaultBatchId = null }: FeedingFormProps) {
-  const { farmId } = useActiveFarm()
+const getSelectedWeekBounds = (dateString: string | null | undefined) => {
+  if (!dateString) return { start: null, end: null }
+  const date = new Date(`${dateString}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return { start: null, end: null }
+
+  const day = date.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const start = new Date(date)
+  start.setDate(date.getDate() + mondayOffset)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+
+  return { start: toIsoDate(start), end: toIsoDate(end) }
+}
+
+export function FeedingForm({
+  farmId,
+  systems,
+  feeds,
+  batches,
+  defaultSystemId = null,
+  defaultBatchId = null,
+}: FeedingFormProps) {
   const mutation = useRecordFeeding()
   const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -94,7 +110,7 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
       amount_kg: 0,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       feed_id: "",
-      feeding_response: "good",
+      feeding_response: 3,
       batch_id: defaultBatchId ? String(defaultBatchId) : "none",
       notes: "",
     },
@@ -109,9 +125,21 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
   const selectedDate = form.watch("date")
   const selectedFeedId = Number(form.watch("feed_id"))
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
-  const selectedFeed = feeds.find((feed) => feed.id === selectedFeedId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
   const previousDate = selectedDate ? shiftDate(selectedDate, -1) : undefined
+  const selectedWeek = useMemo(() => getSelectedWeekBounds(selectedDate), [selectedDate])
+  const availableFeedsQuery = useFeedTypeOptions({
+    farmId,
+    dateFrom: selectedWeek.start,
+    dateTo: selectedWeek.end,
+    inventoryOnly: true,
+    enabled: Boolean(farmId) && Boolean(selectedWeek.start) && Boolean(selectedWeek.end),
+  })
+  const availableFeeds =
+    availableFeedsQuery.data?.status === "success"
+      ? availableFeedsQuery.data.data
+      : []
+  const selectedFeed = availableFeeds.find((feed) => feed.id === selectedFeedId) ?? null
 
   useEffect(() => {
     if (!selectedUnit) return
@@ -122,6 +150,15 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
       form.setValue("system_id", "", { shouldValidate: true })
     }
   }, [form, selectedUnit, systemsForUnit])
+
+  useEffect(() => {
+    const currentFeedId = form.getValues("feed_id")
+    if (!currentFeedId || availableFeedsQuery.isLoading) return
+    const existsThisWeek = availableFeeds.some((feed) => String(feed.id) === currentFeedId)
+    if (!existsThisWeek) {
+      form.setValue("feed_id", "", { shouldValidate: true })
+    }
+  }, [availableFeeds, availableFeedsQuery.isLoading, form])
 
   const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
 
@@ -207,7 +244,7 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
 
       await mutation.mutateAsync(payload)
       setSubmissionSummary(
-        `Saved for ${selectedSystem?.label ?? `System ${systemId}`}. Daily total: ${dailyTotal.toFixed(2)} kg${
+        `Saved for ${formatCageLabel(selectedSystem)}. Daily total: ${dailyTotal.toFixed(2)} kg${
           feedRatePct != null ? ` (${feedRatePct.toFixed(2)}% BW/day).` : "."
         }`,
       )
@@ -234,8 +271,19 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
         actionLabel={showQuickCreate ? "Hide feed type form" : "Add feed type"}
         onAction={() => setShowQuickCreate((current) => !current)}
       >
-        {showQuickCreate ? <FeedTypeQuickCreate onCreated={() => setShowQuickCreate(false)} /> : null}
+        {showQuickCreate ? <FeedTypeQuickCreate farmId={farmId} onCreated={() => setShowQuickCreate(false)} /> : null}
       </DependencyBlocker>
+    )
+  }
+
+  if (!availableFeedsQuery.isLoading && availableFeeds.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="data-entry-form-intro">
+          <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
+          <p>No feed inventory records are available for the selected week. Record incoming feed first.</p>
+        </div>
+      </div>
     )
   }
 
@@ -254,7 +302,7 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
         <div className="space-y-6">
           {existingDailyRecords.length > 0 ? (
             <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
-              Feeding is already recorded for {selectedSystem?.label ?? "this cage"} on {selectedDate}. Confirm this is an additional feed event before saving.
+              Feeding is already recorded for {selectedSystem ? formatCageLabel(selectedSystem) : "this cage"} on {selectedDate}. Confirm this is an additional feed event before saving.
             </div>
           ) : null}
           {submissionSummary ? (
@@ -326,7 +374,7 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                         <SelectContent>
                           {systemsForUnit.map((system) => (
                             <SelectItem key={system.id} value={String(system.id)}>
-                              {system.label ?? `System ${system.id}`}
+                              {formatCageLabel(system)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -349,7 +397,7 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {feeds.map((feed) => (
+                          {availableFeeds.map((feed) => (
                             <SelectItem key={feed.id} value={String(feed.id)}>
                               {feed.label ?? feed.feed_line ?? `Feed ${feed.id}`}
                             </SelectItem>
@@ -391,16 +439,16 @@ export function FeedingForm({ systems, feeds, batches, defaultSystemId = null, d
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Feeding Response</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={(value) => field.onChange(Number(value))} value={String(field.value)}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select response" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {FEEDING_RESPONSE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                        {FEEDING_RESPONSE_LEVELS.map((option) => (
+                          <SelectItem key={option.level} value={String(option.level)}>
+                            Level {option.level} - {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -36,17 +36,18 @@ export async function resolveScopedSystemIds(params: {
     return []
   }
 
-  let scoped: ScopedSystemIds = "all"
+  const activeSystemsResult = await getSystemOptions({
+    farmId,
+    stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+    activeOnly: true,
+    signal: params.signal,
+  })
+  if (activeSystemsResult.status !== "success") return null
 
-  if (params.stage && params.stage !== "all") {
-    const systemsResult = await getSystemOptions({
-      farmId,
-      stage: params.stage,
-      activeOnly: false,
-      signal: params.signal,
-    })
-    if (systemsResult.status !== "success") return null
-    scoped = normalizeSystemIds(systemsResult.data.map((row) => row.id))
+  let scoped: ScopedSystemIds = normalizeSystemIds(activeSystemsResult.data.map((row) => row.id))
+
+  if (scoped.length === 0) {
+    return []
   }
 
   if (params.batch && params.batch !== "all") {
@@ -55,16 +56,11 @@ export async function resolveScopedSystemIds(params: {
     const batchSystemsResult = await getBatchSystemIds({ batchId, signal: params.signal })
     if (batchSystemsResult.status !== "success") return null
     const batchIds = normalizeSystemIds(batchSystemsResult.data.map((row) => row.system_id))
-    if (scoped === "all") {
-      scoped = batchIds
-    } else {
-      const batchIdSet = new Set(batchIds)
-      scoped = scoped.filter((id) => batchIdSet.has(id))
-    }
+    const batchIdSet = new Set(batchIds)
+    scoped = scoped.filter((id) => batchIdSet.has(id))
   }
 
   if (parsedSystemId !== undefined) {
-    if (scoped === "all") return [parsedSystemId]
     return scoped.filter((id) => id === parsedSystemId)
   }
 

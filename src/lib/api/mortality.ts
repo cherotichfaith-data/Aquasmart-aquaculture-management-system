@@ -15,7 +15,7 @@ export type AlertLogRow = {
   fired_at: string | null
 }
 type MortalityEventRow = Tables<"fish_mortality">
-type SurvivalTrendRow = Database["public"]["Functions"]["get_survival_trend"]["Returns"][number]
+type SurvivalTrendRow = Database["public"]["Functions"]["api_survival_trend"]["Returns"][number]
 
 export async function getMortalityEvents(params?: {
   farmId?: string | null
@@ -76,18 +76,20 @@ export async function getAlertLog(params?: {
 }
 
 export async function getSurvivalTrend(params: {
+  farmId?: string | null
   systemId?: number
   dateFrom?: string
   dateTo?: string
   signal?: AbortSignal
 }): Promise<QueryResult<SurvivalTrendRow>> {
-  if (!params.systemId || !params.dateFrom) {
+  if (!params.farmId || !params.systemId || !params.dateFrom) {
     return toQuerySuccess<SurvivalTrendRow>([])
   }
   try {
     const response = await postJson<{ data: SurvivalTrendRow[] }, Omit<typeof params, "signal">>(
       "/api/mortality/survival-trend/query",
       {
+        farmId: params.farmId,
         systemId: params.systemId,
         dateFrom: params.dateFrom,
         dateTo: params.dateTo,

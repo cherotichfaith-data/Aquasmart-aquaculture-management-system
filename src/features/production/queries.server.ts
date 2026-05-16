@@ -1,7 +1,13 @@
 import { toQuerySuccess } from "@/lib/api/_utils"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
-import { getScopedBatchSystems, getScopedSystemOptions, getScopedTimeBounds, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
+import {
+  getScopedBatchSystems,
+  getScopedSystemOptions,
+  getScopedTimeBounds,
+  parseSelectedNumericId,
+  resolveScopedSelectedSystemId,
+} from "@/features/shared/scoped-analytics.server"
 import { listDailyFishInventoryRows, listProductionSummaryRows } from "@/features/shared/query-seed.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import type { Database, Enums } from "@/lib/types/database"
@@ -56,13 +62,13 @@ async function loadProductionPageInitialData(
 
   if (!params.farmId) return empty
 
-  const systemId = parseSelectedNumericId(params.filters.selectedSystem)
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
-  const [bounds, systems, batchSystems] = await Promise.all([
-    getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId),
+  const [systems, batchSystems] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage),
     getScopedBatchSystems(supabase, batchId),
   ])
+  const systemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systems)
+  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId)
 
   if (!bounds.start || !bounds.end) {
     return {

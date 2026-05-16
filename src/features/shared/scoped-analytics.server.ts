@@ -17,6 +17,25 @@ export function parseSelectedNumericId(value?: string | null): number | undefine
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+export function resolveScopedSelectedSystemId(
+  selectedSystem: string | number | undefined | null,
+  systems: Array<{ id: number | null }>,
+): number | undefined {
+  const parsed = typeof selectedSystem === "number" ? selectedSystem : parseSelectedNumericId(selectedSystem)
+  if (!parsed || !Number.isFinite(parsed)) return undefined
+  return systems.some((row) => row.id === parsed) ? parsed : undefined
+}
+
+export function cleanScopedFilterState<T extends { selectedSystem: string; selectedBatch?: string }>(
+  filters: T,
+  systems: Array<{ id: number | null }>,
+): T {
+  if (filters.selectedSystem === "all") return filters
+  return resolveScopedSelectedSystemId(filters.selectedSystem, systems)
+    ? filters
+    : { ...filters, selectedSystem: "all" }
+}
+
 export async function getScopedTimeBounds(
   supabase: ServerClient,
   farmId: string,
@@ -31,6 +50,16 @@ export async function getScopedTimeBounds(
   })
 
   if (!systemId || !Number.isFinite(systemId)) return farmBounds
+
+  const { data: selectedSystem, error: selectedSystemError } = await supabase
+    .from("system")
+    .select("id")
+    .eq("farm_id", farmId)
+    .eq("is_active", true)
+    .eq("id", systemId)
+    .maybeSingle()
+
+  if (selectedSystemError || selectedSystem?.id !== systemId) return farmBounds
 
   const { data, error } = await supabase.rpc("api_system_timeline_bounds", {
     p_farm_id: farmId,
@@ -63,6 +92,7 @@ export async function getScopedSystemOptions(
     .from("system")
     .select("id, farm_id, growth_stage, is_active, name, type, unit")
     .eq("farm_id", farmId)
+    .eq("is_active", true)
 
   if (stage !== "all") {
     query = query.eq("growth_stage", stage)
@@ -95,8 +125,40 @@ export async function getScopedBatchSystems(
     throw error
   }
 
-  const ids = Array.from(
+  const stockedIds = Array.from(
     new Set((data ?? []).map((row) => row.system_id).filter((id): id is number => typeof id === "number")),
   )
-  return ids.map((system_id) => ({ system_id }))
+  if (stockedIds.length === 0) return []
+
+  const lineageIds = new Set(stockedIds)
+  for (let depth = 0; depth < 3; depth += 1) {
+    const sourceIds = Array.from(lineageIds)
+    const { data: transferRows, error: transferError } = await supabase
+      .from("fish_transfer")
+      .select("origin_system_id, target_system_id")
+      .in("origin_system_id", sourceIds)
+      .not("target_system_id", "is", null)
+
+    if (transferError) throw transferError
+
+    const beforeSize = lineageIds.size
+    ;(transferRows ?? []).forEach((row) => {
+      if (typeof row.target_system_id === "number" && Number.isFinite(row.target_system_id)) {
+        lineageIds.add(row.target_system_id)
+      }
+    })
+    if (lineageIds.size === beforeSize) break
+  }
+
+  const { data: activeRows, error: activeError } = await supabase
+    .from("system")
+    .select("id")
+    .in("id", Array.from(lineageIds))
+    .eq("is_active", true)
+
+  if (activeError) throw activeError
+
+  return Array.from(
+    new Set((activeRows ?? []).map((row) => row.id).filter((id): id is number => typeof id === "number")),
+  ).map((system_id) => ({ system_id }))
 }

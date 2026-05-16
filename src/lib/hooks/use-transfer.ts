@@ -15,13 +15,14 @@ export function useRecordTransfer() {
     TransferInput,
     {
       farmId?: string | null
-      originSystemId: number
+      originSystemId?: number | null
+      externalOriginName?: string | null
       targetSystemId?: number | null
       externalTargetName?: string | null
       batchId?: number | null
       date: string
-      numberOfFishTransfer: number
-      totalWeightTransfer: number
+      numberOfFishTransfer?: number | null
+      totalWeightTransfer?: number | null
       abw?: number | null
       transferType: TransferInput["transfer_type"]
       notes?: string | null
@@ -35,7 +36,8 @@ export function useRecordTransfer() {
     buildRecords: (payload) => [
       {
         farmId: payload.farm_id ?? farmId,
-        originSystemId: payload.origin_system_id,
+        originSystemId: payload.origin_system_id ?? null,
+        externalOriginName: payload.external_origin_name ?? null,
         targetSystemId: payload.target_system_id ?? null,
         externalTargetName: payload.external_target_name ?? null,
         batchId: payload.batch_id ?? null,
@@ -51,7 +53,7 @@ export function useRecordTransfer() {
       buildOfflinePendingResult({
         data: { id: 0 } as Tables<"fish_transfer">,
         farmId: input.farm_id ?? farmId,
-        systemId: input.origin_system_id,
+        systemId: input.origin_system_id ?? null,
         date: input.date,
         localIds,
       }),
@@ -64,7 +66,8 @@ export function useRecordTransfer() {
     buildOptimisticEntry: (payload) => ({
       id: `optimistic-${Date.now()}`,
       date: payload.date,
-      origin_system_id: payload.origin_system_id,
+      origin_system_id: payload.origin_system_id ?? null,
+      external_origin_name: payload.external_origin_name ?? null,
       target_system_id: payload.target_system_id,
       external_target_name: payload.external_target_name ?? null,
       transfer_type: payload.transfer_type ?? "transfer",

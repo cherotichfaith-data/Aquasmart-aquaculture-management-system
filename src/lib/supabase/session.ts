@@ -1,5 +1,5 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
-import { isSbAuthMissing, isSbNetworkError, logSbError } from "./log"
+import { isSbAuthMissing, isSbInvalidRefreshToken, isSbNetworkError, logSbError } from "./log"
 
 export type SessionIdentity = {
   userId: string
@@ -78,7 +78,7 @@ export async function getSessionUser(
     const identity = getSessionIdentity(accessToken)
 
     if (sessionError) {
-      if (!isSbAuthMissing(sessionError) && !isSbNetworkError(sessionError)) {
+      if (!isSbAuthMissing(sessionError) && !isSbInvalidRefreshToken(sessionError) && !isSbNetworkError(sessionError)) {
         logSbError(tag, sessionError)
       }
     }
@@ -93,13 +93,13 @@ export async function getSessionUser(
     }
 
     const { data, error } = await supabase.auth.getUser()
-    if (error && !isSbAuthMissing(error) && !isSbNetworkError(error)) {
+    if (error && !isSbAuthMissing(error) && !isSbInvalidRefreshToken(error) && !isSbNetworkError(error)) {
       logSbError(tag, error)
     }
 
     return data?.user ?? null
   } catch (error) {
-    if (!isSbNetworkError(error)) {
+    if (!isSbInvalidRefreshToken(error) && !isSbNetworkError(error)) {
       logSbError(tag, error)
     }
     return null

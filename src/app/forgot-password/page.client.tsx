@@ -28,7 +28,8 @@ export default function ForgotPasswordPageClient() {
       await resetPasswordForEmail(email)
       setNoticeMessage("If that email exists, a password reset link has been sent.")
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to send reset instructions.")
+      const message = error instanceof Error ? error.message : "Unable to send reset instructions."
+      setErrorMessage(/rate limit/i.test(message) ? "Too many email requests. Wait before requesting another link." : message)
     } finally {
       setIsSubmitting(false)
     }

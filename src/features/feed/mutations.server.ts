@@ -21,6 +21,7 @@ const feedSupplierSchema = z.object({
 })
 
 const feedTypeSchema = z.object({
+  farm_id: z.string().uuid(),
   feed_line: z.string().trim().max(255).nullable().optional(),
   feed_category: z.enum(["pre-starter", "starter", "pre-grower", "grower", "finisher", "broodstock"]),
   feed_pellet_size: z.enum(["mash_powder", "<0.49mm", "0.5-0.99mm", "1.0-1.5mm", "1.5-1.99mm", "2mm", "2.5mm", "3mm"]),
@@ -89,6 +90,7 @@ export async function createFeedTypeAction(payload: FeedTypeInput): Promise<{ da
     .from("feed_type")
     .insert({
       feed_line: parsedPayload.feed_line?.trim() ? parsedPayload.feed_line.trim() : null,
+      farm_id: parsedPayload.farm_id,
       feed_category: parsedPayload.feed_category,
       feed_pellet_size: parsedPayload.feed_pellet_size,
       crude_protein_percentage: parsedPayload.crude_protein_percentage,
@@ -106,7 +108,7 @@ export async function createFeedTypeAction(payload: FeedTypeInput): Promise<{ da
     throw new Error("Unable to create feed type.")
   }
 
-  revalidateWriteTags([cacheTags.feedTypes()])
+  revalidateWriteTags([cacheTags.feedTypes(), cacheTags.farm(parsedPayload.farm_id)])
 
   return { data }
 }

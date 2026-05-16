@@ -18,9 +18,9 @@ export function useRecordHarvest() {
       systemId: number
       batchId?: number | null
       date: string
-      numberOfFishHarvest: number
-      totalWeightHarvest: number
-      abw: number
+      numberOfFishHarvest?: number | null
+      totalWeightHarvest?: number | null
+      abw?: number | null
       typeOfHarvest: HarvestInput["type_of_harvest"]
     },
     {

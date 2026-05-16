@@ -89,7 +89,7 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
         actionLabel={showQuickCreate ? "Hide feed type form" : "Add feed type"}
         onAction={() => setShowQuickCreate((current) => !current)}
       >
-        {showQuickCreate ? <FeedTypeQuickCreate onCreated={() => setShowQuickCreate(false)} /> : null}
+        {showQuickCreate ? <FeedTypeQuickCreate farmId={farmId} onCreated={() => setShowQuickCreate(false)} /> : null}
       </DependencyBlocker>
     )
   }
