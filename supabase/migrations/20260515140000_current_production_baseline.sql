@@ -5690,38 +5690,236 @@ CREATE UNIQUE INDEX "water_quality_measurement_local_id_uidx" ON "public"."water
 
 
 
-CREATE OR REPLACE VIEW "analytics"."daily_system_facts" AS
- SELECT "daily_system_facts_cache"."id",
-    "daily_system_facts_cache"."fact_date",
-    "daily_system_facts_cache"."inventory_date",
-    "daily_system_facts_cache"."system_id",
-    "daily_system_facts_cache"."farm_id",
-    "daily_system_facts_cache"."system_name",
-    "daily_system_facts_cache"."production_cycle_id",
-    "daily_system_facts_cache"."growth_stage",
-    "daily_system_facts_cache"."system_is_active",
-    "daily_system_facts_cache"."number_of_fish",
-    "daily_system_facts_cache"."number_of_fish_stocked",
-    "daily_system_facts_cache"."number_of_fish_transferred_in",
-    "daily_system_facts_cache"."number_of_fish_mortality_aggregated",
-    "daily_system_facts_cache"."number_of_fish_mortality",
-    "daily_system_facts_cache"."number_of_fish_transferred_out",
-    "daily_system_facts_cache"."number_of_fish_harvested",
-    "daily_system_facts_cache"."feeding_amount",
-    "daily_system_facts_cache"."feeding_amount_aggregated",
-    "daily_system_facts_cache"."last_sampling_date",
-    "daily_system_facts_cache"."abw_last_sampling",
-    "daily_system_facts_cache"."biomass_last_sampling",
-    "daily_system_facts_cache"."feeding_rate",
-    "daily_system_facts_cache"."system_volume",
-    "daily_system_facts_cache"."biomass_density",
-    "daily_system_facts_cache"."mortality_rate",
-    "daily_system_facts_cache"."has_sampling",
-    "daily_system_facts_cache"."has_abw",
-    "daily_system_facts_cache"."has_inventory_count",
-    "daily_system_facts_cache"."has_feed_record",
-    "daily_system_facts_cache"."data_completeness_score"
-   FROM "analytics"."daily_system_facts_cache";
+create or replace view analytics.daily_system_facts as
+with activity_union as (
+  select system_id, date from public.fish_stocking
+  union all select system_id, date from public.feeding_record
+  union all select system_id, date from public.fish_mortality
+  union all select system_id, date from public.fish_sampling_weight
+  union all select system_id, date from public.fish_harvest
+  union all select target_system_id as system_id, date from public.fish_transfer where target_system_id is not null
+  union all select origin_system_id as system_id, date from public.fish_transfer where origin_system_id is not null
+),
+system_bounds as (
+  select
+    s.id as system_id,
+    s.farm_id,
+    s.name as system_name,
+    s.growth_stage::text as growth_stage,
+    s.is_active as system_is_active,
+    coalesce(
+      min(au.date),
+      s.commissioned_at,
+      current_date
+    ) as start_date,
+    greatest(
+      coalesce(max(au.date), s.decommissioned_at, s.commissioned_at, current_date),
+      coalesce(s.decommissioned_at, max(au.date), s.commissioned_at, current_date)
+    ) as end_date
+  from public.system s
+  left join activity_union au on au.system_id = s.id
+  where s.farm_id is not null
+  group by s.id, s.farm_id, s.name, s.growth_stage, s.is_active, s.commissioned_at, s.decommissioned_at
+),
+date_spine as (
+  select
+    sb.system_id,
+    sb.farm_id,
+    sb.system_name,
+    sb.growth_stage,
+    sb.system_is_active,
+    gs::date as inventory_date
+  from system_bounds sb
+  cross join lateral generate_series(sb.start_date::timestamp, sb.end_date::timestamp, interval '1 day') gs
+),
+daily_stocked as (
+  select system_id, date as inventory_date,
+    sum(number_of_fish_stocking)::double precision as qty_stocked
+  from public.fish_stocking
+  group by system_id, date
+),
+daily_mortality as (
+  select system_id, date as inventory_date,
+    sum(number_of_fish_mortality)::double precision as qty_mortality
+  from public.fish_mortality
+  group by system_id, date
+),
+daily_transfer_in as (
+  select target_system_id as system_id, date as inventory_date,
+    sum(number_of_fish_transfer)::double precision as qty_transfer_in
+  from public.fish_transfer
+  where target_system_id is not null
+  group by target_system_id, date
+),
+daily_transfer_out as (
+  select origin_system_id as system_id, date as inventory_date,
+    sum(number_of_fish_transfer)::double precision as qty_transfer_out
+  from public.fish_transfer
+  where origin_system_id is not null
+  group by origin_system_id, date
+),
+daily_harvest as (
+  select system_id, date as inventory_date,
+    sum(coalesce(number_of_fish_harvest, 0))::double precision as qty_harvest
+  from public.fish_harvest
+  group by system_id, date
+),
+daily_feed as (
+  select system_id, date as inventory_date,
+    sum(feeding_amount)::double precision as feed_kg
+  from public.feeding_record
+  group by system_id, date
+),
+daily_events as (
+  select
+    ds.*,
+    coalesce(stk.qty_stocked, 0) as number_of_fish_stocked,
+    coalesce(tin.qty_transfer_in, 0) as number_of_fish_transferred_in,
+    coalesce(mort.qty_mortality, 0) as number_of_fish_mortality,
+    coalesce(tout.qty_transfer_out, 0) as number_of_fish_transferred_out,
+    coalesce(harv.qty_harvest, 0) as number_of_fish_harvested,
+    coalesce(feed.feed_kg, 0) as feeding_amount
+  from date_spine ds
+  left join daily_stocked stk on stk.system_id = ds.system_id and stk.inventory_date = ds.inventory_date
+  left join daily_transfer_in tin on tin.system_id = ds.system_id and tin.inventory_date = ds.inventory_date
+  left join daily_mortality mort on mort.system_id = ds.system_id and mort.inventory_date = ds.inventory_date
+  left join daily_transfer_out tout on tout.system_id = ds.system_id and tout.inventory_date = ds.inventory_date
+  left join daily_harvest harv on harv.system_id = ds.system_id and harv.inventory_date = ds.inventory_date
+  left join daily_feed feed on feed.system_id = ds.system_id and feed.inventory_date = ds.inventory_date
+),
+running as (
+  select
+    de.*,
+    sum(number_of_fish_stocked + number_of_fish_transferred_in - number_of_fish_mortality - number_of_fish_transferred_out - number_of_fish_harvested)
+      over (partition by system_id order by inventory_date rows between unbounded preceding and current row) as number_of_fish,
+    sum(number_of_fish_mortality)
+      over (partition by system_id order by inventory_date rows between unbounded preceding and current row) as number_of_fish_mortality_aggregated,
+    sum(feeding_amount)
+      over (partition by system_id order by inventory_date rows between unbounded preceding and current row) as feeding_amount_aggregated
+  from daily_events de
+),
+sampling_anchor as (
+  select
+    w.system_id,
+    w.date as anchor_date,
+    coalesce(
+      case
+        when sum(w.number_of_fish_sampling) filter (where w.total_weight_sampling is not null) > 0
+        then sum(w.total_weight_sampling) filter (where w.total_weight_sampling is not null) * 1000.0
+             / nullif(sum(w.number_of_fish_sampling) filter (where w.total_weight_sampling is not null), 0)
+      end,
+      avg(w.abw)
+    )::double precision as abw_g,
+    1 as anchor_rank
+  from public.fish_sampling_weight w
+  group by w.system_id, w.date
+),
+transfer_anchor as (
+  select
+    ft.target_system_id as system_id,
+    ft.date as anchor_date,
+    avg(ft.abw)::double precision as abw_g,
+    2 as anchor_rank
+  from public.fish_transfer ft
+  where ft.target_system_id is not null and ft.abw is not null
+  group by ft.target_system_id, ft.date
+),
+stocking_anchor as (
+  select
+    fs.system_id,
+    fs.date as anchor_date,
+    coalesce(
+      avg(fs.abw),
+      sum(fs.total_weight_stocking) * 1000.0 / nullif(sum(fs.number_of_fish_stocking), 0)
+    )::double precision as abw_g,
+    3 as anchor_rank
+  from public.fish_stocking fs
+  group by fs.system_id, fs.date
+),
+anchors as (
+  select * from sampling_anchor
+  union all select * from transfer_anchor
+  union all select * from stocking_anchor
+),
+last_anchor as (
+  select distinct on (r.system_id, r.inventory_date)
+    r.system_id,
+    r.inventory_date,
+    a.anchor_date as last_sampling_date,
+    a.abw_g as abw_last_sampling
+  from running r
+  left join anchors a on a.system_id = r.system_id and a.anchor_date <= r.inventory_date
+  order by r.system_id, r.inventory_date, a.anchor_date desc nulls last, a.anchor_rank asc
+),
+system_dims as (
+  select
+    s.id as system_id,
+    coalesce(
+      nullif(s.volume, 0),
+      case when s.length > 0 and s.width > 0 and s.depth > 0 then s.length * s.width * s.depth end,
+      case when s.diameter > 0 and s.depth > 0 then pi() * power(s.diameter / 2.0, 2) * s.depth end
+    )::double precision as system_volume
+  from public.system s
+),
+cycle_map as (
+  select cycle_id, system_id, cycle_start, cycle_end
+  from public.production_cycle
+)
+select
+  row_number() over (order by r.system_id, r.inventory_date)::bigint as id,
+  r.inventory_date as fact_date,
+  r.inventory_date,
+  r.system_id::bigint,
+  r.farm_id,
+  r.system_name,
+  cm.cycle_id::bigint as production_cycle_id,
+  r.growth_stage,
+  r.system_is_active,
+  r.number_of_fish,
+  r.number_of_fish_stocked,
+  r.number_of_fish_transferred_in,
+  r.number_of_fish_mortality_aggregated,
+  r.number_of_fish_mortality,
+  r.number_of_fish_transferred_out,
+  r.number_of_fish_harvested,
+  r.feeding_amount,
+  r.feeding_amount_aggregated,
+  la.last_sampling_date,
+  la.abw_last_sampling,
+  (la.abw_last_sampling * r.number_of_fish / 1000.0)::double precision as biomass_last_sampling,
+  case
+    when la.abw_last_sampling * r.number_of_fish / 1000.0 > 0
+    then (r.feeding_amount / (la.abw_last_sampling * r.number_of_fish / 1000.0) * 100.0)::double precision
+    else null::double precision
+  end as feeding_rate,
+  sd.system_volume,
+  case
+    when sd.system_volume > 0 and la.abw_last_sampling * r.number_of_fish / 1000.0 > 0
+    then (la.abw_last_sampling * r.number_of_fish / 1000.0) / sd.system_volume
+    else null::double precision
+  end as biomass_density,
+  case
+    when r.number_of_fish > 0 then (r.number_of_fish_mortality / r.number_of_fish * 100.0)::double precision
+    else 0::double precision
+  end as mortality_rate,
+  (la.last_sampling_date is not null) as has_sampling,
+  (la.abw_last_sampling is not null) as has_abw,
+  (r.number_of_fish is not null) as has_inventory_count,
+  (r.feeding_amount > 0) as has_feed_record,
+  ((case when la.last_sampling_date is not null then 1 else 0 end)
+   + (case when la.abw_last_sampling is not null then 1 else 0 end)
+   + (case when r.number_of_fish is not null then 1 else 0 end)
+   + (case when r.feeding_amount > 0 then 1 else 0 end))::integer as data_completeness_score
+from running r
+left join last_anchor la on la.system_id = r.system_id and la.inventory_date = r.inventory_date
+left join system_dims sd on sd.system_id = r.system_id
+left join cycle_map cm on cm.system_id = r.system_id
+  and r.inventory_date >= cm.cycle_start
+  and (cm.cycle_end is null or r.inventory_date <= cm.cycle_end);
+
+grant select on analytics.daily_system_facts to service_role;
+
+
 
 
 
