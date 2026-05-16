@@ -2192,6 +2192,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      transfer_weight_kg: {
+        Args: {
+          p_abw: number
+          p_number_of_fish_transfer: number
+          p_total_weight_transfer: number
+        }
+        Returns: number
+      }
       water_quality_rating_label: { Args: { p_score: number }; Returns: string }
     }
     Enums: {

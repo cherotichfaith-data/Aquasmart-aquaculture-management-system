@@ -639,6 +639,31 @@ COMMENT ON FUNCTION "public"."api_daily_overlay"("p_farm_id" "uuid", "p_system_i
 
 
 
+CREATE OR REPLACE FUNCTION "public"."transfer_weight_kg"(
+    "p_total_weight_transfer" double precision,
+    "p_number_of_fish_transfer" double precision,
+    "p_abw" double precision
+) RETURNS double precision
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
+    AS $$
+  SELECT COALESCE(
+    p_total_weight_transfer,
+    CASE
+      WHEN p_number_of_fish_transfer IS NOT NULL
+       AND p_number_of_fish_transfer > 0
+       AND p_abw IS NOT NULL
+       AND p_abw > 0
+      THEN (p_number_of_fish_transfer * p_abw) / 1000.0
+      ELSE NULL::double precision
+    END
+  )
+$$;
+
+
+ALTER FUNCTION "public"."transfer_weight_kg"(double precision, double precision, double precision) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date", "p_time_period" "text" DEFAULT NULL::"text", "p_limit" integer DEFAULT NULL::integer, "p_order_desc" boolean DEFAULT true) RETURNS TABLE("system_id" bigint, "input_start_date" "date", "input_end_date" "date", "time_period" "text", "mortality_rate" double precision, "feeding_rate" double precision, "average_biomass" double precision, "biomass_density" double precision, "efcr_period_consolidated" double precision, "water_quality_rating_numeric_average" numeric, "water_quality_rating_average" "text", "efcr_period_consolidated_delta" numeric, "mortality_rate_delta" numeric, "average_biomass_delta" numeric, "biomass_density_delta" numeric, "feeding_rate_delta" numeric, "abw_asof_end" double precision, "abw_asof_end_delta" numeric, "water_quality_rating_numeric_delta" numeric)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
@@ -728,16 +753,16 @@ begin
     select s.system_id,
       coalesce((select sum(h.total_weight_harvest) from public.fish_harvest h where h.system_id = s.system_id and h.date > v_start and h.date <= v_end), 0) as harvest_kg,
       coalesce((select sum(fs.total_weight_stocking) from public.fish_stocking fs where fs.system_id = s.system_id and fs.date > v_start and fs.date <= v_end), 0) as stocked_kg,
-      coalesce((select sum(ft.total_weight_transfer) from public.fish_transfer ft where ft.origin_system_id = s.system_id and ft.date > v_start and ft.date <= v_end and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as tout_kg,
-      coalesce((select sum(ft.total_weight_transfer) from public.fish_transfer ft where ft.target_system_id = s.system_id and ft.date > v_start and ft.date <= v_end and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as tin_kg
+      coalesce((select sum(public.transfer_weight_kg(ft.total_weight_transfer, ft.number_of_fish_transfer, ft.abw)) from public.fish_transfer ft where ft.origin_system_id = s.system_id and ft.date > v_start and ft.date <= v_end and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as tout_kg,
+      coalesce((select sum(public.transfer_weight_kg(ft.total_weight_transfer, ft.number_of_fish_transfer, ft.abw)) from public.fish_transfer ft where ft.target_system_id = s.system_id and ft.date > v_start and ft.date <= v_end and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as tin_kg
     from sys s
   ),
   prev_w as (
     select s.system_id,
       coalesce((select sum(h.total_weight_harvest) from public.fish_harvest h where h.system_id = s.system_id and h.date > v_prev_start and h.date <= v_prev_end), 0) as harvest_kg,
       coalesce((select sum(fs.total_weight_stocking) from public.fish_stocking fs where fs.system_id = s.system_id and fs.date > v_prev_start and fs.date <= v_prev_end), 0) as stocked_kg,
-      coalesce((select sum(ft.total_weight_transfer) from public.fish_transfer ft where ft.origin_system_id = s.system_id and ft.date > v_prev_start and ft.date <= v_prev_end and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as tout_kg,
-      coalesce((select sum(ft.total_weight_transfer) from public.fish_transfer ft where ft.target_system_id = s.system_id and ft.date > v_prev_start and ft.date <= v_prev_end and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as tin_kg
+      coalesce((select sum(public.transfer_weight_kg(ft.total_weight_transfer, ft.number_of_fish_transfer, ft.abw)) from public.fish_transfer ft where ft.origin_system_id = s.system_id and ft.date > v_prev_start and ft.date <= v_prev_end and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as tout_kg,
+      coalesce((select sum(public.transfer_weight_kg(ft.total_weight_transfer, ft.number_of_fish_transfer, ft.abw)) from public.fish_transfer ft where ft.target_system_id = s.system_id and ft.date > v_prev_start and ft.date <= v_prev_end and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as tin_kg
     from sys s
   ),
   cur_efcr as (
@@ -1174,12 +1199,48 @@ begin
   );
 
   RETURN QUERY
-  WITH samples AS (
-    SELECT w.system_id, s.name AS system_name, w.date AS sample_date, w.abw::double precision AS abw_g
+  WITH raw_samples AS (
+    SELECT w.system_id, s.name AS system_name, w.date AS sample_date, w.abw::double precision AS abw_g, 1 AS source_rank
     FROM public.fish_sampling_weight w
     JOIN public.system s ON s.id = w.system_id
-    WHERE s.farm_id = p_farm_id AND (p_system_id IS NULL OR w.system_id = p_system_id)
-    ORDER BY w.system_id, w.date
+    WHERE s.farm_id = p_farm_id
+      AND (p_system_id IS NULL OR w.system_id = p_system_id)
+      AND w.abw IS NOT NULL
+    UNION ALL
+    SELECT ft.target_system_id AS system_id, s.name AS system_name, ft.date AS sample_date, ft.abw::double precision AS abw_g, 2 AS source_rank
+    FROM public.fish_transfer ft
+    JOIN public.system s ON s.id = ft.target_system_id
+    WHERE s.farm_id = p_farm_id
+      AND ft.target_system_id IS NOT NULL
+      AND (p_system_id IS NULL OR ft.target_system_id = p_system_id)
+      AND ft.abw IS NOT NULL
+      AND public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)
+    UNION ALL
+    SELECT fs.system_id, s.name AS system_name, fs.date AS sample_date,
+      COALESCE(
+        fs.abw,
+        CASE
+          WHEN fs.number_of_fish_stocking > 0 AND fs.total_weight_stocking > 0
+          THEN (fs.total_weight_stocking * 1000.0) / fs.number_of_fish_stocking
+          ELSE NULL::double precision
+        END
+      )::double precision AS abw_g,
+      3 AS source_rank
+    FROM public.fish_stocking fs
+    JOIN public.system s ON s.id = fs.system_id
+    WHERE s.farm_id = p_farm_id
+      AND (p_system_id IS NULL OR fs.system_id = p_system_id)
+      AND COALESCE(fs.abw, CASE WHEN fs.number_of_fish_stocking > 0 AND fs.total_weight_stocking > 0 THEN (fs.total_weight_stocking * 1000.0) / fs.number_of_fish_stocking ELSE NULL END) IS NOT NULL
+  ),
+  samples AS (
+    SELECT system_id, system_name, sample_date, abw_g
+    FROM (
+      SELECT rs.*,
+        ROW_NUMBER() OVER (PARTITION BY rs.system_id, rs.sample_date ORDER BY rs.source_rank) AS rn
+      FROM raw_samples rs
+    ) ranked
+    WHERE rn = 1
+    ORDER BY system_id, sample_date
   ),
   intervals AS (
     SELECT cur.system_id, cur.system_name,
@@ -1899,30 +1960,200 @@ $$;
 ALTER FUNCTION "public"."api_latest_water_quality_status"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("cycle_id" integer, "date" "date", "system_id" bigint, "system_name" "text", "growth_stage" "text", "ongoing_cycle" boolean, "average_body_weight" double precision, "number_of_fish_inventory" double precision, "total_feed_amount_period" double precision, "activity" "text", "activity_rank" integer, "total_biomass" double precision, "biomass_increase_period" double precision, "total_feed_amount_aggregated" double precision, "biomass_increase_aggregated" double precision, "daily_mortality_count" double precision, "cumulative_mortality" double precision, "number_of_fish_transfer_out" double precision, "total_weight_transfer_out" double precision, "total_weight_transfer_out_aggregated" double precision, "number_of_fish_transfer_in" double precision, "total_weight_transfer_in" double precision, "total_weight_transfer_in_aggregated" double precision, "number_of_fish_harvested" double precision, "total_weight_harvested" double precision, "total_weight_harvested_aggregated" double precision, "number_of_fish_stocked" double precision, "total_weight_stocked" double precision, "total_weight_stocked_aggregated" double precision, "efcr_period" double precision, "efcr_aggregated" double precision)
-    LANGUAGE "sql" SECURITY DEFINER
-    SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
-    AS $$
-  select ps.cycle_id, ps.date, ps.system_id, ps.system_name, ps.growth_stage::text,
-    ps.ongoing_cycle, ps.average_body_weight, ps.number_of_fish_inventory,
-    ps.total_feed_amount_period, ps.activity, ps.activity_rank, ps.total_biomass,
-    ps.biomass_increase_period, ps.total_feed_amount_aggregated, ps.biomass_increase_aggregated,
-    ps.daily_mortality_count, ps.cumulative_mortality, ps.number_of_fish_transfer_out,
-    ps.total_weight_transfer_out, ps.total_weight_transfer_out_aggregated,
-    ps.number_of_fish_transfer_in, ps.total_weight_transfer_in,
-    ps.total_weight_transfer_in_aggregated, ps.number_of_fish_harvested,
-    ps.total_weight_harvested, ps.total_weight_harvested_aggregated,
-    ps.number_of_fish_stocked, ps.total_weight_stocked, ps.total_weight_stocked_aggregated,
-    ps.efcr_period, ps.efcr_aggregated
-  from analytics.production_summary ps
-  join public.system s on s.id = ps.system_id
-  where s.farm_id = p_farm_id
-    and private.app_rpc_scope_ok(p_farm_id, p_system_id, null, p_start_date, p_end_date)
-    and (p_system_id is null or ps.system_id = p_system_id)
-    and (p_start_date is null or ps.date >= p_start_date)
-    and (p_end_date is null or ps.date <= p_end_date);
-$$;
+CREATE OR REPLACE FUNCTION public.api_production_summary(
+  p_farm_id uuid,
+  p_system_id bigint DEFAULT NULL::bigint,
+  p_start_date date DEFAULT NULL::date,
+  p_end_date date DEFAULT NULL::date
+) RETURNS TABLE(
+  cycle_id integer,
+  date date,
+  system_id bigint,
+  system_name text,
+  growth_stage text,
+  ongoing_cycle boolean,
+  average_body_weight double precision,
+  number_of_fish_inventory double precision,
+  total_feed_amount_period double precision,
+  activity text,
+  activity_rank integer,
+  total_biomass double precision,
+  biomass_increase_period double precision,
+  total_feed_amount_aggregated double precision,
+  biomass_increase_aggregated double precision,
+  daily_mortality_count double precision,
+  cumulative_mortality double precision,
+  number_of_fish_transfer_out double precision,
+  total_weight_transfer_out double precision,
+  total_weight_transfer_out_aggregated double precision,
+  number_of_fish_transfer_in double precision,
+  total_weight_transfer_in double precision,
+  total_weight_transfer_in_aggregated double precision,
+  number_of_fish_harvested double precision,
+  total_weight_harvested double precision,
+  total_weight_harvested_aggregated double precision,
+  number_of_fish_stocked double precision,
+  total_weight_stocked double precision,
+  total_weight_stocked_aggregated double precision,
+  efcr_period double precision,
+  efcr_aggregated double precision
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
+AS $$
+declare
+  v_start date := coalesce(p_start_date, date '1900-01-01');
+  v_end date := coalesce(p_end_date, current_date);
+begin
+  if not private.is_farm_member(p_farm_id) then
+    return;
+  end if;
 
+  perform private.assert_rpc_parameters(
+    p_farm_id := p_farm_id,
+    p_system_id := p_system_id,
+    p_batch_id := null,
+    p_start_date := p_start_date,
+    p_end_date := p_end_date
+  );
+
+  return query
+  with sys as (
+    select s.id, s.name, s.growth_stage::text, s.farm_id, s.decommissioned_at
+    from public.system s
+    where s.farm_id = p_farm_id
+      and (p_system_id is null or s.id = p_system_id)
+  ),
+  latest_fact as (
+    select distinct on (d.system_id)
+      d.system_id, d.inventory_date, d.abw_last_sampling, d.number_of_fish, d.biomass_last_sampling
+    from analytics.daily_system_facts d
+    join sys s on s.id = d.system_id
+    where d.inventory_date <= least(v_end, coalesce(s.decommissioned_at, v_end))
+      and d.has_inventory_count = true
+    order by d.system_id, d.inventory_date desc
+  ),
+  anchors_raw as (
+    select fs.system_id, fs.date, 'stocking'::text as activity, 1 as activity_rank,
+      coalesce(fs.abw, case when fs.number_of_fish_stocking > 0 and fs.total_weight_stocking > 0 then fs.total_weight_stocking * 1000.0 / fs.number_of_fish_stocking end)::double precision as abw,
+      coalesce(d.number_of_fish, fs.number_of_fish_stocking::double precision) as fish_count
+    from public.fish_stocking fs
+    join sys s on s.id = fs.system_id
+    left join analytics.daily_system_facts d on d.system_id = fs.system_id and d.inventory_date = fs.date
+    where fs.date <= least(v_end, coalesce(s.decommissioned_at, v_end))
+
+    union all
+
+    select ft.target_system_id, ft.date, 'transfer in'::text as activity, 1 as activity_rank,
+      ft.abw::double precision as abw,
+      coalesce(d.number_of_fish, ft.number_of_fish_transfer::double precision) as fish_count
+    from public.fish_transfer ft
+    join sys s on s.id = ft.target_system_id
+    left join analytics.daily_system_facts d on d.system_id = ft.target_system_id and d.inventory_date = ft.date
+    where ft.date <= least(v_end, coalesce(s.decommissioned_at, v_end))
+      and ft.abw is not null
+      and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)
+
+    union all
+
+    select w.system_id, w.date, 'sampling'::text as activity, 2 as activity_rank,
+      w.abw::double precision as abw,
+      d.number_of_fish as fish_count
+    from public.fish_sampling_weight w
+    join sys s on s.id = w.system_id
+    join analytics.daily_system_facts d on d.system_id = w.system_id and d.inventory_date = w.date
+    where w.date <= least(v_end, coalesce(s.decommissioned_at, v_end))
+      and w.abw is not null
+
+    union all
+
+    select lf.system_id, lf.inventory_date, 'current status'::text as activity, 4 as activity_rank,
+      lf.abw_last_sampling::double precision as abw,
+      lf.number_of_fish as fish_count
+    from latest_fact lf
+    where lf.inventory_date <= v_end
+      and lf.abw_last_sampling is not null
+  ),
+  anchors as (
+    select distinct on (ar.system_id, ar.date, ar.activity_rank)
+      ar.system_id, ar.date, ar.activity, ar.activity_rank, ar.abw, ar.fish_count
+    from anchors_raw ar
+    where ar.abw is not null and ar.fish_count is not null
+    order by ar.system_id, ar.date, ar.activity_rank
+  ),
+  periods as (
+    select a.*,
+      lag(a.date) over (partition by a.system_id order by a.date, a.activity_rank) as previous_date,
+      lag((a.abw * a.fish_count) / 1000.0) over (partition by a.system_id order by a.date, a.activity_rank) as previous_biomass
+    from anchors a
+  ),
+  enriched as (
+    select
+      coalesce(pc.cycle_id, (-p.system_id)::integer) as cycle_id,
+      p.date,
+      p.system_id,
+      s.name as system_name,
+      s.growth_stage::text as growth_stage,
+      coalesce(pc.ongoing_cycle, true) as ongoing_cycle,
+      p.abw as average_body_weight,
+      p.fish_count as number_of_fish_inventory,
+      coalesce((select sum(fr.feeding_amount)::double precision from public.feeding_record fr where fr.system_id = p.system_id and p.previous_date is not null and fr.date > p.previous_date and fr.date <= p.date), 0) as feed_kg,
+      p.activity,
+      p.activity_rank,
+      ((p.abw * p.fish_count) / 1000.0)::double precision as total_biomass,
+      coalesce(((p.abw * p.fish_count) / 1000.0) - p.previous_biomass, 0)::double precision as biomass_gain,
+      coalesce((select sum(fm.number_of_fish_mortality)::double precision from public.fish_mortality fm where fm.system_id = p.system_id and p.previous_date is not null and fm.date > p.previous_date and fm.date <= p.date), 0) as mortality_count,
+      coalesce((select sum(ft.number_of_fish_transfer)::double precision from public.fish_transfer ft where ft.origin_system_id = p.system_id and p.previous_date is not null and ft.date > p.previous_date and ft.date <= p.date and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as transfer_out_count,
+      coalesce((select sum(public.transfer_weight_kg(ft.total_weight_transfer, ft.number_of_fish_transfer, ft.abw))::double precision from public.fish_transfer ft where ft.origin_system_id = p.system_id and p.previous_date is not null and ft.date > p.previous_date and ft.date <= p.date and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as transfer_out_kg,
+      coalesce((select sum(ft.number_of_fish_transfer)::double precision from public.fish_transfer ft where ft.target_system_id = p.system_id and ((p.previous_date is not null and ft.date > p.previous_date and ft.date <= p.date) or (p.previous_date is null and ft.date = p.date)) and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as transfer_in_count,
+      coalesce((select sum(public.transfer_weight_kg(ft.total_weight_transfer, ft.number_of_fish_transfer, ft.abw))::double precision from public.fish_transfer ft where ft.target_system_id = p.system_id and ((p.previous_date is not null and ft.date > p.previous_date and ft.date <= p.date) or (p.previous_date is null and ft.date = p.date)) and public.transfer_impacts_efcr(ft.transfer_type, ft.origin_system_id, ft.target_system_id)), 0) as transfer_in_kg,
+      coalesce((select sum(fh.number_of_fish_harvest)::double precision from public.fish_harvest fh where fh.system_id = p.system_id and p.previous_date is not null and fh.date > p.previous_date and fh.date <= p.date), 0) as harvest_count,
+      coalesce((select sum(fh.total_weight_harvest)::double precision from public.fish_harvest fh where fh.system_id = p.system_id and p.previous_date is not null and fh.date > p.previous_date and fh.date <= p.date), 0) as harvest_kg,
+      coalesce((select sum(fs.number_of_fish_stocking)::double precision from public.fish_stocking fs where fs.system_id = p.system_id and ((p.previous_date is not null and fs.date > p.previous_date and fs.date <= p.date) or (p.previous_date is null and fs.date = p.date))), 0) as stocked_count,
+      coalesce((select sum(fs.total_weight_stocking)::double precision from public.fish_stocking fs where fs.system_id = p.system_id and ((p.previous_date is not null and fs.date > p.previous_date and fs.date <= p.date) or (p.previous_date is null and fs.date = p.date))), 0) as stocked_kg
+    from periods p
+    join sys s on s.id = p.system_id
+    left join public.production_cycle pc on pc.system_id = p.system_id
+      and p.date >= pc.cycle_start
+      and (pc.cycle_end is null or p.date <= pc.cycle_end)
+  ),
+  final_rows as (
+    select e.*,
+      sum(e.feed_kg) over (partition by e.system_id, e.cycle_id order by e.date, e.activity_rank) as feed_kg_agg,
+      sum(e.biomass_gain) over (partition by e.system_id, e.cycle_id order by e.date, e.activity_rank) as biomass_gain_agg,
+      sum(e.mortality_count) over (partition by e.system_id, e.cycle_id order by e.date, e.activity_rank) as mortality_agg,
+      sum(e.transfer_out_kg) over (partition by e.system_id, e.cycle_id order by e.date, e.activity_rank) as transfer_out_kg_agg,
+      sum(e.transfer_in_kg) over (partition by e.system_id, e.cycle_id order by e.date, e.activity_rank) as transfer_in_kg_agg,
+      sum(e.harvest_kg) over (partition by e.system_id, e.cycle_id order by e.date, e.activity_rank) as harvest_kg_agg,
+      sum(e.stocked_kg) over (partition by e.system_id, e.cycle_id order by e.date, e.activity_rank) as stocked_kg_agg
+    from enriched e
+  )
+  select
+    f.cycle_id, f.date, f.system_id, f.system_name, f.growth_stage, f.ongoing_cycle,
+    f.average_body_weight, f.number_of_fish_inventory, f.feed_kg,
+    f.activity, f.activity_rank, f.total_biomass, f.biomass_gain,
+    f.feed_kg_agg, f.biomass_gain_agg, f.mortality_count, f.mortality_agg,
+    f.transfer_out_count, f.transfer_out_kg, f.transfer_out_kg_agg,
+    f.transfer_in_count, f.transfer_in_kg, f.transfer_in_kg_agg,
+    f.harvest_count, f.harvest_kg, f.harvest_kg_agg,
+    f.stocked_count, f.stocked_kg, f.stocked_kg_agg,
+    case
+      when (f.biomass_gain + f.transfer_out_kg - f.transfer_in_kg + f.harvest_kg - f.stocked_kg) > 0
+      then f.feed_kg / (f.biomass_gain + f.transfer_out_kg - f.transfer_in_kg + f.harvest_kg - f.stocked_kg)
+      else null::double precision
+    end as efcr_period,
+    case
+      when (f.biomass_gain_agg + f.transfer_out_kg_agg - f.transfer_in_kg_agg + f.harvest_kg_agg - f.stocked_kg_agg) > 0
+      then f.feed_kg_agg / (f.biomass_gain_agg + f.transfer_out_kg_agg - f.transfer_in_kg_agg + f.harvest_kg_agg - f.stocked_kg_agg)
+      else null::double precision
+    end as efcr_aggregated
+  from final_rows f
+  where f.date between v_start and v_end
+  order by f.system_id, f.date, f.activity_rank;
+end;
+$$;
 
 ALTER FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
@@ -4263,7 +4494,7 @@ CREATE MATERIALIZED VIEW "analytics"."production_summary" AS
             "bd"."date",
             "bd"."activity",
             COALESCE("sum"("ft"."number_of_fish_transfer"), (0)::double precision) AS "number_of_fish_transfer_out",
-            COALESCE("sum"("ft"."total_weight_transfer"), (0)::double precision) AS "total_weight_transfer_out"
+            COALESCE("sum"("public"."transfer_weight_kg"("ft"."total_weight_transfer", "ft"."number_of_fish_transfer", "ft"."abw")), (0)::double precision) AS "total_weight_transfer_out"
            FROM ("biomass_data" "bd"
              LEFT JOIN "public"."fish_transfer" "ft" ON ((("ft"."origin_system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("ft"."date" > "bd"."previous_date") AND ("ft"."date" <= "bd"."date") AND "public"."transfer_impacts_efcr"("ft"."transfer_type", "ft"."origin_system_id", "ft"."target_system_id"))))
           GROUP BY "bd"."cycle_id", "bd"."system_id", "bd"."date", "bd"."activity"
@@ -4273,7 +4504,7 @@ CREATE MATERIALIZED VIEW "analytics"."production_summary" AS
             "bd"."date",
             "bd"."activity",
             COALESCE("sum"("ft"."number_of_fish_transfer"), (0)::double precision) AS "number_of_fish_transfer_in",
-            COALESCE("sum"("ft"."total_weight_transfer"), (0)::double precision) AS "total_weight_transfer_in"
+            COALESCE("sum"("public"."transfer_weight_kg"("ft"."total_weight_transfer", "ft"."number_of_fish_transfer", "ft"."abw")), (0)::double precision) AS "total_weight_transfer_in"
            FROM ("biomass_data" "bd"
              LEFT JOIN "public"."fish_transfer" "ft" ON ((("ft"."target_system_id" = "bd"."system_id") AND ("bd"."previous_date" IS NOT NULL) AND ("ft"."date" > "bd"."previous_date") AND ("ft"."date" <= "bd"."date") AND "public"."transfer_impacts_efcr"("ft"."transfer_type", "ft"."origin_system_id", "ft"."target_system_id"))))
           GROUP BY "bd"."cycle_id", "bd"."system_id", "bd"."date", "bd"."activity"
@@ -4478,7 +4709,7 @@ CREATE TABLE IF NOT EXISTS "public"."alert_threshold" (
 ALTER TABLE "public"."alert_threshold" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."alert_threshold"."low_sgr_threshold" IS 'SGR (%/day) below which a warning fires. Research brief: fingerlings ≥3%/day; grow-out ≥1%/day.';
+COMMENT ON COLUMN "public"."alert_threshold"."low_sgr_threshold" IS 'SGR (%/day) below which a warning fires. Research brief: fingerlings =3%/day; grow-out =1%/day.';
 
 
 
@@ -6809,6 +7040,10 @@ GRANT ALL ON FUNCTION "public"."revoke_farm_user_invitation"("p_invitation_id" "
 GRANT ALL ON FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."transfer_weight_kg"(double precision, double precision, double precision) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."transfer_weight_kg"(double precision, double precision, double precision) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."transfer_weight_kg"(double precision, double precision, double precision) TO "service_role";
 
 
 
