@@ -123,9 +123,48 @@ export async function listBatchOptionRows(
     p_farm_id: params.farmId,
   })
   if (error) return []
-  return ((data ?? []) as BatchOptionRow[])
+  const rows = ((data ?? []) as BatchOptionRow[])
     .slice()
     .sort((a, b) => String(b.date_of_delivery ?? "").localeCompare(String(a.date_of_delivery ?? "")))
+
+  const { data: activeSystems } = await supabase
+    .from("system")
+    .select("id")
+    .eq("farm_id", params.farmId)
+    .eq("is_active", true)
+
+  const lineageSystemIds = new Set(
+    (activeSystems ?? []).map((row) => row.id).filter((id): id is number => typeof id === "number"),
+  )
+  if (lineageSystemIds.size === 0) return rows.filter((row) => String(row.date_of_delivery ?? "") >= "2026-01-01")
+
+  const batchIds = new Set<number>()
+  for (let depth = 0; depth < 3; depth += 1) {
+    const { data: transfers } = await supabase
+      .from("fish_transfer")
+      .select("batch_id, origin_system_id, target_system_id")
+      .in("target_system_id", Array.from(lineageSystemIds))
+
+    const beforeSize = lineageSystemIds.size
+    ;(transfers ?? []).forEach((row) => {
+      if (typeof row.batch_id === "number") batchIds.add(row.batch_id)
+      if (typeof row.origin_system_id === "number") lineageSystemIds.add(row.origin_system_id)
+    })
+    if (lineageSystemIds.size === beforeSize) break
+  }
+
+  const { data: stockings } = await supabase
+    .from("fish_stocking")
+    .select("batch_id, system_id")
+    .in("system_id", Array.from(lineageSystemIds))
+
+  ;(stockings ?? []).forEach((row) => {
+    if (typeof row.batch_id === "number") batchIds.add(row.batch_id)
+  })
+
+  return batchIds.size > 0
+    ? rows.filter((row) => batchIds.has(row.id))
+    : rows.filter((row) => String(row.date_of_delivery ?? "") >= "2026-01-01")
 }
 
 export async function listDashboardTimePeriodRows(

@@ -52,6 +52,7 @@ export default function LoginForm() {
   const [authMode, setAuthMode] = useState<AuthMode>(searchParams.get("mode") === "signup" ? "signup" : "signin")
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
+  const [formNotice, setFormNotice] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const selectHref = useMemo(
@@ -106,6 +107,7 @@ export default function LoginForm() {
     const nextErrors = validateForm(authMode, { fullName, email, password })
     setFieldErrors(nextErrors)
     setFormError(null)
+    setFormNotice(null)
 
     if (Object.keys(nextErrors).length > 0) {
       return
@@ -121,16 +123,31 @@ export default function LoginForm() {
       }
 
       const [firstName = "", ...lastNameParts] = fullName.trim().split(/\s+/)
-      await signUpWithPassword({
+      const result = await signUpWithPassword({
         firstName,
         lastName: lastNameParts.join(" "),
         email: email.trim(),
         password,
       })
+
+      if (!result.hasSession) {
+        setFormNotice("Account created. Check the user's email to confirm the account before signing in.")
+        setAuthMode("signin")
+        setPassword("")
+        setIsSubmitting(false)
+        return
+      }
+
       window.location.assign(createWorkspaceHref)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to continue."
-      setFormError(/invalid login credentials/i.test(message) ? "Invalid email or password." : message)
+      setFormError(
+        /invalid login credentials/i.test(message)
+          ? "Invalid email or password. If this account was just created, confirm the email first or use the invite setup link."
+          : /already registered|already exists/i.test(message)
+            ? "This email already has an account. Sign in, use Forgot password, or ask an admin for a fresh setup link."
+            : message,
+      )
       setIsSubmitting(false)
     }
   }
@@ -349,7 +366,8 @@ export default function LoginForm() {
         }
 
         .field-error,
-        .form-error {
+        .form-error,
+        .form-notice {
           margin-top: 0.45rem;
           font-size: 0.82rem;
           line-height: 1.45;
@@ -368,6 +386,15 @@ export default function LoginForm() {
           background: color-mix(in srgb, var(--destructive) 8%, transparent);
           border-radius: 12px;
           padding: 0.85rem 0.95rem;
+        }
+
+        .form-notice {
+          margin-bottom: 1rem;
+          border: 1px solid color-mix(in srgb, var(--color-primary) 26%, transparent);
+          background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+          border-radius: 12px;
+          padding: 0.85rem 0.95rem;
+          color: var(--card-foreground);
         }
 
         .submit-button {
@@ -587,6 +614,12 @@ export default function LoginForm() {
             {formError ? (
               <div className="form-error" role="alert">
                 {formError}
+              </div>
+            ) : null}
+
+            {formNotice ? (
+              <div className="form-notice" role="status">
+                {formNotice}
               </div>
             ) : null}
 

@@ -211,6 +211,7 @@ export function useScopedFcrTrend(params?: {
 }
 
 export function useScopedGrowthTrend(params?: {
+  farmId?: string | null
   systemIds?: number[]
   days?: number
   dateFrom?: string
@@ -218,10 +219,13 @@ export function useScopedGrowthTrend(params?: {
   enabled?: boolean
 }) {
   const { session } = useAuth()
+  const activeFarm = useActiveFarm()
+  const farmId = params?.farmId ?? activeFarm.farmId
   const systemIds = params?.systemIds?.filter((id) => Number.isFinite(id)) ?? []
   return useQuery(
     reportsQueryOptions({
       queryKey: queryKeys.reports.growthTrend({
+        farmId,
         systemIds,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
@@ -233,6 +237,7 @@ export function useScopedGrowthTrend(params?: {
           signal,
           fetcher: (systemId) =>
             getGrowthTrend({
+              farmId,
               systemId,
               days: params?.days,
               dateFrom: params?.dateFrom,
@@ -242,7 +247,7 @@ export function useScopedGrowthTrend(params?: {
           errorMessage: "Failed to load growth trend",
         })
       },
-      enabled: Boolean(session) && systemIds.length > 0 && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(farmId) && systemIds.length > 0 && (params?.enabled ?? true),
       refetchOnWindowFocus: false,
       staleTime: 60_000,
     }),
@@ -250,16 +255,20 @@ export function useScopedGrowthTrend(params?: {
 }
 
 export function useScopedSurvivalTrend(params?: {
+  farmId?: string | null
   systemIds?: number[]
   dateFrom?: string
   dateTo?: string
   enabled?: boolean
 }) {
   const { session } = useAuth()
+  const activeFarm = useActiveFarm()
+  const farmId = params?.farmId ?? activeFarm.farmId
   const systemIds = params?.systemIds?.filter((id) => Number.isFinite(id)) ?? []
   return useQuery(
     reportsQueryOptions({
       queryKey: queryKeys.reports.survivalTrendScoped({
+        farmId,
         systemIds,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
@@ -270,6 +279,7 @@ export function useScopedSurvivalTrend(params?: {
           signal,
           fetcher: (systemId) =>
             getSurvivalTrend({
+              farmId,
               systemId,
               dateFrom: params?.dateFrom,
               dateTo: params?.dateTo,
@@ -280,6 +290,7 @@ export function useScopedSurvivalTrend(params?: {
       },
       enabled:
         Boolean(session) &&
+        Boolean(farmId) &&
         systemIds.length > 0 &&
         Boolean(params?.dateFrom) &&
         (params?.enabled ?? true),

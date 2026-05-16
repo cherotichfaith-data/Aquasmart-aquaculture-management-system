@@ -7,7 +7,7 @@ import {
   getWaterQualityPageInitialData,
   parseWaterQualityPageFilters,
 } from "@/features/water-quality/queries.server"
-import { parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
+import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createQueryClient } from "@/lib/react-query/query-client"
 
@@ -26,15 +26,19 @@ export default async function Page({
     farmId,
     filters: initialFilters,
   })
-  const selectedSystemId = parseSelectedNumericId(initialFilters.selectedSystem)
-  const batchId = parseSelectedNumericId(initialFilters.selectedBatch)
+  const effectiveFilters =
+    initialData.systemOptions.status === "success"
+      ? cleanScopedFilterState(initialFilters, initialData.systemOptions.data)
+      : initialFilters
+  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
+  const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
   const queryClient = createQueryClient()
 
   if (initialData.bounds.start && initialData.bounds.end) {
     queryClient.setQueryData(
       queryKeys.timePeriodBounds({
         farmId,
-        timePeriod: initialFilters.timePeriod,
+        timePeriod: effectiveFilters.timePeriod,
         systemId: selectedSystemId,
         scope: "water_quality",
       }),
@@ -44,7 +48,7 @@ export default async function Page({
   queryClient.setQueryData(
     queryKeys.options.systems({
       farmId,
-      stage: initialFilters.selectedStage,
+      stage: effectiveFilters.selectedStage,
       activeOnly: false,
     }),
     initialData.systemOptions,
@@ -101,7 +105,7 @@ export default async function Page({
   return (
     <Suspense fallback={null}>
       <QueryHydration state={dehydrate(queryClient)}>
-        <PageClient initialFarmId={farmId} initialFarmName={farmName} initialFilters={initialFilters} />
+        <PageClient initialFarmId={farmId} initialFarmName={farmName} initialFilters={effectiveFilters} />
       </QueryHydration>
     </Suspense>
   )

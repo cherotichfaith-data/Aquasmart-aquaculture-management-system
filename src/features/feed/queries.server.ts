@@ -17,6 +17,7 @@ import {
   getScopedSystemOptions,
   getScopedTimeBounds,
   parseSelectedNumericId,
+  resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
@@ -67,8 +68,8 @@ async function getFeedRateAnalysis(
   return (data ?? []) as FeedRateRow[]
 }
 
-async function getFeedTypeOptions(supabase: ServerClient): Promise<FeedTypeOption[]> {
-  const { data, error } = await supabase.rpc("api_feed_type_options_rpc")
+async function getFeedTypeOptions(supabase: ServerClient, farmId: string): Promise<FeedTypeOption[]> {
+  const { data, error } = await supabase.rpc("api_feed_type_options_rpc", { p_farm_id: farmId })
 
   if (error) {
     throw new Error(error.message)
@@ -95,19 +96,19 @@ async function loadFeedPageInitialData(
     }
   }
 
-  const selectedSystemId = parseSelectedNumericId(params.filters.selectedSystem)
   const bounds = await getScopedTimeBounds(
     supabase,
     params.farmId,
     params.filters.timePeriod,
     "feeding",
-    selectedSystemId,
+    undefined,
   )
   const [systems, batchSystems, feedTypes] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<SystemOption[]>,
     getScopedBatchSystems(supabase, parseSelectedNumericId(params.filters.selectedBatch)),
-    getFeedTypeOptions(supabase),
+    getFeedTypeOptions(supabase, params.farmId),
   ])
+  const selectedSystemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systems)
 
   if (!bounds.start || !bounds.end) {
     return {

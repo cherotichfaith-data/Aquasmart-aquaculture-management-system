@@ -54,16 +54,24 @@ export function useAlertLog(params?: {
 }
 
 export function useSurvivalTrend(params: {
+  farmId?: string | null
   systemId?: number
   dateFrom?: string
   dateTo?: string
   enabled?: boolean
 }) {
   const { session } = useAuth()
+  const activeFarm = useActiveFarm()
+  const farmId = params.farmId ?? activeFarm.farmId
   return useQuery({
-    queryKey: queryKeys.mortality.survivalTrend(params),
-    queryFn: ({ signal }) => getSurvivalTrend({ ...params, signal }),
-    enabled: Boolean(session) && Boolean(params.systemId) && Boolean(params.dateFrom) && (params.enabled ?? true),
+    queryKey: queryKeys.mortality.survivalTrend({ ...params, farmId }),
+    queryFn: ({ signal }) => getSurvivalTrend({ ...params, farmId, signal }),
+    enabled:
+      Boolean(session) &&
+      Boolean(farmId) &&
+      Boolean(params.systemId) &&
+      Boolean(params.dateFrom) &&
+      (params.enabled ?? true),
     staleTime: 60_000,
   })
 }

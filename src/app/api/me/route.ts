@@ -6,7 +6,7 @@ import {
   normalizeContextValue,
 } from "@/lib/context"
 import { createClient } from "@/lib/supabase/server"
-import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import { isSbInvalidRefreshToken, isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import { getSessionIdentity, isSessionTokenExpired } from "@/lib/supabase/session"
 
 function clearSupabaseAuthCookies(response: NextResponse, cookieStore: Awaited<ReturnType<typeof cookies>>) {
@@ -92,6 +92,14 @@ export async function GET() {
       },
     )
   } catch (error) {
+    if (isSbInvalidRefreshToken(error)) {
+      const cookieStore = await cookies()
+      const response = NextResponse.json({ error: "Session unavailable." }, { status: 401 })
+      clearWorkspaceContextCookies(response)
+      clearSupabaseAuthCookies(response, cookieStore)
+      return response
+    }
+
     if (!isSbNetworkError(error)) {
       logSbError("api:me", error)
     }

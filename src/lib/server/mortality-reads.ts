@@ -16,7 +16,7 @@ type AlertLogRow = {
   fired_at: string | null
 }
 type MortalityEventRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
-type SurvivalTrendRow = Database["public"]["Functions"]["get_survival_trend"]["Returns"][number]
+type SurvivalTrendRow = Database["public"]["Functions"]["api_survival_trend"]["Returns"][number]
 
 const isQuietReadError = (error: unknown) =>
   isSbPermissionDenied(error) || isSbAuthMissing(error) || isMissingObjectError(error)
@@ -71,14 +71,16 @@ export async function listAlertLog(
 export async function listSurvivalTrend(
   supabase: ServerSupabaseClient,
   params: {
+    farmId?: string | null
     systemId?: number
     dateFrom?: string
     dateTo?: string
   },
 ): Promise<SurvivalTrendRow[]> {
-  if (!params.systemId || !params.dateFrom) return []
+  if (!params.farmId || !params.systemId || !params.dateFrom) return []
 
-  const { data, error } = await supabase.rpc("get_survival_trend", {
+  const { data, error } = await supabase.rpc("api_survival_trend", {
+    p_farm_id: params.farmId,
     p_system_id: params.systemId,
     p_start_date: params.dateFrom,
     p_end_date: params.dateTo,

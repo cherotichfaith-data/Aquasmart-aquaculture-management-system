@@ -23,8 +23,8 @@ async function getBatches(supabase: DataEntrySupabaseClient, farmId: string) {
   return toQuerySuccess(batches as never[])
 }
 
-async function getFeedTypes(supabase: DataEntrySupabaseClient) {
-  const { data } = await supabase.rpc("api_feed_type_options_rpc")
+async function getFeedTypes(supabase: DataEntrySupabaseClient, farmId: string) {
+  const { data } = await supabase.rpc("api_feed_type_options_rpc", { p_farm_id: farmId })
 
   const feedTypes = ((data ?? []) as Array<{ label?: string | null }>).slice().sort((a, b) =>
     String(a.label ?? "").localeCompare(String(b.label ?? "")),
@@ -49,7 +49,7 @@ export async function getDataEntryPrefetch(farmId: string) {
       const [systems, batches, feedTypes, recentEntries] = await Promise.all([
         getSystems(supabase, farmId),
         getBatches(supabase, farmId),
-        getFeedTypes(supabase),
+        getFeedTypes(supabase, farmId),
         listRecentEntries(supabase, farmId),
       ])
 

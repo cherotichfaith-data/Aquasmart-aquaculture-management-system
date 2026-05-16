@@ -449,13 +449,19 @@ export default function SamplingPage({
     if (hasSystem) {
       const row = dashboardRowBySystemId.get(systemId as number)
       const stageValue = row?.growth_stage ?? null
-      if (stageValue === "nursing") return "nursing"
-      if (stageValue === "grow_out" || stageValue === "grow out") return "grow_out"
+      if (
+        stageValue === "fingerling" ||
+        stageValue === "juvenile" ||
+        stageValue === "sub_adult" ||
+        stageValue === "broodstock"
+      ) {
+        return stageValue
+      }
     }
     return null
   }, [dashboardRowBySystemId, hasSystem, selectedStage, systemId])
 
-  const targetWeightG = resolvedStage === "nursing" ? moveTargetG : harvestTargetG
+  const targetWeightG = resolvedStage === "fingerling" ? moveTargetG : harvestTargetG
   const latestTargetAbw = chartRows.length > 0 ? chartRows[chartRows.length - 1]?.targetAbw ?? null : null
   const growthEfficiency =
     latestAbw != null && latestTargetAbw != null && latestTargetAbw > 0
@@ -494,7 +500,7 @@ export default function SamplingPage({
     }
   }, [chartRows, targetWeightG])
 
-  const projectionLabel = resolvedStage === "nursing" ? "Estimated Move Date" : "Estimated Harvest Date"
+  const projectionLabel = resolvedStage === "fingerling" ? "Estimated Move Date" : "Estimated Harvest Date"
 
   const selectedSystemRow = hasSystem ? dashboardRowBySystemId.get(systemId as number) ?? null : null
   const currentFish = selectedSystemRow?.fish_end ?? null

@@ -3,7 +3,12 @@ import { cacheTags } from "@/lib/cache/tags"
 import { toQuerySuccess } from "@/lib/api/_utils"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
-import { getScopedTimeBounds, getScopedSystemOptions, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
+import {
+  getScopedTimeBounds,
+  getScopedSystemOptions,
+  parseSelectedNumericId,
+  resolveScopedSelectedSystemId,
+} from "@/features/shared/scoped-analytics.server"
 import {
   listAlertThresholdRows,
   listAppConfigRows,
@@ -32,7 +37,7 @@ type MortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
 type DailyInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 type SystemOptionRow = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
-type GrowthTrendRow = Database["public"]["Functions"]["get_growth_trend"]["Returns"][number] & { system_id: number }
+type GrowthTrendRow = Database["public"]["Functions"]["api_growth_trend"]["Returns"][number] & { system_id: number }
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type HarvestRow = Database["public"]["Tables"]["fish_harvest"]["Row"]
@@ -74,11 +79,13 @@ export function parseReportsPageFilters(
 
 async function getScopedGrowthTrendRows(
   supabase: ReturnType<typeof createAccessTokenClient>,
-  params: { systemIds: number[]; dateFrom: string; dateTo: string },
+  params: { farmId: string | null; systemIds: number[]; dateFrom: string; dateTo: string },
 ) {
+  if (!params.farmId) return []
   const rows = await Promise.all(
     params.systemIds.map(async (systemId) => {
       const result = await listGrowthTrend(supabase, {
+        farmId: params.farmId,
         systemId,
         days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? 180,
         dateFrom: params.dateFrom,
@@ -111,14 +118,14 @@ async function loadReportsPageInitialData(
 
   if (!params.farmId) return empty
 
-  const systemId = parseSelectedNumericId(params.filters.selectedSystem)
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
-  const [bounds, growthSystems, appConfig, alertThresholds] = await Promise.all([
-    getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId),
+  const [growthSystems, appConfig, alertThresholds] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage),
     listAppConfigRows(supabase, { keys: ["target_harvest_weight_g"] }),
     listAlertThresholdRows(supabase, params.farmId, params.userId),
   ])
+  const systemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, growthSystems)
+  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId)
 
   if (!bounds.start || !bounds.end) {
     return {
@@ -179,6 +186,7 @@ async function loadReportsPageInitialData(
       }),
       scopedSystemIds.length > 0
         ? getScopedGrowthTrendRows(supabase, {
+            farmId: params.farmId,
             systemIds: scopedSystemIds,
             dateFrom: bounds.start,
             dateTo: bounds.end,

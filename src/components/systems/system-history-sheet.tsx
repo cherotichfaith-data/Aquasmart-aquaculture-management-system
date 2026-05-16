@@ -32,6 +32,7 @@ import type { SystemTimelineBoundsRow } from "@/lib/api/system-timeline"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import { resolveSystemTimelineWindow } from "@/lib/system-timeline-window"
 import { DATA_ENTRY_PATH } from "@/lib/app-entry"
+import { formatCageLabel } from "@/lib/system-options"
 import {
   formatCompactDate,
   formatDateOnly,
@@ -40,6 +41,7 @@ import {
   formatUnitValue,
   timelineSourceLabel,
 } from "@/lib/analytics-format"
+import { formatFeedingResponseLevel } from "@/lib/feeding-response"
 
 type OperationRow = {
   id: string
@@ -328,7 +330,7 @@ export default function SystemHistorySheet({
         date: row.date,
         createdAt: row.created_at,
         type: "Feeding",
-        detail: `${formatUnitValue(row.feeding_amount, 1, "kg")} | ${row.feeding_response ?? "response N/A"}`,
+        detail: `${formatUnitValue(row.feeding_amount, 1, "kg")} | ${formatFeedingResponseLevel(row.feeding_response)}`,
       })
     })
     samplingRows.forEach((row) => {
@@ -432,7 +434,10 @@ export default function SystemHistorySheet({
     waterRatingQuery.isFetching ||
     measurementQuery.isFetching
 
-  const title = systemLabel ?? summaryRow?.system_name ?? (systemId ? `System ${systemId}` : "System")
+  const title =
+    systemId != null
+      ? formatCageLabel({ id: systemId, label: systemLabel ?? summaryRow?.system_name ?? null, unit: null })
+      : "System"
   const palette = getChartPalette()
   const inventoryDateDomain = useMemo(
     () => buildDailyDateDomain(inventoryTrendRows.map((row) => row.date)),

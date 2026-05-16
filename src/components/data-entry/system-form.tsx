@@ -17,6 +17,7 @@ import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useCreateSystem } from "@/lib/hooks/use-system"
+import { BIOLOGICAL_GROWTH_STAGE_VALUES, formatGrowthStage } from "@/lib/stage-filter"
 import type { Database } from "@/lib/types/database"
 
 type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
@@ -30,7 +31,7 @@ const formSchema = z.object({
     unit: z.string().trim().min(1, "Cage Unit is required"),
     name: z.string().min(1, "Name is required"),
     type: z.enum(["rectangular_cage", "circular_cage", "pond", "tank"]),
-    growth_stage: z.enum(["nursing", "grow_out"]),
+    growth_stage: z.enum(["fingerling", "juvenile", "sub_adult", "broodstock"]),
     volume: z.coerce.number().min(0).optional(),
     depth: z.coerce.number().min(0).optional(),
     length: z.coerce.number().min(0).optional(),
@@ -49,7 +50,7 @@ export function SystemForm() {
             unit: "",
             name: "",
             type: "rectangular_cage",
-            growth_stage: "grow_out",
+            growth_stage: "fingerling",
             volume: 0,
             depth: 0,
             length: 0,
@@ -85,7 +86,7 @@ export function SystemForm() {
                     unit: "",
                     name: "",
                     type: "rectangular_cage",
-                    growth_stage: "grow_out",
+                    growth_stage: "fingerling",
                     volume: 0,
                     depth: 0,
                     length: 0,
@@ -188,8 +189,11 @@ export function SystemForm() {
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="nursing">Nursing</SelectItem>
-                                            <SelectItem value="grow_out">Grow Out</SelectItem>
+                                            {BIOLOGICAL_GROWTH_STAGE_VALUES.map((stage) => (
+                                                <SelectItem key={stage} value={stage}>
+                                                    {formatGrowthStage(stage)}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />

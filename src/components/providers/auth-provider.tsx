@@ -25,7 +25,7 @@ interface AuthContextType {
     hasProfile: boolean;
     isLoading: boolean;
     signInWithPassword: (email: string, password: string) => Promise<void>;
-    signUpWithPassword: (params: { firstName: string; lastName: string; email: string; password: string }) => Promise<void>;
+    signUpWithPassword: (params: { firstName: string; lastName: string; email: string; password: string }) => Promise<{ hasSession: boolean }>;
     resetPasswordForEmail: (email: string) => Promise<void>;
     signOut: () => Promise<void>;
     refreshProfile: () => Promise<void>;
@@ -372,6 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: params.email.trim(),
             password: params.password,
             options: {
+                emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=/onboarding` : undefined,
                 data: {
                     first_name: firstName,
                     last_name: lastName,
@@ -387,11 +388,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         await applyUserContext(data.session ?? null);
+        return { hasSession: Boolean(data.session) };
     }, [applyUserContext, supabase]);
 
     const resetPasswordForEmail = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-            redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth` : undefined,
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+            redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=/auth/set-password` : undefined,
         });
 
         if (error) {

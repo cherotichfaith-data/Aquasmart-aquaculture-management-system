@@ -11,6 +11,7 @@ import {
   getFarmOptions,
   getFeedSupplierOptions,
   getFeedTypeOptions,
+  getWeeklyInventoryFeedTypeOptions,
   getFingerlingSupplierOptions,
   getAppConfig,
   getSystemVolumes,
@@ -35,11 +36,12 @@ export function useSystemOptions(params?: {
 
 export function useBatchOptions(params?: {
   farmId?: string | null
+  activeOnly?: boolean
 }) {
   const { session, user } = useAuth()
   const enabled = (Boolean(session) || Boolean(user)) && Boolean(params?.farmId)
   return useQuery({
-    queryKey: queryKeys.options.batches(params?.farmId),
+    queryKey: queryKeys.options.batches(params),
     queryFn: ({ signal }) => getBatchOptions({ ...params, signal }),
     enabled,
     staleTime: 5 * 60_000,
@@ -56,12 +58,30 @@ export function useDashboardTimePeriodOptions(params?: { enabled?: boolean }) {
   })
 }
 
-export function useFeedTypeOptions() {
+export function useFeedTypeOptions(params?: {
+  farmId?: string | null
+  dateFrom?: string | null
+  dateTo?: string | null
+  inventoryOnly?: boolean
+  enabled?: boolean
+}) {
   const { session, user } = useAuth()
+  const enabled =
+    (Boolean(session) || Boolean(user)) &&
+    Boolean(params?.farmId) &&
+    (params?.inventoryOnly ? Boolean(params.dateFrom) && Boolean(params.dateTo) : true) &&
+    (params?.enabled ?? true)
   return useQuery({
-    queryKey: queryKeys.options.feeds(user?.id),
-    queryFn: ({ signal }) => getFeedTypeOptions({ signal }),
-    enabled: Boolean(session) || Boolean(user),
+    queryKey: queryKeys.options.feeds(params?.farmId, user?.id, {
+      inventoryOnly: params?.inventoryOnly,
+      dateFrom: params?.dateFrom,
+      dateTo: params?.dateTo,
+    }),
+    queryFn: ({ signal }) =>
+      params?.inventoryOnly
+        ? getWeeklyInventoryFeedTypeOptions({ ...params, signal })
+        : getFeedTypeOptions({ ...params, signal }),
+    enabled,
     staleTime: 5 * 60_000,
   })
 }

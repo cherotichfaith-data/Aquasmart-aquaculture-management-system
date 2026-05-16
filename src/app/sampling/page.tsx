@@ -3,7 +3,7 @@ import { dehydrate } from "@tanstack/react-query"
 import PageClient from "./page.client"
 import { QueryHydration } from "@/components/providers/query-hydration"
 import { resolveInitialFarmId } from "@/features/farm/queries.server"
-import { parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
+import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { getSamplingPageInitialData, parseSamplingPageFilters } from "@/features/sampling/queries.server"
 import { listHarvestForecastRows } from "@/features/shared/query-seed.server"
 import { queryKeys } from "@/lib/cache/query-keys"
@@ -35,11 +35,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
   const initialFilters = parseSamplingPageFilters(resolvedSearchParams)
   const { farmId, farmName } = await resolveInitialFarmId(searchFarmId)
   const initialData = await getSamplingPageInitialData({ farmId, filters: initialFilters })
-  const selectedSystemId = parseSelectedNumericId(initialFilters.selectedSystem)
-  const batchId = parseSelectedNumericId(initialFilters.selectedBatch)
+  const effectiveFilters =
+    initialData.systems.status === "success"
+      ? cleanScopedFilterState(initialFilters, initialData.systems.data)
+      : initialFilters
+  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
+  const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
   const scopedSystemIds =
     initialData.systems.status === "success" && initialData.batchSystems.status === "success"
-      ? buildScopedSystemIdList(initialFilters, initialData.systems.data, initialData.batchSystems.data)
+      ? buildScopedSystemIdList(effectiveFilters, initialData.systems.data, initialData.batchSystems.data)
       : []
   const harvestForecast = farmId
     ? await listHarvestForecastRows(createAccessTokenClient(accessToken), {
@@ -53,7 +57,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     queryClient.setQueryData(
       queryKeys.timePeriodBounds({
         farmId,
-        timePeriod: initialFilters.timePeriod,
+        timePeriod: effectiveFilters.timePeriod,
         systemId: selectedSystemId,
         scope: "production",
       }),
@@ -61,12 +65,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     )
   }
   queryClient.setQueryData(
-    queryKeys.options.systems({ farmId, stage: initialFilters.selectedStage, activeOnly: false }),
+    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: false }),
     initialData.systems,
   )
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)
   queryClient.setQueryData(
-    queryKeys.options.systemVolumes({ farmId, stage: initialFilters.selectedStage, activeOnly: true }),
+    queryKeys.options.systemVolumes({ farmId, stage: effectiveFilters.selectedStage, activeOnly: true }),
     initialData.systemVolumes,
   )
   queryClient.setQueryData(
@@ -85,10 +89,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     queryClient.setQueryData(
       queryKeys.dashboard.systemsTable({
         farmId,
-        stage: initialFilters.selectedStage,
-        batch: initialFilters.selectedBatch,
-        system: initialFilters.selectedSystem,
-        timePeriod: initialFilters.timePeriod,
+        stage: effectiveFilters.selectedStage,
+        batch: effectiveFilters.selectedBatch,
+        system: effectiveFilters.selectedSystem,
+        timePeriod: effectiveFilters.timePeriod,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
         includeIncomplete: true,
@@ -111,7 +115,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
       queryKeys.production.summary({
         farmId,
         systemId: selectedSystemId,
-        stage: initialFilters.selectedStage === "all" ? undefined : initialFilters.selectedStage,
+        stage: effectiveFilters.selectedStage === "all" ? undefined : effectiveFilters.selectedStage,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
         limit: 5000,
@@ -123,7 +127,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
   return (
     <Suspense fallback={null}>
       <QueryHydration state={dehydrate(queryClient)}>
-        <PageClient initialFarmId={farmId} initialFarmName={farmName} initialFilters={initialFilters} />
+        <PageClient initialFarmId={farmId} initialFarmName={farmName} initialFilters={effectiveFilters} />
       </QueryHydration>
     </Suspense>
   )

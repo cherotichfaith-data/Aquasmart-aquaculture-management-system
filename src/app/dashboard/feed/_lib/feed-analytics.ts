@@ -1,7 +1,8 @@
 import type { FeedingRecordWithType } from "@/lib/api/reports"
+import { formatFeedingResponseLevel, isLowFeedingResponse, parseFeedingResponseLevel } from "@/lib/feeding-response"
 import type { FeedRateRow } from "@/lib/types/insights"
 
-type NormalizedFeedingResponse = "Excellent" | "Good" | "Fair" | "Poor"
+type NormalizedFeedingResponse = "No Response" | "Low Appetite" | "Ideal Appetite" | "Good Appetite" | "Aggressive Appetite"
 
 export type FeedRatePoint = {
   systemId: number
@@ -58,12 +59,17 @@ export function formatFeedDayLabel(value: string) {
 export function normalizeFeedingResponse(
   value: FeedingRecordWithType["feeding_response"] | string | null | undefined,
 ): NormalizedFeedingResponse | null {
-  const normalized = String(value ?? "").trim().toLowerCase()
-  if (normalized === "very_good") return "Excellent"
-  if (normalized === "good") return "Good"
-  if (normalized === "fair") return "Fair"
-  if (normalized === "bad" || normalized === "poor") return "Poor"
-  return null
+  const level = parseFeedingResponseLevel(value)
+  if (level == null) return null
+  if (level === 1) return "No Response"
+  if (level === 2) return "Low Appetite"
+  if (level === 3) return "Ideal Appetite"
+  if (level === 4) return "Good Appetite"
+  return "Aggressive Appetite"
+}
+
+export function formatFeedingResponse(value: FeedingRecordWithType["feeding_response"] | string | null | undefined) {
+  return formatFeedingResponseLevel(value)
 }
 
 export function buildFeedRatePointsFromAnalysis(rows: FeedRateRow[]): FeedRatePoint[] {
@@ -107,10 +113,8 @@ export function buildConsecutivePoorAlerts(params: {
       .sort((a, b) => String(a.created_at ?? a.date ?? "").localeCompare(String(b.created_at ?? b.date ?? "")))
     const alerts: ResponseAlert[] = []
     for (let index = 1; index < sorted.length; index += 1) {
-      const previous = normalizeFeedingResponse(sorted[index - 1]?.feeding_response)
-      const current = normalizeFeedingResponse(sorted[index]?.feeding_response)
-      const previousNeedsAttention = previous === "Poor" || previous === "Fair"
-      const currentNeedsAttention = current === "Poor" || current === "Fair"
+      const previousNeedsAttention = isLowFeedingResponse(sorted[index - 1]?.feeding_response)
+      const currentNeedsAttention = isLowFeedingResponse(sorted[index]?.feeding_response)
       if (previousNeedsAttention && currentNeedsAttention) {
         alerts.push({
           systemId,

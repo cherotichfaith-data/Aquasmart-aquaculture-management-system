@@ -7,6 +7,7 @@ import { listSurvivalTrend } from "@/lib/server/mortality-reads"
 import { logSbError } from "@/lib/supabase/log"
 
 const survivalTrendSchema = z.object({
+  farmId: z.string().uuid().optional(),
   systemId: z.number().int().positive().optional(),
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

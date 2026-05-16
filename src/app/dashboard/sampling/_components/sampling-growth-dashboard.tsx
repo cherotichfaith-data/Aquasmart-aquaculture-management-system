@@ -101,7 +101,7 @@ export function SamplingGrowthDashboard({
       }
     | null
   targetWeightG: number | null
-  resolvedStage: "nursing" | "grow_out" | null
+  resolvedStage: "fingerling" | "juvenile" | "sub_adult" | "broodstock" | null
   targetDensityKgM3: number | null
   maxFish: number | null
   abwForCapacity: number | null
@@ -383,7 +383,7 @@ export function SamplingGrowthDashboard({
             </div>
             <p className="kpi-card-meta">
               {targetWeightG != null
-                ? `Target ${formatWithUnit(targetWeightG, 0, "g")} ${resolvedStage === "nursing" ? "move" : "harvest"}`
+                ? `Target ${formatWithUnit(targetWeightG, 0, "g")} ${resolvedStage === "fingerling" ? "move" : "harvest"}`
                 : "No backend target configured"}
             </p>
           </div>

@@ -120,7 +120,7 @@ export function useProductionSummaryMetrics(params: {
       if (transferResult.status === "success" && scopedSet !== null) {
         transferResult.data.forEach((row) => {
           const count = row.number_of_fish_transfer ?? 0
-          const originInScope = scopedSet.has(row.origin_system_id)
+          const originInScope = row.origin_system_id != null && scopedSet.has(row.origin_system_id)
           const targetInScope = row.target_system_id != null && scopedSet.has(row.target_system_id)
 
           if (targetInScope && !originInScope) {

@@ -5,9 +5,9 @@ import { isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils
 
 type FeedIncomingRow = Tables<"feed_incoming">
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
-type FcrTrendRow = Database["public"]["Functions"]["get_fcr_trend"]["Returns"][number]
-type GrowthTrendRow = Database["public"]["Functions"]["get_growth_trend"]["Returns"][number]
-type RunningStockRow = Database["public"]["Functions"]["get_running_stock"]["Returns"][number]
+type FcrTrendRow = Database["public"]["Functions"]["api_fcr_trend"]["Returns"][number]
+type GrowthTrendRow = Database["public"]["Functions"]["api_growth_trend"]["Returns"][number]
+type RunningStockRow = Database["public"]["Functions"]["api_running_stock"]["Returns"][number]
 type FeedingRecordRow = Tables<"feeding_record">
 type FishHarvestRow = Tables<"fish_harvest">
 type FishSamplingWeightRow = Tables<"fish_sampling_weight">
@@ -116,13 +116,14 @@ export async function getFcrTrend(params: {
 }
 
 export async function getGrowthTrend(params: {
+  farmId?: string | null
   systemId?: number
   days?: number
   dateFrom?: string
   dateTo?: string
   signal?: AbortSignal
 }): Promise<QueryResult<FeedGrowthTrendRow>> {
-  if (!params.systemId) {
+  if (!params.farmId || !params.systemId) {
     return toQuerySuccess<FeedGrowthTrendRow>([])
   }
 
@@ -130,6 +131,7 @@ export async function getGrowthTrend(params: {
     const response = await postJson<{ data: FeedGrowthTrendRow[] }, Omit<typeof params, "signal">>(
       "/api/reports/growth-trend/query",
       {
+        farmId: params.farmId,
         systemId: params.systemId,
         days: params.days,
         dateFrom: params.dateFrom,

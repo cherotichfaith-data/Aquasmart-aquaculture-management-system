@@ -5,7 +5,7 @@ import { QueryHydration } from "@/components/providers/query-hydration"
 import { resolveInitialFarmId } from "@/features/farm/queries.server"
 import { getFeedPageInitialData, parseFeedPageFilters } from "@/features/feed/queries.server"
 import { listFeedDemandForecastRows } from "@/features/shared/query-seed.server"
-import { parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
+import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createQueryClient } from "@/lib/react-query/query-client"
 import { requireUserContext } from "@/lib/supabase/require-user"
@@ -27,15 +27,19 @@ export default async function Page({
     farmId,
     filters: initialFilters,
   })
+  const effectiveFilters =
+    initialData.systems.status === "success"
+      ? cleanScopedFilterState(initialFilters, initialData.systems.data)
+      : initialFilters
   const feedDemandForecast = farmId
     ? await listFeedDemandForecastRows(createAccessTokenClient(accessToken), { farmId, daysAhead: 14 })
     : []
-  const selectedSystemId = parseSelectedNumericId(initialFilters.selectedSystem)
-  const batchId = parseSelectedNumericId(initialFilters.selectedBatch)
+  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
+  const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
   const scopedSystemIdList =
     selectedSystemId != null
       ? [selectedSystemId]
-      : initialFilters.selectedBatch === "all"
+        : effectiveFilters.selectedBatch === "all"
         ? initialData.systems.status === "success"
           ? initialData.systems.data
               .map((row) => row.id)
@@ -47,9 +51,9 @@ export default async function Page({
   const feedRateScopeIds =
     selectedSystemId != null
       ? [selectedSystemId]
-      : initialFilters.selectedStage === "all" &&
-          initialFilters.selectedBatch === "all" &&
-          initialFilters.selectedSystem === "all"
+      : effectiveFilters.selectedStage === "all" &&
+          effectiveFilters.selectedBatch === "all" &&
+          effectiveFilters.selectedSystem === "all"
         ? null
         : scopedSystemIdList
   const queryClient = createQueryClient()
@@ -58,7 +62,7 @@ export default async function Page({
     queryClient.setQueryData(
       queryKeys.timePeriodBounds({
         farmId,
-        timePeriod: initialFilters.timePeriod,
+        timePeriod: effectiveFilters.timePeriod,
         systemId: selectedSystemId,
         scope: "feeding",
       }),
@@ -68,7 +72,7 @@ export default async function Page({
   queryClient.setQueryData(
     queryKeys.options.systems({
       farmId,
-      stage: initialFilters.selectedStage,
+      stage: effectiveFilters.selectedStage,
       activeOnly: false,
     }),
     initialData.systems,
@@ -76,7 +80,7 @@ export default async function Page({
   queryClient.setQueryData(
     queryKeys.options.systems({
       farmId,
-      stage: initialFilters.selectedStage,
+      stage: effectiveFilters.selectedStage,
       activeOnly: true,
     }),
     initialData.systems,
@@ -130,7 +134,7 @@ export default async function Page({
   return (
     <Suspense fallback={null}>
       <QueryHydration state={dehydrate(queryClient)}>
-        <PageClient initialFarmId={farmId} initialFarmName={farmName} initialFilters={initialFilters} />
+        <PageClient initialFarmId={farmId} initialFarmName={farmName} initialFilters={effectiveFilters} />
       </QueryHydration>
     </Suspense>
   )

@@ -191,12 +191,7 @@ function LogoBlock({
           <Image src="/use this.png" alt="AquaSmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
           {!collapsed || mobile ? (
             <Typography variant="h6" sx={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--color-sidebar-foreground)" }}>
-              <Box component="span" sx={{ color: "inherit" }}>
-                Aqua
-              </Box>
-              <Box component="span" sx={{ color: "var(--color-sidebar-primary)" }}>
-                Smart
-              </Box>
+              AquaSmart
             </Typography>
           ) : null}
         </Link>

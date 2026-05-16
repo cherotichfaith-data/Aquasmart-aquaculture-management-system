@@ -6,9 +6,9 @@ import { countTimeRangeDays } from "@/lib/time-period"
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
-type FcrTrendRow = Database["public"]["Functions"]["get_fcr_trend"]["Returns"][number]
-type GrowthTrendRow = Database["public"]["Functions"]["get_growth_trend"]["Returns"][number]
-type RunningStockRow = Database["public"]["Functions"]["get_running_stock"]["Returns"][number]
+type FcrTrendRow = Database["public"]["Functions"]["api_fcr_trend"]["Returns"][number]
+type GrowthTrendRow = Database["public"]["Functions"]["api_growth_trend"]["Returns"][number]
+type RunningStockRow = Database["public"]["Functions"]["api_running_stock"]["Returns"][number]
 type FishMortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
 type FeedingRecordRow = Database["public"]["Tables"]["feeding_record"]["Row"]
 type FishSamplingWeightRow = Database["public"]["Tables"]["fish_sampling_weight"]["Row"]
@@ -84,6 +84,8 @@ const projectFeedType = (row: FeedTypeProjection | null | undefined): FeedTypeRo
     crude_fat_percentage: row.crude_fat_percentage ?? 0,
     feed_category: String(row.feed_category ?? ""),
     feed_pellet_size: String(row.feed_pellet_size ?? ""),
+    farm_id: "",
+    visibility_scope: "joined_record",
   }
 }
 
@@ -113,7 +115,7 @@ export async function listRunningStock(
 ): Promise<RunningStockRow[]> {
   if (!params.farmId) return []
 
-  const { data, error } = await supabase.rpc("get_running_stock", {
+  const { data, error } = await supabase.rpc("api_running_stock", {
     p_farm_id: params.farmId,
   })
 
@@ -137,7 +139,7 @@ export async function listFcrTrend(
 ): Promise<FcrTrendRow[]> {
   if (!params.farmId || !params.systemId) return []
 
-  const query = supabase.rpc("get_fcr_trend", {
+  const query = supabase.rpc("api_fcr_trend", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
     p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
@@ -165,10 +167,11 @@ export async function listGrowthTrend(
   // G-08 fix: when no systemId is given but farmId is, aggregate across all farm systems
   if (!params.systemId) {
     if (!params.farmId) return []
+    const farmId = params.farmId
     const { data: systems, error: sysErr } = await supabase
       .from("system")
       .select("id")
-      .eq("farm_id", params.farmId)
+      .eq("farm_id", farmId)
       .eq("is_active", true)
     if (sysErr || !systems?.length) return []
     const results = await Promise.all(
@@ -176,7 +179,8 @@ export async function listGrowthTrend(
         .filter((s): s is { id: number } => typeof s.id === "number")
         .map((s) =>
           runRpcRead<GrowthTrendRow>(
-            supabase.rpc("get_growth_trend", {
+            supabase.rpc("api_growth_trend", {
+              p_farm_id: farmId,
               p_system_id: s.id,
               p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
             }),
@@ -186,7 +190,10 @@ export async function listGrowthTrend(
     return results.flat()
   }
 
-  const query = supabase.rpc("get_growth_trend", {
+  if (!params.farmId) return []
+
+  const query = supabase.rpc("api_growth_trend", {
+    p_farm_id: params.farmId,
     p_system_id: params.systemId,
     p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
   })
@@ -477,10 +484,49 @@ export async function listBatchSystemIds(
     throw error
   }
 
-  const uniq = Array.from(
+  const stockedIds = Array.from(
     new Set((data ?? []).map((row) => row.system_id).filter((id): id is number => typeof id === "number")),
   )
-  return uniq.map((system_id) => ({ system_id }))
+  if (stockedIds.length === 0) return []
+
+  const lineageIds = new Set(stockedIds)
+  for (let depth = 0; depth < 3; depth += 1) {
+    const sourceIds = Array.from(lineageIds)
+    const { data: transfers, error: transferError } = await supabase
+      .from("fish_transfer")
+      .select("origin_system_id, target_system_id")
+      .in("origin_system_id", sourceIds)
+      .not("target_system_id", "is", null)
+
+    if (transferError) {
+      if (isQuietReadError(transferError)) break
+      throw transferError
+    }
+
+    const beforeSize = lineageIds.size
+    ;(transfers ?? []).forEach((row) => {
+      if (typeof row.target_system_id === "number" && Number.isFinite(row.target_system_id)) {
+        lineageIds.add(row.target_system_id)
+      }
+    })
+    if (lineageIds.size === beforeSize) break
+  }
+
+  const { data: activeRows, error: activeError } = await supabase
+    .from("system")
+    .select("id")
+    .in("id", Array.from(lineageIds))
+    .eq("is_active", true)
+
+  if (activeError) {
+    if (isQuietReadError(activeError)) return []
+    throw activeError
+  }
+
+  const activeIds = Array.from(
+    new Set((activeRows ?? []).map((row) => row.id).filter((id): id is number => typeof id === "number")),
+  )
+  return activeIds.map((system_id) => ({ system_id }))
 }
 
 const emptyRecentEntries = () => ({

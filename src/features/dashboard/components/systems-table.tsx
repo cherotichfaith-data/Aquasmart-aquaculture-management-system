@@ -27,6 +27,7 @@ import {
   formatUnitValue,
   timelineSourceLabel,
 } from "@/lib/analytics-format"
+import { formatCageLabel } from "@/lib/system-options"
 import { getUtcDateInput, getUtcDateInputDaysAgo } from "@/lib/deterministic-format"
 
 interface SystemsTableProps {
@@ -69,12 +70,12 @@ const ratingToneClass = (value: string | null | undefined) => {
 
 const formatPercent = (value: number | null | undefined, decimals = 1, suffix = "%") => {
   if (!isFiniteNumber(value)) return "--"
-  return `${formatNumberValue(value * 100, { decimals, minimumDecimals: decimals })}${suffix}`
+  return `${formatNumberValue(value, { decimals, minimumDecimals: decimals })}${suffix}`
 }
 
 const formatFeedRate = (value: number | null | undefined) => {
   if (!isFiniteNumber(value)) return "--"
-  return `${formatNumberValue(value * 100, { decimals: 1, minimumDecimals: 1 })}% BW/day`
+  return `${formatNumberValue(value, { decimals: 1, minimumDecimals: 1 })}% BW/day`
 }
 
 const median = (values: number[]) => {
@@ -413,7 +414,9 @@ export default function SystemsTable({
                   >
                     <MuiTableCell>
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-foreground">{row.system_name || `System ${row.system_id}`}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
+                        </p>
                         <p className="text-[11px] text-muted-foreground">{productionSubtitle}</p>
                         <p className="text-[11px] text-muted-foreground">
                           Density {formatNumberValue(row.biomass_density, { decimals: 2 })} kg/m3 | As of {asOf ?? "N/A"}

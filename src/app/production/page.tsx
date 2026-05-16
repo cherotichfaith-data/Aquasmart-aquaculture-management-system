@@ -4,7 +4,7 @@ import { QueryHydration } from "@/components/providers/query-hydration"
 import { PRODUCTION_METRICS, parseProductionMetric } from "@/components/production/metrics"
 import { resolveInitialFarmId } from "@/features/farm/queries.server"
 import { listCycleBenchmarkRows } from "@/features/shared/query-seed.server"
-import { parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
+import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { getProductionPageInitialData, parseProductionPageFilters } from "@/features/production/queries.server"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createQueryClient } from "@/lib/react-query/query-client"
@@ -23,18 +23,22 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
   const includeInventory = PRODUCTION_METRICS[metricFilter].source === "inventory"
   const { farmId, farmName } = await resolveInitialFarmId(searchFarmId)
   const initialData = await getProductionPageInitialData({ farmId, filters: initialFilters, includeInventory })
-  const selectedSystemId = parseSelectedNumericId(initialFilters.selectedSystem)
+  const effectiveFilters =
+    initialData.systems.status === "success"
+      ? cleanScopedFilterState(initialFilters, initialData.systems.data)
+      : initialFilters
+  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
   const cycleBenchmarks = farmId
     ? await listCycleBenchmarkRows(createAccessTokenClient(accessToken), { farmId, systemId: selectedSystemId })
     : []
-  const batchId = parseSelectedNumericId(initialFilters.selectedBatch)
+  const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
   const queryClient = createQueryClient()
 
   if (initialData.bounds.start && initialData.bounds.end) {
     queryClient.setQueryData(
       queryKeys.timePeriodBounds({
         farmId,
-        timePeriod: initialFilters.timePeriod,
+        timePeriod: effectiveFilters.timePeriod,
         systemId: selectedSystemId,
         scope: "production",
       }),
@@ -42,7 +46,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     )
   }
   queryClient.setQueryData(
-    queryKeys.options.systems({ farmId, stage: initialFilters.selectedStage, activeOnly: false }),
+    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: false }),
     initialData.systems,
   )
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)
@@ -51,7 +55,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
       queryKeys.production.summary({
         farmId,
         systemId: selectedSystemId,
-        stage: initialFilters.selectedStage === "all" ? undefined : initialFilters.selectedStage,
+        stage: effectiveFilters.selectedStage === "all" ? undefined : effectiveFilters.selectedStage,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
         limit: 2500,
@@ -79,7 +83,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
 
   return (
     <QueryHydration state={dehydrate(queryClient)}>
-      <PageClient initialFarmId={farmId} initialFarmName={farmName} initialFilters={initialFilters} />
+      <PageClient initialFarmId={farmId} initialFarmName={farmName} initialFilters={effectiveFilters} />
     </QueryHydration>
   )
 }

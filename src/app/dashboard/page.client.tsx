@@ -12,5 +12,11 @@ export default function DashboardPageClient({
   initialFarmName?: string | null
   initialFilters?: DashboardPageInitialFilters
 }) {
-  return <DashboardPage initialFarmId={initialFarmId} initialFarmName={initialFarmName} initialFilters={initialFilters} />
+  return (
+    <DashboardPage
+      initialFarmId={initialFarmId}
+      initialFarmName={initialFarmName}
+      initialFilters={initialFilters}
+    />
+  )
 }

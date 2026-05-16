@@ -22,6 +22,7 @@ import { isSbInvalidRefreshToken } from "@/lib/supabase/log"
 import { getSessionIdentity, isSessionTokenExpired } from "@/lib/supabase/session"
 
 const AUTH_CALLBACK_PATH = "/auth/callback"
+const AUTH_SET_PASSWORD_PATH = "/auth/set-password"
 
 const AUTH_CALLBACK_QUERY_KEYS = [
   "code",
@@ -280,8 +281,9 @@ export async function proxy(request: NextRequest) {
     const activeOrganizationId = normalizeContextValue(request.cookies.get(ACTIVE_ORGANIZATION_COOKIE)?.value)
     const activeFarmId = normalizeContextValue(request.cookies.get(ACTIVE_FARM_COOKIE)?.value)
     const hasActiveWorkspaceContext = Boolean(activeOrganizationId && activeFarmId)
+    const isAccountSetupRoute = pathname === AUTH_SET_PASSWORD_PATH || pathname.startsWith(`${AUTH_SET_PASSWORD_PATH}/`)
 
-    if (isAuthRoute(pathname)) {
+    if (isAuthRoute(pathname) && !isAccountSetupRoute) {
       if (hasActiveWorkspaceContext) {
         const redirectPath = await resolveEntryPathForActiveFarm({ supabase, userId, farmId: activeFarmId })
         return withSupabaseCookies(
@@ -292,6 +294,10 @@ export async function proxy(request: NextRequest) {
     }
 
     const membership = await resolveFarmMembership(supabase, userId)
+
+    if (isAccountSetupRoute) {
+      return response
+    }
 
     if (isAuthRoute(pathname)) {
       const redirectPath = membership.membershipCount > 0 ? WORKSPACE_SELECT_PATH : ONBOARDING_PATH

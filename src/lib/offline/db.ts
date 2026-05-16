@@ -1,12 +1,12 @@
 import Dexie, { type Table } from "dexie"
 import type { Database } from "@/lib/types/database"
+import type { FeedingResponseLevel } from "@/lib/feeding-response"
 
 export type SyncStatus = "pending" | "synced" | "conflict" | "failed"
 
 /** Maximum number of consecutive failures before a record is marked 'failed'. */
 export const MAX_SYNC_RETRIES = 5
 
-type FeedingResponse = Database["public"]["Enums"]["feeding_response"]
 type WaterQualityParameter = Database["public"]["Enums"]["water_quality_parameters"]
 type StockingType = Database["public"]["Enums"]["type_of_stocking"]
 type HarvestType = Database["public"]["Enums"]["type_of_harvest"]
@@ -30,7 +30,7 @@ export interface OfflineFeedingRecord extends OfflineBaseRecord {
   date: string
   feedTypeId: number
   feedingAmount: number
-  feedingResponse: FeedingResponse
+  feedingResponse: FeedingResponseLevel
   notes?: string | null
 }
 

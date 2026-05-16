@@ -37,6 +37,7 @@ export function useAnalyticsPageBootstrap(params: {
   filterOverrides?: SharedFilterOverrides
   boundsEnabled?: boolean
   boundsScope?: AnalyticsTimeScope
+  useSystemBounds?: boolean
 } = {}) {
   const initialFarmId = normalizeFarmId(params.initialFarmId)
   const activeFarm = useActiveFarm({ initialFarmId, initialFarmName: params.initialFarmName })
@@ -88,10 +89,11 @@ export function useAnalyticsPageBootstrap(params: {
     sharedFilters.selectedSystem !== "all" && Number.isFinite(Number(sharedFilters.selectedSystem))
       ? Number(sharedFilters.selectedSystem)
       : undefined
+  const boundsSystemId = params.useSystemBounds === false ? undefined : selectedSystemId
   const boundsQuery = useTimePeriodBounds({
     farmId,
     timePeriod: sharedFilters.timePeriod,
-    systemId: selectedSystemId,
+    systemId: boundsSystemId,
     scope: params.boundsScope ?? "dashboard",
     enabled: params.boundsEnabled,
   })

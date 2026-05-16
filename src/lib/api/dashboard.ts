@@ -8,6 +8,7 @@ import type { TimePeriod } from "@/lib/time-period"
 type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
+type SystemDimensionRow = Pick<Database["public"]["Tables"]["system"]["Row"], "id" | "volume" | "length" | "width" | "depth" | "diameter">
 
 const isMissingRpcError = isMissingObjectError
 
@@ -92,6 +93,34 @@ const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
   return resolved
 }
 
+const resolveSystemVolume = (row: SystemDimensionRow) => {
+  if (typeof row.volume === "number" && Number.isFinite(row.volume) && row.volume > 0) return row.volume
+  if (
+    typeof row.length === "number" &&
+    Number.isFinite(row.length) &&
+    row.length > 0 &&
+    typeof row.width === "number" &&
+    Number.isFinite(row.width) &&
+    row.width > 0 &&
+    typeof row.depth === "number" &&
+    Number.isFinite(row.depth) &&
+    row.depth > 0
+  ) {
+    return row.length * row.width * row.depth
+  }
+  if (
+    typeof row.diameter === "number" &&
+    Number.isFinite(row.diameter) &&
+    row.diameter > 0 &&
+    typeof row.depth === "number" &&
+    Number.isFinite(row.depth) &&
+    row.depth > 0
+  ) {
+    return Math.PI * (row.diameter / 2) ** 2 * row.depth
+  }
+  return null
+}
+
 export async function getDashboardSystems(params?: {
   farmId?: string | null
   stage?: Enums<"system_growth_stage"> | null
@@ -146,12 +175,30 @@ export async function getDashboardSystems(params?: {
   if (inventoryResult.status !== "success") return toQuerySuccess<DashboardSystemRpcRow>(rows)
 
   const perSystemFallback = computePerSystemRateFallbacks(inventoryResult.data)
+  const { data: dimensions } = await supabase
+    .from("system")
+    .select("id, volume, length, width, depth, diameter")
+    .eq("farm_id", params.farmId)
+    .in("id", rows.map((row) => row.system_id))
+  const volumeBySystem = new Map(
+    ((dimensions ?? []) as SystemDimensionRow[]).map((row) => [row.id, resolveSystemVolume(row)]),
+  )
   const normalized = rows.map((row) => {
     const fb = perSystemFallback.get(row.system_id)
+    const volume = volumeBySystem.get(row.system_id)
+    const biomassDensity =
+      shouldBackfillRate(row.biomass_density) &&
+      typeof row.biomass_end === "number" &&
+      Number.isFinite(row.biomass_end) &&
+      typeof volume === "number" &&
+      volume > 0
+        ? row.biomass_end / volume
+        : row.biomass_density
     return {
       ...row,
       feeding_rate: shouldBackfillRate(row.feeding_rate) && fb?.feedingRate != null ? fb.feedingRate : row.feeding_rate,
       mortality_rate: shouldBackfillRate(row.mortality_rate) && fb?.mortalityRate != null ? fb.mortalityRate : row.mortality_rate,
+      biomass_density: biomassDensity,
     }
   })
 

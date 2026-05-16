@@ -2,7 +2,7 @@ import type { User } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { sanitizeNextPath } from "@/lib/app-entry"
-import { logSbError } from "@/lib/supabase/log"
+import { isSbInvalidRefreshToken, logSbError } from "@/lib/supabase/log"
 import { getSessionIdentity, isSessionTokenExpired } from "@/lib/supabase/session"
 
 function redirectToAuth(nextPath?: string | null): never {
@@ -43,7 +43,9 @@ export async function requireUserContext(nextPath?: string | null) {
 
   if (sessionError || !session?.access_token || !identity) {
     if (sessionError) {
-      logSbError("requireUserContext:getSession", sessionError)
+      if (!isSbInvalidRefreshToken(sessionError)) {
+        logSbError("requireUserContext:getSession", sessionError)
+      }
     }
     redirectToAuth(nextPath)
   }

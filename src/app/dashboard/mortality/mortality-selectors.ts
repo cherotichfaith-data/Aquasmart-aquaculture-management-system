@@ -1,6 +1,6 @@
 "use client"
 
-import { normalizeFeedingResponse } from "@/app/dashboard/feed/_lib/feed-analytics"
+import { isLowFeedingResponse } from "@/lib/feeding-response"
 import type { AlertLogRow } from "@/lib/api/mortality"
 import type { FeedingRecordWithType } from "@/lib/api/reports"
 import type { Database, Tables } from "@/lib/types/database"
@@ -9,7 +9,7 @@ import { buildLatestParameterizedReadingsBySystem } from "@/lib/water-quality-re
 
 type SystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
 type MortalityEventRow = Tables<"fish_mortality">
-type SurvivalTrendRow = Database["public"]["Functions"]["get_survival_trend"]["Returns"][number]
+type SurvivalTrendRow = Database["public"]["Functions"]["api_survival_trend"]["Returns"][number]
 type WaterQualityMeasurementRow = Tables<"api_water_quality_measurements">
 type SamplingRow = Tables<"fish_sampling_weight">
 export type InvestigationStatus = "open" | "monitoring" | "resolved" | "escalated"
@@ -192,13 +192,14 @@ function buildPoorAppetiteBySystem(rows: FeedingRecordWithType[], todayDate: str
     let poorResponses7d = 0
     let consecutivePoor = false
     for (let index = 0; index < sorted.length; index += 1) {
-      const current = normalizeFeedingResponse(sorted[index]?.feeding_response)
-      if (current === "Poor") {
+      if (isLowFeedingResponse(sorted[index]?.feeding_response)) {
         poorResponses7d += 1
       }
       if (index > 0) {
-        const previous = normalizeFeedingResponse(sorted[index - 1]?.feeding_response)
-        if (previous === "Poor" && current === "Poor") {
+        if (
+          isLowFeedingResponse(sorted[index - 1]?.feeding_response) &&
+          isLowFeedingResponse(sorted[index]?.feeding_response)
+        ) {
           consecutivePoor = true
         }
       }
@@ -479,7 +480,7 @@ export function buildDriverTrend(params: {
       feedKg: 0,
     }
     current.feedKg += row.feeding_amount ?? 0
-    if (normalizeFeedingResponse(row.feeding_response) === "Poor") {
+    if (isLowFeedingResponse(row.feeding_response)) {
       current.poorResponses += 1
     }
     byDate.set(row.date, current)

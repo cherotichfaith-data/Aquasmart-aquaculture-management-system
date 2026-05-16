@@ -7,6 +7,8 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { FilterPopover } from "@/components/shared/filter-popover"
+import { formatGrowthStage, GROWTH_STAGE_VALUES } from "@/lib/stage-filter"
+import { formatCageLabel } from "@/lib/system-options"
 
 type StageFilter = "all" | Enums<"system_growth_stage">
 
@@ -76,30 +78,25 @@ export default function FarmSelector({
   }, [allSystems, batchSystemsQuery.data, selectedBatch, selectedStage])
   const systemCount = systems.length
   const resolvedLayout = layout ?? (variant === "compact" ? "row" : "grid")
-  const formatStage = (value: StageFilter | string | null | undefined) => {
-    if (value === "nursing") return "Nursing"
-    if (value === "grow_out") return "Grow-out"
-    return "Unspecified"
-  }
   const stages = useMemo(() => {
     const stageSet = new Set<Enums<"system_growth_stage">>()
     allSystems.forEach((system) => {
-      if (system.growth_stage === "nursing" || system.growth_stage === "grow_out") {
+      if (GROWTH_STAGE_VALUES.includes(system.growth_stage)) {
         stageSet.add(system.growth_stage)
       }
     })
     if (selectedStage !== "all") {
       stageSet.add(selectedStage as Enums<"system_growth_stage">)
     }
-    const ordered = Array.from(stageSet).sort((a, b) => formatStage(a).localeCompare(formatStage(b)))
+    const ordered = GROWTH_STAGE_VALUES.filter((stage) => stageSet.has(stage))
     return [
       {
         value: "all",
-        label: "All Stages",
+        label: formatGrowthStage("all"),
       },
       ...ordered.map((value) => ({
         value,
-        label: formatStage(value),
+        label: formatGrowthStage(value),
       })),
     ]
   }, [allSystems, selectedStage])
@@ -125,11 +122,11 @@ export default function FarmSelector({
       },
       ...systems.map((system) => ({
         value: String(system.id),
-        label: system.label || `System ${system.id}`,
+        label: formatCageLabel(system),
         keywords: [
           system.label ?? "",
           system.unit ?? "",
-          formatStage(system.growth_stage),
+          formatGrowthStage(system.growth_stage),
           String(system.type ?? "").replaceAll("_", " "),
           String(system.id),
         ],

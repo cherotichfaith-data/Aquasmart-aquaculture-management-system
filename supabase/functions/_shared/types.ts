@@ -30,15 +30,7 @@ export type WqParameter =
   | 'ammonia'
   | 'salinity';
 
-export type FeedingResponse =
-  | 'excellent'
-  | 'very_good'
-  | 'good'
-  | 'ok'
-  | 'fair'
-  | 'poor'
-  | 'bad'
-  | 'not responding';
+export type FeedingResponse = 1 | 2 | 3 | 4 | 5;
 
 export type HarvestType = 'partial' | 'final';
 

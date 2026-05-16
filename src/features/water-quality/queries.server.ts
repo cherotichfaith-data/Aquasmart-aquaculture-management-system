@@ -26,6 +26,7 @@ import {
   getScopedSystemOptions,
   getScopedTimeBounds,
   parseSelectedNumericId,
+  resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
 import { listAlertThresholdRows } from "@/features/shared/query-seed.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
@@ -260,10 +261,18 @@ async function loadWaterQualityPageInitialData(
 
   if (!params.farmId) return empty
 
-  const selectedSystemId = parseSelectedNumericId(params.filters.selectedSystem)
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
 
-  const [bounds, systemOptions, batchSystems, syncStatus, latestStatus, thresholds] = await Promise.all([
+  const [systemOptions, batchSystems, syncStatus, thresholds] = await Promise.all([
+    getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<
+      WaterQualitySystemOption[]
+    >,
+    getScopedBatchSystems(supabase, batchId),
+    getSyncStatus(supabase, params.farmId),
+    getThresholds(supabase, params.farmId, params.userId),
+  ])
+  const selectedSystemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systemOptions)
+  const [bounds, latestStatus] = await Promise.all([
     getScopedTimeBounds(
       supabase,
       params.farmId,
@@ -271,13 +280,7 @@ async function loadWaterQualityPageInitialData(
       "water_quality",
       selectedSystemId,
     ),
-    getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<
-      WaterQualitySystemOption[]
-    >,
-    getScopedBatchSystems(supabase, batchId),
-    getSyncStatus(supabase, params.farmId),
     getLatestStatus(supabase, params.farmId, selectedSystemId),
-    getThresholds(supabase, params.farmId, params.userId),
   ])
 
   if (!bounds.start || !bounds.end) {

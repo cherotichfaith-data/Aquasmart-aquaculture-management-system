@@ -19,6 +19,7 @@ import type { Enums } from "@/lib/types/database"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import { formatNumberValue } from "@/lib/analytics-format"
+import { createSystemLabelResolver } from "@/lib/system-options"
 
 type ActivityItem = {
   id: string
@@ -81,15 +82,9 @@ export default function RecentActivities({
     return map
   }, [systemsQuery.data])
 
-  const systemNameMap = useMemo(() => {
-    const map = new Map<number, string>()
+  const resolveSystemLabel = useMemo(() => {
     const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
-    systems.forEach((row) => {
-      if (row.id != null && typeof row.label === "string") {
-        map.set(row.id, row.label)
-      }
-    })
-    return map
+    return createSystemLabelResolver(systems)
   }, [systemsQuery.data])
 
   const activities = useMemo(() => {
@@ -223,8 +218,7 @@ export default function RecentActivities({
 
   const getSubtitle = (activity: ActivityItem) => {
     const table = normalizeTableName(activity.table_name)
-    const systemName =
-      activity.system_id != null ? systemNameMap.get(activity.system_id) ?? `System ${activity.system_id}` : null
+    const systemName = activity.system_id != null ? resolveSystemLabel(activity.system_id) : null
     const raw = activity.raw
 
     switch (table) {

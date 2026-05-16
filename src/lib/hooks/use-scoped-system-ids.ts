@@ -21,7 +21,7 @@ export function useScopedSystemIds(params: Params) {
   const systemsQuery = useSystemOptions({
     farmId: params.farmId,
     stage: params.selectedStage,
-    activeOnly: false,
+    activeOnly: true,
     enabled: params.enabled,
   })
 
@@ -30,8 +30,6 @@ export function useScopedSystemIds(params: Params) {
     farmId: params.farmId,
     enabled: params.enabled,
   })
-
-  const hasScopeFilters = hasSystem || params.selectedStage !== "all" || params.selectedBatch !== "all"
 
   const scopedSystemIdList = useMemo(() => {
     const stageIds =
@@ -44,17 +42,26 @@ export function useScopedSystemIds(params: Params) {
         ? batchSystemsQuery.data.data.map((row) => row.system_id)
         : []
 
-    if (hasSystem) return [selectedSystemId as number]
+    if (hasSystem) {
+      return stageIds.includes(selectedSystemId as number) ? [selectedSystemId as number] : stageIds
+    }
     if (params.selectedBatch === "all") return stageIds
     const stageSet = new Set(stageIds)
     return batchIds.filter((id) => stageSet.has(id))
   }, [batchSystemsQuery.data, hasSystem, params.selectedBatch, selectedSystemId, systemsQuery.data])
 
   const scopedSystemIds = useMemo(() => new Set(scopedSystemIdList), [scopedSystemIdList])
+  const resolvedSelectedSystemId = useMemo(() => {
+    if (!hasSystem) return undefined
+    return scopedSystemIdList.length === 1 && scopedSystemIdList[0] === selectedSystemId
+      ? selectedSystemId
+      : undefined
+  }, [hasSystem, scopedSystemIdList, selectedSystemId])
+  const hasScopeFilters = Boolean(resolvedSelectedSystemId) || params.selectedStage !== "all" || params.selectedBatch !== "all"
 
   return {
-    selectedSystemId,
-    hasSystem,
+    selectedSystemId: resolvedSelectedSystemId,
+    hasSystem: Boolean(resolvedSelectedSystemId),
     hasScopeFilters,
     batchId,
     scopedSystemIdList,

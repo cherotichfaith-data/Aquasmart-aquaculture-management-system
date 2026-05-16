@@ -13,7 +13,7 @@ const feedingSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   feed_type_id: z.number().int().positive(),
   feeding_amount: z.number().positive(),
-  feeding_response: z.enum(["very_good", "good", "fair", "bad"]),
+  feeding_response: z.number().int().min(1).max(5),
   notes: z.string().max(500).nullable().optional(),
   local_id: z.string().max(128).optional(),
 })

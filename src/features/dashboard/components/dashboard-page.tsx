@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, type ReactNode } from "react"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Box from "@mui/material/Box"
 import Grid from "@mui/material/Grid"
 import Typography from "@mui/material/Typography"
@@ -16,9 +16,9 @@ import KPIOverview from "./kpi-overview"
 import PopulationOverview from "./population-overview"
 import SystemsTable from "./systems-table"
 import RecentActivities from "./recent-activities"
-import WaterQualityIndex from "./water-quality-index"
 import RecommendedActions from "./recommended-actions"
-import SystemHealthOverview from "./system-health-overview"
+import EfcrByPeriod from "./efcr-by-period"
+import WaterQualityMonthlyAverages from "./water-quality-monthly-averages"
 import { DashboardExportButton } from "./dashboard-export-button"
 import { downloadDashboardSummary, parseDashboardStageParam } from "./dashboard-page-utils"
 
@@ -58,6 +58,8 @@ export default function DashboardPage({
   initialFilters?: DashboardPageInitialFilters
 }) {
   const debugEnabled = process.env.NEXT_PUBLIC_DEBUG === "true"
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const periodParam = searchParams.get("period")
   const systemParam = searchParams.get("system")
@@ -88,6 +90,7 @@ export default function DashboardPage({
     initialFarmName,
     defaultTimePeriod: initialFilters?.timePeriod ?? "month",
     boundsScope: "dashboard",
+    useSystemBounds: false,
     initialFilters,
     filterOverrides,
   })
@@ -99,6 +102,16 @@ export default function DashboardPage({
     selectedSystem,
   })
   const appliedScopedSystemIds = hasScopeFilters ? scopedSystemIdList : null
+  const activeProductionSystemIds = scopedSystemIdList.length > 0 ? scopedSystemIdList : null
+
+  useEffect(() => {
+    if (selectedSystem === "all" || selectedSystemId != null) return
+    const params = new URLSearchParams(searchParams.toString())
+    if (params.get("system") !== selectedSystem) return
+    params.delete("system")
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+  }, [pathname, router, searchParams, selectedSystem, selectedSystemId])
 
   useEffect(() => {
     if (!debugEnabled) return
@@ -156,20 +169,19 @@ export default function DashboardPage({
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, lg: 7 }}>
-          <SectionLabel title="System Health" />
-          <SystemHealthOverview farmId={farmId} systemId={selectedSystemId} />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 5 }}>
-          <SectionLabel title="Water Quality Index" />
-          <WaterQualityIndex
+          <EfcrByPeriod
             farmId={farmId}
-            stage={selectedStage}
-            batch={selectedBatch}
-            system={selectedSystem}
             dateFrom={dateFrom}
             dateTo={dateTo}
-            scopedSystemIds={appliedScopedSystemIds}
-            resolvedSystemId={selectedSystemId}
+            scopedSystemIds={activeProductionSystemIds}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, lg: 5 }}>
+          <WaterQualityMonthlyAverages
+            farmId={farmId}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            scopedSystemIds={activeProductionSystemIds}
           />
         </Grid>
       </Grid>
@@ -192,9 +204,7 @@ export default function DashboardPage({
       </section>
 
       <section>
-        <SectionLabel
-          title="System Status"
-        />
+        <SectionLabel title="System Status" />
         <SystemsTable
           farmId={farmId}
           stage={selectedStage}

@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
-import type { SystemOption } from "@/lib/system-options"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/lib/hooks/app/use-toast"
 import { useSystemOptions } from "@/lib/hooks/use-options"
@@ -284,7 +284,7 @@ export function WaterQualityForm({
                         <SelectContent>
                           {selectableSystems.map((system) => (
                             <SelectItem key={system.id} value={String(system.id)}>
-                              {system.label ?? `System ${system.id}`}
+                              {formatCageLabel(system)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -459,7 +459,7 @@ export function WaterQualityForm({
             }
             value={doClassification ? doClassification.replace("_", " ") : "Enter DO value"}
           />
-          <InfoStat label="Selected System" value={selectedSystem?.label ?? "No system selected"} />
+          <InfoStat label="Selected System" value={selectedSystem ? formatCageLabel(selectedSystem) : "No system selected"} />
           <InfoStat label="Depth" value={`${selectedDepth} m`} />
           <InfoStat label="PM Check" value={selectedTime < "12:00" ? "Still due today" : "PM reading captured"} />
         </InfoPanel>

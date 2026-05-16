@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
-import type { SystemOption } from "@/lib/system-options"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
@@ -219,7 +219,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                     <SelectContent>
                       {systems.map((system) => (
                         <SelectItem key={system.id} value={String(system.id)}>
-                          {system.label ?? `System ${system.id}`}
+                          {formatCageLabel(system)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -268,7 +268,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                       <SelectContent>
                         {systems.map((system) => (
                           <SelectItem key={system.id} value={String(system.id)}>
-                            {system.label ?? `System ${system.id}`}
+                            {formatCageLabel(system)}
                           </SelectItem>
                         ))}
                         <SelectItem value={EXTERNAL_DESTINATION}>External location</SelectItem>
