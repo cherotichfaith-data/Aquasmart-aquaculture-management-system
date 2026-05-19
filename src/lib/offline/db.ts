@@ -28,9 +28,9 @@ export interface OfflineFeedingRecord extends OfflineBaseRecord {
   systemId: number
   batchId?: number | null
   date: string
-  feedTypeId: number
+  feedTypeId?: number | null
   feedingAmount: number
-  feedingResponse: FeedingResponseLevel
+  feedingResponse?: FeedingResponseLevel | null
   notes?: string | null
 }
 

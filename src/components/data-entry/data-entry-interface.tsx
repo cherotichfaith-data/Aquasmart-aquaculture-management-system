@@ -25,7 +25,7 @@ type DataEntryTabId =
     | "harvest"
     | "transfer"
     | "stocking"
-    | "incoming_feed"
+    | "feed_inventory"
     | "system"
 
 interface DataEntryInterfaceProps {
@@ -41,7 +41,7 @@ interface DataEntryInterfaceProps {
         transfer: Tables<"fish_transfer">[]
         harvest: Tables<"fish_harvest">[]
         water_quality: Tables<"water_quality_measurement">[]
-        incoming_feed: Tables<"feed_inventory">[]
+        feed_inventory: Tables<"feed_inventory">[]
         stocking: Tables<"fish_stocking">[]
         systems: Tables<"system">[]
     }
@@ -54,13 +54,13 @@ type RecentEntriesByTab = DataEntryInterfaceProps["recentEntries"]
 
 const sidebarItems = [
     { id: "feeding",       label: "Feeding" },
+    { id: "feed_inventory", label: "Feed Inventory" },
     { id: "mortality",     label: "Mortality" },
     { id: "sampling",      label: "Sampling" },
     { id: "water_quality", label: "Water Quality" },
-    { id: "harvest",       label: "Harvest" },
     { id: "transfer",      label: "Transfer" },
+    { id: "harvest",       label: "Harvest" },
     { id: "stocking",      label: "Stocking" },
-    { id: "incoming_feed", label: "Feed Inventory" },
     { id: "system",        label: "System Setup" },
 ] as const
 
@@ -78,8 +78,8 @@ function getRecentEntriesForTab(recentEntries: RecentEntriesByTab, tab: DataEntr
             return { type: "harvest" as const, data: recentEntries.harvest }
         case "water_quality":
             return { type: "water_quality" as const, data: recentEntries.water_quality }
-        case "incoming_feed":
-            return { type: "incoming_feed" as const, data: recentEntries.incoming_feed }
+        case "feed_inventory":
+            return { type: "feed_inventory" as const, data: recentEntries.feed_inventory }
         case "stocking":
             return { type: "stocking" as const, data: recentEntries.stocking }
         case "system":
@@ -108,11 +108,11 @@ export function DataEntryInterface({
     const canAccessFeedInventory =
         farmRole === "admin" || farmRole === "farm_manager" || farmRole === "system_operator"
     const visibleSidebarItems = useMemo(
-        () => sidebarItems.filter((item) => item.id !== "incoming_feed" || canAccessFeedInventory),
+        () => sidebarItems.filter((item) => item.id !== "feed_inventory" || canAccessFeedInventory),
         [canAccessFeedInventory],
     )
     const requestedTab = tab ?? "feeding"
-    const isRestrictedTab = requestedTab === "incoming_feed" && !canAccessFeedInventory
+    const isRestrictedTab = requestedTab === "feed_inventory" && !canAccessFeedInventory
     const activeTab = useMemo(
         () =>
             visibleSidebarItems.some((item) => item.id === requestedTab)
@@ -188,7 +188,7 @@ export function DataEntryInterface({
                 )
             case "water_quality":
                 return <WaterQualityForm farmId={farmId} systems={systems} defaultSystemId={defaultSystemId} />
-            case "incoming_feed":
+            case "feed_inventory":
                 return <FeedInventoryForm feeds={feeds} farmId={farmId} />
             case "stocking":
                 return (

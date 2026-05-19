@@ -3,7 +3,8 @@ import type { FeedingResponseLevel } from "@/lib/feeding-response"
 
 export type FeedingInsertInput = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
   farm_id?: string | null
-  feeding_response: FeedingResponseLevel
+  feed_type_id?: number | null
+  feeding_response?: FeedingResponseLevel | null
 }
 
 type FeedingRecordRow = Database["public"]["Tables"]["feeding_record"]["Row"]

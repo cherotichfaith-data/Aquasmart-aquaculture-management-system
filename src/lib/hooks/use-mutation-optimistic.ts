@@ -32,7 +32,7 @@ export type RecentEntriesKey =
   | "transfer"
   | "harvest"
   | "water_quality"
-  | "incoming_feed"
+  | "feed_inventory"
   | "stocking"
   | "systems"
 

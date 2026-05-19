@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -28,8 +27,6 @@ import { useFeedTypeOptions } from "@/lib/hooks/use-options"
 import { diffDateDays } from "@/lib/time-series"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { DependencyBlocker } from "./dependency-blocker"
-import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import {
   InfoPanel,
   InfoStat,
@@ -40,23 +37,56 @@ import {
 } from "./form-support"
 import { parseOptionalNumericId, parseRequiredNumericId, requireActiveFarmId, toIsoDate } from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
-import { DATA_ENTRY_PATH } from "@/lib/app-entry"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
   farm_id?: string | null
-  feeding_response: FeedingResponseLevel
+  feed_type_id?: number | null
+  feeding_response?: FeedingResponseLevel | null
 }
 
-const formSchema = z.object({
-  date: z.string().min(1, "Date is required"),
-  unit: z.string().min(1, "Cage unit is required"),
-  system_id: z.string().min(1, "Cage number is required"),
-  feed_id: z.string().min(1, "Feed type is required"),
-  amount_kg: z.coerce.number().min(0.01, "Amount must be positive"),
-  feeding_response: z.coerce.number().int().min(1).max(5),
-  batch_id: z.string().optional(),
-  notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
-})
+const OPTIONAL_SELECT_VALUE = "none"
+
+const formSchema = z
+  .object({
+    date: z.string().min(1, "Date is required"),
+    unit: z.string().min(1, "Cage unit is required"),
+    system_id: z.string().min(1, "Cage number is required"),
+    feed_id: z.string().optional(),
+    amount_kg: z.coerce.number().min(0, "Amount cannot be negative"),
+    feeding_response: z.string().optional(),
+    batch_id: z.string().optional(),
+    notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
+  })
+  .superRefine((values, ctx) => {
+    const hasFeedType = Boolean(values.feed_id && values.feed_id !== OPTIONAL_SELECT_VALUE)
+    const hasFeedingResponse = Boolean(values.feeding_response && values.feeding_response !== OPTIONAL_SELECT_VALUE)
+    const hasComments = Boolean(values.notes?.trim())
+
+    if (values.amount_kg > 0) {
+      if (!hasFeedType) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["feed_id"],
+          message: "Feed type is required when feed was given",
+        })
+      }
+      if (!hasFeedingResponse) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["feeding_response"],
+          message: "Feeding response is required when feed was given",
+        })
+      }
+    }
+
+    if (values.amount_kg === 0 && !hasComments) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["notes"],
+        message: "Add a comment explaining why feeding was not done",
+      })
+    }
+  })
 
 interface FeedingFormProps {
   farmId: string | null
@@ -97,8 +127,6 @@ export function FeedingForm({
   defaultBatchId = null,
 }: FeedingFormProps) {
   const mutation = useRecordFeeding()
-  const router = useRouter()
-  const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [submissionSummary, setSubmissionSummary] = useState<string | null>(null)
 
@@ -112,9 +140,9 @@ export function FeedingForm({
       unit: defaultUnit,
       amount_kg: 0,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
-      feed_id: "",
-      feeding_response: 3,
-      batch_id: defaultBatchId ? String(defaultBatchId) : "none",
+      feed_id: OPTIONAL_SELECT_VALUE,
+      feeding_response: OPTIONAL_SELECT_VALUE,
+      batch_id: defaultBatchId ? String(defaultBatchId) : OPTIONAL_SELECT_VALUE,
       notes: "",
     },
   })
@@ -124,7 +152,7 @@ export function FeedingForm({
   const selectedSystemId = Number(selectedSystemValue)
   const selectedBatchValue = form.watch("batch_id")
   const selectedBatchId =
-    selectedBatchValue && selectedBatchValue !== "none" ? Number(selectedBatchValue) : null
+    selectedBatchValue && selectedBatchValue !== OPTIONAL_SELECT_VALUE ? Number(selectedBatchValue) : null
   const selectedDate = form.watch("date")
   const selectedFeedId = Number(form.watch("feed_id"))
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
@@ -156,10 +184,10 @@ export function FeedingForm({
 
   useEffect(() => {
     const currentFeedId = form.getValues("feed_id")
-    if (!currentFeedId || availableFeedsQuery.isLoading) return
+    if (!currentFeedId || currentFeedId === OPTIONAL_SELECT_VALUE || availableFeedsQuery.isLoading) return
     const existsThisWeek = availableFeeds.some((feed) => String(feed.id) === currentFeedId)
     if (!existsThisWeek) {
-      form.setValue("feed_id", "", { shouldValidate: true })
+      form.setValue("feed_id", OPTIONAL_SELECT_VALUE, { shouldValidate: true })
     }
   }, [availableFeeds, availableFeedsQuery.isLoading, form])
 
@@ -227,7 +255,8 @@ export function FeedingForm({
     try {
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
-      const feedTypeId = parseRequiredNumericId(values.feed_id, "Feed type")
+      const feedTypeId = parseOptionalNumericId(values.feed_id)
+      const feedingResponse = parseOptionalNumericId(values.feeding_response) as FeedingResponseLevel | undefined
       const batchId = parseOptionalNumericId(values.batch_id)
       const existingTotal = existingDailyRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
       const dailyTotal = existingTotal + values.amount_kg
@@ -239,9 +268,9 @@ export function FeedingForm({
         system_id: systemId,
         batch_id: batchId,
         date: values.date,
-        feed_type_id: feedTypeId,
+        feed_type_id: feedTypeId ?? null,
         feeding_amount: values.amount_kg,
-        feeding_response: values.feeding_response,
+        feeding_response: feedingResponse ?? null,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       } as FeedingInsertOverride
 
@@ -266,30 +295,6 @@ export function FeedingForm({
     }
   }
 
-  if (feeds.length === 0) {
-    return (
-      <DependencyBlocker
-        title="No feed types found."
-        description="Add a feed type to continue."
-        actionLabel={showQuickCreate ? "Hide feed type form" : "Add feed type"}
-        onAction={() => setShowQuickCreate((current) => !current)}
-      >
-        {showQuickCreate ? <FeedTypeQuickCreate farmId={farmId} onCreated={() => setShowQuickCreate(false)} /> : null}
-      </DependencyBlocker>
-    )
-  }
-
-  if (!availableFeedsQuery.isLoading && availableFeeds.length === 0) {
-    return (
-      <DependencyBlocker
-        title="No feed inventory available for this week."
-        description="Record the current feed stock before saving feeding for the selected date."
-        actionLabel="Record feed inventory"
-        onAction={() => router.push(`${DATA_ENTRY_PATH}?type=incoming_feed`)}
-      />
-    )
-  }
-
   return (
     <div>
       <div className="data-entry-form-intro">
@@ -311,6 +316,11 @@ export function FeedingForm({
           {submissionSummary ? (
             <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
               {submissionSummary}
+            </div>
+          ) : null}
+          {!availableFeedsQuery.isLoading && availableFeeds.length === 0 ? (
+            <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
+              No feed inventory is available for this week. You can still record a 0 kg feeding entry with comments, or record feed inventory first.
             </div>
           ) : null}
 
@@ -400,6 +410,7 @@ export function FeedingForm({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value={OPTIONAL_SELECT_VALUE}>No feed selected</SelectItem>
                           {availableFeeds.map((feed) => (
                             <SelectItem key={feed.id} value={String(feed.id)}>
                               {feed.label ?? feed.feed_line ?? `Feed ${feed.id}`}
@@ -442,13 +453,14 @@ export function FeedingForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Feeding Response</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(Number(value))} value={String(field.value)}>
+                    <Select onValueChange={field.onChange} value={String(field.value)}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select response" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value={OPTIONAL_SELECT_VALUE}>Not recorded</SelectItem>
                         {FEEDING_RESPONSE_LEVELS.map((option) => (
                           <SelectItem key={option.level} value={String(option.level)}>
                             Level {option.level} - {option.label}
@@ -505,7 +517,7 @@ export function FeedingForm({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="none">No batch</SelectItem>
+                              <SelectItem value={OPTIONAL_SELECT_VALUE}>No batch</SelectItem>
                               {batches.map((batch) => (
                                 <SelectItem key={batch.id} value={String(batch.id)}>
                                   {batch.label || `Batch ${batch.id}`}
