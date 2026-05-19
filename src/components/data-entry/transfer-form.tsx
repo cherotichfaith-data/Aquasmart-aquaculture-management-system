@@ -1,7 +1,6 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/app-ui/button"
@@ -21,7 +20,6 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { DependencyBlocker } from "./dependency-blocker"
 import {
   calculateAbw,
   parseOptionalNumericId,
@@ -30,7 +28,6 @@ import {
   toIsoDate,
 } from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
-import { DATA_ENTRY_PATH } from "@/lib/app-entry"
 
 const EXTERNAL_DESTINATION = "__external__"
 
@@ -53,6 +50,10 @@ const formSchema = z.object({
         message: "External destination is required",
       })
     }
+    return
+  }
+
+  if (values.transfer_type === "count_check") {
     return
   }
 
@@ -84,7 +85,6 @@ interface TransferFormProps {
 
 export function TransferForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: TransferFormProps) {
   const mutation = useRecordTransfer()
-  const router = useRouter()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -95,7 +95,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       origin_system_id: defaultSystemId ? String(defaultSystemId) : "",
       target_system_id: "",
       external_target_name: "",
-      transfer_type: "transfer",
+      transfer_type: systems.length < 2 ? "count_check" : "transfer",
       batch_id: defaultBatchId ? String(defaultBatchId) : "none",
       notes: "",
     },
@@ -161,16 +161,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
     }
   }
 
-  if (systems.length < 2) {
-    return (
-      <DependencyBlocker
-        title="Add another system to record transfers."
-        actionLabel="Add system"
-        onAction={() => router.push(`${DATA_ENTRY_PATH}?type=system`)}
-      />
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="data-entry-form-intro">
@@ -210,7 +200,15 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Origin Cage</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value)
+                      if (form.getValues("transfer_type") === "count_check") {
+                        form.setValue("target_system_id", value, { shouldValidate: true })
+                      }
+                    }}
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select origin" />

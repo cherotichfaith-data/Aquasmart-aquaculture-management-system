@@ -4,13 +4,13 @@ import { formatFeedDayLabel, type FeedRatePoint } from "./feed-analytics"
 import type { FeedExceptionItem } from "./feed-sections"
 import type { FeedRunningStockRow } from "@/lib/api/reports"
 
-export const buildDateWindow = (startDate: string, endDate: string, maxDays = 30) => {
+export const buildDateWindow = (startDate: string, endDate: string, maxDays?: number | null) => {
   const start = new Date(`${startDate}T00:00:00`)
   const end = new Date(`${endDate}T00:00:00`)
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return []
   const dates: string[] = []
   const cursor = new Date(end)
-  while (cursor >= start && dates.length < maxDays) {
+  while (cursor >= start && (maxDays == null || dates.length < maxDays)) {
     dates.unshift(cursor.toISOString().split("T")[0])
     cursor.setDate(cursor.getDate() - 1)
   }
@@ -93,20 +93,20 @@ export function buildFeedExceptionItems(params: {
   poorAlerts: Array<{ systemId: number; date: string; message: string }>
   runningStockRows: FeedRunningStockRow[]
   systemNameById: Map<number, string>
-  /** DO threshold (mg/L) fetched from alert_threshold table. Default 4.0 per research brief. */
+  /** DO threshold (mg/L) fetched from alert_threshold table. */
   lowDoThreshold?: number | null
-  /** SGR (%/day) below which a warning fires. Fetched from alert_threshold. Default 1.0. */
+  /** SGR (%/day) below which a warning fires. Fetched from alert_threshold. */
   lowSgrThreshold?: number | null
-  /** Survival (%) below which a WARNING fires. Fetched from alert_threshold. Default 80. */
+  /** Survival (%) below which a WARNING fires. Fetched from alert_threshold. */
   lowSurvivalPct?: number | null
-  /** Survival (%) below which a CRITICAL fires. Fetched from alert_threshold. Default 70. */
+  /** Survival (%) below which a CRITICAL fires. Fetched from alert_threshold. */
   criticalSurvivalPct?: number | null
 }) {
   const items: FeedExceptionItem[] = []
-  const lowDoThreshold = params.lowDoThreshold ?? 4.0
-  const lowSgrThreshold = params.lowSgrThreshold ?? 1.0
-  const lowSurvivalPct = params.lowSurvivalPct ?? 80.0
-  const criticalSurvivalPct = params.criticalSurvivalPct ?? 70.0
+  const lowDoThreshold = params.lowDoThreshold
+  const lowSgrThreshold = params.lowSgrThreshold
+  const lowSurvivalPct = params.lowSurvivalPct
+  const criticalSurvivalPct = params.criticalSurvivalPct
 
   Array.from(params.latestFeedRateBySystem.values())
     .filter((point) => point.feedRatePct != null && (point.upperBand != null || point.lowerBand != null))
@@ -142,7 +142,7 @@ export function buildFeedExceptionItems(params: {
   })
 
   Array.from(params.latestGrowthBySystem.values())
-    .filter((row) => row.sgr_pct_day < lowSgrThreshold)
+    .filter((row) => lowSgrThreshold != null && row.sgr_pct_day < lowSgrThreshold)
     .forEach((row) => {
       items.push({
         id: `growth-${row.system_id}`,
@@ -154,13 +154,13 @@ export function buildFeedExceptionItems(params: {
     })
 
   Array.from(params.latestSurvivalBySystem.values())
-    .filter((row) => row.survival_pct != null && row.survival_pct < lowSurvivalPct)
+    .filter((row) => lowSurvivalPct != null && row.survival_pct != null && row.survival_pct < lowSurvivalPct)
     .forEach((row) => {
       const survivalPct = row.survival_pct
       if (survivalPct == null) return
       items.push({
         id: `survival-${row.system_id}`,
-        severity: survivalPct < criticalSurvivalPct ? "critical" : "warning",
+        severity: criticalSurvivalPct != null && survivalPct < criticalSurvivalPct ? "critical" : "warning",
         title: `${params.systemNameById.get(row.system_id) ?? `System ${row.system_id}`} survival risk`,
         detail: `Survival ${survivalPct.toFixed(1)}% on ${formatFeedDayLabel(row.event_date)} (threshold: ${lowSurvivalPct}%).`,
         systemId: row.system_id,
@@ -168,6 +168,7 @@ export function buildFeedExceptionItems(params: {
     })
 
   Array.from(params.latestDoBySystem.entries()).forEach(([systemId, reading]) => {
+    if (lowDoThreshold == null) return
     if (reading.value >= lowDoThreshold) return
     items.push({
       id: `do-${systemId}`,
@@ -179,13 +180,13 @@ export function buildFeedExceptionItems(params: {
   })
 
   params.runningStockRows
-    .filter((row) => (row.days_remaining ?? 999) < 30)
-    .sort((a, b) => (a.days_remaining ?? 999) - (b.days_remaining ?? 999))
+    .filter((row) => ["critical", "low", "reorder"].includes(String(row.stock_status)))
+    .sort((a, b) => String(a.stock_status).localeCompare(String(b.stock_status)))
     .slice(0, 3)
     .forEach((row) => {
       items.push({
         id: `stock-${row.feed_type_name}`,
-        severity: (row.days_remaining ?? 999) < 14 ? "critical" : "warning",
+        severity: row.stock_status === "critical" ? "critical" : "warning",
         title: `${row.feed_type_name} stock cover`,
         detail: `${formatMetricNumber(row.days_remaining, 0)} days remaining at ${formatMetricNumber(row.avg_daily_usage_kg, 1)} kg/day.`,
       })

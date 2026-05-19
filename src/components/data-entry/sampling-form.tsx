@@ -89,7 +89,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
     defaultValues: {
       date: toIsoDate(new Date()),
       unit: defaultUnit,
-      number_of_fish: 50,
       total_weight_kg: 0,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       batch_id: defaultBatchId ? String(defaultBatchId) : "none",
@@ -144,7 +143,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
   const daysSinceLastSample = diffDateDays(previousSample?.date, selectedDate)
   const abwDeltaPct =
     projectedAbw && computedAbw ? Math.abs((computedAbw - projectedAbw) / projectedAbw) * 100 : null
-  const isProjectedOutlier = abwDeltaPct != null && abwDeltaPct > 30
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -167,7 +165,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
       form.reset({
         date: toIsoDate(new Date()),
         unit: values.unit,
-        number_of_fish: 50,
         total_weight_kg: 0,
         system_id: values.system_id,
         batch_id: values.batch_id,
@@ -191,12 +188,6 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
-            {isProjectedOutlier ? (
-              <div className="data-entry-callout-alert rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
-                ABW is {abwDeltaPct?.toFixed(0)}% away from the projected value for this cage. Recheck the sample before saving.
-              </div>
-            ) : null}
-
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="data-entry-secondary-grid">
@@ -373,10 +364,8 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
             />
             <InfoStat
               label="Projection Delta"
-              tone={isProjectedOutlier ? "critical" : "default"}
               value={abwDeltaPct != null ? `${abwDeltaPct.toFixed(1)}%` : "No comparison"}
             />
-            <InfoStat label="Sampling Target" value="50 fish per sample" />
           </InfoPanel>
         </div>
       </div>

@@ -17,45 +17,54 @@ import {
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
-import { useRecordFeedInventorySnapshot } from "@/lib/hooks/use-incoming-feed"
+import { useRecordFeedInventorySnapshot } from "@/lib/hooks/use-feed-inventory"
 import { logSbError } from "@/lib/supabase/log"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { DependencyBlocker } from "./dependency-blocker"
 import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import { InfoPanel, InfoStat } from "./form-support"
 import { calculateFeedAmount, parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
 
 const formSchema = z.object({
-  date: z.string().min(1, "Date is required"),
+  inventory_date: z.string().min(1, "Date is required"),
+  inventory_time: z.string().min(1, "Time is required"),
   feed_id: z.string().min(1, "Feed type is required"),
   bag_weight_kg: z.coerce.number().min(0.01, "Bag weight must be positive"),
   number_of_bags: z.coerce.number().int().min(0, "Amount of bags cannot be negative"),
-  open_bags_kg: z.coerce.number().min(0, "Open bag weight cannot be negative"),
+  opened_bags: z.coerce.number().int().min(0, "Open bags cannot be negative"),
+  comments: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 })
 
-interface IncomingFeedFormProps {
+interface FeedInventoryFormProps {
   feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
   farmId: string | null
 }
 
-export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
+export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
   const mutation = useRecordFeedInventorySnapshot()
   const [showQuickCreate, setShowQuickCreate] = useState(false)
+  const feedInventoryFeeds = feeds.filter((feed) => feed.visibility_scope !== "shared_catalog")
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: new Date().toISOString().split("T")[0],
+      inventory_date: new Date().toISOString().split("T")[0],
+      inventory_time: "16:00",
       feed_id: "",
       bag_weight_kg: 25,
       number_of_bags: 0,
-      open_bags_kg: 0,
+      opened_bags: 0,
+      comments: "",
     },
   })
 
+  const selectedFeedId = form.watch("feed_id")
   const bagWeightKg = form.watch("bag_weight_kg")
   const numberOfBags = form.watch("number_of_bags")
-  const openBagsKg = form.watch("open_bags_kg")
-  const totalStockKg = calculateFeedAmount(bagWeightKg, numberOfBags, openBagsKg)
+  const openedBags = form.watch("opened_bags")
+  const selectedFeed = feedInventoryFeeds.find((feed) => String(feed.id) === selectedFeedId) ?? null
+  const selectedFeedLabel = selectedFeed?.label ?? selectedFeed?.feed_line ?? (selectedFeed ? `Feed ${selectedFeed.id}` : "")
+  const totalStockKg = calculateFeedAmount(bagWeightKg, numberOfBags + openedBags, 0)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -64,24 +73,31 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
 
       await mutation.mutateAsync({
         farm_id: resolvedFarmId,
-        date: values.date,
+        inventory_date: values.inventory_date,
+        inventory_time: values.inventory_time,
         feed_type_id: feedTypeId,
-        feed_amount: calculateFeedAmount(values.bag_weight_kg, values.number_of_bags, values.open_bags_kg),
+        feed_type_label: selectedFeedLabel,
+        bag_weight: values.bag_weight_kg,
+        amount_of_bags: values.number_of_bags,
+        opened_bags: values.opened_bags,
+        comments: values.comments?.trim() ? values.comments.trim() : null,
       })
 
       form.reset({
-        date: new Date().toISOString().split("T")[0],
+        inventory_date: new Date().toISOString().split("T")[0],
+        inventory_time: values.inventory_time,
         feed_id: values.feed_id,
         bag_weight_kg: values.bag_weight_kg,
         number_of_bags: 0,
-        open_bags_kg: 0,
+        opened_bags: 0,
+        comments: "",
       })
     } catch (error) {
       logSbError("dataEntry:feedInventory:submit", error)
     }
   }
 
-  if (feeds.length === 0) {
+  if (feedInventoryFeeds.length === 0) {
     return (
       <DependencyBlocker
         title="No feed types found."
@@ -97,8 +113,12 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
   return (
     <div>
       <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Feed Delivery</h2>
-        <p className="text-sm text-muted-foreground">Record incoming feed volume from deliveries or manual store additions.</p>
+        <h2 className="text-xl font-semibold tracking-tight">Feed Inventory</h2>
+        <p className="text-sm text-muted-foreground">Record current feed stock by feed type, including bagged and open-bag quantities.</p>
+      </div>
+
+      <div className="data-entry-status">
+        <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
@@ -108,12 +128,26 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
               <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
-                  name="date"
+                  name="inventory_date"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Date</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="inventory_time"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -135,7 +169,7 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {feeds.map((feed) => (
+                          {feedInventoryFeeds.map((feed) => (
                             <SelectItem key={feed.id} value={String(feed.id)}>
                               {feed.label ?? feed.feed_line ?? `Feed ${feed.id}`}
                             </SelectItem>
@@ -178,18 +212,36 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
 
                 <FormField
                   control={form.control}
-                  name="open_bags_kg"
+                  name="opened_bags"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Open Bags (kg)</FormLabel>
+                      <FormLabel>Open Bags</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} />
+                        <Input type="number" step="1" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="comments"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Comments</FormLabel>
+                    <FormControl>
+                      <textarea
+                        {...field}
+                        rows={3}
+                        className="data-entry-textarea"
+                        placeholder="Stock count note, adjustment reason, or storage observation."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Record Feed Inventory
@@ -200,7 +252,7 @@ export function IncomingFeedForm({ feeds, farmId }: IncomingFeedFormProps) {
 
         <InfoPanel title="Snapshot Totals">
           <InfoStat label="Bagged Stock" value={`${calculateFeedAmount(bagWeightKg, numberOfBags, 0).toFixed(2)} kg`} />
-          <InfoStat label="Open Bags" value={`${(openBagsKg || 0).toFixed(2)} kg`} />
+          <InfoStat label="Open Bags" value={`${calculateFeedAmount(bagWeightKg, openedBags, 0).toFixed(2)} kg`} />
           <InfoStat label="Total Stock" tone="success" value={`${totalStockKg.toFixed(2)} kg`} />
         </InfoPanel>
       </div>

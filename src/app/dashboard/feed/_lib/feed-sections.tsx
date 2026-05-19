@@ -347,9 +347,15 @@ export function FeedStockCompact({
           {visibleRows.length > 0 ? (
             visibleRows.map((row) => {
               const days = row.days_remaining ?? null
-              const barWidth = days == null ? 0 : Math.max(8, Math.min(100, (days / 45) * 100))
+              const barWidth = days == null ? 0 : 100
               const tone =
-                days == null ? "bg-muted-foreground" : days < 14 ? "bg-destructive" : days < 30 ? "bg-warning" : "bg-success"
+                row.stock_status === "critical"
+                  ? "bg-destructive"
+                  : row.stock_status === "low" || row.stock_status === "reorder"
+                    ? "bg-warning"
+                    : row.stock_status === "no_data"
+                      ? "bg-muted-foreground"
+                      : "bg-success"
               return (
                 <div key={`${row.feed_type_name}-${row.current_stock_kg}-${row.days_remaining}`} className="space-y-2">
                   <div className="flex items-center justify-between gap-3">

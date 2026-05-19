@@ -43,7 +43,7 @@ export function useScopedSystemIds(params: Params) {
         : []
 
     if (hasSystem) {
-      return stageIds.includes(selectedSystemId as number) ? [selectedSystemId as number] : stageIds
+      return stageIds.includes(selectedSystemId as number) ? [selectedSystemId as number] : []
     }
     if (params.selectedBatch === "all") return stageIds
     const stageSet = new Set(stageIds)

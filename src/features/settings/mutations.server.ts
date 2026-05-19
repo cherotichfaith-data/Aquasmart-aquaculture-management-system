@@ -1,10 +1,9 @@
 "use server"
 
-import type { User } from "@supabase/supabase-js"
 import { z } from "zod"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isSbMissingFunction, isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import {
   listFarmMembersForFarm,
   listPendingFarmInvitationsForFarm,
@@ -50,8 +49,8 @@ const ACCESS_GRANT_ALLOWED_ROLES = new Set(["admin"])
 
 type InviteActionResult = {
   assigned: true
-  pendingInvite?: boolean
-  inviteSent?: boolean
+  pendingInvite: true
+  inviteSent: boolean
 }
 
 function getAppOrigin() {
@@ -66,9 +65,9 @@ function getAppOrigin() {
 
 function buildInviteRedirectUrl() {
   const origin = getAppOrigin().replace(/\/$/, "")
-  const setupUrl = new URL("/auth/set-password", origin)
-  setupUrl.searchParams.set("next", "/onboarding")
-  return setupUrl.toString()
+  const confirmUrl = new URL("/auth/confirm", origin)
+  confirmUrl.searchParams.set("next", "/onboarding")
+  return confirmUrl.toString()
 }
 
 function isPrivateSchemaUnavailable(error: unknown) {
@@ -99,35 +98,6 @@ async function assertAdminMembership(farmId: string, userId: string) {
   }
 }
 
-async function findExistingUserByEmail(email: string): Promise<User | null> {
-  const admin = createAdminClient()
-  const normalizedEmail = email.trim().toLowerCase()
-  let page = 1
-  const perPage = 200
-
-  while (page <= 20) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
-
-    if (error) {
-      throw error
-    }
-
-    const users = data.users ?? []
-    const match = users.find((user) => String(user.email ?? "").trim().toLowerCase() === normalizedEmail) ?? null
-    if (match) {
-      return match
-    }
-
-    if (users.length < perPage) {
-      return null
-    }
-
-    page += 1
-  }
-
-  return null
-}
-
 export async function grantFarmAccessAction(
   input: z.infer<typeof inviteSchema>,
 ): Promise<InviteActionResult> {
@@ -144,98 +114,47 @@ export async function grantFarmAccessAction(
 
   await assertAdminMembership(payload.farmId, user.id)
 
-  let targetUser: User | null = null
+  const { data: invitationRows, error } = await supabase.rpc("create_farm_user_invitation", {
+    p_farm_id: payload.farmId,
+    p_email: payload.email.trim().toLowerCase(),
+    p_role: payload.role,
+  })
 
-  try {
-    targetUser = await findExistingUserByEmail(payload.email)
-  } catch (error) {
-    if (isSbMissingFunction(error, "listUsers")) {
-      throw new Error("Server-side user lookup is not available on this deployment yet.")
+  if (error) {
+    logSbError("settings:invite:createPendingInvite", error)
+    if (isPrivateSchemaUnavailable(error)) {
+      throw new Error("Pending invites are not enabled on this deployment yet.")
     }
-    logSbError("settings:invite:findExistingUser", error)
-    throw new Error("Unable to verify the target user account.")
+    throw new Error("Unable to save the pending invitation.")
   }
 
-  if (!targetUser?.id) {
-    const { data: invitationRows, error } = await supabase.rpc("create_farm_user_invitation", {
-      p_farm_id: payload.farmId,
-      p_email: payload.email.trim().toLowerCase(),
-      p_role: payload.role,
-    })
-
-    if (error) {
-      logSbError("settings:invite:createPendingInvite", error)
-      if (isPrivateSchemaUnavailable(error)) {
-        throw new Error("Pending invites are not enabled on this deployment yet. Ask the teammate to create their AquaSmart account first.")
-      }
-      throw new Error("Unable to save the pending invitation.")
-    }
-
-    const invitationId = invitationRows?.[0]?.id ?? null
-    const admin = createAdminClient()
-    const normalizedEmail = payload.email.trim().toLowerCase()
-    const inviteOptions = {
-      redirectTo: buildInviteRedirectUrl(),
-      data: {
-        invited_farm_id: payload.farmId,
-        invited_role: payload.role,
-      },
-    }
-    const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, inviteOptions)
-
-    if (inviteError) {
-      logSbError("settings:invite:sendAuthInvite", inviteError)
-      throw new Error(`Invitation was saved, but Supabase could not send the invite email: ${inviteError.message}`)
-    }
-
-    if (invitationId) {
-      const { error: markSentError } = await supabase.rpc("mark_farm_user_invitation_sent", {
-        p_invitation_id: invitationId,
-      })
-      if (markSentError) {
-        logSbError("settings:invite:markSent", markSentError)
-      }
-    }
-
-    return { assigned: true, pendingInvite: true, inviteSent: true }
-  }
-
+  const invitationId = invitationRows?.[0]?.id ?? null
   const admin = createAdminClient()
-  const { data: existingMemberships, error: existingMembershipsError } = await admin
-    .from("farm_user")
-    .select("farm_id, user_id")
-    .eq("farm_id", payload.farmId)
-    .eq("user_id", targetUser.id)
+  const normalizedEmail = payload.email.trim().toLowerCase()
+  const inviteOptions = {
+    redirectTo: buildInviteRedirectUrl(),
+    data: {
+      invited_farm_id: payload.farmId,
+      invited_role: payload.role,
+    },
+  }
+  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, inviteOptions)
 
-  if (existingMembershipsError) {
-    logSbError("settings:invite:existingMembership", existingMembershipsError)
-    throw new Error("Unable to verify the existing farm access assignment.")
+  if (inviteError) {
+    logSbError("settings:invite:sendAuthInvite", inviteError)
+    return { assigned: true, pendingInvite: true, inviteSent: false }
   }
 
-  let membershipError: { message?: string } | null = null
-
-  if ((existingMemberships ?? []).length > 0) {
-    const { error } = await admin
-      .from("farm_user")
-      .update({ role: payload.role })
-      .eq("farm_id", payload.farmId)
-      .eq("user_id", targetUser.id)
-    membershipError = error
-  } else {
-    const { error } = await admin.from("farm_user").insert({
-      farm_id: payload.farmId,
-      user_id: targetUser.id,
-      role: payload.role,
+  if (invitationId) {
+    const { error: markSentError } = await supabase.rpc("mark_farm_user_invitation_sent", {
+      p_invitation_id: invitationId,
     })
-    membershipError = error
+    if (markSentError) {
+      logSbError("settings:invite:markSent", markSentError)
+    }
   }
 
-  if (membershipError) {
-    logSbError("settings:invite:upsertMembership", membershipError)
-    throw new Error("Failed to save the farm access assignment.")
-  }
-
-  return { assigned: true, pendingInvite: false }
+  return { assigned: true, pendingInvite: true, inviteSent: true }
 }
 
 export async function listFarmMembersAction(input: z.infer<typeof memberListSchema>): Promise<SettingsFarmMember[]> {

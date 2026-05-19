@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -39,6 +40,7 @@ import {
 } from "./form-support"
 import { parseOptionalNumericId, parseRequiredNumericId, requireActiveFarmId, toIsoDate } from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+import { DATA_ENTRY_PATH } from "@/lib/app-entry"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
   farm_id?: string | null
@@ -95,6 +97,7 @@ export function FeedingForm({
   defaultBatchId = null,
 }: FeedingFormProps) {
   const mutation = useRecordFeeding()
+  const router = useRouter()
   const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [submissionSummary, setSubmissionSummary] = useState<string | null>(null)
@@ -278,12 +281,12 @@ export function FeedingForm({
 
   if (!availableFeedsQuery.isLoading && availableFeeds.length === 0) {
     return (
-      <div className="space-y-4">
-        <div className="data-entry-form-intro">
-          <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
-          <p>No feed inventory records are available for the selected week. Record incoming feed first.</p>
-        </div>
-      </div>
+      <DependencyBlocker
+        title="No feed inventory available for this week."
+        description="Record the current feed stock before saving feeding for the selected date."
+        actionLabel="Record feed inventory"
+        onAction={() => router.push(`${DATA_ENTRY_PATH}?type=incoming_feed`)}
+      />
     )
   }
 

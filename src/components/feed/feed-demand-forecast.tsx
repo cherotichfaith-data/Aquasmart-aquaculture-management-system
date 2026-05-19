@@ -20,10 +20,6 @@ const statusStyles: Record<FeedStockStatus, { label: string; bg: string; text: s
 function DemandRow({ row }: { row: FeedDemandRow }) {
   const style = statusStyles[row.stock_status]
   const daysStock = row.days_of_stock != null ? `${Math.floor(row.days_of_stock)}d` : "—"
-  const stockPct = row.days_of_stock != null
-    ? Math.min(100, Math.round((row.days_of_stock / 30) * 100))
-    : 0
-
   return (
     <tr className="border-b border-border/40 last:border-0 hover:bg-muted/20 transition-colors">
       {/* Feed type */}
@@ -56,12 +52,7 @@ function DemandRow({ row }: { row: FeedDemandRow }) {
               <span className="text-xs font-medium text-foreground">{row.current_stock_kg.toFixed(0)} kg</span>
               <span className="text-[11px] text-muted-foreground">{daysStock}</span>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-muted/40">
-              <div
-                className={`h-1.5 rounded-full transition-all ${style.bar}`}
-                style={{ width: `${stockPct}%` }}
-              />
-            </div>
+            <div className={`h-1.5 w-full rounded-full ${style.bar}`} />
           </div>
         </div>
       </td>
@@ -136,9 +127,6 @@ export default function FeedDemandForecast({
               {rows.map((row) => <DemandRow key={row.feed_type_id} row={row} />)}
             </tbody>
           </table>
-          <div className="px-4 py-2 border-t border-border/40 text-[10px] text-muted-foreground/70">
-            Stock bar shows days remaining vs a 30-day reference. Critical = &lt;7 days · Low = &lt;14 days.
-          </div>
         </div>
       )}
     </div>

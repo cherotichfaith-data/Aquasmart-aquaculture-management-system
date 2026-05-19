@@ -329,7 +329,7 @@ export async function proxy(request: NextRequest) {
       return response
     }
 
-    if (!isWorkspaceSelectionRoute(pathname)) {
+    if (!isWorkspaceSelectionRoute(pathname) && !isOnboardingRoute(pathname)) {
       return withSupabaseCookies(buildPathRedirect(request, WORKSPACE_SELECT_PATH, nextPath), response)
     }
   }

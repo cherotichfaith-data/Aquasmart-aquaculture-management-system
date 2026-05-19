@@ -9,7 +9,7 @@ import { SamplingForm } from "./sampling-form"
 import { TransferForm } from "./transfer-form"
 import { HarvestForm } from "./harvest-form"
 import { WaterQualityForm } from "./water-quality-form"
-import { IncomingFeedForm } from "./incoming-feed-form"
+import { FeedInventoryForm } from "./feed-inventory-form"
 import { StockingForm } from "./stocking-form"
 import { SystemForm } from "./system-form"
 import { RecentEntriesList } from "./recent-entries-list"
@@ -41,7 +41,7 @@ interface DataEntryInterfaceProps {
         transfer: Tables<"fish_transfer">[]
         harvest: Tables<"fish_harvest">[]
         water_quality: Tables<"water_quality_measurement">[]
-        incoming_feed: Tables<"feed_incoming">[]
+        incoming_feed: Tables<"feed_inventory">[]
         stocking: Tables<"fish_stocking">[]
         systems: Tables<"system">[]
     }
@@ -87,6 +87,13 @@ function getRecentEntriesForTab(recentEntries: RecentEntriesByTab, tab: DataEntr
     }
 }
 
+function buildDataEntryTabHref(tabId: DataEntryTabId, defaultSystemId?: number | null, defaultBatchId?: number | null) {
+    const params = new URLSearchParams({ type: tabId })
+    if (defaultSystemId) params.set("system", String(defaultSystemId))
+    if (defaultBatchId) params.set("batch", String(defaultBatchId))
+    return `${DATA_ENTRY_PATH}?${params.toString()}`
+}
+
 export function DataEntryInterface({
     farmId,
     farmRole = null,
@@ -98,14 +105,14 @@ export function DataEntryInterface({
     defaultSystemId = null,
     defaultBatchId = null,
 }: DataEntryInterfaceProps) {
-    const canAccessIncomingFeed =
+    const canAccessFeedInventory =
         farmRole === "admin" || farmRole === "farm_manager" || farmRole === "system_operator"
     const visibleSidebarItems = useMemo(
-        () => sidebarItems.filter((item) => item.id !== "incoming_feed" || canAccessIncomingFeed),
-        [canAccessIncomingFeed],
+        () => sidebarItems.filter((item) => item.id !== "incoming_feed" || canAccessFeedInventory),
+        [canAccessFeedInventory],
     )
     const requestedTab = tab ?? "feeding"
-    const isRestrictedTab = requestedTab === "incoming_feed" && !canAccessIncomingFeed
+    const isRestrictedTab = requestedTab === "incoming_feed" && !canAccessFeedInventory
     const activeTab = useMemo(
         () =>
             visibleSidebarItems.some((item) => item.id === requestedTab)
@@ -182,7 +189,7 @@ export function DataEntryInterface({
             case "water_quality":
                 return <WaterQualityForm farmId={farmId} systems={systems} defaultSystemId={defaultSystemId} />
             case "incoming_feed":
-                return <IncomingFeedForm feeds={feeds} farmId={farmId} />
+                return <FeedInventoryForm feeds={feeds} farmId={farmId} />
             case "stocking":
                 return (
                     <StockingForm
@@ -222,7 +229,7 @@ export function DataEntryInterface({
                             return (
                                 <Link
                                     key={item.id}
-                                    href={`${DATA_ENTRY_PATH}?type=${item.id}`}
+                                    href={buildDataEntryTabHref(item.id, defaultSystemId, defaultBatchId)}
                                     className={cn(
                                         "data-entry-tab",
                                         isActive

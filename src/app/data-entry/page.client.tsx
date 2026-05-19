@@ -30,6 +30,12 @@ function resolveDataEntryTab(value: string | null): DataEntryTab {
   return dataEntryTabs.includes(value as DataEntryTab) ? (value as DataEntryTab) : "feeding"
 }
 
+function parsePositiveId(value: string | null) {
+  if (!value?.trim()) return null
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 export default function DataEntryPageClient({
   initialFarmId,
   initialFarmName,
@@ -50,14 +56,8 @@ export default function DataEntryPageClient({
   const batchParam = searchParams.get("batch")
 
   const tab = useMemo(() => resolveDataEntryTab(typeParam), [typeParam])
-  const defaultSystemId = useMemo(() => {
-    const parsed = Number(systemParam)
-    return Number.isFinite(parsed) ? parsed : null
-  }, [systemParam])
-  const defaultBatchId = useMemo(() => {
-    const parsed = Number(batchParam)
-    return Number.isFinite(parsed) ? parsed : null
-  }, [batchParam])
+  const requestedSystemId = useMemo(() => parsePositiveId(systemParam), [systemParam])
+  const requestedBatchId = useMemo(() => parsePositiveId(batchParam), [batchParam])
 
   const systemsLoading = systemsQuery.isLoading
   const loading =
@@ -94,6 +94,12 @@ export default function DataEntryPageClient({
   const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
   const batches = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
   const feeds = feedsQuery.data?.status === "success" ? feedsQuery.data.data : []
+  const defaultSystemId = requestedSystemId && systems.some((system) => system.id === requestedSystemId)
+    ? requestedSystemId
+    : null
+  const defaultBatchId = requestedBatchId && batches.some((batch) => batch.id === requestedBatchId)
+    ? requestedBatchId
+    : null
   const hasSystems = systems.length > 0
 
   const recentEntries = useMemo(

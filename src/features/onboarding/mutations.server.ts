@@ -193,10 +193,21 @@ async function resolveTargetFarmAssignment(userId: string, email: string | null 
   }
 }
 
+async function claimPendingInvitationsForCurrentUser(
+  supabase: Awaited<ReturnType<typeof requireMutationActionUser>>["supabase"],
+) {
+  const { error } = await supabase.rpc("claim_my_farm_user_invitations")
+
+  if (error) {
+    if (isPrivateSchemaUnavailable(error)) return
+    throw error
+  }
+}
+
 export async function completeOnboardingProfileAction(
   input: OnboardingProfileInput,
 ): Promise<OnboardingProfileResult> {
-  const { user } = await requireMutationActionUser("onboarding:profile")
+  const { supabase, user } = await requireMutationActionUser("onboarding:profile")
 
   let payload: OnboardingProfileInput
   try {
@@ -211,6 +222,7 @@ export async function completeOnboardingProfileAction(
 
   let assignment: FarmAssignment
   try {
+    await claimPendingInvitationsForCurrentUser(supabase)
     assignment = await resolveTargetFarmAssignment(user.id, user.email ?? null)
   } catch (error) {
     logSbError("onboarding:profile:resolveTargetFarmId", error)

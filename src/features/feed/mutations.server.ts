@@ -4,6 +4,7 @@ import { z } from "zod"
 import { cacheTags, feedInventoryWriteTags } from "@/lib/cache/tags"
 import { revalidateWriteTags } from "@/lib/server/write-through"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import type { Database } from "@/lib/types/database"
 
@@ -12,7 +13,7 @@ type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["
 
 export type FeedSupplierInput = Insert<"feed_supplier">
 export type FeedTypeInput = Insert<"feed_type">
-export type FeedInventorySnapshotInput = Insert<"feed_incoming">
+export type FeedInventorySnapshotInput = Insert<"feed_inventory">
 
 const feedSupplierSchema = z.object({
   company_name: z.string().trim().min(1).max(255),
@@ -34,9 +35,14 @@ const FEED_INVENTORY_ALLOWED_ROLES = new Set(["admin", "farm_manager", "system_o
 
 const feedInventorySchema = z.object({
   farm_id: z.string().uuid(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  inventory_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  inventory_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
   feed_type_id: z.number().int().positive(),
-  feed_amount: z.number().finite().positive(),
+  feed_type_label: z.string().trim().min(1).max(255),
+  bag_weight: z.number().finite().positive(),
+  amount_of_bags: z.number().int().min(0),
+  opened_bags: z.number().int().min(0).nullable().optional(),
+  comments: z.string().trim().max(500).nullable().optional(),
 })
 
 export async function createFeedSupplierAction(payload: FeedSupplierInput): Promise<{ data: Row<"feed_supplier"> }> {
@@ -115,7 +121,7 @@ export async function createFeedTypeAction(payload: FeedTypeInput): Promise<{ da
 
 export async function recordFeedInventorySnapshotAction(
   payload: FeedInventorySnapshotInput,
-): Promise<{ data: Row<"feed_incoming">; meta: { farmId: string; date: string } }> {
+): Promise<{ data: Row<"feed_inventory">; meta: { farmId: string; date: string } }> {
   const { supabase, user } = await requireMutationActionUser("feed-inventory:record")
 
   let parsedPayload: z.infer<typeof feedInventorySchema>
@@ -143,13 +149,19 @@ export async function recordFeedInventorySnapshotAction(
     throw new Error("You do not have permission to record feed inventory.")
   }
 
-  const { data, error } = await supabase
-    .from("feed_incoming")
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("feed_inventory")
     .insert({
       farm_id: parsedPayload.farm_id,
-      date: parsedPayload.date,
+      inventory_date: parsedPayload.inventory_date,
+      inventory_time: parsedPayload.inventory_time ?? null,
       feed_type_id: parsedPayload.feed_type_id,
-      feed_amount: parsedPayload.feed_amount,
+      feed_type_label: parsedPayload.feed_type_label.trim(),
+      bag_weight: parsedPayload.bag_weight,
+      amount_of_bags: parsedPayload.amount_of_bags,
+      opened_bags: parsedPayload.opened_bags ?? null,
+      comments: parsedPayload.comments?.trim() ? parsedPayload.comments.trim() : null,
     })
     .select()
     .single()
@@ -157,9 +169,9 @@ export async function recordFeedInventorySnapshotAction(
   if (error || !data) {
     logSbError("feed-inventory:record:insert", error)
     if (isSbPermissionDenied(error)) {
-      throw new Error("Unable to record feed delivery.")
+      throw new Error("Unable to record feed inventory.")
     }
-    throw new Error("Unable to record feed delivery.")
+    throw new Error("Unable to record feed inventory.")
   }
 
   revalidateWriteTags(feedInventoryWriteTags({ farmId: parsedPayload.farm_id }))
@@ -168,7 +180,7 @@ export async function recordFeedInventorySnapshotAction(
     data,
     meta: {
       farmId: parsedPayload.farm_id,
-      date: parsedPayload.date,
+      date: parsedPayload.inventory_date,
     },
   }
 }

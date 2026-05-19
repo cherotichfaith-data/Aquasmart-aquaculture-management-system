@@ -7,26 +7,31 @@ import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 export function useRecordFeedInventorySnapshot() {
   return useWriteThroughMutation({
     mutationFn: recordFeedInventorySnapshotAction,
-    activityTableName: "feed_incoming",
+    activityTableName: "feed_inventory",
     recentEntryKey: "incoming_feed",
     buildOptimisticEntry: (payload) => {
       return {
         id: `optimistic-${Date.now()}`,
         farm_id: payload.farm_id,
-        date: payload.date,
+        inventory_date: payload.inventory_date,
+        inventory_time: payload.inventory_time ?? null,
         feed_type_id: payload.feed_type_id ?? null,
-        feed_amount: payload.feed_amount ?? null,
+        feed_type_label: payload.feed_type_label,
+        bag_weight: payload.bag_weight,
+        amount_of_bags: payload.amount_of_bags,
+        opened_bags: payload.opened_bags ?? null,
+        comments: payload.comments ?? null,
         created_at: new Date().toISOString(),
         status: "pending",
       }
     },
     invalidate: async ({ queryClient, result }) =>
       invalidateAfterWrite(queryClient, {
-        type: "incomingFeed",
+        type: "feedInventory",
         farmId: result.meta.farmId,
         date: result.meta.date,
       }),
-    successMessage: "Feed delivery recorded.",
-    errorMessage: "Failed to record feed delivery.",
+    successMessage: "Feed inventory recorded.",
+    errorMessage: "Failed to record feed inventory.",
   })
 }
