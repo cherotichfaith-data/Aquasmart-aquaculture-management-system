@@ -3,7 +3,7 @@ import type { QueryResult } from "@/lib/supabase-client"
 import { postJson } from "@/lib/commands/_utils"
 import { isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 
-type FeedIncomingRow = Tables<"feed_incoming">
+type FeedInventoryRow = Tables<"feed_inventory">
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type FcrTrendRow = Database["public"]["Functions"]["api_fcr_trend"]["Returns"][number]
 type GrowthTrendRow = Database["public"]["Functions"]["api_growth_trend"]["Returns"][number]
@@ -331,7 +331,7 @@ const emptyRecentEntries = () => ({
   transfer: toQuerySuccess<FishTransferRow>([]),
   harvest: toQuerySuccess<FishHarvestRow>([]),
   water_quality: toQuerySuccess<WaterQualityMeasurementRow>([]),
-  incoming_feed: toQuerySuccess<FeedIncomingRow>([]),
+  incoming_feed: toQuerySuccess<FeedInventoryRow>([]),
   stocking: toQuerySuccess<FishStockingRow>([]),
   systems: toQuerySuccess<SystemRow>([]),
 })

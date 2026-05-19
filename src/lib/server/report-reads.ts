@@ -15,7 +15,7 @@ type FishSamplingWeightRow = Database["public"]["Tables"]["fish_sampling_weight"
 type FishTransferRow = Database["public"]["Tables"]["fish_transfer"]["Row"]
 type FishHarvestRow = Database["public"]["Tables"]["fish_harvest"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Tables"]["water_quality_measurement"]["Row"]
-type FeedIncomingRow = Database["public"]["Tables"]["feed_incoming"]["Row"]
+type FeedInventoryRow = Database["public"]["Tables"]["feed_inventory"]["Row"]
 type FishStockingRow = Database["public"]["Tables"]["fish_stocking"]["Row"]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 type ChangeType = Database["public"]["Enums"]["change_type_enum"]
@@ -35,7 +35,7 @@ type RecentRowsTable =
   | "fish_transfer"
   | "fish_harvest"
   | "water_quality_measurement"
-  | "feed_incoming"
+  | "feed_inventory"
   | "fish_stocking"
   | "system"
 type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
@@ -415,17 +415,19 @@ export async function listRecentActivities(
   const systemIds = (systems ?? []).map((s) => s.id).filter((id): id is number => typeof id === "number")
   if (systemIds.length === 0) return []
 
-  type RawEvent = { id: number | string; date: string | null; system_id?: number | null; batch_id?: number | null }
+  type RawEvent = { id: number | string; system_id?: number | null; batch_id?: number | null } & Record<string, unknown>
 
   async function fetchTable<T extends RawEvent>(
     table: RecentRowsTable,
     tableName: string,
     changeType: ChangeType,
     useFarmId: boolean,
+    dateColumn = "date",
   ): Promise<ChangeLogRow[]> {
     if (filterTable && filterTable !== "all" && filterTable !== tableName) return []
 
-    let q = supabase.from(table).select("id, date, system_id, batch_id").order("date", { ascending: false }).limit(limit)
+    const selectColumns = useFarmId ? `id, ${dateColumn}` : `id, ${dateColumn}, system_id, batch_id`
+    let q = supabase.from(table).select(selectColumns).order(dateColumn, { ascending: false }).limit(limit)
 
     if (useFarmId) {
       q = q.eq("farm_id", params!.farmId!)
@@ -433,8 +435,8 @@ export async function listRecentActivities(
       if (systemIds.length === 0) return []
       q = q.in("system_id", systemIds)
     }
-    if (dateFrom) q = q.gte("date", dateFrom)
-    if (dateTo) q = q.lte("date", dateTo)
+    if (dateFrom) q = q.gte(dateColumn, dateFrom)
+    if (dateTo) q = q.lte(dateColumn, dateTo)
 
     const { data, error } = await q
     if (error) {
@@ -446,7 +448,7 @@ export async function listRecentActivities(
       table_name: tableName,
       change_type: changeType,
       column_name: null,
-      change_time: row.date ?? null,
+      change_time: typeof row[dateColumn] === "string" ? row[dateColumn] : null,
       system_id: row.system_id ?? null,
       batch_id: row.batch_id ?? null,
     }))
@@ -460,7 +462,7 @@ export async function listRecentActivities(
     fetchTable("fish_harvest",            "fish_harvest",           "INSERT", false),
     fetchTable("fish_transfer",           "fish_transfer",          "INSERT", false),
     fetchTable("water_quality_measurement","water_quality_measurement","INSERT",false),
-    fetchTable("feed_incoming",           "feed_incoming",          "INSERT", true),
+    fetchTable("feed_inventory",          "feed_inventory",         "INSERT", true, "inventory_date"),
   ])
 
   return results
@@ -536,7 +538,7 @@ const emptyRecentEntries = () => ({
   transfer: toQuerySuccess<FishTransferRow>([]),
   harvest: toQuerySuccess<FishHarvestRow>([]),
   water_quality: toQuerySuccess<WaterQualityMeasurementRow>([]),
-  incoming_feed: toQuerySuccess<FeedIncomingRow>([]),
+  incoming_feed: toQuerySuccess<FeedInventoryRow>([]),
   stocking: toQuerySuccess<FishStockingRow>([]),
   systems: toQuerySuccess<SystemRow>([]),
 })
@@ -573,7 +575,7 @@ async function getRecentRows<T>(
     case "fish_mortality":
       query = query.eq("farm_id", farmId)
       break
-    case "feed_incoming":
+    case "feed_inventory":
     case "system":
       query = query.eq("farm_id", farmId)
       break
@@ -615,7 +617,7 @@ export async function listRecentEntries(supabase: ServerSupabaseClient, farmId?:
     transfer,
     harvest,
     waterQuality,
-    incomingFeed,
+    feedInventory,
     stocking,
     systems,
   ] = await Promise.all([
@@ -628,7 +630,7 @@ export async function listRecentEntries(supabase: ServerSupabaseClient, farmId?:
       farmId,
       farmSystemIds,
     }),
-    getRecentRows<FeedIncomingRow>(supabase, "feed_incoming", "date", {
+    getRecentRows<FeedInventoryRow>(supabase, "feed_inventory", "inventory_date", {
       farmId,
       farmSystemIds,
     }),
@@ -643,7 +645,7 @@ export async function listRecentEntries(supabase: ServerSupabaseClient, farmId?:
     transfer: toQuerySuccess(transfer),
     harvest: toQuerySuccess(harvest),
     water_quality: toQuerySuccess(waterQuality),
-    incoming_feed: toQuerySuccess(incomingFeed),
+    incoming_feed: toQuerySuccess(feedInventory),
     stocking: toQuerySuccess(stocking),
     systems: toQuerySuccess(systems),
   }

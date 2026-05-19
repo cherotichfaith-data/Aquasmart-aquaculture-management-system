@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js"
 import { z } from "zod"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createAccessTokenClient } from "@/lib/supabase/server"
 import { logSbError } from "@/lib/supabase/log"
 import { normalizeRole } from "@/lib/app-entry"
 import { getSessionIdentity } from "@/lib/supabase/session"
@@ -26,12 +27,25 @@ export async function completeAccountSetupAction(input: z.infer<typeof accountSe
         app_metadata: tokenIdentity.appMetadata,
       }
     : null
+  let authenticatedSupabase = payload.accessToken ? createAccessTokenClient(payload.accessToken) : null
 
   if (!user) {
     const actionUser = await requireMutationActionUser("auth:setPasswordProfile")
     user = actionUser.user
+    authenticatedSupabase = actionUser.supabase
   }
   const setupUser = user
+
+  try {
+    const { error: claimError } = authenticatedSupabase
+      ? await authenticatedSupabase.rpc("claim_my_farm_user_invitations")
+      : { error: null }
+    if (claimError) {
+      logSbError("auth:setPasswordProfile:claimInvitations", claimError)
+    }
+  } catch (error) {
+    logSbError("auth:setPasswordProfile:claimInvitations", error)
+  }
 
   const { data: authUserData, error: authUserError } = await admin.auth.admin.getUserById(setupUser.id)
   if (authUserError) {

@@ -123,9 +123,7 @@ export async function getBatchOptions(params?: {
 
   if (params.activeOnly ?? true) {
     const currentBatchIds = await getCurrentProductionBatchIds(farmId, params.signal)
-    rows = currentBatchIds.size > 0
-      ? rows.filter((row) => currentBatchIds.has(row.id))
-      : rows.filter((row) => String(row.date_of_delivery ?? "") >= "2026-01-01")
+    rows = rows.filter((row) => currentBatchIds.has(row.id))
   }
 
   return toQuerySuccess<BatchListItem>(rows)
@@ -139,9 +137,13 @@ async function getCurrentProductionBatchIds(
   if ("error" in clientResult) return new Set()
   const { supabase } = clientResult
 
-  let activeQuery = supabase.from("system").select("id").eq("farm_id", farmId).eq("is_active", true)
+  let activeQuery = supabase
+    .from("system")
+    .select("id, commissioned_at")
+    .eq("farm_id", farmId)
+    .eq("is_active", true)
   if (signal) activeQuery = activeQuery.abortSignal(signal)
-  const activeSystems = await resolveClientReadQuery<Pick<SystemRow, "id">>({
+  const activeSystems = await resolveClientReadQuery<Pick<SystemRow, "id" | "commissioned_at">>({
     tag: "getCurrentProductionBatchIds:systems",
     query: activeQuery,
     signal,
@@ -149,50 +151,46 @@ async function getCurrentProductionBatchIds(
   })
   if (activeSystems.status !== "success") return new Set()
 
-  const lineageSystemIds = new Set(
+  const activeSystemStartById = new Map(
     activeSystems.data
-      .map((row) => row.id)
-      .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
+      .filter((row): row is Pick<SystemRow, "id" | "commissioned_at"> & { id: number } =>
+        typeof row.id === "number" && Number.isFinite(row.id),
+      )
+      .map((row) => [row.id, row.commissioned_at ?? "0001-01-01"]),
   )
-  if (lineageSystemIds.size === 0) return new Set()
+  const activeSystemIds = Array.from(activeSystemStartById.keys())
+  if (activeSystemIds.length === 0) return new Set()
 
   const batchIds = new Set<number>()
 
-  for (let depth = 0; depth < 3; depth += 1) {
-    const targetIds = Array.from(lineageSystemIds)
-    let transferQuery = supabase
-      .from("fish_transfer")
-      .select("batch_id, origin_system_id, target_system_id")
-      .in("target_system_id", targetIds)
-    if (signal) transferQuery = transferQuery.abortSignal(signal)
+  let transferQuery = supabase
+    .from("fish_transfer")
+    .select("batch_id, target_system_id, date")
+    .in("target_system_id", activeSystemIds)
+  if (signal) transferQuery = transferQuery.abortSignal(signal)
 
-    const transfers = await resolveClientReadQuery<
-      Pick<FishTransferRow, "batch_id" | "origin_system_id" | "target_system_id">
-    >({
-      tag: "getCurrentProductionBatchIds:transfers",
-      query: transferQuery,
-      signal,
-      quietWhen: isQuietTableError,
-    })
-    if (transfers.status !== "success") break
-
-    const beforeSize = lineageSystemIds.size
+  const transfers = await resolveClientReadQuery<Pick<FishTransferRow, "batch_id" | "target_system_id" | "date">>({
+    tag: "getCurrentProductionBatchIds:transfers",
+    query: transferQuery,
+    signal,
+    quietWhen: isQuietTableError,
+  })
+  if (transfers.status === "success") {
     transfers.data.forEach((row) => {
-      if (typeof row.batch_id === "number") batchIds.add(row.batch_id)
-      if (typeof row.origin_system_id === "number" && Number.isFinite(row.origin_system_id)) {
-        lineageSystemIds.add(row.origin_system_id)
+      if (typeof row.batch_id !== "number" || typeof row.target_system_id !== "number") return
+      if (String(row.date ?? "") >= (activeSystemStartById.get(row.target_system_id) ?? "0001-01-01")) {
+        batchIds.add(row.batch_id)
       }
     })
-    if (lineageSystemIds.size === beforeSize) break
   }
 
   let stockingQuery = supabase
     .from("fish_stocking")
-    .select("batch_id, system_id")
-    .in("system_id", Array.from(lineageSystemIds))
+    .select("batch_id, system_id, date")
+    .in("system_id", activeSystemIds)
   if (signal) stockingQuery = stockingQuery.abortSignal(signal)
 
-  const stockings = await resolveClientReadQuery<Pick<FishStockingRow, "batch_id" | "system_id">>({
+  const stockings = await resolveClientReadQuery<Pick<FishStockingRow, "batch_id" | "system_id" | "date">>({
     tag: "getCurrentProductionBatchIds:stocking",
     query: stockingQuery,
     signal,
@@ -200,11 +198,39 @@ async function getCurrentProductionBatchIds(
   })
   if (stockings.status === "success") {
     stockings.data.forEach((row) => {
-      if (typeof row.batch_id === "number") batchIds.add(row.batch_id)
+      if (typeof row.batch_id !== "number" || typeof row.system_id !== "number") return
+      if (String(row.date ?? "") >= (activeSystemStartById.get(row.system_id) ?? "0001-01-01")) {
+        batchIds.add(row.batch_id)
+      }
     })
   }
 
   return batchIds
+}
+
+async function getExistingFeedTypeIds(
+  farmId: string,
+  signal?: AbortSignal,
+): Promise<Set<number> | null> {
+  const clientResult = await getClientOrError("getExistingFeedTypeIds", { requireSession: true })
+  if ("error" in clientResult) return null
+  const { supabase } = clientResult
+
+  let query = supabase
+    .from("feed_type")
+    .select("id")
+    .or(`farm_id.eq.${farmId},farm_id.is.null`)
+  if (signal) query = query.abortSignal(signal)
+
+  const result = await resolveClientReadQuery<Pick<Database["public"]["Tables"]["feed_type"]["Row"], "id">>({
+    tag: "getExistingFeedTypeIds",
+    query,
+    signal,
+    quietWhen: isQuietTableError,
+  })
+  if (result.status !== "success") return null
+
+  return new Set(result.data.map((row) => row.id).filter((id): id is number => typeof id === "number"))
 }
 
 export async function getDashboardTimePeriodOptions(params?: {
@@ -252,7 +278,11 @@ export async function getFeedTypeOptions(params?: {
   )
   if (res.status !== "success") return res
 
-  const rows = res.data.slice().sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
+  const existingFeedTypeIds = await getExistingFeedTypeIds(params.farmId, params.signal)
+  const rows = res.data
+    .filter((row) => typeof row.id === "number" && (existingFeedTypeIds ? existingFeedTypeIds.has(row.id) : true))
+    .slice()
+    .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
   return toQuerySuccess<FeedTypeOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
 }
 
@@ -264,11 +294,7 @@ export async function getWeeklyInventoryFeedTypeOptions(params?: {
 }): Promise<QueryResult<FeedTypeOptionRow>> {
   if (!params?.farmId || !params.dateFrom || !params.dateTo) return empty<FeedTypeOptionRow>()
 
-  const [feedTypesResult, clientResult] = await Promise.all([
-    getFeedTypeOptions({ farmId: params.farmId, signal: params.signal }),
-    getClientOrError("getWeeklyInventoryFeedTypeOptions", { requireSession: true }),
-  ])
-  if (feedTypesResult.status !== "success") return feedTypesResult
+  const clientResult = await getClientOrError("getWeeklyInventoryFeedTypeOptions", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
 
   let query = clientResult.supabase
@@ -298,14 +324,27 @@ export async function getWeeklyInventoryFeedTypeOptions(params?: {
     inventoryResult.data
       .filter((row) => {
         const baggedKg = (row.amount_of_bags ?? 0) * (row.bag_weight ?? 0)
-        const openKg = row.opened_bags ?? 0
+        const openKg = (row.opened_bags ?? 0) * (row.bag_weight ?? 0)
         return baggedKg + openKg > 0
       })
       .map((row) => row.feed_type_id)
       .filter((feedTypeId): feedTypeId is number => typeof feedTypeId === "number" && Number.isFinite(feedTypeId)),
   )
+  if (stockedFeedTypeIds.size === 0) return toQuerySuccess<FeedTypeOptionRow>([])
 
-  return toQuerySuccess(feedTypesResult.data.filter((feedType) => stockedFeedTypeIds.has(feedType.id)))
+  const feedTypesResult = await rpcOrEmpty(
+    "getWeeklyInventoryFeedTypeOptions:feedTypes",
+    "api_feed_type_options_rpc",
+    { p_farm_id: params.farmId },
+    params.signal,
+  )
+  if (feedTypesResult.status !== "success") return feedTypesResult
+
+  return toQuerySuccess(
+    feedTypesResult.data
+      .filter((feedType) => stockedFeedTypeIds.has(feedType.id))
+      .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? ""))),
+  )
 }
 
 export async function getFeedSupplierOptions(params?: {

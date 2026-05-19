@@ -23,7 +23,11 @@ type SamplingRow = Pick<Tables<"fish_sampling_weight">, "id" | "date" | "system_
 type TransferRow = Pick<Tables<"fish_transfer">, "id" | "date" | "origin_system_id" | "target_system_id" | "external_target_name" | "number_of_fish_transfer" | "created_at"> & PendingMeta
 type HarvestRow = Pick<Tables<"fish_harvest">, "id" | "date" | "system_id" | "type_of_harvest" | "total_weight_harvest" | "created_at"> & PendingMeta
 type WaterQualityRow = Pick<Tables<"water_quality_measurement">, "id" | "date" | "system_id" | "parameter_name" | "parameter_value" | "created_at"> & PendingMeta
-type IncomingFeedRow = Pick<Tables<"feed_incoming">, "id" | "date" | "feed_type_id" | "feed_amount" | "created_at"> & PendingMeta
+type FeedInventoryRow = Pick<
+  Tables<"feed_inventory">,
+  "id" | "inventory_date" | "feed_type_id" | "feed_type_label" | "bag_weight" | "amount_of_bags" | "opened_bags" | "created_at"
+> &
+  PendingMeta
 type StockingRow = Pick<Tables<"fish_stocking">, "id" | "date" | "system_id" | "number_of_fish_stocking" | "type_of_stocking" | "created_at"> & PendingMeta
 
 type RecentEntriesListProps =
@@ -33,7 +37,7 @@ type RecentEntriesListProps =
   | { type: "transfer"; data: TransferRow[]; systems: SystemOption[] }
   | { type: "harvest"; data: HarvestRow[]; systems: SystemOption[] }
   | { type: "water_quality"; data: WaterQualityRow[]; systems: SystemOption[] }
-  | { type: "incoming_feed"; data: IncomingFeedRow[]; systems: SystemOption[] }
+  | { type: "incoming_feed"; data: FeedInventoryRow[]; systems: SystemOption[] }
   | { type: "stocking"; data: StockingRow[]; systems: SystemOption[] }
   | { type: "system"; data: SystemEntryRow[]; systems: SystemOption[] }
 
@@ -341,14 +345,27 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "incoming_feed") {
-    cards = data.slice(0, 5).map((row, index) => ({
-      key: String(row.localId ?? row.id ?? index),
-      title: `Feed ${row.feed_type_id}`,
-      subtitle: formatDate(row.date),
-      meta: formatCreatedAt(row.created_at),
-      pending: row.status === "pending",
-      details: [{ label: "Amount", value: `${row.feed_amount} kg` }],
-    }))
+    const feedInventoryPendingEntries = pendingEntries as unknown as FeedInventoryRow[]
+    const rows = mergeRecentEntries(data, feedInventoryPendingEntries)
+    pendingCount = feedInventoryPendingEntries.length
+    cards = rows.map((row, index) => {
+      const baggedStock = Number(row.bag_weight ?? 0) * Number(row.amount_of_bags ?? 0)
+      const openStock = Number(row.bag_weight ?? 0) * Number(row.opened_bags ?? 0)
+      const totalStock = baggedStock + openStock
+
+      return {
+        key: String(row.localId ?? row.id ?? index),
+        title: row.feed_type_label || `Feed ${row.feed_type_id}`,
+        subtitle: formatDate(row.inventory_date),
+        meta: formatCreatedAt(row.created_at),
+        pending: row.status === "pending",
+        details: [
+          { label: "Bagged", value: `${baggedStock.toFixed(2)} kg` },
+          { label: "Open Bags", value: `${openStock.toFixed(2)} kg` },
+          { label: "Total", value: `${totalStock.toFixed(2)} kg` },
+        ],
+      }
+    })
   } else if (type === "stocking") {
     const rows = mergeRecentEntries(data, pendingEntries as StockingRow[])
     pendingCount = (pendingEntries as StockingRow[]).length

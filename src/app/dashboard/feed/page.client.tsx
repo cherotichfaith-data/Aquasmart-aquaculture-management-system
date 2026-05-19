@@ -82,11 +82,7 @@ export default function FeedManagementPage({
   const hasDateRange = boundsReady
   const dateFrom = boundsStart
   const dateTo = boundsEnd
-  const trendWindowDays = useMemo(() => countTimeRangeDays(dateFrom, dateTo) ?? 180, [dateFrom, dateTo])
-  const heatmapWindowDays = useMemo(() => {
-    const rangeDays = countTimeRangeDays(dateFrom, dateTo)
-    return rangeDays == null ? 14 : Math.min(rangeDays, 30)
-  }, [dateFrom, dateTo])
+  const trendWindowDays = useMemo(() => countTimeRangeDays(dateFrom, dateTo) ?? undefined, [dateFrom, dateTo])
 
   const runningStockQuery = useRunningStock({
     farmId,
@@ -100,7 +96,6 @@ export default function FeedManagementPage({
     batchId: Number.isFinite(batchId) ? (batchId as number) : undefined,
     dateFrom,
     dateTo,
-    limit: 4000,
     enabled: feedingEnabled,
   })
   const inventoryQuery = useDailyFishInventory({
@@ -108,7 +103,6 @@ export default function FeedManagementPage({
     systemId: hasSystem ? (systemId as number) : undefined,
     dateFrom,
     dateTo,
-    limit: 5000,
     orderAsc: true,
     enabled: feedingEnabled,
   })
@@ -133,7 +127,6 @@ export default function FeedManagementPage({
     stage: selectedStage === "all" ? undefined : selectedStage,
     dateFrom,
     dateTo,
-    limit: 5000,
     enabled: hasDateRange,
   })
   const survivalTrendQuery = useScopedSurvivalTrend({
@@ -148,7 +141,6 @@ export default function FeedManagementPage({
     dateFrom,
     dateTo,
     requireSystem: false,
-    limit: 5000,
     enabled: hasDateRange,
   })
 
@@ -260,8 +252,8 @@ export default function FeedManagementPage({
 
   const heatmapDates = useMemo(() => {
     if (!dateFrom || !dateTo) return []
-    return buildDateWindow(dateFrom, dateTo, heatmapWindowDays)
-  }, [dateFrom, dateTo, heatmapWindowDays])
+    return buildDateWindow(dateFrom, dateTo)
+  }, [dateFrom, dateTo])
   const exceptionWindowRecords = useMemo(() => {
     if (heatmapDates.length === 0) return feedingRecords
     const heatmapDateSet = new Set(heatmapDates)
@@ -298,10 +290,10 @@ export default function FeedManagementPage({
     // Prefer the farm-level row (no system_id), fall back to the first row (default scope)
     const row = rows.find((r) => r.system_id == null) ?? rows[0]
     return {
-      lowDoThreshold:      row?.low_do_threshold      ?? 4.0,
-      lowSgrThreshold:     row?.low_sgr_threshold     ?? 1.0,
-      lowSurvivalPct:      row?.low_survival_pct      ?? 80.0,
-      criticalSurvivalPct: row?.critical_survival_pct ?? 70.0,
+      lowDoThreshold: row?.low_do_threshold ?? null,
+      lowSgrThreshold: row?.low_sgr_threshold ?? null,
+      lowSurvivalPct: row?.low_survival_pct ?? null,
+      criticalSurvivalPct: row?.critical_survival_pct ?? null,
     }
   }, [thresholdsQuery.data])
 
@@ -370,9 +362,9 @@ export default function FeedManagementPage({
         <section className="space-y-4">
           <SectionHeading
             title="Feed Demand Forecast"
-            description="14-day projected feed demand per type based on current fish populations, with stock coverage and reorder urgency."
+            description="Projected feed demand per type based on current fish populations, with stock coverage and reorder urgency."
           />
-          <FeedDemandForecast farmId={farmId} daysAhead={14} />
+          <FeedDemandForecast farmId={farmId} />
         </section>
 
         <FeedDashboard

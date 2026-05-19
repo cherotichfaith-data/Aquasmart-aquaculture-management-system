@@ -49,7 +49,10 @@ export default function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [authMode, setAuthMode] = useState<AuthMode>(searchParams.get("mode") === "signup" ? "signup" : "signin")
+  const isInviteContinuation = searchParams.get("next") === ONBOARDING_PATH
+  const [authMode, setAuthMode] = useState<AuthMode>(
+    !isInviteContinuation && searchParams.get("mode") === "signup" ? "signup" : "signin",
+  )
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [formNotice, setFormNotice] = useState<string | null>(null)
@@ -119,6 +122,12 @@ export default function LoginForm() {
       if (authMode === "signin") {
         const result = await login(email.trim(), password)
         window.location.assign(resolveLoginRedirect(result.redirectTo))
+        return
+      }
+
+      if (isInviteContinuation) {
+        setFormError("This email has a pending AquaSmart invite. Open the latest invite email instead of creating a new account.")
+        setIsSubmitting(false)
         return
       }
 
@@ -501,6 +510,12 @@ export default function LoginForm() {
               </span>
             </div>
             <h1>{authMode === "signin" ? "Sign in to your dashboard" : "Create your AquaSmart account"}</h1>
+            {isInviteContinuation ? (
+              <p>
+                If you arrived from an invite, open the latest AquaSmart invite email. The invite link sets up your
+                session before you choose a password.
+              </p>
+            ) : null}
           </div>
 
           <form onSubmit={(event) => void handlePasswordAuth(event)} noValidate>
@@ -640,7 +655,9 @@ export default function LoginForm() {
           </form>
 
           <div className="helper-row">
-            {authMode === "signin" ? (
+            {isInviteContinuation ? (
+              <span>Need a fresh invite link? Ask your farm admin to resend the invitation.</span>
+            ) : authMode === "signin" ? (
               <>
                 New to AquaSmart?{" "}
                 <button

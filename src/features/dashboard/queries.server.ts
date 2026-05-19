@@ -332,11 +332,11 @@ async function resolveScopedSystemIds(params: {
   supabase: ServerClient
   system: string
   batch: string
-  dashboardSystems: DashboardSystemRow[]
+  systemIds: number[]
 }): Promise<number[]> {
-  let scoped = params.dashboardSystems
-    .map((row) => row.system_id)
-    .filter((id): id is number => typeof id === "number")
+  let scoped = Array.from(
+    new Set(params.systemIds.filter((id): id is number => typeof id === "number" && Number.isFinite(id))),
+  )
 
   if (params.system !== "all") {
     const parsed = Number(params.system)
@@ -456,18 +456,18 @@ async function loadDashboardPageInitialData(
     withNetworkFallback("dashboard:getAlertThresholds", [], () => listAlertThresholdRows(supabase, farmId)),
   ])
   const dashboardSystems = await backfillBiomassDensityFromSystemVolume(supabase, farmId, dashboardSystemsRaw)
-
-  const scopedSystemIds = await resolveScopedSystemIds({
-    supabase,
-    system: effectiveSelectedSystem,
-    batch: params.filters.selectedBatch,
-    dashboardSystems,
-  })
   const activeSystemIds = new Set(
     systemOptions
       .map((row) => row.id)
       .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
   )
+
+  const scopedSystemIds = await resolveScopedSystemIds({
+    supabase,
+    system: effectiveSelectedSystem,
+    batch: params.filters.selectedBatch,
+    systemIds: Array.from(activeSystemIds),
+  })
   const activeScopedSystemIds = scopedSystemIds.filter((id) => activeSystemIds.has(id))
 
   const singleSystemId = activeScopedSystemIds.length === 1 ? activeScopedSystemIds[0] : undefined

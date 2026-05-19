@@ -138,7 +138,8 @@ export default function RecentActivities({
         return "fish_harvest"
       case "incoming_feed_events":
       case "feed_incoming":
-        return "feed_incoming"
+      case "feed_inventory":
+        return "feed_inventory"
       case "stocking_events":
       case "fish_stocking":
         return "fish_stocking"
@@ -161,7 +162,7 @@ export default function RecentActivities({
         return <ArrowRightLeft className="h-4 w-4" />
       case "fish_harvest":
         return <Fish className="h-4 w-4" />
-      case "feed_incoming":
+      case "feed_inventory":
         return <Package2 className="h-4 w-4" />
       case "fish_stocking":
         return <Waves className="h-4 w-4" />
@@ -184,7 +185,7 @@ export default function RecentActivities({
         return "bg-warning/10 text-warning"
       case "fish_harvest":
         return "bg-primary/10 text-primary"
-      case "feed_incoming":
+      case "feed_inventory":
         return "bg-muted text-muted-foreground"
       case "fish_stocking":
         return "bg-primary/10 text-primary"
@@ -207,7 +208,7 @@ export default function RecentActivities({
         return "Transfer Event"
       case "fish_harvest":
         return "Harvest Update"
-      case "feed_incoming":
+      case "feed_inventory":
         return "Feed Inventory"
       case "fish_stocking":
         return "Stocking Event"
@@ -244,8 +245,8 @@ export default function RecentActivities({
         return `${systemName ?? "Farm"} - Transfer entry recorded`
       case "fish_harvest":
         return `${systemName ?? "Farm"} - Harvest entry recorded`
-      case "feed_incoming":
-        return "Incoming feed stock recorded"
+      case "feed_inventory":
+        return "Feed inventory recorded"
       case "fish_stocking":
         return `${systemName ?? "Farm"} - Stocking entry recorded`
       default:

@@ -129,19 +129,13 @@ export default function UsersPageClient({
     try {
       const result = await grantFarmAccessAction({ farmId, email: inviteEmail.trim(), role: inviteRole })
 
-      if (result.pendingInvite) {
-        const nextPendingInvites = await listPendingFarmInvitesAction({ farmId })
-        setPendingInvites(nextPendingInvites)
-        showSuccess(
-          result.inviteSent
-            ? "Invitation email sent. The teammate will appear under Pending Invites until they join."
-            : "Invitation saved. The teammate will appear under Pending Invites until they join.",
-        )
-      } else {
-        const nextMembers = await listFarmMembersAction({ farmId })
-        setMembers(nextMembers)
-        showSuccess("Team member added.")
-      }
+      const nextPendingInvites = await listPendingFarmInvitesAction({ farmId })
+      setPendingInvites(nextPendingInvites)
+      showSuccess(
+        result.inviteSent
+          ? "Invitation email sent. The teammate will appear under Pending Invites until they accept."
+          : "Invitation saved, but Supabase could not send the email. The teammate remains pending until they accept.",
+      )
 
       setInviteEmail("")
     } catch (error) {
@@ -278,7 +272,7 @@ export default function UsersPageClient({
               <div>
                 <h2 className="text-xl font-semibold tracking-tight text-foreground">Invite a Team Member</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Invite by email and assign the right role up front. Existing users are added immediately; new users stay pending until they join.
+                  Invite by email and assign the right role up front. Access is created only after the teammate accepts.
                 </p>
               </div>
             </div>

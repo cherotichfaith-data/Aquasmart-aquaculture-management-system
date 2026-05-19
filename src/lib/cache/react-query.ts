@@ -72,6 +72,12 @@ async function invalidateFeedingWriteQueries(
         hasPrefix(queryKey, ["inventory", "daily"]) && toStringValue(queryKey[2]) === params.farmId,
     }),
     queryClient.invalidateQueries({
+      predicate: ({ queryKey }) =>
+        toStringValue(queryKey[0]) === "options" &&
+        toStringValue(queryKey[1]) === "feeds" &&
+        toStringValue(queryKey[2]) === params.farmId,
+    }),
+    queryClient.invalidateQueries({
       predicate: ({ queryKey }) => isFarmScopedReportsQuery(queryKey, params.farmId),
     }),
     queryClient.invalidateQueries({
@@ -151,7 +157,7 @@ async function invalidateFeedInventoryWriteQueries(
     queryClient.invalidateQueries({
       predicate: ({ queryKey }) => isFarmScopedReportsQuery(queryKey, params.farmId),
     }),
-    invalidateRecentActivityQueries(queryClient, { tableName: "feed_incoming", date: params.date }),
+    invalidateRecentActivityQueries(queryClient, { tableName: "feed_inventory", date: params.date }),
   ])
 }
 
@@ -214,7 +220,7 @@ export type DataEntryWriteType =
   | "harvest"
   | "transfer"
   | "stocking"
-  | "incomingFeed"
+  | "feedInventory"
   | "system"
 
 export async function invalidateAfterWrite(
@@ -237,7 +243,7 @@ export async function invalidateAfterWrite(
       })
     case "waterQuality":
       return invalidateWaterQualityWriteQueries(queryClient, { farmId: params.farmId, date: params.date })
-    case "incomingFeed":
+    case "feedInventory":
       return invalidateFeedInventoryWriteQueries(queryClient, { farmId: params.farmId, date: params.date })
     case "system":
       return invalidateSystemWriteQueries(queryClient, { farmId: params.farmId, date: params.date })
