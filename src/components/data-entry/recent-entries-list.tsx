@@ -37,7 +37,7 @@ type RecentEntriesListProps =
   | { type: "transfer"; data: TransferRow[]; systems: SystemOption[] }
   | { type: "harvest"; data: HarvestRow[]; systems: SystemOption[] }
   | { type: "water_quality"; data: WaterQualityRow[]; systems: SystemOption[] }
-  | { type: "incoming_feed"; data: FeedInventoryRow[]; systems: SystemOption[] }
+  | { type: "feed_inventory"; data: FeedInventoryRow[]; systems: SystemOption[] }
   | { type: "stocking"; data: StockingRow[]; systems: SystemOption[] }
   | { type: "system"; data: SystemEntryRow[]; systems: SystemOption[] }
 
@@ -76,7 +76,7 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
               status: "pending",
               date: row.date,
               system_id: row.systemId,
-              feed_type_id: row.feedTypeId,
+              feed_type_id: row.feedTypeId ?? null,
               feeding_amount: row.feedingAmount,
               created_at: toCreatedAt(row.createdAtLocal),
             }))
@@ -344,7 +344,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
         { label: "Value", value: String(row.parameter_value) },
       ],
     }))
-  } else if (type === "incoming_feed") {
+  } else if (type === "feed_inventory") {
     const feedInventoryPendingEntries = pendingEntries as unknown as FeedInventoryRow[]
     const rows = mergeRecentEntries(data, feedInventoryPendingEntries)
     pendingCount = feedInventoryPendingEntries.length

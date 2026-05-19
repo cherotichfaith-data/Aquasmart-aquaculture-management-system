@@ -538,7 +538,7 @@ const emptyRecentEntries = () => ({
   transfer: toQuerySuccess<FishTransferRow>([]),
   harvest: toQuerySuccess<FishHarvestRow>([]),
   water_quality: toQuerySuccess<WaterQualityMeasurementRow>([]),
-  incoming_feed: toQuerySuccess<FeedInventoryRow>([]),
+  feed_inventory: toQuerySuccess<FeedInventoryRow>([]),
   stocking: toQuerySuccess<FishStockingRow>([]),
   systems: toQuerySuccess<SystemRow>([]),
 })
@@ -645,7 +645,7 @@ export async function listRecentEntries(supabase: ServerSupabaseClient, farmId?:
     transfer: toQuerySuccess(transfer),
     harvest: toQuerySuccess(harvest),
     water_quality: toQuerySuccess(waterQuality),
-    incoming_feed: toQuerySuccess(feedInventory),
+    feed_inventory: toQuerySuccess(feedInventory),
     stocking: toQuerySuccess(stocking),
     systems: toQuerySuccess(systems),
   }

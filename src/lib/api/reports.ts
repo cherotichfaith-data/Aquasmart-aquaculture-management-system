@@ -331,7 +331,7 @@ const emptyRecentEntries = () => ({
   transfer: toQuerySuccess<FishTransferRow>([]),
   harvest: toQuerySuccess<FishHarvestRow>([]),
   water_quality: toQuerySuccess<WaterQualityMeasurementRow>([]),
-  incoming_feed: toQuerySuccess<FeedInventoryRow>([]),
+  feed_inventory: toQuerySuccess<FeedInventoryRow>([]),
   stocking: toQuerySuccess<FishStockingRow>([]),
   systems: toQuerySuccess<SystemRow>([]),
 })

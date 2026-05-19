@@ -21,7 +21,7 @@ export type DashboardRecentEntriesData = {
   transfer: QueryResult<Database["public"]["Tables"]["fish_transfer"]["Row"]>
   harvest: QueryResult<Database["public"]["Tables"]["fish_harvest"]["Row"]>
   water_quality: QueryResult<Database["public"]["Tables"]["water_quality_measurement"]["Row"]>
-  incoming_feed: QueryResult<Database["public"]["Tables"]["feed_inventory"]["Row"]>
+  feed_inventory: QueryResult<Database["public"]["Tables"]["feed_inventory"]["Row"]>
   stocking: QueryResult<Database["public"]["Tables"]["fish_stocking"]["Row"]>
   systems: QueryResult<Database["public"]["Tables"]["system"]["Row"]>
 }

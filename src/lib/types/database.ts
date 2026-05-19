@@ -427,9 +427,9 @@ export type Database = {
           created_at: string
           cycle_id: number | null
           date: string
-          feed_type_id: number
+          feed_type_id: number | null
           feeding_amount: number
-          feeding_response: number
+          feeding_response: number | null
           id: number
           local_id: string | null
           notes: string | null
@@ -440,9 +440,9 @@ export type Database = {
           created_at?: string
           cycle_id?: number | null
           date: string
-          feed_type_id: number
+          feed_type_id?: number | null
           feeding_amount: number
-          feeding_response: number
+          feeding_response?: number | null
           id?: number
           local_id?: string | null
           notes?: string | null
@@ -453,9 +453,9 @@ export type Database = {
           created_at?: string
           cycle_id?: number | null
           date?: string
-          feed_type_id?: number
+          feed_type_id?: number | null
           feeding_amount?: number
-          feeding_response?: number
+          feeding_response?: number | null
           id?: number
           local_id?: string | null
           notes?: string | null

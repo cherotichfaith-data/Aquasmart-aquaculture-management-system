@@ -20,7 +20,7 @@ const dataEntryTabs = [
   "harvest",
   "transfer",
   "stocking",
-  "incoming_feed",
+  "feed_inventory",
   "system",
 ] as const
 
@@ -73,7 +73,7 @@ export default function DataEntryPageClient({
       getQueryResultError(data.transfer),
       getQueryResultError(data.harvest),
       getQueryResultError(data.water_quality),
-      getQueryResultError(data.incoming_feed),
+      getQueryResultError(data.feed_inventory),
       getQueryResultError(data.stocking),
       getQueryResultError(data.systems),
     ].filter(Boolean) as string[]
@@ -118,9 +118,9 @@ export default function DataEntryPageClient({
         recentEntriesQuery.data?.water_quality?.status === "success"
           ? recentEntriesQuery.data.water_quality.data
           : [],
-      incoming_feed:
-        recentEntriesQuery.data?.incoming_feed?.status === "success"
-          ? recentEntriesQuery.data.incoming_feed.data
+      feed_inventory:
+        recentEntriesQuery.data?.feed_inventory?.status === "success"
+          ? recentEntriesQuery.data.feed_inventory.data
           : [],
       stocking:
         recentEntriesQuery.data?.stocking?.status === "success" ? recentEntriesQuery.data.stocking.data : [],

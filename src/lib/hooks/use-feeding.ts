@@ -28,9 +28,9 @@ export function useRecordFeeding() {
       systemId: number
       batchId?: number | null
       date: string
-      feedTypeId: number
+      feedTypeId?: number | null
       feedingAmount: number
-      feedingResponse: FeedingInsertInput["feeding_response"]
+      feedingResponse?: FeedingInsertInput["feeding_response"] | null
       notes?: string | null
     },
     {
@@ -45,9 +45,9 @@ export function useRecordFeeding() {
         systemId: payload.system_id,
         batchId: payload.batch_id ?? null,
         date: payload.date,
-        feedTypeId: payload.feed_type_id,
+        feedTypeId: payload.feed_type_id ?? null,
         feedingAmount: payload.feeding_amount,
-        feedingResponse: payload.feeding_response,
+        feedingResponse: payload.feeding_response ?? null,
         notes: payload.notes ?? null,
       },
     ],

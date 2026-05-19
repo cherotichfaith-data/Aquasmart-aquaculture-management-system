@@ -299,9 +299,8 @@ export async function getWeeklyInventoryFeedTypeOptions(params?: {
 
   let query = clientResult.supabase
     .from("feed_inventory")
-    .select("feed_type_id, amount_of_bags, bag_weight, opened_bags")
+    .select("feed_type_id, amount_of_bags, bag_weight, opened_bags, inventory_date, inventory_time, created_at")
     .eq("farm_id", params.farmId)
-    .gte("inventory_date", params.dateFrom)
     .lte("inventory_date", params.dateTo)
     .not("feed_type_id", "is", null)
 
@@ -310,7 +309,7 @@ export async function getWeeklyInventoryFeedTypeOptions(params?: {
   const inventoryResult = await resolveClientReadQuery<
     Pick<
       Database["public"]["Tables"]["feed_inventory"]["Row"],
-      "feed_type_id" | "amount_of_bags" | "bag_weight" | "opened_bags"
+      "feed_type_id" | "amount_of_bags" | "bag_weight" | "opened_bags" | "inventory_date" | "inventory_time" | "created_at"
     >
   >({
     tag: "getWeeklyInventoryFeedTypeOptions",
@@ -320,8 +319,21 @@ export async function getWeeklyInventoryFeedTypeOptions(params?: {
   })
   if (inventoryResult.status !== "success") return inventoryResult
 
+  const latestByFeedType = new Map<number, (typeof inventoryResult.data)[number]>()
+  inventoryResult.data.forEach((row) => {
+    if (typeof row.feed_type_id !== "number" || !Number.isFinite(row.feed_type_id)) return
+    const current = latestByFeedType.get(row.feed_type_id)
+    const rowSortKey = `${row.inventory_date ?? ""}T${row.inventory_time ?? "00:00"}:${row.created_at ?? ""}`
+    const currentSortKey = current
+      ? `${current.inventory_date ?? ""}T${current.inventory_time ?? "00:00"}:${current.created_at ?? ""}`
+      : ""
+    if (!current || rowSortKey > currentSortKey) {
+      latestByFeedType.set(row.feed_type_id, row)
+    }
+  })
+
   const stockedFeedTypeIds = new Set(
-    inventoryResult.data
+    Array.from(latestByFeedType.values())
       .filter((row) => {
         const baggedKg = (row.amount_of_bags ?? 0) * (row.bag_weight ?? 0)
         const openKg = (row.opened_bags ?? 0) * (row.bag_weight ?? 0)

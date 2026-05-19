@@ -8,7 +8,7 @@ export function useRecordFeedInventorySnapshot() {
   return useWriteThroughMutation({
     mutationFn: recordFeedInventorySnapshotAction,
     activityTableName: "feed_inventory",
-    recentEntryKey: "incoming_feed",
+    recentEntryKey: "feed_inventory",
     buildOptimisticEntry: (payload) => {
       return {
         id: `optimistic-${Date.now()}`,
