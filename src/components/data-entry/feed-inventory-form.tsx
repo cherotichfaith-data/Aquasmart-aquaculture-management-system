@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -20,8 +19,6 @@ import type { Database } from "@/lib/types/database"
 import { useRecordFeedInventorySnapshot } from "@/lib/hooks/use-feed-inventory"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { DependencyBlocker } from "./dependency-blocker"
-import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import { InfoPanel, InfoStat } from "./form-support"
 import { calculateFeedAmount, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 
@@ -42,8 +39,7 @@ interface FeedInventoryFormProps {
 
 export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
   const mutation = useRecordFeedInventorySnapshot()
-  const [showQuickCreate, setShowQuickCreate] = useState(false)
-  const feedInventoryFeeds = feeds.filter((feed) => feed.visibility_scope !== "shared_catalog")
+  const feedInventoryFeeds = feeds
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -100,14 +96,9 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
 
   if (feedInventoryFeeds.length === 0) {
     return (
-      <DependencyBlocker
-        title="No feed types found."
-        description="Add a feed type to continue."
-        actionLabel={showQuickCreate ? "Hide feed type form" : "Add feed type"}
-        onAction={() => setShowQuickCreate((current) => !current)}
-      >
-        {showQuickCreate ? <FeedTypeQuickCreate farmId={farmId} onCreated={() => setShowQuickCreate(false)} /> : null}
-      </DependencyBlocker>
+      <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+        No feed types are available for this farm yet.
+      </div>
     )
   }
 
