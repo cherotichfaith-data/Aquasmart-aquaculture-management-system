@@ -18,6 +18,12 @@ type MutationMeta = {
   date: string
 }
 
+type DbErrorLike = {
+  code?: string
+  message?: string
+  details?: string
+}
+
 export type SystemInput = Insert<"system">
 export type FingerlingSupplierInput = Insert<"fingerling_supplier">
 export type FingerlingBatchInput = Insert<"fingerling_batch">
@@ -60,6 +66,17 @@ const farmWorkspaceSchema = z.object({
 })
 
 type FarmWorkspaceInput = z.infer<typeof farmWorkspaceSchema>
+
+function isDuplicateSystemNameError(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const dbError = error as DbErrorLike
+  return (
+    dbError.code === "23505" &&
+    /system_name_farm_unique|farm_id, name|duplicate key/i.test(
+      `${dbError.message ?? ""}\n${dbError.details ?? ""}`,
+    )
+  )
+}
 
 function slugify(value: string) {
   const slug = value
@@ -290,6 +307,9 @@ export async function createSystemAction(
 
   if (error || !data) {
     logSbError("system:create:insert", error)
+    if (isDuplicateSystemNameError(error)) {
+      throw new Error(`A system named "${parsedPayload.name}" already exists in this farm.`)
+    }
     if (isSbPermissionDenied(error)) {
       throw new Error("Unable to create system.")
     }

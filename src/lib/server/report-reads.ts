@@ -531,7 +531,7 @@ export async function listBatchSystemIds(
   return activeIds.map((system_id) => ({ system_id }))
 }
 
-const emptyRecentEntries = () => ({
+export const emptyRecentEntries = () => ({
   mortality: toQuerySuccess<FishMortalityRow>([]),
   feeding: toQuerySuccess<FeedingRecordRow>([]),
   sampling: toQuerySuccess<FishSamplingWeightRow>([]),

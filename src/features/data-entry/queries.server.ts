@@ -2,10 +2,10 @@ import { runServerReadThrough } from "@/lib/cache/server"
 import { cacheTags } from "@/lib/cache/tags"
 import { toQuerySuccess } from "@/lib/api/_utils"
 import { createAccessTokenClient } from "@/lib/supabase/server"
-import { requireUserContext } from "@/lib/supabase/require-user"
 import { getScopedSystemOptions } from "@/features/shared/scoped-analytics.server"
 import { listBatchOptionRows, listFeedTypeOptionRows } from "@/features/shared/query-seed.server"
-import { listRecentEntries } from "@/lib/server/report-reads"
+import { emptyRecentEntries, listRecentEntries } from "@/lib/server/report-reads"
+import { logSbError } from "@/lib/supabase/log"
 
 type DataEntrySupabaseClient = ReturnType<typeof createAccessTokenClient>
 
@@ -22,11 +22,26 @@ async function getFeedTypes(supabase: DataEntrySupabaseClient, farmId: string) {
   return toQuerySuccess(await listFeedTypeOptionRows(supabase, { farmId }))
 }
 
-export async function getDataEntryPrefetch(farmId: string) {
-  const { user, accessToken } = await requireUserContext()
+async function safePrefetch<T>(tag: string, fallback: T, loader: () => Promise<T>) {
+  try {
+    return await loader()
+  } catch (error) {
+    logSbError(tag, error)
+    return fallback
+  }
+}
 
+export async function getDataEntryPrefetch({
+  farmId,
+  userId,
+  accessToken,
+}: {
+  farmId: string
+  userId: string
+  accessToken: string
+}) {
   return runServerReadThrough({
-    keyParts: ["data-entry-page", user.id, farmId],
+    keyParts: ["data-entry-page", userId, farmId],
     tags: [
       cacheTags.farm(farmId),
       cacheTags.systems(farmId),
@@ -36,10 +51,12 @@ export async function getDataEntryPrefetch(farmId: string) {
     loader: async () => {
       const supabase = createAccessTokenClient(accessToken)
       const [systems, batches, feedTypes, recentEntries] = await Promise.all([
-        getSystems(supabase, farmId),
-        getBatches(supabase, farmId),
-        getFeedTypes(supabase, farmId),
-        listRecentEntries(supabase, farmId),
+        safePrefetch("data-entry:prefetch:systems", toQuerySuccess([]), () => getSystems(supabase, farmId)),
+        safePrefetch("data-entry:prefetch:batches", toQuerySuccess([]), () => getBatches(supabase, farmId)),
+        safePrefetch("data-entry:prefetch:feedTypes", toQuerySuccess([]), () => getFeedTypes(supabase, farmId)),
+        safePrefetch("data-entry:prefetch:recentEntries", emptyRecentEntries(), () =>
+          listRecentEntries(supabase, farmId),
+        ),
       ])
 
       return { systems, batches, feedTypes, recentEntries }

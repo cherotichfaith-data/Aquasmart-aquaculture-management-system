@@ -61,7 +61,7 @@ export default async function DataEntryPage({
     redirect("/unauthorized")
   }
 
-  const prefetch = await getDataEntryPrefetch(farmId)
+  const prefetch = await getDataEntryPrefetch({ farmId, userId: user.id, accessToken })
   const queryClient = createQueryClient()
 
   queryClient.setQueryData(queryKeys.farmUserRole(farmId, user.id), role)
