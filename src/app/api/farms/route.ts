@@ -9,10 +9,8 @@ const farmsQuerySchema = z.object({
   orgId: z.string().uuid(),
 })
 
-export async function GET(request: NextRequest) {
-  const parseResult = farmsQuerySchema.safeParse({
-    orgId: request.nextUrl.searchParams.get("orgId"),
-  })
+async function loadFarmsForOrganization(orgId: string) {
+  const parseResult = farmsQuerySchema.safeParse({ orgId })
 
   if (!parseResult.success) {
     return NextResponse.json({ error: "Organization is required." }, { status: 400 })
@@ -43,4 +41,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ error: "Unable to load farms." }, { status: 503 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return loadFarmsForOrganization(request.nextUrl.searchParams.get("orgId") ?? "")
+}
+
+export async function POST(request: NextRequest) {
+  const payload = (await request.json().catch(() => null)) as { orgId?: unknown } | null
+  return loadFarmsForOrganization(typeof payload?.orgId === "string" ? payload.orgId : "")
 }

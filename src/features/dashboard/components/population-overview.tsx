@@ -14,7 +14,6 @@ import MenuItem from "@mui/material/MenuItem"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useProductionTrend } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
-import { LazyRender } from "@/components/shared/lazy-render"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
 import {
@@ -172,26 +171,30 @@ export default function PopulationOverview({
   }, [chartRows, granularity])
   const rowsByBucket = useMemo(() => new Map(chartRows.map((row) => [row.bucket, row])), [chartRows])
   const xLimit = granularity === "day" ? getDateAxisMaxTicks(domain.length) : Math.min(Math.max(domain.length, 4), 8)
-  const feedAmountBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.feedAmount), { minFloor: 0, includeZero: true }),
-    [chartRows],
-  )
-  const abwBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.averageBodyWeight), { minFloor: 0 }),
-    [chartRows],
-  )
-  const mortalityBounds = useMemo(
-    () => buildMetricAxisBounds(chartRows.map((row) => row.mortalityCount), { minFloor: 0, includeZero: true }),
-    [chartRows],
-  )
-  const combinedData = useMemo<ChartData<"bar">>(
-    () => ({
+  const metricMaxima = useMemo(() => {
+    const maxOrOne = (values: Array<number | null | undefined>) => {
+      const max = Math.max(0, ...values.filter((value): value is number => typeof value === "number" && Number.isFinite(value)))
+      return max > 0 ? max : 1
+    }
+
+    return {
+      feedAmount: maxOrOne(chartRows.map((row) => row.feedAmount)),
+      mortality: maxOrOne(chartRows.map((row) => row.mortalityCount)),
+      abw: maxOrOne(chartRows.map((row) => row.averageBodyWeight)),
+    }
+  }, [chartRows])
+
+  const normalizedValue = (value: number | null | undefined, max: number) =>
+    typeof value === "number" && Number.isFinite(value) ? (value / max) * 100 : null
+
+  const combinedData = useMemo<ChartData<"bar">>(() => {
+    return {
       labels: domain.map((bucket) => (granularity === "day" ? bucket : formatBucketLabel(bucket, granularity))),
       datasets: [
         {
           type: "bar",
           label: "Feed",
-          data: domain.map((bucket) => rowsByBucket.get(bucket)?.feedAmount ?? null),
+          data: domain.map((bucket) => normalizedValue(rowsByBucket.get(bucket)?.feedAmount, metricMaxima.feedAmount)),
           borderColor: "#4472C4",
           backgroundColor: "#4472C4",
           borderWidth: 1,
@@ -207,7 +210,7 @@ export default function PopulationOverview({
         {
           type: "bar",
           label: "Mortality",
-          data: domain.map((bucket) => rowsByBucket.get(bucket)?.mortalityCount ?? null),
+          data: domain.map((bucket) => normalizedValue(rowsByBucket.get(bucket)?.mortalityCount, metricMaxima.mortality)),
           borderColor: "#ED7D31",
           backgroundColor: "#ED7D31",
           borderWidth: 1,
@@ -217,13 +220,13 @@ export default function PopulationOverview({
           barPercentage: 0.46,
           maxBarThickness: 28,
           order: 3,
-          yAxisID: "y2",
+          yAxisID: "y",
           hidden: !activeMetrics.mortality,
         },
         {
           type: "line",
           label: "ABW",
-          data: domain.map((bucket) => rowsByBucket.get(bucket)?.averageBodyWeight ?? null),
+          data: domain.map((bucket) => normalizedValue(rowsByBucket.get(bucket)?.averageBodyWeight, metricMaxima.abw)),
           borderColor: "#70AD47",
           backgroundColor: "transparent",
           borderWidth: 2,
@@ -233,40 +236,42 @@ export default function PopulationOverview({
           pointBackgroundColor: "#70AD47",
           pointBorderColor: "#70AD47",
           pointBorderWidth: 1,
+          tension: 0.2,
           spanGaps: true,
           clip: 0,
           order: 1,
-          yAxisID: "yAbw",
+          yAxisID: "y",
           hidden: !activeMetrics.abw,
         },
       ],
-    }) as ChartData<"bar">,
-    [activeMetrics.abw, activeMetrics.feedAmount, activeMetrics.mortality, domain, granularity, palette.chart1, palette.chart2, palette.chart5, rowsByBucket],
-  )
+    } as unknown as ChartData<"bar">
+  }, [activeMetrics.abw, activeMetrics.feedAmount, activeMetrics.mortality, domain, granularity, metricMaxima, rowsByBucket])
 
   const combinedOptions = useMemo<ChartOptions<"bar">>(
     () =>
       buildCartesianOptions<"bar">({
         palette,
-        min: feedAmountBounds.min,
-        max: feedAmountBounds.max,
+        min: 0,
+        max: 100,
         lockYBounds: true,
         xMaxTicksLimit: xLimit,
-        yTitle: "Feed (kg)",
-        yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 0 }),
+        yTitle: "Relative scale (% of each metric's peak)",
+        yTickFormatter: (value) => `${formatNumberValue(Number(value), { decimals: 0 })}%`,
         tooltip: {
           callbacks: {
             title: (items: any) =>
               String(items[0]?.label ?? ""),
             label: (context: any) => {
               const label = String(context.dataset.label ?? "")
+              const bucket = domain[context.dataIndex]
+              const row = rowsByBucket.get(String(bucket))
               if (label === "Feed") {
-                return `Feed: ${formatNumberValue(Number(context.parsed.y), { decimals: 1 })} kg`
+                return `Feed: ${formatNumberValue(row?.feedAmount ?? 0, { decimals: 1 })} kg (${formatNumberValue(Number(context.parsed.y), { decimals: 0 })}% of peak)`
               }
               if (label === "ABW") {
-                return `ABW: ${formatNumberValue(Number(context.parsed.y), { decimals: 0 })} g`
+                return `ABW: ${formatNumberValue(row?.averageBodyWeight ?? 0, { decimals: 0 })} g (${formatNumberValue(Number(context.parsed.y), { decimals: 0 })}% of peak)`
               }
-              return `Mortality: ${formatNumberValue(Number(context.parsed.y), { decimals: 0 })} fish`
+              return `Mortality: ${formatNumberValue(row?.mortalityCount ?? 0, { decimals: 0 })} fish (${formatNumberValue(Number(context.parsed.y), { decimals: 0 })}% of peak)`
             },
           },
         },
@@ -274,73 +279,8 @@ export default function PopulationOverview({
           granularity === "day"
             ? formatChartDate(String(domain[index] ?? ""), { month: "short", day: "numeric" })
             : formatBucketLabel(String(domain[index] ?? ""), granularity),
-        extraScales: {
-          y2: {
-            position: "right",
-            display: activeMetrics.mortality,
-            min: mortalityBounds.min,
-            max: mortalityBounds.max,
-            grid: {
-              drawOnChartArea: false,
-              drawTicks: false,
-            },
-            border: {
-              display: false,
-            },
-            ticks: {
-              color: palette.muted,
-              padding: 8,
-              font: {
-                size: 11,
-                weight: 500,
-              },
-              callback: (value: number | string) => formatNumberValue(Number(value), { decimals: 0 }),
-            },
-            title: {
-              display: true,
-              text: "Mortality",
-              color: palette.muted,
-              font: {
-                size: 11,
-                weight: 500,
-              },
-            },
-          },
-          yAbw: {
-            position: "right",
-            display: activeMetrics.abw,
-            min: abwBounds.min,
-            max: abwBounds.max,
-            offset: true,
-            grid: {
-              drawOnChartArea: false,
-              drawTicks: false,
-            },
-            border: {
-              display: false,
-            },
-            ticks: {
-              color: palette.muted,
-              padding: activeMetrics.mortality ? 34 : 8,
-              font: {
-                size: 11,
-                weight: 500,
-              },
-              callback: (value: number | string) => formatNumberValue(Number(value), { decimals: 0 }),
-            },
-            title: {
-              display: true,
-              text: "ABW (g)",
-              color: palette.muted,
-              font: {
-                size: 11,
-                weight: 500,
-              },
-            },
-          },
-        },
       }),
-    [abwBounds.max, abwBounds.min, activeMetrics.abw, activeMetrics.mortality, domain, feedAmountBounds.max, feedAmountBounds.min, granularity, mortalityBounds.max, mortalityBounds.min, palette, xLimit],
+    [domain, granularity, palette, rowsByBucket, xLimit],
   )
 
   const errorMessage = getErrorMessage(summaryQuery.error)
@@ -439,10 +379,10 @@ export default function PopulationOverview({
         {summaryQuery.isLoading || (summaryQuery.isFetching && !chartRows.length) ? (
           <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading chart...</div>
         ) : chartRows.length ? (
-            <div className="border border-border bg-background px-2 py-3">
-            <LazyRender className="h-[360px]" fallback={<div className="h-full w-full" />}>
+          <div className="border border-border bg-background px-2 py-3">
+            <div className="h-[360px]">
               <Chart type="bar" data={combinedData} options={combinedOptions} />
-            </LazyRender>
+            </div>
           </div>
         ) : (
           <EmptyState title="No trend data" description="No feed, ABW, or mortality rows match this filter." />

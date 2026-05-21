@@ -84,6 +84,6 @@ export async function resolveExistingFarmEntryPath(searchFarmId?: string | null)
     farmId,
     farms,
     role,
-    entryPath: `${resolveAppEntryPath(role)}?farmId=${encodeURIComponent(farmId)}`,
+    entryPath: resolveAppEntryPath(role),
   }
 }

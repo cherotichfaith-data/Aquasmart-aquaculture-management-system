@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { type FormEvent, useMemo, useState } from "react"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -43,6 +43,7 @@ function validateForm(mode: AuthMode, fields: { fullName: string; email: string;
 }
 
 export default function LoginForm() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const { signUpWithPassword } = useAuth()
   const [fullName, setFullName] = useState("")
@@ -121,7 +122,7 @@ export default function LoginForm() {
     try {
       if (authMode === "signin") {
         const result = await login(email.trim(), password)
-        window.location.assign(resolveLoginRedirect(result.redirectTo))
+        router.replace(resolveLoginRedirect(result.redirectTo))
         return
       }
 
@@ -147,7 +148,7 @@ export default function LoginForm() {
         return
       }
 
-      window.location.assign(createWorkspaceHref)
+      router.replace(createWorkspaceHref)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to continue."
       setFormError(

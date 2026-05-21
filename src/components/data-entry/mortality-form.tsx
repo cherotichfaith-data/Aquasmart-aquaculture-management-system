@@ -22,7 +22,7 @@ import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
-import { parseOptionalNumericId, parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
+import { parseOptionalNumericId, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 
 const formSchema = z.object({
   system_id: z.string().min(1, "Cage number is required"),
@@ -101,6 +101,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       })
     } catch (error) {
       logSbError("dataEntry:mortality:submit", error)
+      reportDataEntrySubmitError(error, "Failed to record mortality.")
     }
   }
 

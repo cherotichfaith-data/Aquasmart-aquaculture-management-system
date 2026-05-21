@@ -201,7 +201,7 @@ export function DataEntryInterface({
                     />
                 )
             case "system":
-                return <SystemForm />
+                return <SystemForm farmId={farmId} />
         }
     })()
 

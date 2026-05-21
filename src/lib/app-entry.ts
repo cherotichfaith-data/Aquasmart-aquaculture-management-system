@@ -110,15 +110,7 @@ export function sanitizeNextPath(nextPath: string | null | undefined, fallback =
   try {
     const url = new URL(nextPath, "http://localhost")
     const params = new URLSearchParams(url.search)
-    const farmIds = params
-      .getAll("farmId")
-      .map((value) => value.trim())
-      .filter(Boolean)
-
-    if (farmIds.length > 0) {
-      params.delete("farmId")
-      params.set("farmId", farmIds[farmIds.length - 1]!)
-    }
+    params.delete("farmId")
 
     const query = params.toString()
     return `${url.pathname}${query ? `?${query}` : ""}${url.hash}`

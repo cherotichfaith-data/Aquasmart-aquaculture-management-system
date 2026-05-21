@@ -1,3 +1,5 @@
+import { toast } from "@/lib/hooks/app/use-toast"
+
 export const toIsoDate = (date: Date) => date.toISOString().split("T")[0]
 
 export const parseNumericId = (value: number | string | null | undefined): number | null => {
@@ -43,4 +45,12 @@ export const calculateFeedAmount = (bagWeightKg: number, numberOfBags: number, o
   const resolvedNumberOfBags = Number.isFinite(numberOfBags) ? numberOfBags : 0
   const resolvedOpenBagsKg = Number.isFinite(openBagsKg) ? openBagsKg : 0
   return resolvedBagWeightKg * resolvedNumberOfBags + resolvedOpenBagsKg
+}
+
+export const reportDataEntrySubmitError = (error: unknown, fallback = "Unable to save this record.") => {
+  toast({
+    variant: "destructive",
+    title: "Unable to save",
+    description: error instanceof Error ? error.message : fallback,
+  })
 }

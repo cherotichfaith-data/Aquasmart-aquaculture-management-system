@@ -15,6 +15,7 @@ import {
 } from "@/components/app-ui/form"
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
+import { toast } from "@/lib/hooks/app/use-toast"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useCreateSystem } from "@/lib/hooks/use-system"
 import { BIOLOGICAL_GROWTH_STAGE_VALUES, formatGrowthStage } from "@/lib/stage-filter"
@@ -39,8 +40,9 @@ const formSchema = z.object({
     diameter: z.coerce.number().min(0).optional(),
 })
 
-export function SystemForm() {
-    const { farmId } = useActiveFarm()
+export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }) {
+    const { farmId: activeFarmId, loading: activeFarmLoading } = useActiveFarm()
+    const farmId = initialFarmId ?? activeFarmId
     const createSystem = useCreateSystem()
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -61,6 +63,13 @@ export function SystemForm() {
 
     function onSubmit(values: z.infer<typeof formSchema>) {
         if (!farmId) {
+            toast({
+                variant: "destructive",
+                title: "No active farm",
+                description: activeFarmLoading
+                    ? "The workspace is still loading. Try again in a moment."
+                    : "Select a workspace before recording a system.",
+            })
             return
         }
 
@@ -278,7 +287,7 @@ export function SystemForm() {
                         />
                     )}
 
-                    <Button type="submit" className="data-entry-action" disabled={createSystem.isPending}>
+                    <Button type="submit" className="data-entry-action" disabled={createSystem.isPending || (!farmId && activeFarmLoading)}>
                         {createSystem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Record System
                     </Button>

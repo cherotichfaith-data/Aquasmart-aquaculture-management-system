@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import type { Enums } from "@/lib/types/database"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type Params = {
   farmId?: string | null
@@ -14,8 +15,6 @@ type Params = {
 }
 
 export function useScopedSystemIds(params: Params) {
-  const selectedSystemId = params.selectedSystem !== "all" ? Number(params.selectedSystem) : undefined
-  const hasSystem = Number.isFinite(selectedSystemId)
   const batchId = params.selectedBatch !== "all" ? Number(params.selectedBatch) : undefined
 
   const systemsQuery = useSystemOptions({
@@ -24,6 +23,13 @@ export function useScopedSystemIds(params: Params) {
     activeOnly: true,
     enabled: params.enabled,
   })
+  const selectedSystemId =
+    systemsQuery.data?.status === "success"
+      ? resolveSystemIdFromFilterValue(params.selectedSystem, systemsQuery.data.data)
+      : params.selectedSystem !== "all" && Number.isFinite(Number(params.selectedSystem))
+        ? Number(params.selectedSystem)
+        : undefined
+  const hasSystem = Number.isFinite(selectedSystemId)
 
   const batchSystemsQuery = useBatchSystemIds({
     batchId: Number.isFinite(batchId) ? batchId : undefined,

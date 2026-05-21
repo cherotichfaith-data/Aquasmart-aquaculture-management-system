@@ -132,9 +132,11 @@ export default function UsersPageClient({
       const nextPendingInvites = await listPendingFarmInvitesAction({ farmId })
       setPendingInvites(nextPendingInvites)
       showSuccess(
-        result.inviteSent
-          ? "Invitation email sent. The teammate will appear under Pending Invites until they accept."
-          : "Invitation saved, but Supabase could not send the email. The teammate remains pending until they accept.",
+        result.delivery === "sent"
+          ? "Invitation email sent. The teammate should open that email and set their password from the invite link."
+          : result.delivery === "existing_account"
+            ? "Invitation saved. This email already has an AquaSmart account, so ask the teammate to sign in with that account to activate access."
+            : "Invitation saved, but Supabase could not send the email. Ask the teammate to sign in if they already started account setup, or retry later.",
       )
 
       setInviteEmail("")
@@ -272,7 +274,7 @@ export default function UsersPageClient({
               <div>
                 <h2 className="text-xl font-semibold tracking-tight text-foreground">Invite a Team Member</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Invite by email and assign the right role up front. Access is created only after the teammate accepts.
+                  Invite by email and assign the right role up front. New users must open the invite email; existing users should sign in with the invited email.
                 </p>
               </div>
             </div>
@@ -457,7 +459,7 @@ export default function UsersPageClient({
           <div className="mb-5">
             <h2 className="text-xl font-semibold tracking-tight text-foreground">Pending Invites</h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Invitations waiting for a teammate to accept or create an account.
+              Invitations waiting for a teammate to open the invite link or sign in with the invited email.
             </p>
           </div>
 

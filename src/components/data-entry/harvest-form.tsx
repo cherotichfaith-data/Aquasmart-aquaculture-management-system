@@ -34,6 +34,7 @@ import {
     parseNumericId,
     parseOptionalNumericId,
     parseRequiredNumericId,
+    reportDataEntrySubmitError,
     requireActiveFarmId,
 } from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
@@ -221,6 +222,7 @@ export function HarvestForm({
             await submitHarvest(values)
         } catch (error) {
             logSbError("dataEntry:harvest:submit", error)
+            reportDataEntrySubmitError(error, "Failed to record harvest.")
         }
     }
 
@@ -233,6 +235,7 @@ export function HarvestForm({
             setPendingConfirmation(null)
         } catch (error) {
             logSbError("dataEntry:harvest:confirmFinal", error)
+            reportDataEntrySubmitError(error, "Failed to record final harvest.")
         }
     }
 

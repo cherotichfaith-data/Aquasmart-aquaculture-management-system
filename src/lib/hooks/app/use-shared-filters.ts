@@ -19,6 +19,8 @@ export function useSharedFilters(
   options?: {
     authoritativeInitialValues?: boolean
     resetKey?: string | null
+    urlValues?: Partial<Record<keyof SharedFiltersState, string>>
+    urlKeys?: Partial<Record<keyof SharedFiltersState, string>>
   },
 ) {
   const initialBatch = initialValues?.selectedBatch ?? "all"
@@ -44,18 +46,22 @@ export function useSharedFilters(
     let changed = false
 
     const syncParam = (key: keyof SharedFiltersState, value: string) => {
-      const current = params.get(key === "timePeriod" ? "period" : key.replace("selected", "").toLowerCase())
-      const urlKey = key === "timePeriod" ? "period" : key.replace("selected", "").toLowerCase()
+      const defaultUrlKey = key === "timePeriod" ? "period" : key.replace("selected", "").toLowerCase()
+      const urlKey = options?.urlKeys?.[key] ?? defaultUrlKey
+      const current = params.get(urlKey)
       const isDefault = value === "all" || (key === "timePeriod" && value === defaultTimePeriod)
+      const nextUrlValue = options?.urlValues?.[key] ?? value
 
       if (current == null && isDefault) return
-      if (current === value) return
+      if (current === nextUrlValue) return
 
       changed = true
       if (isDefault) {
         params.delete(urlKey)
+        if (key === "selectedSystem" && urlKey === "cage") params.delete("system")
       } else {
-        params.set(urlKey, value)
+        params.set(urlKey, nextUrlValue)
+        if (key === "selectedSystem" && urlKey === "cage") params.delete("system")
       }
     }
 
@@ -68,7 +74,16 @@ export function useSharedFilters(
       const nextQuery = params.toString()
       window.history.replaceState(null, "", nextQuery ? `${window.location.pathname}?${nextQuery}` : window.location.pathname)
     }
-  }, [defaultTimePeriod, initialBatch, initialPeriod, initialStage, initialSystem, options?.resetKey])
+  }, [
+    defaultTimePeriod,
+    initialBatch,
+    initialPeriod,
+    initialStage,
+    initialSystem,
+    options?.resetKey,
+    options?.urlKeys,
+    options?.urlValues,
+  ])
 
   return {
     selectedBatch,

@@ -33,6 +33,8 @@ export async function login(email: string, password: string): Promise<{ ok: true
     throw new Error("Session unavailable.")
   }
 
+  await supabase.rpc("claim_my_farm_user_invitations")
+
   // Determine post-login redirect by querying membership tables client-side.
   const [{ data: memberships }, { data: profile }] = await Promise.all([
     supabase.from("farm_user").select("farm_id, role").eq("user_id", data.user.id),
@@ -97,9 +99,14 @@ export async function getOrganizations() {
 }
 
 export async function getFarmsByOrganization(orgId: string) {
-  const response = await fetch(`/api/farms?orgId=${encodeURIComponent(orgId)}`, {
+  const response = await fetch("/api/farms", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     credentials: "include",
     cache: "no-store",
+    body: JSON.stringify({ orgId }),
   })
 
   return parseResponse<Array<{ id: string; name: string; location: string | null; organizationId: string | null }>>(

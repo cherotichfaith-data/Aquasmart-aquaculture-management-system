@@ -33,7 +33,7 @@ import { useNotifications } from "@/components/notifications/notifications-provi
 import { useAuth } from "@/components/providers/auth-provider"
 import FarmSelector from "@/components/shared/farm-selector"
 import { FilterPopover } from "@/components/shared/filter-popover"
-import { createSystemLabelResolver } from "@/lib/system-options"
+import { createSystemLabelResolver, getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
 import {
   DEFAULT_WQ_PARAMETER,
@@ -49,7 +49,7 @@ import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { useBatchOptions, useDashboardTimePeriodOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { formatStableDateTime } from "@/lib/deterministic-format"
 import { formatGrowthStage, normalizeStageFilter } from "@/lib/stage-filter"
-import { resolveTimePeriod } from "@/lib/time-period"
+import { resolveTimePeriod, toTimePeriodUrlValue } from "@/lib/time-period"
 
 type PageMeta = {
   title: string
@@ -194,18 +194,25 @@ export default function Header({
     isWaterQualityPage && isWqParameter(searchParams.get("parameter"))
       ? (searchParams.get("parameter") as WqParameter)
       : DEFAULT_WQ_PARAMETER
+  const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
+  const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
+  const timePeriodsQuery = useDashboardTimePeriodOptions()
+  const allSystemsForChips = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
+  const allBatchesForChips = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
 
   const sharedFilterInitialValues = useMemo<Partial<SharedFiltersState> | undefined>(() => {
-    const hasFilterParams = ["system", "batch", "stage", "period"].some((key) => searchParams.get(key) != null)
+    const hasFilterParams = ["cage", "system", "batch", "stage", "period"].some((key) => searchParams.get(key) != null)
     if (!hasFilterParams) return undefined
+    const cageParam = searchParams.get("cage") ?? searchParams.get("system")
+    const selectedSystemId = resolveSystemIdFromFilterValue(cageParam, allSystemsForChips)
 
     return {
       selectedBatch: searchParams.get("batch") ?? "all",
-      selectedSystem: searchParams.get("system") ?? "all",
+      selectedSystem: selectedSystemId != null ? String(selectedSystemId) : cageParam ?? "all",
       selectedStage: normalizeStageFilter(searchParams.get("stage")),
       timePeriod: resolveTimePeriod(searchParams.get("period"), defaultPeriod),
     }
-  }, [defaultPeriod, searchParams])
+  }, [allSystemsForChips, defaultPeriod, searchParams])
 
   const {
     selectedBatch,
@@ -216,16 +223,24 @@ export default function Header({
     setSelectedStage,
     timePeriod,
     setTimePeriod,
-  } = useSharedFilters(defaultPeriod, sharedFilterInitialValues)
+  } = useSharedFilters(defaultPeriod, sharedFilterInitialValues, {
+    urlValues:
+      sharedFilterInitialValues?.selectedSystem && sharedFilterInitialValues.selectedSystem !== "all"
+        ? {
+            selectedSystem:
+              searchParams.get("cage") ??
+              getSystemFilterUrlValue(
+                allSystemsForChips.find((item) => String(item.id) === sharedFilterInitialValues.selectedSystem),
+              ),
+            timePeriod: toTimePeriodUrlValue(sharedFilterInitialValues.timePeriod ?? defaultPeriod),
+          }
+        : { timePeriod: toTimePeriodUrlValue(sharedFilterInitialValues?.timePeriod ?? defaultPeriod) },
+    urlKeys: { selectedSystem: "cage" },
+  })
 
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
   const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
 
-  const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
-  const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
-  const timePeriodsQuery = useDashboardTimePeriodOptions()
-  const allSystemsForChips = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
-  const allBatchesForChips = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
   const timePeriodOptions = useMemo(() => {
     if (timePeriodsQuery.data?.status !== "success") return undefined
     return timePeriodsQuery.data.data.map((row) => row.time_period)
@@ -277,8 +292,15 @@ export default function Header({
     const nextPeriod = next.timePeriod ?? timePeriod
     const nextParameter = next.selectedParameter ?? selectedParameter
 
-    if (nextSystem !== "all") params.set("system", nextSystem)
-    else params.delete("system")
+    if (nextSystem !== "all") {
+      const system = allSystemsForChips.find((item) => String(item.id) === nextSystem)
+      params.set("cage", getSystemFilterUrlValue(system) || nextSystem)
+      params.delete("system")
+    }
+    else {
+      params.delete("cage")
+      params.delete("system")
+    }
 
     if (nextBatch !== "all") params.set("batch", nextBatch)
     else params.delete("batch")
@@ -286,7 +308,7 @@ export default function Header({
     if (nextStage !== "all") params.set("stage", nextStage)
     else params.delete("stage")
 
-    params.set("period", nextPeriod)
+    params.set("period", toTimePeriodUrlValue(nextPeriod))
 
     if (isWaterQualityPage) {
       if (nextParameter !== DEFAULT_WQ_PARAMETER) params.set("parameter", nextParameter)
