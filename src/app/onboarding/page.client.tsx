@@ -122,7 +122,7 @@ export default function OnboardingPageClient() {
         return
       }
 
-      router.replace(`${resolveAppEntryPath(result.role)}?farmId=${encodeURIComponent(farmId)}`)
+      router.replace(resolveAppEntryPath(result.role))
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to complete onboarding.")
       setIsSaving(false)

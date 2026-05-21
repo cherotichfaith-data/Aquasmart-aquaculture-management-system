@@ -23,7 +23,7 @@ import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { DependencyBlocker } from "./dependency-blocker"
 import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import { InfoPanel, InfoStat } from "./form-support"
-import { calculateFeedAmount, parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
+import { calculateFeedAmount, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 
 const formSchema = z.object({
   inventory_date: z.string().min(1, "Date is required"),
@@ -94,6 +94,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
       })
     } catch (error) {
       logSbError("dataEntry:feedInventory:submit", error)
+      reportDataEntrySubmitError(error, "Failed to record feed inventory.")
     }
   }
 

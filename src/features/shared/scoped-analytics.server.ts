@@ -4,6 +4,7 @@ import { resolveSystemTimelineWindow } from "@/lib/system-timeline-window"
 import type { Database, Enums } from "@/lib/types/database"
 import type { TimePeriod } from "@/lib/time-period"
 import { mapSystemRowToOption, type SystemOptionSource } from "@/lib/system-options"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -19,11 +20,9 @@ export function parseSelectedNumericId(value?: string | null): number | undefine
 
 export function resolveScopedSelectedSystemId(
   selectedSystem: string | number | undefined | null,
-  systems: Array<{ id: number | null }>,
+  systems: Array<{ id: number | null; label?: string | null; name?: string | null; unit?: string | null }>,
 ): number | undefined {
-  const parsed = typeof selectedSystem === "number" ? selectedSystem : parseSelectedNumericId(selectedSystem)
-  if (!parsed || !Number.isFinite(parsed)) return undefined
-  return systems.some((row) => row.id === parsed) ? parsed : undefined
+  return resolveSystemIdFromFilterValue(selectedSystem, systems)
 }
 
 export function cleanScopedFilterState<T extends { selectedSystem: string; selectedBatch?: string }>(
@@ -31,8 +30,9 @@ export function cleanScopedFilterState<T extends { selectedSystem: string; selec
   systems: Array<{ id: number | null }>,
 ): T {
   if (filters.selectedSystem === "all") return filters
-  return resolveScopedSelectedSystemId(filters.selectedSystem, systems)
-    ? filters
+  const selectedSystemId = resolveScopedSelectedSystemId(filters.selectedSystem, systems)
+  return selectedSystemId
+    ? { ...filters, selectedSystem: String(selectedSystemId) }
     : { ...filters, selectedSystem: "all" }
 }
 

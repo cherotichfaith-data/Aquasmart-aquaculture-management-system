@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/components/providers/auth-provider"
-import { getContext } from "@/lib/api"
 import { normalizeRole } from "@/lib/app-entry"
 import { isSbAuthMissing, logSbError } from "@/lib/supabase/log"
 import type { Database } from "@/lib/types/database"
@@ -28,15 +27,6 @@ async function getActiveFarmRole(params: { farmId?: string | null; userId?: stri
 
   if (error && !isSbAuthMissing(error)) {
     logSbError("getActiveFarmRole", error)
-  }
-
-  try {
-    const context = await getContext()
-    if (context.farm?.id === params.farmId) {
-      return normalizeRole(context.role ?? null) as FarmRole | null
-    }
-  } catch (contextError) {
-    logSbError("getActiveFarmRole:context", contextError)
   }
 
   if (error && !isSbAuthMissing(error)) {

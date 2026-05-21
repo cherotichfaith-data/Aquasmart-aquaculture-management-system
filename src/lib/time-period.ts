@@ -73,6 +73,31 @@ export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
   "all history": "All History",
 }
 
+export const TIME_PERIOD_URL_VALUES: Record<TimePeriod, string> = {
+  day: "day",
+  week: "week",
+  "2 weeks": "2-weeks",
+  month: "month",
+  quarter: "quarter",
+  "6 months": "6-months",
+  year: "year",
+  "all history": "all-history",
+}
+
+const TIME_PERIODS_BY_URL_VALUE = new Map(
+  Object.entries(TIME_PERIOD_URL_VALUES).map(([period, urlValue]) => [urlValue, period as TimePeriod]),
+)
+
+export function toTimePeriodUrlValue(value: TimePeriod) {
+  return TIME_PERIOD_URL_VALUES[value] ?? value
+}
+
+export function parseTimePeriodUrlValue(value: unknown): TimePeriod | null {
+  if (typeof value !== "string") return null
+  const normalized = value.trim().toLowerCase()
+  return TIME_PERIODS_BY_URL_VALUE.get(normalized) ?? (isTimePeriod(normalized) ? normalized : null)
+}
+
 export const isTimePeriod = (value: unknown): value is TimePeriod =>
   typeof value === "string" && TIME_PERIODS.includes(value as TimePeriod)
 
@@ -80,7 +105,7 @@ export const isBaseTimePeriod = (value: unknown): value is BaseTimePeriod =>
   value !== "all history" && isTimePeriod(value)
 
 export const resolveTimePeriod = (value: unknown, fallback: TimePeriod = DEFAULT_TIME_PERIOD): TimePeriod =>
-  isTimePeriod(value) ? value : fallback
+  parseTimePeriodUrlValue(value) ?? fallback
 
 const DAY_MS = 86_400_000
 

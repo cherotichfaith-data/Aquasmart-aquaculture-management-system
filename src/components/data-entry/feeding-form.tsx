@@ -35,7 +35,7 @@ import {
   getSystemUnits,
   getSystemsForUnit,
 } from "./form-support"
-import { parseOptionalNumericId, parseRequiredNumericId, requireActiveFarmId, toIsoDate } from "./form-utils"
+import { parseOptionalNumericId, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId, toIsoDate } from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
@@ -292,6 +292,7 @@ export function FeedingForm({
       })
     } catch (error) {
       logSbError("dataEntry:feeding:submit", error)
+      reportDataEntrySubmitError(error, "Failed to record feeding.")
     }
   }
 

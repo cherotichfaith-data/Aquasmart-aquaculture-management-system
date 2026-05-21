@@ -51,6 +51,7 @@ type InviteActionResult = {
   assigned: true
   pendingInvite: true
   inviteSent: boolean
+  delivery: "sent" | "existing_account" | "failed"
 }
 
 function getAppOrigin() {
@@ -74,6 +75,25 @@ function isPrivateSchemaUnavailable(error: unknown) {
   if (!error || typeof error !== "object") return false
   const maybe = error as { code?: string; message?: string }
   return maybe.code === "PGRST106" || /Invalid schema:\s*private/i.test(String(maybe.message ?? ""))
+}
+
+async function findAuthUserByEmail(email: string) {
+  const admin = createAdminClient()
+  const targetEmail = email.trim().toLowerCase()
+  let page = 1
+  const perPage = 200
+
+  while (page <= 20) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+
+    const match = (data.users ?? []).find((user) => user.email?.trim().toLowerCase() === targetEmail)
+    if (match) return match
+    if ((data.users ?? []).length < perPage) break
+    page += 1
+  }
+
+  return null
 }
 
 async function assertAdminMembership(farmId: string, userId: string) {
@@ -131,6 +151,12 @@ export async function grantFarmAccessAction(
   const invitationId = invitationRows?.[0]?.id ?? null
   const admin = createAdminClient()
   const normalizedEmail = payload.email.trim().toLowerCase()
+  const existingUser = await findAuthUserByEmail(normalizedEmail)
+
+  if (existingUser) {
+    return { assigned: true, pendingInvite: true, inviteSent: false, delivery: "existing_account" }
+  }
+
   const inviteOptions = {
     redirectTo: buildInviteRedirectUrl(),
     data: {
@@ -142,7 +168,7 @@ export async function grantFarmAccessAction(
 
   if (inviteError) {
     logSbError("settings:invite:sendAuthInvite", inviteError)
-    return { assigned: true, pendingInvite: true, inviteSent: false }
+    return { assigned: true, pendingInvite: true, inviteSent: false, delivery: "failed" }
   }
 
   if (invitationId) {
@@ -154,7 +180,7 @@ export async function grantFarmAccessAction(
     }
   }
 
-  return { assigned: true, pendingInvite: true, inviteSent: true }
+  return { assigned: true, pendingInvite: true, inviteSent: true, delivery: "sent" }
 }
 
 export async function listFarmMembersAction(input: z.infer<typeof memberListSchema>): Promise<SettingsFarmMember[]> {

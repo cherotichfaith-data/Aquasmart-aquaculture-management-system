@@ -24,6 +24,7 @@ import {
   calculateAbw,
   parseOptionalNumericId,
   parseRequiredNumericId,
+  reportDataEntrySubmitError,
   requireActiveFarmId,
   toIsoDate,
 } from "./form-utils"
@@ -158,6 +159,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       })
     } catch (error) {
       logSbError("dataEntry:transfer:submit", error)
+      reportDataEntrySubmitError(error, "Failed to record transfer.")
     }
   }
 

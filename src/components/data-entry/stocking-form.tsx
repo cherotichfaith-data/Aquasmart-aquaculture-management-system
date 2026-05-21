@@ -32,6 +32,7 @@ import {
   calculateAbw,
   calculateAbwOrZero,
   parseRequiredNumericId,
+  reportDataEntrySubmitError,
   requireActiveFarmId,
   toIsoDate,
 } from "./form-utils"
@@ -133,6 +134,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       })
     } catch (error) {
       logSbError("dataEntry:stocking:submit", error)
+      reportDataEntrySubmitError(error, "Failed to record stocking.")
     }
   }
 

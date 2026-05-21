@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { LogOut } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -23,18 +23,22 @@ function getActiveFarmStorageKey(userId: string) {
   return `aquasmart:${userId}:activeFarmId`
 }
 
-function buildWorkspaceDestination(nextPath: string, farmId: string) {
+function buildWorkspaceDestination(nextPath: string) {
   const [pathname, search = ""] = nextPath.split("?", 2)
   const params = new URLSearchParams(search)
-  params.set("farmId", farmId)
+  params.delete("farmId")
   const query = params.toString()
   return query ? `${pathname}?${query}` : pathname
 }
 
 export default function WorkspaceSelector({
   initialOrganizations = [],
+  initialDisplayName,
+  initialUserId,
 }: {
   initialOrganizations?: OrganizationSummary[]
+  initialDisplayName?: string | null
+  initialUserId?: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -48,25 +52,27 @@ export default function WorkspaceSelector({
   const [isLoadingFarms, setIsLoadingFarms] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const farmRequestOrganizationIdRef = useRef<string | null>(null)
 
-  const displayName =
-    typeof profile?.full_name === "string" && profile.full_name.trim()
-      ? profile.full_name.trim().split(/\s+/)[0]
-      : typeof user?.user_metadata?.firstName === "string" && user.user_metadata.firstName.trim()
+  const canUseClientAuthName = Boolean(user?.id && (!initialUserId || user.id === initialUserId))
+  const clientDisplayName =
+    canUseClientAuthName && typeof profile?.full_name === "string" && profile.full_name.trim()
+      ? profile.full_name.trim()
+      : canUseClientAuthName && typeof user?.user_metadata?.firstName === "string" && user.user_metadata.firstName.trim()
         ? user.user_metadata.firstName.trim()
-        : typeof user?.email === "string"
+        : canUseClientAuthName && typeof user?.email === "string"
           ? user.email.split("@")[0]
-          : "there"
+          : null
+  const displayName = (clientDisplayName ?? initialDisplayName ?? "there").split(/\s+/)[0] ?? "there"
 
   const continueToWorkspace = (organizationId: string, farmId: string) => {
     if (typeof window !== "undefined" && user?.id) {
       window.localStorage.setItem(getActiveFarmStorageKey(user.id), farmId)
       setBrowserWorkspaceContext({ organizationId, farmId })
       window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId } }))
-      window.dispatchEvent(new Event("farm-memberships-updated"))
     }
 
-    router.replace(buildWorkspaceDestination(nextPath, farmId))
+    router.replace(buildWorkspaceDestination(nextPath))
   }
 
   useEffect(() => {
@@ -112,6 +118,11 @@ export default function WorkspaceSelector({
   }, [isLoading, organizations, selectedOrganizationId])
 
   const handleOrganizationSelect = async (organizationId: string) => {
+    if (farmRequestOrganizationIdRef.current === organizationId) {
+      return
+    }
+
+    farmRequestOrganizationIdRef.current = organizationId
     setSelectedOrganizationId(organizationId)
     setSelectedFarmId(null)
     setErrorMessage(null)
@@ -122,6 +133,7 @@ export default function WorkspaceSelector({
       setFarms(nextFarms)
     } catch (error) {
       setFarms([])
+      farmRequestOrganizationIdRef.current = null
       setErrorMessage(error instanceof Error ? error.message : "Unable to load farms.")
     } finally {
       setIsLoadingFarms(false)

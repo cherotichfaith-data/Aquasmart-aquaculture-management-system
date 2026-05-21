@@ -38,6 +38,8 @@ export function useAnalyticsPageBootstrap(params: {
   boundsEnabled?: boolean
   boundsScope?: AnalyticsTimeScope
   useSystemBounds?: boolean
+  filterUrlValues?: Partial<Record<keyof SharedFiltersState, string>>
+  filterUrlKeys?: Partial<Record<keyof SharedFiltersState, string>>
 } = {}) {
   const initialFarmId = normalizeFarmId(params.initialFarmId)
   const activeFarm = useActiveFarm({ initialFarmId, initialFarmName: params.initialFarmName })
@@ -84,7 +86,10 @@ export function useAnalyticsPageBootstrap(params: {
     params.initialFilters?.timePeriod,
   ])
 
-  const sharedFilters = useSharedFilters(params.defaultTimePeriod ?? "2 weeks", sharedFilterInitialValues)
+  const sharedFilters = useSharedFilters(params.defaultTimePeriod ?? "2 weeks", sharedFilterInitialValues, {
+    urlValues: params.filterUrlValues,
+    urlKeys: params.filterUrlKeys,
+  })
   const selectedSystemId =
     sharedFilters.selectedSystem !== "all" && Number.isFinite(Number(sharedFilters.selectedSystem))
       ? Number(sharedFilters.selectedSystem)

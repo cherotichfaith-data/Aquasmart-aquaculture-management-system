@@ -37,6 +37,7 @@ import {
   calculateAbwOrZero,
   parseOptionalNumericId,
   parseRequiredNumericId,
+  reportDataEntrySubmitError,
   requireActiveFarmId,
   toIsoDate,
 } from "./form-utils"
@@ -172,6 +173,7 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
       })
     } catch (error) {
       logSbError("dataEntry:sampling:submit", error)
+      reportDataEntrySubmitError(error, "Failed to record sampling.")
     }
   }
 

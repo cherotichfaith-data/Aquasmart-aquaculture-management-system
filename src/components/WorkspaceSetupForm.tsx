@@ -16,10 +16,10 @@ function getActiveFarmStorageKey(userId: string) {
   return `aquasmart:${userId}:activeFarmId`
 }
 
-function buildWorkspaceDestination(nextPath: string, farmId: string) {
+function buildWorkspaceDestination(nextPath: string) {
   const [pathname, search = ""] = nextPath.split("?", 2)
   const params = new URLSearchParams(search)
-  params.set("farmId", farmId)
+  params.delete("farmId")
   const query = params.toString()
   return query ? `${pathname}?${query}` : pathname
 }
@@ -87,7 +87,7 @@ export default function WorkspaceSetupForm() {
       window.dispatchEvent(new Event("farm-memberships-updated"))
     }
 
-    router.replace(buildWorkspaceDestination(nextPath, nextFarmId))
+    router.replace(buildWorkspaceDestination(nextPath))
   }
 
   const handleCreateWorkspace = async (event: FormEvent<HTMLFormElement>) => {

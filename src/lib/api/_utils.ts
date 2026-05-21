@@ -34,7 +34,6 @@ export type KpiRpcName =
   | "api_feed_demand_forecast"
   | "api_cycle_benchmarks"
   // Compute layer RPCs
-  | "api_recommended_actions"
   | "api_feed_fcr_intervals"
   | "api_feed_rate_analysis"
   | "api_kpi_coverage"

@@ -7,7 +7,6 @@ import CardContent from "@mui/material/CardContent"
 import { Card } from "@/components/app-ui/card"
 import { Chart } from "@/components/charts/chartjs"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
-import { LazyRender } from "@/components/shared/lazy-render"
 import { buildCartesianOptions, buildMetricAxisBounds, getChartPalette } from "@/components/charts/chartjs-theme"
 import { formatNumberValue } from "@/lib/analytics-format"
 import { getErrorMessage } from "@/lib/utils/query-result"
@@ -163,9 +162,9 @@ export default function EfcrByPeriod({
           <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">Loading eFCR...</div>
         ) : chartRows.length ? (
           <div className="border border-border bg-background px-2 py-3">
-            <LazyRender className="h-[300px]" fallback={<div className="h-full w-full" />}>
+            <div className="h-[300px]">
               <Chart type="bar" data={data} options={options} />
-            </LazyRender>
+            </div>
           </div>
         ) : (
           <EmptyState title="No eFCR intervals" description="No valid feed-to-growth intervals match this period." />

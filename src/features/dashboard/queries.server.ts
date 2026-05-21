@@ -10,7 +10,6 @@ import {
   getScopedBatchSystems,
   getScopedSystemOptions,
   getScopedTimeBounds,
-  parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
 import {
   listAlertThresholdRows,
@@ -22,15 +21,16 @@ import type {
   ProductionTrendRpcRow,
   ProductionTrendRow,
 } from "./types"
+import type { RecommendedActionRow } from "@/lib/types/insights"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/api/_utils"
 import { normalizeStageFilter } from "@/lib/stage-filter"
-import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
+import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
 import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics-rpc-shared"
 import { toProductionTrendRows } from "./production-trend"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
 type KpiCoverageRow = Database["public"]["Functions"]["api_kpi_coverage"]["Returns"][number]
-type RecommendedActionRow = Database["public"]["Functions"]["api_recommended_actions"]["Returns"][number]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 type SystemDimensionRow = Pick<Database["public"]["Tables"]["system"]["Row"], "id" | "volume" | "length" | "width" | "depth" | "diameter">
@@ -67,17 +67,14 @@ export function parseDashboardPageFilters(
   searchParams?: Record<string, string | string[] | undefined>,
 ): DashboardPageInitialFilters {
   const selectedBatchRaw = searchParams?.batch
-  const selectedSystemRaw = searchParams?.system
+  const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
   const timePeriodRaw = searchParams?.period
 
   const selectedBatch = typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all"
   const selectedSystem = typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all"
   const selectedStage = normalizeStageFilter(selectedStageRaw)
-  const timePeriod =
-    typeof timePeriodRaw === "string" && isTimePeriod(timePeriodRaw)
-      ? (timePeriodRaw as TimePeriod)
-      : DEFAULT_TIME_PERIOD
+  const timePeriod = resolveTimePeriod(timePeriodRaw, DEFAULT_TIME_PERIOD)
 
   return {
     selectedBatch,
@@ -114,11 +111,24 @@ async function getTimeBounds(
 async function resolveActiveSystemId(
   supabase: ServerClient,
   farmId: string,
-  systemId?: number,
+  selectedSystem?: string | number | null,
 ): Promise<number | undefined> {
+  if (!selectedSystem || selectedSystem === "all") return undefined
+
+  const { data: systems, error: systemsError } = await supabase
+    .from("system")
+    .select("id, name, unit")
+    .eq("farm_id", farmId)
+    .eq("is_active", true)
+
+  if (systemsError) {
+    throw systemsError
+  }
+
+  const systemId = resolveSystemIdFromFilterValue(selectedSystem, systems ?? [])
   if (!systemId || !Number.isFinite(systemId)) return undefined
 
-  const { data, error } = await supabase
+  const { data, error: selectedSystemError } = await supabase
     .from("system")
     .select("id")
     .eq("farm_id", farmId)
@@ -126,7 +136,7 @@ async function resolveActiveSystemId(
     .eq("id", systemId)
     .maybeSingle()
 
-  if (error || typeof data?.id !== "number") return undefined
+  if (selectedSystemError || typeof data?.id !== "number") return undefined
   return data.id
 }
 
@@ -316,10 +326,10 @@ async function getRecommendedActionRows(
   supabase: ServerClient,
   params: { farmId: string; systemId?: number },
 ): Promise<RecommendedActionRow[]> {
-  const { data, error } = await supabase.rpc("api_recommended_actions", {
+  const { data, error } = await supabase.rpc("api_recommended_actions" as never, {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
-  })
+  } as never)
 
   if (error) {
     throw error
@@ -397,9 +407,9 @@ async function loadDashboardPageInitialData(
   const farmId = params.farmId
 
   const selectedSystemId = await withNetworkFallback("dashboard:resolveActiveSystemId", undefined, () =>
-    resolveActiveSystemId(supabase, farmId, parseSelectedNumericId(params.filters.selectedSystem)),
+    resolveActiveSystemId(supabase, farmId, params.filters.selectedSystem),
   )
-  const effectiveSelectedSystem = selectedSystemId != null ? params.filters.selectedSystem : "all"
+  const effectiveSelectedSystem = selectedSystemId != null ? String(selectedSystemId) : "all"
   const bounds = await getTimeBounds(supabase, farmId, params.filters.timePeriod, selectedSystemId)
   if (!bounds.start || !bounds.end) {
     return {

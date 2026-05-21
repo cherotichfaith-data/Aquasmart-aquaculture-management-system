@@ -9,8 +9,10 @@ import Typography from "@mui/material/Typography"
 import type { DashboardPageInitialFilters } from "@/features/dashboard/types"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
+import { useSystemOptions } from "@/lib/hooks/use-options"
 import { logSbError } from "@/lib/supabase/log"
-import { resolveTimePeriod } from "@/lib/time-period"
+import { getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
+import { resolveTimePeriod, toTimePeriodUrlValue } from "@/lib/time-period"
 
 import KPIOverview from "./kpi-overview"
 import PopulationOverview from "./population-overview"
@@ -62,18 +64,32 @@ export default function DashboardPage({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const periodParam = searchParams.get("period")
-  const systemParam = searchParams.get("system")
+  const systemParam = searchParams.get("cage") ?? searchParams.get("system")
   const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")
+  const systemsQuery = useSystemOptions({
+    farmId: initialFarmId,
+    activeOnly: true,
+  })
+  const systemOptions = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
+  const selectedSystemUrlValue = useMemo(() => {
+    const systemId = resolveSystemIdFromFilterValue(systemParam, systemOptions)
+    if (systemId == null) return systemParam ?? undefined
+    return getSystemFilterUrlValue(systemOptions.find((system) => system.id === systemId)) || (systemParam ?? undefined)
+  }, [systemOptions, systemParam])
 
   const filterOverrides = useMemo(
-    () => ({
-      selectedBatch: batchParam ?? "all",
-      selectedSystem: systemParam ?? "all",
-      selectedStage: parseDashboardStageParam(stageParam),
-      timePeriod: resolveTimePeriod(periodParam, initialFilters?.timePeriod ?? "month"),
-    }),
-    [batchParam, initialFilters?.timePeriod, periodParam, stageParam, systemParam],
+    () => {
+      const systemId = resolveSystemIdFromFilterValue(systemParam, systemOptions)
+
+      return {
+        selectedBatch: batchParam ?? "all",
+        selectedSystem: systemId != null ? String(systemId) : systemParam ?? "all",
+        selectedStage: parseDashboardStageParam(stageParam),
+        timePeriod: resolveTimePeriod(periodParam, initialFilters?.timePeriod ?? "month"),
+      }
+    },
+    [batchParam, initialFilters?.timePeriod, periodParam, stageParam, systemOptions, systemParam],
   )
 
   const {
@@ -93,6 +109,11 @@ export default function DashboardPage({
     useSystemBounds: false,
     initialFilters,
     filterOverrides,
+    filterUrlValues:
+      selectedSystemUrlValue && selectedSystemUrlValue !== "all"
+        ? { selectedSystem: selectedSystemUrlValue, timePeriod: toTimePeriodUrlValue(filterOverrides.timePeriod ?? "month") }
+        : { timePeriod: toTimePeriodUrlValue(filterOverrides.timePeriod ?? "month") },
+    filterUrlKeys: { selectedSystem: "cage" },
   })
 
   const { selectedSystemId, scopedSystemIdList, hasScopeFilters } = useScopedSystemIds({
@@ -107,8 +128,9 @@ export default function DashboardPage({
   useEffect(() => {
     if (selectedSystem === "all" || selectedSystemId != null) return
     const params = new URLSearchParams(searchParams.toString())
-    if (params.get("system") !== selectedSystem) return
+    if ((params.get("cage") ?? params.get("system")) !== selectedSystem) return
     params.delete("system")
+    params.delete("cage")
     const nextQuery = params.toString()
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
   }, [pathname, router, searchParams, selectedSystem, selectedSystemId])
@@ -154,7 +176,11 @@ export default function DashboardPage({
   return (
     <Box sx={{ p: { xs: 1.5, md: 2 }, display: "flex", flexDirection: "column", gap: 2 }}>
       <section>
-        <SectionLabel title="Core Performance Overview" action={<DashboardExportButton onClick={handleDownload} />} />
+        <SectionLabel
+          title="Core Performance Overview"
+          description="Farm KPIs from the selected period and cage scope."
+          action={<DashboardExportButton onClick={handleDownload} />}
+        />
         <KPIOverview
           farmId={farmId}
           stage={selectedStage}
@@ -187,7 +213,10 @@ export default function DashboardPage({
       </Grid>
 
       <section>
-        <SectionLabel title="Feed, Growth & Mortality Trends" />
+        <SectionLabel
+          title="Feed, ABW & Mortality Trend"
+          description="One combined trend from the farmer's feeding, sampling, and mortality records."
+        />
         <PopulationOverview
           farmId={farmId}
           stage={selectedStage}
@@ -204,7 +233,7 @@ export default function DashboardPage({
       </section>
 
       <section>
-        <SectionLabel title="System Status" />
+        <SectionLabel title="System Status" description="Current cage-level production, water, and operating flags." />
         <SystemsTable
           farmId={farmId}
           stage={selectedStage}
@@ -221,7 +250,7 @@ export default function DashboardPage({
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
           <section className="space-y-0">
-            <SectionLabel title="Recent Activity" />
+            <SectionLabel title="Recent Activity" description="Latest recorded farm operations." />
             <RecentActivities
               farmId={farmId}
               batch={selectedBatch}
@@ -238,7 +267,7 @@ export default function DashboardPage({
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
           <section className="space-y-0">
-            <SectionLabel title="Recommended Actions" />
+            <SectionLabel title="Recommended Actions" description="Priorities generated from current farm signals." />
             <RecommendedActions
               farmId={farmId}
               stage={selectedStage}
