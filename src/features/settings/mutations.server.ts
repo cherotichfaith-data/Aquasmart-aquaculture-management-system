@@ -46,6 +46,7 @@ const revokeInviteSchema = z.object({
 })
 
 const ACCESS_GRANT_ALLOWED_ROLES = new Set(["admin"])
+const PRODUCTION_APP_ORIGIN = "https://aquasmart-fish-management-system.vercel.app"
 
 type InviteActionResult = {
   assigned: true
@@ -54,14 +55,46 @@ type InviteActionResult = {
   delivery: "sent" | "existing_account" | "failed"
 }
 
-function getAppOrigin() {
-  const configured =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    process.env.VERCEL_URL?.trim()
+function normalizeOrigin(value: string | undefined | null) {
+  const trimmed = value?.trim()
+  if (!trimmed) return null
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
 
-  if (!configured) return "http://localhost:3000"
-  return configured.startsWith("http") ? configured : `https://${configured}`
+  try {
+    const url = new URL(withProtocol)
+    return url.origin
+  } catch {
+    return null
+  }
+}
+
+function isLocalOrigin(origin: string) {
+  try {
+    const hostname = new URL(origin).hostname
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+  } catch {
+    return false
+  }
+}
+
+function getAppOrigin() {
+  const isHostedRuntime = Boolean(process.env.VERCEL || process.env.VERCEL_ENV)
+  const candidates = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    process.env.VERCEL_URL,
+    isHostedRuntime ? PRODUCTION_APP_ORIGIN : "http://localhost:3000",
+  ]
+
+  for (const candidate of candidates) {
+    const origin = normalizeOrigin(candidate)
+    if (!origin) continue
+    if (isHostedRuntime && isLocalOrigin(origin)) continue
+    return origin
+  }
+
+  return PRODUCTION_APP_ORIGIN
 }
 
 function buildInviteRedirectUrl() {
