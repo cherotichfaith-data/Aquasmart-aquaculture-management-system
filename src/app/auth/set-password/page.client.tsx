@@ -144,20 +144,31 @@ export default function SetPasswordPageClient() {
               <span className="text-[var(--secondary)]">Aqua</span>
               <span className="text-primary">Smart</span>
             </div>
-            <h1 className="text-xl font-semibold tracking-tight text-card-foreground">Complete account setup</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-card-foreground">Create your account</h1>
           </div>
         </div>
 
         <p className="mt-3 text-sm text-[color:color-mix(in_srgb,var(--card-foreground)_76%,transparent)]">
-          {email ? `Signed in as ${email}.` : "Confirm your name and set a password for future sign-ins."}
+          Enter your name and choose a password for the invited email address.
         </p>
 
         {isLoading ? (
           <div className="mt-5 rounded-[12px] border border-[color:color-mix(in_srgb,var(--card)_70%,transparent)] bg-[color:color-mix(in_srgb,var(--card)_52%,transparent)] px-3 py-2 text-sm text-[color:color-mix(in_srgb,var(--card-foreground)_78%,transparent)]">
-            Loading account...
+            Verifying invite...
           </div>
         ) : (
           <form onSubmit={(event) => void handleSubmit(event)} className="mt-5 space-y-4">
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-card-foreground">Email</span>
+              <input
+                type="email"
+                value={email}
+                readOnly
+                autoComplete="email"
+                className={`${inputClass} cursor-not-allowed opacity-80`}
+              />
+            </label>
+
             <label className="block space-y-2">
               <span className="text-sm font-medium text-card-foreground">Full name</span>
               <input
@@ -203,7 +214,7 @@ export default function SetPasswordPageClient() {
               disabled={isSubmitting}
               className="w-full rounded-[12px] bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[0_12px_28px_color-mix(in_srgb,var(--primary)_40%,transparent)] transition hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_18px_36px_color-mix(in_srgb,var(--primary)_45%,transparent)] disabled:opacity-70"
             >
-              {isSubmitting ? "Saving..." : "Save and continue"}
+              {isSubmitting ? "Creating account..." : "Create account"}
             </button>
           </form>
         )}
