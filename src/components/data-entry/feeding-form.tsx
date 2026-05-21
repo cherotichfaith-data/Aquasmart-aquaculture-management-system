@@ -166,11 +166,20 @@ export function FeedingForm({
     inventoryOnly: true,
     enabled: Boolean(farmId) && Boolean(selectedWeek.start) && Boolean(selectedWeek.end),
   })
-  const availableFeeds =
+  const allFeedsQuery = useFeedTypeOptions({
+    farmId,
+    enabled: Boolean(farmId),
+  })
+  const inventoryFeeds =
     availableFeedsQuery.data?.status === "success"
       ? availableFeedsQuery.data.data
       : []
-  const selectedFeed = availableFeeds.find((feed) => feed.id === selectedFeedId) ?? null
+  const allFeeds =
+    allFeedsQuery.data?.status === "success"
+      ? allFeedsQuery.data.data
+      : []
+  const feedOptions = inventoryFeeds.length > 0 ? inventoryFeeds : allFeeds
+  const selectedFeed = feedOptions.find((feed) => feed.id === selectedFeedId) ?? null
 
   useEffect(() => {
     if (!selectedUnit) return
@@ -184,12 +193,17 @@ export function FeedingForm({
 
   useEffect(() => {
     const currentFeedId = form.getValues("feed_id")
-    if (!currentFeedId || currentFeedId === OPTIONAL_SELECT_VALUE || availableFeedsQuery.isLoading) return
-    const existsThisWeek = availableFeeds.some((feed) => String(feed.id) === currentFeedId)
+    if (
+      !currentFeedId ||
+      currentFeedId === OPTIONAL_SELECT_VALUE ||
+      availableFeedsQuery.isLoading ||
+      allFeedsQuery.isLoading
+    ) return
+    const existsThisWeek = feedOptions.some((feed) => String(feed.id) === currentFeedId)
     if (!existsThisWeek) {
       form.setValue("feed_id", OPTIONAL_SELECT_VALUE, { shouldValidate: true })
     }
-  }, [availableFeeds, availableFeedsQuery.isLoading, form])
+  }, [allFeedsQuery.isLoading, availableFeedsQuery.isLoading, feedOptions, form])
 
   const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
 
@@ -319,9 +333,9 @@ export function FeedingForm({
               {submissionSummary}
             </div>
           ) : null}
-          {!availableFeedsQuery.isLoading && availableFeeds.length === 0 ? (
+          {!availableFeedsQuery.isLoading && !allFeedsQuery.isLoading && inventoryFeeds.length === 0 ? (
             <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
-              No feed inventory is available for this week. You can still record a 0 kg feeding entry with comments, or record feed inventory first.
+              No feed inventory is available for this week. Feed types are still available, but record feed inventory to track stock.
             </div>
           ) : null}
 
@@ -412,7 +426,7 @@ export function FeedingForm({
                         </FormControl>
                         <SelectContent>
                           <SelectItem value={OPTIONAL_SELECT_VALUE}>No feed selected</SelectItem>
-                          {availableFeeds.map((feed) => (
+                          {feedOptions.map((feed) => (
                             <SelectItem key={feed.id} value={String(feed.id)}>
                               {feed.label ?? feed.feed_line ?? `Feed ${feed.id}`}
                             </SelectItem>
