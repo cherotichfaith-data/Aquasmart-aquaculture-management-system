@@ -372,13 +372,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: params.email.trim(),
             password: params.password,
             options: {
-                emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=/onboarding` : undefined,
+                emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=/auth` : undefined,
                 data: {
                     first_name: firstName,
                     last_name: lastName,
                     full_name: fullName,
                     name: fullName,
                     role: "admin",
+                    password_configured: true,
                 },
             },
         });

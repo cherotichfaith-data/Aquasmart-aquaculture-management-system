@@ -23,7 +23,11 @@ function shouldCompleteInvitedAccountSetup(
   next: string,
 ) {
   const metadata = user?.user_metadata ?? {}
-  return next === ONBOARDING_PATH && metadata.password_configured !== true
+  const hasInviteMetadata =
+    typeof metadata.invited_farm_id === "string" ||
+    typeof metadata.invited_role === "string"
+
+  return next === ONBOARDING_PATH && hasInviteMetadata && metadata.password_configured !== true
 }
 
 function normalizeOtpType(value: string | null): EmailOtpType | null {

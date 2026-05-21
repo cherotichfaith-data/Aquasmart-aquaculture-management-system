@@ -71,6 +71,13 @@ function buildInviteRedirectUrl() {
   return confirmUrl.toString()
 }
 
+function buildExistingAccountSetupRedirectUrl() {
+  const origin = getAppOrigin().replace(/\/$/, "")
+  const callbackUrl = new URL("/auth/callback", origin)
+  callbackUrl.searchParams.set("next", "/auth/set-password?next=/onboarding")
+  return callbackUrl.toString()
+}
+
 function isPrivateSchemaUnavailable(error: unknown) {
   if (!error || typeof error !== "object") return false
   const maybe = error as { code?: string; message?: string }
@@ -154,7 +161,25 @@ export async function grantFarmAccessAction(
   const existingUser = await findAuthUserByEmail(normalizedEmail)
 
   if (existingUser) {
-    return { assigned: true, pendingInvite: true, inviteSent: false, delivery: "existing_account" }
+    const { error: setupEmailError } = await admin.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: buildExistingAccountSetupRedirectUrl(),
+    })
+
+    if (setupEmailError) {
+      logSbError("settings:invite:sendExistingAccountSetup", setupEmailError)
+      return { assigned: true, pendingInvite: true, inviteSent: false, delivery: "failed" }
+    }
+
+    if (invitationId) {
+      const { error: markSentError } = await supabase.rpc("mark_farm_user_invitation_sent", {
+        p_invitation_id: invitationId,
+      })
+      if (markSentError) {
+        logSbError("settings:invite:markExistingAccountSetupSent", markSentError)
+      }
+    }
+
+    return { assigned: true, pendingInvite: true, inviteSent: true, delivery: "existing_account" }
   }
 
   const inviteOptions = {

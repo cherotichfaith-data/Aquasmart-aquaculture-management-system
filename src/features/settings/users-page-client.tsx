@@ -135,7 +135,7 @@ export default function UsersPageClient({
         result.delivery === "sent"
           ? "Invitation email sent. The teammate should open that email and set their password from the invite link."
           : result.delivery === "existing_account"
-            ? "Invitation saved. This email already has an AquaSmart account, so ask the teammate to sign in with that account to activate access."
+            ? "Setup email sent. The teammate should open that email and create their password."
             : "Invitation saved, but Supabase could not send the email. Ask the teammate to sign in if they already started account setup, or retry later.",
       )
 
