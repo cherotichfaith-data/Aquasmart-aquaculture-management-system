@@ -19,6 +19,7 @@ type PushStatus = "pushed" | "conflict" | "error" | "missing"
 type PushRecordResult = {
   status: PushStatus
   response?: unknown
+  errorMessage?: string
 }
 
 type SyncConfig = {
@@ -159,6 +160,41 @@ function extractServerId(responseBody: unknown): number | undefined {
     return (data as { id: number }).id
   }
   return undefined
+}
+
+function extractResponseError(responseBody: unknown, fallback: string): string {
+  if (responseBody && typeof responseBody === "object") {
+    const maybeError = (responseBody as { error?: unknown; message?: unknown }).error
+    const maybeMessage = (responseBody as { error?: unknown; message?: unknown }).message
+    if (typeof maybeError === "string" && maybeError.trim()) return maybeError
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage
+  }
+  return fallback
+}
+
+export async function pushRecordDirect(tableName: OfflineTableName, record: any): Promise<PushRecordResult> {
+  const config = syncConfigs[tableName]
+  const response = await fetch(config.apiPath, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config.buildBody(record)),
+  })
+
+  const body = await response.json().catch(() => null)
+
+  if (response.ok) {
+    return { status: "pushed", response: body }
+  }
+
+  if (response.status === 409) {
+    return { status: "conflict", response: body }
+  }
+
+  return {
+    status: "error",
+    response: body,
+    errorMessage: extractResponseError(body, "Unable to save this record."),
+  }
 }
 
 export async function pushPendingRecordById(tableName: OfflineTableName, localId: string): Promise<PushRecordResult> {

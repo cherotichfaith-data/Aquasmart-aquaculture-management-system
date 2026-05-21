@@ -2,13 +2,24 @@
 
 import { useCallback } from "react"
 import { offlineDB, type OfflineTableName } from "@/lib/offline/db"
-import { getPendingCount, pushPendingRecordById } from "@/lib/offline/sync"
+import { getPendingCount, pushPendingRecordById, pushRecordDirect } from "@/lib/offline/sync"
 import { useSyncStore } from "@/lib/offline/sync-store"
 
 type SyncTrackedRecord = {
   localId: string
   syncStatus: "pending"
   createdAtLocal: number
+}
+
+function isNetworkSaveError(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const name = String((error as { name?: unknown }).name ?? "")
+  const message = String((error as { message?: unknown }).message ?? "")
+  return (
+    name === "TypeError" ||
+    name === "AbortError" ||
+    /fetch failed|failed to fetch|network|load failed/i.test(message)
+  )
 }
 
 type OfflineMutationOptions<TInput, TRecord extends object, TResult> = {
@@ -36,6 +47,40 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
           ...record,
         } satisfies SyncTrackedRecord & TRecord
       })
+
+      if (navigator.onLine) {
+        try {
+          const responses: unknown[] = []
+
+          for (const record of records) {
+            const result = await pushRecordDirect(options.tableName, record)
+
+            if (result.status === "pushed" || result.status === "conflict") {
+              if (result.response !== undefined) {
+                responses.push(result.response)
+              }
+              continue
+            }
+
+            throw new Error(result.errorMessage ?? "Unable to save this record.")
+          }
+
+          setSyncError(null)
+          setLastSyncedAt(new Date())
+          window.dispatchEvent(new CustomEvent("offline-sync-complete"))
+
+          if (options.combineSyncedResponses) {
+            return options.combineSyncedResponses({ input, responses, localIds })
+          }
+          if (responses[0] !== undefined) {
+            return responses[0] as TResult
+          }
+        } catch (error) {
+          if (!isNetworkSaveError(error)) {
+            throw error
+          }
+        }
+      }
 
       await offlineDB.table(options.tableName).bulkAdd(records as Array<SyncTrackedRecord & TRecord>)
       setPendingCount(await getPendingCount())
