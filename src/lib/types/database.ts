@@ -183,6 +183,272 @@ export type Database = {
         }
         Relationships: []
       }
+      energy_alarm_events: {
+        Row: {
+          acknowledged_at: string | null
+          alarm_code: string
+          alarm_name: string | null
+          created_at: string
+          ended_at: string | null
+          farm_id: string
+          id: number
+          message: string | null
+          meter_id: string | null
+          payload: Json
+          resolved_at: string | null
+          severity: string
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          alarm_code: string
+          alarm_name?: string | null
+          created_at?: string
+          ended_at?: string | null
+          farm_id: string
+          id?: number
+          message?: string | null
+          meter_id?: string | null
+          payload?: Json
+          resolved_at?: string | null
+          severity?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          alarm_code?: string
+          alarm_name?: string | null
+          created_at?: string
+          ended_at?: string | null
+          farm_id?: string
+          id?: number
+          message?: string | null
+          meter_id?: string | null
+          payload?: Json
+          resolved_at?: string | null
+          severity?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "energy_alarm_events_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farm"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      energy_live: {
+        Row: {
+          created_at: string
+          current_a: number | null
+          energy_today_kwh: number | null
+          energy_total_kwh: number | null
+          farm_id: string
+          frequency_hz: number | null
+          id: number
+          measured_at: string
+          meter_id: string
+          meter_name: string | null
+          payload: Json
+          power_factor: number | null
+          power_kw: number | null
+          source: string
+          status: string
+          updated_at: string
+          voltage_v: number | null
+        }
+        Insert: {
+          created_at?: string
+          current_a?: number | null
+          energy_today_kwh?: number | null
+          energy_total_kwh?: number | null
+          farm_id: string
+          frequency_hz?: number | null
+          id?: number
+          measured_at?: string
+          meter_id: string
+          meter_name?: string | null
+          payload?: Json
+          power_factor?: number | null
+          power_kw?: number | null
+          source?: string
+          status?: string
+          updated_at?: string
+          voltage_v?: number | null
+        }
+        Update: {
+          created_at?: string
+          current_a?: number | null
+          energy_today_kwh?: number | null
+          energy_total_kwh?: number | null
+          farm_id?: string
+          frequency_hz?: number | null
+          id?: number
+          measured_at?: string
+          meter_id?: string
+          meter_name?: string | null
+          payload?: Json
+          power_factor?: number | null
+          power_kw?: number | null
+          source?: string
+          status?: string
+          updated_at?: string
+          voltage_v?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "energy_live_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farm"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      energy_meter_timeseries: {
+        Row: {
+          active_power_kw: number | null
+          apparent_power_kva: number | null
+          created_at: string
+          current_l1_a: number | null
+          current_l2_a: number | null
+          current_l3_a: number | null
+          energy_export_kwh: number | null
+          energy_import_kwh: number | null
+          farm_id: string
+          frequency_hz: number | null
+          id: number
+          measured_at: string
+          meter_id: string
+          payload: Json
+          power_factor: number | null
+          reactive_power_kvar: number | null
+          updated_at: string
+          voltage_l1_v: number | null
+          voltage_l2_v: number | null
+          voltage_l3_v: number | null
+        }
+        Insert: {
+          active_power_kw?: number | null
+          apparent_power_kva?: number | null
+          created_at?: string
+          current_l1_a?: number | null
+          current_l2_a?: number | null
+          current_l3_a?: number | null
+          energy_export_kwh?: number | null
+          energy_import_kwh?: number | null
+          farm_id: string
+          frequency_hz?: number | null
+          id?: number
+          measured_at: string
+          meter_id: string
+          payload?: Json
+          power_factor?: number | null
+          reactive_power_kvar?: number | null
+          updated_at?: string
+          voltage_l1_v?: number | null
+          voltage_l2_v?: number | null
+          voltage_l3_v?: number | null
+        }
+        Update: {
+          active_power_kw?: number | null
+          apparent_power_kva?: number | null
+          created_at?: string
+          current_l1_a?: number | null
+          current_l2_a?: number | null
+          current_l3_a?: number | null
+          energy_export_kwh?: number | null
+          energy_import_kwh?: number | null
+          farm_id?: string
+          frequency_hz?: number | null
+          id?: number
+          measured_at?: string
+          meter_id?: string
+          payload?: Json
+          power_factor?: number | null
+          reactive_power_kvar?: number | null
+          updated_at?: string
+          voltage_l1_v?: number | null
+          voltage_l2_v?: number | null
+          voltage_l3_v?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "energy_meter_timeseries_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farm"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      energy_timeseries: {
+        Row: {
+          battery_state_of_charge_pct: number | null
+          created_at: string
+          energy_export_kwh: number | null
+          energy_import_kwh: number | null
+          energy_kwh: number | null
+          farm_id: string
+          grid_import_kwh: number | null
+          id: number
+          measured_at: string
+          payload: Json
+          power_kw: number | null
+          solar_generation_kwh: number | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          battery_state_of_charge_pct?: number | null
+          created_at?: string
+          energy_export_kwh?: number | null
+          energy_import_kwh?: number | null
+          energy_kwh?: number | null
+          farm_id: string
+          grid_import_kwh?: number | null
+          id?: number
+          measured_at: string
+          payload?: Json
+          power_kw?: number | null
+          solar_generation_kwh?: number | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          battery_state_of_charge_pct?: number | null
+          created_at?: string
+          energy_export_kwh?: number | null
+          energy_import_kwh?: number | null
+          energy_kwh?: number | null
+          farm_id?: string
+          grid_import_kwh?: number | null
+          id?: number
+          measured_at?: string
+          payload?: Json
+          power_kw?: number | null
+          solar_generation_kwh?: number | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "energy_timeseries_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farm"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       farm: {
         Row: {
           created_at: string | null
@@ -381,6 +647,7 @@ export type Database = {
           feed_pellet_size: Database["public"]["Enums"]["feed_pellet_size"]
           feed_supplier: number
           id: number
+          is_active: boolean
         }
         Insert: {
           created_at?: string
@@ -392,6 +659,7 @@ export type Database = {
           feed_pellet_size: Database["public"]["Enums"]["feed_pellet_size"]
           feed_supplier: number
           id?: number
+          is_active?: boolean
         }
         Update: {
           created_at?: string
@@ -403,6 +671,7 @@ export type Database = {
           feed_pellet_size?: Database["public"]["Enums"]["feed_pellet_size"]
           feed_supplier?: number
           id?: number
+          is_active?: boolean
         }
         Relationships: [
           {
@@ -433,6 +702,7 @@ export type Database = {
           id: number
           local_id: string | null
           notes: string | null
+          synced_at: string | null
           system_id: number
         }
         Insert: {
@@ -446,6 +716,7 @@ export type Database = {
           id?: number
           local_id?: string | null
           notes?: string | null
+          synced_at?: string | null
           system_id: number
         }
         Update: {
@@ -459,6 +730,7 @@ export type Database = {
           id?: number
           local_id?: string | null
           notes?: string | null
+          synced_at?: string | null
           system_id?: number
         }
         Relationships: [
@@ -608,6 +880,7 @@ export type Database = {
           id: number
           local_id: string | null
           number_of_fish_harvest: number | null
+          synced_at: string | null
           system_id: number
           total_weight_harvest: number
           type_of_harvest: Database["public"]["Enums"]["type_of_harvest"]
@@ -621,6 +894,7 @@ export type Database = {
           id?: number
           local_id?: string | null
           number_of_fish_harvest?: number | null
+          synced_at?: string | null
           system_id: number
           total_weight_harvest: number
           type_of_harvest: Database["public"]["Enums"]["type_of_harvest"]
@@ -634,6 +908,7 @@ export type Database = {
           id?: number
           local_id?: string | null
           number_of_fish_harvest?: number | null
+          synced_at?: string | null
           system_id?: number
           total_weight_harvest?: number
           type_of_harvest?: Database["public"]["Enums"]["type_of_harvest"]
@@ -653,13 +928,6 @@ export type Database = {
             referencedRelation: "production_cycle"
             referencedColumns: ["cycle_id"]
           },
-          {
-            foreignKeyName: "fish_harvest_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "system"
-            referencedColumns: ["id"]
-          },
         ]
       }
       fish_mortality: {
@@ -678,6 +946,7 @@ export type Database = {
           notes: string | null
           number_of_fish_mortality: number
           recorded_by: string | null
+          synced_at: string | null
           system_id: number
           total_weight_mortality: number | null
         }
@@ -696,6 +965,7 @@ export type Database = {
           notes?: string | null
           number_of_fish_mortality: number
           recorded_by?: string | null
+          synced_at?: string | null
           system_id: number
           total_weight_mortality?: number | null
         }
@@ -714,6 +984,7 @@ export type Database = {
           notes?: string | null
           number_of_fish_mortality?: number
           recorded_by?: string | null
+          synced_at?: string | null
           system_id?: number
           total_weight_mortality?: number | null
         }
@@ -759,6 +1030,7 @@ export type Database = {
           local_id: string | null
           notes: string | null
           number_of_fish_sampling: number
+          synced_at: string | null
           system_id: number
           total_weight_sampling: number
         }
@@ -772,6 +1044,7 @@ export type Database = {
           local_id?: string | null
           notes?: string | null
           number_of_fish_sampling: number
+          synced_at?: string | null
           system_id: number
           total_weight_sampling: number
         }
@@ -785,6 +1058,7 @@ export type Database = {
           local_id?: string | null
           notes?: string | null
           number_of_fish_sampling?: number
+          synced_at?: string | null
           system_id?: number
           total_weight_sampling?: number
         }
@@ -823,6 +1097,7 @@ export type Database = {
           local_id: string | null
           notes: string | null
           number_of_fish_stocking: number
+          synced_at: string | null
           system_id: number
           total_weight_stocking: number
           type_of_stocking: Database["public"]["Enums"]["type_of_stocking"]
@@ -837,6 +1112,7 @@ export type Database = {
           local_id?: string | null
           notes?: string | null
           number_of_fish_stocking: number
+          synced_at?: string | null
           system_id: number
           total_weight_stocking: number
           type_of_stocking: Database["public"]["Enums"]["type_of_stocking"]
@@ -851,6 +1127,7 @@ export type Database = {
           local_id?: string | null
           notes?: string | null
           number_of_fish_stocking?: number
+          synced_at?: string | null
           system_id?: number
           total_weight_stocking?: number
           type_of_stocking?: Database["public"]["Enums"]["type_of_stocking"]
@@ -893,6 +1170,7 @@ export type Database = {
           notes: string | null
           number_of_fish_transfer: number
           origin_system_id: number | null
+          synced_at: string | null
           target_system_id: number
           total_weight_transfer: number | null
           transfer_type: Database["public"]["Enums"]["transfer_type"]
@@ -910,6 +1188,7 @@ export type Database = {
           notes?: string | null
           number_of_fish_transfer: number
           origin_system_id?: number | null
+          synced_at?: string | null
           target_system_id: number
           total_weight_transfer?: number | null
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
@@ -927,6 +1206,7 @@ export type Database = {
           notes?: string | null
           number_of_fish_transfer?: number
           origin_system_id?: number | null
+          synced_at?: string | null
           target_system_id?: number
           total_weight_transfer?: number | null
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
@@ -1074,15 +1354,7 @@ export type Database = {
           system_id?: number
           target_weight_g?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "production_cycle_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "system"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       raw_uploads: {
         Row: {
@@ -1208,6 +1480,7 @@ export type Database = {
       user_profile: {
         Row: {
           created_at: string | null
+          email: string | null
           farm_id: string | null
           full_name: string | null
           notifications_enabled: boolean | null
@@ -1218,6 +1491,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          email?: string | null
           farm_id?: string | null
           full_name?: string | null
           notifications_enabled?: boolean | null
@@ -1228,6 +1502,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          email?: string | null
           farm_id?: string | null
           full_name?: string | null
           notifications_enabled?: boolean | null
@@ -1913,10 +2188,15 @@ export type Database = {
       api_recommended_actions: {
         Args: { p_farm_id: string; p_system_id?: number }
         Returns: {
-          description: string
-          due: string
-          priority: string
-          title: string
+          context_json: Json
+          current_value: number
+          metric_name: string
+          severity: string
+          system_id: number
+          system_name: string
+          threshold_high: number
+          threshold_low: number
+          unit: string
         }[]
       }
       api_running_stock: {
@@ -2136,15 +2416,6 @@ export type Database = {
           survival_pct: number
         }[]
       }
-      has_farm_role:
-        | { Args: { farm: string; roles: string[] }; Returns: boolean }
-        | {
-            Args: { _user_id: string; farm: string; roles: string[] }
-            Returns: boolean
-          }
-      is_farm_member:
-        | { Args: { farm: string }; Returns: boolean }
-        | { Args: { _user_id: string; farm: string }; Returns: boolean }
       mark_farm_user_invitation_sent: {
         Args: { p_invitation_id: string }
         Returns: undefined
@@ -2158,6 +2429,7 @@ export type Database = {
           upserted_days: number
         }[]
       }
+      refresh_analytics_cache: { Args: never; Returns: undefined }
       refresh_daily_water_quality_rating: {
         Args: { p_from?: string; p_system_id?: number; p_to?: string }
         Returns: undefined

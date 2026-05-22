@@ -247,8 +247,10 @@ export async function completeOnboardingProfileAction(
   const { error: profileError } = await assignment.admin.from("user_profile").upsert(
     {
       user_id: user.id,
+      email: user.email ?? null,
       full_name: payload.fullName,
       role: selectedRole,
+      ...(assignment.farmId ? { farm_id: assignment.farmId } : {}),
     },
     { onConflict: "user_id" },
   )

@@ -182,6 +182,7 @@ export async function createWorkspaceClientSide(params: {
   await supabase.from("user_profile").upsert(
     {
       user_id: user.id,
+      email: user.email ?? null,
       organization_id: org.id,
       farm_id: farm.id,
       role: "admin",

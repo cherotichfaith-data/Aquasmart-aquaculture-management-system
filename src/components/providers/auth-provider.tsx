@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const [profileResult, settingsResult, membershipResult] = await Promise.all([
             supabase
                 .from("user_profile")
-                .select("user_id, full_name, role, notifications_enabled, organization_id, farm_id, created_at, updated_at")
+                .select("user_id, email, full_name, role, notifications_enabled, organization_id, farm_id, created_at, updated_at")
                 .eq("user_id", authUser.id)
                 .maybeSingle(),
             supabase
