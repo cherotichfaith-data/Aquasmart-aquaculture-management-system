@@ -276,7 +276,6 @@ async function fetchActiveFarmRange(
   ]
   const ratingSource: [string, string, string] = ["daily_water_quality_rating", "system_id", "rating_date"]
   const farmDateSources: Array<[string, string]> = [
-    ["feed_incoming", "date"],
     ["feed_inventory", "inventory_date"],
   ]
 

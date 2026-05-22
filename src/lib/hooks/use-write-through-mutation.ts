@@ -55,12 +55,16 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
       const pendingSync = hasPendingSyncMeta(result) && Boolean(result.meta.pendingSync)
 
       if (!pendingSync) {
-        await config.invalidate?.({ queryClient, payload, result })
+        void Promise.resolve(config.invalidate?.({ queryClient, payload, result })).catch((error) => {
+          console.error("dataEntry:invalidate", error)
+        })
       }
 
       toast({
-        title: pendingSync ? "Saved Offline" : "Success",
+        variant: pendingSync ? "warning" : "success",
+        title: pendingSync ? "Saved offline" : "Record saved",
         description: pendingSync ? "Saved locally and queued for sync." : config.successMessage,
+        duration: pendingSync ? 7000 : 6000,
       })
     },
     onError: (error: unknown, _payload, context) => {

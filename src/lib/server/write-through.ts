@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js"
 import { enforceUserRateLimit, type ApiRateLimitPolicy } from "@/lib/server/rate-limit"
 import { isSbNetworkError, isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { createClient } from "@/lib/supabase/server"
+import { getSessionIdentity, isSessionTokenExpired } from "@/lib/supabase/session"
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 
@@ -43,6 +44,63 @@ export async function requireRateLimitedRouteUser(
   policy: ApiRateLimitPolicy,
 ): Promise<{ user: User } | { response: NextResponse }> {
   const auth = await requireRouteUser(supabase, tag)
+  if ("response" in auth) return auth
+
+  const rateLimit = await enforceUserRateLimit({
+    request,
+    tag,
+    userId: auth.user.id,
+    policy,
+  })
+  if (rateLimit.response) return { response: rateLimit.response }
+
+  return auth
+}
+
+export async function requireSessionRouteUser(
+  supabase: ServerSupabaseClient,
+  tag: string,
+): Promise<{ user: User } | { response: NextResponse }> {
+  let accessToken: string | null = null
+  let error: unknown = null
+
+  try {
+    const result = await supabase.auth.getSession()
+    accessToken = result.data.session?.access_token ?? null
+    error = result.error
+  } catch (caught) {
+    error = caught
+  }
+
+  const identity = getSessionIdentity(accessToken)
+  if (error || !accessToken || !identity || isSessionTokenExpired(accessToken)) {
+    if (error) {
+      if (isSbNetworkError(error)) {
+        logSbError(`${tag}:getSession`, error)
+        return { response: NextResponse.json({ error: "Authentication service unavailable." }, { status: 503 }) }
+      }
+      logSbError(`${tag}:getSession`, error)
+    }
+    return { response: NextResponse.json({ error: "Unauthorized." }, { status: 401 }) }
+  }
+
+  return {
+    user: {
+      id: identity.userId,
+      email: identity.email ?? undefined,
+      user_metadata: identity.userMetadata,
+      app_metadata: identity.appMetadata,
+    } as User,
+  }
+}
+
+export async function requireRateLimitedSessionRouteUser(
+  supabase: ServerSupabaseClient,
+  request: Request,
+  tag: string,
+  policy: ApiRateLimitPolicy,
+): Promise<{ user: User } | { response: NextResponse }> {
+  const auth = await requireSessionRouteUser(supabase, tag)
   if ("response" in auth) return auth
 
   const rateLimit = await enforceUserRateLimit({

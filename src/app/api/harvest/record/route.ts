@@ -10,10 +10,10 @@ const harvestSchema = z.object({
   system_id: z.number().int().positive(),
   batch_id: z.number().int().positive().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  number_of_fish_harvest: z.number().min(0),
-  total_weight_harvest: z.number().min(0),
+  number_of_fish_harvest: z.number().int().positive(),
+  total_weight_harvest: z.number().positive(),
   type_of_harvest: z.enum(["partial", "final"]),
-  abw: z.number().min(0),
+  abw: z.number().positive().nullable().optional(),
   local_id: z.string().max(128).optional(),
 })
 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     number_of_fish_harvest: payload.number_of_fish_harvest,
     total_weight_harvest: payload.total_weight_harvest,
     type_of_harvest: payload.type_of_harvest,
-    abw: payload.abw,
+    abw: (payload.total_weight_harvest * 1000) / payload.number_of_fish_harvest,
     local_id: payload.local_id ?? null,
     synced_at: new Date().toISOString(),
   }

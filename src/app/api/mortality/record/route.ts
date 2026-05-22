@@ -13,11 +13,19 @@ const mortalitySchema = z.object({
   batch_id: z.number().int().positive().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   number_of_fish_mortality: z.number().positive(),
+  total_weight_mortality: z.number().min(0).nullable().optional(),
   cause: z.enum(MORTALITY_CAUSES),
-  avg_dead_wt_g: z.number().min(0).nullable().optional(),
   is_mass_mortality: z.boolean().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
   local_id: z.string().max(128).optional(),
+}).superRefine((payload, ctx) => {
+  if (payload.number_of_fish_mortality >= 100 && payload.total_weight_mortality == null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["total_weight_mortality"],
+      message: "Total dead weight is required when mortality is 100 fish or more.",
+    })
+  }
 })
 
 export async function POST(request: Request) {
@@ -42,10 +50,9 @@ export async function POST(request: Request) {
     .upsert({
       ...payload,
       batch_id: payload.batch_id ?? null,
-      avg_dead_wt_g: payload.avg_dead_wt_g ?? null,
+      total_weight_mortality: payload.total_weight_mortality ?? null,
       is_mass_mortality: payload.is_mass_mortality ?? null,
       notes: payload.notes?.trim() ? payload.notes.trim() : null,
-      recorded_by: auth.user.id,
       local_id: payload.local_id ?? null,
       synced_at: new Date().toISOString(),
     }, {

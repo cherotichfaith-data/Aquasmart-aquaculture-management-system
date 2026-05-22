@@ -9,7 +9,10 @@ export type ServerClient = ReturnType<typeof createAccessTokenClient>
 
 type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
-type SystemVolumeRow = Pick<Database["public"]["Tables"]["system"]["Row"], "id" | "name" | "volume" | "growth_stage">
+type SystemVolumeRow = Pick<
+  Database["public"]["Tables"]["system"]["Row"],
+  "commissioned_at" | "growth_stage" | "id" | "is_active" | "name" | "volume"
+>
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type BatchOptionRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
@@ -91,7 +94,7 @@ export async function listSystemVolumeRows(
 ): Promise<SystemVolumeRow[]> {
   let query = supabase
     .from("system")
-    .select("id, name, volume, growth_stage, is_active, farm_id")
+    .select("id, commissioned_at, name, volume, growth_stage, is_active, farm_id")
     .eq("farm_id", params.farmId)
 
   if (params.stage && params.stage !== "all") {
@@ -101,7 +104,10 @@ export async function listSystemVolumeRows(
     query = query.eq("is_active", true)
   }
 
-  const { data, error } = await query.order("name", { ascending: true })
+  const { data, error } = await query
+    .order("is_active", { ascending: false })
+    .order("commissioned_at", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: false })
   if (error) return []
   return (data ?? []) as SystemVolumeRow[]
 }

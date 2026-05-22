@@ -14,8 +14,9 @@ export type SystemOption = {
 
 export type SystemOptionSource = Pick<
   Database["public"]["Tables"]["system"]["Row"],
-  "farm_id" | "growth_stage" | "id" | "is_active" | "name" | "type"
+  "commissioned_at" | "farm_id" | "growth_stage" | "id" | "is_active" | "name" | "type"
 > & {
+  production_start?: string | null
   unit: string | null
 }
 
@@ -99,4 +100,28 @@ export function mapSystemRowToOption(system: SystemOptionSource): SystemOption {
     type: system.type,
     unit: system.unit,
   }
+}
+
+export function sortSystemsByCurrentProduction<T extends Pick<SystemOptionSource, "commissioned_at" | "id" | "is_active" | "name" | "unit">>(
+  systems: T[],
+): T[] {
+  return systems.slice().sort((a, b) => {
+    const activeDelta = Number(b.is_active !== false) - Number(a.is_active !== false)
+    if (activeDelta !== 0) return activeDelta
+
+    const aProductionStart = "production_start" in a ? String(a.production_start ?? "") : ""
+    const bProductionStart = "production_start" in b ? String(b.production_start ?? "") : ""
+    const stockedDelta = Number(Boolean(bProductionStart)) - Number(Boolean(aProductionStart))
+    if (stockedDelta !== 0) return stockedDelta
+
+    const dateDelta = String(bProductionStart || b.commissioned_at || "0001-01-01").localeCompare(
+      String(aProductionStart || a.commissioned_at || "0001-01-01"),
+    )
+    if (dateDelta !== 0) return dateDelta
+
+    const idDelta = Number(b.id ?? 0) - Number(a.id ?? 0)
+    if (idDelta !== 0) return idDelta
+
+    return formatSystemOptionLabel(a).localeCompare(formatSystemOptionLabel(b))
+  })
 }

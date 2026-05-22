@@ -87,7 +87,7 @@ export function useRecordMortality() {
       batchId?: number | null
       date: string
       numberOfFishMortality: number
-      avgDeadWtG?: number | null
+      totalWeightMortality?: number | null
       cause: MortalityInput["cause"]
       isMassMortality?: boolean | null
       notes?: string | null
@@ -105,7 +105,7 @@ export function useRecordMortality() {
         batchId: payload.batch_id ?? null,
         date: payload.date,
         numberOfFishMortality: payload.number_of_fish_mortality,
-        avgDeadWtG: payload.avg_dead_wt_g ?? null,
+        totalWeightMortality: payload.total_weight_mortality ?? null,
         cause: payload.cause,
         isMassMortality: payload.is_mass_mortality ?? null,
         notes: payload.notes ?? null,

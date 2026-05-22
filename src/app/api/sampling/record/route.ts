@@ -12,10 +12,15 @@ const samplingSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   number_of_fish_sampling: z.number().positive(),
   total_weight_sampling: z.number().positive(),
-  abw: z.number().min(0),
+  abw: z.number().min(0).optional(),
   notes: z.string().max(500).nullable().optional(),
   local_id: z.string().max(128).optional(),
 })
+
+const normalizeSamplingWeightKg = (totalWeight: number, sampleCount: number) => {
+  if (sampleCount <= 0) return totalWeight
+  return totalWeight / sampleCount > 20 ? totalWeight / 1000 : totalWeight
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -34,13 +39,16 @@ export async function POST(request: Request) {
   const systemScope = await getSystemFarmId(supabase, payload.system_id, "sampling:record")
   if ("response" in systemScope) return systemScope.response
 
+  const totalWeightSamplingKg = normalizeSamplingWeightKg(payload.total_weight_sampling, payload.number_of_fish_sampling)
+  const abw = (totalWeightSamplingKg * 1000) / payload.number_of_fish_sampling
+
   const insertPayload = {
     system_id: payload.system_id,
     batch_id: payload.batch_id ?? null,
     date: payload.date,
     number_of_fish_sampling: payload.number_of_fish_sampling,
-    total_weight_sampling: payload.total_weight_sampling,
-    abw: payload.abw,
+    total_weight_sampling: totalWeightSamplingKg,
+    abw,
     notes: payload.notes?.trim() ? payload.notes.trim() : null,
     local_id: payload.local_id ?? null,
     synced_at: new Date().toISOString(),

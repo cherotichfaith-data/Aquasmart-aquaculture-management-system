@@ -142,6 +142,7 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
     selectedDate,
   )
   const daysSinceLastSample = diffDateDays(previousSample?.date, selectedDate)
+  const isEarlierThanMonthlyCadence = daysSinceLastSample != null && daysSinceLastSample < 25
   const abwDeltaPct =
     projectedAbw && computedAbw ? Math.abs((computedAbw - projectedAbw) / projectedAbw) * 100 : null
 
@@ -181,7 +182,7 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
     <div>
       <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Sampling</h2>
-        <p className="text-sm text-muted-foreground">Capture total sampled weight in kilograms and flag unrealistic ABW shifts before save.</p>
+        <p className="text-sm text-muted-foreground">Capture the monthly sampled fish count and total sample weight in kilograms for this batch.</p>
       </div>
 
       <div className="data-entry-status">
@@ -322,6 +323,12 @@ export function SamplingForm({ systems, batches, defaultSystemId = null, default
               <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
                 Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter sample count and total weight (kg)"}
               </div>
+
+              {isEarlierThanMonthlyCadence ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Last sampling was {formatRelativeDays(daysSinceLastSample)}. Sampling is normally done monthly because it stresses the fish.
+                </div>
+              ) : null}
 
               <FormField
                 control={form.control}

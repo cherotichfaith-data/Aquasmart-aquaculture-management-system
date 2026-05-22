@@ -53,6 +53,7 @@ export function SelectedBatchSupplierInfo({
     if (!selectedBatch) return null
     return suppliers.find((supplier) => supplier.id === selectedBatch.supplier_id) ?? null
   }, [selectedBatch, suppliers])
+  const sourceName = selectedSupplier?.company_name ?? (suppliersQuery.isLoading ? "Loading source..." : "Source not found")
 
   if (!selectedBatch) return null
 
@@ -60,9 +61,7 @@ export function SelectedBatchSupplierInfo({
     <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
       <div className="font-medium">Selected Batch</div>
       <div className="text-muted-foreground">Batch: {selectedBatch.label || `Batch ${selectedBatch.id}`}</div>
-      <div className="text-muted-foreground">
-        Supplier: {selectedSupplier?.company_name ?? `Supplier ${selectedBatch.supplier_id}`}
-      </div>
+      <div className="text-muted-foreground">Source: {sourceName}</div>
       <div className="text-muted-foreground">Delivery Date: {selectedBatch.date_of_delivery}</div>
     </div>
   )

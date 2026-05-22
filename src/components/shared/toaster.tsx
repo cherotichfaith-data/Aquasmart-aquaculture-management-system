@@ -8,6 +8,14 @@ import IconButton from "@mui/material/IconButton"
 import Snackbar from "@mui/material/Snackbar"
 import { X } from "lucide-react"
 import { useToast } from "@/lib/hooks/app/use-toast"
+import type { ToastVariant } from "@/lib/hooks/app/use-toast"
+
+function getToastSeverity(variant: ToastVariant | undefined) {
+  if (variant === "destructive") return "error"
+  if (variant === "success") return "success"
+  if (variant === "warning") return "warning"
+  return "info"
+}
 
 function renderToastAction(action: React.ReactNode) {
   if (!React.isValidElement(action)) {
@@ -35,7 +43,7 @@ export function Toaster() {
         >
           <Alert
             variant="filled"
-            severity={variant === "destructive" ? "error" : "info"}
+            severity={getToastSeverity(variant)}
             sx={{
               width: "100%",
               minWidth: { xs: 280, sm: 360 },

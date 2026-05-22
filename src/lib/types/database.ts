@@ -513,48 +513,6 @@ export type Database = {
           },
         ]
       }
-      feed_incoming: {
-        Row: {
-          created_at: string
-          date: string
-          farm_id: string
-          feed_amount: number
-          feed_type_id: number | null
-          id: number
-        }
-        Insert: {
-          created_at?: string
-          date: string
-          farm_id: string
-          feed_amount: number
-          feed_type_id?: number | null
-          id?: number
-        }
-        Update: {
-          created_at?: string
-          date?: string
-          farm_id?: string
-          feed_amount?: number
-          feed_type_id?: number | null
-          id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feed_incoming_farm_id_fkey"
-            columns: ["farm_id"]
-            isOneToOne: false
-            referencedRelation: "farm"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "feed_incoming_feed_id_fkey"
-            columns: ["feed_type_id"]
-            isOneToOne: false
-            referencedRelation: "feed_type"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       feed_inventory: {
         Row: {
           amount_of_bags: number | null
@@ -562,7 +520,7 @@ export type Database = {
           comments: string | null
           created_at: string
           farm_id: string
-          feed_type_id: number | null
+          feed_type_id: number
           feed_type_label: string
           id: number
           inventory_date: string
@@ -575,7 +533,7 @@ export type Database = {
           comments?: string | null
           created_at?: string
           farm_id: string
-          feed_type_id?: number | null
+          feed_type_id: number
           feed_type_label: string
           id?: number
           inventory_date: string
@@ -588,7 +546,7 @@ export type Database = {
           comments?: string | null
           created_at?: string
           farm_id?: string
-          feed_type_id?: number | null
+          feed_type_id?: number
           feed_type_label?: string
           id?: number
           inventory_date?: string
@@ -928,12 +886,17 @@ export type Database = {
             referencedRelation: "production_cycle"
             referencedColumns: ["cycle_id"]
           },
+          {
+            foreignKeyName: "fish_harvest_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "system"
+            referencedColumns: ["id"]
+          },
         ]
       }
       fish_mortality: {
         Row: {
-          abw: number | null
-          avg_dead_wt_g: number | null
           batch_id: number | null
           cause: string
           created_at: string
@@ -945,14 +908,11 @@ export type Database = {
           local_id: string | null
           notes: string | null
           number_of_fish_mortality: number
-          recorded_by: string | null
           synced_at: string | null
           system_id: number
           total_weight_mortality: number | null
         }
         Insert: {
-          abw?: number | null
-          avg_dead_wt_g?: number | null
           batch_id?: number | null
           cause?: string
           created_at?: string
@@ -964,14 +924,11 @@ export type Database = {
           local_id?: string | null
           notes?: string | null
           number_of_fish_mortality: number
-          recorded_by?: string | null
           synced_at?: string | null
           system_id: number
           total_weight_mortality?: number | null
         }
         Update: {
-          abw?: number | null
-          avg_dead_wt_g?: number | null
           batch_id?: number | null
           cause?: string
           created_at?: string
@@ -983,7 +940,6 @@ export type Database = {
           local_id?: string | null
           notes?: string | null
           number_of_fish_mortality?: number
-          recorded_by?: string | null
           synced_at?: string | null
           system_id?: number
           total_weight_mortality?: number | null
@@ -1171,7 +1127,7 @@ export type Database = {
           number_of_fish_transfer: number
           origin_system_id: number | null
           synced_at: string | null
-          target_system_id: number
+          target_system_id: number | null
           total_weight_transfer: number | null
           transfer_type: Database["public"]["Enums"]["transfer_type"]
         }
@@ -1189,7 +1145,7 @@ export type Database = {
           number_of_fish_transfer: number
           origin_system_id?: number | null
           synced_at?: string | null
-          target_system_id: number
+          target_system_id?: number | null
           total_weight_transfer?: number | null
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
         }
@@ -1207,7 +1163,7 @@ export type Database = {
           number_of_fish_transfer?: number
           origin_system_id?: number | null
           synced_at?: string | null
-          target_system_id?: number
+          target_system_id?: number | null
           total_weight_transfer?: number | null
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
         }
@@ -1331,6 +1287,7 @@ export type Database = {
       }
       production_cycle: {
         Row: {
+          batch_id: number
           cycle_end: string | null
           cycle_id: number
           cycle_start: string
@@ -1339,6 +1296,7 @@ export type Database = {
           target_weight_g: number | null
         }
         Insert: {
+          batch_id: number
           cycle_end?: string | null
           cycle_id?: number
           cycle_start: string
@@ -1347,6 +1305,7 @@ export type Database = {
           target_weight_g?: number | null
         }
         Update: {
+          batch_id?: number
           cycle_end?: string | null
           cycle_id?: number
           cycle_start?: string
@@ -1354,7 +1313,22 @@ export type Database = {
           system_id?: number
           target_weight_g?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "production_cycle_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "fingerling_batch"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_cycle_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "system"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       raw_uploads: {
         Row: {
@@ -2488,7 +2462,10 @@ export type Database = {
       feed_pellet_size:
         | "mash_powder"
         | "<0.49mm"
+        | "0.5mm"
         | "0.5-0.99mm"
+        | "0.5-1.0mm"
+        | "0.9-1.6mm"
         | "1.0-1.5mm"
         | "1.5-1.99mm"
         | "2mm"

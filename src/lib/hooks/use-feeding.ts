@@ -88,7 +88,12 @@ export function useRecordFeeding() {
     },
     onSuccess: async ({ data, meta }) => {
       if (hasPendingSyncMeta({ meta }) && meta.pendingSync) {
-        toast({ title: "Saved Offline", description: "Saved locally and queued for sync." })
+        toast({
+          variant: "warning",
+          title: "Saved offline",
+          description: "Saved locally and queued for sync.",
+          duration: 7000,
+        })
         return
       }
 
@@ -101,13 +106,20 @@ export function useRecordFeeding() {
         return { ...o, feeding: { ...feeding, data: nextFeeding } }
       })
 
-      await invalidateAfterWrite(queryClient, {
+      void invalidateAfterWrite(queryClient, {
         type: "feeding",
         farmId: meta.farmId,
         date: meta.date,
+      }).catch((error) => {
+        console.error("dataEntry:feeding:invalidate", error)
       })
 
-      toast({ title: "Success", description: "Feeding event recorded." })
+      toast({
+        variant: "success",
+        title: "Record saved",
+        description: "Feeding event recorded.",
+        duration: 6000,
+      })
     },
     onError: (error: unknown, _payload, context) => {
       restoreRecentEntries(queryClient, context?.previous)
