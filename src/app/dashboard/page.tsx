@@ -54,6 +54,7 @@ export default async function DashboardPage({
 
   const workspaceContext = await loadWorkspaceContextForUser({
     userId: contextUser.id,
+    accessToken,
     requestedFarmId,
     cookieOrganizationId,
     cookieFarmId,

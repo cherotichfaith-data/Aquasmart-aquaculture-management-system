@@ -48,37 +48,35 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
         } satisfies SyncTrackedRecord & TRecord
       })
 
-      if (navigator.onLine) {
-        try {
-          const responses: unknown[] = []
+      try {
+        const responses: unknown[] = []
 
-          for (const record of records) {
-            const result = await pushRecordDirect(options.tableName, record)
+        for (const record of records) {
+          const result = await pushRecordDirect(options.tableName, record)
 
-            if (result.status === "pushed" || result.status === "conflict") {
-              if (result.response !== undefined) {
-                responses.push(result.response)
-              }
-              continue
+          if (result.status === "pushed" || result.status === "conflict") {
+            if (result.response !== undefined) {
+              responses.push(result.response)
             }
-
-            throw new Error(result.errorMessage ?? "Unable to save this record.")
+            continue
           }
 
-          setSyncError(null)
-          setLastSyncedAt(new Date())
-          window.dispatchEvent(new CustomEvent("offline-sync-complete"))
+          throw new Error(result.errorMessage ?? "Unable to save this record.")
+        }
 
-          if (options.combineSyncedResponses) {
-            return options.combineSyncedResponses({ input, responses, localIds })
-          }
-          if (responses[0] !== undefined) {
-            return responses[0] as TResult
-          }
-        } catch (error) {
-          if (!isNetworkSaveError(error)) {
-            throw error
-          }
+        setSyncError(null)
+        setLastSyncedAt(new Date())
+        window.dispatchEvent(new CustomEvent("offline-sync-complete"))
+
+        if (options.combineSyncedResponses) {
+          return options.combineSyncedResponses({ input, responses, localIds })
+        }
+        if (responses[0] !== undefined) {
+          return responses[0] as TResult
+        }
+      } catch (error) {
+        if (!isNetworkSaveError(error)) {
+          throw error
         }
       }
 

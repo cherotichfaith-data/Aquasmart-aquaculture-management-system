@@ -31,7 +31,7 @@ export default async function SelectWorkspacePage({
   }
 
   const { user, accessToken } = await requireUserContext(`${WORKSPACE_SELECT_PATH}?next=${encodeURIComponent(nextPath)}`)
-  const initialOrganizations = await loadWorkspaceOrganizationsForUser(user.id)
+  const initialOrganizations = await loadWorkspaceOrganizationsForUser(user.id, accessToken)
 
   if (initialOrganizations.length === 0) {
     redirect(`${ONBOARDING_CREATE_WORKSPACE_PATH}?next=${encodeURIComponent(nextPath)}`)

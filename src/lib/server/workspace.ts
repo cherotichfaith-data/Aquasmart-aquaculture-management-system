@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createAccessTokenClient } from "@/lib/supabase/access-token-client"
 import {
   normalizeContextValue,
   type FarmSummary,
@@ -28,8 +29,12 @@ type FarmOrganizationRow = {
   organization_id: string | null
 }
 
-async function loadWorkspaceMembershipRows(userId: string) {
-  const admin = createAdminClient()
+function createWorkspaceClient(accessToken?: string | null) {
+  return accessToken ? createAccessTokenClient(accessToken) : createAdminClient()
+}
+
+async function loadWorkspaceMembershipRows(userId: string, accessToken?: string | null) {
+  const admin = createWorkspaceClient(accessToken)
   const [{ data: memberships, error: membershipError }, { data: profile, error: profileError }] = await Promise.all([
     admin.from("farm_user").select("farm_id, role").eq("user_id", userId),
     admin.from("user_profile").select("farm_id, organization_id, role").eq("user_id", userId).maybeSingle(),
@@ -111,8 +116,8 @@ async function loadWorkspaceMembershipRows(userId: string) {
   return { admin, memberships: rows }
 }
 
-async function loadWorkspaceAssets(userId: string) {
-  const { admin, memberships } = await loadWorkspaceMembershipRows(userId)
+async function loadWorkspaceAssets(userId: string, accessToken?: string | null) {
+  const { admin, memberships } = await loadWorkspaceMembershipRows(userId, accessToken)
   const directOrganizationIds = memberships
     .map((row) => normalizeContextValue(row.organization_id))
     .filter((value): value is string => Boolean(value))
@@ -174,24 +179,32 @@ async function loadWorkspaceAssets(userId: string) {
   }
 }
 
-export async function loadWorkspaceOrganizationsForUser(userId: string): Promise<OrganizationSummary[]> {
-  const { organizations } = await loadWorkspaceAssets(userId)
+export async function loadWorkspaceOrganizationsForUser(
+  userId: string,
+  accessToken?: string | null,
+): Promise<OrganizationSummary[]> {
+  const { organizations } = await loadWorkspaceAssets(userId, accessToken)
   return organizations
 }
 
-export async function loadWorkspaceFarmsForUser(userId: string, organizationId: string): Promise<FarmSummary[]> {
-  const { farms } = await loadWorkspaceAssets(userId)
+export async function loadWorkspaceFarmsForUser(
+  userId: string,
+  organizationId: string,
+  accessToken?: string | null,
+): Promise<FarmSummary[]> {
+  const { farms } = await loadWorkspaceAssets(userId, accessToken)
   return farms.filter((farm) => farm.organizationId === organizationId)
 }
 
 export async function loadWorkspaceContextForUser(params: {
   userId: string
+  accessToken?: string | null
   requestedOrganizationId?: string | null
   requestedFarmId?: string | null
   cookieOrganizationId?: string | null
   cookieFarmId?: string | null
 }): Promise<WorkspaceContext> {
-  const { memberships, organizations, farms } = await loadWorkspaceAssets(params.userId)
+  const { memberships, organizations, farms } = await loadWorkspaceAssets(params.userId, params.accessToken)
   const organizationIdSet = new Set(organizations.map((row) => row.id))
   const farmMap = new Map(farms.map((row) => [row.id, row]))
 

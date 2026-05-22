@@ -140,7 +140,9 @@ export default function DashboardLayout({
         }}
         id="app-scroll-root"
       >
-        {hideHeader ? null : (
+        {hideHeader ? (
+          <SyncStatusBar />
+        ) : (
           <>
             <Header
               initialFarmId={initialFarmId}

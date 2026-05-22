@@ -9,7 +9,7 @@ export function useSyncController() {
   const syncingRef = useRef(false)
 
   const triggerSync = useCallback(async () => {
-    if (syncingRef.current || !navigator.onLine) return
+    if (syncingRef.current) return
 
     syncingRef.current = true
     setIsSyncing(true)
@@ -42,16 +42,12 @@ export function useSyncController() {
   useEffect(() => {
     setManualSync(triggerSync)
     void getPendingCount().then(setPendingCount)
-    if (navigator.onLine) {
-      void triggerSync()
-    }
+    void triggerSync()
 
     window.addEventListener("online", triggerSync)
 
     const intervalId = window.setInterval(() => {
-      if (navigator.onLine) {
-        void triggerSync()
-      }
+      void triggerSync()
     }, 60_000)
 
     return () => {
