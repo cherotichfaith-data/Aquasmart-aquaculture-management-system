@@ -27,7 +27,7 @@ function isDuplicateSystemNameError(error: unknown) {
   const dbError = error as { code?: string; message?: string; details?: string }
   return (
     dbError.code === "23505" &&
-    /system_name_farm_unique|farm_id, name|duplicate key/i.test(
+    /system_active_name_farm_unique|system_name_farm_unique|farm_id, name|duplicate key/i.test(
       `${dbError.message ?? ""}\n${dbError.details ?? ""}`,
     )
   )
