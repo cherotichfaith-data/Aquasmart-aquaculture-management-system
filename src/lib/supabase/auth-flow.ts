@@ -115,6 +115,13 @@ export async function completeSupabaseAuthLink(request: Request) {
     logSbError("authLink:getUser", userError)
   }
 
+  if (userData.user) {
+    const { error: claimError } = await supabase.rpc("claim_my_farm_user_invitations")
+    if (claimError) {
+      logSbError("authLink:claimInvitations", claimError)
+    }
+  }
+
   if (shouldCompleteInvitedAccountSetup(userData.user ?? null, next)) {
     return NextResponse.redirect(buildAccountSetupUrl(origin, next))
   }
