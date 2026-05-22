@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod"
 import { getWorkspaceCookieValues, setWorkspaceContextCookies } from "@/lib/context"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { loadWorkspaceContextForUser } from "@/lib/server/workspace"
 import { requireUserContext } from "@/lib/supabase/require-user"
+import { createAccessTokenClient } from "@/lib/supabase/access-token-client"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 
 const selectWorkspaceSchema = z.object({
@@ -13,11 +13,12 @@ const selectWorkspaceSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const { user } = await requireUserContext(request.nextUrl.pathname)
+    const { user, accessToken } = await requireUserContext(request.nextUrl.pathname)
 
     const cookies = getWorkspaceCookieValues(request.cookies)
     const context = await loadWorkspaceContextForUser({
       userId: user.id,
+      accessToken,
       cookieOrganizationId: cookies.organizationId,
       cookieFarmId: cookies.farmId,
     })
@@ -46,18 +47,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { user } = await requireUserContext(request.nextUrl.pathname)
-    const admin = createAdminClient()
+    const { user, accessToken } = await requireUserContext(request.nextUrl.pathname)
+    const supabase = createAccessTokenClient(accessToken)
     const [
       { data: membership, error: membershipError },
       { data: farm, error: farmError },
       { data: organization, error: organizationError },
       { data: profile, error: profileError },
     ] = await Promise.all([
-      admin.from("farm_user").select("role").eq("user_id", user.id).eq("farm_id", payload.farmId).maybeSingle(),
-      admin.from("farm").select("id, organization_id").eq("id", payload.farmId).maybeSingle(),
-      admin.from("organization").select("id, owner_id").eq("id", payload.orgId).maybeSingle(),
-      admin
+      supabase.from("farm_user").select("role").eq("user_id", user.id).eq("farm_id", payload.farmId).maybeSingle(),
+      supabase.from("farm").select("id, organization_id").eq("id", payload.farmId).maybeSingle(),
+      supabase.from("organization").select("id, owner_id").eq("id", payload.orgId).maybeSingle(),
+      supabase
         .from("user_profile")
         .select("organization_id, farm_id, role")
         .eq("user_id", user.id)

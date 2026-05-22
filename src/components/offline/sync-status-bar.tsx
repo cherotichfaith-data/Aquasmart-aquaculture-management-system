@@ -12,27 +12,16 @@ import { useSyncStore } from "@/lib/offline/sync-store"
 export function SyncStatusBar() {
   const { isSyncing, pendingCount, lastSyncedAt, syncError, manualSync } = useSyncStore()
   const [hasMounted, setHasMounted] = useState(false)
-  const [isOnline, setIsOnline] = useState(true)
 
   useEffect(() => {
     setHasMounted(true)
-    setIsOnline(navigator.onLine)
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
-    return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
-    }
   }, [])
 
   if (!hasMounted) {
     return null
   }
 
-  const canSyncNow = Boolean(manualSync) && isOnline && !isSyncing && pendingCount > 0
+  const canSyncNow = Boolean(manualSync) && !isSyncing && pendingCount > 0
   const syncButton = canSyncNow ? (
     <Button size="small" variant="outlined" onClick={() => void manualSync?.()} sx={{ minHeight: 28, borderRadius: 999, px: 1.5, fontSize: "0.6875rem" }}>
       Sync now

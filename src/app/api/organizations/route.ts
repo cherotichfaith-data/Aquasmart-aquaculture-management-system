@@ -16,7 +16,7 @@ export async function GET() {
       return NextResponse.json({ error: "Session unavailable." }, { status: 401 })
     }
 
-    const organizations = await loadWorkspaceOrganizationsForUser(identity.userId)
+    const organizations = await loadWorkspaceOrganizationsForUser(identity.userId, session?.access_token)
 
     return NextResponse.json(
       { organizations },

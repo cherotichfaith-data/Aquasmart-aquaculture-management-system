@@ -1,7 +1,6 @@
 "use client"
 
 import { invalidateAfterWrite } from "@/lib/cache/react-query"
-import { createSystemAction } from "@/features/farm/mutations.server"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 import type { Database } from "@/lib/types/database"
 
@@ -9,9 +8,32 @@ type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
   unit?: string | null
 }
 
+async function createSystem(payload: SystemInsertWithUnit) {
+  const response = await fetch("/api/system/record", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  })
+  const body = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    const message =
+      body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
+        ? (body as { error: string }).error
+        : "Failed to create system."
+    throw new Error(message)
+  }
+
+  return body as {
+    data: Database["public"]["Tables"]["system"]["Row"]
+    meta: { farmId: string; systemId: number | null; date: string }
+  }
+}
+
 export function useCreateSystem() {
   return useWriteThroughMutation({
-    mutationFn: createSystemAction,
+    mutationFn: createSystem,
     activityTableName: "system",
     recentEntryKey: "systems",
     buildOptimisticEntry: (payload) => {

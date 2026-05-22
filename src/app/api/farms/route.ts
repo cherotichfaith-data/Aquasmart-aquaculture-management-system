@@ -27,7 +27,7 @@ async function loadFarmsForOrganization(orgId: string) {
       return NextResponse.json({ error: "Session unavailable." }, { status: 401 })
     }
 
-    const farms = await loadWorkspaceFarmsForUser(identity.userId, parseResult.data.orgId)
+    const farms = await loadWorkspaceFarmsForUser(identity.userId, parseResult.data.orgId, session?.access_token)
 
     return NextResponse.json(farms, {
       headers: {
