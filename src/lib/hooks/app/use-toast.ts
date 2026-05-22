@@ -3,7 +3,7 @@
 // Inspired by react-hot-toast library
 import * as React from 'react'
 
-export type ToastVariant = 'default' | 'destructive'
+export type ToastVariant = 'default' | 'destructive' | 'success' | 'warning'
 
 export type ToastProps = {
   open?: boolean

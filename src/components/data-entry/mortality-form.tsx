@@ -30,8 +30,16 @@ const formSchema = z.object({
   date: z.string().min(1, "Date is required"),
   number_of_fish: z.coerce.number().min(1, "Must be positive"),
   cause: z.enum(MORTALITY_CAUSES, { errorMap: () => ({ message: "Cause is required" }) }),
-  avg_dead_wt_g: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().min(0).optional()),
+  total_weight_mortality: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().min(0).optional()),
   notes: z.string().max(500, "Notes must be 500 characters or fewer").optional(),
+}).superRefine((values, ctx) => {
+  if (values.number_of_fish >= 100 && values.total_weight_mortality == null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["total_weight_mortality"],
+      message: "Total dead weight is required for 100 or more dead fish.",
+    })
+  }
 })
 
 interface MortalityFormProps {
@@ -64,7 +72,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       number_of_fish: 0,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       batch_id: defaultBatchId ? String(defaultBatchId) : "none",
-      avg_dead_wt_g: undefined,
+      total_weight_mortality: undefined,
       notes: "",
     },
   })
@@ -85,9 +93,9 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
         batch_id: batchId,
         date: values.date,
         number_of_fish_mortality: values.number_of_fish,
+        total_weight_mortality: values.total_weight_mortality ?? null,
         cause: values.cause,
         is_mass_mortality: values.number_of_fish >= 100,
-        avg_dead_wt_g: values.avg_dead_wt_g ?? null,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
 
@@ -96,7 +104,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
         number_of_fish: 0,
         system_id: values.system_id,
         batch_id: values.batch_id,
-        avg_dead_wt_g: undefined,
+        total_weight_mortality: undefined,
         notes: "",
       })
     } catch (error) {
@@ -117,7 +125,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
         {mortalityCount >= 100 ? (
         <div className="data-entry-callout-alert rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
-            Mass mortality threshold exceeded. An alert will fire. Complete a DO and water-quality check for this cage as part of the response.
+            Mass mortality threshold exceeded. Weigh the dead fish and record the total dead weight, then complete a DO and water-quality check for this cage.
           </div>
         ) : null}
 
@@ -236,10 +244,10 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
           <FormField
             control={form.control}
-            name="avg_dead_wt_g"
+            name="total_weight_mortality"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Avg Dead Weight (g)</FormLabel>
+                <FormLabel>Total Dead Weight (kg){mortalityCount >= 100 ? " *" : ""}</FormLabel>
                 <FormControl>
                   <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
                 </FormControl>

@@ -1,4 +1,5 @@
 import type { Database, Enums } from "@/lib/types/database"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
   getClientOrError,
@@ -9,7 +10,12 @@ import {
   toQuerySuccess,
   type OptionsRpcName,
 } from "@/lib/api/_utils"
-import { mapSystemRowToOption, type SystemOption, type SystemOptionSource } from "@/lib/system-options"
+import {
+  mapSystemRowToOption,
+  sortSystemsByCurrentProduction,
+  type SystemOption,
+  type SystemOptionSource,
+} from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import type { WorkspaceContext } from "@/lib/context"
 
@@ -24,6 +30,7 @@ type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
 type FishStockingRow = Database["public"]["Tables"]["fish_stocking"]["Row"]
 type FishTransferRow = Database["public"]["Tables"]["fish_transfer"]["Row"]
+type ProductionCycleRow = Database["public"]["Tables"]["production_cycle"]["Row"]
 type OptionsRpcRow<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Returns"][number]
 type OptionsRpcArgs<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Args"]
 
@@ -34,6 +41,69 @@ const isQuietOptionsError = (err: unknown): boolean =>
 
 const isQuietTableError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
+
+async function getFirstStockingDateBySystemId(
+  supabase: SupabaseClient<Database>,
+  systemIds: number[],
+  signal?: AbortSignal,
+) {
+  const firstStockingBySystemId = new Map<number, string>()
+  if (systemIds.length === 0) return firstStockingBySystemId
+
+  let stockingQuery = supabase
+    .from("fish_stocking")
+    .select("system_id, date")
+    .in("system_id", systemIds)
+    .order("date", { ascending: true })
+  if (signal) stockingQuery = stockingQuery.abortSignal(signal)
+
+  const stockingResult = await resolveClientReadQuery<Pick<FishStockingRow, "date" | "system_id">>({
+    tag: "getFirstStockingDateBySystemId",
+    query: stockingQuery,
+    signal,
+    quietWhen: isQuietTableError,
+  })
+  if (stockingResult.status !== "success") return firstStockingBySystemId
+
+  stockingResult.data.forEach((row) => {
+    if (typeof row.system_id !== "number" || !row.date || firstStockingBySystemId.has(row.system_id)) return
+    firstStockingBySystemId.set(row.system_id, row.date)
+  })
+
+  return firstStockingBySystemId
+}
+
+async function getProductionStartBySystemId(
+  supabase: SupabaseClient<Database>,
+  systemIds: number[],
+  signal?: AbortSignal,
+) {
+  const productionStartBySystemId = await getFirstStockingDateBySystemId(supabase, systemIds, signal)
+  const missingSystemIds = systemIds.filter((id) => !productionStartBySystemId.has(id))
+  if (missingSystemIds.length === 0) return productionStartBySystemId
+
+  let cycleQuery = supabase
+    .from("production_cycle")
+    .select("system_id, cycle_start")
+    .in("system_id", missingSystemIds)
+    .order("cycle_start", { ascending: false })
+  if (signal) cycleQuery = cycleQuery.abortSignal(signal)
+
+  const cycleResult = await resolveClientReadQuery<Pick<ProductionCycleRow, "cycle_start" | "system_id">>({
+    tag: "getProductionStartBySystemId:cycles",
+    query: cycleQuery,
+    signal,
+    quietWhen: isQuietTableError,
+  })
+  if (cycleResult.status !== "success") return productionStartBySystemId
+
+  cycleResult.data.forEach((row) => {
+    if (typeof row.system_id !== "number" || !row.cycle_start || productionStartBySystemId.has(row.system_id)) return
+    productionStartBySystemId.set(row.system_id, row.cycle_start)
+  })
+
+  return productionStartBySystemId
+}
 
 /**
  * Helper for RPC calls:
@@ -74,7 +144,7 @@ export async function getSystemOptions(params?: {
 
   let query = supabase
     .from("system")
-    .select("id, farm_id, growth_stage, is_active, name, type, unit")
+    .select("id, commissioned_at, farm_id, growth_stage, is_active, name, type, unit")
     .eq("farm_id", params.farmId)
 
   if (params.stage && params.stage !== "all") {
@@ -89,15 +159,26 @@ export async function getSystemOptions(params?: {
 
   const result = await resolveClientReadQuery<SystemOptionSource>({
     tag: "getSystemOptions",
-    query: query.order("name", { ascending: true }),
+    query: query
+      .order("is_active", { ascending: false })
+      .order("commissioned_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: false }),
     signal: params.signal,
     quietWhen: isQuietOptionsError,
   })
   if (result.status !== "success") return result
 
-  const rows = (result.data as unknown as SystemOptionSource[])
+  const sourceRows = result.data as unknown as SystemOptionSource[]
+  const productionStartBySystemId = await getProductionStartBySystemId(
+    supabase,
+    sourceRows.map((row) => row.id).filter((id): id is number => typeof id === "number"),
+    params.signal,
+  )
+
+  const rows = sortSystemsByCurrentProduction(
+    sourceRows.map((row) => ({ ...row, production_start: productionStartBySystemId.get(row.id) ?? null })),
+  )
     .map(mapSystemRowToOption)
-    .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
   return toQuerySuccess<SystemListItem>(rows)
 }
 
@@ -336,7 +417,7 @@ export async function getWeeklyInventoryFeedTypeOptions(params?: {
     Array.from(latestByFeedType.values())
       .filter((row) => {
         const baggedKg = (row.amount_of_bags ?? 0) * (row.bag_weight ?? 0)
-        const openKg = (row.opened_bags ?? 0) * (row.bag_weight ?? 0)
+        const openKg = (row.opened_bags ?? 0) / 1000
         return baggedKg + openKg > 0
       })
       .map((row) => row.feed_type_id)

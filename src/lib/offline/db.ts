@@ -40,7 +40,7 @@ export interface OfflineMortalityRecord extends OfflineBaseRecord {
   batchId?: number | null
   date: string
   numberOfFishMortality: number
-  avgDeadWtG?: number | null
+  totalWeightMortality?: number | null
   cause: string
   isMassMortality?: boolean | null
   notes?: string | null

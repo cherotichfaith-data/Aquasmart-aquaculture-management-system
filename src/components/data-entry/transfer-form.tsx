@@ -36,7 +36,7 @@ const formSchema = z.object({
   origin_system_id: z.string().min(1, "Origin cage is required"),
   target_system_id: z.string().optional(),
   external_target_name: z.string().optional(),
-  transfer_type: z.enum(["transfer", "grading", "density_thinning", "broodstock", "count_check", "external_out"]),
+  transfer_type: z.enum(["transfer", "grading", "density_thinning", "external_out"]),
   batch_id: z.string().optional(),
   date: z.string().min(1, "Date is required"),
   number_of_fish: z.coerce.number().min(1, "Count must be positive"),
@@ -54,10 +54,6 @@ const formSchema = z.object({
     return
   }
 
-  if (values.transfer_type === "count_check") {
-    return
-  }
-
   if (!values.target_system_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -71,8 +67,6 @@ const TRANSFER_TYPE_OPTIONS = [
   { value: "transfer", label: "Transfer" },
   { value: "grading", label: "Grading" },
   { value: "density_thinning", label: "Density thinning" },
-  { value: "broodstock", label: "Broodstock" },
-  { value: "count_check", label: "Count check" },
   { value: "external_out", label: "External out" },
 ] as const
 
@@ -96,7 +90,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       origin_system_id: defaultSystemId ? String(defaultSystemId) : "",
       target_system_id: "",
       external_target_name: "",
-      transfer_type: systems.length < 2 ? "count_check" : "transfer",
+      transfer_type: "transfer",
       batch_id: defaultBatchId ? String(defaultBatchId) : "none",
       notes: "",
     },
@@ -115,9 +109,8 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const resolvedFarmId = requireActiveFarmId(farmId)
-      const isCountCheck = values.transfer_type === "count_check"
       const isExternalTransfer = values.transfer_type === "external_out"
-      if (!isExternalTransfer && !isCountCheck && values.origin_system_id === values.target_system_id) {
+      if (!isExternalTransfer && values.origin_system_id === values.target_system_id) {
         form.setError("target_system_id", { message: "Origin and destination cannot be the same" })
         return
       }
@@ -134,7 +127,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       await mutation.mutateAsync({
         farm_id: resolvedFarmId,
         origin_system_id: originId,
-        target_system_id: isCountCheck ? originId : targetId ?? originId,
+        target_system_id: isExternalTransfer ? null : targetId,
         external_target_name:
           resolvedTransferType === "external_out" ? values.external_target_name?.trim() ?? null : null,
         transfer_type: resolvedTransferType,
@@ -151,7 +144,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
         number_of_fish: 0,
         total_weight_kg: 0,
         origin_system_id: values.origin_system_id,
-        target_system_id: values.transfer_type === "count_check" ? values.origin_system_id : "",
+        target_system_id: "",
         external_target_name: "",
         transfer_type: values.transfer_type,
         batch_id: values.batch_id,
@@ -175,7 +168,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
 
         {isExternalOut ? (
           <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
-            Destination not in the system list. This transfer will be recorded as <span className="font-semibold">external_out</span>.
+            Fish will leave this farm system and no receiving cage will be tracked.
           </div>
         ) : null}
 
@@ -205,9 +198,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                   <Select
                     onValueChange={(value) => {
                       field.onChange(value)
-                      if (form.getValues("transfer_type") === "count_check") {
-                        form.setValue("target_system_id", value, { shouldValidate: true })
-                      }
                     }}
                     value={field.value}
                   >
@@ -258,7 +248,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                         }
                       }}
                       value={field.value}
-                      disabled={transferType === "count_check"}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -291,10 +280,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                   <Select
                     onValueChange={(value) => {
                       field.onChange(value)
-                      if (value === "count_check") {
-                        const origin = form.getValues("origin_system_id")
-                        if (origin) form.setValue("target_system_id", origin, { shouldValidate: true })
-                      }
                       if (value === "external_out") {
                         form.setValue("target_system_id", EXTERNAL_DESTINATION, { shouldValidate: false })
                       } else if (form.getValues("target_system_id") === EXTERNAL_DESTINATION) {

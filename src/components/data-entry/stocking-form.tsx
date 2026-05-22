@@ -42,6 +42,8 @@ type StockingInsertWithNotes = Database["public"]["Tables"]["fish_stocking"]["In
   farm_id?: string | null
   notes?: string | null
 }
+type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
+type FingerlingBatchRow = Database["public"]["Tables"]["fingerling_batch"]["Row"]
 
 const formSchema = z.object({
   unit: z.string().min(1, "Cage unit is required"),
@@ -65,9 +67,17 @@ interface StockingFormProps {
 export function StockingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: StockingFormProps) {
   const mutation = useRecordStocking()
   const [showBatchCreate, setShowBatchCreate] = useState(false)
+  const [createdBatches, setCreatedBatches] = useState<BatchOption[]>([])
 
   const units = useMemo(() => getSystemUnits(systems), [systems])
   const defaultUnit = findUnitForSystem(systems, defaultSystemId)
+  const batchOptions = useMemo(() => {
+    const existingIds = new Set(batches.map((batch) => batch.id))
+    return [
+      ...createdBatches.filter((batch) => !existingIds.has(batch.id)),
+      ...batches,
+    ]
+  }, [batches, createdBatches])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -90,6 +100,22 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   const totalWeightKg = form.watch("total_weight_kg")
   const computedAbw = calculateAbw(totalWeightKg, numberOfFish)
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
+
+  function handleBatchCreated(batch: FingerlingBatchRow) {
+    const option: BatchOption = {
+      id: batch.id,
+      farm_id: batch.farm_id ?? farmId ?? "",
+      supplier_id: batch.supplier_id,
+      date_of_delivery: batch.date_of_delivery,
+      number_of_fish: batch.number_of_fish ?? 0,
+      abw: batch.abw ?? 0,
+      label: batch.name,
+    }
+
+    setCreatedBatches((current) => [option, ...current.filter((item) => item.id !== option.id)])
+    form.setValue("batch_id", String(option.id), { shouldValidate: true })
+    setShowBatchCreate(false)
+  }
 
   useEffect(() => {
     if (!selectedUnit) return
@@ -138,7 +164,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
     }
   }
 
-  if (batches.length === 0) {
+  if (batchOptions.length === 0) {
     return (
       <DependencyBlocker
         title="No batches found."
@@ -146,7 +172,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         actionLabel={showBatchCreate ? "Hide batch form" : "Create batch"}
         onAction={() => setShowBatchCreate((current) => !current)}
       >
-        {showBatchCreate ? <BatchQuickCreate onCreated={() => setShowBatchCreate(false)} /> : null}
+        {showBatchCreate ? <BatchQuickCreate onCreated={handleBatchCreated} /> : null}
       </DependencyBlocker>
     )
   }
@@ -160,6 +186,14 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
+
+      <div className="flex justify-end">
+        <Button type="button" variant="outline" onClick={() => setShowBatchCreate((current) => !current)}>
+          {showBatchCreate ? "Hide batch form" : "Add New Batch"}
+        </Button>
+      </div>
+
+      {showBatchCreate ? <BatchQuickCreate onCreated={handleBatchCreated} /> : null}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -245,7 +279,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {batches.map((batch) => (
+                          {batchOptions.map((batch) => (
                             <SelectItem key={batch.id} value={String(batch.id)}>
                               {batch.label || `Batch ${batch.id}`}
                             </SelectItem>
@@ -262,7 +296,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
 
           <div className="data-entry-secondary-grid">
             <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-            <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
+            <SelectedBatchSupplierInfo batches={batchOptions} batchId={selectedBatchId} />
           </div>
 
           <div className="data-entry-secondary-grid">

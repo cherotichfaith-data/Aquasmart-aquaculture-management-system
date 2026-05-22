@@ -9,9 +9,10 @@ import { Label } from "@/components/app-ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useFingerlingSupplierOptions } from "@/lib/hooks/use-options"
 import { useCreateFingerlingBatch, useCreateFingerlingSupplier } from "@/lib/hooks/use-reference-data"
+import type { Database } from "@/lib/types/database"
 
 interface BatchQuickCreateProps {
-  onCreated?: () => void
+  onCreated?: (batch: Database["public"]["Tables"]["fingerling_batch"]["Row"]) => void
 }
 
 export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
@@ -84,7 +85,7 @@ export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
     }
 
     setError(null)
-    await createBatch.mutateAsync({
+    const created = await createBatch.mutateAsync({
       farm_id: farmId,
       name: batchName.trim(),
       date_of_delivery: dateOfDelivery,
@@ -97,7 +98,7 @@ export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
     setDateOfDelivery(new Date().toISOString().split("T")[0])
     setNumberOfFish("")
     setAbw("")
-    onCreated?.()
+    onCreated?.(created.data)
   }
 
   return (

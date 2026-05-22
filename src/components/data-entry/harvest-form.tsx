@@ -30,7 +30,6 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import {
     calculateAbw,
-    calculateAbwOrZero,
     parseNumericId,
     parseOptionalNumericId,
     parseRequiredNumericId,
@@ -43,8 +42,8 @@ const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
     batch_id: z.string().optional(),
     date: z.string().min(1, "Date is required"),
-    number_of_fish: z.coerce.number().min(0, "Count must be positive"),
-    amount_kg: z.coerce.number().min(0, "Weight must be positive"),
+    number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Count must be positive"),
+    amount_kg: z.coerce.number().min(0.01, "Weight must be positive"),
     type_of_harvest: z.enum(["partial", "final"]).default("partial"),
 })
 
@@ -198,7 +197,7 @@ export function HarvestForm({
             number_of_fish_harvest: values.number_of_fish,
             total_weight_harvest: values.amount_kg,
             type_of_harvest: values.type_of_harvest,
-            abw: calculateAbwOrZero(values.amount_kg, values.number_of_fish),
+            abw: calculateAbw(values.amount_kg, values.number_of_fish),
         })
 
         form.reset({
@@ -302,7 +301,7 @@ export function HarvestForm({
                                     name="number_of_fish"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Fish Count</FormLabel>
+                                            <FormLabel>Harvested Fish Count</FormLabel>
                                             <FormControl>
                                                 <Input type="number" {...field} />
                                             </FormControl>
@@ -315,7 +314,7 @@ export function HarvestForm({
                                     name="amount_kg"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Weight (kg)</FormLabel>
+                                            <FormLabel>Total Harvested Weight (kg)</FormLabel>
                                             <FormControl>
                                                 <Input type="number" step="0.01" {...field} />
                                             </FormControl>
@@ -352,7 +351,7 @@ export function HarvestForm({
                                     name="batch_id"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Batch (Optional)</FormLabel>
+                                            <FormLabel>Batch (auto-resolved if blank)</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value || "none"}>
                                                 <FormControl>
                                                     <SelectTrigger>
