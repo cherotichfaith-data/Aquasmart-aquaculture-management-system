@@ -766,6 +766,7 @@ export type Database = {
           name: string
           number_of_fish: number | null
           supplier_id: number
+          system_id: number | null
         }
         Insert: {
           abw?: number | null
@@ -776,6 +777,7 @@ export type Database = {
           name: string
           number_of_fish?: number | null
           supplier_id: number
+          system_id?: number | null
         }
         Update: {
           abw?: number | null
@@ -786,6 +788,7 @@ export type Database = {
           name?: string
           number_of_fish?: number | null
           supplier_id?: number
+          system_id?: number | null
         }
         Relationships: [
           {
@@ -800,6 +803,13 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "fingerling_supplier"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fingerling_batch_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "system"
             referencedColumns: ["id"]
           },
         ]
@@ -2060,6 +2070,7 @@ export type Database = {
           label: string
           number_of_fish: number
           supplier_id: number
+          system_id: number | null
         }[]
       }
       api_fingerling_supplier_options_rpc: {
@@ -2067,7 +2078,7 @@ export type Database = {
         Returns: {
           company_name: string
           id: number
-          location_city: string
+          location_city: string | null
           location_country: string
         }[]
       }

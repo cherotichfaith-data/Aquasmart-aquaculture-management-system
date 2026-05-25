@@ -205,9 +205,38 @@ export async function getBatchOptions(params?: {
   if (params.activeOnly ?? true) {
     const currentBatchIds = await getCurrentProductionBatchIds(farmId, params.signal)
     rows = rows.filter((row) => currentBatchIds.has(row.id))
+  } else {
+    const activeSystemIds = await getActiveSystemIds(farmId, params.signal)
+    rows = rows.filter((row) => row.system_id == null || activeSystemIds.has(row.system_id))
   }
 
   return toQuerySuccess<BatchListItem>(rows)
+}
+
+async function getActiveSystemIds(
+  farmId: string,
+  signal?: AbortSignal,
+): Promise<Set<number>> {
+  const clientResult = await getClientOrError("getActiveSystemIds", { requireSession: true })
+  if ("error" in clientResult) return new Set()
+  const { supabase } = clientResult
+
+  let query = supabase
+    .from("system")
+    .select("id")
+    .eq("farm_id", farmId)
+    .eq("is_active", true)
+  if (signal) query = query.abortSignal(signal)
+
+  const result = await resolveClientReadQuery<Pick<SystemRow, "id">>({
+    tag: "getActiveSystemIds",
+    query,
+    signal,
+    quietWhen: isQuietTableError,
+  })
+  if (result.status !== "success") return new Set()
+
+  return new Set(result.data.map((row) => row.id).filter((id): id is number => typeof id === "number"))
 }
 
 async function getCurrentProductionBatchIds(
@@ -461,12 +490,30 @@ export async function getFeedSupplierOptions(params?: {
 export async function getFingerlingSupplierOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<FingerlingSupplierRow>> {
-  return rpcOrEmpty(
+  const rpcResult = await rpcOrEmpty(
     "getFingerlingSupplierOptions",
     "api_fingerling_supplier_options_rpc",
     undefined,
     params?.signal,
   )
+  if (rpcResult.status !== "success" || rpcResult.data.length > 0) return rpcResult
+
+  const clientResult = await getClientOrError("getFingerlingSupplierOptions:fallback", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase
+    .from("fingerling_supplier")
+    .select("id, company_name, location_country, location_city")
+    .order("company_name", { ascending: true })
+  if (params?.signal) query = query.abortSignal(params.signal)
+
+  return resolveClientReadQuery<FingerlingSupplierRow>({
+    tag: "getFingerlingSupplierOptions:fallback",
+    query,
+    signal: params?.signal,
+    quietWhen: isQuietTableError,
+  })
 }
 
 export async function getFarmOptions(params?: {
