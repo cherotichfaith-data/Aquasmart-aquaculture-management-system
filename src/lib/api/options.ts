@@ -24,7 +24,7 @@ type BatchListItem = Database["public"]["Functions"]["api_fingerling_batch_optio
 type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type FarmOptionRow = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
 type FeedSupplierRow = Database["public"]["Tables"]["feed_supplier"]["Row"]
-type FingerlingSupplierRow = Database["public"]["Tables"]["fingerling_supplier"]["Row"]
+type FingerlingSupplierRow = Database["public"]["Functions"]["api_fingerling_supplier_options_rpc"]["Returns"][number]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
@@ -461,19 +461,12 @@ export async function getFeedSupplierOptions(params?: {
 export async function getFingerlingSupplierOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<FingerlingSupplierRow>> {
-  const clientResult = await getClientOrError("getFingerlingSupplierOptions", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("fingerling_supplier").select("*").order("company_name", { ascending: true })
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  return resolveClientReadQuery<FingerlingSupplierRow>({
-    tag: "getFingerlingSupplierOptions",
-    query,
-    signal: params?.signal,
-    quietWhen: isQuietTableError,
-  })
+  return rpcOrEmpty(
+    "getFingerlingSupplierOptions",
+    "api_fingerling_supplier_options_rpc",
+    {},
+    params?.signal,
+  )
 }
 
 export async function getFarmOptions(params?: {

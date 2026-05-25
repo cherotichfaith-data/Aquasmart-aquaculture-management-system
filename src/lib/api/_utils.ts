@@ -45,6 +45,7 @@ export type OptionsRpcName =
   | "api_farm_options_rpc"
   | "api_system_options_rpc"
   | "api_fingerling_batch_options_rpc"
+  | "api_fingerling_supplier_options_rpc"
   | "api_feed_type_options_rpc"
 
 /**
