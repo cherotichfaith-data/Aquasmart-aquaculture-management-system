@@ -79,6 +79,17 @@ function isDuplicateSystemNameError(error: unknown) {
   )
 }
 
+function isDuplicateFingerlingSupplierNameError(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const dbError = error as DbErrorLike
+  return (
+    dbError.code === "23505" &&
+    /supplier_name_key|fingerling_supplier.*company_name|duplicate key/i.test(
+      `${dbError.message ?? ""}\n${dbError.details ?? ""}`,
+    )
+  )
+}
+
 function slugify(value: string) {
   const slug = value
     .toLowerCase()
@@ -362,6 +373,17 @@ export async function createFingerlingSupplierAction(
 
   if (error || !data) {
     logSbError("fingerling-supplier:create:insert", error)
+    if (isDuplicateFingerlingSupplierNameError(error)) {
+      const { data: existing, error: existingError } = await supabase
+        .from("fingerling_supplier")
+        .select()
+        .eq("company_name", parsedPayload.company_name)
+        .maybeSingle()
+
+      if (!existingError && existing) {
+        return { data: existing }
+      }
+    }
     if (isSbPermissionDenied(error)) {
       throw new Error("Unable to create fingerling supplier.")
     }
