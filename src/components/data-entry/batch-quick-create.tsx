@@ -71,20 +71,25 @@ export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
     }
 
     setError(null)
-    const created = await createBatch.mutateAsync({
-      farm_id: farmId,
-      name: batchName.trim(),
-      date_of_delivery: dateOfDelivery,
-      supplier_id: Number(supplierId),
-      number_of_fish: numberOfFishValue,
-      abw: abwValue,
-    })
 
-    setBatchName("")
-    setDateOfDelivery(new Date().toISOString().split("T")[0])
-    setNumberOfFish("")
-    setAbw("")
-    onCreated?.(created.data)
+    try {
+      const created = await createBatch.mutateAsync({
+        farm_id: farmId,
+        name: batchName.trim(),
+        date_of_delivery: dateOfDelivery,
+        supplier_id: Number(supplierId),
+        number_of_fish: numberOfFishValue,
+        abw: abwValue,
+      })
+
+      setBatchName("")
+      setDateOfDelivery(new Date().toISOString().split("T")[0])
+      setNumberOfFish("")
+      setAbw("")
+      onCreated?.(created.data)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to create fingerling batch.")
+    }
   }
 
   return (
