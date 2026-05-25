@@ -107,7 +107,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
     const option: BatchOption = {
       id: batch.id,
       farm_id: batch.farm_id ?? farmId ?? "",
-      system_id: batch.system_id,
+      system_id: batch.system_id ?? null,
       supplier_id: batch.supplier_id,
       date_of_delivery: batch.date_of_delivery,
       number_of_fish: batch.number_of_fish ?? 0,
@@ -175,13 +175,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         actionLabel={showBatchCreate ? "Hide batch form" : "Create batch"}
         onAction={() => setShowBatchCreate((current) => !current)}
       >
-        {showBatchCreate ? (
-          <BatchQuickCreate
-            systems={systems}
-            defaultSystemId={selectedSystemId ? Number(selectedSystemId) : null}
-            onCreated={handleBatchCreated}
-          />
-        ) : null}
+        {showBatchCreate ? <BatchQuickCreate onCreated={handleBatchCreated} /> : null}
       </DependencyBlocker>
     )
   }
@@ -202,13 +196,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         </Button>
       </div>
 
-      {showBatchCreate ? (
-        <BatchQuickCreate
-          systems={systems}
-          defaultSystemId={selectedSystemId ? Number(selectedSystemId) : null}
-          onCreated={handleBatchCreated}
-        />
-      ) : null}
+      {showBatchCreate ? <BatchQuickCreate onCreated={handleBatchCreated} /> : null}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

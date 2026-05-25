@@ -8,31 +8,42 @@ import { Input } from "@/components/app-ui/input"
 import { Label } from "@/components/app-ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useFingerlingSupplierOptions } from "@/lib/hooks/use-options"
-import { useCreateFingerlingBatch } from "@/lib/hooks/use-reference-data"
-import { formatCageLabel, type SystemOption } from "@/lib/system-options"
+import { useCreateFingerlingBatch, useCreateFingerlingSupplier } from "@/lib/hooks/use-reference-data"
 import type { Database } from "@/lib/types/database"
 
+type FingerlingSupplierOption = Database["public"]["Functions"]["api_fingerling_supplier_options_rpc"]["Returns"][number]
+
 interface BatchQuickCreateProps {
-  defaultSystemId?: number | null
   onCreated?: (batch: Database["public"]["Tables"]["fingerling_batch"]["Row"]) => void
-  systems: SystemOption[]
 }
 
-export function BatchQuickCreate({ defaultSystemId = null, onCreated, systems }: BatchQuickCreateProps) {
+export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
   const { farmId } = useActiveFarm()
   const suppliersQuery = useFingerlingSupplierOptions()
   const createBatch = useCreateFingerlingBatch()
+  const createSupplier = useCreateFingerlingSupplier()
 
-  const suppliers = suppliersQuery.data?.status === "success" ? suppliersQuery.data.data : []
-  const activeSystems = useMemo(() => systems.filter((system) => system.is_active !== false), [systems])
+  const loadedSuppliers = suppliersQuery.data?.status === "success" ? suppliersQuery.data.data : []
+  const [createdSuppliers, setCreatedSuppliers] = useState<FingerlingSupplierOption[]>([])
+  const suppliers = useMemo(() => {
+    const existingIds = new Set(loadedSuppliers.map((supplier) => supplier.id))
+    return [
+      ...createdSuppliers.filter((supplier) => !existingIds.has(supplier.id)),
+      ...loadedSuppliers,
+    ]
+  }, [createdSuppliers, loadedSuppliers])
 
   const [batchName, setBatchName] = useState("")
   const [dateOfDelivery, setDateOfDelivery] = useState(new Date().toISOString().split("T")[0])
-  const [systemId, setSystemId] = useState(defaultSystemId ? String(defaultSystemId) : "")
   const [supplierId, setSupplierId] = useState("")
+  const [showSupplierForm, setShowSupplierForm] = useState(false)
+  const [supplierName, setSupplierName] = useState("")
+  const [supplierCountry, setSupplierCountry] = useState("")
+  const [supplierCity, setSupplierCity] = useState("")
   const [numberOfFish, setNumberOfFish] = useState("")
   const [abw, setAbw] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const showSupplierEditor = showSupplierForm || suppliers.length === 0
 
   useEffect(() => {
     if (supplierId && suppliers.some((supplier) => String(supplier.id) === supplierId)) return
@@ -43,14 +54,37 @@ export function BatchQuickCreate({ defaultSystemId = null, onCreated, systems }:
     }
   }, [supplierId, suppliers])
 
-  useEffect(() => {
-    if (systemId && activeSystems.some((system) => String(system.id) === systemId)) return
-    if (defaultSystemId && activeSystems.some((system) => system.id === defaultSystemId)) {
-      setSystemId(String(defaultSystemId))
-    } else if (systemId) {
-      setSystemId("")
+  async function handleCreateSupplier() {
+    if (!supplierName.trim() || !supplierCountry.trim()) {
+      setError("Supplier name and country are required.")
+      return
     }
-  }, [activeSystems, defaultSystemId, systemId])
+
+    setError(null)
+
+    try {
+      const created = await createSupplier.mutateAsync({
+        company_name: supplierName.trim(),
+        location_country: supplierCountry.trim(),
+        location_city: supplierCity.trim() || null,
+      })
+      const option: FingerlingSupplierOption = {
+        id: created.data.id,
+        company_name: created.data.company_name,
+        location_country: created.data.location_country,
+        location_city: created.data.location_city,
+      }
+
+      setCreatedSuppliers((current) => [option, ...current.filter((supplier) => supplier.id !== option.id)])
+      setSupplierId(String(option.id))
+      setSupplierName("")
+      setSupplierCountry("")
+      setSupplierCity("")
+      setShowSupplierForm(false)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to create fingerling supplier.")
+    }
+  }
 
   async function handleCreateBatch() {
     if (!farmId) {
@@ -59,11 +93,6 @@ export function BatchQuickCreate({ defaultSystemId = null, onCreated, systems }:
     }
     if (!batchName.trim() || !dateOfDelivery || !supplierId) {
       setError("Batch name, delivery date, and supplier are required.")
-      return
-    }
-
-    if (!systemId) {
-      setError("Select a cage before creating a batch.")
       return
     }
 
@@ -97,7 +126,6 @@ export function BatchQuickCreate({ defaultSystemId = null, onCreated, systems }:
         name: batchName.trim(),
         date_of_delivery: dateOfDelivery,
         supplier_id: Number(supplierId),
-        system_id: Number(systemId),
         number_of_fish: numberOfFishValue,
         abw: abwValue,
       })
@@ -154,23 +182,8 @@ export function BatchQuickCreate({ defaultSystemId = null, onCreated, systems }:
             <p className="text-xs text-destructive">{suppliersQuery.data.error}</p>
           ) : null}
           {!suppliersQuery.isLoading && suppliers.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Add fingerling suppliers in the supplier form first.</p>
+            <p className="text-xs text-muted-foreground">Create a fingerling supplier first.</p>
           ) : null}
-        </div>
-        <div className="space-y-2">
-          <Label>Cage</Label>
-          <Select value={systemId} onValueChange={setSystemId} disabled={activeSystems.length === 0}>
-            <SelectTrigger>
-              <SelectValue placeholder={activeSystems.length === 0 ? "No active cages found" : "Select cage"} />
-            </SelectTrigger>
-            <SelectContent>
-              {activeSystems.map((system) => (
-                <SelectItem key={system.id} value={String(system.id)}>
-                  {formatCageLabel(system)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="batch-fish-count">Number of Fish</Label>
@@ -182,9 +195,34 @@ export function BatchQuickCreate({ defaultSystemId = null, onCreated, systems }:
         </div>
       </div>
 
+      <Button type="button" variant="outline" onClick={() => setShowSupplierForm((current) => !current)}>
+        {showSupplierEditor && suppliers.length > 0 ? "Hide supplier form" : "New supplier"}
+      </Button>
+
+      {showSupplierEditor ? (
+        <div className="grid gap-4 rounded-md border border-border/80 p-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="fingerling-supplier-name">Supplier Name</Label>
+            <Input id="fingerling-supplier-name" value={supplierName} onChange={(event) => setSupplierName(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fingerling-supplier-country">Country</Label>
+            <Input id="fingerling-supplier-country" value={supplierCountry} onChange={(event) => setSupplierCountry(event.target.value)} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="fingerling-supplier-city">City (Optional)</Label>
+            <Input id="fingerling-supplier-city" value={supplierCity} onChange={(event) => setSupplierCity(event.target.value)} />
+          </div>
+          <Button type="button" variant="outline" onClick={handleCreateSupplier} disabled={createSupplier.isPending}>
+            {createSupplier.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save supplier
+          </Button>
+        </div>
+      ) : null}
+
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <Button type="button" onClick={handleCreateBatch} disabled={createBatch.isPending || suppliers.length === 0 || activeSystems.length === 0}>
+      <Button type="button" onClick={handleCreateBatch} disabled={createBatch.isPending || suppliers.length === 0}>
         {createBatch.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Create batch
       </Button>

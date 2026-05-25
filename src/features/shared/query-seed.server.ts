@@ -146,10 +146,7 @@ export async function listBatchOptionRows(
       .map((row) => [row.id, row.commissioned_at ?? "0001-01-01"]),
   )
   const activeSystemIds = Array.from(activeSystemStartById.keys())
-  if (params.activeOnly === false) {
-    const activeSystemIdSet = new Set(activeSystemIds)
-    return rows.filter((row) => row.system_id == null || activeSystemIdSet.has(row.system_id))
-  }
+  if (params.activeOnly === false) return rows
 
   if (activeSystemIds.length === 0) return []
 
