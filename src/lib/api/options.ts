@@ -461,15 +461,7 @@ export async function getFeedSupplierOptions(params?: {
 export async function getFingerlingSupplierOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<FingerlingSupplierRow>> {
-  const rpcResult = await rpcOrEmpty(
-    "getFingerlingSupplierOptions",
-    "api_fingerling_supplier_options_rpc",
-    undefined,
-    params?.signal,
-  )
-  if (rpcResult.status !== "success" || rpcResult.data.length > 0) return rpcResult
-
-  const clientResult = await getClientOrError("getFingerlingSupplierOptions:fallback", { requireSession: true })
+  const clientResult = await getClientOrError("getFingerlingSupplierOptions", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -480,7 +472,7 @@ export async function getFingerlingSupplierOptions(params?: {
   if (params?.signal) query = query.abortSignal(params.signal)
 
   return resolveClientReadQuery<FingerlingSupplierRow>({
-    tag: "getFingerlingSupplierOptions:fallback",
+    tag: "getFingerlingSupplierOptions",
     query,
     signal: params?.signal,
     quietWhen: isQuietTableError,
