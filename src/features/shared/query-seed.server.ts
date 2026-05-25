@@ -124,7 +124,7 @@ export async function listAppConfigRows(
 
 export async function listBatchOptionRows(
   supabase: ServerClient,
-  params: { farmId: string },
+  params: { farmId: string; activeOnly?: boolean },
 ): Promise<BatchOptionRow[]> {
   const { data, error } = await supabase.rpc("api_fingerling_batch_options_rpc", {
     p_farm_id: params.farmId,
@@ -133,6 +133,8 @@ export async function listBatchOptionRows(
   const rows = ((data ?? []) as BatchOptionRow[])
     .slice()
     .sort((a, b) => String(b.date_of_delivery ?? "").localeCompare(String(a.date_of_delivery ?? "")))
+
+  if (params.activeOnly === false) return rows
 
   const { data: activeSystems } = await supabase
     .from("system")

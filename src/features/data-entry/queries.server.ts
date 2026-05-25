@@ -15,7 +15,7 @@ async function getSystems(supabase: DataEntrySupabaseClient, farmId: string) {
 }
 
 async function getBatches(supabase: DataEntrySupabaseClient, farmId: string) {
-  return toQuerySuccess(await listBatchOptionRows(supabase, { farmId }))
+  return toQuerySuccess(await listBatchOptionRows(supabase, { farmId, activeOnly: false }))
 }
 
 async function getFeedTypes(supabase: DataEntrySupabaseClient, farmId: string) {
@@ -45,6 +45,7 @@ export async function getDataEntryPrefetch({
     tags: [
       cacheTags.farm(farmId),
       cacheTags.systems(farmId),
+      cacheTags.batchOptions(farmId),
       cacheTags.feedTypes(),
       cacheTags.reports(farmId, "recent-entries"),
     ],
