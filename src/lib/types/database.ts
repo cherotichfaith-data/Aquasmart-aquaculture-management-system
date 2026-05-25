@@ -2062,6 +2062,15 @@ export type Database = {
           supplier_id: number
         }[]
       }
+      api_fingerling_supplier_options_rpc: {
+        Args: never
+        Returns: {
+          company_name: string
+          id: number
+          location_city: string
+          location_country: string
+        }[]
+      }
       api_growth_trend: {
         Args: { p_days?: number; p_farm_id: string; p_system_id: number }
         Returns: {
