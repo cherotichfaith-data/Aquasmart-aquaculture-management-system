@@ -582,16 +582,6 @@ export default function Sidebar({
   onToggle: () => void
   onCollapseToggle: () => void
 }) {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 768
-
-  useEffect(() => {
-    if (!isDesktop && open) {
-      onToggle()
-    }
-  }, [isDesktop, onToggle, open, pathname, searchParams])
-
   return (
     <>
       <Drawer
@@ -602,7 +592,7 @@ export default function Sidebar({
         sx={{
           display: { xs: "block", md: "none" },
           "& .MuiDrawer-paper": {
-            width: Math.min(DASHBOARD_SIDEBAR_WIDTH, 320),
+            width: `min(${DASHBOARD_SIDEBAR_WIDTH}px, calc(100vw - 48px))`,
             boxSizing: "border-box",
           },
         }}

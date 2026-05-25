@@ -5,6 +5,12 @@ import { apiRateLimits } from "@/lib/server/rate-limit"
 import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import type { Database } from "@/lib/types/database"
+
+type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
+type DbAssignedStockingInsert = Omit<StockingInsert, "cycle_id"> & {
+  cycle_id?: StockingInsert["cycle_id"]
+}
 
 const stockingSchema = z.object({
   system_id: z.number().int().positive(),
@@ -35,7 +41,7 @@ export async function POST(request: Request) {
   const systemScope = await getSystemFarmId(supabase, payload.system_id, "stocking:record")
   if ("response" in systemScope) return systemScope.response
 
-  const insertPayload = {
+  const insertPayload: DbAssignedStockingInsert = {
     system_id: payload.system_id,
     batch_id: payload.batch_id,
     date: payload.date,
@@ -50,7 +56,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("fish_stocking")
-    .upsert(insertPayload, { onConflict: "local_id" })
+    .upsert(insertPayload as StockingInsert, { onConflict: "local_id" })
     .select()
     .maybeSingle()
 

@@ -6,6 +6,9 @@ type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["
 type WithFarmId<T> = T & {
   farm_id?: string | null
 }
+type DbAssignedCycle<T extends { cycle_id?: unknown }> = Omit<T, "cycle_id"> & {
+  cycle_id?: T["cycle_id"]
+}
 
 type MutationMeta = {
   farmId: string
@@ -20,7 +23,7 @@ type MutationResponse<T extends keyof Database["public"]["Tables"]> = {
 
 export type HarvestInput = WithFarmId<Insert<"fish_harvest">>
 export type SamplingInput = WithFarmId<Insert<"fish_sampling_weight">>
-export type StockingInput = WithFarmId<Insert<"fish_stocking">>
+export type StockingInput = WithFarmId<DbAssignedCycle<Insert<"fish_stocking">>>
 export type TransferInput = WithFarmId<Insert<"fish_transfer">>
 export type WaterQualityInput = Array<WithFarmId<Insert<"water_quality_measurement">>>
 export type MortalityInput = Insert<"fish_mortality">

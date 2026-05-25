@@ -159,7 +159,7 @@ export async function getDashboardSystems(params?: {
   const allowFallback = params?.allowFallback ?? true
   if (!allowFallback) return toQuerySuccess<DashboardSystemRpcRow>(rows)
 
-  if (!rows.some((r) => shouldBackfillRate(r.feeding_rate) || shouldBackfillRate(r.mortality_rate))) {
+  if (!rows.some((r) => shouldBackfillRate(r.feeding_rate) || shouldBackfillRate(r.mortality_rate) || shouldBackfillRate(r.biomass_density))) {
     return toQuerySuccess<DashboardSystemRpcRow>(rows)
   }
 

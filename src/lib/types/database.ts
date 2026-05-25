@@ -1047,7 +1047,7 @@ export type Database = {
           abw: number
           batch_id: number
           created_at: string
-          cycle_id: number | null
+          cycle_id: number
           date: string
           id: number
           local_id: string | null
@@ -1062,7 +1062,7 @@ export type Database = {
           abw: number
           batch_id: number
           created_at?: string
-          cycle_id?: number | null
+          cycle_id: number
           date: string
           id?: number
           local_id?: string | null
@@ -1077,7 +1077,7 @@ export type Database = {
           abw?: number
           batch_id?: number
           created_at?: string
-          cycle_id?: number | null
+          cycle_id?: number
           date?: string
           id?: number
           local_id?: string | null
@@ -2313,6 +2313,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      feed_inventory_snapshot_kg: {
+        Args: {
+          p_amount_of_bags: number
+          p_bag_weight: number
+          p_opened_bags: number
+        }
+        Returns: number
+      }
       get_daily_feed_target_kg: {
         Args: { p_farm_id?: string; p_system_id?: number }
         Returns: {
@@ -2409,6 +2417,13 @@ export type Database = {
         Returns: undefined
       }
       request_matview_refresh: { Args: never; Returns: undefined }
+      resolve_cycle_batch_for_system_date: {
+        Args: { p_date: string; p_system_id: number }
+        Returns: {
+          batch_id: number
+          cycle_id: number
+        }[]
+      }
       resolve_sampling_abw_g:
         | {
             Args: {
@@ -2462,10 +2477,7 @@ export type Database = {
       feed_pellet_size:
         | "mash_powder"
         | "<0.49mm"
-        | "0.5mm"
         | "0.5-0.99mm"
-        | "0.5-1.0mm"
-        | "0.9-1.6mm"
         | "1.0-1.5mm"
         | "1.5-1.99mm"
         | "2mm"
@@ -2476,6 +2488,9 @@ export type Database = {
         | "4.5mm"
         | "5mm"
         | "unknown"
+        | "0.5mm"
+        | "0.5-1.0mm"
+        | "0.9-1.6mm"
       system_growth_stage:
         | "fingerling"
         | "juvenile"
@@ -2685,6 +2700,9 @@ export const Constants = {
         "4.5mm",
         "5mm",
         "unknown",
+        "0.5mm",
+        "0.5-1.0mm",
+        "0.9-1.6mm",
       ],
       system_growth_stage: [
         "fingerling",

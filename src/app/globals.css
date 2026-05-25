@@ -184,7 +184,9 @@ next-router-prefetch {
 
   html {
     min-height: 100%;
+    max-width: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     scroll-behavior: smooth;
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -197,7 +199,9 @@ next-router-prefetch {
   body {
     @apply bg-background text-foreground font-sans antialiased leading-relaxed;
     min-height: 100%;
+    max-width: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
@@ -220,6 +224,18 @@ next-router-prefetch {
   @media (max-width: 768px) {
     body {
       background-attachment: scroll;
+    }
+
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+
+    button,
+    [role="button"],
+    a {
+      -webkit-tap-highlight-color: transparent;
     }
   }
 
@@ -263,7 +279,7 @@ next-router-prefetch {
   }
 
   .dense-table {
-    @apply w-full min-w-full text-[13px] leading-6;
+    @apply w-full min-w-[44rem] text-[13px] leading-6;
   }
 
   .dense-table thead th {
@@ -349,7 +365,7 @@ next-router-prefetch {
   }
 
   .chart-canvas-shell {
-    @apply overflow-hidden rounded-xl border border-border bg-background p-3;
+    @apply overflow-hidden rounded-xl border border-border bg-background p-2.5 sm:p-3;
     box-shadow: none;
   }
 
@@ -385,7 +401,7 @@ next-router-prefetch {
   }
 
   .data-entry-page-shell {
-    @apply max-w-[1240px] px-3 sm:px-4 lg:px-5;
+    @apply max-w-[1240px] px-1 sm:px-4 lg:px-5;
   }
 
   .data-entry-board {
@@ -402,7 +418,7 @@ next-router-prefetch {
   }
 
   .data-entry-tabs-shell {
-    @apply border-b border-border/55 bg-muted/20 px-3 py-2 sm:px-4;
+    @apply border-b border-border/55 bg-muted/20 px-2 py-2 sm:px-4;
   }
 
   .data-entry-tabs-list {
@@ -410,7 +426,7 @@ next-router-prefetch {
   }
 
   .data-entry-tab {
-    @apply inline-flex shrink-0 items-center rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors;
+    @apply inline-flex min-h-10 shrink-0 items-center rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors;
   }
 
   .data-entry-tab-active {
@@ -426,7 +442,7 @@ next-router-prefetch {
   }
 
   .data-entry-canvas {
-    @apply min-w-0 p-4 sm:p-5;
+    @apply min-w-0 p-3 sm:p-5;
   }
 
   .data-entry-canvas > div {
@@ -552,11 +568,11 @@ next-router-prefetch {
   }
 
   .data-entry-action {
-    @apply min-h-10 min-w-[170px] rounded-lg px-4;
+    @apply min-h-11 w-full rounded-lg px-4 sm:w-auto sm:min-w-[170px];
   }
 
   .data-entry-recent-panel {
-    @apply h-full rounded-none border-0 p-4;
+    @apply h-full rounded-none border-0 p-3 sm:p-4;
   }
 
   .data-entry-recent-list {
