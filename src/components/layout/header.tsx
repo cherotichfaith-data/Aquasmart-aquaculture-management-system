@@ -426,12 +426,12 @@ export default function Header({
   }
 
   return (
-    <Box component="header" sx={{ position: "relative", px: { xs: 1, sm: 1.5, md: 2 }, pt: { xs: 0.5, md: 0.75 } }}>
+    <Box component="header" sx={{ position: "relative", px: { xs: 0.75, sm: 1.5, md: 2 }, pt: { xs: 0.5, md: 0.75 } }}>
       <Paper
         elevation={0}
         sx={{
           borderRadius: 1,
-          px: { xs: 1.5, md: 2 },
+          px: { xs: 1, sm: 1.5, md: 2 },
           py: isCondensed ? 1 : 1.25,
           backgroundColor: "background.paper",
           border: (theme) => `1px solid ${theme.palette.divider}`,
@@ -443,12 +443,15 @@ export default function Header({
         }}
       >
         <Box sx={{ display: "grid", gap: showToolbar ? 1.25 : 0 }}>
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "space-between", flexWrap: "nowrap" }}>
             <Box sx={{ display: "flex", gap: 1, alignItems: "center", minWidth: 0, flex: 1 }}>
               <IconButton
                 onClick={onMenuClick}
+                aria-label="Open navigation"
                 sx={{
                   display: { md: "none" },
+                  minWidth: 44,
+                  minHeight: 44,
                   borderRadius: 999,
                   bgcolor: "transparent",
                   color: "text.secondary",
@@ -464,6 +467,7 @@ export default function Header({
                       fontSize: isCondensed ? { xs: "1.15rem", sm: "1.35rem" } : { xs: "1.35rem", sm: "1.8rem" },
                       fontWeight: 700,
                       lineHeight: 1.15,
+                      overflowWrap: "anywhere",
                     }}
                   >
                     {pageMeta.title}
@@ -489,6 +493,8 @@ export default function Header({
                     setNotificationsAnchor(value)
                   })}
                   sx={{
+                    minWidth: 44,
+                    minHeight: 44,
                     borderRadius: 999,
                     color: "text.secondary",
                     bgcolor: "transparent",
@@ -504,6 +510,8 @@ export default function Header({
                   onClick={openMenu(setUserMenuAnchor)}
                   sx={{
                     p: 0.25,
+                    minWidth: 44,
+                    minHeight: 44,
                     borderRadius: 999,
                     bgcolor: "transparent",
                   }}
@@ -580,11 +588,12 @@ export default function Header({
                   </Box>
                 </Box>
                 {showAddData ? (
-                  <Box sx={{ ml: { md: "auto" } }}>
+                  <Box sx={{ width: { xs: "100%", sm: "auto" }, ml: { md: "auto" } }}>
                     <Button
                       variant="contained"
                       onClick={openMenu(setAddDataAnchor)}
                       startIcon={<PlusCircle size={18} />}
+                      fullWidth
                       sx={{
                         minHeight: 40,
                         borderRadius: 1.5,

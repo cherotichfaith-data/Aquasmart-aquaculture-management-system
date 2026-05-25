@@ -35,3 +35,11 @@ Product Requirements Document.xlsx
 supabase/.temp/
 supabase/.branches/
 .claude/
+
+# local Codex scratch/output artifacts
+.codex-tmp/
+outputs/
+
+# local spreadsheet working files
+*.xlsx
+.~lock*

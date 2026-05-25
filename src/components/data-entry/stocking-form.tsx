@@ -38,7 +38,9 @@ import {
 } from "./form-utils"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
-type StockingInsertWithNotes = Database["public"]["Tables"]["fish_stocking"]["Insert"] & {
+type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
+type StockingInsertWithNotes = Omit<StockingInsert, "cycle_id"> & {
+  cycle_id?: StockingInsert["cycle_id"]
   farm_id?: string | null
   notes?: string | null
 }

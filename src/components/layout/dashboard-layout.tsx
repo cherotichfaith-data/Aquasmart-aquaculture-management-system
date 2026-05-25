@@ -158,8 +158,8 @@ export default function DashboardLayout({
           sx={{
             flex: 1,
             overflowX: "hidden",
-            px: { xs: 1, sm: 1.5, md: 2, lg: 3 },
-            pb: { xs: 3, md: 4 },
+            px: { xs: 0.75, sm: 1.5, md: 2, lg: 3 },
+            pb: { xs: "calc(1.5rem + env(safe-area-inset-bottom))", md: 4 },
             pt: hideHeader ? { xs: 0.5, md: 0.75 } : showHeaderToolbar ? { xs: 0.5, md: 0.75 } : 0,
           }}
         >

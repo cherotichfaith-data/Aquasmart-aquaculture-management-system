@@ -4,12 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { ArrowUpDown, Clock, Droplets, Fish, TriangleAlert } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
 import MuiButton from "@mui/material/Button"
-import MuiTable from "@mui/material/Table"
-import TableBody from "@mui/material/TableBody"
-import MuiTableCell from "@mui/material/TableCell"
-import TableHead from "@mui/material/TableHead"
-import TableRow from "@mui/material/TableRow"
-import TableContainer from "@mui/material/TableContainer"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/app-ui/table"
 import type { DashboardSystemRow } from "@/features/dashboard/types"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
@@ -290,42 +286,152 @@ export default function SystemsTable({
   }
 
   return (
-    <div className="soft-panel p-4 sm:p-6">
+    <Card>
       {showHeader ? (
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-[1.08rem] font-semibold tracking-[-0.02em] text-foreground">System Status</h2>
-            <p className="text-[11px] font-medium text-muted-foreground">{totalRows} active cages in scope</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <DataUpdatedAt updatedAt={combinedUpdatedAt} />
+        <CardHeader className="pb-1">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>System Status</CardTitle>
+              <p className="mt-1 text-[11px] font-medium text-muted-foreground">{totalRows} active cages in scope</p>
+            </div>
             <DataFetchingBadge isFetching={combinedFetching} isLoading={loading} />
           </div>
-        </div>
+          <DataUpdatedAt updatedAt={combinedUpdatedAt} />
+        </CardHeader>
       ) : null}
 
-      <TableContainer sx={{ maxHeight: "62vh", overflow: "auto" }}>
-          <MuiTable sx={{ minWidth: 1180 }} stickyHeader>
-          <TableHead className="bg-muted/60">
-            <TableRow>
-              <MuiTableCell className="sticky top-0 bg-muted/70">{renderSortHead("Cage", "system_name")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("Fish Count", "fish_end", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("Biomass kg", "biomass_end", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("ABW g", "abw", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("Last Sampled", "sample_age_days", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("eFCR", "efcr", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("Feed Rate %", "feeding_rate", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("Mortality %", "mortality_rate", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("DO Latest", "do_latest", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-right">{renderSortHead("WQ Rating", "water_quality", "right")}</MuiTableCell>
-              <MuiTableCell className="sticky top-0 bg-muted/70 text-center text-[11px] font-semibold uppercase tracking-wide text-foreground/80">
-                Flags
-              </MuiTableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {pagedSystems.length > 0 ? (
-              pagedSystems.map((row) => {
+      <CardContent className={showHeader ? "pt-2" : undefined}>
+        {loading ? (
+          <div className="flex h-[240px] items-center justify-center text-muted-foreground">
+            Loading table...
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-3 md:hidden">
+              {pagedSystems.length > 0 ? (
+                pagedSystems.map((row) => {
+            const timeline = timelineMap.get(row.system_id)
+            const asOf = formatAsOfDate(timeline?.snapshot_as_of ?? row.as_of_date ?? row.input_end_date)
+            const effectiveTimeline = resolveSystemTimelineWindow(timeline, {
+              windowStart: dateFrom ?? null,
+              windowEnd: dateTo ?? null,
+            })
+            const productionPeriod = formatProductionPeriod(
+              effectiveTimeline?.displayStart,
+              effectiveTimeline?.displayEnd,
+              false,
+            )
+            const summaryPeriod = formatProductionPeriod(row.input_start_date, row.input_end_date, false)
+            const productionLabel = timelineSourceLabel(effectiveTimeline?.periodSource ?? timeline?.period_source)
+            const productionSubtitle =
+              productionLabel && productionPeriod
+                ? `${productionLabel} ${productionPeriod}`
+                : summaryPeriod
+                  ? `Summary window ${summaryPeriod}`
+                  : effectiveTimeline?.hasTimeline
+                    ? "No activity in selected period"
+                    : "No resolved production timeline"
+            const latestStatus = latestStatusMap.get(row.system_id)
+            const latestDo = latestDoMap.get(row.system_id)?.value ?? null
+            const fedToday = (todayFeedBySystem.get(row.system_id) ?? 0) > 0
+            const staleSample = (row.sample_age_days ?? 0) > 30
+            const doCritical = Boolean(latestStatus?.do_exceeded)
+            const efcrOutlier =
+              isFiniteNumber(row.efcr) &&
+              isFiniteNumber(farmMedianEfcr) &&
+              farmMedianEfcr > 0 &&
+              row.efcr > farmMedianEfcr * 3
+            const flags = [
+              staleSample ? "Sample stale" : null,
+              !fedToday ? "No feed today" : null,
+              doCritical ? "Low DO" : null,
+              efcrOutlier ? "eFCR outlier" : null,
+            ].filter(Boolean)
+
+            return (
+              <button
+                key={row.system_id}
+                type="button"
+                onClick={() => setSelectedSystemId(row.system_id)}
+                className="w-full rounded-lg border border-border/70 bg-background p-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-5 text-foreground">
+                      {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{productionSubtitle}</p>
+                    <p className="mt-1 text-[11px] leading-4 text-muted-foreground">As of {asOf ?? "N/A"}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}>
+                    {row.water_quality_rating_average ?? "Unknown"}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Fish</p>
+                    <p className="mt-0.5 font-semibold text-foreground">{formatNumberValue(row.fish_end)}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Biomass</p>
+                    <p className="mt-0.5 font-semibold text-foreground">{formatUnitValue(row.biomass_end, 1, "kg")}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">ABW</p>
+                    <p className="mt-0.5 font-semibold text-foreground">{formatUnitValue(row.abw, 1, "g")}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">DO</p>
+                    <p className={`mt-0.5 font-semibold ${doCritical ? "text-destructive" : "text-foreground"}`}>
+                      {latestDo == null ? "--" : `${formatNumberValue(latestDo, { decimals: 1, minimumDecimals: 1 })} mg/L`}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {flags.length > 0 ? (
+                    flags.map((flag) => (
+                      <span key={flag} className="rounded-full bg-warning/15 px-2 py-1 text-[11px] font-semibold text-warning">
+                        {flag}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="rounded-full bg-success/15 px-2 py-1 text-[11px] font-semibold text-success">No active flags</span>
+                  )}
+                </div>
+              </button>
+            )
+                })
+              ) : (
+                <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                  {emptyReason === "Missing time bounds"
+                    ? "No time range selected"
+                    : emptyReason === "No scoped systems"
+                      ? "No systems match the selected filters"
+                      : "No active cages found"}
+                </div>
+              )}
+            </div>
+
+            <div className="soft-table-shell hidden max-h-[480px] md:block">
+              <Table className="min-w-[1180px]">
+                <TableHeader className="bg-muted/60">
+                  <TableRow>
+                    <TableHead>{renderSortHead("Cage", "system_name")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("Fish Count", "fish_end", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("Biomass kg", "biomass_end", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("ABW g", "abw", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("Last Sampled", "sample_age_days", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("eFCR", "efcr", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("Feed Rate %", "feeding_rate", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("Mortality %", "mortality_rate", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("DO Latest", "do_latest", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("WQ Rating", "water_quality", "right")}</TableHead>
+                    <TableHead className="text-center">Flags</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedSystems.length > 0 ? (
+                    pagedSystems.map((row) => {
                 const timeline = timelineMap.get(row.system_id)
                 const asOf = formatAsOfDate(timeline?.snapshot_as_of ?? row.as_of_date ?? row.input_end_date)
                 const effectiveTimeline = resolveSystemTimelineWindow(timeline, {
@@ -401,7 +507,7 @@ export default function SystemsTable({
                 return (
                   <TableRow
                     key={row.system_id}
-                    className="cursor-pointer border-b border-border/70 hover:bg-muted/45"
+                    className="cursor-pointer"
                     onClick={() => setSelectedSystemId(row.system_id)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -412,7 +518,7 @@ export default function SystemsTable({
                     role="button"
                     tabIndex={0}
                   >
-                    <MuiTableCell>
+                    <TableCell className="min-w-[220px]">
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-foreground">
                           {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
@@ -422,25 +528,25 @@ export default function SystemsTable({
                           Density {formatNumberValue(row.biomass_density, { decimals: 2 })} kg/m3 | As of {asOf ?? "N/A"}
                         </p>
                       </div>
-                    </MuiTableCell>
-                    <MuiTableCell className="text-right text-sm">{formatNumberValue(row.fish_end)}</MuiTableCell>
-                    <MuiTableCell className="text-right text-sm">{formatUnitValue(row.biomass_end, 1, "kg")}</MuiTableCell>
-                    <MuiTableCell className="text-right text-sm">{formatUnitValue(row.abw, 1, "g")}</MuiTableCell>
-                    <MuiTableCell className="text-right text-sm">
+                    </TableCell>
+                    <TableCell className="text-right">{formatNumberValue(row.fish_end)}</TableCell>
+                    <TableCell className="text-right">{formatUnitValue(row.biomass_end, 1, "kg")}</TableCell>
+                    <TableCell className="text-right">{formatUnitValue(row.abw, 1, "g")}</TableCell>
+                    <TableCell className="text-right">
                       {row.sample_age_days == null ? "--" : `${formatNumberValue(row.sample_age_days)}d ago`}
-                    </MuiTableCell>
-                    <MuiTableCell className="text-right text-sm">{formatNumberValue(row.efcr, { decimals: 2 })}</MuiTableCell>
-                    <MuiTableCell className="text-right text-sm">{formatFeedRate(row.feeding_rate)}</MuiTableCell>
-                    <MuiTableCell className="text-right text-sm">{formatPercent(row.mortality_rate, 2)}</MuiTableCell>
-                    <MuiTableCell className={`text-right text-sm ${doCritical ? "text-destructive" : "text-foreground"}`}>
+                    </TableCell>
+                    <TableCell className="text-right">{formatNumberValue(row.efcr, { decimals: 2 })}</TableCell>
+                    <TableCell className="text-right">{formatFeedRate(row.feeding_rate)}</TableCell>
+                    <TableCell className="text-right">{formatPercent(row.mortality_rate, 2)}</TableCell>
+                    <TableCell className={`text-right ${doCritical ? "text-destructive" : "text-foreground"}`}>
                       {latestDo == null ? "--" : `${formatNumberValue(latestDo, { decimals: 1, minimumDecimals: 1 })} mg/L`}
-                    </MuiTableCell>
-                    <MuiTableCell className="text-right">
+                    </TableCell>
+                    <TableCell className="text-right">
                       <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}>
                         {row.water_quality_rating_average ?? "Unknown"}
                       </span>
-                    </MuiTableCell>
-                    <MuiTableCell>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center justify-center gap-1">
                         {flags.length > 0 ? (
                           flags.map((flag) => {
@@ -460,49 +566,52 @@ export default function SystemsTable({
                           <span className="text-[11px] text-muted-foreground">--</span>
                         )}
                       </div>
-                    </MuiTableCell>
+                    </TableCell>
                   </TableRow>
                 )
-              })
-            ) : (
-              <TableRow>
-                <MuiTableCell colSpan={11} className="h-24 text-center text-muted-foreground">
-                  {emptyReason === "Missing time bounds"
-                    ? "No time range selected"
-                    : emptyReason === "No scoped systems"
-                      ? "No systems match the selected filters"
-                      : "No active cages found"}
-                </MuiTableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </MuiTable>
-      </TableContainer>
-      {showPagination ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
-          <span>
-            Showing {startIndex + 1}-{endIndex} of {totalRows}
-          </span>
-          <div className="flex items-center gap-2">
-            <MuiButton
-              variant="outlined"
-              size="small"
-              onClick={() => setPageIndex((current) => Math.max(current - 1, 0))}
-              disabled={currentPage === 0}
-            >
-              Previous
-            </MuiButton>
-            <MuiButton
-              variant="outlined"
-              size="small"
-              onClick={() => setPageIndex((current) => Math.min(current + 1, totalPages - 1))}
-              disabled={currentPage >= totalPages - 1}
-            >
-              Next
-            </MuiButton>
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                        {emptyReason === "Missing time bounds"
+                          ? "No time range selected"
+                          : emptyReason === "No scoped systems"
+                            ? "No systems match the selected filters"
+                            : "No active cages found"}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
+        {showPagination && !loading ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
+            <span>
+              Showing {startIndex + 1}-{endIndex} of {totalRows}
+            </span>
+            <div className="flex items-center gap-2">
+              <MuiButton
+                variant="outlined"
+                size="small"
+                onClick={() => setPageIndex((current) => Math.max(current - 1, 0))}
+                disabled={currentPage === 0}
+              >
+                Previous
+              </MuiButton>
+              <MuiButton
+                variant="outlined"
+                size="small"
+                onClick={() => setPageIndex((current) => Math.min(current + 1, totalPages - 1))}
+                disabled={currentPage >= totalPages - 1}
+              >
+                Next
+              </MuiButton>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </CardContent>
 
       <SystemHistorySheet
         open={selectedSystemId !== null}
@@ -515,6 +624,6 @@ export default function SystemsTable({
         summaryRow={selectedSystem}
         initialTimelineRow={selectedSystemId != null ? (timelineMap.get(selectedSystemId) ?? null) : null}
       />
-    </div>
+    </Card>
   )
 }
