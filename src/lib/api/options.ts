@@ -464,7 +464,7 @@ export async function getFingerlingSupplierOptions(params?: {
   return rpcOrEmpty(
     "getFingerlingSupplierOptions",
     "api_fingerling_supplier_options_rpc",
-    {},
+    undefined,
     params?.signal,
   )
 }
