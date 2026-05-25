@@ -205,38 +205,9 @@ export async function getBatchOptions(params?: {
   if (params.activeOnly ?? true) {
     const currentBatchIds = await getCurrentProductionBatchIds(farmId, params.signal)
     rows = rows.filter((row) => currentBatchIds.has(row.id))
-  } else {
-    const activeSystemIds = await getActiveSystemIds(farmId, params.signal)
-    rows = rows.filter((row) => row.system_id == null || activeSystemIds.has(row.system_id))
   }
 
   return toQuerySuccess<BatchListItem>(rows)
-}
-
-async function getActiveSystemIds(
-  farmId: string,
-  signal?: AbortSignal,
-): Promise<Set<number>> {
-  const clientResult = await getClientOrError("getActiveSystemIds", { requireSession: true })
-  if ("error" in clientResult) return new Set()
-  const { supabase } = clientResult
-
-  let query = supabase
-    .from("system")
-    .select("id")
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
-  if (signal) query = query.abortSignal(signal)
-
-  const result = await resolveClientReadQuery<Pick<SystemRow, "id">>({
-    tag: "getActiveSystemIds",
-    query,
-    signal,
-    quietWhen: isQuietTableError,
-  })
-  if (result.status !== "success") return new Set()
-
-  return new Set(result.data.map((row) => row.id).filter((id): id is number => typeof id === "number"))
 }
 
 async function getCurrentProductionBatchIds(
