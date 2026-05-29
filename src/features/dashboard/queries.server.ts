@@ -33,7 +33,7 @@ type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_c
 type KpiCoverageRow = Database["public"]["Functions"]["api_kpi_coverage"]["Returns"][number]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
-type SystemDimensionRow = Pick<Database["public"]["Tables"]["system"]["Row"], "id" | "volume" | "length" | "width" | "depth" | "diameter">
+type SystemDimensionRow = Pick<Database["public"]["Tables"]["system"]["Row"], "id" | "volume" | "depth">
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "month"
 
 function isSbStatementTimeout(error: unknown) {
@@ -167,29 +167,6 @@ async function getDashboardSystemsRaw(
 
 const resolveSystemVolume = (row: SystemDimensionRow) => {
   if (typeof row.volume === "number" && Number.isFinite(row.volume) && row.volume > 0) return row.volume
-  if (
-    typeof row.length === "number" &&
-    Number.isFinite(row.length) &&
-    row.length > 0 &&
-    typeof row.width === "number" &&
-    Number.isFinite(row.width) &&
-    row.width > 0 &&
-    typeof row.depth === "number" &&
-    Number.isFinite(row.depth) &&
-    row.depth > 0
-  ) {
-    return row.length * row.width * row.depth
-  }
-  if (
-    typeof row.diameter === "number" &&
-    Number.isFinite(row.diameter) &&
-    row.diameter > 0 &&
-    typeof row.depth === "number" &&
-    Number.isFinite(row.depth) &&
-    row.depth > 0
-  ) {
-    return Math.PI * (row.diameter / 2) ** 2 * row.depth
-  }
   return null
 }
 
@@ -201,7 +178,7 @@ async function backfillBiomassDensityFromSystemVolume(
   if (!rows.length) return rows
   const { data, error } = await supabase
     .from("system")
-    .select("id, volume, length, width, depth, diameter")
+    .select("id, volume, depth")
     .eq("farm_id", farmId)
     .in("id", rows.map((row) => row.system_id))
   if (error) return rows

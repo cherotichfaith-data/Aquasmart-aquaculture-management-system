@@ -35,9 +35,6 @@ const formSchema = z.object({
     growth_stage: z.enum(["fingerling", "juvenile", "sub_adult", "broodstock"]),
     volume: z.coerce.number().min(0).optional(),
     depth: z.coerce.number().min(0).optional(),
-    length: z.coerce.number().min(0).optional(),
-    width: z.coerce.number().min(0).optional(),
-    diameter: z.coerce.number().min(0).optional(),
 })
 
 export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }) {
@@ -55,9 +52,6 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
             growth_stage: "fingerling",
             volume: 0,
             depth: 0,
-            length: 0,
-            width: 0,
-            diameter: 0,
         },
     })
 
@@ -81,9 +75,6 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
             growth_stage: values.growth_stage,
             ...(values.volume !== undefined ? { volume: values.volume } : {}),
             ...(values.depth !== undefined ? { depth: values.depth } : {}),
-            ...(values.length !== undefined ? { length: values.length } : {}),
-            ...(values.width !== undefined ? { width: values.width } : {}),
-            ...(values.diameter !== undefined ? { diameter: values.diameter } : {}),
             is_active: true,
             farm_id: farmId,
         }
@@ -98,15 +89,10 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                     growth_stage: "fingerling",
                     volume: 0,
                     depth: 0,
-                    length: 0,
-                    width: 0,
-                    diameter: 0,
                 })
             },
         })
     }
-
-    const type = form.watch("type")
 
     return (
         <div>
@@ -239,53 +225,6 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                             )}
                         />
                     </div>
-
-                    {(type === "rectangular_cage" || type === "pond" || type === "tank") && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="length"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Length (m)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" step="0.1" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="width"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Width (m)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" step="0.1" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                    )}
-
-                    {(type === "circular_cage" || type === "tank") && (
-                        <FormField
-                            control={form.control}
-                            name="diameter"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Diameter (m)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.1" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    )}
 
                     <Button type="submit" className="data-entry-action" disabled={createSystem.isPending || (!farmId && activeFarmLoading)}>
                         {createSystem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
