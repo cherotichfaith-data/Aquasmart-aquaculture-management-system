@@ -301,7 +301,10 @@ export async function createSystemAction(
   const { data, error } = await supabase
     .from("system")
     .insert({
-      ...parsedPayload,
+      farm_id: parsedPayload.farm_id,
+      name: parsedPayload.name,
+      type: parsedPayload.type,
+      growth_stage: parsedPayload.growth_stage,
       commissioned_at: parsedPayload.commissioned_at ?? null,
       unit: parsedPayload.unit?.trim() ? parsedPayload.unit.trim() : null,
       is_active: parsedPayload.is_active ?? true,
