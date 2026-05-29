@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Loader2 } from "lucide-react"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { Button } from "@/components/app-ui/button"
 import { Input } from "@/components/app-ui/input"
 import { Label } from "@/components/app-ui/label"
@@ -14,11 +13,11 @@ import type { Database } from "@/lib/types/database"
 type FingerlingSupplierOption = Database["public"]["Functions"]["api_fingerling_supplier_options_rpc"]["Returns"][number]
 
 interface BatchQuickCreateProps {
+  farmId: string | null
   onCreated?: (batch: Database["public"]["Tables"]["fingerling_batch"]["Row"]) => void
 }
 
-export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
-  const { farmId } = useActiveFarm()
+export function BatchQuickCreate({ farmId, onCreated }: BatchQuickCreateProps) {
   const suppliersQuery = useFingerlingSupplierOptions()
   const createBatch = useCreateFingerlingBatch()
   const createSupplier = useCreateFingerlingSupplier()
@@ -43,7 +42,7 @@ export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
   const [numberOfFish, setNumberOfFish] = useState("")
   const [abw, setAbw] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const showSupplierEditor = showSupplierForm || suppliers.length === 0
+  const showSupplierEditor = showSupplierForm || (!suppliersQuery.isLoading && suppliers.length === 0)
 
   useEffect(() => {
     if (supplierId && suppliers.some((supplier) => String(supplier.id) === supplierId)) return
@@ -182,7 +181,7 @@ export function BatchQuickCreate({ onCreated }: BatchQuickCreateProps) {
             <p className="text-xs text-destructive">{suppliersQuery.data.error}</p>
           ) : null}
           {!suppliersQuery.isLoading && suppliers.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Create a fingerling supplier first.</p>
+            <p className="text-xs text-muted-foreground">No fingerling suppliers were found.</p>
           ) : null}
         </div>
         <div className="space-y-2">
