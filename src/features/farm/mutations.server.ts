@@ -37,9 +37,6 @@ const systemSchema = z.object({
   growth_stage: z.enum(BIOLOGICAL_GROWTH_STAGE_VALUES),
   volume: z.number().min(0).nullable().optional(),
   depth: z.number().min(0).nullable().optional(),
-  length: z.number().min(0).nullable().optional(),
-  width: z.number().min(0).nullable().optional(),
-  diameter: z.number().min(0).nullable().optional(),
   is_active: z.boolean().optional(),
 })
 
@@ -310,9 +307,6 @@ export async function createSystemAction(
       is_active: parsedPayload.is_active ?? true,
       volume: parsedPayload.volume ?? null,
       depth: parsedPayload.depth ?? null,
-      length: parsedPayload.length ?? null,
-      width: parsedPayload.width ?? null,
-      diameter: parsedPayload.diameter ?? null,
     })
     .select()
     .single()

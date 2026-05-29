@@ -245,74 +245,6 @@ export type Database = {
           },
         ]
       }
-      energy_live: {
-        Row: {
-          created_at: string
-          current_a: number | null
-          energy_today_kwh: number | null
-          energy_total_kwh: number | null
-          farm_id: string
-          frequency_hz: number | null
-          id: number
-          measured_at: string
-          meter_id: string
-          meter_name: string | null
-          payload: Json
-          power_factor: number | null
-          power_kw: number | null
-          source: string
-          status: string
-          updated_at: string
-          voltage_v: number | null
-        }
-        Insert: {
-          created_at?: string
-          current_a?: number | null
-          energy_today_kwh?: number | null
-          energy_total_kwh?: number | null
-          farm_id: string
-          frequency_hz?: number | null
-          id?: number
-          measured_at?: string
-          meter_id: string
-          meter_name?: string | null
-          payload?: Json
-          power_factor?: number | null
-          power_kw?: number | null
-          source?: string
-          status?: string
-          updated_at?: string
-          voltage_v?: number | null
-        }
-        Update: {
-          created_at?: string
-          current_a?: number | null
-          energy_today_kwh?: number | null
-          energy_total_kwh?: number | null
-          farm_id?: string
-          frequency_hz?: number | null
-          id?: number
-          measured_at?: string
-          meter_id?: string
-          meter_name?: string | null
-          payload?: Json
-          power_factor?: number | null
-          power_kw?: number | null
-          source?: string
-          status?: string
-          updated_at?: string
-          voltage_v?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "energy_live_farm_id_fkey"
-            columns: ["farm_id"]
-            isOneToOne: false
-            referencedRelation: "farm"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       energy_meter_timeseries: {
         Row: {
           active_power_kw: number | null
@@ -383,65 +315,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "energy_meter_timeseries_farm_id_fkey"
-            columns: ["farm_id"]
-            isOneToOne: false
-            referencedRelation: "farm"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      energy_timeseries: {
-        Row: {
-          battery_state_of_charge_pct: number | null
-          created_at: string
-          energy_export_kwh: number | null
-          energy_import_kwh: number | null
-          energy_kwh: number | null
-          farm_id: string
-          grid_import_kwh: number | null
-          id: number
-          measured_at: string
-          payload: Json
-          power_kw: number | null
-          solar_generation_kwh: number | null
-          source: string
-          updated_at: string
-        }
-        Insert: {
-          battery_state_of_charge_pct?: number | null
-          created_at?: string
-          energy_export_kwh?: number | null
-          energy_import_kwh?: number | null
-          energy_kwh?: number | null
-          farm_id: string
-          grid_import_kwh?: number | null
-          id?: number
-          measured_at: string
-          payload?: Json
-          power_kw?: number | null
-          solar_generation_kwh?: number | null
-          source?: string
-          updated_at?: string
-        }
-        Update: {
-          battery_state_of_charge_pct?: number | null
-          created_at?: string
-          energy_export_kwh?: number | null
-          energy_import_kwh?: number | null
-          energy_kwh?: number | null
-          farm_id?: string
-          grid_import_kwh?: number | null
-          id?: number
-          measured_at?: string
-          payload?: Json
-          power_kw?: number | null
-          solar_generation_kwh?: number | null
-          source?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "energy_timeseries_farm_id_fkey"
             columns: ["farm_id"]
             isOneToOne: false
             referencedRelation: "farm"
@@ -1302,6 +1175,7 @@ export type Database = {
           cycle_id: number
           cycle_start: string
           ongoing_cycle: boolean
+          previous_system_id: number | null
           system_id: number
           target_weight_g: number | null
         }
@@ -1311,6 +1185,7 @@ export type Database = {
           cycle_id?: number
           cycle_start: string
           ongoing_cycle: boolean
+          previous_system_id?: number | null
           system_id: number
           target_weight_g?: number | null
         }
@@ -1320,6 +1195,7 @@ export type Database = {
           cycle_id?: number
           cycle_start?: string
           ongoing_cycle?: boolean
+          previous_system_id?: number | null
           system_id?: number
           target_weight_g?: number | null
         }
@@ -1329,6 +1205,13 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "fingerling_batch"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_cycle_previous_system_id_fkey"
+            columns: ["previous_system_id"]
+            isOneToOne: false
+            referencedRelation: "system"
             referencedColumns: ["id"]
           },
           {
@@ -1401,55 +1284,49 @@ export type Database = {
       }
       system: {
         Row: {
+          cage_status: Database["public"]["Enums"]["cage_status_enum"] | null
           commissioned_at: string | null
           created_at: string
           decommissioned_at: string | null
           depth: number | null
-          diameter: number | null
           farm_id: string | null
           growth_stage: Database["public"]["Enums"]["system_growth_stage"]
           id: number
           is_active: boolean
-          length: number | null
           name: string
           type: Database["public"]["Enums"]["system_type"]
           unit: string | null
           volume: number | null
-          width: number | null
         }
         Insert: {
+          cage_status?: Database["public"]["Enums"]["cage_status_enum"] | null
           commissioned_at?: string | null
           created_at?: string
           decommissioned_at?: string | null
           depth?: number | null
-          diameter?: number | null
           farm_id?: string | null
           growth_stage: Database["public"]["Enums"]["system_growth_stage"]
           id?: number
           is_active?: boolean
-          length?: number | null
           name: string
           type: Database["public"]["Enums"]["system_type"]
           unit?: string | null
           volume?: number | null
-          width?: number | null
         }
         Update: {
+          cage_status?: Database["public"]["Enums"]["cage_status_enum"] | null
           commissioned_at?: string | null
           created_at?: string
           decommissioned_at?: string | null
           depth?: number | null
-          diameter?: number | null
           farm_id?: string | null
           growth_stage?: Database["public"]["Enums"]["system_growth_stage"]
           id?: number
           is_active?: boolean
-          length?: number | null
           name?: string
           type?: Database["public"]["Enums"]["system_type"]
           unit?: string | null
           volume?: number | null
-          width?: number | null
         }
         Relationships: [
           {
@@ -2485,6 +2362,7 @@ export type Database = {
     }
     Enums: {
       arrows: "up" | "down" | "straight"
+      cage_status_enum: "occupied" | "available" | "retired"
       change_type_enum: "INSERT" | "UPDATE" | "DELETE"
       feed_category:
         | "pre-starter"
@@ -2696,6 +2574,7 @@ export const Constants = {
   public: {
     Enums: {
       arrows: ["up", "down", "straight"],
+      cage_status_enum: ["occupied", "available", "retired"],
       change_type_enum: ["INSERT", "UPDATE", "DELETE"],
       feed_category: [
         "pre-starter",
