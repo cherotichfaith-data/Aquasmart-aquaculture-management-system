@@ -16,9 +16,6 @@ const systemSchema = z.object({
   growth_stage: z.enum(BIOLOGICAL_GROWTH_STAGE_VALUES),
   volume: z.number().min(0).nullable().optional(),
   depth: z.number().min(0).nullable().optional(),
-  length: z.number().min(0).nullable().optional(),
-  width: z.number().min(0).nullable().optional(),
-  diameter: z.number().min(0).nullable().optional(),
   is_active: z.boolean().optional(),
 })
 
@@ -50,15 +47,15 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("system")
     .insert({
-      ...payload,
+      farm_id: payload.farm_id,
+      name: payload.name,
+      type: payload.type,
+      growth_stage: payload.growth_stage,
       commissioned_at: payload.commissioned_at ?? null,
       unit: payload.unit?.trim() ? payload.unit.trim() : null,
       is_active: payload.is_active ?? true,
       volume: payload.volume ?? null,
       depth: payload.depth ?? null,
-      length: payload.length ?? null,
-      width: payload.width ?? null,
-      diameter: payload.diameter ?? null,
     })
     .select()
     .single()
