@@ -175,7 +175,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         actionLabel={showBatchCreate ? "Hide batch form" : "Create batch"}
         onAction={() => setShowBatchCreate((current) => !current)}
       >
-        {showBatchCreate ? <BatchQuickCreate onCreated={handleBatchCreated} /> : null}
+        {showBatchCreate ? <BatchQuickCreate farmId={farmId} onCreated={handleBatchCreated} /> : null}
       </DependencyBlocker>
     )
   }
@@ -196,7 +196,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         </Button>
       </div>
 
-      {showBatchCreate ? <BatchQuickCreate onCreated={handleBatchCreated} /> : null}
+      {showBatchCreate ? <BatchQuickCreate farmId={farmId} onCreated={handleBatchCreated} /> : null}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

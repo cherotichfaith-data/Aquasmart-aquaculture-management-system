@@ -361,6 +361,16 @@ export async function createFingerlingSupplierAction(
     )
   }
 
+  const { data: existingSupplier, error: existingSupplierError } = await supabase
+    .from("fingerling_supplier")
+    .select()
+    .eq("company_name", parsedPayload.company_name)
+    .maybeSingle()
+
+  if (!existingSupplierError && existingSupplier) {
+    return { data: existingSupplier }
+  }
+
   const { data, error } = await supabase
     .from("fingerling_supplier")
     .insert({
