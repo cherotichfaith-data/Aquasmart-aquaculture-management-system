@@ -66,6 +66,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to record stocking." }, { status })
   }
 
+  const { error: statusError } = await supabase
+    .from("system")
+    .update({ cage_status: "occupied" })
+    .eq("id", payload.system_id)
+    .eq("farm_id", systemScope.farmId)
+
+  if (statusError) {
+    logSbError("stocking:record:updateCageStatus", statusError)
+  }
+
   revalidateWriteTags(
     inventoryWriteTags({ farmId: systemScope.farmId, systemId: payload.system_id, includeProduction: true }),
   )

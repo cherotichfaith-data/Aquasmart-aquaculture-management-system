@@ -76,6 +76,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
             ...(values.volume !== undefined ? { volume: values.volume } : {}),
             ...(values.depth !== undefined ? { depth: values.depth } : {}),
             is_active: true,
+            cage_status: "available",
             farm_id: farmId,
         }
 

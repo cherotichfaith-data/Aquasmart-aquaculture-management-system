@@ -102,6 +102,12 @@ async function invalidateInventoryWriteQueries(
   const tasks = [
     queryClient.invalidateQueries({
       predicate: ({ queryKey }) =>
+        toStringValue(queryKey[0]) === "options" &&
+        toStringValue(queryKey[1]) === "systems" &&
+        toStringValue(queryKey[2]) === params.farmId,
+    }),
+    queryClient.invalidateQueries({
+      predicate: ({ queryKey }) =>
         hasPrefix(queryKey, ["inventory", "daily"]) && toStringValue(queryKey[2]) === params.farmId,
     }),
     queryClient.invalidateQueries({

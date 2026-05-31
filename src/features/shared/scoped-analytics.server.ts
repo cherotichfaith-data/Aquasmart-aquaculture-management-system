@@ -110,7 +110,7 @@ export async function getScopedSystemOptions(
 ): Promise<ScopedSystemOption[]> {
   let query = supabase
     .from("system")
-    .select("id, commissioned_at, farm_id, growth_stage, is_active, name, type, unit")
+    .select("id, cage_status, commissioned_at, farm_id, growth_stage, is_active, name, type, unit")
     .eq("farm_id", farmId)
     .eq("is_active", true)
 
