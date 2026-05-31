@@ -25,6 +25,10 @@ type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_
 type FarmOptionRow = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
 type FeedSupplierRow = Database["public"]["Tables"]["feed_supplier"]["Row"]
 type FingerlingSupplierRow = Database["public"]["Functions"]["api_fingerling_supplier_options_rpc"]["Returns"][number]
+type FingerlingSupplierTableRow = Pick<
+  Database["public"]["Tables"]["fingerling_supplier"]["Row"],
+  "company_name" | "id" | "location_city" | "location_country"
+>
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
@@ -41,6 +45,39 @@ const isQuietOptionsError = (err: unknown): boolean =>
 
 const isQuietTableError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
+
+const SUPPLIER_OPTIONS_TIMEOUT_MS = 8_000
+
+function createTimeoutSignal(signal: AbortSignal | undefined, timeoutMs: number) {
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  const timeout = setTimeout(abort, timeoutMs)
+
+  if (signal?.aborted) {
+    abort()
+  } else {
+    signal?.addEventListener("abort", abort, { once: true })
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timeout)
+      signal?.removeEventListener("abort", abort)
+    },
+  }
+}
+
+function normalizeFingerlingSupplierOptions(
+  rows: Array<FingerlingSupplierRow | FingerlingSupplierTableRow> | null | undefined,
+): FingerlingSupplierRow[] {
+  return (rows ?? []).map((row) => ({
+    company_name: row.company_name,
+    id: row.id,
+    location_city: row.location_city ?? "",
+    location_country: row.location_country,
+  }))
+}
 
 async function getFirstStockingDateBySystemId(
   supabase: SupabaseClient<Database>,
@@ -463,11 +500,51 @@ export async function getFeedSupplierOptions(params?: {
 export async function getFingerlingSupplierOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<FingerlingSupplierRow>> {
-  return rpcOrEmpty(
-    "getFingerlingSupplierOptions",
-    "api_fingerling_supplier_options_rpc",
-    undefined,
-    params?.signal,
+  const clientResult = await getClientOrError("getFingerlingSupplierOptions", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  const timed = createTimeoutSignal(params?.signal, SUPPLIER_OPTIONS_TIMEOUT_MS)
+  try {
+    let rpcQuery = queryOptionsRpc(supabase, "api_fingerling_supplier_options_rpc")
+    rpcQuery = rpcQuery.abortSignal(timed.signal)
+    const { data, error } = await rpcQuery
+
+    if (!error) {
+      return toQuerySuccess<FingerlingSupplierRow>(
+        normalizeFingerlingSupplierOptions((data ?? []) as unknown as FingerlingSupplierRow[]),
+      )
+    }
+
+    if (params?.signal?.aborted || isQuietOptionsError(error)) {
+      return toQuerySuccess<FingerlingSupplierRow>([])
+    }
+  } catch (error) {
+    if (params?.signal?.aborted || (timed.signal.aborted && !params?.signal?.aborted)) {
+      // Fall through to the table read when only the RPC timeout fired.
+    } else if (isQuietOptionsError(error)) {
+      return toQuerySuccess<FingerlingSupplierRow>([])
+    }
+  } finally {
+    timed.cleanup()
+  }
+
+  let fallbackQuery = supabase
+    .from("fingerling_supplier")
+    .select("id, company_name, location_country, location_city")
+    .order("company_name", { ascending: true })
+  if (params?.signal) fallbackQuery = fallbackQuery.abortSignal(params.signal)
+
+  const { data, error } = await fallbackQuery
+  if (error) {
+    if (params?.signal?.aborted || isQuietTableError(error)) {
+      return toQuerySuccess<FingerlingSupplierRow>([])
+    }
+    return { status: "error", data: null, error: getErrorMessage(error) }
+  }
+
+  return toQuerySuccess<FingerlingSupplierRow>(
+    normalizeFingerlingSupplierOptions((data ?? []) as FingerlingSupplierTableRow[]),
   )
 }
 
