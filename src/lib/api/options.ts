@@ -181,7 +181,7 @@ export async function getSystemOptions(params?: {
 
   let query = supabase
     .from("system")
-    .select("id, commissioned_at, farm_id, growth_stage, is_active, name, type, unit")
+    .select("id, cage_status, commissioned_at, farm_id, growth_stage, is_active, name, type, unit")
     .eq("farm_id", params.farmId)
 
   if (params.stage && params.stage !== "all") {

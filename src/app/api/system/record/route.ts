@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       commissioned_at: payload.commissioned_at ?? null,
       unit: payload.unit?.trim() ? payload.unit.trim() : null,
       is_active: payload.is_active ?? true,
+      cage_status: "available",
       volume: payload.volume ?? null,
       depth: payload.depth ?? null,
     })

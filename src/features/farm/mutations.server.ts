@@ -308,6 +308,7 @@ export async function createSystemAction(
       commissioned_at: parsedPayload.commissioned_at ?? null,
       unit: parsedPayload.unit?.trim() ? parsedPayload.unit.trim() : null,
       is_active: parsedPayload.is_active ?? true,
+      cage_status: "available",
       volume: parsedPayload.volume ?? null,
       depth: parsedPayload.depth ?? null,
     })

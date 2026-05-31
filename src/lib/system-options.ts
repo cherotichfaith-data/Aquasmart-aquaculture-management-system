@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/types/database"
 
 export type SystemOption = {
+  cage_status?: Database["public"]["Enums"]["cage_status_enum"] | null
   farm_id: string
   farm_name: string
   growth_stage: Database["public"]["Enums"]["system_growth_stage"]
@@ -14,7 +15,7 @@ export type SystemOption = {
 
 export type SystemOptionSource = Pick<
   Database["public"]["Tables"]["system"]["Row"],
-  "commissioned_at" | "farm_id" | "growth_stage" | "id" | "is_active" | "name" | "type"
+  "cage_status" | "commissioned_at" | "farm_id" | "growth_stage" | "id" | "is_active" | "name" | "type"
 > & {
   production_start?: string | null
   unit: string | null
@@ -90,6 +91,7 @@ export function resolveSystemIdFromFilterValue(
 
 export function mapSystemRowToOption(system: SystemOptionSource): SystemOption {
   return {
+    cage_status: system.cage_status,
     farm_id: system.farm_id ?? "",
     farm_name: "",
     growth_stage: system.growth_stage,

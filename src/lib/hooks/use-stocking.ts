@@ -75,6 +75,7 @@ export function useRecordStocking() {
         type: "stocking",
         farmId: result.meta.farmId,
         date: result.meta.date,
+        systemId: result.meta.systemId,
       }),
     successMessage: "Stocking recorded.",
     errorMessage: "Failed to record stocking.",
