@@ -101,13 +101,19 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   const numberOfFish = form.watch("number_of_fish")
   const totalWeightKg = form.watch("total_weight_kg")
   const computedAbw = calculateAbw(totalWeightKg, numberOfFish)
+  const selectedSystemIdNumber = Number(selectedSystemId)
+  const selectedSystemIdForBatch =
+    Number.isFinite(selectedSystemIdNumber) && selectedSystemIdNumber > 0 ? selectedSystemIdNumber : null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
 
   function handleBatchCreated(batch: FingerlingBatchRow) {
+    const systemId = batch.system_id ?? selectedSystemIdForBatch
+    if (!systemId) return
+
     const option: BatchOption = {
       id: batch.id,
       farm_id: batch.farm_id ?? farmId ?? "",
-      system_id: batch.system_id ?? null,
+      system_id: systemId,
       supplier_id: batch.supplier_id,
       date_of_delivery: batch.date_of_delivery,
       number_of_fish: batch.number_of_fish ?? 0,
@@ -171,11 +177,68 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
     return (
       <DependencyBlocker
         title="No batches found."
-        description="Create a batch to continue stocking."
+        description="Select the cage for the new batch, then create a batch to continue stocking."
         actionLabel={showBatchCreate ? "Hide batch form" : "Create batch"}
         onAction={() => setShowBatchCreate((current) => !current)}
       >
-        {showBatchCreate ? <BatchQuickCreate farmId={farmId} onCreated={handleBatchCreated} /> : null}
+        <Form {...form}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="unit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cage Unit</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {units.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="system_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cage Number</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {systemsForUnit.map((system) => (
+                        <SelectItem key={system.id} value={String(system.id)}>
+                          {formatCageLabel(system)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+        {showBatchCreate ? (
+          <div className="mt-4">
+            <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} onCreated={handleBatchCreated} />
+          </div>
+        ) : null}
       </DependencyBlocker>
     )
   }
@@ -196,7 +259,9 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         </Button>
       </div>
 
-      {showBatchCreate ? <BatchQuickCreate farmId={farmId} onCreated={handleBatchCreated} /> : null}
+      {showBatchCreate ? (
+        <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} onCreated={handleBatchCreated} />
+      ) : null}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

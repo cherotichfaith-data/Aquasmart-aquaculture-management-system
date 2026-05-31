@@ -1947,7 +1947,7 @@ export type Database = {
           label: string
           number_of_fish: number
           supplier_id: number
-          system_id: number | null
+          system_id: number
         }[]
       }
       api_fingerling_supplier_options_rpc: {
@@ -1955,7 +1955,7 @@ export type Database = {
         Returns: {
           company_name: string
           id: number
-          location_city: string | null
+          location_city: string
           location_country: string
         }[]
       }
