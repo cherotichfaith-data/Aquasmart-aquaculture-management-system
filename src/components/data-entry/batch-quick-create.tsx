@@ -14,10 +14,11 @@ type FingerlingSupplierOption = Database["public"]["Functions"]["api_fingerling_
 
 interface BatchQuickCreateProps {
   farmId: string | null
+  systemId?: number | null
   onCreated?: (batch: Database["public"]["Tables"]["fingerling_batch"]["Row"]) => void
 }
 
-export function BatchQuickCreate({ farmId, onCreated }: BatchQuickCreateProps) {
+export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQuickCreateProps) {
   const suppliersQuery = useFingerlingSupplierOptions()
   const createBatch = useCreateFingerlingBatch()
   const createSupplier = useCreateFingerlingSupplier()
@@ -71,7 +72,7 @@ export function BatchQuickCreate({ farmId, onCreated }: BatchQuickCreateProps) {
         id: created.data.id,
         company_name: created.data.company_name,
         location_country: created.data.location_country,
-        location_city: created.data.location_city,
+        location_city: created.data.location_city ?? "",
       }
 
       setCreatedSuppliers((current) => [option, ...current.filter((supplier) => supplier.id !== option.id)])
@@ -88,6 +89,10 @@ export function BatchQuickCreate({ farmId, onCreated }: BatchQuickCreateProps) {
   async function handleCreateBatch() {
     if (!farmId) {
       setError("Select a farm before creating a batch.")
+      return
+    }
+    if (!systemId) {
+      setError("Select a cage before creating a batch.")
       return
     }
     if (!batchName.trim() || !dateOfDelivery || !supplierId) {
@@ -125,6 +130,7 @@ export function BatchQuickCreate({ farmId, onCreated }: BatchQuickCreateProps) {
         name: batchName.trim(),
         date_of_delivery: dateOfDelivery,
         supplier_id: Number(supplierId),
+        system_id: systemId,
         number_of_fish: numberOfFishValue,
         abw: abwValue,
       })

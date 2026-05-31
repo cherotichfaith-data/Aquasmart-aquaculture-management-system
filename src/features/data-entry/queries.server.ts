@@ -15,7 +15,7 @@ async function getSystems(supabase: DataEntrySupabaseClient, farmId: string) {
 }
 
 async function getBatches(supabase: DataEntrySupabaseClient, farmId: string) {
-  return toQuerySuccess(await listBatchOptionRows(supabase, { farmId, activeOnly: false }))
+  return toQuerySuccess(await listBatchOptionRows(supabase, { farmId }))
 }
 
 async function getFeedTypes(supabase: DataEntrySupabaseClient, farmId: string) {
@@ -41,7 +41,7 @@ export async function getDataEntryPrefetch({
   accessToken: string
 }) {
   return runServerReadThrough({
-    keyParts: ["data-entry-page", userId, farmId],
+    keyParts: ["data-entry-page", "active-batches-v2", userId, farmId],
     tags: [
       cacheTags.farm(farmId),
       cacheTags.systems(farmId),

@@ -203,19 +203,20 @@ export async function getBatchOptions(params?: {
     .sort((a, b) => String(b.date_of_delivery ?? "").localeCompare(String(a.date_of_delivery ?? "")))
 
   if (params.activeOnly ?? true) {
-    const currentBatchIds = await getCurrentProductionBatchIds(farmId, params.signal)
-    rows = rows.filter((row) => currentBatchIds.has(row.id))
+    const currentBatchScope = await getCurrentProductionBatchScope(farmId, params.signal)
+    rows = rows.filter((row) => currentBatchScope.batchIds.has(row.id) && currentBatchScope.systemIds.has(row.system_id))
   }
 
   return toQuerySuccess<BatchListItem>(rows)
 }
 
-async function getCurrentProductionBatchIds(
+async function getCurrentProductionBatchScope(
   farmId: string,
   signal?: AbortSignal,
-): Promise<Set<number>> {
-  const clientResult = await getClientOrError("getCurrentProductionBatchIds", { requireSession: true })
-  if ("error" in clientResult) return new Set()
+): Promise<{ batchIds: Set<number>; systemIds: Set<number> }> {
+  const emptyScope = { batchIds: new Set<number>(), systemIds: new Set<number>() }
+  const clientResult = await getClientOrError("getCurrentProductionBatchScope", { requireSession: true })
+  if ("error" in clientResult) return emptyScope
   const { supabase } = clientResult
 
   let activeQuery = supabase
@@ -225,12 +226,12 @@ async function getCurrentProductionBatchIds(
     .eq("is_active", true)
   if (signal) activeQuery = activeQuery.abortSignal(signal)
   const activeSystems = await resolveClientReadQuery<Pick<SystemRow, "id" | "commissioned_at">>({
-    tag: "getCurrentProductionBatchIds:systems",
+    tag: "getCurrentProductionBatchScope:systems",
     query: activeQuery,
     signal,
     quietWhen: isQuietTableError,
   })
-  if (activeSystems.status !== "success") return new Set()
+  if (activeSystems.status !== "success") return emptyScope
 
   const activeSystemStartById = new Map(
     activeSystems.data
@@ -240,7 +241,8 @@ async function getCurrentProductionBatchIds(
       .map((row) => [row.id, row.commissioned_at ?? "0001-01-01"]),
   )
   const activeSystemIds = Array.from(activeSystemStartById.keys())
-  if (activeSystemIds.length === 0) return new Set()
+  const activeSystemIdSet = new Set(activeSystemIds)
+  if (activeSystemIds.length === 0) return emptyScope
 
   const batchIds = new Set<number>()
 
@@ -251,7 +253,7 @@ async function getCurrentProductionBatchIds(
   if (signal) transferQuery = transferQuery.abortSignal(signal)
 
   const transfers = await resolveClientReadQuery<Pick<FishTransferRow, "batch_id" | "target_system_id" | "date">>({
-    tag: "getCurrentProductionBatchIds:transfers",
+    tag: "getCurrentProductionBatchScope:transfers",
     query: transferQuery,
     signal,
     quietWhen: isQuietTableError,
@@ -272,7 +274,7 @@ async function getCurrentProductionBatchIds(
   if (signal) stockingQuery = stockingQuery.abortSignal(signal)
 
   const stockings = await resolveClientReadQuery<Pick<FishStockingRow, "batch_id" | "system_id" | "date">>({
-    tag: "getCurrentProductionBatchIds:stocking",
+    tag: "getCurrentProductionBatchScope:stocking",
     query: stockingQuery,
     signal,
     quietWhen: isQuietTableError,
@@ -286,7 +288,7 @@ async function getCurrentProductionBatchIds(
     })
   }
 
-  return batchIds
+  return { batchIds, systemIds: activeSystemIdSet }
 }
 
 async function getExistingFeedTypeIds(
@@ -461,22 +463,12 @@ export async function getFeedSupplierOptions(params?: {
 export async function getFingerlingSupplierOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<FingerlingSupplierRow>> {
-  const clientResult = await getClientOrError("getFingerlingSupplierOptions", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase
-    .from("fingerling_supplier")
-    .select("id, company_name, location_country, location_city")
-    .order("company_name", { ascending: true })
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  return resolveClientReadQuery<FingerlingSupplierRow>({
-    tag: "getFingerlingSupplierOptions",
-    query,
-    signal: params?.signal,
-    quietWhen: isQuietTableError,
-  })
+  return rpcOrEmpty(
+    "getFingerlingSupplierOptions",
+    "api_fingerling_supplier_options_rpc",
+    undefined,
+    params?.signal,
+  )
 }
 
 export async function getFarmOptions(params?: {
