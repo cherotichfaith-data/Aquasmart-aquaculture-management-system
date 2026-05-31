@@ -44,7 +44,8 @@ export function useBatchOptions(params?: {
     queryKey: queryKeys.options.batches(params),
     queryFn: ({ signal }) => getBatchOptions({ ...params, signal }),
     enabled,
-    staleTime: 5 * 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   })
 }
 

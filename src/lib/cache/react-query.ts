@@ -97,6 +97,7 @@ async function invalidateInventoryWriteQueries(
     date: string
     tableName: string
     includeProductionQueries?: boolean
+    includeBatchOptions?: boolean
   },
 ) {
   const tasks = [
@@ -123,6 +124,17 @@ async function invalidateInventoryWriteQueries(
     tasks.push(
       queryClient.invalidateQueries({
         predicate: ({ queryKey }) => isFarmScopedProductionQuery(queryKey, params.farmId),
+      }),
+    )
+  }
+
+  if (params.includeBatchOptions) {
+    tasks.push(
+      queryClient.invalidateQueries({
+        predicate: ({ queryKey }) =>
+          toStringValue(queryKey[0]) === "options" &&
+          toStringValue(queryKey[1]) === "batches" &&
+          toStringValue(queryKey[2]) === params.farmId,
       }),
     )
   }
@@ -273,6 +285,7 @@ export async function invalidateAfterWrite(
         date: params.date,
         tableName: "fish_transfer",
         includeProductionQueries: true,
+        includeBatchOptions: true,
       })
     case "stocking":
       return invalidateInventoryWriteQueries(queryClient, {
@@ -280,6 +293,7 @@ export async function invalidateAfterWrite(
         date: params.date,
         tableName: "fish_stocking",
         includeProductionQueries: true,
+        includeBatchOptions: true,
       })
   }
 }
