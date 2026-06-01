@@ -10,7 +10,12 @@ import { useFingerlingSupplierOptions } from "@/lib/hooks/use-options"
 import { useCreateFingerlingBatch, useCreateFingerlingSupplier } from "@/lib/hooks/use-reference-data"
 import type { Database } from "@/lib/types/database"
 
-type FingerlingSupplierOption = Database["public"]["Functions"]["api_fingerling_supplier_options_rpc"]["Returns"][number]
+type FingerlingSupplierOption = Pick<
+  Database["public"]["Tables"]["fingerling_supplier"]["Row"],
+  "company_name" | "id" | "location_country"
+> & {
+  location_city: string
+}
 
 interface BatchQuickCreateProps {
   farmId: string | null
@@ -40,8 +45,6 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
   const [supplierName, setSupplierName] = useState("")
   const [supplierCountry, setSupplierCountry] = useState("")
   const [supplierCity, setSupplierCity] = useState("")
-  const [numberOfFish, setNumberOfFish] = useState("")
-  const [abw, setAbw] = useState("")
   const [error, setError] = useState<string | null>(null)
   const showSupplierEditor = showSupplierForm || (!suppliersQuery.isLoading && suppliers.length === 0)
 
@@ -100,28 +103,6 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
       return
     }
 
-    if (!numberOfFish.trim()) {
-      setError("Number of fish is required.")
-      return
-    }
-
-    const numberOfFishValue = Number(numberOfFish)
-    if (!Number.isFinite(numberOfFishValue) || numberOfFishValue <= 0) {
-      setError("Number of fish must be greater than 0.")
-      return
-    }
-
-    if (!abw.trim()) {
-      setError("ABW is required.")
-      return
-    }
-
-    const abwValue = Number(abw)
-    if (!Number.isFinite(abwValue) || abwValue <= 0) {
-      setError("ABW must be greater than 0.")
-      return
-    }
-
     setError(null)
 
     try {
@@ -131,14 +112,10 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
         date_of_delivery: dateOfDelivery,
         supplier_id: Number(supplierId),
         system_id: systemId,
-        number_of_fish: numberOfFishValue,
-        abw: abwValue,
       })
 
       setBatchName("")
       setDateOfDelivery(new Date().toISOString().split("T")[0])
-      setNumberOfFish("")
-      setAbw("")
       onCreated?.(created.data)
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unable to create fingerling batch.")
@@ -189,14 +166,6 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
           {!suppliersQuery.isLoading && suppliers.length === 0 ? (
             <p className="text-xs text-muted-foreground">No fingerling suppliers were found.</p>
           ) : null}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="batch-fish-count">Number of Fish</Label>
-          <Input id="batch-fish-count" type="number" value={numberOfFish} onChange={(event) => setNumberOfFish(event.target.value)} />
-        </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="batch-abw">ABW (g)</Label>
-          <Input id="batch-abw" type="number" step="0.01" value={abw} onChange={(event) => setAbw(event.target.value)} />
         </div>
       </div>
 
