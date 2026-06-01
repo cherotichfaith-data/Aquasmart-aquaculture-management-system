@@ -20,7 +20,11 @@ type FingerlingSupplierOption = Pick<
 interface BatchQuickCreateProps {
   farmId: string | null
   systemId?: number | null
-  onCreated?: (batch: Database["public"]["Tables"]["fingerling_batch"]["Row"]) => void
+  onCreated?: (
+    batch: Database["public"]["Tables"]["fingerling_batch"]["Row"] & {
+      supplier_name?: string | null
+    },
+  ) => void
 }
 
 export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQuickCreateProps) {
@@ -106,6 +110,7 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
     setError(null)
 
     try {
+      const selectedSupplier = suppliers.find((supplier) => String(supplier.id) === supplierId) ?? null
       const created = await createBatch.mutateAsync({
         farm_id: farmId,
         name: batchName.trim(),
@@ -116,7 +121,10 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
 
       setBatchName("")
       setDateOfDelivery(new Date().toISOString().split("T")[0])
-      onCreated?.(created.data)
+      onCreated?.({
+        ...created.data,
+        supplier_name: selectedSupplier?.company_name ?? null,
+      })
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unable to create fingerling batch.")
     }

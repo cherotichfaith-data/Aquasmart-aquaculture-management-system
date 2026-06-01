@@ -44,8 +44,12 @@ type StockingInsertWithNotes = Omit<StockingInsert, "cycle_id"> & {
   farm_id?: string | null
   notes?: string | null
 }
-type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
-type FingerlingBatchRow = Database["public"]["Tables"]["fingerling_batch"]["Row"]
+type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number] & {
+  supplier_name?: string | null
+}
+type FingerlingBatchRow = Database["public"]["Tables"]["fingerling_batch"]["Row"] & {
+  supplier_name?: string | null
+}
 
 const formSchema = z.object({
   unit: z.string().min(1, "Cage unit is required"),
@@ -119,6 +123,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       number_of_fish: batch.number_of_fish ?? 0,
       abw: batch.abw ?? 0,
       label: batch.name,
+      supplier_name: batch.supplier_name ?? null,
     }
 
     setCreatedBatches((current) => [option, ...current.filter((item) => item.id !== option.id)])
