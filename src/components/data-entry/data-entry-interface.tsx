@@ -160,6 +160,7 @@ export function DataEntryInterface({
             case "sampling":
                 return (
                     <SamplingForm
+                        farmId={farmId}
                         systems={systems}
                         batches={batches}
                         defaultSystemId={defaultSystemId}
