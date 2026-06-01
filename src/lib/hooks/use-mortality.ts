@@ -89,7 +89,6 @@ export function useRecordMortality() {
       numberOfFishMortality: number
       totalWeightMortality?: number | null
       cause: MortalityInput["cause"]
-      isMassMortality?: boolean | null
       notes?: string | null
     },
     {
@@ -107,7 +106,6 @@ export function useRecordMortality() {
         numberOfFishMortality: payload.number_of_fish_mortality,
         totalWeightMortality: payload.total_weight_mortality ?? null,
         cause: payload.cause,
-        isMassMortality: payload.is_mass_mortality ?? null,
         notes: payload.notes ?? null,
       },
     ],

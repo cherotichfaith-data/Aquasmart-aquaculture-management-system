@@ -15,13 +15,10 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/s
 import { getErrorMessage } from "@/lib/utils/query-result"
 import SystemHistorySheet from "@/components/systems/system-history-sheet"
 import type { TimePeriod } from "@/lib/time-period"
-import { resolveSystemTimelineWindow } from "@/lib/system-timeline-window"
 import {
   formatAsOfDate,
   formatNumberValue,
-  formatProductionPeriod,
   formatUnitValue,
-  timelineSourceLabel,
 } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
 import { getUtcDateInput, getUtcDateInputDaysAgo } from "@/lib/deterministic-format"
@@ -44,6 +41,7 @@ type SortKey =
   | "system_name"
   | "fish_end"
   | "biomass_end"
+  | "biomass_density"
   | "abw"
   | "sample_age_days"
   | "efcr"
@@ -312,25 +310,6 @@ export default function SystemsTable({
                 pagedSystems.map((row) => {
             const timeline = timelineMap.get(row.system_id)
             const asOf = formatAsOfDate(timeline?.snapshot_as_of ?? row.as_of_date ?? row.input_end_date)
-            const effectiveTimeline = resolveSystemTimelineWindow(timeline, {
-              windowStart: dateFrom ?? null,
-              windowEnd: dateTo ?? null,
-            })
-            const productionPeriod = formatProductionPeriod(
-              effectiveTimeline?.displayStart,
-              effectiveTimeline?.displayEnd,
-              false,
-            )
-            const summaryPeriod = formatProductionPeriod(row.input_start_date, row.input_end_date, false)
-            const productionLabel = timelineSourceLabel(effectiveTimeline?.periodSource ?? timeline?.period_source)
-            const productionSubtitle =
-              productionLabel && productionPeriod
-                ? `${productionLabel} ${productionPeriod}`
-                : summaryPeriod
-                  ? `Summary window ${summaryPeriod}`
-                  : effectiveTimeline?.hasTimeline
-                    ? "No activity in selected period"
-                    : "No resolved production timeline"
             const latestStatus = latestStatusMap.get(row.system_id)
             const latestDo = latestDoMap.get(row.system_id)?.value ?? null
             const fedToday = (todayFeedBySystem.get(row.system_id) ?? 0) > 0
@@ -360,7 +339,6 @@ export default function SystemsTable({
                     <p className="text-sm font-semibold leading-5 text-foreground">
                       {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
                     </p>
-                    <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{productionSubtitle}</p>
                     <p className="mt-1 text-[11px] leading-4 text-muted-foreground">As of {asOf ?? "N/A"}</p>
                   </div>
                   <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}>
@@ -379,6 +357,12 @@ export default function SystemsTable({
                   <div className="rounded-md bg-muted/45 px-2.5 py-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">ABW</p>
                     <p className="mt-0.5 font-semibold text-foreground">{formatUnitValue(row.abw, 1, "g")}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Density</p>
+                    <p className="mt-0.5 font-semibold text-foreground">
+                      {formatUnitValue(row.biomass_density, 2, "kg/m3")}
+                    </p>
                   </div>
                   <div className="rounded-md bg-muted/45 px-2.5 py-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">DO</p>
@@ -419,6 +403,7 @@ export default function SystemsTable({
                     <TableHead>{renderSortHead("Cage", "system_name")}</TableHead>
                     <TableHead className="text-right">{renderSortHead("Fish Count", "fish_end", "right")}</TableHead>
                     <TableHead className="text-right">{renderSortHead("Biomass kg", "biomass_end", "right")}</TableHead>
+                    <TableHead className="text-right">{renderSortHead("Density kg/m3", "biomass_density", "right")}</TableHead>
                     <TableHead className="text-right">{renderSortHead("ABW g", "abw", "right")}</TableHead>
                     <TableHead className="text-right">{renderSortHead("Last Sampled", "sample_age_days", "right")}</TableHead>
                     <TableHead className="text-right">{renderSortHead("eFCR", "efcr", "right")}</TableHead>
@@ -434,25 +419,6 @@ export default function SystemsTable({
                     pagedSystems.map((row) => {
                 const timeline = timelineMap.get(row.system_id)
                 const asOf = formatAsOfDate(timeline?.snapshot_as_of ?? row.as_of_date ?? row.input_end_date)
-                const effectiveTimeline = resolveSystemTimelineWindow(timeline, {
-                  windowStart: dateFrom ?? null,
-                  windowEnd: dateTo ?? null,
-                })
-                const productionPeriod = formatProductionPeriod(
-                  effectiveTimeline?.displayStart,
-                  effectiveTimeline?.displayEnd,
-                  false,
-                )
-                const summaryPeriod = formatProductionPeriod(row.input_start_date, row.input_end_date, false)
-                const productionLabel = timelineSourceLabel(effectiveTimeline?.periodSource ?? timeline?.period_source)
-                const productionSubtitle =
-                  productionLabel && productionPeriod
-                    ? `${productionLabel} ${productionPeriod}`
-                    : summaryPeriod
-                      ? `Summary window ${summaryPeriod}`
-                      : effectiveTimeline?.hasTimeline
-                        ? "No activity in selected period"
-                        : "No resolved production timeline"
                 const latestStatus = latestStatusMap.get(row.system_id)
                 const latestDo = latestDoMap.get(row.system_id)?.value ?? null
                 const fedToday = (todayFeedBySystem.get(row.system_id) ?? 0) > 0
@@ -523,14 +489,12 @@ export default function SystemsTable({
                         <p className="text-sm font-medium text-foreground">
                           {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
                         </p>
-                        <p className="text-[11px] text-muted-foreground">{productionSubtitle}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Density {formatNumberValue(row.biomass_density, { decimals: 2 })} kg/m3 | As of {asOf ?? "N/A"}
-                        </p>
+                        <p className="text-[11px] text-muted-foreground">As of {asOf ?? "N/A"}</p>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">{formatNumberValue(row.fish_end)}</TableCell>
                     <TableCell className="text-right">{formatUnitValue(row.biomass_end, 1, "kg")}</TableCell>
+                    <TableCell className="text-right">{formatUnitValue(row.biomass_density, 2, "kg/m3")}</TableCell>
                     <TableCell className="text-right">{formatUnitValue(row.abw, 1, "g")}</TableCell>
                     <TableCell className="text-right">
                       {row.sample_age_days == null ? "--" : `${formatNumberValue(row.sample_age_days)}d ago`}
@@ -572,7 +536,7 @@ export default function SystemsTable({
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
                         {emptyReason === "Missing time bounds"
                           ? "No time range selected"
                           : emptyReason === "No scoped systems"
