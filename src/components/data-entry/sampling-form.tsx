@@ -18,7 +18,6 @@ import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useRecordSampling } from "@/lib/hooks/use-sampling"
 import { useSamplingData } from "@/lib/hooks/use-reports"
 import { diffDateDays } from "@/lib/time-series"
@@ -54,6 +53,7 @@ const formSchema = z.object({
 })
 
 interface SamplingFormProps {
+  farmId: string | null
   systems: SystemOption[]
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
   defaultSystemId?: number | null
@@ -76,8 +76,7 @@ const projectAbwFromHistory = (
   return latestAbw * Math.exp(sgrPerDay * projectionDays)
 }
 
-export function SamplingForm({ systems, batches, defaultSystemId = null, defaultBatchId = null }: SamplingFormProps) {
-  const { farmId } = useActiveFarm()
+export function SamplingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: SamplingFormProps) {
   const mutation = useRecordSampling()
 
 
