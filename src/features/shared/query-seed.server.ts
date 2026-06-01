@@ -149,8 +149,6 @@ export async function listBatchOptionRows(
   if (params.activeOnly === false) return rows
 
   if (activeSystemIds.length === 0) return []
-  const activeSystemIdSet = new Set(activeSystemIds)
-
   const batchIds = new Set<number>()
   const { data: transfers } = await supabase
     .from("fish_transfer")
@@ -176,7 +174,11 @@ export async function listBatchOptionRows(
     }
   })
 
-  return rows.filter((row) => batchIds.has(row.id) && activeSystemIdSet.has(row.system_id))
+  return rows.filter((row) => {
+    const systemStart = activeSystemStartById.get(row.system_id)
+    if (!systemStart) return false
+    return batchIds.has(row.id) || String(row.date_of_delivery ?? "") >= systemStart
+  })
 }
 
 export async function listFeedTypeOptionRows(

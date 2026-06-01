@@ -221,7 +221,11 @@ export async function getBatchOptions(params?: {
 
   if (params.activeOnly ?? true) {
     const currentBatchScope = await getCurrentProductionBatchScope(farmId, params.signal)
-    rows = rows.filter((row) => currentBatchScope.batchIds.has(row.id) && currentBatchScope.systemIds.has(row.system_id))
+    rows = rows.filter((row) => {
+      const systemStart = currentBatchScope.systemStartById.get(row.system_id)
+      if (!systemStart) return false
+      return currentBatchScope.batchIds.has(row.id) || String(row.date_of_delivery ?? "") >= systemStart
+    })
   }
 
   return toQuerySuccess<BatchListItem>(rows)
@@ -230,8 +234,8 @@ export async function getBatchOptions(params?: {
 async function getCurrentProductionBatchScope(
   farmId: string,
   signal?: AbortSignal,
-): Promise<{ batchIds: Set<number>; systemIds: Set<number> }> {
-  const emptyScope = { batchIds: new Set<number>(), systemIds: new Set<number>() }
+): Promise<{ batchIds: Set<number>; systemStartById: Map<number, string> }> {
+  const emptyScope = { batchIds: new Set<number>(), systemStartById: new Map<number, string>() }
   const clientResult = await getClientOrError("getCurrentProductionBatchScope", { requireSession: true })
   if ("error" in clientResult) return emptyScope
   const { supabase } = clientResult
@@ -258,7 +262,6 @@ async function getCurrentProductionBatchScope(
       .map((row) => [row.id, row.commissioned_at ?? "0001-01-01"]),
   )
   const activeSystemIds = Array.from(activeSystemStartById.keys())
-  const activeSystemIdSet = new Set(activeSystemIds)
   if (activeSystemIds.length === 0) return emptyScope
 
   const batchIds = new Set<number>()
@@ -305,7 +308,7 @@ async function getCurrentProductionBatchScope(
     })
   }
 
-  return { batchIds, systemIds: activeSystemIdSet }
+  return { batchIds, systemStartById: activeSystemStartById }
 }
 
 async function getExistingFeedTypeIds(
