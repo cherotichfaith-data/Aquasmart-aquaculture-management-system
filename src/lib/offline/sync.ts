@@ -62,7 +62,6 @@ const syncConfigs: Record<OfflineTableName, SyncConfig> = {
       number_of_fish_mortality: record.numberOfFishMortality,
       total_weight_mortality: record.totalWeightMortality ?? null,
       cause: record.cause,
-      is_mass_mortality: record.isMassMortality ?? null,
       notes: record.notes ?? null,
       local_id: record.localId,
     }),

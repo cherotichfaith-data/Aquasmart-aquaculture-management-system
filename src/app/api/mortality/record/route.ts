@@ -15,7 +15,6 @@ const mortalitySchema = z.object({
   number_of_fish_mortality: z.number().positive(),
   total_weight_mortality: z.number().min(0).nullable().optional(),
   cause: z.enum(MORTALITY_CAUSES),
-  is_mass_mortality: z.boolean().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
   local_id: z.string().max(128).optional(),
 }).superRefine((payload, ctx) => {
@@ -48,10 +47,12 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("fish_mortality")
     .upsert({
-      ...payload,
+      system_id: payload.system_id,
       batch_id: payload.batch_id ?? null,
+      date: payload.date,
+      number_of_fish_mortality: payload.number_of_fish_mortality,
       total_weight_mortality: payload.total_weight_mortality ?? null,
-      is_mass_mortality: payload.is_mass_mortality ?? null,
+      cause: payload.cause,
       notes: payload.notes?.trim() ? payload.notes.trim() : null,
       local_id: payload.local_id ?? null,
       synced_at: new Date().toISOString(),

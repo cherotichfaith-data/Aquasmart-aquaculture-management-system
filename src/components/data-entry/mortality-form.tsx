@@ -95,7 +95,6 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
         number_of_fish_mortality: values.number_of_fish,
         total_weight_mortality: values.total_weight_mortality ?? null,
         cause: values.cause,
-        is_mass_mortality: values.number_of_fish >= 100,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
 

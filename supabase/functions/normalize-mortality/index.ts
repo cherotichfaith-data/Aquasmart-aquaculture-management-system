@@ -14,7 +14,6 @@ const COL = {
   avgDeadWt:   ['avg dead weight', 'avg dead wt', 'avg_dead_wt_g', 'dead avg weight'],
   cause:       ['cause', 'cause of death', 'mortality cause', 'reason', 'cause_of_death'],
   notes:       ['notes', 'remarks', 'comments'],
-  isMass:      ['mass mortality', 'is_mass_mortality', 'mass event'],
 };
 
 function findCol(headers: string[], aliases: string[]): number {
@@ -38,7 +37,6 @@ export async function normalizeMortalityRows(
     avgDeadWt:   findCol(headers, COL.avgDeadWt),
     cause:       findCol(headers, COL.cause),
     notes:       findCol(headers, COL.notes),
-    isMass:      findCol(headers, COL.isMass),
   };
 
   const reviewItems: object[] = [];
@@ -56,8 +54,6 @@ export async function normalizeMortalityRows(
     const rawAvgDeadWt   = ci.avgDeadWt   >= 0 ? vals[ci.avgDeadWt]   : null;
     const rawCause       = ci.cause       >= 0 ? vals[ci.cause]       : null;
     const rawNotes       = ci.notes       >= 0 ? vals[ci.notes]       : null;
-    const rawIsMass      = ci.isMass      >= 0 ? vals[ci.isMass]      : null;
-
     if (!rawCage && !rawDate && !rawCount) { result.skipped++; continue; }
 
     const systemId = rawCage ? await resolveCageId(String(rawCage), farmId) : null;
@@ -92,10 +88,6 @@ export async function normalizeMortalityRows(
     const cause = rawCause ? String(rawCause).trim() : 'unknown';
     const localId = `mort|${farmId}|${systemId}|${date}|${count}`;
 
-    const isMass = rawIsMass
-      ? ['yes', 'true', '1', 'y'].includes(String(rawIsMass).toLowerCase().trim())
-      : (count! > 50);
-
     const mortRow: MortalityRow = {
       system_id: systemId!,
       date: date!,
@@ -106,7 +98,6 @@ export async function normalizeMortalityRows(
       cause,
       notes: rawNotes ? String(rawNotes).trim() : null,
       farm_id: farmId,
-      is_mass_mortality: isMass,
       local_id: localId,
     };
 

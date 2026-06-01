@@ -123,7 +123,6 @@ export interface MortalityRow {
   notes?: string | null;
   farm_id?: string | null;
   batch_id?: number | null;
-  is_mass_mortality?: boolean | null;
   local_id?: string | null;
 }
 
