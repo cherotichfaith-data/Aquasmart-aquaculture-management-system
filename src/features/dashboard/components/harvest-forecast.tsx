@@ -4,6 +4,7 @@ import { useHarvestForecast } from "@/lib/hooks/use-analytics"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
+import { formatStableDate } from "@/lib/deterministic-format"
 import type { HarvestForecastRow, HarvestForecastStatus } from "@/lib/types/insights"
 
 // ── Status badge styling ──────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ function ForecastRow({ row }: { row: HarvestForecastRow }) {
   const adg = row.adg_g_day != null ? `${row.adg_g_day.toFixed(2)} g/day` : "—"
   const daysLeft = row.days_to_target != null ? `${Math.ceil(row.days_to_target)}d` : "—"
   const harvestDate = row.projected_harvest_date
-    ? new Date(row.projected_harvest_date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    ? formatStableDate(row.projected_harvest_date, { day: "numeric", month: "short", year: "numeric" })
     : "—"
 
   return (
