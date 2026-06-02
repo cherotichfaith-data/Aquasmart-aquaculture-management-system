@@ -584,7 +584,7 @@ export async function getDashboardPageInitialData(params: {
   return runServerReadThrough({
     keyParts: [
       "dashboard-page",
-      "active-current-systems-v4",
+      "active-current-systems-v5",
       params.farmId,
       params.filters.selectedBatch,
       params.filters.selectedSystem,
