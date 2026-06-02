@@ -128,21 +128,6 @@ const withAbortSignal = (query: TimePeriodBoundsRpcQuery, signal?: AbortSignal):
   return query.abortSignal(signal)
 }
 
-const isTimeBoundsSignatureError = (error: unknown) => {
-  if (!error || typeof error !== "object") return false
-  const value = error as { code?: unknown; message?: unknown; details?: unknown }
-  const code = String(value.code ?? "")
-  const message = String(value.message ?? "")
-  const details = String(value.details ?? "")
-  const haystack = `${message}\n${details}`.toLowerCase()
-
-  return (
-    code === "PGRST202" &&
-    haystack.includes("api_time_period_bounds_scoped") &&
-    haystack.includes("p_system_id")
-  )
-}
-
 const mapTimeBoundsRow = (row: TimePeriodBoundsRpcRow | null): TimeBounds => ({
   start: row?.input_start_date ?? null,
   end: row?.input_end_date ?? null,
@@ -156,20 +141,6 @@ const mapTimeBoundsRow = (row: TimePeriodBoundsRpcRow | null): TimeBounds => ({
   isTruncated: row?.is_truncated ?? null,
 })
 
-async function fetchTimePeriodBoundsRpc(
-  supabase: RpcClient,
-  args: Record<string, unknown>,
-  signal?: AbortSignal,
-) {
-  const query = withAbortSignal(
-    supabase
-      .rpc("api_time_period_bounds_scoped", args)
-      .maybeSingle(),
-    signal,
-  )
-  return query
-}
-
 export async function fetchTimePeriodBounds(
   supabase: RpcClient,
   params: {
@@ -181,21 +152,20 @@ export async function fetchTimePeriodBounds(
     signal?: AbortSignal
   },
 ): Promise<TimeBounds> {
-  const rpcArgs = {
-    p_farm_id: params.farmId,
-    p_time_period: params.timePeriod,
-    p_anchor_date: params.anchorDate ?? null,
-    p_scope: params.scope ?? "dashboard",
-    p_system_id: params.systemId ?? null,
-  }
-  let { data, error } = await fetchTimePeriodBoundsRpc(supabase, rpcArgs, params.signal)
+  const query = withAbortSignal(
+    supabase
+      .rpc("api_time_period_bounds_scoped", {
+        p_farm_id: params.farmId,
+        p_time_period: params.timePeriod,
+        p_anchor_date: params.anchorDate ?? null,
+        p_scope: params.scope ?? "dashboard",
+        p_system_id: params.systemId ?? null,
+      })
+      .maybeSingle(),
+    params.signal,
+  )
 
-  if (error && isTimeBoundsSignatureError(error)) {
-    const { p_system_id: _pSystemId, ...legacyArgs } = rpcArgs
-    const legacyResult = await fetchTimePeriodBoundsRpc(supabase, legacyArgs, params.signal)
-    data = legacyResult.data
-    error = legacyResult.error
-  }
+  const { data, error } = await query
 
   if (error) {
     return { start: null, end: null }
