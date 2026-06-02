@@ -1,5 +1,4 @@
 import type { SystemTimelineBoundsRow } from "@/lib/api/system-timeline"
-import { buildTimeBoundsFromAvailableRange, type TimeBounds, type TimePeriod } from "@/lib/time-period"
 
 export type WindowedSystemTimeline = {
   periodSource: string | null
@@ -65,29 +64,4 @@ export function resolveSystemTimelineWindow(
     hasTimeline,
     hasDataInWindow,
   }
-}
-
-export function buildTimeBoundsFromTimelineRows(params: {
-  rows: Array<SystemTimelineBoundsRow | null | undefined>
-  timePeriod: TimePeriod
-  anchorScope?: string | null
-}): TimeBounds | null {
-  let availableFromDate: string | null = null
-  let latestAvailableDate: string | null = null
-
-  params.rows.forEach((row) => {
-    const timeline = resolveSystemTimelineWindow(row)
-    if (!timeline?.fullStart || !timeline.fullEnd) return
-    availableFromDate = minDate(availableFromDate, timeline.fullStart)
-    latestAvailableDate = maxDate(latestAvailableDate, timeline.fullEnd)
-  })
-
-  if (!availableFromDate || !latestAvailableDate) return null
-
-  return buildTimeBoundsFromAvailableRange({
-    timePeriod: params.timePeriod,
-    availableFromDate,
-    latestAvailableDate,
-    anchorScope: params.anchorScope ?? null,
-  })
 }

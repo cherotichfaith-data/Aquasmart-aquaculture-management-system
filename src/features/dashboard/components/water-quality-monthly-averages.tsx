@@ -10,6 +10,7 @@ import { Chart } from "@/components/charts/chartjs"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
 import { buildCartesianOptions, buildMetricAxisBounds, getChartPalette } from "@/components/charts/chartjs-theme"
 import { formatNumberValue } from "@/lib/analytics-format"
+import { formatStableDate } from "@/lib/deterministic-format"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import { useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 
@@ -49,7 +50,7 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === "nu
 const monthLabel = (key: string) => {
   const date = new Date(`${key}-01T00:00:00Z`)
   if (Number.isNaN(date.getTime())) return key
-  return date.toLocaleDateString(undefined, { month: "short", year: "2-digit" })
+  return formatStableDate(date, { month: "short", day: undefined, year: "2-digit" })
 }
 
 export default function WaterQualityMonthlyAverages({

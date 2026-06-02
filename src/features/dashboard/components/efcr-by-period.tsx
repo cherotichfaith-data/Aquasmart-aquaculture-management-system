@@ -9,6 +9,7 @@ import { Chart } from "@/components/charts/chartjs"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
 import { buildCartesianOptions, buildMetricAxisBounds, getChartPalette } from "@/components/charts/chartjs-theme"
 import { formatNumberValue } from "@/lib/analytics-format"
+import { formatStableDate } from "@/lib/deterministic-format"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import { getFcrIntervals } from "@/lib/api/analytics"
 
@@ -30,7 +31,7 @@ function bucketLabel(start: string, end: string) {
   const startDate = new Date(`${start}T00:00:00Z`)
   const endDate = new Date(`${end}T00:00:00Z`)
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return `${start} - ${end}`
-  return `${startDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} - ${endDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+  return `${formatStableDate(startDate, { month: "short", day: "numeric", year: undefined })} - ${formatStableDate(endDate, { month: "short", day: "numeric", year: undefined })}`
 }
 
 export default function EfcrByPeriod({
