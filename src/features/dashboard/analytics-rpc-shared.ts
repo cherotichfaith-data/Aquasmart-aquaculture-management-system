@@ -211,7 +211,7 @@ export function buildKpiOverviewFromRpc(params: {
         },
         {
           key: "biomass",
-          label: "Avg Biomass",
+          label: "Total Biomass",
           value: biomass,
           unit: "kg",
           decimals: 1,
@@ -362,7 +362,7 @@ export function buildKpiOverviewFromRpc(params: {
     },
     {
       key: "biomass",
-      label: "Avg Biomass",
+      label: "Total Biomass",
       value: biomass,
       unit: "kg",
       decimals: 1,

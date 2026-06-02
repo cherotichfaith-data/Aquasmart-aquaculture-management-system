@@ -803,6 +803,7 @@ export type Database = {
           date: string
           farm_id?: string | null
           id?: number
+          is_mass_mortality?: boolean | null
           local_id?: string | null
           notes?: string | null
           number_of_fish_mortality: number
@@ -818,6 +819,7 @@ export type Database = {
           date?: string
           farm_id?: string | null
           id?: number
+          is_mass_mortality?: boolean | null
           local_id?: string | null
           notes?: string | null
           number_of_fish_mortality?: number
