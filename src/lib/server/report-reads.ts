@@ -2,7 +2,6 @@ import type { Database } from "@/lib/types/database"
 import { createClient } from "@/lib/supabase/server"
 import { toQuerySuccess, isInvalidBigintUuidError, isMissingObjectError } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import { countTimeRangeDays } from "@/lib/time-period"
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
@@ -142,7 +141,7 @@ export async function listFcrTrend(
   const query = supabase.rpc("api_fcr_trend", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
-    p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
+    p_days: params.days,
   })
 
   const { data, error } = await query
@@ -182,7 +181,7 @@ export async function listGrowthTrend(
             supabase.rpc("api_growth_trend", {
               p_farm_id: farmId,
               p_system_id: s.id,
-              p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
+              p_days: params.days,
             }),
           ),
         ),
@@ -195,7 +194,7 @@ export async function listGrowthTrend(
   const query = supabase.rpc("api_growth_trend", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
-    p_days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? params.days,
+    p_days: params.days,
   })
 
   return runRpcRead<GrowthTrendRow>(query)

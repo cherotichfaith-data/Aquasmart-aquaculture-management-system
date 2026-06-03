@@ -32,6 +32,7 @@ export default function ReportsPage({
     selectedStage,
     dateFrom: boundsStart,
     dateTo: boundsEnd,
+    boundsQuery,
   } = useAnalyticsPageBootstrap({
     initialFarmId,
     initialFarmName,
@@ -40,7 +41,7 @@ export default function ReportsPage({
   })
   const dateFrom = boundsStart ?? ""
   const dateTo = boundsEnd ?? ""
-  const dateRange = { from: dateFrom, to: dateTo }
+  const dateRange = { from: dateFrom, to: dateTo, days: boundsQuery.data.resolvedDays }
 
   useEffect(() => {
     if (!tabParam) return

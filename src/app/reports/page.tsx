@@ -8,7 +8,6 @@ import { getReportsPageInitialData, parseReportsPageFilters } from "@/features/r
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createQueryClient } from "@/lib/react-query/query-client"
 import { requireUserContext } from "@/lib/supabase/require-user"
-import { countTimeRangeDays } from "@/lib/time-period"
 
 type SearchParams = Record<string, string | string[] | undefined>
 
@@ -104,7 +103,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
         systemIds: scopedGrowthSystemIds,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
-        days: countTimeRangeDays(initialData.bounds.start, initialData.bounds.end) ?? 180,
+        days: initialData.bounds.resolvedDays ?? undefined,
       }),
       initialData.growthTrend,
     )

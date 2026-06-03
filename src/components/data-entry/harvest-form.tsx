@@ -23,7 +23,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
 import { useProductionSummary } from "@/lib/hooks/use-production"
-import { countTimeRangeDays } from "@/lib/time-period"
 import { logSbError } from "@/lib/supabase/log"
 import type { Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
@@ -46,6 +45,16 @@ const formSchema = z.object({
     amount_kg: z.coerce.number().min(0.01, "Weight must be positive"),
     type_of_harvest: z.enum(["partial", "final"]).default("partial"),
 })
+
+const DAY_MS = 86_400_000
+
+function countCycleDays(startDate?: string | null, endDate?: string | null) {
+    if (!startDate || !endDate) return null
+    const start = new Date(`${startDate}T00:00:00Z`)
+    const end = new Date(`${endDate}T00:00:00Z`)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return null
+    return Math.floor((end.getTime() - start.getTime()) / DAY_MS) + 1
+}
 
 interface HarvestFormProps {
     farmId: string | null
@@ -81,7 +90,7 @@ function HarvestCycleSummary({
         return summaryRows.filter((row) => row.cycle_id === latestCycleRow.cycle_id)
     }, [latestCycleRow, summaryRows])
     const cycleStartDate = cycleRows[cycleRows.length - 1]?.date ?? latestCycleRow?.date ?? null
-    const cycleDays = countTimeRangeDays(cycleStartDate, latestCycleRow?.date ?? null)
+    const cycleDays = countCycleDays(cycleStartDate, latestCycleRow?.date ?? null)
     const queryError = getErrorMessage(summaryQuery.error) ?? getQueryResultError(summaryQuery.data)
     const summaryLabel = systemId ? formatCageLabel(system) : "Selected system"
     const asOfDate = latestCycleRow?.date ?? null
