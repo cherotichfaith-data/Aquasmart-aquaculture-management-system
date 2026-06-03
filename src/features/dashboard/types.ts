@@ -39,11 +39,6 @@ export type KPIOverviewMetric = {
   invertTrend: boolean
   tone?: "good" | "warn" | "bad" | "neutral"
   badge?: string
-  trust?: {
-    source: string
-    basis: string
-    coverage: string
-  }
 }
 
 export type RecommendedAction = {

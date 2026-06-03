@@ -1,19 +1,7 @@
 import type { Database } from "@/lib/types/database"
-import type { KpiCoverageRow } from "@/lib/types/insights"
 import type { DashboardPageInitialData, KPIOverviewMetric, RecommendedAction } from "./types"
 
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
-type DashboardSystemRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
-
-const TRUST_FALLBACKS: Record<string, { source: string; basis: string }> = {
-  efcr: { source: "Dashboard consolidated", basis: "In-window conversion" },
-  mortality: { source: "Dashboard consolidated", basis: "In-window mortality rate" },
-  abw: { source: "Dashboard consolidated", basis: "As-of-end body weight" },
-  biomass: { source: "Dashboard consolidated", basis: "Average in-window biomass" },
-  biomass_density: { source: "Dashboard consolidated", basis: "Average in-window density" },
-  feeding: { source: "Dashboard consolidated", basis: "% body weight/day" },
-  water_quality: { source: "Dashboard consolidated", basis: "Average in-window rating" },
-}
 
 const PRIORITY_ORDER: Record<RecommendedAction["priority"], number> = {
   High: 0,
@@ -30,49 +18,6 @@ const WATER_QUALITY_BADGES: Record<string, { tone: KPIOverviewMetric["tone"]; ba
 
 const isFiniteNumber = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value)
-
-const toUniqueSystemIds = (rows: Array<{ system_id: number | null | undefined }>, predicate: (row: { system_id: number | null | undefined }) => boolean) =>
-  new Set(
-    rows
-      .filter((row) => predicate(row))
-      .map((row) => row.system_id)
-      .filter((systemId): systemId is number => typeof systemId === "number" && Number.isFinite(systemId)),
-  ).size
-
-const average = (values: Array<number | null | undefined>) => {
-  const numeric = values.filter(isFiniteNumber)
-  if (!numeric.length) return null
-  return numeric.reduce((sum, value) => sum + value, 0) / numeric.length
-}
-
-const weightedAverage = (
-  entries: Array<{ value: number | null | undefined; weight: number | null | undefined }>,
-) => {
-  let weightedSum = 0
-  let totalWeight = 0
-
-  entries.forEach(({ value, weight }) => {
-    if (!isFiniteNumber(value)) return
-    if (!isFiniteNumber(weight) || weight <= 0) return
-    weightedSum += value * weight
-    totalWeight += weight
-  })
-
-  if (totalWeight > 0) return weightedSum / totalWeight
-  return average(entries.map((entry) => entry.value))
-}
-
-const buildCoverageLabel = (covered: number, total: number) => `${covered}/${total} ${total === 1 ? "system" : "systems"}`
-
-const buildSystemRowsTrust = (
-  key: keyof typeof TRUST_FALLBACKS,
-  covered: number,
-  total: number,
-): NonNullable<KPIOverviewMetric["trust"]> => ({
-  source: "Dashboard system status",
-  basis: key === "biomass" ? "As-of-end biomass" : "As-of-end period metrics",
-  coverage: buildCoverageLabel(covered, total),
-})
 
 const getRoundedWaterQualityLabel = (value: number | null) => {
   if (!isFiniteNumber(value)) return null
@@ -127,8 +72,6 @@ export function mergeRecommendedActionRows(rows: RecommendedActionInputRow[]): R
 export function buildKpiOverviewFromRpc(params: {
   scopedSystemIds: number[]
   consolidatedRows: DashboardConsolidatedRow[]
-  systemRows: DashboardSystemRow[]
-  coverageRows?: KpiCoverageRow[]
   dateFrom: string
   dateTo: string
 }): DashboardPageInitialData["kpiOverview"] {
@@ -140,179 +83,13 @@ export function buildKpiOverviewFromRpc(params: {
   const consolidatedRows = params.consolidatedRows.filter(
     (row) => row.system_id == null || scopedSet.has(row.system_id),
   )
-  const systemRows = params.systemRows.filter((row) => scopedSet.has(row.system_id))
 
   if (!consolidatedRows.length) {
-    if (!systemRows.length) {
-      return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }
-    }
-
-    const totalSystems = params.scopedSystemIds.length
-    const mortality = weightedAverage(
-      systemRows.map((row) => ({
-        value: row.mortality_rate,
-        weight: row.fish_end,
-      })),
-    )
-    const abw = weightedAverage(
-      systemRows.map((row) => ({
-        value: row.abw,
-        weight: row.fish_end,
-      })),
-    )
-    const biomass = average(systemRows.map((row) => row.biomass_end))
-    const biomassDensity = average(systemRows.map((row) => row.biomass_density))
-    const feeding = weightedAverage(
-      systemRows.map((row) => ({
-        value: row.feeding_rate,
-        weight: row.biomass_end,
-      })),
-    )
-    const waterQuality = average(systemRows.map((row) => row.water_quality_rating_numeric_average))
-    const waterQualityLabel = getRoundedWaterQualityLabel(waterQuality)
-    const waterQualityDisplay = waterQualityLabel ? WATER_QUALITY_BADGES[waterQualityLabel] : null
-
-    return {
-      metrics: [
-        {
-          key: "efcr",
-          label: "eFCR",
-          value: systemRows.find((row) => isFiniteNumber(row.efcr))?.efcr ?? null,
-          decimals: 2,
-          trend: null,
-          trendFormat: "delta",
-          trendDecimals: 2,
-          invertTrend: true,
-          trust: buildSystemRowsTrust("efcr", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).efcr)), totalSystems),
-        },
-        {
-          key: "mortality",
-          label: "Mortality Rate",
-          value: mortality,
-          unit: "%/day",
-          decimals: 2,
-          trend: null,
-          trendFormat: "delta",
-          trendDecimals: 2,
-          trendUnit: "%/day",
-          invertTrend: true,
-          trust: buildSystemRowsTrust("mortality", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).mortality_rate)), totalSystems),
-        },
-        {
-          key: "abw",
-          label: "Avg Body Weight",
-          value: abw,
-          unit: "g",
-          decimals: 1,
-          trend: null,
-          trendFormat: "delta",
-          trendDecimals: 1,
-          trendUnit: "g",
-          invertTrend: false,
-          trust: buildSystemRowsTrust("abw", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).abw)), totalSystems),
-        },
-        {
-          key: "biomass",
-          label: "Total Biomass",
-          value: biomass,
-          unit: "kg",
-          decimals: 1,
-          trend: null,
-          trendFormat: "delta",
-          trendDecimals: 1,
-          trendUnit: "kg",
-          invertTrend: false,
-          trust: buildSystemRowsTrust("biomass", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).biomass_end)), totalSystems),
-        },
-        {
-          key: "biomass_density",
-          label: "Biomass Density",
-          value: biomassDensity,
-          unit: "kg/m3",
-          decimals: 2,
-          trend: null,
-          trendFormat: "delta",
-          trendDecimals: 2,
-          trendUnit: "kg/m3",
-          invertTrend: false,
-          trust: buildSystemRowsTrust("biomass_density", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).biomass_density)), totalSystems),
-        },
-        {
-          key: "feeding",
-          label: "Feeding Rate",
-          value: feeding,
-          unit: "% BW/day",
-          decimals: 2,
-          trend: null,
-          trendFormat: "delta",
-          trendDecimals: 2,
-          trendUnit: "% BW/day",
-          invertTrend: false,
-          trust: buildSystemRowsTrust("feeding", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).feeding_rate)), totalSystems),
-        },
-        {
-          key: "water_quality",
-          label: "Water Quality",
-          value: waterQuality,
-          decimals: 1,
-          trend: null,
-          invertTrend: false,
-          tone: waterQualityDisplay?.tone ?? "neutral",
-          badge: waterQualityDisplay?.badge ?? "Monitoring",
-          trust: buildSystemRowsTrust("water_quality", toUniqueSystemIds(systemRows, (row) => isFiniteNumber((row as DashboardSystemRow).water_quality_rating_numeric_average)), totalSystems),
-        },
-      ],
-      dateBounds: { start: params.dateFrom, end: params.dateTo },
-    }
+    return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }
   }
 
-  const systemRowsById = new Map(systemRows.map((row) => [row.system_id, row]))
-  const coverageByKey = new Map((params.coverageRows ?? []).map((row) => [row.kpi_key, row]))
-  const totalSystems = params.scopedSystemIds.length
-
-  const buildTrust = (
-    key: keyof typeof TRUST_FALLBACKS,
-    predicate: (row: DashboardConsolidatedRow) => boolean,
-  ): NonNullable<KPIOverviewMetric["trust"]> => {
-    const fallback = TRUST_FALLBACKS[key]
-    const coverage = coverageByKey.get(key)
-    const covered = toUniqueSystemIds(consolidatedRows, (row) => predicate(row as DashboardConsolidatedRow))
-
-    return {
-      source: coverage?.data_source ?? fallback.source,
-      basis: coverage?.basis ?? fallback.basis,
-      coverage: buildCoverageLabel(covered, totalSystems),
-    }
-  }
-
-  const mortalityWeight = (systemId: number) => systemRowsById.get(systemId)?.fish_end ?? null
-  const abwWeight = (systemId: number) => systemRowsById.get(systemId)?.fish_end ?? null
-
-  const consolidatedEfcrRow =
-    consolidatedRows.find((row) => isFiniteNumber(row.efcr_period_consolidated)) ?? null
-  const efcr = consolidatedEfcrRow?.efcr_period_consolidated ?? null
-  const efcrTrend = consolidatedEfcrRow?.efcr_period_consolidated_delta ?? null
-  const mortality = weightedAverage(
-    consolidatedRows.map((row) => ({
-      value: row.mortality_rate,
-      weight: mortalityWeight(row.system_id),
-    })),
-  )
-  const abw = weightedAverage(
-    consolidatedRows.map((row) => ({
-      value: row.abw_asof_end,
-      weight: abwWeight(row.system_id),
-    })),
-  )
-  const biomass = average(consolidatedRows.map((row) => row.average_biomass))
-  const biomassDensity = average(consolidatedRows.map((row) => row.biomass_density))
-  const feeding = weightedAverage(
-    consolidatedRows.map((row) => ({
-      value: row.feeding_rate,
-      weight: row.average_biomass,
-    })),
-  )
-  const waterQuality = average(consolidatedRows.map((row) => row.water_quality_rating_numeric_average))
+  const consolidated = consolidatedRows.find((row) => row.system_id == null) ?? consolidatedRows[0]
+  const waterQuality = consolidated.water_quality_rating_numeric_average ?? null
 
   const waterQualityLabel = getRoundedWaterQualityLabel(waterQuality)
   const waterQualityDisplay = waterQualityLabel ? WATER_QUALITY_BADGES[waterQualityLabel] : null
@@ -321,93 +98,72 @@ export function buildKpiOverviewFromRpc(params: {
     {
       key: "efcr",
       label: "eFCR",
-      value: efcr,
+      value: consolidated.efcr_period_consolidated ?? null,
       decimals: 2,
-      trend: efcrTrend,
+      trend: consolidated.efcr_period_consolidated_delta ?? null,
       trendFormat: "delta",
       trendDecimals: 2,
       invertTrend: true,
-      trust: buildTrust("efcr", (row) => isFiniteNumber(row.efcr_period_consolidated)),
     },
     {
       key: "mortality",
       label: "Mortality Rate",
-      value: mortality,
+      value: consolidated.mortality_rate ?? null,
       unit: "%/day",
       decimals: 2,
-      trend: weightedAverage(
-        consolidatedRows.map((row) => ({
-          value: row.mortality_rate_delta,
-          weight: mortalityWeight(row.system_id),
-        })),
-      ),
+      trend: consolidated.mortality_rate_delta ?? null,
       trendFormat: "delta",
       trendDecimals: 2,
       trendUnit: "%/day",
       invertTrend: true,
-      trust: buildTrust("mortality", (row) => isFiniteNumber(row.mortality_rate)),
     },
     {
       key: "abw",
       label: "Avg Body Weight",
-      value: abw,
+      value: consolidated.abw_asof_end ?? null,
       unit: "g",
       decimals: 1,
-      trend: weightedAverage(
-        consolidatedRows.map((row) => ({
-          value: row.abw_asof_end_delta,
-          weight: abwWeight(row.system_id),
-        })),
-      ),
+      trend: consolidated.abw_asof_end_delta ?? null,
       trendFormat: "delta",
       trendDecimals: 1,
       trendUnit: "g",
       invertTrend: false,
-      trust: buildTrust("abw", (row) => isFiniteNumber(row.abw_asof_end)),
     },
     {
       key: "biomass",
       label: "Total Biomass",
-      value: biomass,
+      value: consolidated.average_biomass ?? null,
       unit: "kg",
       decimals: 1,
-      trend: average(consolidatedRows.map((row) => row.average_biomass_delta)),
+      trend: consolidated.average_biomass_delta ?? null,
       trendFormat: "delta",
       trendDecimals: 1,
       trendUnit: "kg",
       invertTrend: false,
-      trust: buildTrust("biomass", (row) => isFiniteNumber(row.average_biomass)),
     },
     {
       key: "biomass_density",
       label: "Biomass Density",
-      value: biomassDensity,
+      value: consolidated.biomass_density ?? null,
       unit: "kg/m3",
       decimals: 2,
-      trend: average(consolidatedRows.map((row) => row.biomass_density_delta)),
+      trend: consolidated.biomass_density_delta ?? null,
       trendFormat: "delta",
       trendDecimals: 2,
       trendUnit: "kg/m3",
       invertTrend: false,
-      trust: buildTrust("biomass_density", (row) => isFiniteNumber(row.biomass_density)),
     },
     {
       key: "feeding",
       label: "Feeding Rate",
-      value: feeding,
+      value: consolidated.feeding_rate ?? null,
       unit: "% BW/day",
       decimals: 2,
-      trend: weightedAverage(
-        consolidatedRows.map((row) => ({
-          value: row.feeding_rate_delta,
-          weight: row.average_biomass,
-        })),
-      ),
+      trend: consolidated.feeding_rate_delta ?? null,
       trendFormat: "delta",
       trendDecimals: 2,
       trendUnit: "% BW/day",
       invertTrend: false,
-      trust: buildTrust("feeding", (row) => isFiniteNumber(row.feeding_rate)),
     },
     {
       key: "water_quality",
@@ -418,7 +174,6 @@ export function buildKpiOverviewFromRpc(params: {
       invertTrend: false,
       tone: waterQualityDisplay?.tone ?? "neutral",
       badge: waterQualityDisplay?.badge ?? "Monitoring",
-      trust: buildTrust("water_quality", (row) => isFiniteNumber(row.water_quality_rating_numeric_average)),
     },
   ]
 

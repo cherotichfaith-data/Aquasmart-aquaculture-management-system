@@ -4,10 +4,8 @@ import { useQuery } from "@tanstack/react-query"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
 import { queryKeys } from "@/lib/cache/query-keys"
-import type { KPIOverviewMetric } from "@/features/dashboard/types"
 import { buildKpiOverviewFromRpc } from "@/features/dashboard/analytics-rpc-shared"
-import { getKpiCoverage } from "@/lib/api/analytics"
-import { getDashboardConsolidated, getDashboardSystems } from "@/lib/api/dashboard"
+import { getDashboardConsolidated } from "@/lib/api/dashboard"
 import type { TimePeriod } from "@/lib/time-period"
 import { resolveScopedSystemIds } from "./shared"
 
@@ -44,43 +42,27 @@ export function useKpiOverview(params: {
         if (Array.isArray(scopedSystemIds) && scopedSystemIds.length === 0) return { metrics: [], dateBounds: range }
         const singleSystemId = Array.isArray(scopedSystemIds) && scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
 
-        const [consolidatedResult, systemsResult, coverageResult] = await Promise.all([
-          getDashboardConsolidated({
-            farmId: params.farmId ?? null,
-            systemId: singleSystemId,
-            dateFrom: range.start,
-            dateTo: range.end,
-            signal,
-          }),
-          getDashboardSystems({
-            farmId: params.farmId ?? null,
-            stage: params.stage === "all" ? null : params.stage,
-            systemId: singleSystemId,
-            dateFrom: range.start,
-            dateTo: range.end,
-            signal,
-          }),
-          getKpiCoverage({
-            farmId: params.farmId!,
-            dateFrom: range.start,
-            dateTo: range.end,
-            signal,
-          }),
-        ])
+        const consolidatedResult = await getDashboardConsolidated({
+          farmId: params.farmId ?? null,
+          systemId: singleSystemId,
+          dateFrom: range.start,
+          dateTo: range.end,
+          signal,
+        })
 
-        if (consolidatedResult.status !== "success" || systemsResult.status !== "success") {
+        if (consolidatedResult.status !== "success") {
           return { metrics: [], dateBounds: range }
         }
 
         const resolvedSystemIds = Array.isArray(scopedSystemIds)
           ? scopedSystemIds
-          : systemsResult.data.map((row) => row.system_id)
+          : consolidatedResult.data
+              .map((row) => row.system_id)
+              .filter((systemId): systemId is number => typeof systemId === "number" && Number.isFinite(systemId))
 
         return buildKpiOverviewFromRpc({
           scopedSystemIds: resolvedSystemIds,
           consolidatedRows: consolidatedResult.data,
-          systemRows: systemsResult.data,
-          coverageRows: coverageResult.status === "success" ? coverageResult.data : [],
           dateFrom: range.start,
           dateTo: range.end,
         })

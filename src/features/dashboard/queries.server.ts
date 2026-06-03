@@ -30,7 +30,6 @@ import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics
 import { toProductionTrendRows } from "./production-trend"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
-type KpiCoverageRow = Database["public"]["Functions"]["api_kpi_coverage"]["Returns"][number]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 type SystemDimensionRow = Pick<Database["public"]["Tables"]["system"]["Row"], "id" | "volume" | "depth">
@@ -282,23 +281,6 @@ async function getDashboardConsolidatedRows(
   return (data ?? []) as DashboardConsolidatedRow[]
 }
 
-async function getKpiCoverageRows(
-  supabase: ServerClient,
-  params: { farmId: string; dateFrom?: string | null; dateTo?: string | null },
-): Promise<KpiCoverageRow[]> {
-  const { data, error } = await supabase.rpc("api_kpi_coverage", {
-    p_farm_id: params.farmId,
-    ...(params.dateFrom ? { p_date_from: params.dateFrom } : {}),
-    ...(params.dateTo   ? { p_date_to:   params.dateTo   } : {}),
-  })
-  if (error) {
-    if (isMissingObjectError(error)) return []
-    logSbError("dashboard:getKpiCoverageRows", error)
-    return []
-  }
-  return (data ?? []) as KpiCoverageRow[]
-}
-
 async function getRecommendedActionRows(
   supabase: ServerClient,
   params: { farmId: string; systemId?: number },
@@ -344,16 +326,12 @@ async function resolveScopedSystemIds(params: {
 function buildKpiOverview(params: {
   scopedSystemIds: number[]
   consolidatedRows: DashboardConsolidatedRow[]
-  systemRows: DashboardSystemRow[]
-  coverageRows: KpiCoverageRow[]
   dateFrom: string
   dateTo: string
 }): DashboardPageInitialData["kpiOverview"] {
   return buildKpiOverviewFromRpc({
     scopedSystemIds: params.scopedSystemIds,
     consolidatedRows: params.consolidatedRows,
-    systemRows: params.systemRows,
-    coverageRows: params.coverageRows,
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
   })
@@ -462,7 +440,7 @@ async function loadDashboardPageInitialData(
     params.filters.selectedStage === "all" &&
     params.filters.selectedBatch === "all" &&
     effectiveSelectedSystem === "all"
-  const [productionRows, consolidatedRows, kpiCoverageRows, recommendedActionRows, waterQualityMeasurements] =
+  const [productionRows, consolidatedRows, recommendedActionRows, waterQualityMeasurements] =
     await Promise.all([
       withNetworkFallback("dashboard:getProductionSummaryRows", [], () =>
         getProductionSummaryRows(supabase, {
@@ -479,17 +457,6 @@ async function loadDashboardPageInitialData(
           getDashboardConsolidatedRows(supabase, {
             farmId,
             systemId: singleSystemId,
-            dateFrom: startDate,
-            dateTo: endDate,
-          }),
-        { allowMissingObject: true },
-      ),
-      withNetworkFallback(
-        "dashboard:getKpiCoverageRows",
-        [],
-        () =>
-          getKpiCoverageRows(supabase, {
-            farmId,
             dateFrom: startDate,
             dateTo: endDate,
           }),
@@ -555,8 +522,6 @@ async function loadDashboardPageInitialData(
     kpiOverview: buildKpiOverview({
       scopedSystemIds: activeScopedSystemIds,
       consolidatedRows,
-      systemRows: dashboardSystems,
-      coverageRows: kpiCoverageRows,
       dateFrom: startDate,
       dateTo: endDate,
     }),
