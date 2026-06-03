@@ -644,25 +644,13 @@ export function buildDailyDoVariation(rows: WaterQualityMeasurementViewRow[]) {
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
-export function buildDailyTempAverage(rows: WaterQualityMeasurementViewRow[]) {
-  const byDate = new Map<string, { sum: number; count: number }>()
-
-  rows
-    .filter((row) => row.parameter_name === "temperature")
-    .forEach((row) => {
-      if (!row.date || row.parameter_value == null) return
-      const current = byDate.get(row.date) ?? { sum: 0, count: 0 }
-      current.sum += row.parameter_value
-      current.count += 1
-      byDate.set(row.date, current)
-    })
-
-  return Array.from(byDate.entries())
-    .map(([date, agg]) => ({
-      date,
-      average: agg.count > 0 ? agg.sum / agg.count : null,
+export function buildDailyTempAverage(rows: WaterQualityRatingRow[]) {
+  return rows
+    .map((row) => ({
+      date: row.rating_date,
+      average: row.temperature_average,
     }))
-    .filter((row) => row.average != null)
+    .filter((row): row is { date: string; average: number } => Boolean(row.date) && row.average != null)
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 

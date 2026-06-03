@@ -5361,6 +5361,9 @@ CREATE OR REPLACE VIEW "public"."api_daily_water_quality_rating" WITH ("security
     ("dwr"."worst_parameter")::"text" AS "worst_parameter_normalized",
     "dwr"."worst_parameter_value",
     "dwr"."worst_parameter_unit",
+    ( SELECT "avg"("wqm"."parameter_value") AS "avg"
+           FROM "public"."water_quality_measurement" "wqm"
+          WHERE (("wqm"."system_id" = "dwr"."system_id") AND ("wqm"."date" = "dwr"."rating_date") AND ("wqm"."parameter_name" = 'temperature'::"public"."water_quality_parameters"))) AS "temperature_average",
     "dwr"."created_at"
    FROM ("public"."daily_water_quality_rating" "dwr"
      JOIN "public"."system" "s" ON (("s"."id" = "dwr"."system_id")))
