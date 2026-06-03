@@ -1775,6 +1775,8 @@ export type Database = {
           feeding_rate: number
           fish_end: number
           growth_stage: Database["public"]["Enums"]["system_growth_stage"]
+          abw_delta: number
+          abw_trend: string
           input_end_date: string
           input_start_date: string
           missing_days_count: number

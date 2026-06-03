@@ -1017,7 +1017,7 @@ COMMENT ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p
 
 
 
-CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "growth_stage" "public"."system_growth_stage", "input_start_date" "date", "input_end_date" "date", "as_of_date" "date", "fish_end" double precision, "biomass_end" double precision, "sampling_end_date" "date", "sample_age_days" integer, "efcr" double precision, "efcr_date" "date", "feed_total" double precision, "abw" double precision, "feeding_rate" double precision, "mortality_rate" double precision, "biomass_density" double precision, "missing_days_count" integer, "water_quality_rating_average" "text", "water_quality_rating_numeric_average" double precision, "water_quality_latest_date" "date", "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text")
+CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "growth_stage" "public"."system_growth_stage", "input_start_date" "date", "input_end_date" "date", "as_of_date" "date", "fish_end" double precision, "biomass_end" double precision, "sampling_end_date" "date", "sample_age_days" integer, "efcr" double precision, "efcr_date" "date", "feed_total" double precision, "abw" double precision, "abw_delta" double precision, "abw_trend" "text", "feeding_rate" double precision, "mortality_rate" double precision, "biomass_density" double precision, "missing_days_count" integer, "water_quality_rating_average" "text", "water_quality_rating_numeric_average" double precision, "water_quality_latest_date" "date", "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
     AS $$
@@ -1047,6 +1047,31 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
       biomass_density
     from inv
     order by system_id, inventory_date desc
+  ),
+  abw_ranked as (
+    select
+      dfi.system_id,
+      dfi.abw_last_sampling as abw,
+      row_number() over (
+        partition by dfi.system_id
+        order by dfi.last_sampling_date desc nulls last, dfi.inventory_date desc
+      ) as rn
+    from inv dfi
+    where dfi.abw_last_sampling is not null
+      and dfi.last_sampling_date is not null
+  ),
+  abw_delta as (
+    select
+      cur.system_id,
+      (cur.abw - prev.abw)::double precision as abw_delta,
+      case
+        when prev.abw is null or cur.abw is null or cur.abw = prev.abw then 'flat'
+        when cur.abw > prev.abw then 'up'
+        else 'down'
+      end as abw_trend
+    from abw_ranked cur
+    left join abw_ranked prev on prev.system_id = cur.system_id and prev.rn = 2
+    where cur.rn = 1
   ),
   base as (
     select sys.system_id, sys.system_name, sys.growth_stage,
@@ -1121,7 +1146,7 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
     b.fish_end, b.biomass_end, b.sampling_end_date,
     case when b.sampling_end_date is null or b.input_end_date is null then null
       else (b.input_end_date - b.sampling_end_date)::int end as sample_age_days,
-    pl.efcr, pl.efcr_date, pf.feed_total, b.abw,
+    pl.efcr, pl.efcr_date, pf.feed_total, b.abw, ad.abw_delta, coalesce(ad.abw_trend, 'flat') as abw_trend,
     ia.feeding_rate, ia.mortality_rate, b.biomass_density,
     case when b.input_start_date is null or b.input_end_date is null then null
       else greatest(0, (b.input_end_date - b.input_start_date + 1)::int - coalesce(ia.days_present, 0))
@@ -1134,6 +1159,7 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
   left join inv_agg ia on ia.system_id = b.system_id
   left join ps_feed pf on pf.system_id = b.system_id
   left join ps_latest pl on pl.system_id = b.system_id
+  left join abw_delta ad on ad.system_id = b.system_id
   left join wq_avg wa on wa.system_id = b.system_id
   left join wq_latest wl on wl.system_id = b.system_id
   order by b.system_name;
