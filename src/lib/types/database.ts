@@ -1684,6 +1684,7 @@ export type Database = {
           p_farm_id: string
           p_limit?: number
           p_order_asc?: boolean
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
           p_start_date?: string
           p_system_id?: number
         }
@@ -1714,6 +1715,7 @@ export type Database = {
         Args: {
           p_end_date?: string
           p_farm_id: string
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
           p_start_date?: string
           p_system_id?: number
         }
@@ -1730,6 +1732,7 @@ export type Database = {
           p_farm_id: string
           p_limit?: number
           p_order_desc?: boolean
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
           p_start_date?: string
           p_system_id?: number
           p_time_period?: string
@@ -1766,6 +1769,8 @@ export type Database = {
         }
         Returns: {
           abw: number
+          abw_delta: number
+          abw_trend: string
           as_of_date: string
           biomass_density: number
           biomass_end: number
@@ -1775,8 +1780,6 @@ export type Database = {
           feeding_rate: number
           fish_end: number
           growth_stage: Database["public"]["Enums"]["system_growth_stage"]
-          abw_delta: number
-          abw_trend: string
           input_end_date: string
           input_start_date: string
           missing_days_count: number
@@ -1797,6 +1800,7 @@ export type Database = {
         Args: {
           p_end_date?: string
           p_farm_id: string
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
           p_start_date?: string
           p_system_id?: number
         }
@@ -1950,15 +1954,6 @@ export type Database = {
           number_of_fish: number
           supplier_id: number
           system_id: number
-        }[]
-      }
-      api_fingerling_supplier_options_rpc: {
-        Args: never
-        Returns: {
-          company_name: string
-          id: number
-          location_city: string
-          location_country: string
         }[]
       }
       api_growth_trend: {

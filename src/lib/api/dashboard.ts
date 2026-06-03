@@ -118,6 +118,7 @@ export async function getDashboardSystems(params?: {
 
   const inventoryResult = await getDailyFishInventory({
     farmId: params.farmId,
+    stage: params.stage ?? undefined,
     dateFrom: params.dateFrom ?? undefined,
     dateTo: params.dateTo ?? undefined,
     limit: 10000,
@@ -159,6 +160,7 @@ export async function getDashboardSystems(params?: {
 
 export async function getDashboardConsolidated(params?: {
   farmId?: string | null
+  stage?: Enums<"system_growth_stage"> | null
   systemId?: number | null
   dateFrom?: string | null
   dateTo?: string | null
@@ -177,6 +179,7 @@ export async function getDashboardConsolidated(params?: {
     {
       p_farm_id: params.farmId,
       p_system_id: params.systemId ?? undefined,
+      p_stage: params.stage ?? undefined,
       p_start_date: params.dateFrom ?? undefined,
       p_end_date: params.dateTo ?? undefined,
       p_time_period:

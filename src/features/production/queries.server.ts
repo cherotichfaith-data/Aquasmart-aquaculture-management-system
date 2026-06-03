@@ -92,6 +92,7 @@ async function loadProductionPageInitialData(
       ? listDailyFishInventoryRows(supabase, {
           farmId: params.farmId,
           systemId,
+          stage: params.filters.selectedStage === "all" ? undefined : params.filters.selectedStage,
           dateFrom: bounds.start,
           dateTo: bounds.end,
           limit: 5000,

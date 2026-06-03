@@ -7,7 +7,7 @@ import { queryKeys } from "@/lib/cache/query-keys"
 import type { DashboardSystemRow, SystemsTableData } from "@/features/dashboard/types"
 import { getDashboardSystems } from "@/lib/api/dashboard"
 import type { TimePeriod } from "@/lib/time-period"
-import { hasCompleteSystemMetrics, resolveScopedSystemIds } from "./shared"
+import { hasCompleteSystemMetrics } from "./shared"
 
 export function useSystemsTable(params: {
   farmId?: string | null
@@ -48,16 +48,7 @@ export function useSystemsTable(params: {
       const stage = params.stage === "all" ? null : params.stage
       const parsedSystemId = params.system && params.system !== "all" ? Number(params.system) : null
       const systemId = Number.isFinite(parsedSystemId) ? (parsedSystemId as number) : null
-      const scopedSystemIds = await resolveScopedSystemIds({
-        farmId,
-        stage: params.stage,
-        batch: params.batch ?? "all",
-        system: params.system,
-        dateFrom: startDate,
-        dateTo: endDate,
-        signal,
-        scopedSystemIds: params.scopedSystemIds,
-      })
+      const scopedSystemIds = Array.isArray(params.scopedSystemIds) ? params.scopedSystemIds : null
       if (debugEnabled) {
         console.debug("[dashboard][useSystemsTable]", {
           farmId,
@@ -69,13 +60,7 @@ export function useSystemsTable(params: {
           scopedSystemIds,
         })
       }
-      if (scopedSystemIds === null) {
-        return {
-          rows: [] as DashboardSystemRow[],
-          meta: { reason: "Scoped systems error", start: startDate, end: endDate },
-        }
-      }
-      if (Array.isArray(scopedSystemIds) && scopedSystemIds.length === 0) {
+      if (scopedSystemIds && scopedSystemIds.length === 0) {
         return {
           rows: [] as DashboardSystemRow[],
           meta: { reason: "No scoped systems", start: startDate, end: endDate },
@@ -99,7 +84,7 @@ export function useSystemsTable(params: {
       }
 
       const rows = ((result.data ?? []) as DashboardSystemRow[]).filter((row) => {
-        if (Array.isArray(scopedSystemIds) && !scopedSystemIds.includes(row.system_id)) return false
+        if (scopedSystemIds && !scopedSystemIds.includes(row.system_id)) return false
         if (params.includeIncomplete) return true
         return hasCompleteSystemMetrics(row)
       })

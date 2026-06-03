@@ -7,7 +7,6 @@ import { queryKeys } from "@/lib/cache/query-keys"
 import { buildKpiOverviewFromRpc } from "@/features/dashboard/analytics-rpc-shared"
 import { getDashboardConsolidated } from "@/lib/api/dashboard"
 import type { TimePeriod } from "@/lib/time-period"
-import { resolveScopedSystemIds } from "./shared"
 
 export function useKpiOverview(params: {
   farmId?: string | null
@@ -28,22 +27,13 @@ export function useKpiOverview(params: {
       const dateTo = params.dateTo ?? null
 
       const buildRangeMetrics = async (range: { start: string; end: string }) => {
-        const scopedSystemIds = await resolveScopedSystemIds({
-          farmId: params.farmId ?? null,
-          stage: params.stage,
-          system: params.system,
-          batch: params.batch ?? "all",
-          dateFrom: range.start,
-          dateTo: range.end,
-          signal,
-          scopedSystemIds: params.scopedSystemIds,
-        })
-        if (scopedSystemIds === null) return { metrics: [], dateBounds: range }
-        if (Array.isArray(scopedSystemIds) && scopedSystemIds.length === 0) return { metrics: [], dateBounds: range }
-        const singleSystemId = Array.isArray(scopedSystemIds) && scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
+        const scopedSystemIds = Array.isArray(params.scopedSystemIds) ? params.scopedSystemIds : null
+        if (scopedSystemIds && scopedSystemIds.length === 0) return { metrics: [], dateBounds: range }
+        const singleSystemId = scopedSystemIds?.length === 1 ? scopedSystemIds[0] : undefined
 
         const consolidatedResult = await getDashboardConsolidated({
           farmId: params.farmId ?? null,
+          stage: params.stage === "all" ? undefined : params.stage,
           systemId: singleSystemId,
           dateFrom: range.start,
           dateTo: range.end,
@@ -54,7 +44,7 @@ export function useKpiOverview(params: {
           return { metrics: [], dateBounds: range }
         }
 
-        const resolvedSystemIds = Array.isArray(scopedSystemIds)
+        const resolvedSystemIds = scopedSystemIds
           ? scopedSystemIds
           : consolidatedResult.data
               .map((row) => row.system_id)

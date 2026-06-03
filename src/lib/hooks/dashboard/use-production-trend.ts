@@ -11,7 +11,6 @@ import { getFeedingRecords, getMortalityData, getSamplingData } from "@/lib/api/
 import { sortByDateAsc } from "@/lib/utils"
 import type { TimePeriod } from "@/lib/time-period"
 import { formatCageLabel } from "@/lib/system-options"
-import { resolveScopedSystemIds } from "./shared"
 
 type InventoryTrendRow = Awaited<ReturnType<typeof getDailyFishInventory>> extends infer Result
   ? Result extends { status: "success"; data: Array<infer Row> }
@@ -195,6 +194,7 @@ export function useProductionTrend(params: {
         const inventoryResult = await getDailyFishInventory({
           farmId: params.farmId ?? null,
           systemId: parsedSystemId,
+          stage: params.stage,
           orderAsc: false,
           limit: 5000,
           signal,
@@ -207,19 +207,9 @@ export function useProductionTrend(params: {
           signal,
         })
       }
-      const scopedSystemIds = await resolveScopedSystemIds({
-        farmId: params.farmId ?? null,
-        stage: (params.stage ?? "all") as "all" | Enums<"system_growth_stage">,
-        batch: params.batch ?? "all",
-        system: params.system,
-        dateFrom,
-        dateTo,
-        signal,
-        scopedSystemIds: params.scopedSystemIds,
-      })
-      if (scopedSystemIds === null) return []
-      if (Array.isArray(scopedSystemIds) && scopedSystemIds.length === 0) return []
-      const systemId = Array.isArray(scopedSystemIds) && scopedSystemIds.length === 1 ? scopedSystemIds[0] : parsedSystemId
+      const scopedSystemIds = Array.isArray(params.scopedSystemIds) ? params.scopedSystemIds : null
+      if (scopedSystemIds && scopedSystemIds.length === 0) return []
+      const systemId = scopedSystemIds?.length === 1 ? scopedSystemIds[0] : parsedSystemId
       const summaryResult = await getProductionSummary({
         farmId: params.farmId ?? null,
         stage: params.stage ?? undefined,
@@ -230,7 +220,7 @@ export function useProductionTrend(params: {
         signal,
       })
       const summaryRows = summaryResult.status === "success" ? summaryResult.data : []
-      const filtered = Array.isArray(scopedSystemIds)
+      const filtered = scopedSystemIds
         ? summaryRows.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
         : summaryRows
       if (filtered.length > 0) return sortByDateAsc(filtered, (row) => row.date)
@@ -238,6 +228,7 @@ export function useProductionTrend(params: {
       const inventoryResult = await getDailyFishInventory({
         farmId: params.farmId ?? null,
         systemId,
+        stage: params.stage,
         dateFrom,
         dateTo,
         orderAsc: true,
@@ -245,7 +236,7 @@ export function useProductionTrend(params: {
         signal,
       })
       if (inventoryResult.status !== "success") return []
-      const inventoryRows = Array.isArray(scopedSystemIds)
+      const inventoryRows = scopedSystemIds
         ? inventoryResult.data.filter((row) => row.system_id != null && scopedSystemIds.includes(row.system_id))
         : inventoryResult.data
       const inventoryTrendRows = inventoryRows.map(toTrendRowFromInventory)
@@ -253,7 +244,7 @@ export function useProductionTrend(params: {
       return getOperationalTrendFallback({
         farmId: params.farmId ?? null,
         systemId,
-        systemIds: Array.isArray(scopedSystemIds) ? scopedSystemIds : null,
+        systemIds: scopedSystemIds,
         dateFrom,
         dateTo,
         signal,

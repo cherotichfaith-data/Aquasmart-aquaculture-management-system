@@ -8,7 +8,6 @@ import type { RecommendedAction } from "@/features/dashboard/types"
 import { mergeRecommendedActionRows } from "@/features/dashboard/analytics-rpc-shared"
 import { getScopedRecommendedActions } from "@/lib/api/analytics"
 import type { TimePeriod } from "@/lib/time-period"
-import { resolveScopedSystemIds } from "./shared"
 
 export function useRecommendedActions(params: {
   farmId?: string | null
@@ -36,25 +35,13 @@ export function useRecommendedActions(params: {
           due: string
         }>
       }
-      const scopedSystemIds = await resolveScopedSystemIds({
-        farmId: params.farmId ?? null,
-        stage: params.stage ?? "all",
-        batch: params.batch ?? "all",
-        system: params.system,
-        dateFrom,
-        dateTo,
-        signal,
-        scopedSystemIds: params.scopedSystemIds,
-      })
-      if (scopedSystemIds === null) {
-        return [] as RecommendedAction[]
-      }
-      if (Array.isArray(scopedSystemIds) && scopedSystemIds.length === 0) {
+      const scopedSystemIds = Array.isArray(params.scopedSystemIds) ? params.scopedSystemIds : null
+      if (scopedSystemIds && scopedSystemIds.length === 0) {
         return [] as RecommendedAction[]
       }
       const actionsResult = await getScopedRecommendedActions({
         farmId: params.farmId!,
-        systemIds: Array.isArray(scopedSystemIds) ? scopedSystemIds : undefined,
+        systemIds: scopedSystemIds ?? undefined,
         signal,
       })
 

@@ -101,6 +101,7 @@ export default function FeedManagementPage({
   const inventoryQuery = useDailyFishInventory({
     farmId,
     systemId: hasSystem ? (systemId as number) : undefined,
+    stage: selectedStage === "all" ? undefined : selectedStage,
     dateFrom,
     dateTo,
     orderAsc: true,

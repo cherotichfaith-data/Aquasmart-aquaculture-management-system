@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/types/database"
+import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, isAbortLikeError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
@@ -8,6 +8,7 @@ type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inv
 type DailyInventoryRpcArgs = {
   p_farm_id: string
   p_system_id?: number
+  p_stage?: Enums<"system_growth_stage">
   p_start_date?: string
   p_end_date?: string
   // NEW (server-side paging/order)
@@ -20,6 +21,7 @@ type DailyInventoryRpcArgs = {
 const dailyInventoryRpcArgs = (params: {
   farmId: string
   systemId?: number
+  stage?: Enums<"system_growth_stage">
   dateFrom?: string
   dateTo?: string
   cursorDate?: string
@@ -28,6 +30,7 @@ const dailyInventoryRpcArgs = (params: {
 }): DailyInventoryRpcArgs => ({
   p_farm_id: params.farmId,
   p_system_id: params.systemId ?? undefined,
+  p_stage: params.stage ?? undefined,
   p_start_date: params.dateFrom ?? undefined,
   p_end_date: params.dateTo ?? undefined,
   p_cursor_date: params.cursorDate ?? undefined,
@@ -37,6 +40,7 @@ const dailyInventoryRpcArgs = (params: {
 
 export async function getDailyFishInventory(params?: {
   systemId?: number
+  stage?: Enums<"system_growth_stage">
   dateFrom?: string
   dateTo?: string
   limit?: number
@@ -56,6 +60,7 @@ export async function getDailyFishInventory(params?: {
   const args = dailyInventoryRpcArgs({
     farmId: params.farmId,
     systemId: params.systemId,
+    stage: params.stage,
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
     cursorDate: params.cursorDate,

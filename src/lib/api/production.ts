@@ -15,6 +15,7 @@ import type { ProductionTrendRpcRow } from "@/features/dashboard/types"
 type ProductionRpcArgs = {
   p_farm_id: string
   p_system_id?: number
+  p_stage?: Enums<"system_growth_stage">
   p_start_date?: string
   p_end_date?: string
 }
@@ -22,11 +23,13 @@ type ProductionRpcArgs = {
 const productionRpcArgs = (params: {
   farmId: string
   systemId?: number
+  stage?: Enums<"system_growth_stage">
   dateFrom?: string
   dateTo?: string
 }): ProductionRpcArgs => ({
   p_farm_id: params.farmId,
   p_system_id: params.systemId ?? undefined,
+  p_stage: params.stage ?? undefined,
   p_start_date: params.dateFrom ?? undefined,
   p_end_date: params.dateTo ?? undefined,
 })
@@ -57,6 +60,7 @@ export async function getProductionSummary(params?: {
     productionRpcArgs({
       farmId: params.farmId,
       systemId: params.systemId,
+      stage: params.stage,
       dateFrom: params.dateFrom,
       dateTo: params.dateTo,
     }),
@@ -75,7 +79,6 @@ export async function getProductionSummary(params?: {
     .slice()
     .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
 
-  if (params?.stage) rows = rows.filter((row) => row.growth_stage === params.stage)
   if (params?.limit) rows = rows.slice(0, params.limit)
 
   return toQuerySuccess(rows)

@@ -114,29 +114,10 @@ async function resolveActiveSystemId(
 ): Promise<number | undefined> {
   if (!selectedSystem || selectedSystem === "all") return undefined
 
-  const { data: systems, error: systemsError } = await supabase
-    .from("system")
-    .select("id, name, unit")
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
-
-  if (systemsError) {
-    throw systemsError
-  }
-
-  const systemId = resolveSystemIdFromFilterValue(selectedSystem, systems ?? [])
+  const systems = await getScopedSystemOptions(supabase, farmId, "all")
+  const systemId = resolveSystemIdFromFilterValue(selectedSystem, systems)
   if (!systemId || !Number.isFinite(systemId)) return undefined
-
-  const { data, error: selectedSystemError } = await supabase
-    .from("system")
-    .select("id")
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
-    .eq("id", systemId)
-    .maybeSingle()
-
-  if (selectedSystemError || typeof data?.id !== "number") return undefined
-  return data.id
+  return systemId
 }
 
 async function getDashboardSystemsRaw(
@@ -209,6 +190,7 @@ async function getProductionSummaryRows(
   supabase: ServerClient,
   params: {
     farmId: string
+    stage?: DashboardPageInitialFilters["selectedStage"]
     systemId?: number
     dateFrom?: string | null
     dateTo?: string | null
@@ -217,6 +199,7 @@ async function getProductionSummaryRows(
   const { data, error } = await supabase.rpc("api_production_summary", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
     p_start_date: params.dateFrom ?? undefined,
     p_end_date: params.dateTo ?? undefined,
   })
@@ -262,6 +245,7 @@ async function getDashboardConsolidatedRows(
   supabase: ServerClient,
   params: {
     farmId: string
+    stage?: DashboardPageInitialFilters["selectedStage"]
     systemId?: number
     dateFrom?: string | null
     dateTo?: string | null
@@ -270,6 +254,7 @@ async function getDashboardConsolidatedRows(
   const { data, error } = await supabase.rpc("api_dashboard_consolidated", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
     p_start_date: params.dateFrom ?? undefined,
     p_end_date: params.dateTo ?? undefined,
   })
@@ -295,32 +280,6 @@ async function getRecommendedActionRows(
   }
 
   return (data ?? []) as RecommendedActionRow[]
-}
-
-async function resolveScopedSystemIds(params: {
-  supabase: ServerClient
-  system: string
-  batch: string
-  systemIds: number[]
-}): Promise<number[]> {
-  let scoped = Array.from(
-    new Set(params.systemIds.filter((id): id is number => typeof id === "number" && Number.isFinite(id))),
-  )
-
-  if (params.system !== "all") {
-    const parsed = Number(params.system)
-    if (!Number.isFinite(parsed)) return []
-    scoped = scoped.filter((id) => id === parsed)
-  }
-
-  if (params.batch !== "all") {
-    const batchId = Number(params.batch)
-    if (!Number.isFinite(batchId)) return []
-    const batchIds = new Set(await getBatchSystemIds(params.supabase, batchId))
-    scoped = scoped.filter((id) => batchIds.has(id))
-  }
-
-  return scoped
 }
 
 function buildKpiOverview(params: {
@@ -421,19 +380,16 @@ async function loadDashboardPageInitialData(
     withNetworkFallback("dashboard:getAlertThresholds", [], () => listAlertThresholdRows(supabase, farmId)),
   ])
   const dashboardSystems = await backfillBiomassDensityFromSystemVolume(supabase, farmId, dashboardSystemsRaw)
-  const activeSystemIds = new Set(
-    systemOptions
-      .map((row) => row.id)
-      .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
-  )
-
-  const scopedSystemIds = await resolveScopedSystemIds({
-    supabase,
-    system: effectiveSelectedSystem,
-    batch: params.filters.selectedBatch,
-    systemIds: Array.from(activeSystemIds),
-  })
-  const activeScopedSystemIds = scopedSystemIds.filter((id) => activeSystemIds.has(id))
+  const dashboardSystemIds = dashboardSystems
+    .map((row) => row.system_id)
+    .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
+  const batchScopedIds =
+    params.filters.selectedBatch !== "all"
+      ? new Set(batchSystems.map((row) => row.system_id))
+      : null
+  const activeScopedSystemIds = batchScopedIds
+    ? dashboardSystemIds.filter((id) => batchScopedIds.has(id))
+    : dashboardSystemIds
 
   const singleSystemId = activeScopedSystemIds.length === 1 ? activeScopedSystemIds[0] : undefined
   const useFarmWideRecommendedActions =
@@ -445,6 +401,7 @@ async function loadDashboardPageInitialData(
       withNetworkFallback("dashboard:getProductionSummaryRows", [], () =>
         getProductionSummaryRows(supabase, {
           farmId,
+          stage: params.filters.selectedStage,
           systemId: singleSystemId,
           dateFrom: startDate,
           dateTo: endDate,
@@ -456,6 +413,7 @@ async function loadDashboardPageInitialData(
         () =>
           getDashboardConsolidatedRows(supabase, {
             farmId,
+            stage: params.filters.selectedStage,
             systemId: singleSystemId,
             dateFrom: startDate,
             dateTo: endDate,
@@ -490,13 +448,11 @@ async function loadDashboardPageInitialData(
 
   const filteredProductionRows = productionRows.filter(
     (row) =>
-      (params.filters.selectedStage === "all" || row.growth_stage === params.filters.selectedStage) &&
       row.system_id != null &&
       activeScopedSystemIds.includes(row.system_id),
   )
 
   const systemsTableRows = dashboardSystems.filter((row) => {
-    if (params.filters.selectedStage !== "all" && row.growth_stage !== params.filters.selectedStage) return false
     if (!activeScopedSystemIds.includes(row.system_id)) return false
     return true
   })
