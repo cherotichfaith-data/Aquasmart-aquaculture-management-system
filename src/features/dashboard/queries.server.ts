@@ -13,12 +13,12 @@ import {
 } from "@/features/shared/scoped-analytics.server"
 import {
   listAlertThresholdRows,
+  listProductionSummaryRows,
 } from "@/features/shared/query-seed.server"
 import type {
   DashboardPageInitialData,
   DashboardPageInitialFilters,
   DashboardSystemRow,
-  ProductionTrendRpcRow,
   ProductionTrendRow,
 } from "./types"
 import type { RecommendedActionRow } from "@/lib/types/insights"
@@ -184,31 +184,6 @@ async function backfillBiomassDensityFromSystemVolume(
 async function getBatchSystemIds(supabase: ServerClient, batchId?: number): Promise<number[]> {
   const rows = await getScopedBatchSystems(supabase, batchId)
   return rows.map((row) => row.system_id)
-}
-
-async function getProductionSummaryRows(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    stage?: DashboardPageInitialFilters["selectedStage"]
-    systemId?: number
-    dateFrom?: string | null
-    dateTo?: string | null
-  },
-): Promise<ProductionTrendRow[]> {
-  const { data, error } = await supabase.rpc("api_production_summary", {
-    p_farm_id: params.farmId,
-    p_system_id: params.systemId,
-    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
-    p_start_date: params.dateFrom ?? undefined,
-    p_end_date: params.dateTo ?? undefined,
-  })
-
-  if (error) {
-    throw error
-  }
-
-  return toProductionTrendRows((data ?? []) as ProductionTrendRpcRow[])
 }
 
 async function getWaterQualityMeasurements(
@@ -399,13 +374,13 @@ async function loadDashboardPageInitialData(
   const [productionRows, consolidatedRows, recommendedActionRows, waterQualityMeasurements] =
     await Promise.all([
       withNetworkFallback("dashboard:getProductionSummaryRows", [], () =>
-        getProductionSummaryRows(supabase, {
+        listProductionSummaryRows(supabase, {
           farmId,
-          stage: params.filters.selectedStage,
+          stage: params.filters.selectedStage === "all" ? undefined : params.filters.selectedStage,
           systemId: singleSystemId,
           dateFrom: startDate,
           dateTo: endDate,
-        }),
+        }).then(toProductionTrendRows),
       ),
       withNetworkFallback(
         "dashboard:getDashboardConsolidatedRows",
