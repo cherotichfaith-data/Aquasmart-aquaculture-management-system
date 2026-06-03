@@ -18,8 +18,11 @@ const isQuietError = (err: unknown): boolean =>
 const shouldBackfillRate = (value: number | null | undefined): boolean =>
   value == null || !Number.isFinite(value) || value === 0
 
+const isPositiveFiniteNumber = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0
+
 const deriveFeedingRate = (row: DailyFishInventoryRow): number | null => {
-  if (typeof row.feeding_rate === "number" && Number.isFinite(row.feeding_rate) && row.feeding_rate > 0) {
+  if (isPositiveFiniteNumber(row.feeding_rate)) {
     return row.feeding_rate
   }
   if (
@@ -35,29 +38,10 @@ const deriveFeedingRate = (row: DailyFishInventoryRow): number | null => {
   return null
 }
 
-const deriveMortalityRate = (row: DailyFishInventoryRow): number | null => {
-  // Prefer backend-computed start-of-day mortality_rate
-  if (typeof row.mortality_rate === "number" && Number.isFinite(row.mortality_rate) && row.mortality_rate > 0) {
-    return row.mortality_rate
-  }
-  // Fallback: daily deaths / end-of-day fish (less correct than backend)
-  if (
-    typeof row.number_of_fish_mortality === "number" &&
-    Number.isFinite(row.number_of_fish_mortality) &&
-    typeof row.number_of_fish === "number" &&
-    Number.isFinite(row.number_of_fish) &&
-    row.number_of_fish > 0
-  ) {
-    const derived = row.number_of_fish_mortality / row.number_of_fish
-    return Number.isFinite(derived) && derived > 0 ? derived : null
-  }
-  return null
-}
-
 const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
   const map = new Map<
     number,
-    { feedingWeighted: number; feedingWeight: number; mortalityWeighted: number; mortalityWeight: number }
+    { feedingWeighted: number; feedingWeight: number }
   >()
 
   rows.forEach((row) => {
@@ -65,29 +49,21 @@ const computePerSystemRateFallbacks = (rows: DailyFishInventoryRow[]) => {
     const current = map.get(row.system_id) ?? {
       feedingWeighted: 0,
       feedingWeight: 0,
-      mortalityWeighted: 0,
-      mortalityWeight: 0,
     }
 
     const feedingRate = deriveFeedingRate(row)
-    const mortalityRate = deriveMortalityRate(row)
 
     if (feedingRate != null && typeof row.biomass_last_sampling === "number" && row.biomass_last_sampling > 0) {
       current.feedingWeighted += feedingRate * row.biomass_last_sampling
       current.feedingWeight += row.biomass_last_sampling
     }
-    if (mortalityRate != null && typeof row.number_of_fish === "number" && row.number_of_fish > 0) {
-      current.mortalityWeighted += mortalityRate * row.number_of_fish
-      current.mortalityWeight += row.number_of_fish
-    }
     map.set(row.system_id, current)
   })
 
-  const resolved = new Map<number, { feedingRate: number | null; mortalityRate: number | null }>()
+  const resolved = new Map<number, { feedingRate: number | null }>()
   map.forEach((v, k) => {
     resolved.set(k, {
       feedingRate: v.feedingWeight > 0 ? v.feedingWeighted / v.feedingWeight : null,
-      mortalityRate: v.mortalityWeight > 0 ? v.mortalityWeighted / v.mortalityWeight : null,
     })
   })
   return resolved
@@ -136,7 +112,7 @@ export async function getDashboardSystems(params?: {
   const allowFallback = params?.allowFallback ?? true
   if (!allowFallback) return toQuerySuccess<DashboardSystemRpcRow>(rows)
 
-  if (!rows.some((r) => shouldBackfillRate(r.feeding_rate) || shouldBackfillRate(r.mortality_rate) || shouldBackfillRate(r.biomass_density))) {
+  if (!rows.some((r) => shouldBackfillRate(r.feeding_rate) || shouldBackfillRate(r.biomass_density))) {
     return toQuerySuccess<DashboardSystemRpcRow>(rows)
   }
 
@@ -174,7 +150,6 @@ export async function getDashboardSystems(params?: {
     return {
       ...row,
       feeding_rate: shouldBackfillRate(row.feeding_rate) && fb?.feedingRate != null ? fb.feedingRate : row.feeding_rate,
-      mortality_rate: shouldBackfillRate(row.mortality_rate) && fb?.mortalityRate != null ? fb.mortalityRate : row.mortality_rate,
       biomass_density: biomassDensity,
     }
   })
