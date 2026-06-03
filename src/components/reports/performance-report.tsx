@@ -6,7 +6,6 @@ import { sortByDateAsc } from "@/lib/utils"
 import type { Database, Enums } from "@/lib/types/database"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
-import { computeEfcrFromProductionRows } from "@/features/production/analytics"
 import {
   BenchmarkStatusSection,
   PerformanceRecordsSection,
@@ -16,6 +15,9 @@ import {
 } from "./performance-report-sections"
 
 type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+
+const isFiniteNumber = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value)
 
 const selectLatestRowsPerCycle = (rows: ProductionSummaryRow[]) => {
   const byCycle = new Map<string, ProductionSummaryRow>()
@@ -82,19 +84,21 @@ export default function PerformanceReport({
     performanceTableQuery.dataUpdatedAt ?? 0,
   )
   const chartRows = useMemo(() => {
-    const byDate = new Map<string, { totalBiomass: number; efcrRows: typeof rows }>()
+    const byDate = new Map<string, { totalBiomass: number; efcrPeriod: number | null }>()
     rows.forEach((row) => {
       if (!row.date) return
-      const current = byDate.get(row.date) ?? { totalBiomass: 0, efcrRows: [] }
+      const current = byDate.get(row.date) ?? { totalBiomass: 0, efcrPeriod: null }
       current.totalBiomass += row.total_biomass ?? 0
-      current.efcrRows.push(row)
+      if (isFiniteNumber(row.efcr_period)) {
+        current.efcrPeriod = row.efcr_period
+      }
       byDate.set(row.date, current)
     })
 
     return sortByDateAsc(
       Array.from(byDate.entries()).map(([date, current]) => ({
         date,
-        efcr_period: computeEfcrFromProductionRows(current.efcrRows),
+        efcr_period: current.efcrPeriod,
         total_biomass: current.totalBiomass,
       })),
       (row) => row.date,
@@ -125,15 +129,8 @@ export default function PerformanceReport({
         acc.totalStockedFish += row.number_of_fish_stocked ?? 0
         acc.totalCumulativeMortality += row.cumulative_mortality ?? 0
         acc.totalTransferOutFish += row.number_of_fish_transfer_out ?? 0
-        if (typeof row.efcr_aggregated === "number") {
-          const weight = row.biomass_increase_aggregated ?? 0
-          if (weight > 0) {
-            acc.efcrWeighted += row.efcr_aggregated * weight
-            acc.efcrWeight += weight
-          } else {
-            acc.efcrFallback += row.efcr_aggregated
-            acc.efcrFallbackCount += 1
-          }
+        if (acc.efcrAggregated == null && isFiniteNumber(row.efcr_aggregated)) {
+          acc.efcrAggregated = row.efcr_aggregated
         }
         return acc
       },
@@ -147,19 +144,10 @@ export default function PerformanceReport({
         totalStockedFish: 0,
         totalCumulativeMortality: 0,
         totalTransferOutFish: 0,
-        efcrWeighted: 0,
-        efcrWeight: 0,
-        efcrFallback: 0,
-        efcrFallbackCount: 0,
+        efcrAggregated: null as number | null,
       },
     )
 
-    const efcr =
-      totals.efcrWeight > 0
-        ? totals.efcrWeighted / totals.efcrWeight
-        : totals.efcrFallbackCount > 0
-          ? totals.efcrFallback / totals.efcrFallbackCount
-          : null
     const feedingRate =
       totals.totalBiomass > 0 && totals.totalFeed > 0
         ? totals.totalFeed / totals.totalBiomass
@@ -172,7 +160,7 @@ export default function PerformanceReport({
         : null
 
     return {
-      efcr_aggregated_consolidated: efcr,
+      efcr_aggregated_consolidated: totals.efcrAggregated,
       feeding_rate: feedingRate,
       average_biomass: totals.totalBiomass,
       mortality_rate: mortalityRate,

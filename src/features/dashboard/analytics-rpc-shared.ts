@@ -137,7 +137,9 @@ export function buildKpiOverviewFromRpc(params: {
   }
 
   const scopedSet = new Set(params.scopedSystemIds)
-  const consolidatedRows = params.consolidatedRows.filter((row) => scopedSet.has(row.system_id))
+  const consolidatedRows = params.consolidatedRows.filter(
+    (row) => row.system_id == null || scopedSet.has(row.system_id),
+  )
   const systemRows = params.systemRows.filter((row) => scopedSet.has(row.system_id))
 
   if (!consolidatedRows.length) {
@@ -175,7 +177,7 @@ export function buildKpiOverviewFromRpc(params: {
         {
           key: "efcr",
           label: "eFCR",
-          value: average(systemRows.map((row) => row.efcr)),
+          value: systemRows.find((row) => isFiniteNumber(row.efcr))?.efcr ?? null,
           decimals: 2,
           trend: null,
           trendFormat: "delta",
@@ -286,7 +288,10 @@ export function buildKpiOverviewFromRpc(params: {
   const mortalityWeight = (systemId: number) => systemRowsById.get(systemId)?.fish_end ?? null
   const abwWeight = (systemId: number) => systemRowsById.get(systemId)?.fish_end ?? null
 
-  const efcr = average(consolidatedRows.map((row) => row.efcr_period_consolidated))
+  const consolidatedEfcrRow =
+    consolidatedRows.find((row) => isFiniteNumber(row.efcr_period_consolidated)) ?? null
+  const efcr = consolidatedEfcrRow?.efcr_period_consolidated ?? null
+  const efcrTrend = consolidatedEfcrRow?.efcr_period_consolidated_delta ?? null
   const mortality = weightedAverage(
     consolidatedRows.map((row) => ({
       value: row.mortality_rate,
@@ -318,7 +323,7 @@ export function buildKpiOverviewFromRpc(params: {
       label: "eFCR",
       value: efcr,
       decimals: 2,
-      trend: average(consolidatedRows.map((row) => row.efcr_period_consolidated_delta)),
+      trend: efcrTrend,
       trendFormat: "delta",
       trendDecimals: 2,
       invertTrend: true,
