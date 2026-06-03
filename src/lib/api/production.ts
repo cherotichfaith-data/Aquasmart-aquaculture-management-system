@@ -1,4 +1,3 @@
-import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
   getClientOrError,
@@ -11,40 +10,14 @@ import {
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import { toProductionTrendRows } from "@/features/dashboard/production-trend"
 import type { ProductionTrendRpcRow } from "@/features/dashboard/types"
-
-type ProductionRpcArgs = {
-  p_farm_id: string
-  p_system_id?: number
-  p_stage?: Enums<"system_growth_stage">
-  p_start_date?: string
-  p_end_date?: string
-}
-
-const productionRpcArgs = (params: {
-  farmId: string
-  systemId?: number
-  stage?: Enums<"system_growth_stage">
-  dateFrom?: string
-  dateTo?: string
-}): ProductionRpcArgs => ({
-  p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? undefined,
-  p_stage: params.stage ?? undefined,
-  p_start_date: params.dateFrom ?? undefined,
-  p_end_date: params.dateTo ?? undefined,
-})
+import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
 
 const isQuietError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
 
 const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
 
-export async function getProductionSummary(params?: {
-  systemId?: number
-  stage?: Enums<"system_growth_stage">
-  dateFrom?: string
-  dateTo?: string
-  limit?: number
+export async function getProductionSummary(params?: Omit<ProductionSummaryParams, "farmId"> & {
   farmId?: string | null
   signal?: AbortSignal
 }): Promise<QueryResult<ProductionTrendRpcRow & { feeding_rate: number | null }>> {
@@ -57,7 +30,7 @@ export async function getProductionSummary(params?: {
   let query = queryKpiRpc(
     supabase,
     "api_production_summary",
-    productionRpcArgs({
+    buildProductionSummaryRpcArgs({
       farmId: params.farmId,
       systemId: params.systemId,
       stage: params.stage,

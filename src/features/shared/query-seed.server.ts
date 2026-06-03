@@ -9,6 +9,7 @@ import {
   type SystemHealthScoreParams,
 } from "@/lib/types/insights"
 import { normalizeSystemHealthRow } from "@/lib/health-grade"
+import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
 import { parseAlertThresholdSettings } from "@/lib/alert-thresholds"
 import { logSbError } from "@/lib/supabase/log"
 
@@ -36,22 +37,9 @@ type FarmMember = {
 
 export async function listProductionSummaryRows(
   supabase: ServerClient,
-  params: {
-    farmId: string
-    systemId?: number
-    stage?: Database["public"]["Enums"]["system_growth_stage"]
-    dateFrom?: string
-    dateTo?: string
-    limit?: number
-  },
+  params: ProductionSummaryParams,
 ): Promise<ProductionSummaryRow[]> {
-  const { data, error } = await supabase.rpc("api_production_summary", {
-    p_farm_id: params.farmId,
-    p_system_id: params.systemId,
-    p_stage: params.stage,
-    p_start_date: params.dateFrom,
-    p_end_date: params.dateTo,
-  })
+  const { data, error } = await supabase.rpc("api_production_summary", buildProductionSummaryRpcArgs(params))
   if (error) return []
 
   let rows = ((data ?? []) as ProductionSummaryRow[])
