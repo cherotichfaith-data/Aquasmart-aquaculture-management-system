@@ -1,6 +1,13 @@
 import type { Database } from "@/lib/types/database"
 import { createAccessTokenClient } from "@/lib/supabase/server"
-import type { CycleBenchmarkRow, FeedDemandRow, HarvestForecastRow, SystemHealthRow } from "@/lib/types/insights"
+import {
+  buildSystemHealthScoreRpcArgs,
+  type CycleBenchmarkRow,
+  type FeedDemandRow,
+  type HarvestForecastRow,
+  type SystemHealthRow,
+  type SystemHealthScoreParams,
+} from "@/lib/types/insights"
 import { normalizeSystemHealthRow } from "@/lib/health-grade"
 import { parseAlertThresholdSettings } from "@/lib/alert-thresholds"
 import { logSbError } from "@/lib/supabase/log"
@@ -334,12 +341,9 @@ export async function getFarmUserRole(
 
 export async function listSystemHealthScoreRows(
   supabase: ServerClient,
-  params: { farmId: string; systemId?: number },
+  params: SystemHealthScoreParams,
 ): Promise<SystemHealthRow[]> {
-  const { data, error } = await supabase.rpc("api_system_health_score", {
-    p_farm_id: params.farmId,
-    ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
-  })
+  const { data, error } = await supabase.rpc("api_system_health_score", buildSystemHealthScoreRpcArgs(params))
   if (error) {
     logSbError("query-seed:listSystemHealthScoreRows", error)
     return []

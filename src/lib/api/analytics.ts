@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import type {
   SystemHealthRow,
+  SystemHealthScoreParams,
   HarvestForecastRow,
   FeedDemandRow,
   CycleBenchmarkRow,
@@ -15,6 +16,7 @@ import type {
   FeedRateRow,
   KpiCoverageRow,
 } from "@/lib/types/insights"
+import { buildSystemHealthScoreRpcArgs } from "@/lib/types/insights"
 import { normalizeSystemHealthRow } from "@/lib/health-grade"
 import { getDashboardSystems } from "@/lib/api/dashboard"
 import { toSystemsOverviewRows } from "@/features/dashboard/systems-overview"
@@ -55,15 +57,13 @@ async function callAnalyticsRpc<T>(params: {
 
 // ── System Health Scores ──────────────────────────────────────────────────────
 
-export async function getSystemHealthScores(params: {
-  farmId: string
-  systemId?: number
+export async function getSystemHealthScores(params: SystemHealthScoreParams & {
   signal?: AbortSignal
 }): Promise<QueryResult<SystemHealthRow>> {
   const result = await callAnalyticsRpc<SystemHealthRow>({
     tag: "getSystemHealthScores",
     rpcName: "api_system_health_score",
-    args: { p_farm_id: params.farmId, ...(params.systemId != null ? { p_system_id: params.systemId } : {}) },
+    args: buildSystemHealthScoreRpcArgs(params),
     signal: params.signal,
   })
   return result.status === "success"

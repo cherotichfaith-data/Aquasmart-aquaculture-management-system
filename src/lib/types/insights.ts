@@ -60,6 +60,23 @@ export type SystemHealthRow = {
   wq_date: string | null
 }
 
+export type SystemHealthScoreParams = {
+  farmId: string
+  systemId?: number
+}
+
+export type SystemHealthScoreRpcArgs = {
+  p_farm_id: string
+  p_system_id?: number
+}
+
+export function buildSystemHealthScoreRpcArgs(params: SystemHealthScoreParams): SystemHealthScoreRpcArgs {
+  return {
+    p_farm_id: params.farmId,
+    ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
+  }
+}
+
 // ── Cycle Benchmarks ──────────────────────────────────────────────────────────
 
 export type BenchmarkLabel = "best_ever" | "above_avg" | "average" | "below_avg" | "no_history"
