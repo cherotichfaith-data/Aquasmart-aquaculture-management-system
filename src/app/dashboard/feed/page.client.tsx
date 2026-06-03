@@ -17,7 +17,6 @@ import { useFeedRateAnalysis } from "@/lib/hooks/use-analytics"
 import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import type { FeedPageInitialFilters } from "@/features/feed/types"
-import { countTimeRangeDays } from "@/lib/time-period"
 import {
   buildConsecutivePoorAlerts,
   buildFeedDeviationMatrixCells,
@@ -53,6 +52,7 @@ export default function FeedManagementPage({
     timePeriod,
     dateFrom: boundsStart,
     dateTo: boundsEnd,
+    boundsQuery,
     boundsReady,
   } = useAnalyticsPageBootstrap({
     initialFarmId,
@@ -82,7 +82,7 @@ export default function FeedManagementPage({
   const hasDateRange = boundsReady
   const dateFrom = boundsStart
   const dateTo = boundsEnd
-  const trendWindowDays = useMemo(() => countTimeRangeDays(dateFrom, dateTo) ?? undefined, [dateFrom, dateTo])
+  const trendWindowDays = boundsQuery.data.resolvedDays ?? undefined
 
   const runningStockQuery = useRunningStock({
     farmId,

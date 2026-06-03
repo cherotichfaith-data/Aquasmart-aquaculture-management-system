@@ -21,16 +21,6 @@ export const TIME_PERIODS: TimePeriod[] = [
   "all history",
 ]
 
-export const TIME_PERIOD_DAY_COUNTS: Record<BaseTimePeriod, number> = {
-  day: 1,
-  week: 7,
-  "2 weeks": 14,
-  month: 30,
-  quarter: 90,
-  "6 months": 180,
-  year: 365,
-}
-
 export const DEFAULT_TIME_PERIOD: TimePeriod = "2 weeks"
 
 export type TimeBounds = {
@@ -105,23 +95,6 @@ export const isBaseTimePeriod = (value: unknown): value is BaseTimePeriod =>
 
 export const resolveTimePeriod = (value: unknown, fallback: TimePeriod = DEFAULT_TIME_PERIOD): TimePeriod =>
   parseTimePeriodUrlValue(value) ?? fallback
-
-const DAY_MS = 86_400_000
-
-const parseUtcDate = (value: string) => {
-  const [year, month, day] = value.split("-").map(Number)
-  return new Date(Date.UTC(year, (month || 1) - 1, day || 1))
-}
-
-export function countTimeRangeDays(startDate?: string | null, endDate?: string | null) {
-  if (!startDate || !endDate) return null
-  const start = parseUtcDate(startDate)
-  const end = parseUtcDate(endDate)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-    return null
-  }
-  return Math.floor((end.getTime() - start.getTime()) / DAY_MS) + 1
-}
 
 const withAbortSignal = (query: TimePeriodBoundsRpcQuery, signal?: AbortSignal): TimePeriodBoundsRpcQuery => {
   if (!signal || typeof query.abortSignal !== "function") return query

@@ -20,7 +20,7 @@ import { listFeedingRecords, listGrowthTrend, listHarvests } from "@/lib/server/
 import { listMortalityEvents } from "@/lib/server/mortality-reads"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import type { Database, Enums } from "@/lib/types/database"
-import { countTimeRangeDays, isTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
+import { isTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
 
 export type ReportsPageFilters = {
   selectedBatch: string
@@ -79,7 +79,7 @@ export function parseReportsPageFilters(
 
 async function getScopedGrowthTrendRows(
   supabase: ReturnType<typeof createAccessTokenClient>,
-  params: { farmId: string | null; systemIds: number[]; dateFrom: string; dateTo: string },
+  params: { farmId: string | null; systemIds: number[]; dateFrom: string; dateTo: string; days?: number | null },
 ) {
   if (!params.farmId) return []
   const rows = await Promise.all(
@@ -87,7 +87,7 @@ async function getScopedGrowthTrendRows(
       const result = await listGrowthTrend(supabase, {
         farmId: params.farmId,
         systemId,
-        days: countTimeRangeDays(params.dateFrom, params.dateTo) ?? 180,
+        days: params.days ?? undefined,
         dateFrom: params.dateFrom,
         dateTo: params.dateTo,
       })
@@ -190,6 +190,7 @@ async function loadReportsPageInitialData(
             systemIds: scopedSystemIds,
             dateFrom: bounds.start,
             dateTo: bounds.end,
+            days: bounds.resolvedDays,
           })
         : Promise.resolve([]),
       listWaterQualityMeasurementRows(supabase, {

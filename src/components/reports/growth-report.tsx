@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useScopedGrowthTrend } from "@/lib/hooks/use-reports"
 import { useAppConfig, useSystemOptions } from "@/lib/hooks/use-options"
-import { countTimeRangeDays } from "@/lib/time-period"
 import type { Enums } from "@/lib/types/database"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
@@ -24,7 +23,7 @@ export default function GrowthReport({
   farmName,
 }: {
   farmId?: string | null
-  dateRange?: { from: string; to: string }
+  dateRange?: { from: string; to: string; days?: number | null }
   systemId?: number
   stage?: "all" | Enums<"system_growth_stage">
   farmName?: string | null
@@ -60,9 +59,9 @@ export default function GrowthReport({
 
   const growthTrendQuery = useScopedGrowthTrend({
     systemIds: scopedSystemIds,
-    days: countTimeRangeDays(dateRange?.from, dateRange?.to) ?? 180,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
+    days: dateRange?.days ?? undefined,
     enabled: boundsReady && scopedSystemIds.length > 0,
   })
 
