@@ -1588,6 +1588,7 @@ export type Database = {
           rating_numeric: number | null
           system_id: number | null
           system_name: string | null
+          temperature_average: number | null
           worst_parameter:
             | Database["public"]["Enums"]["water_quality_parameters"]
             | null

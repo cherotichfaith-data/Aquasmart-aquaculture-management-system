@@ -287,7 +287,7 @@ export default function WaterQualityPage({
     [overlayByDate, scopedMeasurementRows, selectedParameter],
   )
   const diurnalDoPattern = useMemo(() => buildDiurnalDoPattern(scopedMeasurementRows), [scopedMeasurementRows])
-  const dailyTempAverage = useMemo(() => buildDailyTempAverage(scopedMeasurementRows), [scopedMeasurementRows])
+  const dailyTempAverage = useMemo(() => buildDailyTempAverage(ratingRows), [ratingRows])
   const depthProfileScopeIds = selectedSystemId != null ? [selectedSystemId] : []
   const depthProfiles = useMemo(
     () => buildDepthProfiles(scopedMeasurementRows, depthProfileScopeIds),
