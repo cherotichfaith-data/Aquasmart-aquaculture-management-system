@@ -78,6 +78,7 @@ function ProductionContent({
   const inventoryQuery = useDailyFishInventory({
     farmId,
     systemId: Number.isFinite(systemId) ? systemId : undefined,
+    stage: selectedStage !== "all" ? selectedStage : undefined,
     dateFrom: dateRange.startDate || undefined,
     dateTo: dateRange.endDate || undefined,
     limit: 5000,

@@ -142,14 +142,13 @@ async function loadReportsPageInitialData(
       ? [systemId]
       : growthSystems.map((row) => row.id).filter((id): id is number => typeof id === "number")
 
-  // Fetch the un-filtered production summary once; derive the stage-filtered view in-memory.
-  // This eliminates the duplicate api_production_summary RPC call (G-13 fix).
   const selectedStage = params.filters.selectedStage === "all" ? undefined : params.filters.selectedStage
   const [productionFeeding, feedingRecords, mortalityEvents, mortalityInventory, harvestRecords, growthTrend, waterQualityMeasurements] =
     await Promise.all([
       listProductionSummaryRows(supabase, {
         farmId: params.farmId,
         systemId,
+        stage: selectedStage,
         dateFrom: bounds.start,
         dateTo: bounds.end,
         limit: 5000,
@@ -172,6 +171,7 @@ async function loadReportsPageInitialData(
       listDailyFishInventoryRows(supabase, {
         farmId: params.farmId,
         systemId,
+        stage: selectedStage,
         dateFrom: bounds.start,
         dateTo: bounds.end,
         limit: 2000,
@@ -201,14 +201,9 @@ async function loadReportsPageInitialData(
       }),
     ])
 
-  // Derive stage-filtered view from the already-fetched productionFeeding rows (G-13 fix)
-  const productionPerformance = selectedStage
-    ? productionFeeding.filter((row) => row.growth_stage === selectedStage)
-    : productionFeeding
-
   return {
     bounds,
-    productionPerformance: toQuerySuccess(productionPerformance),
+    productionPerformance: toQuerySuccess(productionFeeding),
     productionFeeding: toQuerySuccess(productionFeeding),
     feedingRecords: toQuerySuccess(feedingRecords),
     mortalityEvents: toQuerySuccess(mortalityEvents),

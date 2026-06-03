@@ -7,7 +7,6 @@ import { queryKeys } from "@/lib/cache/query-keys"
 import { getProductionSummary } from "@/lib/api/production"
 import { getTransferData } from "@/lib/api/reports"
 import type { TimePeriod } from "@/lib/time-period"
-import { resolveScopedSystemIds } from "@/lib/hooks/dashboard/shared"
 
 const ENABLE_BACKGROUND_REFETCH = process.env.NODE_ENV === "production"
 
@@ -57,19 +56,10 @@ export function useProductionSummaryMetrics(params: {
         }
       }
 
-      const scopedSystemIds = await resolveScopedSystemIds({
-        farmId: params.farmId ?? null,
-        stage: params.stage ?? "all",
-        system: params.system,
-        batch: params.batch ?? "all",
-        dateFrom,
-        dateTo,
-        signal,
-        scopedSystemIds: params.scopedSystemIds,
-      })
-      if (Array.isArray(scopedSystemIds) && scopedSystemIds.length === 0) return empty
+      const scopedSystemIds = Array.isArray(params.scopedSystemIds) ? params.scopedSystemIds : null
+      if (scopedSystemIds && scopedSystemIds.length === 0) return empty
 
-      const singleSystemId = Array.isArray(scopedSystemIds) && scopedSystemIds.length === 1 ? scopedSystemIds[0] : undefined
+      const singleSystemId = scopedSystemIds?.length === 1 ? scopedSystemIds[0] : undefined
       const summaryResult = await getProductionSummary({
         farmId: params.farmId ?? null,
         systemId: singleSystemId,
@@ -98,7 +88,7 @@ export function useProductionSummaryMetrics(params: {
         limit: 5000,
         signal,
       })
-      const scopedSet = Array.isArray(scopedSystemIds) ? new Set(scopedSystemIds) : null
+      const scopedSet = scopedSystemIds ? new Set(scopedSystemIds) : null
       const filtered = scopedSet
         ? summaryResult.data.filter((row) => row.system_id != null && scopedSet.has(row.system_id))
         : summaryResult.data

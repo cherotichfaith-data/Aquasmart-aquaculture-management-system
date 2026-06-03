@@ -122,7 +122,8 @@ export default function DashboardPage({
     selectedBatch,
     selectedSystem,
   })
-  const appliedScopedSystemIds = hasScopeFilters ? scopedSystemIdList : null
+  const shouldApplySystemIdScope = selectedBatch !== "all" || selectedSystemId != null
+  const appliedScopedSystemIds = shouldApplySystemIdScope ? scopedSystemIdList : null
   const activeProductionSystemIds = scopedSystemIdList.length > 0 ? scopedSystemIdList : null
 
   useEffect(() => {
@@ -147,6 +148,7 @@ export default function DashboardPage({
       selectedSystemId,
       scopedSystemIdList,
       hasScopeFilters,
+      shouldApplySystemIdScope,
       appliedScopedSystemIds,
     })
   }, [
@@ -161,6 +163,7 @@ export default function DashboardPage({
     selectedStage,
     selectedSystem,
     selectedSystemId,
+    shouldApplySystemIdScope,
   ])
 
   const handleDownload = async () => {

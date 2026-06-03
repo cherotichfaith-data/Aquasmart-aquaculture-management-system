@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server"
 import { fetchTimePeriodBounds } from "@/lib/time-period"
 import type { Database, Enums } from "@/lib/types/database"
 import type { TimePeriod } from "@/lib/time-period"
-import { mapSystemRowToOption, sortSystemsByCurrentProduction, type SystemOptionSource } from "@/lib/system-options"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>
@@ -10,26 +9,6 @@ type ServerClient = Awaited<ReturnType<typeof createClient>>
 export type ScopedAnalyticsStage = "all" | Enums<"system_growth_stage">
 export type ScopedAnalyticsTimePeriod = TimePeriod
 export type ScopedSystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
-
-async function getFirstStockingDateBySystemId(supabase: ServerClient, systemIds: number[]) {
-  const firstStockingBySystemId = new Map<number, string>()
-  if (systemIds.length === 0) return firstStockingBySystemId
-
-  const { data, error } = await supabase
-    .from("fish_stocking")
-    .select("system_id, date")
-    .in("system_id", systemIds)
-    .order("date", { ascending: true })
-
-  if (error) throw error
-
-  ;(data ?? []).forEach((row) => {
-    if (typeof row.system_id !== "number" || !row.date || firstStockingBySystemId.has(row.system_id)) return
-    firstStockingBySystemId.set(row.system_id, row.date)
-  })
-
-  return firstStockingBySystemId
-}
 
 export function parseSelectedNumericId(value?: string | null): number | undefined {
   if (!value || value === "all") return undefined
@@ -75,34 +54,14 @@ export async function getScopedSystemOptions(
   farmId: string,
   stage: ScopedAnalyticsStage,
 ): Promise<ScopedSystemOption[]> {
-  let query = supabase
-    .from("system")
-    .select("id, cage_status, commissioned_at, farm_id, growth_stage, is_active, name, type, unit")
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
+  const { data, error } = await supabase.rpc("api_system_options_rpc", {
+    p_farm_id: farmId,
+    p_stage: stage === "all" ? undefined : stage,
+    p_active_only: true,
+  })
 
-  if (stage !== "all") {
-    query = query.eq("growth_stage", stage)
-  }
-
-  const { data, error } = await query
-    .order("commissioned_at", { ascending: false, nullsFirst: false })
-    .order("id", { ascending: false })
-
-  if (error) {
-    throw error
-  }
-
-  const sourceRows = (data ?? []) as unknown as SystemOptionSource[]
-  const firstStockingBySystemId = await getFirstStockingDateBySystemId(
-    supabase,
-    sourceRows.map((row) => row.id).filter((id): id is number => typeof id === "number"),
-  )
-
-  return sortSystemsByCurrentProduction(
-    sourceRows.map((row) => ({ ...row, production_start: firstStockingBySystemId.get(row.id) ?? null })),
-  )
-    .map(mapSystemRowToOption)
+  if (error) throw error
+  return (data ?? []) as ScopedSystemOption[]
 }
 
 export async function getScopedBatchSystems(

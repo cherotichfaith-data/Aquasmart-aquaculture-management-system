@@ -41,6 +41,7 @@ export async function listProductionSummaryRows(
   const { data, error } = await supabase.rpc("api_production_summary", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
+    p_stage: params.stage,
     p_start_date: params.dateFrom,
     p_end_date: params.dateTo,
   })
@@ -50,9 +51,6 @@ export async function listProductionSummaryRows(
     .slice()
     .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
 
-  if (params.stage) {
-    rows = rows.filter((row) => row.growth_stage === params.stage)
-  }
   if (params.limit) {
     rows = rows.slice(0, params.limit)
   }
@@ -64,6 +62,7 @@ export async function listDailyFishInventoryRows(
   params: {
     farmId: string
     systemId?: number
+    stage?: Database["public"]["Enums"]["system_growth_stage"]
     dateFrom?: string
     dateTo?: string
     cursorDate?: string
@@ -74,6 +73,7 @@ export async function listDailyFishInventoryRows(
   const { data, error } = await supabase.rpc("api_daily_fish_inventory_rpc", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
+    p_stage: params.stage,
     p_start_date: params.dateFrom,
     p_end_date: params.dateTo,
     p_cursor_date: params.cursorDate,
