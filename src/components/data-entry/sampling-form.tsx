@@ -95,6 +95,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
       notes: "",
     },
   })
+  const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
   const selectedUnit = form.watch("unit")
   const selectedSystemId = Number(form.watch("system_id"))
@@ -106,6 +107,22 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
   const totalWeightKg = form.watch("total_weight_kg")
   const computedAbw = calculateAbw(totalWeightKg, numberOfFish)
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
+
+  useEffect(() => {
+    if (!defaultSystemValue) return
+    const resolvedUnit = findUnitForSystem(systems, defaultSystemId)
+    if (!resolvedUnit) return
+
+    const currentSystem = form.getValues("system_id")
+    if (currentSystem && currentSystem !== defaultSystemValue) return
+
+    if (form.getValues("unit") !== resolvedUnit) {
+      form.setValue("unit", resolvedUnit, { shouldValidate: true })
+    }
+    if (currentSystem !== defaultSystemValue) {
+      form.setValue("system_id", defaultSystemValue, { shouldValidate: true })
+    }
+  }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
     if (!selectedUnit) return
