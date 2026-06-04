@@ -1691,22 +1691,22 @@ export type Database = {
         }
         Returns: {
           abw_last_sampling: number
+          batch_id: number
           biomass_density: number
           biomass_last_sampling: number
           farm_id: string
           feeding_amount: number
-          feeding_amount_aggregated: number
           feeding_rate: number
+          growth_stage: string
+          has_abw: boolean
+          has_feed_record: boolean
+          has_inventory_count: boolean
           inventory_date: string
-          last_sampling_date: string
+          last_abw_date: string
           mortality_rate: number
           number_of_fish: number
-          number_of_fish_harvested: number
           number_of_fish_mortality: number
-          number_of_fish_mortality_aggregated: number
-          number_of_fish_stocked: number
-          number_of_fish_transferred_in: number
-          number_of_fish_transferred_out: number
+          production_cycle_id: number
           system_id: number
           system_name: string
           system_volume: number
@@ -1716,7 +1716,6 @@ export type Database = {
         Args: {
           p_end_date?: string
           p_farm_id: string
-          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
           p_start_date?: string
           p_system_id?: number
         }
@@ -1801,17 +1800,15 @@ export type Database = {
         Args: {
           p_end_date?: string
           p_farm_id: string
-          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
           p_start_date?: string
           p_system_id?: number
         }
         Returns: {
-          biomass_efcr_multiple: number
           biomass_last_sampling: number
-          efcr_period_last_sampling: number
+          efcr_aggregated: number
+          efcr_period: number
           farm_id: string
           inventory_date: string
-          last_sampling_date: string
           system_id: number
           system_name: string
         }[]
@@ -2017,6 +2014,7 @@ export type Database = {
         Args: {
           p_end_date?: string
           p_farm_id: string
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
           p_start_date?: string
           p_system_id?: number
         }
@@ -2024,6 +2022,7 @@ export type Database = {
           activity: string
           activity_rank: number
           average_body_weight: number
+          biomass_density: number
           biomass_increase_aggregated: number
           biomass_increase_period: number
           cumulative_mortality: number
@@ -2032,11 +2031,11 @@ export type Database = {
           date: string
           efcr_aggregated: number
           efcr_period: number
+          feeding_rate: number
           growth_stage: string
           number_of_fish_harvested: number
           number_of_fish_inventory: number
           number_of_fish_stocked: number
-          number_of_fish_transfer_in: number
           number_of_fish_transfer_out: number
           ongoing_cycle: boolean
           system_id: number
@@ -2048,10 +2047,26 @@ export type Database = {
           total_weight_harvested_aggregated: number
           total_weight_stocked: number
           total_weight_stocked_aggregated: number
-          total_weight_transfer_in: number
-          total_weight_transfer_in_aggregated: number
           total_weight_transfer_out: number
           total_weight_transfer_out_aggregated: number
+        }[]
+      }
+      api_production_trend: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+          p_system_id?: number
+        }
+        Returns: {
+          avg_abw_g: number
+          daily_mortality: number
+          feeding_rate: number
+          system_count: number
+          total_biomass_kg: number
+          total_feed_kg: number
+          total_fish_count: number
+          trend_date: string
         }[]
       }
       api_recommended_actions: {
@@ -2068,6 +2083,31 @@ export type Database = {
           unit: string
         }[]
       }
+      api_report_production_summary: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+          p_system_id?: number
+        }
+        Returns: {
+          abw_period_count: number
+          avg_abw_g: number
+          biomass_density: number
+          efcr_aggregated: number
+          efcr_period: number
+          feeding_rate: number
+          period_end: string
+          period_start: string
+          system_id: number
+          system_name: string
+          total_biomass_end_kg: number
+          total_biomass_start_kg: number
+          total_feed_kg: number
+          total_harvested_kg: number
+          total_mortality_count: number
+        }[]
+      }
       api_running_stock: {
         Args: { p_farm_id: string }
         Returns: {
@@ -2079,6 +2119,28 @@ export type Database = {
           last_delivery_date: string
           pellet_size: string
           stock_status: string
+        }[]
+      }
+      api_sampling_period_abw: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+          p_system_id?: number
+        }
+        Returns: {
+          abw_count: number
+          abw_variance: number
+          avg_abw_g: number
+          last_abw_g: number
+          last_sample_date: string
+          max_abw_g: number
+          min_abw_g: number
+          period_end: string
+          period_start: string
+          system_id: number
+          system_name: string
+          total_fish: number
         }[]
       }
       api_survival_trend: {
@@ -2173,11 +2235,55 @@ export type Database = {
           time_period: string
         }[]
       }
+      api_water_quality_index: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+          p_system_id?: number
+        }
+        Returns: {
+          do_score: number
+          measurement_days: number
+          period_end: string
+          period_start: string
+          ph_score: number
+          system_id: number
+          system_name: string
+          temp_score: number
+          wqi_grade: string
+          wqi_score: number
+        }[]
+      }
       api_water_quality_sync_status: {
         Args: { p_farm_id: string }
         Returns: {
           latest_measurement_ts: string
           latest_rating_date: string
+        }[]
+      }
+      api_water_quality_trend: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+          p_system_id?: number
+        }
+        Returns: {
+          do_avg: number
+          do_max: number
+          do_min: number
+          do_variation: number
+          ph_avg: number
+          rating: string
+          rating_7d_rolling: number
+          rating_numeric: number
+          system_id: number
+          system_name: string
+          temp_avg: number
+          temp_max: number
+          temp_min: number
+          wq_date: string
         }[]
       }
       claim_my_farm_user_invitations: { Args: never; Returns: number }
