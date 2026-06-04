@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { sortByDateAsc } from "@/lib/utils"
-import type { Database, Enums } from "@/lib/types/database"
+import type { Enums } from "@/lib/types/database"
+import type { ProductionTrendRow } from "@/features/dashboard/types"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
 import {
@@ -14,7 +15,7 @@ import {
   SystemBiomassComparisonSection,
 } from "./performance-report-sections"
 
-type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+type ProductionSummaryRow = ProductionTrendRow
 
 const isFiniteNumber = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value)
