@@ -9,7 +9,7 @@ import {
 } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import { toProductionTrendRows } from "@/features/dashboard/production-trend"
-import type { ProductionTrendRpcRow } from "@/features/dashboard/types"
+import type { ProductionTrendRow, ProductionTrendRpcRow } from "@/features/dashboard/types"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
 
 const isQuietError = (err: unknown): boolean =>
@@ -20,8 +20,8 @@ const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
 export async function getProductionSummary(params?: Omit<ProductionSummaryParams, "farmId"> & {
   farmId?: string | null
   signal?: AbortSignal
-}): Promise<QueryResult<ProductionTrendRpcRow & { feeding_rate: number | null }>> {
-  if (!params?.farmId) return empty<ProductionTrendRpcRow & { feeding_rate: number | null }>()
+}): Promise<QueryResult<ProductionTrendRow>> {
+  if (!params?.farmId) return empty<ProductionTrendRow>()
 
   const clientResult = await getClientOrError("getProductionSummary", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
@@ -43,7 +43,7 @@ export async function getProductionSummary(params?: Omit<ProductionSummaryParams
   const { data, error } = await query
   if (error) {
     if (isQuietError(error) || isInvalidBigintUuidError(error)) {
-      return empty<ProductionTrendRpcRow & { feeding_rate: number | null }>()
+      return empty<ProductionTrendRow>()
     }
     return toQueryError("getProductionSummary", error)
   }
