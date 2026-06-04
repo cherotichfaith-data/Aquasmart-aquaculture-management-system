@@ -46,7 +46,7 @@ export default function DataEntryPageClient({
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const activeFarmRoleQuery = useActiveFarmRole(farmId)
 
-  const systemsQuery = useSystemOptions({ farmId })
+  const systemsQuery = useSystemOptions({ farmId, activeOnly: true })
   const batchesQuery = useBatchOptions({ farmId })
   const feedsQuery = useFeedTypeOptions({ farmId })
   const recentEntriesQuery = useRecentEntries()

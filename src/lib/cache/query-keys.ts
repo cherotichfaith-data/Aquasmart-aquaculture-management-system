@@ -9,7 +9,7 @@ export const queryKeys = {
       stage?: string | null
       activeOnly?: boolean
     }) {
-      return ["options", "systems", farmToken(params?.farmId), params?.stage ?? "all", params?.activeOnly ?? false] as const
+      return ["options", "systems", farmToken(params?.farmId), params?.stage ?? "all", params?.activeOnly ?? true] as const
     },
     batches(params?: { farmId?: string | null; activeOnly?: boolean }) {
       return ["options", "batches", farmToken(params?.farmId), params?.activeOnly ?? true] as const

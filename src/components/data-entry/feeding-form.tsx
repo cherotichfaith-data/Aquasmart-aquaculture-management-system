@@ -146,6 +146,7 @@ export function FeedingForm({
       notes: "",
     },
   })
+  const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
   const selectedUnit = form.watch("unit")
   const selectedSystemValue = form.watch("system_id")
@@ -180,6 +181,22 @@ export function FeedingForm({
       : []
   const feedOptions = inventoryFeeds.length > 0 ? inventoryFeeds : allFeeds
   const selectedFeed = feedOptions.find((feed) => feed.id === selectedFeedId) ?? null
+
+  useEffect(() => {
+    if (!defaultSystemValue) return
+    const resolvedUnit = findUnitForSystem(systems, defaultSystemId)
+    if (!resolvedUnit) return
+
+    const currentSystem = form.getValues("system_id")
+    if (currentSystem && currentSystem !== defaultSystemValue) return
+
+    if (form.getValues("unit") !== resolvedUnit) {
+      form.setValue("unit", resolvedUnit, { shouldValidate: true })
+    }
+    if (currentSystem !== defaultSystemValue) {
+      form.setValue("system_id", defaultSystemValue, { shouldValidate: true })
+    }
+  }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
     if (!selectedUnit) return

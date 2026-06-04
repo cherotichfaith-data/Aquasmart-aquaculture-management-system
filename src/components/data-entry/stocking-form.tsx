@@ -98,6 +98,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       type_of_stocking: "empty",
     },
   })
+  const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
   const selectedUnit = form.watch("unit")
   const selectedSystemId = form.watch("system_id")
@@ -130,6 +131,22 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
     form.setValue("batch_id", String(option.id), { shouldValidate: true })
     setShowBatchCreate(false)
   }
+
+  useEffect(() => {
+    if (!defaultSystemValue) return
+    const resolvedUnit = findUnitForSystem(systems, defaultSystemId)
+    if (!resolvedUnit) return
+
+    const currentSystem = form.getValues("system_id")
+    if (currentSystem && currentSystem !== defaultSystemValue) return
+
+    if (form.getValues("unit") !== resolvedUnit) {
+      form.setValue("unit", resolvedUnit, { shouldValidate: true })
+    }
+    if (currentSystem !== defaultSystemValue) {
+      form.setValue("system_id", defaultSystemValue, { shouldValidate: true })
+    }
+  }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
     if (!selectedUnit) return
