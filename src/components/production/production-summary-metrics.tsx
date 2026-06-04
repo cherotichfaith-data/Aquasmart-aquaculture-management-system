@@ -56,7 +56,6 @@ export default function ProductionSummaryMetrics({
       (acc, row) => {
         acc.totalStockedFish += row.number_of_fish_stocked ?? 0
         acc.cumulativeMortality += row.daily_mortality_count ?? 0
-        acc.transferInFish += row.number_of_fish_transfer_in ?? 0
         acc.transferOutFish += row.number_of_fish_transfer_out ?? 0
         acc.totalHarvestedFish += row.number_of_fish_harvested ?? 0
         acc.totalHarvestedKg += row.total_weight_harvested ?? 0
@@ -65,7 +64,6 @@ export default function ProductionSummaryMetrics({
       {
         totalStockedFish: 0,
         cumulativeMortality: 0,
-        transferInFish: 0,
         transferOutFish: 0,
         totalHarvestedFish: 0,
         totalHarvestedKg: 0,
@@ -76,8 +74,8 @@ export default function ProductionSummaryMetrics({
       { label: "Total Stocked", value: `${formatWholeNumber(totals.totalStockedFish)} fish` },
       { label: "Cumulative Mortality", value: `${formatWholeNumber(totals.cumulativeMortality)} fish` },
       {
-        label: "Net Transfers",
-        value: `+${formatWholeNumber(totals.transferInFish)} fish / -${formatWholeNumber(totals.transferOutFish)} fish`,
+        label: "Transfer Out",
+        value: `${formatWholeNumber(totals.transferOutFish)} fish`,
       },
       {
         label: "Total Harvested",
