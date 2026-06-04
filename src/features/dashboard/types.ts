@@ -6,7 +6,7 @@ export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
 export type DashboardTimePeriod = TimePeriod
 
 export type ProductionTrendRpcRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
-export type ProductionTrendRow = ProductionTrendRpcRow & {
+export type ProductionTrendRow = Omit<ProductionTrendRpcRow, "feeding_rate"> & {
   feeding_rate: number | null
 }
 export type DashboardUserProfile = Database["public"]["Tables"]["user_profile"]["Row"]
