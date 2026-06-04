@@ -28,8 +28,9 @@ import {
   FeedOverviewSection,
   type SectionKey,
 } from "./feed-dashboard-sections"
+import type { ProductionTrendRow } from "@/features/dashboard/types"
 
-type ProductionRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+type ProductionRow = ProductionTrendRow
 
 type GrowthRow = {
   system_id: number
