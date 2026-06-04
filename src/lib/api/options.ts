@@ -159,33 +159,33 @@ export async function getSystemOptions(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase
-    .from("system")
-    .select("id, cage_status, commissioned_at, farm_id, growth_stage, is_active, name, type, unit")
-    .eq("farm_id", params.farmId)
+  let query = queryOptionsRpc(supabase, "api_system_options_rpc", {
+    p_farm_id: params.farmId,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+    p_active_only: params.activeOnly ?? true,
+  })
+  if (params.signal) query = query.abortSignal(params.signal)
 
-  if (params.stage && params.stage !== "all") {
-    query = query.eq("growth_stage", params.stage)
-  }
-  if (params.activeOnly ?? true) {
-    query = query.eq("is_active", true)
-  }
-  if (params.signal) {
-    query = query.abortSignal(params.signal)
-  }
-
-  const result = await resolveClientReadQuery<SystemOptionSource>({
+  type SystemOptionsRpcRow = OptionsRpcRow<"api_system_options_rpc">
+  const result = await resolveClientReadQuery<SystemOptionsRpcRow>({
     tag: "getSystemOptions",
-    query: query
-      .order("is_active", { ascending: false })
-      .order("commissioned_at", { ascending: false, nullsFirst: false })
-      .order("id", { ascending: false }),
+    query: query as PromiseLike<{ data: SystemOptionsRpcRow[] | null; error: unknown }>,
     signal: params.signal,
     quietWhen: isQuietOptionsError,
   })
   if (result.status !== "success") return result
 
-  const sourceRows = result.data as unknown as SystemOptionSource[]
+  const sourceRows: SystemOptionSource[] = result.data.map((row) => ({
+    cage_status: null,
+    commissioned_at: null,
+    farm_id: row.farm_id,
+    growth_stage: row.growth_stage,
+    id: row.id,
+    is_active: row.is_active,
+    name: row.name ?? null,
+    type: row.type as SystemOptionSource["type"],
+    unit: row.unit ?? null,
+  }))
   const productionStartBySystemId = await getProductionStartBySystemId(
     supabase,
     sourceRows.map((row) => row.id).filter((id): id is number => typeof id === "number"),

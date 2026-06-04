@@ -2,6 +2,7 @@ import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { TimeBounds, TimePeriod } from "@/lib/time-period"
 import type { WqParameter } from "@/features/water-quality/wq-utils"
+import type { SystemOption } from "@/lib/system-options"
 
 export type WaterQualityRow = Tables<"water_quality_measurement">
 export type WaterQualityInsert = Database["public"]["Tables"]["water_quality_measurement"]["Insert"]
@@ -21,7 +22,7 @@ export type WaterQualityPageFilters = {
   activeTab: WaterQualityPageTab
   selectedParameter: WqParameter
 }
-export type WaterQualitySystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
+export type WaterQualitySystemOption = SystemOption
 export type WaterQualitySyncRow = Database["public"]["Functions"]["api_water_quality_sync_status"]["Returns"][number]
 export type WaterQualityLatestStatusRow =
   Database["public"]["Functions"]["api_latest_water_quality_status"]["Returns"][number]

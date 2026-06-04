@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -2037,6 +2037,7 @@ export type Database = {
           number_of_fish_inventory: number
           number_of_fish_stocked: number
           number_of_fish_transfer_out: number
+          number_of_fish_transfer_out_aggregated: number
           ongoing_cycle: boolean
           system_id: number
           system_name: string
@@ -2193,7 +2194,9 @@ export type Database = {
           id: number
           is_active: boolean
           label: string
+          name: string
           type: string
+          unit: string
         }[]
       }
       api_system_timeline_bounds: {

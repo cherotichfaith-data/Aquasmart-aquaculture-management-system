@@ -1,6 +1,7 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { TimeBounds, TimePeriod } from "@/lib/time-period"
+import type { SystemOption } from "@/lib/system-options"
 
 export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
 export type DashboardTimePeriod = TimePeriod
@@ -11,7 +12,7 @@ export type ProductionTrendRow = Omit<ProductionTrendRpcRow, "feeding_rate"> & {
 }
 export type DashboardUserProfile = Database["public"]["Tables"]["user_profile"]["Row"]
 export type DashboardUserSettings = Database["public"]["Tables"]["user_settings"]["Row"]
-export type DashboardSystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
+export type DashboardSystemOption = SystemOption
 export type DashboardWaterQualityMeasurement = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 export type DashboardAlertThreshold = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 export type DashboardRecentEntriesData = {
