@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .maybeSingle(),
             supabase
                 .from("user_settings")
-                .select("user_id, theme, default_views, alert_thresholds, created_at, updated_at")
+                .select("user_id, theme, default_views, created_at, updated_at")
                 .eq("user_id", authUser.id)
                 .maybeSingle(),
             supabase

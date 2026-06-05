@@ -7,7 +7,6 @@ import { queryKeys } from "@/lib/cache/query-keys"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
   getBatchSystemIds,
-  getFcrTrend,
   getFeedingRecords,
   getGrowthTrend,
   getMortalityData,
@@ -17,9 +16,8 @@ import {
   getStockings,
   getTransferData,
 } from "@/lib/api/reports"
-import { getSurvivalTrend } from "@/lib/api/mortality"
+import { getEfcrTrend, type EfcrTrendRow } from "@/lib/api/analytics"
 import type {
-  FeedFcrTrendRow,
   FeedGrowthTrendRow,
   FeedingRecordWithType,
 } from "@/lib/api/reports"
@@ -166,10 +164,9 @@ export function useStockingData(params?: {
   )
 }
 
-export function useScopedFcrTrend(params?: {
+export function useScopedEfcrTrend(params?: {
   farmId?: string | null
   systemIds?: number[]
-  days?: number
   dateFrom?: string
   dateTo?: string
   enabled?: boolean
@@ -180,27 +177,25 @@ export function useScopedFcrTrend(params?: {
   const systemIds = params?.systemIds?.filter((id) => Number.isFinite(id)) ?? []
   return useQuery(
     reportsQueryOptions({
-      queryKey: queryKeys.reports.fcrTrend({
+      queryKey: queryKeys.reports.efcrTrend({
         farmId: resolvedFarmId,
         systemIds,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
-        days: params?.days,
       }),
       queryFn: async ({ signal }) => {
-        return collectScopedTrendRows<FeedFcrTrendRow>({
+        return collectScopedTrendRows<EfcrTrendRow>({
           systemIds,
           signal,
           fetcher: (systemId) =>
-            getFcrTrend({
-              farmId: resolvedFarmId,
+            getEfcrTrend({
+              farmId: resolvedFarmId!,
               systemId,
-              days: params?.days,
               dateFrom: params?.dateFrom,
               dateTo: params?.dateTo,
               signal,
             }),
-          errorMessage: "Failed to load FCR trend",
+          errorMessage: "Failed to load eFCR trend",
         })
       },
       enabled: Boolean(session) && Boolean(resolvedFarmId) && systemIds.length > 0 && (params?.enabled ?? true),
@@ -248,52 +243,6 @@ export function useScopedGrowthTrend(params?: {
         })
       },
       enabled: Boolean(session) && Boolean(farmId) && systemIds.length > 0 && (params?.enabled ?? true),
-      refetchOnWindowFocus: false,
-      staleTime: 60_000,
-    }),
-  )
-}
-
-export function useScopedSurvivalTrend(params?: {
-  farmId?: string | null
-  systemIds?: number[]
-  dateFrom?: string
-  dateTo?: string
-  enabled?: boolean
-}) {
-  const { session } = useAuth()
-  const activeFarm = useActiveFarm()
-  const farmId = params?.farmId ?? activeFarm.farmId
-  const systemIds = params?.systemIds?.filter((id) => Number.isFinite(id)) ?? []
-  return useQuery(
-    reportsQueryOptions({
-      queryKey: queryKeys.reports.survivalTrendScoped({
-        farmId,
-        systemIds,
-        dateFrom: params?.dateFrom,
-        dateTo: params?.dateTo,
-      }),
-      queryFn: async ({ signal }) => {
-        return collectScopedTrendRows({
-          systemIds,
-          signal,
-          fetcher: (systemId) =>
-            getSurvivalTrend({
-              farmId,
-              systemId,
-              dateFrom: params?.dateFrom,
-              dateTo: params?.dateTo,
-              signal,
-            }),
-          errorMessage: "Failed to load survival trend",
-        })
-      },
-      enabled:
-        Boolean(session) &&
-        Boolean(farmId) &&
-        systemIds.length > 0 &&
-        Boolean(params?.dateFrom) &&
-        (params?.enabled ?? true),
       refetchOnWindowFocus: false,
       staleTime: 60_000,
     }),

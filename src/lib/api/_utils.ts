@@ -16,27 +16,22 @@ type PublicFunctions = Database["public"]["Functions"]
 export type KpiRpcName =
   | "api_dashboard_consolidated"
   | "api_dashboard_systems"
-  | "api_daily_overlay"
   | "api_daily_fish_inventory_rpc"
   | "api_efcr_trend"
-  | "api_fcr_trend"
   | "api_growth_trend"
   | "api_production_summary"
+  | "api_recommended_actions"
   | "api_running_stock"
-  | "api_system_timeline_bounds"
-  | "api_survival_trend"
   | "api_latest_water_quality_status"
-  | "api_water_quality_sync_status"
+  | "api_water_quality_trend"
+  | "api_water_quality_index"
   | "api_time_period_bounds_scoped"
   // Analytics layer RPCs
-  | "api_system_health_score"
   | "api_harvest_forecast"
-  | "api_feed_demand_forecast"
   | "api_cycle_benchmarks"
   // Compute layer RPCs
   | "api_feed_fcr_intervals"
   | "api_feed_rate_analysis"
-  | "api_kpi_coverage"
 
 /**
  * Option RPCs (replacing PostgREST option views where possible).

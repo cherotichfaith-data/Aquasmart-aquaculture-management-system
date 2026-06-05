@@ -8,8 +8,7 @@ import {
   toQuerySuccess,
 } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import { toProductionTrendRows } from "@/features/dashboard/production-trend"
-import type { ProductionTrendRow, ProductionTrendRpcRow } from "@/features/dashboard/types"
+import type { ProductionTrendRpcRow } from "@/features/dashboard/types"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
 
 const isQuietError = (err: unknown): boolean =>
@@ -20,8 +19,8 @@ const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
 export async function getProductionSummary(params?: Omit<ProductionSummaryParams, "farmId"> & {
   farmId?: string | null
   signal?: AbortSignal
-}): Promise<QueryResult<ProductionTrendRow>> {
-  if (!params?.farmId) return empty<ProductionTrendRow>()
+}): Promise<QueryResult<ProductionTrendRpcRow>> {
+  if (!params?.farmId) return empty<ProductionTrendRpcRow>()
 
   const clientResult = await getClientOrError("getProductionSummary", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
@@ -43,12 +42,12 @@ export async function getProductionSummary(params?: Omit<ProductionSummaryParams
   const { data, error } = await query
   if (error) {
     if (isQuietError(error) || isInvalidBigintUuidError(error)) {
-      return empty<ProductionTrendRow>()
+      return empty<ProductionTrendRpcRow>()
     }
     return toQueryError("getProductionSummary", error)
   }
 
-  let rows = toProductionTrendRows((data ?? []) as ProductionTrendRpcRow[])
+  let rows = ((data ?? []) as ProductionTrendRpcRow[])
     .slice()
     .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
 

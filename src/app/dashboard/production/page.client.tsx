@@ -5,11 +5,10 @@ import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useProductionSummary } from "@/lib/hooks/use-production"
-import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
-import { PRODUCTION_METRICS, parseProductionMetric } from "@/components/production/metrics"
+import { parseProductionMetric } from "@/components/production/metrics"
 import { ProductionSections } from "./_components/production-sections"
 import { buildProductionChartRows } from "./_lib/production-page"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
@@ -45,7 +44,6 @@ function ProductionContent({
   const filterParam = searchParams.get("filter")
 
   const metricFilter = parseProductionMetric(filterParam)
-  const metricMeta = PRODUCTION_METRICS[metricFilter]
   const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
   const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
 
@@ -73,20 +71,6 @@ function ProductionContent({
     enabled: rangeEnabled,
     staleTime: LIVE_PRODUCTION_STALE_TIME_MS,
   })
-
-  const inventoryEnabled = metricMeta.source === "inventory"
-  const inventoryQuery = useDailyFishInventory({
-    farmId,
-    systemId: Number.isFinite(systemId) ? systemId : undefined,
-    stage: selectedStage !== "all" ? selectedStage : undefined,
-    dateFrom: dateRange.startDate || undefined,
-    dateTo: dateRange.endDate || undefined,
-    limit: 5000,
-    orderAsc: true,
-    enabled: inventoryEnabled && rangeEnabled,
-    staleTime: LIVE_PRODUCTION_STALE_TIME_MS,
-  })
-
   const stageSystemIds = useMemo(() => {
     if (selectedStage === "all") return null
     if (systemOptionsQuery.data?.status !== "success") return null
@@ -115,15 +99,9 @@ function ProductionContent({
     }
     return stageSet
   }, [batchSystemIds, selectedSystem, stageSystemIds])
-  const scopedSystemIdList = useMemo(
-    () => (scopedSystemIds ? Array.from(scopedSystemIds) : null),
-    [scopedSystemIds],
-  )
 
   const productionRowsRaw =
     productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
-  const inventoryRowsRaw =
-    inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
 
   const productionRows = useMemo(() => {
     let rows = productionRowsRaw
@@ -133,17 +111,9 @@ function ProductionContent({
     return rows
   }, [productionRowsRaw, scopedSystemIds])
 
-  const inventoryRows = useMemo(() => {
-    let rows = inventoryRowsRaw
-    if (scopedSystemIds) {
-      rows = rows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id))
-    }
-    return rows
-  }, [inventoryRowsRaw, scopedSystemIds])
-
   const formattedChartRows = useMemo(
-    () => buildProductionChartRows({ metricFilter, productionRows, inventoryRows }),
-    [inventoryRows, metricFilter, productionRows],
+    () => buildProductionChartRows({ metricFilter, productionRows }),
+    [metricFilter, productionRows],
   )
 
   const tableRows = useMemo(() => {
@@ -152,36 +122,22 @@ function ProductionContent({
   }, [productionRows])
 
   const summaryError = getErrorMessage(productionSummaryQuery.error) ?? getQueryResultError(productionSummaryQuery.data)
-  const inventoryError =
-    inventoryEnabled ? getErrorMessage(inventoryQuery.error) ?? getQueryResultError(inventoryQuery.data) : null
-  const chartError = metricMeta.source === "inventory" ? inventoryError : summaryError
-  const chartUpdatedAt =
-    metricMeta.source === "inventory"
-      ? Math.max(inventoryQuery.dataUpdatedAt ?? 0, productionSummaryQuery.dataUpdatedAt ?? 0)
-      : productionSummaryQuery.dataUpdatedAt
+  const chartUpdatedAt = productionSummaryQuery.dataUpdatedAt
   const tableUpdatedAt = productionSummaryQuery.dataUpdatedAt
 
   return (
     <ProductionSections
-      farmId={farmId}
-      systemId={Number.isFinite(systemId) ? systemId : undefined}
       selectedBatch={selectedBatch}
       selectedSystem={selectedSystem}
       selectedStage={selectedStage}
       timePeriod={timePeriod}
-      dateFrom={dateFrom}
-      dateTo={dateTo}
-      scopedSystemIds={scopedSystemIdList}
       formattedChartRows={formattedChartRows}
       metricFilter={metricFilter}
-      chartLoading={metricMeta.source === "inventory" ? inventoryQuery.isLoading : productionSummaryQuery.isLoading}
-      chartFetching={metricMeta.source === "inventory" ? inventoryQuery.isFetching : productionSummaryQuery.isFetching}
+      chartLoading={productionSummaryQuery.isLoading}
+      chartFetching={productionSummaryQuery.isFetching}
       chartUpdatedAt={chartUpdatedAt}
-      chartError={chartError}
-      onRetryChart={() => {
-        productionSummaryQuery.refetch()
-        if (inventoryEnabled) inventoryQuery.refetch()
-      }}
+      chartError={summaryError}
+      onRetryChart={() => productionSummaryQuery.refetch()}
       tableRows={tableRows}
       tableLoading={productionSummaryQuery.isLoading}
       tableFetching={productionSummaryQuery.isFetching}

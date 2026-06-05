@@ -51,9 +51,8 @@ const fingerlingBatchSchema = z.object({
   name: z.string().trim().min(1).max(255),
   date_of_delivery: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   supplier_id: z.number().int().positive(),
-  system_id: z.number().int().positive().nullable().optional(),
-  number_of_fish: z.number().finite().min(0).nullable().optional(),
-  abw: z.number().finite().min(0).nullable().optional(),
+  number_of_fish: z.number().finite().positive(),
+  abw: z.number().finite().positive(),
 })
 
 const farmWorkspaceSchema = z.object({
@@ -426,9 +425,8 @@ export async function createFingerlingBatchAction(
       name: parsedPayload.name,
       date_of_delivery: parsedPayload.date_of_delivery,
       supplier_id: parsedPayload.supplier_id,
-      system_id: parsedPayload.system_id ?? null,
-      number_of_fish: parsedPayload.number_of_fish ?? null,
-      abw: parsedPayload.abw ?? null,
+      number_of_fish: parsedPayload.number_of_fish,
+      abw: parsedPayload.abw,
     })
     .select()
     .single()

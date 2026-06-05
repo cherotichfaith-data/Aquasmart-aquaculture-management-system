@@ -4,19 +4,7 @@ import { isMissingObjectError } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
-type AlertSeverity = string
-type AlertLogRow = {
-  id: string | number
-  farm_id: string | null
-  system_id: number | null
-  severity: string | null
-  rule_code: string | null
-  message: string | null
-  acknowledged_at: string | null
-  fired_at: string | null
-}
 type MortalityEventRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
-type SurvivalTrendRow = Database["public"]["Functions"]["api_survival_trend"]["Returns"][number]
 
 const isQuietReadError = (error: unknown) =>
   isSbPermissionDenied(error) || isSbAuthMissing(error) || isMissingObjectError(error)
@@ -52,44 +40,4 @@ export async function listMortalityEvents(
   return (data ?? []) as MortalityEventRow[]
 }
 
-export async function listAlertLog(
-  supabase: ServerSupabaseClient,
-  params?: {
-    farmId?: string | null
-    systemId?: number
-    severity?: AlertSeverity
-    ruleCodes?: string[]
-    unacknowledgedOnly?: boolean
-    limit?: number
-  },
-): Promise<AlertLogRow[]> {
-  void supabase
-  void params
-  return []
-}
 
-export async function listSurvivalTrend(
-  supabase: ServerSupabaseClient,
-  params: {
-    farmId?: string | null
-    systemId?: number
-    dateFrom?: string
-    dateTo?: string
-  },
-): Promise<SurvivalTrendRow[]> {
-  if (!params.farmId || !params.systemId || !params.dateFrom) return []
-
-  const { data, error } = await supabase.rpc("api_survival_trend", {
-    p_farm_id: params.farmId,
-    p_system_id: params.systemId,
-    p_start_date: params.dateFrom,
-    p_end_date: params.dateTo,
-  })
-
-  if (error) {
-    if (isQuietReadError(error)) return []
-    throw error
-  }
-
-  return ((data ?? []) as SurvivalTrendRow[]) ?? []
-}

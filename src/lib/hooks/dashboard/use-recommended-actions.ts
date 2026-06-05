@@ -6,8 +6,14 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { queryKeys } from "@/lib/cache/query-keys"
 import type { RecommendedAction } from "@/features/dashboard/types"
 import { mergeRecommendedActionRows } from "@/features/dashboard/analytics-rpc-shared"
-import { getScopedRecommendedActions } from "@/lib/api/analytics"
+import { getRecommendedActions } from "@/lib/api/analytics"
 import type { TimePeriod } from "@/lib/time-period"
+
+const hasSystemId = (row: unknown): row is { system_id: number } =>
+  typeof row === "object" &&
+  row !== null &&
+  "system_id" in row &&
+  typeof (row as { system_id?: unknown }).system_id === "number"
 
 export function useRecommendedActions(params: {
   farmId?: string | null
@@ -39,9 +45,9 @@ export function useRecommendedActions(params: {
       if (scopedSystemIds && scopedSystemIds.length === 0) {
         return [] as RecommendedAction[]
       }
-      const actionsResult = await getScopedRecommendedActions({
+      const actionsResult = await getRecommendedActions({
         farmId: params.farmId!,
-        systemIds: scopedSystemIds ?? undefined,
+        systemId: scopedSystemIds?.length === 1 ? scopedSystemIds[0] : undefined,
         signal,
       })
 
@@ -49,7 +55,11 @@ export function useRecommendedActions(params: {
         return [] as RecommendedAction[]
       }
 
-      return mergeRecommendedActionRows(actionsResult.data)
+      const rows = scopedSystemIds
+        ? actionsResult.data.filter((row) => hasSystemId(row) && scopedSystemIds.includes(row.system_id))
+        : actionsResult.data
+
+      return mergeRecommendedActionRows(rows)
     },
     enabled: (Boolean(session) || Boolean(user)) && Boolean(params.farmId) && hasBounds,
     staleTime: 5 * 60_000,

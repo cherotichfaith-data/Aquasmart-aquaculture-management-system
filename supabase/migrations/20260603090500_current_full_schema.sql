@@ -1030,6 +1030,8 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
     select s.id as system_id, s.name as system_name, s.growth_stage
     from public.system s, perm
     where perm.ok and s.farm_id = p_farm_id
+      and coalesce(s.is_active, true) = true
+      and coalesce(s.cage_status, 'occupied'::public.cage_status_enum) <> 'retired'::public.cage_status_enum
       and (p_stage is null or s.growth_stage = p_stage)
       and (p_system_id is null or s.id = p_system_id)
   ),
@@ -1120,8 +1122,32 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
   ),
   ps_latest as (
     select distinct on (system_id)
-      system_id, date as efcr_date, efcr_period as efcr
-    from ps_window order by system_id, date desc
+      system_id, date as efcr_date, coalesce(efcr_period, efcr_aggregated) as efcr
+    from ps_window
+    where efcr_period is not null or efcr_aggregated is not null
+    order by system_id, date desc
+  ),
+  efcr_sampling as (
+    select distinct on (b.system_id)
+      b.system_id,
+      ev.inventory_date as efcr_date,
+      ev.efcr_period_last_sampling::double precision as efcr
+    from base b
+    left join analytics.efcr_period_last_sampling_view ev
+      on ev.system_id = b.system_id
+      and ev.inventory_date <= b.input_end_date
+      and ev.efcr_period_last_sampling is not null
+    order by b.system_id, ev.inventory_date desc
+  ),
+  sampling_latest as (
+    select distinct on (b.system_id)
+      b.system_id,
+      fsw.date as sampling_end_date
+    from base b
+    left join public.fish_sampling_weight fsw
+      on fsw.system_id = b.system_id
+      and fsw.date <= b.input_end_date
+    order by b.system_id, fsw.date desc
   ),
   wq_window as (
     select wq.* from public.daily_water_quality_rating wq
@@ -1146,10 +1172,10 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
   )
   select b.system_id, b.system_name, b.growth_stage,
     b.input_start_date, b.input_end_date, b.input_end_date as as_of_date,
-    b.fish_end, b.biomass_end, b.sampling_end_date,
-    case when b.sampling_end_date is null or b.input_end_date is null then null
-      else (b.input_end_date - b.sampling_end_date)::int end as sample_age_days,
-    pl.efcr, pl.efcr_date, pf.feed_total, b.abw, ad.abw_delta, coalesce(ad.abw_trend, 'flat') as abw_trend,
+    b.fish_end, b.biomass_end, coalesce(sl.sampling_end_date, b.sampling_end_date) as sampling_end_date,
+    case when coalesce(sl.sampling_end_date, b.sampling_end_date) is null or b.input_end_date is null then null
+      else (b.input_end_date - coalesce(sl.sampling_end_date, b.sampling_end_date))::int end as sample_age_days,
+    coalesce(pl.efcr, es.efcr) as efcr, coalesce(pl.efcr_date, es.efcr_date) as efcr_date, pf.feed_total, b.abw, ad.abw_delta, coalesce(ad.abw_trend, 'flat') as abw_trend,
     ia.feeding_rate, ia.mortality_rate, b.biomass_density,
     case when b.input_start_date is null or b.input_end_date is null then null
       else greatest(0, (b.input_end_date - b.input_start_date + 1)::int - coalesce(ia.days_present, 0))
@@ -1162,6 +1188,8 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
   left join inv_agg ia on ia.system_id = b.system_id
   left join ps_feed pf on pf.system_id = b.system_id
   left join ps_latest pl on pl.system_id = b.system_id
+  left join efcr_sampling es on es.system_id = b.system_id
+  left join sampling_latest sl on sl.system_id = b.system_id
   left join abw_delta ad on ad.system_id = b.system_id
   left join wq_avg wa on wa.system_id = b.system_id
   left join wq_latest wl on wl.system_id = b.system_id

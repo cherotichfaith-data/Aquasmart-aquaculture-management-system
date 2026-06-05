@@ -112,7 +112,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
 
   function handleBatchCreated(batch: FingerlingBatchRow) {
-    const systemId = batch.system_id ?? selectedSystemIdForBatch
+    const systemId = selectedSystemIdForBatch
     if (!systemId) return
 
     const option: BatchOption = {

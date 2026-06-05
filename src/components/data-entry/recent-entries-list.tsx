@@ -18,7 +18,12 @@ type SystemEntryRow = Pick<Tables<"system">, "id" | "commissioned_at" | "name" |
 } & PendingMeta
 
 type MortalityRow = Pick<Tables<"fish_mortality">, "id" | "date" | "system_id" | "number_of_fish_mortality" | "created_at"> & PendingMeta
-type FeedingRow = Pick<Tables<"feeding_record">, "id" | "date" | "system_id" | "feed_type_id" | "feeding_amount" | "created_at"> & PendingMeta
+type FeedingRow = Omit<
+  Pick<Tables<"feeding_record">, "id" | "date" | "system_id" | "feed_type_id" | "feeding_amount" | "created_at">,
+  "feed_type_id"
+> & {
+  feed_type_id: number | null
+} & PendingMeta
 type SamplingRow = Pick<Tables<"fish_sampling_weight">, "id" | "date" | "system_id" | "number_of_fish_sampling" | "abw" | "created_at"> & PendingMeta
 type TransferRow = Pick<Tables<"fish_transfer">, "id" | "date" | "origin_system_id" | "target_system_id" | "external_target_name" | "number_of_fish_transfer" | "created_at"> & PendingMeta
 type HarvestRow = Pick<Tables<"fish_harvest">, "id" | "date" | "system_id" | "type_of_harvest" | "total_weight_harvest" | "created_at"> & PendingMeta

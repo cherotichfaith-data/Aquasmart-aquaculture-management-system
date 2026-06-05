@@ -7,22 +7,18 @@ import ProductionMetricFilter from "@/components/production/metrics-filter"
 import ProductionChart from "@/components/production/production-chart"
 import ProductionSummaryMetrics from "@/components/production/production-summary-metrics"
 import ProductionTable from "@/components/production/production-table"
-import CycleBenchmarks from "@/components/production/cycle-benchmarks"
 import { SectionHeading } from "@/components/shared/section-heading"
 import { toDashboardPath } from "@/lib/app-entry"
+import type { ProductionMetric } from "@/components/production/metrics"
+import type { ProductionChartRow } from "@/components/production/production-chart"
 import type { Enums } from "@/lib/types/database"
 import type { TimePeriod } from "@/lib/time-period"
 
 export function ProductionSections({
-  farmId,
-  systemId,
   selectedBatch,
   selectedSystem,
   selectedStage,
   timePeriod,
-  dateFrom,
-  dateTo,
-  scopedSystemIds,
   formattedChartRows,
   metricFilter,
   chartLoading,
@@ -37,17 +33,12 @@ export function ProductionSections({
   summaryError,
   onRetryTable,
 }: {
-  farmId?: string | null
-  systemId?: number
   selectedBatch: string
   selectedSystem: string
   selectedStage: "all" | Enums<"system_growth_stage">
   timePeriod: TimePeriod
-  dateFrom?: string
-  dateTo?: string
-  scopedSystemIds?: number[] | null
-  formattedChartRows: any[]
-  metricFilter: any
+  formattedChartRows: ProductionChartRow[]
+  metricFilter: ProductionMetric
   chartLoading: boolean
   chartFetching: boolean
   chartUpdatedAt: number
@@ -115,14 +106,6 @@ export function ProductionSections({
           error={summaryError}
           onRetry={onRetryTable}
         />
-      </div>
-
-      <div className="space-y-4">
-        <SectionHeading
-          title="Cycle Benchmarks"
-          description="Current production cycle performance vs your historical best for FCR, daily growth, and survival."
-        />
-        <CycleBenchmarks farmId={farmId} systemId={systemId} />
       </div>
     </div>
   )

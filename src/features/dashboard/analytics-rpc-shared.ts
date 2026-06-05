@@ -29,17 +29,20 @@ const getRoundedWaterQualityLabel = (value: number | null) => {
 }
 
 type RecommendedActionInputRow = {
-  title: string
-  description: string
-  priority: string | null | undefined
-  due: string | null | undefined
+  system_name?: string | null
+  metric_name?: string | null
+  severity?: string | null
+  current_value?: number | null
+  threshold_low?: number | null
+  threshold_high?: number | null
+  unit?: string | null
 }
 
 const normalizeActionPriority = (priority: string | null | undefined): RecommendedAction["priority"] => {
   if (!priority) return "Info"
 
   const normalized = priority.trim().toLowerCase()
-  if (normalized === "high") return "High"
+  if (normalized === "high" || normalized === "critical") return "High"
   if (normalized === "medium") return "Medium"
   return "Info"
 }
@@ -48,11 +51,24 @@ export function mergeRecommendedActionRows(rows: RecommendedActionInputRow[]): R
   const deduped = new Map<string, RecommendedAction>()
 
   rows.forEach((row) => {
+    const metric = row.metric_name?.trim() || "Farm signal"
+    const system = row.system_name?.trim() || "Farm"
+    const value = isFiniteNumber(row.current_value) ? row.current_value : null
+    const unit = row.unit?.trim() ? ` ${row.unit.trim()}` : ""
+    const thresholds = [
+      isFiniteNumber(row.threshold_low) ? `low ${row.threshold_low}${unit}` : null,
+      isFiniteNumber(row.threshold_high) ? `high ${row.threshold_high}${unit}` : null,
+    ].filter(Boolean).join(", ")
     const action: RecommendedAction = {
-      title: row.title,
-      description: row.description,
-      priority: normalizeActionPriority(row.priority),
-      due: row.due ?? "",
+      title: `${system}: ${metric}`,
+      description:
+        value == null
+          ? `${metric} requires attention.`
+          : thresholds
+            ? `Current value is ${value}${unit}; thresholds: ${thresholds}.`
+            : `Current value is ${value}${unit}.`,
+      priority: normalizeActionPriority(row.severity),
+      due: "Now",
     }
     const key = `${action.priority}::${action.title}::${action.description}::${action.due}`
     if (!deduped.has(key)) {

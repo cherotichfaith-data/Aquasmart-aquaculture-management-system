@@ -1,25 +1,16 @@
 import type { Database } from "@/lib/types/database"
 import type { TimeBounds } from "@/lib/time-period"
-import { sortByDateAsc } from "@/lib/utils"
-import { runServerReadThrough } from "@/lib/cache/server"
-import { cacheTags } from "@/lib/cache/tags"
 import { createAccessTokenClient } from "@/lib/supabase/server"
-import { requireUserContext } from "@/lib/supabase/require-user"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import {
   getScopedBatchSystems,
   getScopedSystemOptions,
   getScopedTimeBounds,
 } from "@/features/shared/scoped-analytics.server"
-import {
-  listAlertThresholdRows,
-  listProductionSummaryRows,
-} from "@/features/shared/query-seed.server"
 import type {
   DashboardPageInitialData,
   DashboardPageInitialFilters,
   DashboardSystemRow,
-  ProductionTrendRow,
 } from "./types"
 import type { RecommendedActionRow } from "@/lib/types/insights"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/api/_utils"
@@ -27,12 +18,9 @@ import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
 import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics-rpc-shared"
-import { toProductionTrendRows } from "./production-trend"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
-type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
-type SystemDimensionRow = Pick<Database["public"]["Tables"]["system"]["Row"], "id" | "volume" | "depth">
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "month"
 
 function isSbStatementTimeout(error: unknown) {
@@ -145,42 +133,6 @@ async function getDashboardSystemsRaw(
   return (data ?? []) as DashboardSystemRow[]
 }
 
-const resolveSystemVolume = (row: SystemDimensionRow) => {
-  if (typeof row.volume === "number" && Number.isFinite(row.volume) && row.volume > 0) return row.volume
-  return null
-}
-
-async function backfillBiomassDensityFromSystemVolume(
-  supabase: ServerClient,
-  farmId: string,
-  rows: DashboardSystemRow[],
-): Promise<DashboardSystemRow[]> {
-  if (!rows.length) return rows
-  const { data, error } = await supabase
-    .from("system")
-    .select("id, volume, depth")
-    .eq("farm_id", farmId)
-    .in("id", rows.map((row) => row.system_id))
-  if (error) return rows
-
-  const volumeBySystem = new Map(((data ?? []) as SystemDimensionRow[]).map((row) => [row.id, resolveSystemVolume(row)]))
-  return rows.map((row) => {
-    if (typeof row.biomass_density === "number" && Number.isFinite(row.biomass_density) && row.biomass_density > 0) {
-      return row
-    }
-    const volume = volumeBySystem.get(row.system_id)
-    if (
-      typeof volume === "number" &&
-      volume > 0 &&
-      typeof row.biomass_end === "number" &&
-      Number.isFinite(row.biomass_end)
-    ) {
-      return { ...row, biomass_density: row.biomass_end / volume }
-    }
-    return row
-  })
-}
-
 async function getBatchSystemIds(supabase: ServerClient, batchId?: number): Promise<number[]> {
   const rows = await getScopedBatchSystems(supabase, batchId)
   return rows.map((row) => row.system_id)
@@ -245,10 +197,10 @@ async function getRecommendedActionRows(
   supabase: ServerClient,
   params: { farmId: string; systemId?: number },
 ): Promise<RecommendedActionRow[]> {
-  const { data, error } = await supabase.rpc("api_recommended_actions" as never, {
+  const { data, error } = await supabase.rpc("api_recommended_actions", {
     p_farm_id: params.farmId,
     p_system_id: params.systemId,
-  } as never)
+  })
 
   if (error) {
     throw error
@@ -278,9 +230,7 @@ function buildEmptyDashboardPageInitialData(): DashboardPageInitialData {
     batchSystems: toQuerySuccess([]),
     kpiOverview: { metrics: [], dateBounds: { start: null, end: null } },
     systemsTable: { rows: [], meta: { reason: "Missing time bounds", start: null, end: null } },
-    productionTrend: [],
     waterQualityMeasurements: toQuerySuccess([]),
-    alertThresholds: toQuerySuccess([]),
     recommendedActions: [],
   }
 }
@@ -299,7 +249,7 @@ async function loadDashboardPageInitialData(
     resolveActiveSystemId(supabase, farmId, params.filters.selectedSystem),
   )
   const effectiveSelectedSystem = selectedSystemId != null ? String(selectedSystemId) : "all"
-  const bounds = await getTimeBounds(supabase, farmId, params.filters.timePeriod, selectedSystemId)
+  const bounds = await getTimeBounds(supabase, farmId, params.filters.timePeriod)
   if (!bounds.start || !bounds.end) {
     return {
       ...empty,
@@ -319,11 +269,6 @@ async function loadDashboardPageInitialData(
       ),
       kpiOverview: { metrics: [], dateBounds: bounds },
       systemsTable: { rows: [], meta: { reason: "Missing time bounds", start: bounds.start, end: bounds.end } },
-      alertThresholds: toQuerySuccess(
-        await withNetworkFallback("dashboard:getAlertThresholds:missing-bounds", [], () =>
-          listAlertThresholdRows(supabase, farmId),
-        ),
-      ),
     }
   }
 
@@ -334,7 +279,7 @@ async function loadDashboardPageInitialData(
   const startDate = bounds.start!
   const endDate = bounds.end!
 
-  const [systemOptions, batchSystems, dashboardSystemsRaw, alertThresholds] = await Promise.all([
+  const [systemOptions, batchSystems, dashboardSystemsRaw] = await Promise.all([
     withNetworkFallback("dashboard:getScopedSystemOptions", [], () =>
       getScopedSystemOptions(supabase, farmId, params.filters.selectedStage),
     ),
@@ -352,9 +297,8 @@ async function loadDashboardPageInitialData(
         }),
       { allowMissingObject: true },
     ),
-    withNetworkFallback("dashboard:getAlertThresholds", [], () => listAlertThresholdRows(supabase, farmId)),
   ])
-  const dashboardSystems = await backfillBiomassDensityFromSystemVolume(supabase, farmId, dashboardSystemsRaw)
+  const dashboardSystems = dashboardSystemsRaw
   const dashboardSystemIds = dashboardSystems
     .map((row) => row.system_id)
     .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
@@ -367,21 +311,8 @@ async function loadDashboardPageInitialData(
     : dashboardSystemIds
 
   const singleSystemId = activeScopedSystemIds.length === 1 ? activeScopedSystemIds[0] : undefined
-  const useFarmWideRecommendedActions =
-    params.filters.selectedStage === "all" &&
-    params.filters.selectedBatch === "all" &&
-    effectiveSelectedSystem === "all"
-  const [productionRows, consolidatedRows, recommendedActionRows, waterQualityMeasurements] =
+  const [consolidatedRows, recommendedActionRows, waterQualityMeasurements] =
     await Promise.all([
-      withNetworkFallback("dashboard:getProductionSummaryRows", [], () =>
-        listProductionSummaryRows(supabase, {
-          farmId,
-          stage: params.filters.selectedStage === "all" ? undefined : params.filters.selectedStage,
-          systemId: singleSystemId,
-          dateFrom: startDate,
-          dateTo: endDate,
-        }).then(toProductionTrendRows),
-      ),
       withNetworkFallback(
         "dashboard:getDashboardConsolidatedRows",
         [],
@@ -400,13 +331,7 @@ async function loadDashboardPageInitialData(
         [],
         async () => {
           if (activeScopedSystemIds.length === 0) return []
-          if (useFarmWideRecommendedActions) {
-            return getRecommendedActionRows(supabase, { farmId })
-          }
-          const rows: RecommendedActionRow[][] = await Promise.all(
-            activeScopedSystemIds.map((systemId) => getRecommendedActionRows(supabase, { farmId, systemId })),
-          )
-          return rows.flat()
+          return getRecommendedActionRows(supabase, { farmId, systemId: singleSystemId })
         },
         { allowMissingObject: true },
       ),
@@ -420,12 +345,6 @@ async function loadDashboardPageInitialData(
         }),
       ),
     ])
-
-  const filteredProductionRows = productionRows.filter(
-    (row) =>
-      row.system_id != null &&
-      activeScopedSystemIds.includes(row.system_id),
-  )
 
   const systemsTableRows = dashboardSystems.filter((row) => {
     if (!activeScopedSystemIds.includes(row.system_id)) return false
@@ -465,9 +384,7 @@ async function loadDashboardPageInitialData(
         reason: activeScopedSystemIds.length === 0 ? "No scoped systems" : undefined,
       },
     },
-    productionTrend: sortByDateAsc(filteredProductionRows, (row) => row.date),
     waterQualityMeasurements: toQuerySuccess(waterQualityMeasurements),
-    alertThresholds: toQuerySuccess(alertThresholds),
     recommendedActions: mergeRecommendedActionRows(recommendedActionRows),
   }
 }
@@ -477,26 +394,5 @@ export async function getDashboardPageInitialData(params: {
   filters: DashboardPageInitialFilters
   accessToken: string
 }): Promise<DashboardPageInitialData> {
-  return runServerReadThrough({
-    keyParts: [
-      "dashboard-page",
-      "active-current-systems-v5",
-      params.farmId,
-      params.filters.selectedBatch,
-      params.filters.selectedSystem,
-      params.filters.selectedStage,
-      params.filters.timePeriod,
-    ],
-    tags: params.farmId
-      ? [
-          cacheTags.farm(params.farmId),
-          cacheTags.systems(params.farmId),
-          cacheTags.inventory(params.farmId),
-          cacheTags.dashboard(params.farmId),
-          cacheTags.waterQuality(params.farmId),
-          cacheTags.reports(params.farmId, "recent-entries"),
-        ]
-      : [],
-    loader: () => loadDashboardPageInitialData(createAccessTokenClient(params.accessToken), params),
-  })
+  return loadDashboardPageInitialData(createAccessTokenClient(params.accessToken), params)
 }

@@ -33,7 +33,7 @@ export function useTimePeriodBounds(params: {
             signal,
           }),
     enabled,
-    staleTime: 5 * 60_000,
+    staleTime: 0,
   })
 
   const bounds = query.data ?? { start: null, end: null }

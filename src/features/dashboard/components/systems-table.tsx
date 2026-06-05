@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowUpDown, Clock, Droplets, Fish, TriangleAlert } from "lucide-react"
+import { ArrowUpDown, Clock, Droplets, TriangleAlert } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
 import MuiButton from "@mui/material/Button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
@@ -9,8 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { DashboardSystemRow } from "@/features/dashboard/types"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
-import { buildSystemTimelineMap, useSystemTimelineBounds } from "@/lib/hooks/use-system-timeline"
-import { useLatestWaterQualityStatus, useWaterQualityMeasurements, useWaterQualityOverlay } from "@/lib/hooks/use-water-quality"
+import { useLatestWaterQualityStatus, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import SystemHistorySheet from "@/components/systems/system-history-sheet"
@@ -21,7 +20,7 @@ import {
   formatUnitValue,
 } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
-import { getUtcDateInput, getUtcDateInputDaysAgo } from "@/lib/deterministic-format"
+import { getUtcDateInputDaysAgo } from "@/lib/deterministic-format"
 
 interface SystemsTableProps {
   stage: Enums<"system_growth_stage"> | "all"
@@ -115,10 +114,6 @@ export default function SystemsTable({
   const errorMessage = getErrorMessage(systemsQuery.error)
   const emptyReason = systemsQuery.data?.meta.reason ?? null
 
-  const timelineQuery = useSystemTimelineBounds({
-    farmId,
-    enabled: Boolean(farmId) && systems.length > 0,
-  })
   const latestStatusQuery = useLatestWaterQualityStatus(undefined, { farmId })
   const doMeasurementsQuery = useWaterQualityMeasurements({
     farmId,
@@ -127,19 +122,6 @@ export default function SystemsTable({
     limit: 5000,
     enabled: Boolean(farmId),
   })
-  const today = useMemo(() => getUtcDateInput(), [])
-  const todayOverlayQuery = useWaterQualityOverlay({
-    farmId,
-    dateFrom: today,
-    dateTo: today,
-    enabled: Boolean(farmId),
-  })
-
-  const timelineMap = useMemo(
-    () => (timelineQuery.data?.status === "success" ? buildSystemTimelineMap(timelineQuery.data.data) : new Map()),
-    [timelineQuery.data],
-  )
-
   const latestStatusMap = useMemo(() => {
     const rows = latestStatusQuery.data?.status === "success" ? latestStatusQuery.data.data : []
     const map = new Map<number, (typeof rows)[number]>()
@@ -164,17 +146,6 @@ export default function SystemsTable({
 
     return map
   }, [doMeasurementsQuery.data])
-
-  const todayFeedBySystem = useMemo(() => {
-    const map = new Map<number, number>()
-    const rows = todayOverlayQuery.data?.status === "success" ? todayOverlayQuery.data.data : []
-
-    rows.forEach((row) => {
-      map.set(row.system_id, (map.get(row.system_id) ?? 0) + (row.feeding_amount ?? 0))
-    })
-
-    return map
-  }, [todayOverlayQuery.data])
 
   const farmMedianEfcr = useMemo(
     () => median(systems.map((row) => row.efcr).filter(isFiniteNumber)),
@@ -218,17 +189,13 @@ export default function SystemsTable({
 
   const combinedUpdatedAt = Math.max(
     systemsQuery.dataUpdatedAt ?? 0,
-    timelineQuery.dataUpdatedAt ?? 0,
     latestStatusQuery.dataUpdatedAt ?? 0,
     doMeasurementsQuery.dataUpdatedAt ?? 0,
-    todayOverlayQuery.dataUpdatedAt ?? 0,
   )
   const combinedFetching =
     systemsQuery.isFetching ||
-    timelineQuery.isFetching ||
     latestStatusQuery.isFetching ||
-    doMeasurementsQuery.isFetching ||
-    todayOverlayQuery.isFetching
+    doMeasurementsQuery.isFetching
 
   useEffect(() => {
     setPageIndex(0)
@@ -308,11 +275,9 @@ export default function SystemsTable({
             <div className="grid gap-3 md:hidden">
               {pagedSystems.length > 0 ? (
                 pagedSystems.map((row) => {
-            const timeline = timelineMap.get(row.system_id)
-            const asOf = formatAsOfDate(timeline?.snapshot_as_of ?? row.as_of_date ?? row.input_end_date)
+            const asOf = formatAsOfDate(row.as_of_date ?? row.input_end_date)
             const latestStatus = latestStatusMap.get(row.system_id)
             const latestDo = latestDoMap.get(row.system_id)?.value ?? null
-            const fedToday = (todayFeedBySystem.get(row.system_id) ?? 0) > 0
             const staleSample = (row.sample_age_days ?? 0) > 30
             const doCritical = Boolean(latestStatus?.do_exceeded)
             const efcrOutlier =
@@ -322,7 +287,6 @@ export default function SystemsTable({
               row.efcr > farmMedianEfcr * 3
             const flags = [
               staleSample ? "Sample stale" : null,
-              !fedToday ? "No feed today" : null,
               doCritical ? "Low DO" : null,
               efcrOutlier ? "eFCR outlier" : null,
             ].filter(Boolean)
@@ -417,11 +381,9 @@ export default function SystemsTable({
                 <TableBody>
                   {pagedSystems.length > 0 ? (
                     pagedSystems.map((row) => {
-                const timeline = timelineMap.get(row.system_id)
-                const asOf = formatAsOfDate(timeline?.snapshot_as_of ?? row.as_of_date ?? row.input_end_date)
+                const asOf = formatAsOfDate(row.as_of_date ?? row.input_end_date)
                 const latestStatus = latestStatusMap.get(row.system_id)
                 const latestDo = latestDoMap.get(row.system_id)?.value ?? null
-                const fedToday = (todayFeedBySystem.get(row.system_id) ?? 0) > 0
                 const staleSample = (row.sample_age_days ?? 0) > 30
                 const doCritical = Boolean(latestStatus?.do_exceeded)
                 const efcrOutlier =
@@ -436,14 +398,6 @@ export default function SystemsTable({
                         key: "stale-sample",
                         title: `Sample is ${row.sample_age_days} days old.`,
                         icon: Clock,
-                        className: "bg-warning/15 text-warning",
-                      }
-                    : null,
-                  !fedToday
-                    ? {
-                        key: "missing-feed",
-                        title: "No feed recorded today.",
-                        icon: Fish,
                         className: "bg-warning/15 text-warning",
                       }
                     : null,
@@ -586,7 +540,6 @@ export default function SystemsTable({
         dateFrom={dateFrom ?? undefined}
         dateTo={dateTo ?? undefined}
         summaryRow={selectedSystem}
-        initialTimelineRow={selectedSystemId != null ? (timelineMap.get(selectedSystemId) ?? null) : null}
       />
     </Card>
   )

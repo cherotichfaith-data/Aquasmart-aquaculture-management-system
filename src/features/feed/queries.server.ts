@@ -1,6 +1,4 @@
 import type { QueryResult } from "@/lib/supabase-client"
-import { runServerReadThrough } from "@/lib/cache/server"
-import { cacheTags } from "@/lib/cache/tags"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { toQuerySuccess } from "@/lib/api/_utils"
@@ -8,7 +6,6 @@ import { logSbError } from "@/lib/supabase/log"
 import type {
   FeedPageInitialData,
   FeedPageInitialFilters,
-  FeedTypeOption,
   SystemOption,
 } from "./types"
 import type { FeedRateRow } from "@/lib/types/insights"
@@ -20,7 +17,7 @@ import {
   resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
-import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
 
 const DEFAULT_TIME_PERIOD: FeedPageInitialFilters["timePeriod"] = "quarter"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
@@ -31,17 +28,14 @@ function toSuccess<T>(data: T[]): QueryResult<T> {
 
 export function parseFeedPageFilters(searchParams?: Record<string, string | string[] | undefined>): FeedPageInitialFilters {
   const selectedBatchRaw = searchParams?.batch
-  const selectedSystemRaw = searchParams?.system
+  const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
   const timePeriodRaw = searchParams?.period
 
   const selectedBatch = typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all"
   const selectedSystem = typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all"
   const selectedStage = normalizeStageFilter(selectedStageRaw)
-  const timePeriod =
-    typeof timePeriodRaw === "string" && isTimePeriod(timePeriodRaw)
-      ? (timePeriodRaw as TimePeriod)
-      : DEFAULT_TIME_PERIOD
+  const timePeriod = resolveTimePeriod(timePeriodRaw, DEFAULT_TIME_PERIOD)
 
   return {
     selectedBatch,
@@ -51,7 +45,7 @@ export function parseFeedPageFilters(searchParams?: Record<string, string | stri
   }
 }
 
-async function getFeedRateAnalysis(
+async function loadFeedRateSummary(
   supabase: ServerClient,
   params: { farmId: string; systemId?: number; dateFrom: string; dateTo: string },
 ): Promise<FeedRateRow[]> {
@@ -62,20 +56,10 @@ async function getFeedRateAnalysis(
     p_date_to: params.dateTo,
   })
   if (error) {
-    logSbError("feed:getFeedRateAnalysis", error)
+    logSbError("feed:loadFeedRateSummary", error)
     return []
   }
   return (data ?? []) as FeedRateRow[]
-}
-
-async function getFeedTypeOptions(supabase: ServerClient, farmId: string): Promise<FeedTypeOption[]> {
-  const { data, error } = await supabase.rpc("api_feed_type_options_rpc", { p_farm_id: farmId })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (data ?? []) as FeedTypeOption[]
 }
 
 async function loadFeedPageInitialData(
@@ -89,41 +73,36 @@ async function loadFeedPageInitialData(
       bounds: { start: null, end: null },
       systems: toSuccess([]),
       batchSystems: toSuccess([]),
-      feedTypes: toSuccess([]),
       feedingRecords: toSuccess([]),
-      inventory: toSuccess([]),
       feedRateSummary: toSuccess([]),
     }
   }
 
+  const [systems, batchSystems] = await Promise.all([
+    getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<SystemOption[]>,
+    getScopedBatchSystems(supabase, parseSelectedNumericId(params.filters.selectedBatch)),
+  ])
+  const selectedSystemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systems)
   const bounds = await getScopedTimeBounds(
     supabase,
     params.farmId,
     params.filters.timePeriod,
     "feeding",
-    undefined,
+    selectedSystemId,
   )
-  const [systems, batchSystems, feedTypes] = await Promise.all([
-    getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<SystemOption[]>,
-    getScopedBatchSystems(supabase, parseSelectedNumericId(params.filters.selectedBatch)),
-    getFeedTypeOptions(supabase, params.farmId),
-  ])
-  const selectedSystemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systems)
 
   if (!bounds.start || !bounds.end) {
     return {
       bounds,
       systems: toSuccess(systems),
       batchSystems: toSuccess(batchSystems),
-      feedTypes: toSuccess(feedTypes),
       feedingRecords: toSuccess([]),
-      inventory: toSuccess([]),
       feedRateSummary: toSuccess([]),
     }
   }
 
   // Pre-fetch feed rate analysis so charts hydrate on first render.
-  const feedRateSummary = await getFeedRateAnalysis(supabase, {
+  const feedRateSummary = await loadFeedRateSummary(supabase, {
     farmId: params.farmId,
     systemId: selectedSystemId ?? undefined,
     dateFrom: bounds.start,
@@ -134,9 +113,7 @@ async function loadFeedPageInitialData(
     bounds,
     systems: toSuccess(systems),
     batchSystems: toSuccess(batchSystems),
-    feedTypes: toSuccess(feedTypes),
     feedingRecords: toSuccess([]),
-    inventory: toSuccess([]),
     feedRateSummary: toSuccess(feedRateSummary),
   }
 }
@@ -145,27 +122,6 @@ export async function getFeedPageInitialData(params: {
   farmId: string | null
   filters: FeedPageInitialFilters
 }): Promise<FeedPageInitialData> {
-  const { user, accessToken } = await requireUserContext()
-
-  return runServerReadThrough({
-    keyParts: [
-      "feed-page",
-      user.id,
-      params.farmId,
-      params.filters.selectedBatch,
-      params.filters.selectedSystem,
-      params.filters.selectedStage,
-      params.filters.timePeriod,
-    ],
-    tags: params.farmId
-      ? [
-          cacheTags.feedTypes(),
-          cacheTags.farm(params.farmId),
-          cacheTags.systems(params.farmId),
-          cacheTags.inventory(params.farmId),
-          cacheTags.feeding(params.farmId),
-        ]
-      : [],
-    loader: () => loadFeedPageInitialData(createAccessTokenClient(accessToken), params),
-  })
+  const { accessToken } = await requireUserContext()
+  return loadFeedPageInitialData(createAccessTokenClient(accessToken), params)
 }

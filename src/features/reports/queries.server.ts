@@ -1,5 +1,3 @@
-import { runServerReadThrough } from "@/lib/cache/server"
-import { cacheTags } from "@/lib/cache/tags"
 import { toQuerySuccess } from "@/lib/api/_utils"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
@@ -20,7 +18,7 @@ import { listFeedingRecords, listGrowthTrend, listHarvests } from "@/lib/server/
 import { listMortalityEvents } from "@/lib/server/mortality-reads"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import type { Database, Enums } from "@/lib/types/database"
-import { isTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
+import { resolveTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
 
 export type ReportsPageFilters = {
   selectedBatch: string
@@ -62,7 +60,7 @@ export function parseReportsPageFilters(
   searchParams?: Record<string, string | string[] | undefined>,
 ): ReportsPageFilters {
   const selectedBatchRaw = searchParams?.batch
-  const selectedSystemRaw = searchParams?.system
+  const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
   const timePeriodRaw = searchParams?.period
 
@@ -70,10 +68,7 @@ export function parseReportsPageFilters(
     selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",
     selectedSystem: typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all",
     selectedStage: normalizeStageFilter(selectedStageRaw),
-    timePeriod:
-      typeof timePeriodRaw === "string" && isTimePeriod(timePeriodRaw)
-        ? (timePeriodRaw as TimePeriod)
-        : DEFAULT_TIME_PERIOD,
+    timePeriod: resolveTimePeriod(timePeriodRaw, DEFAULT_TIME_PERIOD),
   }
 }
 
@@ -219,27 +214,5 @@ async function loadReportsPageInitialData(
 
 export async function getReportsPageInitialData(params: { farmId: string | null; filters: ReportsPageFilters }) {
   const { user, accessToken } = await requireUserContext()
-
-  return runServerReadThrough({
-    keyParts: [
-      "reports-page",
-      user.id,
-      params.farmId,
-      params.filters.selectedBatch,
-      params.filters.selectedSystem,
-      params.filters.selectedStage,
-      params.filters.timePeriod,
-    ],
-    tags: params.farmId
-      ? [
-          cacheTags.farm(params.farmId),
-          cacheTags.systems(params.farmId),
-          cacheTags.inventory(params.farmId),
-          cacheTags.feeding(params.farmId),
-          cacheTags.waterQuality(params.farmId),
-          cacheTags.reports(params.farmId, "mortality"),
-        ]
-      : [],
-    loader: () => loadReportsPageInitialData(createAccessTokenClient(accessToken), { ...params, userId: user.id }),
-  })
+  return loadReportsPageInitialData(createAccessTokenClient(accessToken), { ...params, userId: user.id })
 }

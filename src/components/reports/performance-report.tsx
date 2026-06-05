@@ -122,7 +122,6 @@ export default function PerformanceReport({
     const totals = latestCycleRows.reduce(
       (acc, row) => {
         acc.totalBiomass += row.total_biomass ?? 0
-        acc.totalFeed += row.total_feed_amount_period ?? 0
         acc.totalFish += row.number_of_fish_inventory ?? 0
         acc.totalMortality += row.daily_mortality_count ?? 0
         acc.totalHarvestKg += row.total_weight_harvested_aggregated ?? 0
@@ -130,6 +129,9 @@ export default function PerformanceReport({
         acc.totalStockedFish += row.number_of_fish_stocked ?? 0
         acc.totalCumulativeMortality += row.cumulative_mortality ?? 0
         acc.totalTransferOutFish += row.number_of_fish_transfer_out ?? 0
+        if (acc.backendFeedingRate == null && isFiniteNumber(row.feeding_rate)) {
+          acc.backendFeedingRate = row.feeding_rate
+        }
         if (acc.efcrAggregated == null && isFiniteNumber(row.efcr_aggregated)) {
           acc.efcrAggregated = row.efcr_aggregated
         }
@@ -137,7 +139,6 @@ export default function PerformanceReport({
       },
       {
         totalBiomass: 0,
-        totalFeed: 0,
         totalFish: 0,
         totalMortality: 0,
         totalHarvestKg: 0,
@@ -145,14 +146,11 @@ export default function PerformanceReport({
         totalStockedFish: 0,
         totalCumulativeMortality: 0,
         totalTransferOutFish: 0,
+        backendFeedingRate: null as number | null,
         efcrAggregated: null as number | null,
       },
     )
 
-    const feedingRate =
-      totals.totalBiomass > 0 && totals.totalFeed > 0
-        ? totals.totalFeed / totals.totalBiomass
-        : null
     const mortalityRate =
       totals.totalFish > 0 ? totals.totalMortality / totals.totalFish : null
     const survivalRatePct =
@@ -162,7 +160,7 @@ export default function PerformanceReport({
 
     return {
       efcr_aggregated_consolidated: totals.efcrAggregated,
-      feeding_rate: feedingRate,
+      feeding_rate: totals.backendFeedingRate,
       average_biomass: totals.totalBiomass,
       mortality_rate: mortalityRate,
       survival_rate_pct: survivalRatePct,

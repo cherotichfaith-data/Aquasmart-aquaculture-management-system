@@ -10,6 +10,7 @@ import {
 import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createQueryClient } from "@/lib/react-query/query-client"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type SearchParams = Record<string, string | string[] | undefined>
 
@@ -30,7 +31,8 @@ export default async function Page({
     initialData.systemOptions.status === "success"
       ? cleanScopedFilterState(initialFilters, initialData.systemOptions.data)
       : initialFilters
-  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
+  const systemOptions = initialData.systemOptions.status === "success" ? initialData.systemOptions.data : []
+  const selectedSystemId = resolveSystemIdFromFilterValue(effectiveFilters.selectedSystem, systemOptions)
   const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
   const queryClient = createQueryClient()
 
@@ -54,24 +56,12 @@ export default async function Page({
     initialData.systemOptions,
   )
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)
-  queryClient.setQueryData(queryKeys.waterQuality.syncStatus(farmId), initialData.syncStatus)
   queryClient.setQueryData(
     queryKeys.waterQuality.latestStatus({ farmId, systemId: selectedSystemId }),
     initialData.latestStatus,
   )
-  queryClient.setQueryData(queryKeys.waterQuality.thresholds(farmId), initialData.thresholds)
 
   if (initialData.bounds.start && initialData.bounds.end) {
-    queryClient.setQueryData(
-      queryKeys.waterQuality.dailyRating({
-        farmId,
-        systemId: selectedSystemId,
-        dateFrom: initialData.bounds.start,
-        dateTo: initialData.bounds.end,
-        limit: 2000,
-      }),
-      initialData.ratings,
-    )
     queryClient.setQueryData(
       queryKeys.waterQuality.measurements({
         farmId,
@@ -81,24 +71,6 @@ export default async function Page({
         limit: 2000,
       }),
       initialData.measurements,
-    )
-    queryClient.setQueryData(
-      queryKeys.waterQuality.overlay({
-        farmId,
-        systemId: selectedSystemId,
-        dateFrom: initialData.bounds.start,
-        dateTo: initialData.bounds.end,
-      }),
-      initialData.overlay,
-    )
-    queryClient.setQueryData(
-      queryKeys.activity.recentActivities({
-        tableName: "water_quality_measurement",
-        dateFrom: `${initialData.bounds.start}T00:00:00`,
-        dateTo: `${initialData.bounds.end}T23:59:59`,
-        limit: 1500,
-      }),
-      initialData.activities,
     )
   }
 

@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -16,22 +16,13 @@ export type Database = {
     Tables: {
       _affected_systems: {
         Row: {
-          created_at: string
-          min_affected_date: string
           system_id: number
-          updated_at: string
         }
         Insert: {
-          created_at?: string
-          min_affected_date: string
           system_id: number
-          updated_at?: string
         }
         Update: {
-          created_at?: string
-          min_affected_date?: string
           system_id?: number
-          updated_at?: string
         }
         Relationships: [
           {
@@ -476,7 +467,7 @@ export type Database = {
           feed_category: Database["public"]["Enums"]["feed_category"]
           feed_line: string | null
           feed_pellet_size: Database["public"]["Enums"]["feed_pellet_size"]
-          feed_supplier: number
+          feed_supplier_id: number
           id: number
           is_active: boolean
         }
@@ -488,7 +479,7 @@ export type Database = {
           feed_category: Database["public"]["Enums"]["feed_category"]
           feed_line?: string | null
           feed_pellet_size: Database["public"]["Enums"]["feed_pellet_size"]
-          feed_supplier: number
+          feed_supplier_id: number
           id?: number
           is_active?: boolean
         }
@@ -500,7 +491,7 @@ export type Database = {
           feed_category?: Database["public"]["Enums"]["feed_category"]
           feed_line?: string | null
           feed_pellet_size?: Database["public"]["Enums"]["feed_pellet_size"]
-          feed_supplier?: number
+          feed_supplier_id?: number
           id?: number
           is_active?: boolean
         }
@@ -514,7 +505,7 @@ export type Database = {
           },
           {
             foreignKeyName: "feed_type_feed_supplier_fkey"
-            columns: ["feed_supplier"]
+            columns: ["feed_supplier_id"]
             isOneToOne: false
             referencedRelation: "feed_supplier"
             referencedColumns: ["id"]
@@ -527,7 +518,7 @@ export type Database = {
           created_at: string
           cycle_id: number | null
           date: string
-          feed_type_id: number | null
+          feed_type_id: number
           feeding_amount: number
           feeding_response: number | null
           id: number
@@ -541,7 +532,7 @@ export type Database = {
           created_at?: string
           cycle_id?: number | null
           date: string
-          feed_type_id?: number | null
+          feed_type_id: number
           feeding_amount: number
           feeding_response?: number | null
           id?: number
@@ -555,7 +546,7 @@ export type Database = {
           created_at?: string
           cycle_id?: number | null
           date?: string
-          feed_type_id?: number | null
+          feed_type_id?: number
           feeding_amount?: number
           feeding_response?: number | null
           id?: number
@@ -631,37 +622,34 @@ export type Database = {
       }
       fingerling_batch: {
         Row: {
-          abw: number | null
+          abw: number
           created_at: string
           date_of_delivery: string
           farm_id: string | null
           id: number
           name: string
-          number_of_fish: number | null
+          number_of_fish: number
           supplier_id: number
-          system_id: number | null
         }
         Insert: {
-          abw?: number | null
+          abw: number
           created_at?: string
           date_of_delivery: string
           farm_id?: string | null
           id?: number
           name: string
-          number_of_fish?: number | null
+          number_of_fish: number
           supplier_id: number
-          system_id?: number | null
         }
         Update: {
-          abw?: number | null
+          abw?: number
           created_at?: string
           date_of_delivery?: string
           farm_id?: string | null
           id?: number
           name?: string
-          number_of_fish?: number | null
+          number_of_fish?: number
           supplier_id?: number
-          system_id?: number | null
         }
         Relationships: [
           {
@@ -676,13 +664,6 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "fingerling_supplier"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fingerling_batch_system_id_fkey"
-            columns: ["system_id"]
-            isOneToOne: false
-            referencedRelation: "system"
             referencedColumns: ["id"]
           },
         ]
@@ -785,7 +766,6 @@ export type Database = {
           created_at: string
           cycle_id: number | null
           date: string
-          farm_id: string | null
           id: number
           is_mass_mortality: boolean | null
           local_id: string | null
@@ -801,7 +781,6 @@ export type Database = {
           created_at?: string
           cycle_id?: number | null
           date: string
-          farm_id?: string | null
           id?: number
           is_mass_mortality?: boolean | null
           local_id?: string | null
@@ -817,7 +796,6 @@ export type Database = {
           created_at?: string
           cycle_id?: number | null
           date?: string
-          farm_id?: string | null
           id?: number
           is_mass_mortality?: boolean | null
           local_id?: string | null
@@ -841,13 +819,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "production_cycle"
             referencedColumns: ["cycle_id"]
-          },
-          {
-            foreignKeyName: "fish_mortality_farm_id_fkey"
-            columns: ["farm_id"]
-            isOneToOne: false
-            referencedRelation: "farm"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "mortality_system_id_fkey"
@@ -1391,7 +1362,6 @@ export type Database = {
       }
       user_settings: {
         Row: {
-          alert_thresholds: Json | null
           created_at: string | null
           default_views: Json | null
           theme: string | null
@@ -1399,7 +1369,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          alert_thresholds?: Json | null
           created_at?: string | null
           default_views?: Json | null
           theme?: string | null
@@ -1407,7 +1376,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          alert_thresholds?: Json | null
           created_at?: string | null
           default_views?: Json | null
           theme?: string | null
@@ -1838,18 +1806,6 @@ export type Database = {
           updated_at: string
         }[]
       }
-      api_fcr_trend: {
-        Args: { p_days?: number; p_farm_id: string; p_system_id: number }
-        Returns: {
-          abw_end_g: number
-          days_interval: number
-          fcr: number
-          period_end: string
-          period_start: string
-          total_feed_kg: number
-          weight_gain_kg: number
-        }[]
-      }
       api_feed_demand_forecast: {
         Args: { p_days_ahead?: number; p_farm_id: string }
         Returns: {
@@ -1876,7 +1832,7 @@ export type Database = {
           abw_end_g: number
           abw_start_g: number
           dominant_feed_type: string
-          fcr: number
+          efcr_period: number
           interval_days: number
           interval_end: string
           interval_start: string
@@ -1886,7 +1842,6 @@ export type Database = {
           system_name: string
           total_feed_kg: number
           warning: string
-          weight_gain_kg: number
         }[]
       }
       api_feed_rate_analysis: {
@@ -1912,35 +1867,20 @@ export type Database = {
           upper_band_pct: number
         }[]
       }
-      api_feed_type_options_rpc:
-        | {
-            Args: never
-            Returns: {
-              crude_fat_percentage: number
-              crude_protein_percentage: number
-              farm_id: string
-              feed_category: string
-              feed_line: string
-              feed_pellet_size: string
-              id: number
-              label: string
-              visibility_scope: string
-            }[]
-          }
-        | {
-            Args: { p_farm_id: string }
-            Returns: {
-              crude_fat_percentage: number
-              crude_protein_percentage: number
-              farm_id: string
-              feed_category: string
-              feed_line: string
-              feed_pellet_size: string
-              id: number
-              label: string
-              visibility_scope: string
-            }[]
-          }
+      api_feed_type_options_rpc: {
+        Args: { p_farm_id: string }
+        Returns: {
+          crude_fat_percentage: number
+          crude_protein_percentage: number
+          farm_id: string
+          feed_category: string
+          feed_line: string
+          feed_pellet_size: string
+          id: number
+          label: string
+          visibility_scope: string
+        }[]
+      }
       api_fingerling_batch_options_rpc: {
         Args: { p_farm_id?: string }
         Returns: {
@@ -2062,7 +2002,6 @@ export type Database = {
         Returns: {
           avg_abw_g: number
           daily_mortality: number
-          feeding_rate: number
           system_count: number
           total_biomass_kg: number
           total_feed_kg: number
@@ -2097,7 +2036,6 @@ export type Database = {
           biomass_density: number
           efcr_aggregated: number
           efcr_period: number
-          feeding_rate: number
           period_end: string
           period_start: string
           system_id: number
@@ -2142,43 +2080,6 @@ export type Database = {
           system_id: number
           system_name: string
           total_fish: number
-        }[]
-      }
-      api_survival_trend: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date: string
-          p_system_id: number
-        }
-        Returns: {
-          cum_deaths: number
-          daily_deaths: number
-          daily_mort_pct: number
-          event_date: string
-          live_count: number
-          stocked: number
-          survival_pct: number
-        }[]
-      }
-      api_system_health_score: {
-        Args: { p_farm_id: string; p_system_id?: number }
-        Returns: {
-          adg_g_day: number
-          fcr_score: number
-          growth_score: number
-          health_grade: string
-          health_score: number
-          last_sample_date: string
-          latest_abw_g: number
-          latest_efcr: number
-          mortality_rate_pct: number
-          mortality_score: number
-          system_id: number
-          system_name: string
-          wq_date: string
-          wq_rating_avg: number
-          wq_score: number
         }[]
       }
       api_system_options_rpc: {
@@ -2342,18 +2243,6 @@ export type Database = {
           system_name: string
         }[]
       }
-      get_fcr_trend: {
-        Args: { p_days?: number; p_farm_id: string; p_system_id: number }
-        Returns: {
-          abw_end_g: number
-          days_interval: number
-          fcr: number
-          period_end: string
-          period_start: string
-          total_feed_kg: number
-          weight_gain_kg: number
-        }[]
-      }
       get_feed_rate_target: {
         Args: { p_growth_stage: string }
         Returns: {
@@ -2364,18 +2253,6 @@ export type Database = {
           pellet_size_mm: string
           sessions_per_day: number
           stage: string
-        }[]
-      }
-      get_growth_trend: {
-        Args: { p_days?: number; p_system_id: number }
-        Returns: {
-          abw_g: number
-          adg_g_day: number
-          days_interval: number
-          prev_abw_g: number
-          sample_date: string
-          sgr_pct_day: number
-          weight_gain_g: number
         }[]
       }
       get_running_stock: {
@@ -2391,18 +2268,6 @@ export type Database = {
           stock_status: string
         }[]
       }
-      get_survival_trend: {
-        Args: { p_end_date?: string; p_start_date: string; p_system_id: number }
-        Returns: {
-          cum_deaths: number
-          daily_deaths: number
-          daily_mort_pct: number
-          event_date: string
-          live_count: number
-          stocked: number
-          survival_pct: number
-        }[]
-      }
       mark_farm_user_invitation_sent: {
         Args: { p_invitation_id: string }
         Returns: undefined
@@ -2410,18 +2275,15 @@ export type Database = {
       process_inventory_queue: {
         Args: { p_limit?: number }
         Returns: {
-          processed_from_date: string
           processed_system_id: number
           processed_to_date: string
           upserted_days: number
         }[]
       }
-      refresh_analytics_cache: { Args: never; Returns: undefined }
       refresh_daily_water_quality_rating: {
         Args: { p_from?: string; p_system_id?: number; p_to?: string }
         Returns: undefined
       }
-      request_matview_refresh: { Args: never; Returns: undefined }
       resolve_cycle_batch_for_system_date: {
         Args: { p_date: string; p_system_id: number }
         Returns: {

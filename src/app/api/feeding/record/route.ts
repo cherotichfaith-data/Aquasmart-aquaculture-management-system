@@ -12,7 +12,7 @@ const feedingSchema = z
     system_id: z.number().int().positive(),
     batch_id: z.number().int().positive().nullable().optional(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    feed_type_id: z.number().int().positive().nullable().optional(),
+    feed_type_id: z.number().int().positive(),
     feeding_amount: z.number().min(0),
     feeding_response: z.number().int().min(1).max(5).nullable().optional(),
     notes: z.string().max(500).nullable().optional(),
@@ -20,13 +20,6 @@ const feedingSchema = z
   })
   .superRefine((payload, ctx) => {
     if (payload.feeding_amount > 0) {
-      if (!payload.feed_type_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["feed_type_id"],
-          message: "Feed type is required when feed was given.",
-        })
-      }
       if (!payload.feeding_response) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -81,7 +74,7 @@ export async function POST(request: Request) {
       system_id: payload.system_id,
       batch_id: payload.batch_id ?? null,
       date: payload.date,
-      feed_type_id: payload.feed_type_id ?? null,
+      feed_type_id: payload.feed_type_id,
       feeding_amount: payload.feeding_amount,
       feeding_response: payload.feeding_response ?? null,
       notes: payload.notes?.trim() ? payload.notes.trim() : null,

@@ -1,39 +1,26 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
+import { useSystemOptions } from "@/lib/hooks/use-options"
 import {
   useFeedingRecords,
-  useRunningStock,
-  useScopedFcrTrend,
-  useScopedGrowthTrend,
-  useScopedSurvivalTrend,
+  useScopedEfcrTrend,
 } from "@/lib/hooks/use-reports"
-import { useProductionSummary } from "@/lib/hooks/use-production"
-import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useFeedRateAnalysis } from "@/lib/hooks/use-analytics"
-import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import type { FeedPageInitialFilters } from "@/features/feed/types"
+import { normalizeStageFilter } from "@/lib/stage-filter"
+import { getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
+import { resolveTimePeriod, toTimePeriodUrlValue } from "@/lib/time-period"
 import {
-  buildConsecutivePoorAlerts,
-  buildFeedDeviationMatrixCells,
   buildFeedRatePointsFromAnalysis,
-  type FcrInterval,
+  type EfcrTrendPoint,
 } from "./_lib/feed-analytics"
-import type { FeedExceptionItem } from "./_lib/feed-sections"
-import {
-  buildDateWindow,
-  buildFeedExceptionItems,
-  buildLatestDoBySystem,
-  buildLatestFeedRateBySystem,
-  buildLatestRowBySystem,
-} from "./_lib/feed-page"
 import { FeedDashboard } from "./_components/feed-dashboard"
-import FeedDemandForecast from "@/components/feed/feed-demand-forecast"
-import { SectionHeading } from "@/components/shared/section-heading"
 
 export default function FeedManagementPage({
   initialFarmId,
@@ -44,6 +31,37 @@ export default function FeedManagementPage({
   initialFarmName?: string | null
   initialFilters: FeedPageInitialFilters
 }) {
+  const searchParams = useSearchParams()
+  const periodParam = searchParams.get("period")
+  const systemParam = searchParams.get("cage") ?? searchParams.get("system")
+  const batchParam = searchParams.get("batch")
+  const stageParam = searchParams.get("stage")
+  const filterSystemsQuery = useSystemOptions({ farmId: initialFarmId, activeOnly: true })
+  const filterSystemOptions = filterSystemsQuery.data?.status === "success" ? filterSystemsQuery.data.data : []
+  const selectedSystemUrlValue = useMemo(() => {
+    const systemId = resolveSystemIdFromFilterValue(systemParam, filterSystemOptions)
+    if (systemId == null) return systemParam ?? undefined
+    return getSystemFilterUrlValue(filterSystemOptions.find((system) => system.id === systemId)) || (systemParam ?? undefined)
+  }, [filterSystemOptions, systemParam])
+  const filterOverrides = useMemo(() => {
+    const selectedSystemId = resolveSystemIdFromFilterValue(systemParam ?? "all", filterSystemOptions)
+    return {
+      selectedBatch: batchParam ?? "all",
+      selectedSystem: selectedSystemId != null ? String(selectedSystemId) : systemParam ?? "all",
+      selectedStage: normalizeStageFilter(stageParam),
+      timePeriod: resolveTimePeriod(periodParam, initialFilters.timePeriod),
+    }
+  }, [batchParam, filterSystemOptions, initialFilters.timePeriod, periodParam, stageParam, systemParam])
+  const filterUrlValues = useMemo(() => {
+    const timePeriodValue = toTimePeriodUrlValue(filterOverrides.timePeriod)
+    if (selectedSystemUrlValue && selectedSystemUrlValue !== "all") {
+      return {
+        selectedSystem: selectedSystemUrlValue,
+        timePeriod: timePeriodValue,
+      }
+    }
+    return { timePeriod: timePeriodValue }
+  }, [filterOverrides.timePeriod, selectedSystemUrlValue])
   const {
     farmId,
     selectedBatch,
@@ -52,7 +70,6 @@ export default function FeedManagementPage({
     timePeriod,
     dateFrom: boundsStart,
     dateTo: boundsEnd,
-    boundsQuery,
     boundsReady,
   } = useAnalyticsPageBootstrap({
     initialFarmId,
@@ -60,9 +77,11 @@ export default function FeedManagementPage({
     defaultTimePeriod: "quarter",
     boundsScope: "feeding",
     initialFilters,
+    filterOverrides,
+    filterUrlValues,
   })
+
   const selectedFeedType = "all"
-  const [selectedHistorySystemId, setSelectedHistorySystemId] = useState<number | null>(null)
 
   const {
     selectedSystemId: systemId,
@@ -79,16 +98,10 @@ export default function FeedManagementPage({
     selectedSystem,
   })
 
-  const hasDateRange = boundsReady
   const dateFrom = boundsStart
   const dateTo = boundsEnd
-  const trendWindowDays = boundsQuery.data.resolvedDays ?? undefined
+  const feedingEnabled = (hasSystem || scopedSystemIdList.length > 0) && boundsReady
 
-  const runningStockQuery = useRunningStock({
-    farmId,
-    enabled: Boolean(farmId),
-  })
-  const feedingEnabled = (hasSystem || scopedSystemIdList.length > 0) && hasDateRange
   const feedingRecordsQuery = useFeedingRecords({
     farmId,
     systemId: hasSystem ? (systemId as number) : undefined,
@@ -98,101 +111,13 @@ export default function FeedManagementPage({
     dateTo,
     enabled: feedingEnabled,
   })
-  const inventoryQuery = useDailyFishInventory({
-    farmId,
-    systemId: hasSystem ? (systemId as number) : undefined,
-    stage: selectedStage === "all" ? undefined : selectedStage,
-    dateFrom,
-    dateTo,
-    orderAsc: true,
-    enabled: feedingEnabled,
-  })
-  const fcrTrendQuery = useScopedFcrTrend({
+  const efcrTrendQuery = useScopedEfcrTrend({
     farmId,
     systemIds: scopedSystemIdList,
-    days: trendWindowDays,
     dateFrom,
     dateTo,
     enabled: feedingEnabled,
   })
-  const growthTrendQuery = useScopedGrowthTrend({
-    systemIds: scopedSystemIdList,
-    days: trendWindowDays,
-    dateFrom,
-    dateTo,
-    enabled: feedingEnabled,
-  })
-  const productionSummaryQuery = useProductionSummary({
-    farmId,
-    systemId: hasSystem ? (systemId as number) : undefined,
-    stage: selectedStage === "all" ? undefined : selectedStage,
-    dateFrom,
-    dateTo,
-    enabled: hasDateRange,
-  })
-  const survivalTrendQuery = useScopedSurvivalTrend({
-    systemIds: scopedSystemIdList,
-    dateFrom,
-    dateTo,
-    enabled: feedingEnabled,
-  })
-  const measurementsQuery = useWaterQualityMeasurements({
-    farmId,
-    systemId: hasSystem ? (systemId as number) : undefined,
-    dateFrom,
-    dateTo,
-    requireSystem: false,
-    enabled: hasDateRange,
-  })
-
-  const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
-  const systemNameById = useMemo(() => {
-    const map = new Map<number, string>()
-    systems.forEach((row) => {
-      if (row.id == null) return
-      map.set(row.id, row.label ?? `System ${row.id}`)
-    })
-    return map
-  }, [systems])
-
-  const feedingRecordsRaw = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
-  const inventoryRowsRaw = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
-  const fcrTrendRowsRaw = fcrTrendQuery.data?.status === "success" ? fcrTrendQuery.data.data : []
-  const growthTrendRowsRaw = growthTrendQuery.data?.status === "success" ? growthTrendQuery.data.data : []
-  const productionRowsRaw = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
-  const survivalTrendRowsRaw = survivalTrendQuery.data?.status === "success" ? survivalTrendQuery.data.data : []
-  const runningStockRows = runningStockQuery.data?.status === "success" ? runningStockQuery.data.data : []
-
-  const measurementsRaw = measurementsQuery.data?.status === "success" ? measurementsQuery.data.data : []
-
-  const feedingRecords = useMemo(() => {
-    return feedingRecordsRaw
-      .filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id))
-      .filter((row) => {
-        if (selectedFeedType === "all") return true
-        return String(row.feed_type_id ?? "") === selectedFeedType
-      })
-  }, [feedingRecordsRaw, scopedSystemIds, selectedFeedType])
-
-  const inventoryRows = useMemo(
-    () => inventoryRowsRaw.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
-    [inventoryRowsRaw, scopedSystemIds],
-  )
-  const productionRows = useMemo(
-    () => productionRowsRaw.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
-    [productionRowsRaw, scopedSystemIds],
-  )
-
-  const measurements = useMemo(
-    () =>
-      measurementsRaw.filter(
-        (row) =>
-          row.system_id != null &&
-          scopedSystemIds.has(row.system_id) &&
-          row.parameter_name === "dissolved_oxygen",
-      ),
-    [measurementsRaw, scopedSystemIds],
-  )
 
   const feedRateScopeIds = useMemo(() => {
     if (hasSystem) return systemId != null ? [systemId as number] : []
@@ -207,7 +132,30 @@ export default function FeedManagementPage({
     dateTo,
     enabled: feedingEnabled,
   })
+
+  const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
+  const systemNameById = useMemo(() => {
+    const map = new Map<number, string>()
+    systems.forEach((row) => {
+      if (row.id == null) return
+      map.set(row.id, row.label ?? `System ${row.id}`)
+    })
+    return map
+  }, [systems])
+
+  const feedingRecordsRaw = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
+  const efcrTrendRowsRaw = efcrTrendQuery.data?.status === "success" ? efcrTrendQuery.data.data : []
   const feedRateAnalysisRowsRaw = feedRateAnalysisQuery.data?.status === "success" ? feedRateAnalysisQuery.data.data : []
+
+  const feedingRecords = useMemo(() => {
+    return feedingRecordsRaw
+      .filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id))
+      .filter((row) => {
+        if (selectedFeedType === "all") return true
+        return String(row.feed_type_id ?? "") === selectedFeedType
+      })
+  }, [feedingRecordsRaw, scopedSystemIds, selectedFeedType])
+
   const feedRateAnalysisRows = useMemo(
     () => feedRateAnalysisRowsRaw.filter((row) => scopedSystemIds.has(row.system_id)),
     [feedRateAnalysisRowsRaw, scopedSystemIds],
@@ -217,128 +165,25 @@ export default function FeedManagementPage({
     () => buildFeedRatePointsFromAnalysis(feedRateAnalysisRows),
     [feedRateAnalysisRows],
   )
-  const fcrIntervals = useMemo<FcrInterval[]>(
+
+  const efcrTrendPoints = useMemo<EfcrTrendPoint[]>(
     () =>
-      fcrTrendRowsRaw
-        .map((row) => {
-          const targetEfcr = null
-          const upperTarget = targetEfcr != null ? targetEfcr * 1.1 : 2
-          const lowerTarget = targetEfcr != null ? targetEfcr * 0.85 : 1.2
-
-          return {
-            systemId: row.system_id,
-            startDate: row.period_start,
-            endDate: row.period_end,
-            days: row.days_interval,
-            previousAbwG: 0,
-            currentAbwG: row.abw_end_g,
-            liveFishCount: null,
-            totalFeedKg: row.total_feed_kg,
-            weightGainKg: row.weight_gain_kg,
-            fcr: row.fcr,
-            sgrPctPerDay: null,
-            warning:
-              row.fcr > upperTarget
-                ? "Above target FCR."
-                : row.fcr < lowerTarget
-                  ? "Below expected FCR. Check feed rate against growth."
-                  : null,
-            dominantFeedType: null,
-            dominantFeedTypeId: null,
-          }
-        })
-        .sort((a, b) => (a.systemId === b.systemId ? a.endDate.localeCompare(b.endDate) : a.systemId - b.systemId)),
-    [fcrTrendRowsRaw],
-  )
-
-  const heatmapDates = useMemo(() => {
-    if (!dateFrom || !dateTo) return []
-    return buildDateWindow(dateFrom, dateTo)
-  }, [dateFrom, dateTo])
-  const exceptionWindowRecords = useMemo(() => {
-    if (heatmapDates.length === 0) return feedingRecords
-    const heatmapDateSet = new Set(heatmapDates)
-    return feedingRecords.filter((row) => row.date != null && heatmapDateSet.has(row.date))
-  }, [feedingRecords, heatmapDates])
-
-  const poorAlerts = useMemo(
-    () => buildConsecutivePoorAlerts({ feedingRecords: exceptionWindowRecords, systemLabels: systemNameById }),
-    [exceptionWindowRecords, systemNameById],
-  )
-  const matrixCells = useMemo(
-    () =>
-      buildFeedDeviationMatrixCells({
-        systemIds: scopedSystemIdList,
-        dates: heatmapDates,
-        rows: feedRateAnalysisRows,
-      }),
-    [feedRateAnalysisRows, heatmapDates, scopedSystemIdList],
-  )
-
-  const latestFeedRateBySystem = useMemo(() => buildLatestFeedRateBySystem(feedRatePoints), [feedRatePoints])
-  const latestGrowthBySystem = useMemo(
-    () => buildLatestRowBySystem(growthTrendRowsRaw, (row) => String(row.sample_date)),
-    [growthTrendRowsRaw],
-  )
-  const latestSurvivalBySystem = useMemo(
-    () => buildLatestRowBySystem(survivalTrendRowsRaw, (row) => String(row.event_date)),
-    [survivalTrendRowsRaw],
-  )
-  const latestDoBySystem = useMemo(() => buildLatestDoBySystem(measurements), [measurements])
-  const thresholdsQuery = useAlertThresholds({ farmId })
-  const { lowDoThreshold, lowSgrThreshold, lowSurvivalPct, criticalSurvivalPct } = useMemo(() => {
-    const rows = thresholdsQuery.data?.status === "success" ? thresholdsQuery.data.data : []
-    // Prefer the farm-level row (no system_id), fall back to the first row (default scope)
-    const row = rows.find((r) => r.system_id == null) ?? rows[0]
-    return {
-      lowDoThreshold: row?.low_do_threshold ?? null,
-      lowSgrThreshold: row?.low_sgr_threshold ?? null,
-      lowSurvivalPct: row?.low_survival_pct ?? null,
-      criticalSurvivalPct: row?.critical_survival_pct ?? null,
-    }
-  }, [thresholdsQuery.data])
-
-  const exceptionItems = useMemo<FeedExceptionItem[]>(
-    () =>
-      buildFeedExceptionItems({
-        latestDoBySystem,
-        latestFeedRateBySystem,
-        latestGrowthBySystem,
-        latestSurvivalBySystem,
-        poorAlerts,
-        runningStockRows,
-        systemNameById,
-        lowDoThreshold,
-        lowSgrThreshold,
-        lowSurvivalPct,
-        criticalSurvivalPct,
-      }),
-    [
-      latestDoBySystem, latestFeedRateBySystem, latestGrowthBySystem, latestSurvivalBySystem,
-      poorAlerts, runningStockRows, systemNameById,
-      lowDoThreshold, lowSgrThreshold, lowSurvivalPct, criticalSurvivalPct,
-    ],
+      efcrTrendRowsRaw
+        .filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id))
+        .map((row) => ({
+          systemId: row.system_id,
+          date: row.inventory_date,
+          efcr: row.efcr_period,
+        }))
+        .sort((a, b) => (a.systemId === b.systemId ? a.date.localeCompare(b.date) : a.systemId - b.systemId)),
+    [efcrTrendRowsRaw, scopedSystemIds],
   )
 
   const errorMessages = [
-    getErrorMessage(runningStockQuery.error),
-    getQueryResultError(runningStockQuery.data),
     getErrorMessage(feedingRecordsQuery.error),
     getQueryResultError(feedingRecordsQuery.data),
-    getErrorMessage(inventoryQuery.error),
-    getQueryResultError(inventoryQuery.data),
-    getErrorMessage(fcrTrendQuery.error),
-    getQueryResultError(fcrTrendQuery.data),
-    getErrorMessage(growthTrendQuery.error),
-    getQueryResultError(growthTrendQuery.data),
-    getErrorMessage(productionSummaryQuery.error),
-    getQueryResultError(productionSummaryQuery.data),
-    getErrorMessage(survivalTrendQuery.error),
-    getQueryResultError(survivalTrendQuery.data),
-    getErrorMessage(measurementsQuery.error),
-    getQueryResultError(measurementsQuery.data),
-    getErrorMessage(thresholdsQuery.error),
-    getQueryResultError(thresholdsQuery.data),
+    getErrorMessage(efcrTrendQuery.error),
+    getQueryResultError(efcrTrendQuery.data),
     getErrorMessage(feedRateAnalysisQuery.error),
     getQueryResultError(feedRateAnalysisQuery.data),
     getErrorMessage(systemsQuery.error),
@@ -347,61 +192,26 @@ export default function FeedManagementPage({
     getQueryResultError(batchSystemsQuery.data),
   ].filter(Boolean) as string[]
 
-  const loading =
-    runningStockQuery.isLoading ||
-    feedingRecordsQuery.isLoading ||
-    inventoryQuery.isLoading ||
-    fcrTrendQuery.isLoading ||
-    growthTrendQuery.isLoading ||
-    productionSummaryQuery.isLoading ||
-    survivalTrendQuery.isLoading ||
-    measurementsQuery.isLoading ||
-    feedRateAnalysisQuery.isLoading
+  const loading = feedingRecordsQuery.isLoading || efcrTrendQuery.isLoading || feedRateAnalysisQuery.isLoading
+
   return (
     <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName}>
       <div className="space-y-6">
-        <section className="space-y-4">
-          <SectionHeading
-            title="Feed Demand Forecast"
-            description="Projected feed demand per type based on current fish populations, with stock coverage and reorder urgency."
-          />
-          <FeedDemandForecast farmId={farmId} />
-        </section>
-
         <FeedDashboard
           timePeriod={timePeriod}
           errorMessage={errorMessages[0] ?? null}
           onRetry={() => {
-            runningStockQuery.refetch()
             feedingRecordsQuery.refetch()
-            inventoryQuery.refetch()
-            fcrTrendQuery.refetch()
-            growthTrendQuery.refetch()
-            productionSummaryQuery.refetch()
-            survivalTrendQuery.refetch()
-            measurementsQuery.refetch()
+            efcrTrendQuery.refetch()
+            feedRateAnalysisQuery.refetch()
             systemsQuery.refetch()
             batchSystemsQuery.refetch()
           }}
           loading={loading}
-          scopedSystemIdList={scopedSystemIdList}
           systemNameById={systemNameById}
-          exceptionItems={exceptionItems}
-          runningStockRows={runningStockRows}
           feedingRecords={feedingRecords}
-          inventoryRows={inventoryRows}
-          productionRows={productionRows}
-          growthRows={growthTrendRowsRaw}
-          measurements={measurements}
           feedRatePoints={feedRatePoints}
-          fcrIntervals={fcrIntervals}
-          heatmapDates={heatmapDates}
-          matrixCells={matrixCells}
-          selectedHistorySystemId={selectedHistorySystemId}
-          onSelectedHistorySystemIdChange={setSelectedHistorySystemId}
-          farmId={farmId}
-          dateFrom={dateFrom ?? null}
-          dateTo={dateTo ?? null}
+          efcrTrendPoints={efcrTrendPoints}
         />
       </div>
     </DashboardLayout>

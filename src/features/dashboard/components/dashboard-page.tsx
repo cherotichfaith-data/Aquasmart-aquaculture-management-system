@@ -10,19 +10,15 @@ import type { DashboardPageInitialFilters } from "@/features/dashboard/types"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
-import { logSbError } from "@/lib/supabase/log"
 import { getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, toTimePeriodUrlValue } from "@/lib/time-period"
 
 import KPIOverview from "./kpi-overview"
-import PopulationOverview from "./population-overview"
 import SystemsTable from "./systems-table"
-import RecentActivities from "./recent-activities"
 import RecommendedActions from "./recommended-actions"
 import EfcrByPeriod from "./efcr-by-period"
 import WaterQualityMonthlyAverages from "./water-quality-monthly-averages"
-import { DashboardExportButton } from "./dashboard-export-button"
-import { downloadDashboardSummary, parseDashboardStageParam } from "./dashboard-page-utils"
+import { parseDashboardStageParam } from "./dashboard-page-utils"
 
 function SectionLabel({
   title,
@@ -100,7 +96,6 @@ export default function DashboardPage({
     timePeriod,
     dateFrom,
     dateTo,
-    setTimePeriod,
   } = useAnalyticsPageBootstrap({
     initialFarmId,
     initialFarmName,
@@ -113,7 +108,6 @@ export default function DashboardPage({
       selectedSystemUrlValue && selectedSystemUrlValue !== "all"
         ? { selectedSystem: selectedSystemUrlValue, timePeriod: toTimePeriodUrlValue(filterOverrides.timePeriod ?? "month") }
         : { timePeriod: toTimePeriodUrlValue(filterOverrides.timePeriod ?? "month") },
-    filterUrlKeys: { selectedSystem: "cage" },
   })
 
   const { selectedSystemId, scopedSystemIdList, hasScopeFilters } = useScopedSystemIds({
@@ -166,24 +160,12 @@ export default function DashboardPage({
     shouldApplySystemIdScope,
   ])
 
-  const handleDownload = async () => {
-    try {
-      await downloadDashboardSummary({ farmId, selectedSystem, selectedStage, dateFrom, dateTo })
-    } catch (error) {
-      logSbError("dashboard:download", error)
-    }
-  }
-
   if (!farmId) return <Box sx={{ minHeight: "60vh" }} />
 
   return (
     <Box sx={{ p: { xs: 1.5, md: 2 }, display: "flex", flexDirection: "column", gap: 2 }}>
       <section>
-        <SectionLabel
-          title="Core Performance Overview"
-          description="Farm KPIs from the selected period and cage scope."
-          action={<DashboardExportButton onClick={handleDownload} />}
-        />
+        <SectionLabel title="Core Performance Overview" />
         <KPIOverview
           farmId={farmId}
           stage={selectedStage}
@@ -216,27 +198,7 @@ export default function DashboardPage({
       </Grid>
 
       <section>
-        <SectionLabel
-          title="Feed, ABW & Mortality Trend"
-          description="One combined trend from the farmer's feeding, sampling, and mortality records."
-        />
-        <PopulationOverview
-          farmId={farmId}
-          stage={selectedStage}
-          batch={selectedBatch}
-          system={selectedSystem}
-          timePeriod={timePeriod}
-          scopedSystemIds={appliedScopedSystemIds}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onTimePeriodChange={setTimePeriod}
-          showHeaderTitle={false}
-          showUpdatedAt={false}
-        />
-      </section>
-
-      <section>
-        <SectionLabel title="System Status" description="Current cage-level production, water, and operating flags." />
+        <SectionLabel title="System Status" />
         <SystemsTable
           farmId={farmId}
           stage={selectedStage}
@@ -250,42 +212,21 @@ export default function DashboardPage({
         />
       </section>
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <section className="space-y-0">
-            <SectionLabel title="Recent Activity" description="Latest recorded farm operations." />
-            <RecentActivities
-              farmId={farmId}
-              batch={selectedBatch}
-              stage={selectedStage}
-              system={selectedSystem}
-              dateFrom={dateFrom}
-              dateTo={dateTo}
-              title="Recent Activity"
-              countLabel="entries"
-              maxItems={5}
-              showHeader={false}
-            />
-          </section>
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <section className="space-y-0">
-            <SectionLabel title="Recommended Actions" description="Priorities generated from current farm signals." />
-            <RecommendedActions
-              farmId={farmId}
-              stage={selectedStage}
-              batch={selectedBatch}
-              system={selectedSystem}
-              timePeriod={timePeriod}
-              dateFrom={dateFrom}
-              dateTo={dateTo}
-              scopedSystemIds={appliedScopedSystemIds}
-              maxItems={5}
-              showHeader={false}
-            />
-          </section>
-        </Grid>
-      </Grid>
+      <section className="space-y-0">
+        <SectionLabel title="Recommended Actions" />
+        <RecommendedActions
+          farmId={farmId}
+          stage={selectedStage}
+          batch={selectedBatch}
+          system={selectedSystem}
+          timePeriod={timePeriod}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          scopedSystemIds={appliedScopedSystemIds}
+          maxItems={5}
+          showHeader={false}
+        />
+      </section>
     </Box>
   )
 }
