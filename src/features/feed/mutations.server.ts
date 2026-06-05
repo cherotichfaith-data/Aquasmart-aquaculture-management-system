@@ -28,7 +28,7 @@ const feedTypeSchema = z.object({
   feed_pellet_size: z.enum(["mash_powder", "<0.49mm", "0.5-0.99mm", "1.0-1.5mm", "1.5-1.99mm", "2mm", "2.5mm", "3mm"]),
   crude_protein_percentage: z.number().finite().positive(),
   crude_fat_percentage: z.number().finite().min(0).nullable().optional(),
-  feed_supplier: z.number().int().positive(),
+  feed_supplier_id: z.number().int().positive(),
 })
 
 const FEED_INVENTORY_ALLOWED_ROLES = new Set(["admin", "farm_manager", "system_operator"])
@@ -101,7 +101,7 @@ export async function createFeedTypeAction(payload: FeedTypeInput): Promise<{ da
       feed_pellet_size: parsedPayload.feed_pellet_size,
       crude_protein_percentage: parsedPayload.crude_protein_percentage,
       crude_fat_percentage: parsedPayload.crude_fat_percentage ?? null,
-      feed_supplier: parsedPayload.feed_supplier,
+      feed_supplier_id: parsedPayload.feed_supplier_id,
     })
     .select()
     .single()

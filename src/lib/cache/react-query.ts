@@ -193,13 +193,6 @@ async function invalidateMortalityWriteQueries(
       predicate: ({ queryKey }) =>
         toStringValue(queryKey[0]) === "mortality-events" && toStringValue(queryKey[1]) === params.farmId,
     }),
-    queryClient.invalidateQueries({
-      predicate: ({ queryKey }) => toStringValue(queryKey[0]) === "alert-log" && toStringValue(queryKey[1]) === params.farmId,
-    }),
-    queryClient.invalidateQueries({
-      predicate: ({ queryKey }) =>
-        toStringValue(queryKey[0]) === "survival-trend" && Number(queryKey[1]) === params.systemId,
-    }),
   ])
 }
 

@@ -1,22 +1,14 @@
 import type {
-  WaterQualityActivityRow,
   WaterQualityLatestStatusRow,
   WaterQualityMeasurementViewRow,
-  WaterQualityOverlayRow,
-  WaterQualityRatingRow,
   WaterQualitySystemOption,
-  WaterQualityThresholdRow,
 } from "@/features/water-quality/types"
 import {
-  operatorColumns,
   parameterLabels,
-  parseJsonish,
-  slope,
   type MeasurementEvent,
   type WqParameter,
 } from "./water-quality-utils"
-import { calculateWqi, getWqiLabel, selectThresholdRow, type WaterQualityStatusLabel } from "@/lib/water-quality-index"
-import { getSemanticColor } from "@/lib/theme/semantic-colors"
+import { getWqiLabel, selectThresholdRow, type WaterQualityStatusLabel } from "@/lib/water-quality-index"
 import { buildLatestParameterizedReadingsBySystem } from "@/lib/water-quality-readings"
 
 export type EnvParameter =
@@ -52,19 +44,6 @@ export type SensorStatus = {
   status: "online" | "warning" | "offline"
   lastSeen: string | null
   minutesSince: number | null
-}
-
-export type NutrientLoad = {
-  value: number
-  level: string
-  color: string
-}
-
-export type AlgalActivity = {
-  value: number
-  level: string
-  color: string
-  source: number | null
 }
 
 export type SystemWqiRow = WaterQualitySystemListItem & {
@@ -109,22 +88,10 @@ export type AlertItem = {
   systemId?: number
 }
 
-export type OverlayByDate = Map<string, { feeding: number; mortality: number }>
-
-export type DailyRiskTrendRow = {
-  date: string
-  rating: number | null
-  worstParameter: string | null
-  feeding: number | null
-  mortality: number | null
-}
-
 export type ParameterTrendRow = {
   date: string
   mean: number | null
   count: number
-  feeding: number | null
-  mortality: number | null
   rolling: number | null
 }
 
@@ -144,7 +111,7 @@ const ENV_PARAMETERS = new Set<EnvParameter>([
   "secchi_disk_depth",
 ])
 
-export { calculateWqi, getWqiLabel, selectThresholdRow }
+export { getWqiLabel, selectThresholdRow }
 export type { WaterQualityStatusLabel }
 
 export function buildSystemLabelById(rows: WaterQualitySystemOption[]) {
@@ -165,36 +132,6 @@ export function buildSystemOptions(rows: WaterQualitySystemOption[]): WaterQuali
       label: system.label ?? `System ${system.id}`,
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
-}
-
-export function buildRatingTrendBySystemId(rows: WaterQualityRatingRow[]) {
-  const map = new Map<number, number>()
-  const grouped = new Map<number, Array<{ date: string; rating: number }>>()
-
-  rows.forEach((row) => {
-    if (row.system_id == null || row.rating_date == null || typeof row.rating_numeric !== "number") return
-    const list = grouped.get(row.system_id) ?? []
-    list.push({ date: row.rating_date, rating: row.rating_numeric })
-    grouped.set(row.system_id, list)
-  })
-
-  grouped.forEach((list, systemId) => {
-    list.sort((a, b) => a.date.localeCompare(b.date))
-    map.set(systemId, slope(list.slice(-7).map((item) => item.rating)))
-  })
-
-  return map
-}
-
-export function buildOperatorByRecordId(rows: WaterQualityActivityRow[]) {
-  const map = new Map<string, string>()
-  rows.forEach((row) => {
-    if (!row.record_id || !row.column_name || !operatorColumns.has(row.column_name)) return
-    const parsed = parseJsonish(row.new_value)
-    if (!parsed) return
-    map.set(String(row.record_id), parsed)
-  })
-  return map
 }
 
 export function buildLatestReadingsBySystem(rows: WaterQualityMeasurementViewRow[]) {
@@ -342,54 +279,6 @@ export function getTemperatureStats(rows: WaterQualityMeasurementViewRow[]) {
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length
   const variance = values.length > 1 ? values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length : 0
   return { mean, std: Math.sqrt(variance) }
-}
-
-export function buildNutrientLoad(readings: CurrentReadings): NutrientLoad {
-  const nitrate = readings.nitrate
-  const nitrite = readings.nitrite
-  const ammonia = readings.ammonia
-  const hasData = nitrate != null || nitrite != null || ammonia != null
-  const value = hasData ? (nitrate ?? 0) + (nitrite ?? 0) + (ammonia ?? 0) : 0
-
-  if (!hasData) return { value: 0, level: "No data", color: getSemanticColor("neutral") }
-  if (value >= 2) return { value, level: "High", color: getSemanticColor("bad") }
-  if (value >= 1) return { value, level: "Moderate", color: getSemanticColor("warn") }
-  return { value, level: "Low", color: getSemanticColor("good") }
-}
-
-export function buildAlgalActivity(readings: CurrentReadings): AlgalActivity {
-  const secchi = readings.secchi_disk_depth
-  if (secchi == null || !Number.isFinite(secchi)) {
-    return { value: 0, level: "No data", color: getSemanticColor("neutral"), source: null }
-  }
-  const value = Math.max(0, Math.min(50, 50 - secchi * 10))
-  if (value >= 30) return { value, level: "High", color: getSemanticColor("bad"), source: secchi }
-  if (value >= 10) return { value, level: "Moderate", color: getSemanticColor("good"), source: secchi }
-  return { value, level: "Low", color: getSemanticColor("info"), source: secchi }
-}
-
-export function buildAllSystemsWqi(
-  systemOptions: WaterQualitySystemListItem[],
-  latestReadingsBySystem: Map<number, LatestReadingState>,
-  thresholdRows: WaterQualityThresholdRow[],
-  temperatureStats: { mean: number | null; std: number | null },
-) {
-  return systemOptions.map((system) => {
-    const readings = latestReadingsBySystem.get(system.id)?.readings ?? {}
-    const thresholdRow = selectThresholdRow(thresholdRows, system.id)
-    const wqi = calculateWqi(
-      readings.dissolved_oxygen ?? null,
-      readings.temperature ?? null,
-      thresholdRow?.low_do_threshold ?? 5,
-      temperatureStats.mean,
-      temperatureStats.std,
-    )
-    return {
-      ...system,
-      wqi,
-      wqiLabel: getWqiLabel(wqi),
-    }
-  })
 }
 
 export function getAverageWqi(allSystemsWqi: SystemWqiRow[]) {
@@ -544,45 +433,9 @@ export function buildAlertItems(criticalRiskRows: SystemRiskRow[]): AlertItem[] 
   })
 }
 
-export function buildOverlayByDate(rows: WaterQualityOverlayRow[], scopedSystemIds: number[]): OverlayByDate {
-  const map = new Map<string, { feeding: number; mortality: number }>()
-  rows.forEach((row) => {
-    if (!row.inventory_date || !scopedSystemIds.includes(row.system_id)) return
-    const current = map.get(row.inventory_date) ?? { feeding: 0, mortality: 0 }
-    current.feeding += row.feeding_amount ?? 0
-    current.mortality += row.number_of_fish_mortality ?? 0
-    map.set(row.inventory_date, current)
-  })
-  return map
-}
-
-export function buildDailyRiskTrend(rows: WaterQualityRatingRow[], overlayByDate: OverlayByDate): DailyRiskTrendRow[] {
-  const byDate = new Map<string, { worst: { parameter: string | null; rating: number } }>()
-
-  rows.forEach((row) => {
-    if (!row.rating_date || typeof row.rating_numeric !== "number") return
-    const current = byDate.get(row.rating_date) ?? { worst: { parameter: null, rating: 999 } }
-    if (row.rating_numeric < current.worst.rating) {
-      current.worst = { parameter: row.worst_parameter ?? null, rating: row.rating_numeric }
-    }
-    byDate.set(row.rating_date, current)
-  })
-
-  return Array.from(byDate.entries())
-    .map(([date, agg]) => ({
-      date,
-      rating: agg.worst.rating !== 999 ? agg.worst.rating : null,
-      worstParameter: agg.worst.parameter,
-      feeding: overlayByDate.get(date)?.feeding ?? null,
-      mortality: overlayByDate.get(date)?.mortality ?? null,
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date))
-}
-
 export function buildParameterTrendData(
   rows: WaterQualityMeasurementViewRow[],
   selectedParameter: WqParameter,
-  overlayByDate: OverlayByDate,
 ): ParameterTrendRow[] {
   const byDate = new Map<string, { sum: number; count: number }>()
 
@@ -601,8 +454,6 @@ export function buildParameterTrendData(
       date,
       mean: agg.count > 0 ? agg.sum / agg.count : null,
       count: agg.count,
-      feeding: overlayByDate.get(date)?.feeding ?? null,
-      mortality: overlayByDate.get(date)?.mortality ?? null,
     }))
     .sort((a, b) => a.date.localeCompare(b.date))
 
@@ -616,42 +467,6 @@ export function buildParameterTrendData(
       rolling: window.length ? window.reduce((sum, value) => sum + value, 0) / window.length : null,
     }
   })
-}
-
-export function buildDailyDoVariation(rows: WaterQualityMeasurementViewRow[]) {
-  const byDate = new Map<string, { min: number; max: number }>()
-
-  rows
-    .filter((row) => row.parameter_name === "dissolved_oxygen")
-    .forEach((row) => {
-      if (!row.date || row.parameter_value == null) return
-      const current = byDate.get(row.date)
-      if (!current) {
-        byDate.set(row.date, { min: row.parameter_value, max: row.parameter_value })
-        return
-      }
-      current.min = Math.min(current.min, row.parameter_value)
-      current.max = Math.max(current.max, row.parameter_value)
-    })
-
-  return Array.from(byDate.entries())
-    .map(([date, agg]) => ({
-      date,
-      variation: agg.max - agg.min,
-      min: agg.min,
-      max: agg.max,
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date))
-}
-
-export function buildDailyTempAverage(rows: WaterQualityRatingRow[]) {
-  return rows
-    .map((row) => ({
-      date: row.rating_date,
-      average: row.temperature_average,
-    }))
-    .filter((row): row is { date: string; average: number } => Boolean(row.date) && row.average != null)
-    .sort((a, b) => a.date.localeCompare(b.date))
 }
 
 export function buildDepthProfiles(rows: WaterQualityMeasurementViewRow[], systemIds: number[]): DepthProfiles {
@@ -731,19 +546,6 @@ export function getDepthProfileData(depthProfiles: DepthProfiles, selectedDate: 
   return depthProfiles.dataByDate.get(selectedDate) ?? []
 }
 
-export function buildDailyParameterByDate(rows: WaterQualityMeasurementViewRow[]) {
-  const map = new Map<string, { doValue?: number; ammoniaValue?: number; tempValue?: number }>()
-  rows.forEach((row) => {
-    if (!row.date || row.parameter_value == null) return
-    const current = map.get(row.date) ?? {}
-    if (row.parameter_name === "dissolved_oxygen") current.doValue = row.parameter_value
-    if (row.parameter_name === "ammonia") current.ammoniaValue = row.parameter_value
-    if (row.parameter_name === "temperature") current.tempValue = row.parameter_value
-    map.set(row.date, current)
-  })
-  return map
-}
-
 export function buildCurrentAlerts(rows: WaterQualityLatestStatusRow[]) {
   const alerts: string[] = []
   rows.forEach((row) => {
@@ -754,53 +556,5 @@ export function buildCurrentAlerts(rows: WaterQualityLatestStatusRow[]) {
       alerts.push(`${row.system_name ?? `System ${row.system_id}`}: Ammonia above threshold.`)
     }
   })
-  return alerts
-}
-
-export function buildEmergingRisks(
-  dailyParameterByDate: Map<string, { doValue?: number; ammoniaValue?: number; tempValue?: number }>,
-  dailyRiskTrend: DailyRiskTrendRow[],
-) {
-  const alerts: string[] = []
-  const doSeries = dailyRiskTrend
-    .map((row) => dailyParameterByDate.get(row.date)?.doValue)
-    .filter((value): value is number => typeof value === "number")
-    .slice(-7)
-  const ammoniaSeries = dailyRiskTrend
-    .map((row) => dailyParameterByDate.get(row.date)?.ammoniaValue)
-    .filter((value): value is number => typeof value === "number")
-    .slice(-7)
-
-  if (doSeries.length >= 4 && slope(doSeries) < -0.05) {
-    alerts.push("DO trend is worsening over the last 7 days.")
-  }
-  if (ammoniaSeries.length >= 4 && slope(ammoniaSeries) > 0.02) {
-    alerts.push("Ammonia trend is rising over the last 7 days.")
-  }
-
-  const ratingSeries = dailyRiskTrend
-    .map((row) => row.rating)
-    .filter((value): value is number => typeof value === "number")
-    .slice(-14)
-  if (ratingSeries.length >= 5) {
-    const mean = ratingSeries.reduce((sum, value) => sum + value, 0) / ratingSeries.length
-    const variance = ratingSeries.reduce((sum, value) => sum + (value - mean) ** 2, 0) / ratingSeries.length
-    if (Math.sqrt(variance) >= 0.6) {
-      alerts.push("Daily rating volatility is high (frequent swings).")
-    }
-  }
-
-  const worstSeries = dailyRiskTrend
-    .map((row) => row.worstParameter)
-    .filter((value): value is string => Boolean(value))
-    .slice(-14)
-  let switches = 0
-  for (let index = 1; index < worstSeries.length; index += 1) {
-    if (worstSeries[index] !== worstSeries[index - 1]) switches += 1
-  }
-  if (switches >= 4) {
-    alerts.push("Worst parameter is switching frequently; system may be unstable.")
-  }
-
   return alerts
 }

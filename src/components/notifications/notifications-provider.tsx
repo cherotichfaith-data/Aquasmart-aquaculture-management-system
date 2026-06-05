@@ -12,7 +12,6 @@ import { useRouter } from "next/navigation"
 import { DATA_ENTRY_PATH, toDashboardPath } from "@/lib/app-entry"
 import { formatNumberValue } from "@/lib/analytics-format"
 import type { Tables } from "@/lib/types/database"
-import { parseAlertThresholdSettings } from "@/lib/alert-thresholds"
 import { formatCageLabel } from "@/lib/system-options"
 
 type AlertThresholdRow = Tables<"alert_threshold">
@@ -123,33 +122,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     enabled: Boolean(session) && Boolean(farmId),
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
-      const [{ data: settingsRow, error: settingsError }, fallbackResult] = await Promise.all([
-        userId
-          ? supabase.from("user_settings").select("alert_thresholds").eq("user_id", userId).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        (() => {
-          let query = supabase
-            .from("alert_threshold")
-            .select("*")
-            .or(`farm_id.eq.${farmId!},scope.eq.default`)
-          if (signal) query = query.abortSignal(signal)
-          return query
-        })(),
-      ])
-
-      if (settingsError) {
-        if (!signal?.aborted && !isAbortLikeError(settingsError) && !isSbPermissionDenied(settingsError)) {
-          logSbError("notifications:settingsThresholds", settingsError)
-        }
-        return [] as AlertThresholdRow[]
-      }
-
-      const settingsThresholds = parseAlertThresholdSettings(settingsRow?.alert_thresholds ?? null, farmId)
-      if (settingsThresholds.length > 0) {
-        return settingsThresholds
-      }
-
-      const { data, error } = fallbackResult
+      let query = supabase
+        .from("alert_threshold")
+        .select("*")
+        .or(`farm_id.eq.${farmId!},scope.eq.default`)
+      if (signal) query = query.abortSignal(signal)
+      const { data, error } = await query
       if (error) {
         if (!signal?.aborted && !isAbortLikeError(error) && !isSbPermissionDenied(error)) {
           logSbError("notifications:thresholds", error)

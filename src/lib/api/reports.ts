@@ -5,7 +5,6 @@ import { isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils
 
 type FeedInventoryRow = Tables<"feed_inventory">
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
-type FcrTrendRow = Database["public"]["Functions"]["api_fcr_trend"]["Returns"][number]
 type GrowthTrendRow = Database["public"]["Functions"]["api_growth_trend"]["Returns"][number]
 type RunningStockRow = Database["public"]["Functions"]["api_running_stock"]["Returns"][number]
 type FeedingRecordRow = Tables<"feeding_record">
@@ -27,7 +26,6 @@ export type ChangeLogRow = {
 }
 
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
-export type FeedFcrTrendRow = FcrTrendRow
 export type FeedGrowthTrendRow = GrowthTrendRow
 export type FeedRunningStockRow = RunningStockRow
 
@@ -80,38 +78,6 @@ export async function getRunningStock(params: {
   } catch (error) {
     if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedRunningStockRow>([])
     return toQueryError("getRunningStock", error)
-  }
-}
-
-
-export async function getFcrTrend(params: {
-  farmId?: string | null
-  systemId?: number
-  days?: number
-  dateFrom?: string
-  dateTo?: string
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedFcrTrendRow>> {
-  if (!params.farmId || !params.systemId) {
-    return toQuerySuccess<FeedFcrTrendRow>([])
-  }
-
-  try {
-    const response = await postJson<{ data: FeedFcrTrendRow[] }, Omit<typeof params, "signal">>(
-      "/api/reports/fcr-trend/query",
-      {
-        farmId: params.farmId,
-        systemId: params.systemId,
-        days: params.days,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-      },
-      { signal: params.signal },
-    )
-    return toQuerySuccess<FeedFcrTrendRow>(response.data)
-  } catch (error) {
-    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<FeedFcrTrendRow>([])
-    return toQueryError("getFcrTrend", error)
   }
 }
 

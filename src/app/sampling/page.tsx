@@ -5,20 +5,19 @@ import { QueryHydration } from "@/components/providers/query-hydration"
 import { resolveInitialFarmId } from "@/features/farm/queries.server"
 import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { getSamplingPageInitialData, parseSamplingPageFilters } from "@/features/sampling/queries.server"
-import { listHarvestForecastRows } from "@/features/shared/query-seed.server"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createQueryClient } from "@/lib/react-query/query-client"
 import { requireUserContext } from "@/lib/supabase/require-user"
-import { createAccessTokenClient } from "@/lib/supabase/server"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type SearchParams = Record<string, string | string[] | undefined>
 
 function buildScopedSystemIdList(
   filters: ReturnType<typeof parseSamplingPageFilters>,
-  systems: Array<{ id: number | null }>,
+  systems: Array<{ id: number | null; label?: string | null; name?: string | null; unit?: string | null }>,
   batchSystems: Array<{ system_id: number }>,
 ) {
-  const selectedSystemId = parseSelectedNumericId(filters.selectedSystem)
+  const selectedSystemId = resolveSystemIdFromFilterValue(filters.selectedSystem, systems)
   if (selectedSystemId) return [selectedSystemId]
 
   const stageIds = systems.map((row) => row.id).filter((id): id is number => typeof id === "number")
@@ -30,7 +29,7 @@ function buildScopedSystemIdList(
 
 export default async function Page({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const resolvedSearchParams = (await searchParams) ?? {}
-  const { user, accessToken } = await requireUserContext("/sampling")
+  await requireUserContext("/sampling")
   const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
   const initialFilters = parseSamplingPageFilters(resolvedSearchParams)
   const { farmId, farmName } = await resolveInitialFarmId(searchFarmId)
@@ -39,18 +38,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     initialData.systems.status === "success"
       ? cleanScopedFilterState(initialFilters, initialData.systems.data)
       : initialFilters
-  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
+  const systemOptions = initialData.systems.status === "success" ? initialData.systems.data : []
+  const selectedSystemId = resolveSystemIdFromFilterValue(effectiveFilters.selectedSystem, systemOptions)
   const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
   const scopedSystemIds =
     initialData.systems.status === "success" && initialData.batchSystems.status === "success"
       ? buildScopedSystemIdList(effectiveFilters, initialData.systems.data, initialData.batchSystems.data)
       : []
-  const harvestForecast = farmId
-    ? await listHarvestForecastRows(createAccessTokenClient(accessToken), {
-        farmId,
-        systemId: selectedSystemId,
-      })
-    : []
   const queryClient = createQueryClient()
 
   if (initialData.bounds.start && initialData.bounds.end) {
@@ -69,36 +63,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     initialData.systems,
   )
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)
-  queryClient.setQueryData(
-    queryKeys.options.systemVolumes({ farmId, stage: effectiveFilters.selectedStage, activeOnly: true }),
-    initialData.systemVolumes,
-  )
-  queryClient.setQueryData(
-    queryKeys.appConfig(
-      ["target_density_kg_m3", "target_harvest_weight_g", "target_move_weight_g", "growth_curve_points"],
-      user.id,
-    ),
-    initialData.appConfig,
-  )
-  queryClient.setQueryData(
-    queryKeys.analytics.harvestForecast({ farmId, systemId: selectedSystemId }),
-    { status: "success", data: harvestForecast },
-  )
-
   if (initialData.bounds.start && initialData.bounds.end) {
-    queryClient.setQueryData(
-      queryKeys.dashboard.systemsTable({
-        farmId,
-        stage: effectiveFilters.selectedStage,
-        batch: effectiveFilters.selectedBatch,
-        system: effectiveFilters.selectedSystem,
-        timePeriod: effectiveFilters.timePeriod,
-        dateFrom: initialData.bounds.start,
-        dateTo: initialData.bounds.end,
-        includeIncomplete: true,
-      }),
-      initialData.systemsTable,
-    )
     queryClient.setQueryData(
       queryKeys.reports.sampling({
         farmId,
@@ -112,15 +77,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
       initialData.sampling,
     )
     queryClient.setQueryData(
-      queryKeys.production.summary({
+      queryKeys.reports.growthTrend({
         farmId,
-        systemId: selectedSystemId,
-        stage: effectiveFilters.selectedStage === "all" ? undefined : effectiveFilters.selectedStage,
+        systemIds: scopedSystemIds,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
-        limit: 5000,
       }),
-      initialData.productionSummary,
+      initialData.growthTrend,
     )
   }
 

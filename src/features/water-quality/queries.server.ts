@@ -1,5 +1,3 @@
-import { runServerReadThrough } from "@/lib/cache/server"
-import { cacheTags } from "@/lib/cache/tags"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { toQuerySuccess } from "@/lib/api/_utils"
@@ -8,18 +6,13 @@ import {
   type ListWaterQualityMeasurementsInput,
 } from "./schemas"
 import type {
-  WaterQualityActivityRow,
   WaterQualityLatestStatusRow,
   WaterQualityMeasurementViewRow,
-  WaterQualityOverlayRow,
   WaterQualityPageFilters,
   WaterQualityPageInitialData,
   WaterQualityPageTab,
-  WaterQualityRatingRow,
   WaterQualityRow,
-  WaterQualitySyncRow,
   WaterQualitySystemOption,
-  WaterQualityThresholdRow,
 } from "./types"
 import {
   getScopedBatchSystems,
@@ -28,9 +21,8 @@ import {
   parseSelectedNumericId,
   resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
-import { listAlertThresholdRows } from "@/features/shared/query-seed.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
-import { isTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
 import {
   DEFAULT_WQ_PARAMETER,
   isWqParameter,
@@ -65,7 +57,7 @@ export async function listWaterQualityMeasurements(
 }
 
 const DEFAULT_TIME_PERIOD: WaterQualityPageFilters["timePeriod"] = "month"
-const VALID_TABS: WaterQualityPageTab[] = ["overview", "alerts", "sensors", "parameter", "environment", "depth"]
+const VALID_TABS: WaterQualityPageTab[] = ["alerts", "parameter", "environment", "depth"]
 
 function isValidTab(value: string): value is WaterQualityPageTab {
   return VALID_TABS.includes(value as WaterQualityPageTab)
@@ -75,7 +67,7 @@ export function parseWaterQualityPageFilters(
   searchParams?: Record<string, string | string[] | undefined>,
 ): WaterQualityPageFilters {
   const selectedBatchRaw = searchParams?.batch
-  const selectedSystemRaw = searchParams?.system
+  const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
   const timePeriodRaw = searchParams?.period
   const activeTabRaw = searchParams?.tab
@@ -85,22 +77,13 @@ export function parseWaterQualityPageFilters(
     selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",
     selectedSystem: typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all",
     selectedStage: normalizeStageFilter(selectedStageRaw),
-    timePeriod:
-      typeof timePeriodRaw === "string" && isTimePeriod(timePeriodRaw)
-        ? (timePeriodRaw as TimePeriod)
-        : DEFAULT_TIME_PERIOD,
-    activeTab: typeof activeTabRaw === "string" && isValidTab(activeTabRaw) ? activeTabRaw : "overview",
+    timePeriod: resolveTimePeriod(timePeriodRaw, DEFAULT_TIME_PERIOD),
+    activeTab: typeof activeTabRaw === "string" && isValidTab(activeTabRaw) ? activeTabRaw : "environment",
     selectedParameter:
       typeof selectedParameterRaw === "string" && isWqParameter(selectedParameterRaw)
         ? selectedParameterRaw
         : DEFAULT_WQ_PARAMETER,
   }
-}
-
-async function getSyncStatus(supabase: ServerClient, farmId: string): Promise<WaterQualitySyncRow[]> {
-  const { data, error } = await supabase.rpc("api_water_quality_sync_status", { p_farm_id: farmId })
-  if (error) return []
-  return (data ?? []) as WaterQualitySyncRow[]
 }
 
 async function getLatestStatus(
@@ -114,33 +97,6 @@ async function getLatestStatus(
   })
   if (error) return []
   return (data ?? []) as WaterQualityLatestStatusRow[]
-}
-
-async function getThresholds(
-  supabase: ServerClient,
-  farmId: string,
-  userId: string,
-): Promise<WaterQualityThresholdRow[]> {
-  return (await listAlertThresholdRows(supabase, farmId, userId)) as WaterQualityThresholdRow[]
-}
-
-async function getRatings(
-  supabase: ServerClient,
-  params: { farmId: string; systemId?: number; dateFrom: string; dateTo: string; limit: number },
-): Promise<WaterQualityRatingRow[]> {
-  let query = supabase
-    .from("api_daily_water_quality_rating")
-    .select("*")
-    .eq("farm_id", params.farmId)
-    .gte("rating_date", params.dateFrom)
-    .lte("rating_date", params.dateTo)
-    .order("rating_date", { ascending: true })
-    .limit(params.limit)
-
-  if (params.systemId) query = query.eq("system_id", params.systemId)
-  const { data, error } = await query
-  if (error) return []
-  return (data ?? []) as WaterQualityRatingRow[]
 }
 
 async function getMeasurements(
@@ -163,113 +119,30 @@ async function getMeasurements(
   return (data ?? []) as WaterQualityMeasurementViewRow[]
 }
 
-async function getOverlay(
-  supabase: ServerClient,
-  params: { farmId: string; systemId?: number; dateFrom: string; dateTo: string },
-): Promise<WaterQualityOverlayRow[]> {
-  const { data, error } = await supabase.rpc("api_daily_overlay", {
-    p_farm_id: params.farmId,
-    p_system_id: params.systemId,
-    p_start_date: params.dateFrom,
-    p_end_date: params.dateTo,
-  })
-  if (error) return []
-  return (data ?? []) as WaterQualityOverlayRow[]
-}
-
-async function getActivities(
-  supabase: ServerClient,
-  params: { farmId: string; dateFrom: string; dateTo: string; limit: number },
-): Promise<WaterQualityActivityRow[]> {
-  // Resolve farm system IDs to scope per-system table queries
-  const { data: systems, error: sysErr } = await supabase
-    .from("system")
-    .select("id")
-    .eq("farm_id", params.farmId)
-  if (sysErr || !systems?.length) return []
-
-  const systemIds = systems
-    .map((s) => s.id)
-    .filter((id): id is number => typeof id === "number")
-  if (systemIds.length === 0) return []
-
-  type EventRow = { id: number; date: string | null; system_id?: number | null }
-
-  async function fetchEvents(
-    table: "water_quality_measurement" | "feeding_record" | "fish_mortality" | "fish_stocking",
-    tableName: string,
-    useFarmId: boolean,
-  ): Promise<WaterQualityActivityRow[]> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let q: any = supabase
-      .from(table)
-      .select("id, date, system_id")
-      .order("date", { ascending: false })
-      .limit(params.limit)
-
-    q = useFarmId ? q.eq("farm_id", params.farmId) : q.in("system_id", systemIds)
-    q = q.gte("date", params.dateFrom).lte("date", params.dateTo)
-
-    const { data, error } = await q
-    if (error) return []
-    return (data ?? []).map((row: EventRow) => ({
-      id: row.id,
-      table_name: tableName,
-      change_type: "INSERT" as const,
-      column_name: null,
-      change_time: row.date ?? null,
-      record_id: row.id,
-      new_value: null,
-    }))
-  }
-
-  const results = await Promise.all([
-    fetchEvents("water_quality_measurement", "water_quality_measurement", false),
-    fetchEvents("feeding_record",            "feeding_record",            false),
-    fetchEvents("fish_mortality",            "fish_mortality",            true),
-    fetchEvents("fish_stocking",             "fish_stocking",             false),
-  ])
-
-  return results
-    .flat()
-    .sort((a, b) =>
-      String(b.change_time ?? "").localeCompare(String(a.change_time ?? "")),
-    )
-    .slice(0, params.limit)
-}
-
 async function loadWaterQualityPageInitialData(
   supabase: ServerClient,
   params: {
     farmId: string | null
     filters: WaterQualityPageFilters
-    userId: string
   },
 ): Promise<WaterQualityPageInitialData> {
   const empty: WaterQualityPageInitialData = {
     bounds: { start: null, end: null },
     systemOptions: toQuerySuccess([]),
     batchSystems: toQuerySuccess([]),
-    syncStatus: toQuerySuccess([]),
     latestStatus: toQuerySuccess([]),
-    ratings: toQuerySuccess([]),
     measurements: toQuerySuccess([]),
-    overlay: toQuerySuccess([]),
-    activities: toQuerySuccess([]),
-    thresholds: toQuerySuccess([]),
   }
 
   if (!params.farmId) return empty
 
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
 
-  const [systemOptions, batchSystems, syncStatus, thresholds] = await Promise.all([
+  const [systemOptions, batchSystems] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<
       WaterQualitySystemOption[]
     >,
     getScopedBatchSystems(supabase, batchId),
-    getSyncStatus(supabase, params.farmId),
-    getThresholds(supabase, params.farmId, params.userId),
   ])
   const selectedSystemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systemOptions)
   const [bounds, latestStatus] = await Promise.all([
@@ -288,56 +161,25 @@ async function loadWaterQualityPageInitialData(
       bounds,
       systemOptions: toQuerySuccess(systemOptions),
       batchSystems: toQuerySuccess(batchSystems),
-      syncStatus: toQuerySuccess(syncStatus),
       latestStatus: toQuerySuccess(latestStatus),
-      ratings: toQuerySuccess([]),
       measurements: toQuerySuccess([]),
-      overlay: toQuerySuccess([]),
-      activities: toQuerySuccess([]),
-      thresholds: toQuerySuccess(thresholds),
     }
   }
 
-  const [ratings, measurements, overlay, activities] = await Promise.all([
-    getRatings(supabase, {
-      farmId: params.farmId,
-      systemId: selectedSystemId,
-      dateFrom: bounds.start,
-      dateTo: bounds.end,
-      limit: 2000,
-    }),
-    getMeasurements(supabase, {
-      farmId: params.farmId,
-      systemId: selectedSystemId,
-      dateFrom: bounds.start,
-      dateTo: bounds.end,
-      limit: 2000,
-    }),
-    getOverlay(supabase, {
-      farmId: params.farmId,
-      systemId: selectedSystemId,
-      dateFrom: bounds.start,
-      dateTo: bounds.end,
-    }),
-    getActivities(supabase, {
-      farmId: params.farmId,
-      dateFrom: bounds.start,
-      dateTo: bounds.end,
-      limit: 1500,
-    }),
-  ])
+  const measurements = await getMeasurements(supabase, {
+    farmId: params.farmId,
+    systemId: selectedSystemId,
+    dateFrom: bounds.start,
+    dateTo: bounds.end,
+    limit: 2000,
+  })
 
   return {
     bounds,
     systemOptions: toQuerySuccess(systemOptions),
     batchSystems: toQuerySuccess(batchSystems),
-    syncStatus: toQuerySuccess(syncStatus),
     latestStatus: toQuerySuccess(latestStatus),
-    ratings: toQuerySuccess(ratings),
     measurements: toQuerySuccess(measurements),
-    overlay: toQuerySuccess(overlay),
-    activities: toQuerySuccess(activities),
-    thresholds: toQuerySuccess(thresholds),
   }
 }
 
@@ -345,26 +187,6 @@ export async function getWaterQualityPageInitialData(params: {
   farmId: string | null
   filters: WaterQualityPageFilters
 }): Promise<WaterQualityPageInitialData> {
-  const { user, accessToken } = await requireUserContext()
-
-  return runServerReadThrough({
-    keyParts: [
-      "water-quality-page",
-      user.id,
-      params.farmId,
-      params.filters.selectedBatch,
-      params.filters.selectedSystem,
-      params.filters.selectedStage,
-      params.filters.timePeriod,
-    ],
-    tags: params.farmId
-      ? [
-          cacheTags.farm(params.farmId),
-          cacheTags.systems(params.farmId),
-          cacheTags.inventory(params.farmId),
-          cacheTags.waterQuality(params.farmId),
-        ]
-      : [],
-    loader: () => loadWaterQualityPageInitialData(createAccessTokenClient(accessToken), { ...params, userId: user.id }),
-  })
+  const { accessToken } = await requireUserContext()
+  return loadWaterQualityPageInitialData(createAccessTokenClient(accessToken), params)
 }

@@ -8,7 +8,7 @@ import { QueryHydration } from "@/components/providers/query-hydration"
 import { WORKSPACE_SELECT_PATH, resolveAppEntryPath, sanitizeNextPath } from "@/lib/app-entry"
 import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
 import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
-import { listBatchOptionRows, listDashboardTimePeriodRows, listSystemHealthScoreRows } from "@/features/shared/query-seed.server"
+import { listBatchOptionRows, listDashboardTimePeriodRows } from "@/features/shared/query-seed.server"
 import { loadWorkspaceContextForUser } from "@/lib/server/workspace"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { queryKeys } from "@/lib/cache/query-keys"
@@ -84,8 +84,7 @@ export default async function DashboardPage({
     initialData.systemOptions.status === "success"
       ? cleanScopedFilterState(initialFilters, initialData.systemOptions.data)
       : initialFilters
-  const [systemHealthScores, batchOptions, timePeriodOptions] = await Promise.all([
-    listSystemHealthScoreRows(analyticsSupabase, { farmId }),
+  const [batchOptions, timePeriodOptions] = await Promise.all([
     listBatchOptionRows(analyticsSupabase, { farmId }),
     listDashboardTimePeriodRows(analyticsSupabase),
   ])
@@ -128,8 +127,6 @@ export default async function DashboardPage({
   queryClient.setQueryData(queryKeys.options.batches({ farmId }), toQuerySuccess(batchOptions))
   queryClient.setQueryData(queryKeys.options.timePeriods(), toQuerySuccess(timePeriodOptions))
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)
-  queryClient.setQueryData(queryKeys.waterQuality.thresholds(farmId), initialData.alertThresholds)
-  queryClient.setQueryData(queryKeys.analytics.healthScores({ farmId }), { status: "success", data: systemHealthScores })
   queryClient.setQueryData(queryKeys.farmUserRole(farmId, contextUser.id), workspaceContext.role)
 
   if (initialData.bounds.start && initialData.bounds.end) {
@@ -158,20 +155,6 @@ export default async function DashboardPage({
       }),
       initialData.systemsTable,
     )
-    if (initialData.productionTrend.length > 0) {
-      queryClient.setQueryData(
-        queryKeys.dashboard.productionTrend({
-          farmId,
-          stage: effectiveFilters.selectedStage,
-          batch: effectiveFilters.selectedBatch,
-          system: effectiveFilters.selectedSystem,
-          timePeriod: effectiveFilters.timePeriod,
-          dateFrom: initialData.bounds.start,
-          dateTo: initialData.bounds.end,
-        }),
-        initialData.productionTrend,
-      )
-    }
     queryClient.setQueryData(
       queryKeys.dashboard.recommendedActions({
         farmId,

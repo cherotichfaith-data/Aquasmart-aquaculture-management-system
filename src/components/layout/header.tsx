@@ -228,14 +228,12 @@ export default function Header({
       sharedFilterInitialValues?.selectedSystem && sharedFilterInitialValues.selectedSystem !== "all"
         ? {
             selectedSystem:
-              searchParams.get("cage") ??
               getSystemFilterUrlValue(
                 allSystemsForChips.find((item) => String(item.id) === sharedFilterInitialValues.selectedSystem),
-              ),
+              ) ?? sharedFilterInitialValues.selectedSystem,
             timePeriod: toTimePeriodUrlValue(sharedFilterInitialValues.timePeriod ?? defaultPeriod),
           }
         : { timePeriod: toTimePeriodUrlValue(sharedFilterInitialValues?.timePeriod ?? defaultPeriod) },
-    urlKeys: { selectedSystem: "cage" },
   })
 
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
@@ -294,8 +292,8 @@ export default function Header({
 
     if (nextSystem !== "all") {
       const system = allSystemsForChips.find((item) => String(item.id) === nextSystem)
-      params.set("cage", getSystemFilterUrlValue(system) || nextSystem)
-      params.delete("system")
+      params.set("system", getSystemFilterUrlValue(system) || nextSystem)
+      params.delete("cage")
     }
     else {
       params.delete("cage")

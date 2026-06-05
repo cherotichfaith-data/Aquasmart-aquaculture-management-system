@@ -3,13 +3,12 @@
 import { isLowFeedingResponse } from "@/lib/feeding-response"
 import type { AlertLogRow } from "@/lib/api/mortality"
 import type { FeedingRecordWithType } from "@/lib/api/reports"
-import type { Database, Tables } from "@/lib/types/database"
-import { isMortalityCause, type MortalityCause } from "@/lib/mortality"
+import type { Tables } from "@/lib/types/database"
+import { isMortalityCause, type DerivedSurvivalSeriesRow, type MortalityCause } from "@/lib/mortality"
 import { buildLatestParameterizedReadingsBySystem } from "@/lib/water-quality-readings"
 import type { SystemOption } from "@/lib/system-options"
 
 type MortalityEventRow = Tables<"fish_mortality">
-type SurvivalTrendRow = Database["public"]["Functions"]["api_survival_trend"]["Returns"][number]
 type WaterQualityMeasurementRow = Tables<"api_water_quality_measurements">
 type SamplingRow = Tables<"fish_sampling_weight">
 export type InvestigationStatus = "open" | "monitoring" | "resolved" | "escalated"
@@ -160,8 +159,8 @@ function buildLastSampleBySystem(rows: SamplingRow[]) {
   return map
 }
 
-function buildSurvivalBySystem(rows: Array<SurvivalTrendRow & { system_id: number }>) {
-  const map = new Map<number, SurvivalTrendRow[]>()
+function buildSurvivalBySystem(rows: DerivedSurvivalSeriesRow[]) {
+  const map = new Map<number, DerivedSurvivalSeriesRow[]>()
   rows.forEach((row) => {
     const list = map.get(row.system_id) ?? []
     list.push(row)
@@ -281,7 +280,7 @@ export function buildMortalityRiskRows(params: {
   systems: SystemOption[]
   events: MortalityEventRow[]
   alerts: AlertLogRow[]
-  survivalRows: Array<SurvivalTrendRow & { system_id: number }>
+  survivalRows: DerivedSurvivalSeriesRow[]
   measurements: WaterQualityMeasurementRow[]
   samplingRows: SamplingRow[]
   feedingRows: FeedingRecordWithType[]
@@ -322,7 +321,11 @@ export function buildMortalityRiskRows(params: {
     const survivalPct = latestSurvival?.survival_pct ?? null
     const survivalSlope =
       survivalWindow.length >= 2
-        ? slope(survivalWindow.map((row) => row.survival_pct).filter((value) => Number.isFinite(value)))
+        ? slope(
+            survivalWindow
+              .map((row) => row.survival_pct)
+              .filter((value): value is number => typeof value === "number" && Number.isFinite(value)),
+          )
         : null
     const worseningSurvival = survivalSlope != null && survivalSlope < -0.03
     const trendDirection =
@@ -412,7 +415,7 @@ export function buildDeathsTrend(events: MortalityEventRow[]) {
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
-export function buildSurvivalTrend(rows: Array<SurvivalTrendRow & { system_id: number }>) {
+export function buildSurvivalTrend(rows: DerivedSurvivalSeriesRow[]) {
   const byDate = new Map<string, { dailyDeaths: number; liveCount: number; stocked: number }>()
   rows.forEach((row) => {
     const current = byDate.get(row.event_date) ?? { dailyDeaths: 0, liveCount: 0, stocked: 0 }

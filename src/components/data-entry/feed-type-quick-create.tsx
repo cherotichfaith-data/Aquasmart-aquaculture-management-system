@@ -118,7 +118,7 @@ export function FeedTypeQuickCreate({
       feed_pellet_size: pelletSize,
       crude_protein_percentage: proteinValue,
       crude_fat_percentage: fatValue,
-      feed_supplier: Number(supplierId),
+      feed_supplier_id: Number(supplierId),
     })
 
     setFeedLine("")

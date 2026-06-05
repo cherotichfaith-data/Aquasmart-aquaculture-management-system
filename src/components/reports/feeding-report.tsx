@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useFeedingRecords } from "@/lib/hooks/use-reports"
-import { useProductionSummary } from "@/lib/hooks/use-production"
+import { getProductionSummary } from "@/lib/api/production"
 import { sortByDateAsc } from "@/lib/utils"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
@@ -51,13 +52,18 @@ export default function FeedingReport({
     dateTo: dateRange?.to,
     enabled: boundsReady,
   })
-  const summaryQuery = useProductionSummary({
-    farmId,
-    systemId,
-    dateFrom: dateRange?.from,
-    dateTo: dateRange?.to,
-    limit: chartLimit,
-    enabled: boundsReady,
+  const summaryQuery = useQuery({
+    queryKey: ["reports", "feeding", "production-summary", farmId, systemId ?? "all", dateRange?.from, dateRange?.to],
+    queryFn: ({ signal }) =>
+      getProductionSummary({
+        farmId,
+        systemId,
+        dateFrom: dateRange?.from,
+        dateTo: dateRange?.to,
+        signal,
+      }),
+    enabled: Boolean(farmId) && boundsReady,
+    staleTime: 5 * 60_000,
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
   const feedingTableQuery = useFeedingRecords({
@@ -127,34 +133,14 @@ export default function FeedingReport({
 
   const efcrByCageRows = useMemo(() => {
     const byDate = new Map<string, Record<string, number | string | null>>()
-    const byDateAndSystem = new Map<string, { weightedEfcr: number; weight: number; fallbackTotal: number; fallbackCount: number }>()
 
     summaryRows.forEach((row) => {
       if (!row.date || row.system_id == null || typeof row.efcr_period !== "number") return
-      const compositeKey = `${row.date}|${row.system_id}`
-      const bucket = byDateAndSystem.get(compositeKey) ?? { weightedEfcr: 0, weight: 0, fallbackTotal: 0, fallbackCount: 0 }
-      const weight = row.biomass_increase_period ?? 0
-      if (weight > 0) {
-        bucket.weightedEfcr += row.efcr_period * weight
-        bucket.weight += weight
-      } else {
-        bucket.fallbackTotal += row.efcr_period
-        bucket.fallbackCount += 1
-      }
-      byDateAndSystem.set(compositeKey, bucket)
-    })
-
-    byDateAndSystem.forEach((bucket, compositeKey) => {
-      const [date, rawSystemId] = compositeKey.split("|")
-      const systemKeyValue = systemKey(Number(rawSystemId))
-      const row = byDate.get(date) ?? { date }
-      row[systemKeyValue] =
-        bucket.weight > 0
-          ? bucket.weightedEfcr / bucket.weight
-          : bucket.fallbackCount > 0
-            ? bucket.fallbackTotal / bucket.fallbackCount
-            : null
-      byDate.set(date, row)
+      const date = row.date
+      const systemKeyValue = systemKey(row.system_id)
+      const bucket = byDate.get(date) ?? { date }
+      bucket[systemKeyValue] = row.efcr_period
+      byDate.set(date, bucket)
     })
 
     return sortByDateAsc(Array.from(byDate.values()), (row) => String(row.date ?? ""))
@@ -182,29 +168,25 @@ export default function FeedingReport({
   }, [records])
 
   const avgEfcr = useMemo(() => {
-    const aggregate = summaryRows.reduce(
+    const weighted = summaryRows.reduce(
       (acc, row) => {
         if (typeof row.efcr_period !== "number") return acc
-        const weight = row.biomass_increase_period ?? 0
-        if (weight > 0) {
-          acc.weightedEfcr += row.efcr_period * weight
-          acc.weight += weight
-        } else {
-          acc.fallbackTotal += row.efcr_period
-          acc.fallbackCount += 1
-        }
+        const weight = row.total_feed_amount_period ?? 0
+        if (weight <= 0) return acc
+        acc.value += row.efcr_period * weight
+        acc.weight += weight
         return acc
       },
-      { weightedEfcr: 0, weight: 0, fallbackTotal: 0, fallbackCount: 0 },
+      { value: 0, weight: 0 },
     )
-
-    if (aggregate.weight > 0) return aggregate.weightedEfcr / aggregate.weight
-    return aggregate.fallbackCount > 0 ? aggregate.fallbackTotal / aggregate.fallbackCount : null
+    return weighted.weight > 0 ? weighted.value / weighted.weight : null
   }, [summaryRows])
 
   const biomassGain = useMemo(() => {
-    const vals = summaryRows.map((row) => row.biomass_increase_period).filter((v): v is number => typeof v === "number")
-    return vals.reduce((a, b) => a + b, 0)
+    return summaryRows.reduce(
+      (sum, row) => sum + Math.max(0, row.biomass_increase_period ?? 0),
+      0,
+    )
   }, [summaryRows])
 
   const systemBreakdownRows = useMemo(() => {

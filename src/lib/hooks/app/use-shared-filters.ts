@@ -59,9 +59,11 @@ export function useSharedFilters(
       if (isDefault) {
         params.delete(urlKey)
         if (key === "selectedSystem" && urlKey === "cage") params.delete("system")
+        if (key === "selectedSystem" && urlKey === "system") params.delete("cage")
       } else {
         params.set(urlKey, nextUrlValue)
         if (key === "selectedSystem" && urlKey === "cage") params.delete("system")
+        if (key === "selectedSystem" && urlKey === "system") params.delete("cage")
       }
     }
 

@@ -6,33 +6,22 @@ import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/auth-provider"
 import { queryKeys } from "@/lib/cache/query-keys"
 import {
-  getSystemHealthScores,
   getHarvestForecast,
-  getFeedDemandForecast,
   getCycleBenchmarks,
-  getScopedRecommendedActions,
+  getRecommendedActions,
   getFcrIntervals,
-  getScopedFeedRateAnalysis,
-  getKpiCoverage,
+  getFeedRateAnalysis,
 } from "@/lib/api/analytics"
 
 const STALE_5MIN = 5 * 60_000
 
-// ── System Health Scores ──────────────────────────────────────────────────────
+const hasSystemId = (row: unknown): row is { system_id: number } =>
+  typeof row === "object" &&
+  row !== null &&
+  "system_id" in row &&
+  typeof (row as { system_id?: unknown }).system_id === "number"
 
-export function useSystemHealthScores(params: {
-  farmId?: string | null
-  systemId?: number
-}) {
-  const { session } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.analytics.healthScores({ farmId: params.farmId, systemId: params.systemId }),
-    queryFn: ({ signal }) =>
-      getSystemHealthScores({ farmId: params.farmId!, systemId: params.systemId, signal }),
-    enabled: Boolean(session) && Boolean(params.farmId),
-    staleTime: STALE_5MIN,
-  })
-}
+// ── System Health Scores ──────────────────────────────────────────────────────
 
 // ── Harvest Forecast ──────────────────────────────────────────────────────────
 
@@ -50,21 +39,7 @@ export function useHarvestForecast(params: {
   })
 }
 
-// ── Feed Demand Forecast ──────────────────────────────────────────────────────
 
-export function useFeedDemandForecast(params: {
-  farmId?: string | null
-  daysAhead?: number
-}) {
-  const { session } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.analytics.feedDemand({ farmId: params.farmId, daysAhead: params.daysAhead }),
-    queryFn: ({ signal }) =>
-      getFeedDemandForecast({ farmId: params.farmId!, daysAhead: params.daysAhead, signal }),
-    enabled: Boolean(session) && Boolean(params.farmId),
-    staleTime: STALE_5MIN,
-  })
-}
 
 // ── Cycle Benchmarks ──────────────────────────────────────────────────────────
 
@@ -96,12 +71,20 @@ export function useRecommendedActions(params: {
       systemId: params.systemId,
       systemIds: params.systemIds,
     }),
-    queryFn: ({ signal }) =>
-      getScopedRecommendedActions({
+    queryFn: async ({ signal }) => {
+      const systemIds = params.systemId != null ? [params.systemId] : params.systemIds
+      if (Array.isArray(systemIds) && systemIds.length === 0) {
+        return { status: "success" as const, data: [] }
+      }
+      const result = await getRecommendedActions({
         farmId: params.farmId!,
-        systemIds: params.systemId != null ? [params.systemId] : params.systemIds,
+        systemId: Array.isArray(systemIds) && systemIds.length === 1 ? systemIds[0] : undefined,
         signal,
-      }),
+      })
+      if (result.status !== "success" || !Array.isArray(systemIds)) return result
+      const scope = new Set(systemIds)
+      return { ...result, data: result.data.filter((row) => hasSystemId(row) && scope.has(row.system_id)) }
+    },
     enabled: Boolean(session) && Boolean(params.farmId),
     staleTime: STALE_5MIN,
   })
@@ -155,14 +138,22 @@ export function useFeedRateAnalysis(params: {
       dateFrom: params.dateFrom,
       dateTo: params.dateTo,
     }),
-    queryFn: ({ signal }) =>
-      getScopedFeedRateAnalysis({
+    queryFn: async ({ signal }) => {
+      const systemIds = params.systemId != null ? [params.systemId] : params.systemIds
+      if (Array.isArray(systemIds) && systemIds.length === 0) {
+        return { status: "success" as const, data: [] }
+      }
+      const result = await getFeedRateAnalysis({
         farmId: params.farmId!,
-        systemIds: params.systemId != null ? [params.systemId] : params.systemIds,
+        systemId: Array.isArray(systemIds) && systemIds.length === 1 ? systemIds[0] : undefined,
         dateFrom: params.dateFrom,
         dateTo: params.dateTo,
         signal,
-      }),
+      })
+      if (result.status !== "success" || !Array.isArray(systemIds)) return result
+      const scope = new Set(systemIds)
+      return { ...result, data: result.data.filter((row) => scope.has(row.system_id)) }
+    },
     enabled:
       (params.enabled ?? true) &&
       Boolean(session) &&
@@ -175,26 +166,3 @@ export function useFeedRateAnalysis(params: {
 
 // ── KPI Coverage ──────────────────────────────────────────────────────────────
 
-export function useKpiCoverage(params: {
-  farmId?: string | null
-  dateFrom?: string
-  dateTo?: string
-}) {
-  const { session } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.analytics.kpiCoverage({
-      farmId: params.farmId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    }),
-    queryFn: ({ signal }) =>
-      getKpiCoverage({
-        farmId: params.farmId!,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-        signal,
-      }),
-    enabled: Boolean(session) && Boolean(params.farmId),
-    staleTime: STALE_5MIN,
-  })
-}

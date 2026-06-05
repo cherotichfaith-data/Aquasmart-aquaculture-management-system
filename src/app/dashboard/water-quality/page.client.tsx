@@ -1,20 +1,16 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import type { WaterQualityPageFilters } from "@/features/water-quality/types"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import SystemHistorySheet from "@/components/systems/system-history-sheet"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import {
-  useAlertThresholds,
   useLatestWaterQualityStatus,
-  useWaterQualitySyncStatus,
-  useWaterQualityOverlay,
   useWaterQualityMeasurements,
-  useDailyWaterQualityRating,
 } from "@/lib/hooks/use-water-quality"
-import { useRecentActivities } from "@/lib/hooks/use-dashboard"
+import { getWaterQualityIndex } from "@/lib/api/water-quality"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import {
   DEFAULT_WQ_PARAMETER,
@@ -23,53 +19,25 @@ import {
   type WqParameter,
 } from "./_lib/water-quality-utils"
 import {
-  buildAlertItems,
-  buildAggregatedReadings,
-  buildAlgalActivity,
-  buildAllSystemsWqi,
-  buildDiurnalDoPattern,
   buildCurrentAlerts,
-  buildDailyParameterByDate,
-  buildDailyRiskTrend,
-  buildDailyTempAverage,
   buildDepthProfiles,
-  buildEmergingRisks,
   buildLatestReadingsBySystem,
   buildLastMeasurementBySystemId,
   buildMeasurementEvents,
-  buildNutrientLoad,
-  buildOperatorByRecordId,
-  buildOverlayByDate,
   buildParameterTrendData,
-  buildRatingTrendBySystemId,
-  buildSensorCounts,
-  buildSensorStatusBySystem,
   buildSystemLabelById,
   buildSystemOptions,
   buildSystemRiskRows,
-  calculateWqi,
   getAverageWqi,
   getDepthProfileData,
-  getSelectedReadings,
-  getTemperatureStats,
   getWqiLabel,
   resolveDepthProfileDate,
-  selectThresholdRow,
   type DepthProfileRow,
 } from "./_lib/water-quality-selectors"
 import { WaterQualityAlertsTab } from "./_components/water-quality-alerts-tab"
 import { WaterQualityDepthTab } from "./_components/water-quality-depth-tab"
 import { WaterQualityEnvironmentTab } from "./_components/water-quality-environment-tab"
-import { WaterQualityOverviewTab } from "./_components/water-quality-overview-tab"
 import { WaterQualityParameterTab } from "./_components/water-quality-parameter-tab"
-import { WaterQualitySensorsTab } from "./_components/water-quality-sensors-tab"
-import { Tabs, TabsContent } from "@/components/app-ui/tabs"
-import {
-  buildWaterQualityTabQuery,
-  CHART_TABS,
-  resolveWaterQualityTab,
-  WATER_QUALITY_TABS,
-} from "./_lib/water-quality-page"
 
 export default function WaterQualityPage({
   initialFarmId,
@@ -80,15 +48,18 @@ export default function WaterQualityPage({
   initialFarmName?: string | null
   initialFilters?: WaterQualityPageFilters
 }) {
-  const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [depthProfileDate, setDepthProfileDate] = useState<string | null>(null)
+  const selectedParameter = useMemo<WqParameter>(() => {
+    const nextParameter = searchParams.get("parameter")
+    if (isWqParameter(nextParameter)) return nextParameter
+    return initialFilters?.selectedParameter ?? DEFAULT_WQ_PARAMETER
+  }, [initialFilters?.selectedParameter, searchParams])
 
   const {
     farmId,
     selectedBatch,
     selectedSystem,
-    setSelectedSystem,
     selectedStage,
     dateFrom,
     dateTo,
@@ -100,19 +71,6 @@ export default function WaterQualityPage({
     boundsScope: "water_quality",
     initialFilters,
   })
-  const selectedSystemValue = selectedSystem
-  const isAllSystemsSelected = selectedSystem === "all"
-  const [showFeedingOverlay, setShowFeedingOverlay] = useState(true)
-  const [showMortalityOverlay, setShowMortalityOverlay] = useState(true)
-  const [depthProfileDate, setDepthProfileDate] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState(() => initialFilters?.activeTab ?? "overview")
-  const [selectedHistorySystemId, setSelectedHistorySystemId] = useState<number | null>(null)
-  const selectedParameter = useMemo<WqParameter>(() => {
-    const nextParameter = searchParams.get("parameter")
-    if (isWqParameter(nextParameter)) return nextParameter
-    return initialFilters?.selectedParameter ?? DEFAULT_WQ_PARAMETER
-  }, [initialFilters?.selectedParameter, searchParams])
-  const chartLimit = 2000
 
   const {
     selectedSystemId,
@@ -126,18 +84,19 @@ export default function WaterQualityPage({
     selectedSystem,
   })
 
-  const syncStatusQuery = useWaterQualitySyncStatus({ farmId })
-  const latestStatusQuery = useLatestWaterQualityStatus(selectedSystemId, {
-    farmId,
-  })
-  const ratingsQuery = useDailyWaterQualityRating({
-    farmId,
-    systemId: selectedSystemId,
-    dateFrom,
-    dateTo,
-    requireSystem: false,
-    limit: chartLimit,
-    enabled: boundsReady,
+  const latestStatusQuery = useLatestWaterQualityStatus(selectedSystemId, { farmId })
+  const wqiQuery = useQuery({
+    queryKey: ["dashboard", "water-quality", "index", farmId, selectedSystemId ?? "all", dateFrom, dateTo],
+    queryFn: ({ signal }) =>
+      getWaterQualityIndex({
+        farmId: farmId!,
+        systemId: selectedSystemId ?? undefined,
+        dateFrom,
+        dateTo,
+        signal,
+      }),
+    enabled: Boolean(farmId) && boundsReady,
+    staleTime: 60_000,
   })
   const measurementsQuery = useWaterQualityMeasurements({
     farmId,
@@ -145,38 +104,17 @@ export default function WaterQualityPage({
     dateFrom,
     dateTo,
     requireSystem: false,
-    limit: chartLimit,
+    limit: 2000,
     enabled: boundsReady,
   })
-  const overlayQuery = useWaterQualityOverlay({
-    farmId,
-    systemId: selectedSystemId,
-    dateFrom,
-    dateTo,
-    requireSystem: false,
-    enabled: boundsReady,
-  })
-  const activitiesQuery = useRecentActivities({
-    farmId,
-    tableName: "water_quality_measurement",
-    dateFrom: dateFrom ? `${dateFrom}T00:00:00` : undefined,
-    dateTo: dateTo ? `${dateTo}T23:59:59` : undefined,
-    limit: 1500,
-    enabled: boundsReady,
-  })
-  const thresholdsQuery = useAlertThresholds({ farmId })
+
   const scopedSystemIds = scopedSystemIdList
-  const latestUpdatedAt = Math.max(
-    measurementsQuery.dataUpdatedAt ?? 0,
-    ratingsQuery.dataUpdatedAt ?? 0,
-    overlayQuery.dataUpdatedAt ?? 0,
-    latestStatusQuery.dataUpdatedAt ?? 0,
-    syncStatusQuery.dataUpdatedAt ?? 0,
-  )
   const systemsRows = useMemo(
     () => getResultRows(systemsQuery.data).filter((system) => system.id != null),
     [systemsQuery.data],
   )
+  const systemLabelById = useMemo(() => buildSystemLabelById(systemsRows), [systemsRows])
+  const systemOptions = useMemo(() => buildSystemOptions(systemsRows), [systemsRows])
   const scopedMeasurementRows = useMemo(
     () =>
       getResultRows(measurementsQuery.data).filter(
@@ -191,80 +129,46 @@ export default function WaterQualityPage({
       ),
     [latestStatusQuery.data, scopedSystemIds],
   )
-  const ratingRows = useMemo(
+  const wqiRows = useMemo(
     () =>
-      getResultRows(ratingsQuery.data).filter(
+      getResultRows(wqiQuery.data).filter(
         (row) => row.system_id != null && scopedSystemIds.includes(row.system_id),
       ),
-    [ratingsQuery.data, scopedSystemIds],
+    [scopedSystemIds, wqiQuery.data],
   )
-  const thresholdRows = useMemo(() => getResultRows(thresholdsQuery.data), [thresholdsQuery.data])
-  const thresholdRow = useMemo(
-    () => selectThresholdRow(thresholdRows, selectedSystemId ?? undefined),
-    [selectedSystemId, thresholdRows],
-  )
-  const lowDoThreshold = thresholdRow?.low_do_threshold ?? 5
-  const highAmmoniaThreshold = thresholdRow?.high_ammonia_threshold ?? 0.05
 
-  const systemLabelById = useMemo(() => buildSystemLabelById(systemsRows), [systemsRows])
-  const systemOptions = useMemo(() => buildSystemOptions(systemsRows), [systemsRows])
-  const ratingTrendBySystemId = useMemo(() => buildRatingTrendBySystemId(ratingRows), [ratingRows])
-  const operatorByRecordId = useMemo(
-    () => buildOperatorByRecordId(getResultRows(activitiesQuery.data)),
-    [activitiesQuery.data],
-  )
   const latestReadingsBySystem = useMemo(
     () => buildLatestReadingsBySystem(scopedMeasurementRows),
     [scopedMeasurementRows],
   )
   const measurementEvents = useMemo(
-    () => buildMeasurementEvents(scopedMeasurementRows, systemLabelById, operatorByRecordId),
-    [operatorByRecordId, scopedMeasurementRows, systemLabelById],
+    () => buildMeasurementEvents(scopedMeasurementRows, systemLabelById, new Map()),
+    [scopedMeasurementRows, systemLabelById],
   )
   const lastMeasurementBySystemId = useMemo(
     () => buildLastMeasurementBySystemId(measurementEvents),
     [measurementEvents],
   )
-  const sensorStatusBySystem = useMemo(
-    () => buildSensorStatusBySystem(systemOptions, lastMeasurementBySystemId),
-    [lastMeasurementBySystemId, systemOptions],
-  )
-  const sensorCounts = useMemo(() => buildSensorCounts(sensorStatusBySystem), [sensorStatusBySystem])
-  const aggregatedReadings = useMemo(
-    () => buildAggregatedReadings(latestReadingsBySystem),
-    [latestReadingsBySystem],
-  )
-  const selectedReadings = useMemo(
-    () => getSelectedReadings(selectedSystemId, latestReadingsBySystem, aggregatedReadings),
-    [aggregatedReadings, latestReadingsBySystem, selectedSystemId],
-  )
-  const temperatureStats = useMemo(() => getTemperatureStats(scopedMeasurementRows), [scopedMeasurementRows])
-  const selectedSystemWqi = useMemo(
-    () =>
-      calculateWqi(
-        selectedReadings.dissolved_oxygen ?? null,
-        selectedReadings.temperature ?? null,
-        lowDoThreshold,
-        temperatureStats.mean,
-        temperatureStats.std,
-      ),
-    [lowDoThreshold, selectedReadings, temperatureStats.mean, temperatureStats.std],
-  )
-  const nutrientLoad = useMemo(() => buildNutrientLoad(selectedReadings), [selectedReadings])
-  const algalActivity = useMemo(() => buildAlgalActivity(selectedReadings), [selectedReadings])
-  const allSystemsWqi = useMemo(
-    () => buildAllSystemsWqi(systemOptions, latestReadingsBySystem, thresholdRows, temperatureStats),
-    [latestReadingsBySystem, systemOptions, temperatureStats, thresholdRows],
-  )
+  const allSystemsWqi = useMemo(() => {
+    const wqiBySystem = new Map(wqiRows.map((row) => [row.system_id, row]))
+    return systemOptions.map((system) => {
+      const wqi = wqiBySystem.get(system.id)?.wqi_score ?? null
+      return {
+        ...system,
+        wqi,
+        wqiLabel: getWqiLabel(wqi),
+      }
+    })
+  }, [systemOptions, wqiRows])
   const averageWqi = useMemo(() => getAverageWqi(allSystemsWqi), [allSystemsWqi])
+  const selectedSystemWqi = selectedSystemId != null ? (wqiRows[0]?.wqi_score ?? null) : null
   const wqiValue = selectedSystemId != null ? selectedSystemWqi : averageWqi
   const wqiLabel = useMemo(() => getWqiLabel(wqiValue), [wqiValue])
-  const averageWqiLabel = useMemo(() => getWqiLabel(averageWqi), [averageWqi])
   const systemRiskRows = useMemo(
-    () => buildSystemRiskRows(latestStatusRows, ratingTrendBySystemId, systemLabelById, lastMeasurementBySystemId),
-    [lastMeasurementBySystemId, latestStatusRows, ratingTrendBySystemId, systemLabelById],
+    () => buildSystemRiskRows(latestStatusRows, new Map(), systemLabelById, lastMeasurementBySystemId),
+    [lastMeasurementBySystemId, latestStatusRows, systemLabelById],
   )
-  const criticalRiskRows = useMemo(
+  const alertRows = useMemo(
     () =>
       systemRiskRows.filter((row) => {
         const rating = String(row.rating ?? "").toLowerCase()
@@ -272,22 +176,11 @@ export default function WaterQualityPage({
       }),
     [systemRiskRows],
   )
-  const alertItems = useMemo(() => buildAlertItems(criticalRiskRows), [criticalRiskRows])
-  const highAlertCount = useMemo(
-    () => alertItems.filter((alert) => alert.priority === "high").length,
-    [alertItems],
-  )
-  const overlayByDate = useMemo(
-    () => buildOverlayByDate(getResultRows(overlayQuery.data), scopedSystemIds),
-    [overlayQuery.data, scopedSystemIds],
-  )
-  const dailyRiskTrend = useMemo(() => buildDailyRiskTrend(ratingRows, overlayByDate), [overlayByDate, ratingRows])
+  const currentAlerts = useMemo(() => buildCurrentAlerts(latestStatusRows), [latestStatusRows])
   const parameterTrendData = useMemo(
-    () => buildParameterTrendData(scopedMeasurementRows, selectedParameter, overlayByDate),
-    [overlayByDate, scopedMeasurementRows, selectedParameter],
+    () => buildParameterTrendData(scopedMeasurementRows, selectedParameter),
+    [scopedMeasurementRows, selectedParameter],
   )
-  const diurnalDoPattern = useMemo(() => buildDiurnalDoPattern(scopedMeasurementRows), [scopedMeasurementRows])
-  const dailyTempAverage = useMemo(() => buildDailyTempAverage(ratingRows), [ratingRows])
   const depthProfileScopeIds = selectedSystemId != null ? [selectedSystemId] : []
   const depthProfiles = useMemo(
     () => buildDepthProfiles(scopedMeasurementRows, depthProfileScopeIds),
@@ -312,18 +205,6 @@ export default function WaterQualityPage({
     if (depthProfileDate !== latest) setDepthProfileDate(latest)
   }, [depthProfiles, depthProfileDate])
 
-  useEffect(() => {
-    const tab = searchParams.get("tab")
-    setActiveTab(resolveWaterQualityTab(tab))
-  }, [searchParams])
-
-  const handleTabChange = (value: string) => {
-    if (!WATER_QUALITY_TABS.has(value)) return
-    setActiveTab(value as WaterQualityPageFilters["activeTab"])
-    const query = buildWaterQualityTabQuery(new URLSearchParams(searchParams.toString()), value)
-    router.replace(query ? `${pathname}?${query}` : pathname)
-  }
-
   const depthProfileDoData = useMemo(
     () => depthProfileData.filter((row): row is DepthProfileRow & { dissolvedOxygen: number } => row.dissolvedOxygen != null),
     [depthProfileData],
@@ -333,18 +214,6 @@ export default function WaterQualityPage({
     [depthProfileData],
   )
 
-  const doProfileSeries = useMemo(() => [...depthProfileDoData].sort((a, b) => a.depth - b.depth), [depthProfileDoData])
-  const tempProfileSeries = useMemo(() => [...depthProfileTempData].sort((a, b) => a.depth - b.depth), [depthProfileTempData])
-
-  const surfaceDo = doProfileSeries[0]?.dissolvedOxygen ?? null
-  const bottomDo = doProfileSeries.length ? doProfileSeries[doProfileSeries.length - 1].dissolvedOxygen : null
-  const doGradient = surfaceDo != null && bottomDo != null ? surfaceDo - bottomDo : null
-  const isStratified = surfaceDo != null && bottomDo != null && bottomDo < 4 && surfaceDo > 6
-
-  const surfaceTemp = tempProfileSeries[0]?.temperature ?? null
-  const bottomTemp = tempProfileSeries.length ? tempProfileSeries[tempProfileSeries.length - 1].temperature : null
-  const tempGradient = surfaceTemp != null && bottomTemp != null ? surfaceTemp - bottomTemp : null
-
   const selectedParameterUnit = useMemo(() => {
     if (selectedParameter === "dissolved_oxygen" || selectedParameter === "ammonia") return "mg/L"
     if (selectedParameter === "temperature") return "deg C"
@@ -352,25 +221,12 @@ export default function WaterQualityPage({
     return ""
   }, [selectedParameter])
 
-  const dailyParameterByDate = useMemo(
-    () => buildDailyParameterByDate(scopedMeasurementRows),
-    [scopedMeasurementRows],
-  )
-  const currentAlerts = useMemo(() => buildCurrentAlerts(latestStatusRows), [latestStatusRows])
-  const emergingRisks = useMemo(
-    () => buildEmergingRisks(dailyParameterByDate, dailyRiskTrend),
-    [dailyParameterByDate, dailyRiskTrend],
-  )
-
   const dataIssues = useMemo(() => {
     const issues: string[] = []
     const checks: Array<[string, { status: "success" | "error"; error?: string } | undefined]> = [
-      ["Sync status", syncStatusQuery.data],
       ["Latest status", latestStatusQuery.data],
-      ["Daily ratings", ratingsQuery.data],
+      ["Water quality index", wqiQuery.data],
       ["Measurements", measurementsQuery.data],
-      ["Daily overlay", overlayQuery.data],
-      ["Thresholds", thresholdsQuery.data as any],
       ["Batch systems", selectedBatch !== "all" ? (batchSystemsQuery.data as any) : undefined],
     ]
 
@@ -378,155 +234,53 @@ export default function WaterQualityPage({
       if (!result || result.status !== "error") return
       issues.push(`${label}: ${result.error ?? "request failed"}`)
     })
-
     if (!scopedSystemIds.length && farmId) {
       issues.push("No scoped systems found for selected farm/stage/batch/system filters.")
     }
-
     return issues
   }, [
-    syncStatusQuery.data,
-    latestStatusQuery.data,
     batchSystemsQuery.data,
     farmId,
+    latestStatusQuery.data,
     measurementsQuery.data,
-    overlayQuery.data,
-    ratingsQuery.data,
     scopedSystemIds.length,
     selectedBatch,
-    thresholdsQuery.data,
+    wqiQuery.data,
   ])
 
   const loading =
     measurementsQuery.isLoading ||
-    ratingsQuery.isLoading ||
-    overlayQuery.isLoading ||
     systemsQuery.isLoading ||
     latestStatusQuery.isLoading ||
-    syncStatusQuery.isLoading
+    wqiQuery.isLoading
+
   return (
     <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName}>
-      <div className="space-y-5">
-        {activeTab === "overview" && (
-          <WaterQualityOverviewTab
-            averageWqi={averageWqi}
-            averageWqiLabel={averageWqiLabel}
-            alertItems={alertItems}
-            highAlertCount={highAlertCount}
-            sensorOnlineCount={sensorCounts.online}
-            systemCount={systemOptions.length}
-            systemRiskRows={systemRiskRows}
-            onChangeTab={handleTabChange}
-            onSelectSystem={setSelectedSystem}
-            onOpenSystemHistory={setSelectedHistorySystemId}
-          />
-        )}
-
-        {activeTab === "alerts" && (
-          <WaterQualityAlertsTab
-            criticalRiskRows={criticalRiskRows}
-            currentAlerts={currentAlerts}
-            emergingRisks={emergingRisks}
-            lowDoThreshold={lowDoThreshold}
-            highAmmoniaThreshold={highAmmoniaThreshold}
-            onOpenSystemHistory={setSelectedHistorySystemId}
-          />
-        )}
-
-        {activeTab === "sensors" && (
-          <WaterQualitySensorsTab
-            sensorCounts={sensorCounts}
-            systemOptions={systemOptions}
-            sensorStatusBySystem={sensorStatusBySystem}
-            onOpenSystemHistory={setSelectedHistorySystemId}
-          />
-        )}
-
-        {CHART_TABS.has(activeTab) && (
-          <div className="soft-panel space-y-4 p-5">
-            {activeTab === "parameter" ? (
-              <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={showFeedingOverlay}
-                    onChange={(e) => setShowFeedingOverlay(e.target.checked)}
-                  />
-                  Overlay feeding
-                </label>
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={showMortalityOverlay}
-                    onChange={(e) => setShowMortalityOverlay(e.target.checked)}
-                  />
-                  Overlay mortality
-                </label>
-              </div>
-            ) : null}
-            <Tabs value={activeTab}>
-              <TabsContent value="environment">
-                <WaterQualityEnvironmentTab
-                  wqiValue={wqiValue}
-                  wqiLabel={wqiLabel}
-                  isAllSystemsSelected={selectedSystemId == null}
-                  nutrientLoad={nutrientLoad}
-                  algalActivity={algalActivity}
-                  allSystemsWqi={allSystemsWqi}
-                  selectedSystemValue={selectedSystemValue}
-                  onSelectSystem={setSelectedSystem}
-                  onOpenSystemHistory={setSelectedHistorySystemId}
-                />
-              </TabsContent>
-
-              <TabsContent value="depth">
-                <WaterQualityDepthTab
-                  selectedDepthProfileDate={selectedDepthProfileDate}
-                  onSelectDepthProfileDate={setDepthProfileDate}
-                  depthDates={depthProfiles.dates}
-                  isAllSystemsSelected={isAllSystemsSelected}
-                  depthProfileData={depthProfileData}
-                  depthProfileDoData={depthProfileDoData}
-                  depthProfileTempData={depthProfileTempData}
-                  isStratified={isStratified}
-                  surfaceDo={surfaceDo}
-                  bottomDo={bottomDo}
-                  doGradient={doGradient}
-                  tempGradient={tempGradient}
-                />
-              </TabsContent>
-
-              <TabsContent value="parameter">
-                <WaterQualityParameterTab
-                  latestUpdatedAt={latestUpdatedAt}
-                  isFetching={measurementsQuery.isFetching || ratingsQuery.isFetching}
-                  isLoading={loading}
-                  dataIssues={dataIssues}
-                  parameterTrendData={parameterTrendData}
-                  selectedParameter={selectedParameter}
-                  selectedParameterUnit={selectedParameterUnit}
-                  lowDoThreshold={lowDoThreshold}
-                  highAmmoniaThreshold={highAmmoniaThreshold}
-                  showFeedingOverlay={showFeedingOverlay}
-                  showMortalityOverlay={showMortalityOverlay}
-                  diurnalDoPattern={diurnalDoPattern}
-                  dailyTempAverage={dailyTempAverage}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
+      <div className="space-y-6">
+        <WaterQualityEnvironmentTab wqiValue={wqiValue} wqiLabel={wqiLabel} />
+        <WaterQualityParameterTab
+          latestUpdatedAt={Math.max(measurementsQuery.dataUpdatedAt ?? 0, wqiQuery.dataUpdatedAt ?? 0)}
+          isFetching={measurementsQuery.isFetching || wqiQuery.isFetching}
+          isLoading={loading}
+          dataIssues={dataIssues}
+          parameterTrendData={parameterTrendData}
+          selectedParameter={selectedParameter}
+          selectedParameterUnit={selectedParameterUnit}
+        />
+        <WaterQualityAlertsTab
+          alertRows={alertRows}
+          currentAlerts={currentAlerts}
+        />
+        <WaterQualityDepthTab
+          selectedDepthProfileDate={selectedDepthProfileDate}
+          onSelectDepthProfileDate={setDepthProfileDate}
+          depthDates={depthProfiles.dates}
+          isAllSystemsSelected={selectedSystemId == null}
+          depthProfileData={depthProfileData}
+          depthProfileDoData={depthProfileDoData}
+          depthProfileTempData={depthProfileTempData}
+        />
       </div>
-      <SystemHistorySheet
-        open={selectedHistorySystemId !== null}
-        onOpenChange={(open) => !open && setSelectedHistorySystemId(null)}
-        farmId={farmId}
-        systemId={selectedHistorySystemId}
-        systemLabel={selectedHistorySystemId != null ? (systemLabelById.get(selectedHistorySystemId) ?? null) : null}
-        dateFrom={dateFrom ?? undefined}
-        dateTo={dateTo ?? undefined}
-      />
     </DashboardLayout>
   )
 }
-

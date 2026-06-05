@@ -6,10 +6,13 @@ import SystemHistorySheet from "@/components/systems/system-history-sheet"
 import { DataErrorState } from "@/components/shared/data-states"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import type { MortalityPageInitialFilters } from "@/features/mortality/queries.server"
-import { useAlertLog, useMortalityEvents } from "@/lib/hooks/use-mortality"
-import { useFeedingRecords, useSamplingData, useScopedSurvivalTrend } from "@/lib/hooks/use-reports"
+import type { AlertLogRow } from "@/lib/api/mortality"
+import { useMortalityEvents } from "@/lib/hooks/use-mortality"
+import { useFeedingRecords, useSamplingData } from "@/lib/hooks/use-reports"
+import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
+import { deriveSurvivalSeriesFromProductionSummary } from "@/lib/survival-series"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import {
   buildDeathsTrend,
@@ -74,17 +77,12 @@ export default function MortalityPage({
     limit: 5000,
     enabled: boundsReady,
   })
-  const alertsQuery = useAlertLog({
+  const productionSummaryQuery = useProductionSummary({
     farmId,
-    ruleCodes: ["MASS_MORTALITY", "ELEVATED_MORTALITY"],
-    limit: 200,
-    enabled: boundsReady,
-  })
-  const survivalQuery = useScopedSurvivalTrend({
-    systemIds: scopedSystemIdList,
+    stage: selectedStage === "all" ? undefined : selectedStage,
     dateFrom,
     dateTo,
-    enabled: boundsReady && scopedSystemIdList.length > 0,
+    enabled: boundsReady,
   })
   const feedingQuery = useFeedingRecords({
     systemIds: scopedSystemIdList,
@@ -113,8 +111,15 @@ export default function MortalityPage({
 
   const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
   const eventsRaw = eventsQuery.data?.status === "success" ? eventsQuery.data.data : []
-  const alertsRaw = alertsQuery.data?.status === "success" ? alertsQuery.data.data : []
-  const survivalRows = survivalQuery.data?.status === "success" ? survivalQuery.data.data : []
+  const alertsRaw: AlertLogRow[] = []
+  const productionRowsRaw = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const survivalRows = useMemo(
+    () =>
+      deriveSurvivalSeriesFromProductionSummary(
+        productionRowsRaw.filter((row) => scopedSystemIds.has(row.system_id)),
+      ),
+    [productionRowsRaw, scopedSystemIds],
+  )
   const feedingRows = feedingQuery.data?.status === "success" ? feedingQuery.data.data : []
   const samplingRows = samplingQuery.data?.status === "success" ? samplingQuery.data.data : []
   const measurementRowsRaw = measurementsQuery.data?.status === "success" ? measurementsQuery.data.data : []
@@ -176,8 +181,7 @@ export default function MortalityPage({
     systemsQuery.isLoading ||
     batchSystemsQuery.isLoading ||
     eventsQuery.isLoading ||
-    alertsQuery.isLoading ||
-    survivalQuery.isLoading ||
+    productionSummaryQuery.isLoading ||
     feedingQuery.isLoading ||
     samplingQuery.isLoading ||
     measurementsQuery.isLoading
@@ -189,10 +193,8 @@ export default function MortalityPage({
     getQueryResultError(batchSystemsQuery.data),
     getErrorMessage(eventsQuery.error),
     getQueryResultError(eventsQuery.data),
-    getErrorMessage(alertsQuery.error),
-    getQueryResultError(alertsQuery.data),
-    getErrorMessage(survivalQuery.error),
-    getQueryResultError(survivalQuery.data),
+    getErrorMessage(productionSummaryQuery.error),
+    getQueryResultError(productionSummaryQuery.data),
     getErrorMessage(feedingQuery.error),
     getQueryResultError(feedingQuery.data),
     getErrorMessage(samplingQuery.error),
@@ -211,8 +213,7 @@ export default function MortalityPage({
             systemsQuery.refetch()
             batchSystemsQuery.refetch()
             eventsQuery.refetch()
-            alertsQuery.refetch()
-            survivalQuery.refetch()
+            productionSummaryQuery.refetch()
             feedingQuery.refetch()
             samplingQuery.refetch()
             measurementsQuery.refetch()

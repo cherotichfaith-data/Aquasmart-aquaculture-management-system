@@ -23,14 +23,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/app-ui/ta
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
 import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
 import { useMortalityData, useFeedingRecords, useSamplingData, useStockingData, useTransferData } from "@/lib/hooks/use-reports"
-import { useSurvivalTrend } from "@/lib/hooks/use-mortality"
-import { useSystemTimelineBounds } from "@/lib/hooks/use-system-timeline"
+import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useDailyWaterQualityRating, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
 import { getHarvests } from "@/lib/api/reports"
+import { getWaterQualityTrend } from "@/lib/api/water-quality"
+import { deriveSurvivalSeriesFromProductionSummary } from "@/lib/survival-series"
 import type { DashboardSystemRow } from "@/features/dashboard/types"
-import type { SystemTimelineBoundsRow } from "@/lib/api/system-timeline"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
-import { resolveSystemTimelineWindow } from "@/lib/system-timeline-window"
 import { DATA_ENTRY_PATH } from "@/lib/app-entry"
 import { formatCageLabel } from "@/lib/system-options"
 import {
@@ -39,7 +38,6 @@ import {
   formatDateTimeValue,
   formatNumberValue,
   formatUnitValue,
-  timelineSourceLabel,
 } from "@/lib/analytics-format"
 import { formatFeedingResponseLevel } from "@/lib/feeding-response"
 
@@ -68,7 +66,6 @@ export default function SystemHistorySheet({
   dateFrom,
   dateTo,
   summaryRow,
-  initialTimelineRow,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -78,43 +75,21 @@ export default function SystemHistorySheet({
   dateFrom?: string
   dateTo?: string
   summaryRow?: DashboardSystemRow | null
-  initialTimelineRow?: SystemTimelineBoundsRow | null
 }) {
   const router = useRouter()
   const enabled = open && Boolean(farmId) && Boolean(systemId)
 
-  const timelineQuery = useSystemTimelineBounds({
-    farmId,
-    systemId: systemId ?? undefined,
-    enabled,
-  })
-
-  const timeline = useMemo(
-    () => initialTimelineRow ?? (timelineQuery.data?.status === "success" ? timelineQuery.data.data[0] ?? null : null),
-    [initialTimelineRow, timelineQuery.data],
-  )
-  const effectiveTimeline = useMemo(
-    () =>
-      resolveSystemTimelineWindow(timeline, {
-        windowStart: dateFrom ?? null,
-        windowEnd: dateTo ?? null,
-      }),
-    [dateFrom, dateTo, timeline],
-  )
-  const effectiveDateFrom = effectiveTimeline?.queryStart ?? undefined
-  const effectiveDateTo = effectiveTimeline?.queryEnd ?? undefined
-  const sourceLabel = timelineSourceLabel(effectiveTimeline?.periodSource ?? timeline?.period_source) ?? "Production timeline"
+  const effectiveDateFrom = dateFrom
+  const effectiveDateTo = dateTo
+  const sourceLabel = "Selected period"
   const periodLabel =
-    effectiveTimeline?.displayStart && effectiveTimeline.displayEnd
-      ? `${formatDateOnly(effectiveTimeline.displayStart)} to ${formatDateOnly(effectiveTimeline.displayEnd)}`
-      : effectiveTimeline?.displayStart
-        ? `${formatDateOnly(effectiveTimeline.displayStart)}`
-        : effectiveTimeline?.hasTimeline
-          ? "No activity in selected period"
-          : "No resolved production period"
-  const snapshotLabel = formatDateOnly(effectiveTimeline?.snapshotAsOf ?? timeline?.snapshot_as_of ?? summaryRow?.as_of_date ?? summaryRow?.input_end_date)
-  const hasResolvedTimeline = Boolean(effectiveTimeline?.hasDataInWindow)
-  const hasAnyTimeline = Boolean(effectiveTimeline?.hasTimeline)
+    effectiveDateFrom && effectiveDateTo
+      ? `${formatDateOnly(effectiveDateFrom)} to ${formatDateOnly(effectiveDateTo)}`
+      : effectiveDateFrom
+        ? formatDateOnly(effectiveDateFrom)
+        : "No selected period"
+  const snapshotLabel = formatDateOnly(summaryRow?.as_of_date ?? summaryRow?.input_end_date)
+  const hasResolvedTimeline = Boolean(effectiveDateFrom && effectiveDateTo)
 
   const inventoryQuery = useDailyFishInventory({
     farmId,
@@ -173,7 +148,8 @@ export default function SystemHistorySheet({
     enabled: enabled && hasResolvedTimeline,
     staleTime: 60_000,
   })
-  const survivalQuery = useSurvivalTrend({
+  const productionSummaryQuery = useProductionSummary({
+    farmId,
     systemId: systemId ?? undefined,
     dateFrom: effectiveDateFrom,
     dateTo: effectiveDateTo,
@@ -186,6 +162,19 @@ export default function SystemHistorySheet({
     dateTo: effectiveDateTo,
     limit: 60,
     enabled: enabled && hasResolvedTimeline,
+  })
+  const waterTrendQuery = useQuery({
+    queryKey: ["system-history", "water-quality-trend", farmId, systemId ?? "all", effectiveDateFrom ?? "", effectiveDateTo ?? ""],
+    queryFn: ({ signal }) =>
+      getWaterQualityTrend({
+        farmId: farmId!,
+        systemId: systemId ?? undefined,
+        dateFrom: effectiveDateFrom,
+        dateTo: effectiveDateTo,
+        signal,
+      }),
+    enabled: enabled && hasResolvedTimeline,
+    staleTime: 60_000,
   })
   const measurementQuery = useWaterQualityMeasurements({
     farmId,
@@ -207,8 +196,13 @@ export default function SystemHistorySheet({
     [rawTransferRows, systemId],
   )
   const harvestRows = harvestQuery.data?.status === "success" ? harvestQuery.data.data : []
-  const survivalRows = survivalQuery.data?.status === "success" ? survivalQuery.data.data : []
+  const productionSummaryRows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const survivalRows = useMemo(
+    () => deriveSurvivalSeriesFromProductionSummary(productionSummaryRows),
+    [productionSummaryRows],
+  )
   const waterRatingRows = waterRatingQuery.data?.status === "success" ? waterRatingQuery.data.data : []
+  const waterTrendRowsRpc = waterTrendQuery.data?.status === "success" ? waterTrendQuery.data.data : []
   const measurementRows = measurementQuery.data?.status === "success" ? measurementQuery.data.data : []
 
   const latestInventory = inventoryRows[inventoryRows.length - 1] ?? null
@@ -216,52 +210,9 @@ export default function SystemHistorySheet({
   const latestSurvival = survivalRows[survivalRows.length - 1] ?? null
   const latestRating = waterRatingRows[waterRatingRows.length - 1] ?? null
 
-  const totalFeedKg = useMemo(() => feedingRows.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0), [feedingRows])
-  const totalMortality = useMemo(
-    () => mortalityRows.reduce((sum, row) => sum + (row.number_of_fish_mortality ?? 0), 0),
-    [mortalityRows],
-  )
-  const totalHarvestKg = useMemo(
-    () => harvestRows.reduce((sum, row) => sum + (row.total_weight_harvest ?? 0), 0),
-    [harvestRows],
-  )
-
-  const sampledAbwByDate = useMemo(() => {
-    const byDate = new Map<string, { weightedAbw: number; sampleWeight: number; fallbackAbw: number; fallbackCount: number }>()
-
-    samplingRows.forEach((row) => {
-      if (!row.date || typeof row.abw !== "number") return
-
-      const current = byDate.get(row.date) ?? {
-        weightedAbw: 0,
-        sampleWeight: 0,
-        fallbackAbw: 0,
-        fallbackCount: 0,
-      }
-      const sampleCount = row.number_of_fish_sampling ?? 0
-
-      if (sampleCount > 0) {
-        current.weightedAbw += row.abw * sampleCount
-        current.sampleWeight += sampleCount
-      } else {
-        current.fallbackAbw += row.abw
-        current.fallbackCount += 1
-      }
-
-      byDate.set(row.date, current)
-    })
-
-    return new Map(
-      Array.from(byDate.entries()).map(([date, current]) => [
-        date,
-        current.sampleWeight > 0
-          ? current.weightedAbw / current.sampleWeight
-          : current.fallbackCount > 0
-            ? current.fallbackAbw / current.fallbackCount
-            : null,
-      ]),
-    )
-  }, [samplingRows])
+  const totalFeedKg = productionSummaryRows.reduce((sum, row) => sum + (row.total_feed_amount_period ?? 0), 0)
+  const totalMortality = productionSummaryRows.reduce((sum, row) => sum + (row.daily_mortality_count ?? 0), 0)
+  const totalHarvestKg = productionSummaryRows.reduce((sum, row) => sum + (row.total_weight_harvested ?? 0), 0)
 
   const inventoryTrendRows = useMemo(
     () =>
@@ -269,36 +220,24 @@ export default function SystemHistorySheet({
         date: row.inventory_date,
         label: formatCompactDate(row.inventory_date),
         biomass: row.biomass_last_sampling,
-        abw: sampledAbwByDate.get(row.inventory_date) ?? null,
+        abw: row.abw_last_sampling,
         feed: row.feeding_amount,
       })),
-    [inventoryRows, sampledAbwByDate],
+    [inventoryRows],
   )
 
-  const waterTrendRows = useMemo(() => {
-    const grouped = new Map<string, { doSum: number; doCount: number; tempSum: number; tempCount: number }>()
-    measurementRows.forEach((row) => {
-      if (!row.date || row.parameter_value == null) return
-      const current = grouped.get(row.date) ?? { doSum: 0, doCount: 0, tempSum: 0, tempCount: 0 }
-      if (row.parameter_name === "dissolved_oxygen") {
-        current.doSum += row.parameter_value
-        current.doCount += 1
-      }
-      if (row.parameter_name === "temperature") {
-        current.tempSum += row.parameter_value
-        current.tempCount += 1
-      }
-      grouped.set(row.date, current)
-    })
-    return Array.from(grouped.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, current]) => ({
-        date,
-        label: formatCompactDate(date),
-        dissolvedOxygen: current.doCount > 0 ? current.doSum / current.doCount : null,
-        temperature: current.tempCount > 0 ? current.tempSum / current.tempCount : null,
-      }))
-  }, [measurementRows])
+  const waterTrendRows = useMemo(
+    () =>
+      waterTrendRowsRpc
+        .map((row) => ({
+          date: row.wq_date,
+          label: formatCompactDate(row.wq_date),
+          dissolvedOxygen: row.do_avg,
+          temperature: row.temp_avg,
+        }))
+        .sort((left, right) => left.date.localeCompare(right.date)),
+    [waterTrendRowsRpc],
+  )
 
   const latestMeasurements = useMemo(() => {
     const byParameter = new Map<string, (typeof measurementRows)[number]>()
@@ -315,13 +254,12 @@ export default function SystemHistorySheet({
   const operations = useMemo<OperationRow[]>(() => {
     const items: OperationRow[] = []
     stockingRows.forEach((row) => {
-      const isInitialStocking = row.date === timeline?.first_stocking_date
       items.push({
         id: `stocking-${row.id}`,
         date: row.date,
         createdAt: row.created_at,
         type: "Stocking",
-        detail: `${isInitialStocking ? "Initial stocking" : "Addition"} | ${formatNumberValue(row.number_of_fish_stocking)} fish | ${formatUnitValue(row.total_weight_stocking, 1, "kg")}`,
+        detail: `Stocking | ${formatNumberValue(row.number_of_fish_stocking)} fish | ${formatUnitValue(row.total_weight_stocking, 1, "kg")}`,
       })
     })
     feedingRows.forEach((row) => {
@@ -381,13 +319,11 @@ export default function SystemHistorySheet({
         return String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? ""))
       })
       .slice(0, 20)
-  }, [feedingRows, harvestRows, mortalityRows, samplingRows, stockingRows, systemId, timeline?.first_stocking_date, transferRows])
+  }, [feedingRows, harvestRows, mortalityRows, samplingRows, stockingRows, systemId, transferRows])
 
   const errorMessages = [
     getErrorMessage(inventoryQuery.error),
     getQueryResultError(inventoryQuery.data),
-    getErrorMessage(timelineQuery.error),
-    getQueryResultError(timelineQuery.data),
     getErrorMessage(feedingQuery.error),
     getQueryResultError(feedingQuery.data),
     getErrorMessage(stockingQuery.error),
@@ -400,16 +336,17 @@ export default function SystemHistorySheet({
     getQueryResultError(transferQuery.data),
     getErrorMessage(harvestQuery.error),
     getQueryResultError(harvestQuery.data),
-    getErrorMessage(survivalQuery.error),
-    getQueryResultError(survivalQuery.data),
+    getErrorMessage(productionSummaryQuery.error),
+    getQueryResultError(productionSummaryQuery.data),
     getErrorMessage(waterRatingQuery.error),
     getQueryResultError(waterRatingQuery.data),
+    getErrorMessage(waterTrendQuery.error),
+    getQueryResultError(waterTrendQuery.data),
     getErrorMessage(measurementQuery.error),
     getQueryResultError(measurementQuery.data),
   ].filter(Boolean) as string[]
 
   const loading =
-    timelineQuery.isLoading ||
     inventoryQuery.isLoading ||
     feedingQuery.isLoading ||
     stockingQuery.isLoading ||
@@ -417,12 +354,12 @@ export default function SystemHistorySheet({
     mortalityQuery.isLoading ||
     transferQuery.isLoading ||
     harvestQuery.isLoading ||
-    survivalQuery.isLoading ||
+    productionSummaryQuery.isLoading ||
     waterRatingQuery.isLoading ||
+    waterTrendQuery.isLoading ||
     measurementQuery.isLoading
 
   const fetching =
-    timelineQuery.isFetching ||
     inventoryQuery.isFetching ||
     feedingQuery.isFetching ||
     stockingQuery.isFetching ||
@@ -430,8 +367,9 @@ export default function SystemHistorySheet({
     mortalityQuery.isFetching ||
     transferQuery.isFetching ||
     harvestQuery.isFetching ||
-    survivalQuery.isFetching ||
+    productionSummaryQuery.isFetching ||
     waterRatingQuery.isFetching ||
+    waterTrendQuery.isFetching ||
     measurementQuery.isFetching
 
   const title =
@@ -608,16 +546,10 @@ export default function SystemHistorySheet({
 
         <div className="space-y-4 px-4 pb-4">
           {errorMessages.length > 0 ? <DataErrorState title="Unable to load system history" description={errorMessages[0]} /> : null}
-          {!loading && !hasAnyTimeline && errorMessages.length === 0 ? (
+          {!loading && !hasResolvedTimeline && errorMessages.length === 0 ? (
             <DataErrorState
-              title="No production timeline"
-              description="This system does not have enough stocking or observed activity data to resolve an honest production period yet."
-            />
-          ) : null}
-          {!loading && hasAnyTimeline && !hasResolvedTimeline && errorMessages.length === 0 ? (
-            <DataErrorState
-              title="No production data in selected period"
-              description="This system has a production timeline, but it does not overlap the currently selected time period."
+              title="No selected period"
+              description="Choose a date range to load this system history."
             />
           ) : null}
 

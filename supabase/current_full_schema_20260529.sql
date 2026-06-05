@@ -1,5 +1,11 @@
+--
+-- PostgreSQL database dump
+--
 
+-- \restrict m65J61fDTcB6y4HbeyrKLFokavmuZjjZjuuO3mLHO3kEVqG5nxQ4mOU3XbNSBom
 
+-- Dumped from database version 15.14
+-- Dumped by pg_dump version 15.14
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -12,91 +18,169 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: analytics; Type: SCHEMA; Schema: -; Owner: postgres
+--
 
 CREATE SCHEMA IF NOT EXISTS "analytics";
 
 
 ALTER SCHEMA "analytics" OWNER TO "postgres";
 
+--
+-- Name: pg_cron; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "pg_cron" WITH SCHEMA "pg_catalog";
 
 
+--
+-- Name: EXTENSION "pg_cron"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "pg_cron" IS 'Job scheduler for PostgreSQL';
 
 
-
+--
+-- Name: energy; Type: SCHEMA; Schema: -; Owner: postgres
+--
 
 CREATE SCHEMA IF NOT EXISTS "energy";
 
 
 ALTER SCHEMA "energy" OWNER TO "postgres";
 
+--
+-- Name: pg_net; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "pg_net" WITH SCHEMA "extensions";
 
 
+--
+-- Name: EXTENSION "pg_net"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "pg_net" IS 'Async HTTP';
 
 
-
+--
+-- Name: pgsodium; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "pgsodium";
 
 
+--
+-- Name: EXTENSION "pgsodium"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "pgsodium" IS 'Pgsodium is a modern cryptography library for Postgres.';
 
 
-
+--
+-- Name: private; Type: SCHEMA; Schema: -; Owner: postgres
+--
 
 CREATE SCHEMA IF NOT EXISTS "private";
 
 
 ALTER SCHEMA "private" OWNER TO "postgres";
 
+--
+-- Name: SCHEMA "public"; Type: COMMENT; Schema: -; Owner: pg_database_owner
+--
 
 COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
+--
+-- Name: btree_gist; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "btree_gist" WITH SCHEMA "extensions";
 
 
+--
+-- Name: EXTENSION "btree_gist"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "btree_gist" IS 'support for indexing common datatypes in GiST';
 
 
-
+--
+-- Name: pg_stat_statements; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA "extensions";
 
 
+--
+-- Name: EXTENSION "pg_stat_statements"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "pg_stat_statements" IS 'track planning and execution statistics of all SQL statements executed';
 
 
-
+--
+-- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
 
 
+--
+-- Name: EXTENSION "pgcrypto"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "pgcrypto" IS 'cryptographic functions';
 
 
-
+--
+-- Name: pgjwt; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "pgjwt" WITH SCHEMA "extensions";
 
 
+--
+-- Name: EXTENSION "pgjwt"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "pgjwt" IS 'JSON Web Token API for Postgresql';
 
 
-
+--
+-- Name: supabase_vault; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
 
 
+--
+-- Name: EXTENSION "supabase_vault"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "supabase_vault" IS 'Supabase Vault Extension';
 
 
-
+--
+-- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
+--
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 
 
+--
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
+--
+
+-- COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
 
 
-
+--
+-- Name: arrows; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."arrows" AS ENUM (
     'up',
@@ -107,6 +191,9 @@ CREATE TYPE "public"."arrows" AS ENUM (
 
 ALTER TYPE "public"."arrows" OWNER TO "postgres";
 
+--
+-- Name: cage_status_enum; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."cage_status_enum" AS ENUM (
     'occupied',
@@ -117,6 +204,9 @@ CREATE TYPE "public"."cage_status_enum" AS ENUM (
 
 ALTER TYPE "public"."cage_status_enum" OWNER TO "postgres";
 
+--
+-- Name: change_type_enum; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."change_type_enum" AS ENUM (
     'INSERT',
@@ -127,6 +217,9 @@ CREATE TYPE "public"."change_type_enum" AS ENUM (
 
 ALTER TYPE "public"."change_type_enum" OWNER TO "postgres";
 
+--
+-- Name: farm_user_invitation_rpc_result; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."farm_user_invitation_rpc_result" AS (
 	"id" "uuid",
@@ -147,6 +240,9 @@ CREATE TYPE "public"."farm_user_invitation_rpc_result" AS (
 
 ALTER TYPE "public"."farm_user_invitation_rpc_result" OWNER TO "postgres";
 
+--
+-- Name: feed_category; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."feed_category" AS ENUM (
     'pre-starter',
@@ -161,6 +257,9 @@ CREATE TYPE "public"."feed_category" AS ENUM (
 
 ALTER TYPE "public"."feed_category" OWNER TO "postgres";
 
+--
+-- Name: feed_pellet_size; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."feed_pellet_size" AS ENUM (
     'mash_powder',
@@ -184,6 +283,9 @@ CREATE TYPE "public"."feed_pellet_size" AS ENUM (
 
 ALTER TYPE "public"."feed_pellet_size" OWNER TO "postgres";
 
+--
+-- Name: system_growth_stage; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."system_growth_stage" AS ENUM (
     'fingerling',
@@ -195,6 +297,9 @@ CREATE TYPE "public"."system_growth_stage" AS ENUM (
 
 ALTER TYPE "public"."system_growth_stage" OWNER TO "postgres";
 
+--
+-- Name: system_type; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."system_type" AS ENUM (
     'cage',
@@ -209,6 +314,9 @@ CREATE TYPE "public"."system_type" AS ENUM (
 
 ALTER TYPE "public"."system_type" OWNER TO "postgres";
 
+--
+-- Name: time_period; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."time_period" AS ENUM (
     'day',
@@ -223,6 +331,9 @@ CREATE TYPE "public"."time_period" AS ENUM (
 
 ALTER TYPE "public"."time_period" OWNER TO "postgres";
 
+--
+-- Name: transfer_type; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."transfer_type" AS ENUM (
     'transfer',
@@ -238,6 +349,9 @@ CREATE TYPE "public"."transfer_type" AS ENUM (
 
 ALTER TYPE "public"."transfer_type" OWNER TO "postgres";
 
+--
+-- Name: type_of_harvest; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."type_of_harvest" AS ENUM (
     'partial',
@@ -247,6 +361,9 @@ CREATE TYPE "public"."type_of_harvest" AS ENUM (
 
 ALTER TYPE "public"."type_of_harvest" OWNER TO "postgres";
 
+--
+-- Name: type_of_stocking; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."type_of_stocking" AS ENUM (
     'empty',
@@ -256,6 +373,9 @@ CREATE TYPE "public"."type_of_stocking" AS ENUM (
 
 ALTER TYPE "public"."type_of_stocking" OWNER TO "postgres";
 
+--
+-- Name: units; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."units" AS ENUM (
     'm',
@@ -270,6 +390,9 @@ CREATE TYPE "public"."units" AS ENUM (
 
 ALTER TYPE "public"."units" OWNER TO "postgres";
 
+--
+-- Name: water_quality_parameters; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."water_quality_parameters" AS ENUM (
     'pH',
@@ -285,6 +408,9 @@ CREATE TYPE "public"."water_quality_parameters" AS ENUM (
 
 ALTER TYPE "public"."water_quality_parameters" OWNER TO "postgres";
 
+--
+-- Name: water_quality_rating; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE "public"."water_quality_rating" AS ENUM (
     'optimal',
@@ -296,6 +422,9 @@ CREATE TYPE "public"."water_quality_rating" AS ENUM (
 
 ALTER TYPE "public"."water_quality_rating" OWNER TO "postgres";
 
+--
+-- Name: app_rpc_scope_ok("uuid", bigint, bigint, "date", "date"); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."app_rpc_scope_ok"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_batch_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS boolean
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -321,6 +450,9 @@ $$;
 
 ALTER FUNCTION "private"."app_rpc_scope_ok"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
+--
+-- Name: apply_pending_farm_user_invitations("uuid", "text"); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."apply_pending_farm_user_invitations"("p_user_id" "uuid", "p_email" "text") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -388,6 +520,9 @@ $$;
 
 ALTER FUNCTION "private"."apply_pending_farm_user_invitations"("p_user_id" "uuid", "p_email" "text") OWNER TO "postgres";
 
+--
+-- Name: assert_rpc_parameters("uuid", bigint, bigint, "date", "date"); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."assert_rpc_parameters"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_batch_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS "void"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -424,6 +559,9 @@ $$;
 
 ALTER FUNCTION "private"."assert_rpc_parameters"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
+--
+-- Name: clamp_rpc_limit(integer, integer, integer); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."clamp_rpc_limit"("p_limit" integer, "p_default" integer DEFAULT 1000, "p_max" integer DEFAULT 10000) RETURNS integer
     LANGUAGE "sql" IMMUTABLE
@@ -435,6 +573,9 @@ $$;
 
 ALTER FUNCTION "private"."clamp_rpc_limit"("p_limit" integer, "p_default" integer, "p_max" integer) OWNER TO "postgres";
 
+--
+-- Name: has_farm_role("uuid", "text"[]); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[]) RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -452,6 +593,9 @@ CREATE OR REPLACE FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "tex
 
 ALTER FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[]) OWNER TO "postgres";
 
+--
+-- Name: has_farm_role("uuid", "text"[], "uuid"); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[], "_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -469,6 +613,9 @@ CREATE OR REPLACE FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "tex
 
 ALTER FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[], "_user_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: is_farm_member("uuid"); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."is_farm_member"("farm" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -485,6 +632,9 @@ CREATE OR REPLACE FUNCTION "private"."is_farm_member"("farm" "uuid") RETURNS boo
 
 ALTER FUNCTION "private"."is_farm_member"("farm" "uuid") OWNER TO "postgres";
 
+--
+-- Name: is_farm_member("uuid", "uuid"); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."is_farm_member"("farm" "uuid", "_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -501,6 +651,9 @@ CREATE OR REPLACE FUNCTION "private"."is_farm_member"("farm" "uuid", "_user_id" 
 
 ALTER FUNCTION "private"."is_farm_member"("farm" "uuid", "_user_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: set_updated_at(); Type: FUNCTION; Schema: private; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "private"."set_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -514,6 +667,9 @@ $$;
 
 ALTER FUNCTION "private"."set_updated_at"() OWNER TO "postgres";
 
+--
+-- Name: after_event_update_inventory(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."after_event_update_inventory"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -523,10 +679,16 @@ CREATE OR REPLACE FUNCTION "public"."after_event_update_inventory"() RETURNS "tr
 
 ALTER FUNCTION "public"."after_event_update_inventory"() OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "after_event_update_inventory"(); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."after_event_update_inventory"() IS 'Registers affected system(s) and triggers scoped daily inventory recomputation.';
 
 
+--
+-- Name: api_cycle_benchmarks("uuid", bigint); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "system_name" "text", "current_cycle_start" "date", "current_efcr" double precision, "current_adg_g_day" double precision, "current_survival_pct" double precision, "current_abw_g" double precision, "current_days_in_cycle" integer, "best_efcr" double precision, "best_efcr_cycle_start" "date", "best_adg_g_day" double precision, "best_survival_pct" double precision, "efcr_vs_best" double precision, "adg_vs_best" double precision, "survival_vs_best" double precision, "benchmark_label" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -647,12 +809,18 @@ $$;
 
 ALTER FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_daily_fish_inventory_rpc("uuid", bigint, "date", "date", "date", bigint, boolean, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
-CREATE OR REPLACE FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date", "p_cursor_date" "date" DEFAULT NULL::"date", "p_cursor_system_id" bigint DEFAULT NULL::bigint, "p_order_asc" boolean DEFAULT false, "p_limit" integer DEFAULT 5000) RETURNS TABLE("inventory_date" "date", "system_id" bigint, "farm_id" "uuid", "number_of_fish" double precision, "number_of_fish_stocked" double precision, "number_of_fish_transferred_in" double precision, "number_of_fish_mortality_aggregated" double precision, "number_of_fish_mortality" double precision, "number_of_fish_transferred_out" double precision, "number_of_fish_harvested" double precision, "feeding_amount" double precision, "feeding_amount_aggregated" double precision, "last_sampling_date" "date", "abw_last_sampling" double precision, "biomass_last_sampling" double precision, "feeding_rate" double precision, "system_volume" double precision, "biomass_density" double precision, "mortality_rate" double precision, "system_name" "text")
+CREATE OR REPLACE FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date", "p_cursor_date" "date" DEFAULT NULL::"date", "p_cursor_system_id" bigint DEFAULT NULL::bigint, "p_order_asc" boolean DEFAULT false, "p_limit" integer DEFAULT 5000) RETURNS TABLE("inventory_date" "date", "system_id" bigint, "farm_id" "uuid", "number_of_fish" double precision, "number_of_fish_stocked" double precision, "number_of_fish_transferred_in" double precision, "number_of_fish_mortality_aggregated" double precision, "number_of_fish_mortality" double precision, "number_of_fish_transferred_out" double precision, "number_of_fish_harvested" double precision, "feeding_amount" double precision, "feeding_amount_aggregated" double precision, "last_sampling_date" "date", "abw_last_sampling" double precision, "biomass_last_sampling" double precision, "feeding_rate" double precision, "system_volume" double precision, "biomass_density" double precision, "mortality_rate" double precision, "system_name" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
     AS $$
@@ -688,7 +856,6 @@ begin
     join public.system s on s.id = dfi.system_id
     where s.farm_id = p_farm_id
       and (p_system_id is null or dfi.system_id = p_system_id)
-      and (p_stage is null or s.growth_stage = p_stage)
       and (p_start_date is null or dfi.inventory_date >= p_start_date)
       and (p_end_date is null or dfi.inventory_date <= p_end_date)
       and (p_cursor_date is null or (dfi.inventory_date, dfi.system_id) > (p_cursor_date, coalesce(p_cursor_system_id, -1)))
@@ -712,7 +879,6 @@ begin
     join public.system s on s.id = dfi.system_id
     where s.farm_id = p_farm_id
       and (p_system_id is null or dfi.system_id = p_system_id)
-      and (p_stage is null or s.growth_stage = p_stage)
       and (p_start_date is null or dfi.inventory_date >= p_start_date)
       and (p_end_date is null or dfi.inventory_date <= p_end_date)
       and (p_cursor_date is null or (dfi.inventory_date, dfi.system_id) < (p_cursor_date, coalesce(p_cursor_system_id, 9223372036854775807)))
@@ -723,12 +889,18 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) OWNER TO "postgres";
+ALTER FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) OWNER TO "postgres";
+
+--
+-- Name: FUNCTION "api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
-COMMENT ON FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
-
-
+--
+-- Name: api_daily_overlay("uuid", bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_daily_overlay"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "inventory_date" "date", "feeding_amount" double precision, "number_of_fish_mortality" double precision)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -749,12 +921,18 @@ $$;
 
 ALTER FUNCTION "public"."api_daily_overlay"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_daily_overlay"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_daily_overlay"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_dashboard_consolidated("uuid", bigint, "date", "date", "text", integer, boolean); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
-CREATE OR REPLACE FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date", "p_time_period" "text" DEFAULT NULL::"text", "p_limit" integer DEFAULT NULL::integer, "p_order_desc" boolean DEFAULT true) RETURNS TABLE("system_id" bigint, "input_start_date" "date", "input_end_date" "date", "time_period" "text", "mortality_rate" double precision, "feeding_rate" double precision, "average_biomass" double precision, "biomass_density" double precision, "efcr_period_consolidated" double precision, "water_quality_rating_numeric_average" numeric, "water_quality_rating_average" "text", "efcr_period_consolidated_delta" numeric, "mortality_rate_delta" numeric, "average_biomass_delta" numeric, "biomass_density_delta" numeric, "feeding_rate_delta" numeric, "abw_asof_end" double precision, "abw_asof_end_delta" numeric, "water_quality_rating_numeric_delta" numeric)
+CREATE OR REPLACE FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date", "p_time_period" "text" DEFAULT NULL::"text", "p_limit" integer DEFAULT NULL::integer, "p_order_desc" boolean DEFAULT true) RETURNS TABLE("system_id" bigint, "input_start_date" "date", "input_end_date" "date", "time_period" "text", "mortality_rate" double precision, "feeding_rate" double precision, "average_biomass" double precision, "biomass_density" double precision, "efcr_period_consolidated" double precision, "water_quality_rating_numeric_average" numeric, "water_quality_rating_average" "text", "efcr_period_consolidated_delta" numeric, "mortality_rate_delta" numeric, "average_biomass_delta" numeric, "biomass_density_delta" numeric, "feeding_rate_delta" numeric, "abw_asof_end" double precision, "abw_asof_end_delta" numeric, "water_quality_rating_numeric_delta" numeric)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
     AS $$
@@ -809,7 +987,6 @@ begin
     from public.system s
     where s.farm_id = p_farm_id
       and coalesce(s.is_active, true) = true
-      and (p_stage is null or s.growth_stage = p_stage)
       and (p_system_id is null or s.id = p_system_id)
   ),
   inv as (
@@ -891,28 +1068,6 @@ begin
     where ps.date between v_prev_start and v_prev_end
     group by ps.system_id
   ),
-  cur_sampling_efcr as (
-    select distinct on (s.system_id)
-      s.system_id,
-      ev.efcr_period_last_sampling::double precision as efcr
-    from sys s
-    left join analytics.efcr_period_last_sampling_view ev
-      on ev.system_id = s.system_id
-      and ev.inventory_date <= v_end
-      and ev.efcr_period_last_sampling is not null
-    order by s.system_id, ev.inventory_date desc
-  ),
-  prev_sampling_efcr as (
-    select distinct on (s.system_id)
-      s.system_id,
-      ev.efcr_period_last_sampling::double precision as efcr
-    from sys s
-    left join analytics.efcr_period_last_sampling_view ev
-      on ev.system_id = s.system_id
-      and ev.inventory_date <= v_prev_end
-      and ev.efcr_period_last_sampling is not null
-    order by s.system_id, ev.inventory_date desc
-  ),
   cur_wq as (
     select s.system_id, avg(dwr.rating_numeric::numeric) as wq_num
     from sys s
@@ -956,23 +1111,6 @@ begin
         limit 1
       ) as abw_asof_end
     from sys s
-  ),
-  resolved as (
-    select
-      s.system_id,
-      case
-        when ce.denominator is null or ce.denominator <= 0 then cse.efcr
-        else (ce.feed_sum::double precision / ce.denominator::double precision)
-      end as cur_efcr,
-      case
-        when pe.denominator is null or pe.denominator <= 0 then pse.efcr
-        else (pe.feed_sum::double precision / pe.denominator::double precision)
-      end as prev_efcr
-    from sys s
-    left join cur_efcr ce on ce.system_id = s.system_id
-    left join prev_efcr pe on pe.system_id = s.system_id
-    left join cur_sampling_efcr cse on cse.system_id = s.system_id
-    left join prev_sampling_efcr pse on pse.system_id = s.system_id
   )
   select
     s.system_id,
@@ -983,13 +1121,26 @@ begin
     cm.feeding_rate::double precision,
     cm.average_biomass::double precision,
     cm.biomass_density::double precision,
-    r.cur_efcr::double precision as efcr_period_consolidated,
+    case
+      when ce.denominator is null or ce.denominator <= 0 then null::double precision
+      else (ce.feed_sum::double precision / ce.denominator::double precision)
+    end as efcr_period_consolidated,
     cwq.wq_num::numeric as water_quality_rating_numeric_average,
     case
       when cwq.wq_num is null then null::text
       else public.water_quality_rating_label(cwq.wq_num)
     end as water_quality_rating_average,
-    (r.cur_efcr::numeric - r.prev_efcr::numeric) as efcr_period_consolidated_delta,
+    (
+      case
+        when ce.denominator is null or ce.denominator <= 0 then null::numeric
+        else (ce.feed_sum / ce.denominator)::numeric
+      end
+      -
+      case
+        when pe.denominator is null or pe.denominator <= 0 then null::numeric
+        else (pe.feed_sum / pe.denominator)::numeric
+      end
+    ) as efcr_period_consolidated_delta,
     (cm.mortality_rate::numeric - pm.mortality_rate::numeric) as mortality_rate_delta,
     (cm.average_biomass::numeric - pm.average_biomass::numeric) as average_biomass_delta,
     (cm.biomass_density::numeric - pm.biomass_density::numeric) as biomass_density_delta,
@@ -1000,7 +1151,8 @@ begin
   from sys s
   left join cur_metrics cm on cm.system_id = s.system_id
   left join prev_metrics pm on pm.system_id = s.system_id
-  left join resolved r on r.system_id = s.system_id
+  left join cur_efcr ce on ce.system_id = s.system_id
+  left join prev_efcr pe on pe.system_id = s.system_id
   left join cur_wq cwq on cwq.system_id = s.system_id
   left join prev_wq pwq on pwq.system_id = s.system_id
   left join cur_abw cabw on cabw.system_id = s.system_id
@@ -1013,14 +1165,20 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) OWNER TO "postgres";
+ALTER FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) OWNER TO "postgres";
+
+--
+-- Name: FUNCTION "api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks. Core analytics are sourced from analytics.daily_system_facts and analytics.production_summary.';
 
 
-COMMENT ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks. Core analytics are sourced from analytics.daily_system_facts and analytics.production_summary; eFCR falls back to latest sampling eFCR as-of the selected end date.';
+--
+-- Name: api_dashboard_systems("uuid", "public"."system_growth_stage", bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
-
-
-CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "growth_stage" "public"."system_growth_stage", "input_start_date" "date", "input_end_date" "date", "as_of_date" "date", "fish_end" double precision, "biomass_end" double precision, "sampling_end_date" "date", "sample_age_days" integer, "efcr" double precision, "efcr_date" "date", "feed_total" double precision, "abw" double precision, "abw_delta" double precision, "abw_trend" "text", "feeding_rate" double precision, "mortality_rate" double precision, "biomass_density" double precision, "missing_days_count" integer, "water_quality_rating_average" "text", "water_quality_rating_numeric_average" double precision, "water_quality_latest_date" "date", "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text")
+CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "growth_stage" "public"."system_growth_stage", "input_start_date" "date", "input_end_date" "date", "as_of_date" "date", "fish_end" double precision, "biomass_end" double precision, "sampling_end_date" "date", "sample_age_days" integer, "efcr" double precision, "efcr_date" "date", "feed_total" double precision, "abw" double precision, "feeding_rate" double precision, "mortality_rate" double precision, "biomass_density" double precision, "missing_days_count" integer, "water_quality_rating_average" "text", "water_quality_rating_numeric_average" double precision, "water_quality_latest_date" "date", "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
     AS $$
@@ -1030,8 +1188,6 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
     select s.id as system_id, s.name as system_name, s.growth_stage
     from public.system s, perm
     where perm.ok and s.farm_id = p_farm_id
-      and coalesce(s.is_active, true) = true
-      and coalesce(s.cage_status, 'occupied'::public.cage_status_enum) <> 'retired'::public.cage_status_enum
       and (p_stage is null or s.growth_stage = p_stage)
       and (p_system_id is null or s.id = p_system_id)
   ),
@@ -1052,31 +1208,6 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
       biomass_density
     from inv
     order by system_id, inventory_date desc
-  ),
-  abw_ranked as (
-    select
-      dfi.system_id,
-      dfi.abw_last_sampling as abw,
-      row_number() over (
-        partition by dfi.system_id
-        order by dfi.last_sampling_date desc nulls last, dfi.inventory_date desc
-      ) as rn
-    from inv dfi
-    where dfi.abw_last_sampling is not null
-      and dfi.last_sampling_date is not null
-  ),
-  abw_delta as (
-    select
-      cur.system_id,
-      (cur.abw - prev.abw)::double precision as abw_delta,
-      case
-        when prev.abw is null or cur.abw is null or cur.abw = prev.abw then 'flat'
-        when cur.abw > prev.abw then 'up'
-        else 'down'
-      end as abw_trend
-    from abw_ranked cur
-    left join abw_ranked prev on prev.system_id = cur.system_id and prev.rn = 2
-    where cur.rn = 1
   ),
   base as (
     select sys.system_id, sys.system_name, sys.growth_stage,
@@ -1122,32 +1253,8 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
   ),
   ps_latest as (
     select distinct on (system_id)
-      system_id, date as efcr_date, coalesce(efcr_period, efcr_aggregated) as efcr
-    from ps_window
-    where efcr_period is not null or efcr_aggregated is not null
-    order by system_id, date desc
-  ),
-  efcr_sampling as (
-    select distinct on (b.system_id)
-      b.system_id,
-      ev.inventory_date as efcr_date,
-      ev.efcr_period_last_sampling::double precision as efcr
-    from base b
-    left join analytics.efcr_period_last_sampling_view ev
-      on ev.system_id = b.system_id
-      and ev.inventory_date <= b.input_end_date
-      and ev.efcr_period_last_sampling is not null
-    order by b.system_id, ev.inventory_date desc
-  ),
-  sampling_latest as (
-    select distinct on (b.system_id)
-      b.system_id,
-      fsw.date as sampling_end_date
-    from base b
-    left join public.fish_sampling_weight fsw
-      on fsw.system_id = b.system_id
-      and fsw.date <= b.input_end_date
-    order by b.system_id, fsw.date desc
+      system_id, date as efcr_date, efcr_period as efcr
+    from ps_window order by system_id, date desc
   ),
   wq_window as (
     select wq.* from public.daily_water_quality_rating wq
@@ -1172,10 +1279,10 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
   )
   select b.system_id, b.system_name, b.growth_stage,
     b.input_start_date, b.input_end_date, b.input_end_date as as_of_date,
-    b.fish_end, b.biomass_end, coalesce(sl.sampling_end_date, b.sampling_end_date) as sampling_end_date,
-    case when coalesce(sl.sampling_end_date, b.sampling_end_date) is null or b.input_end_date is null then null
-      else (b.input_end_date - coalesce(sl.sampling_end_date, b.sampling_end_date))::int end as sample_age_days,
-    coalesce(pl.efcr, es.efcr) as efcr, coalesce(pl.efcr_date, es.efcr_date) as efcr_date, pf.feed_total, b.abw, ad.abw_delta, coalesce(ad.abw_trend, 'flat') as abw_trend,
+    b.fish_end, b.biomass_end, b.sampling_end_date,
+    case when b.sampling_end_date is null or b.input_end_date is null then null
+      else (b.input_end_date - b.sampling_end_date)::int end as sample_age_days,
+    pl.efcr, pl.efcr_date, pf.feed_total, b.abw,
     ia.feeding_rate, ia.mortality_rate, b.biomass_density,
     case when b.input_start_date is null or b.input_end_date is null then null
       else greatest(0, (b.input_end_date - b.input_start_date + 1)::int - coalesce(ia.days_present, 0))
@@ -1188,9 +1295,6 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
   left join inv_agg ia on ia.system_id = b.system_id
   left join ps_feed pf on pf.system_id = b.system_id
   left join ps_latest pl on pl.system_id = b.system_id
-  left join efcr_sampling es on es.system_id = b.system_id
-  left join sampling_latest sl on sl.system_id = b.system_id
-  left join abw_delta ad on ad.system_id = b.system_id
   left join wq_avg wa on wa.system_id = b.system_id
   left join wq_latest wl on wl.system_id = b.system_id
   order by b.system_name;
@@ -1199,6 +1303,9 @@ $$;
 
 ALTER FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
+--
+-- Name: api_efcr_trend("uuid", bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_efcr_trend"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "farm_id" "uuid", "inventory_date" "date", "last_sampling_date" "date", "efcr_period_last_sampling" numeric, "biomass_last_sampling" numeric, "biomass_efcr_multiple" numeric, "system_name" "text")
     LANGUAGE "sql" SECURITY DEFINER
@@ -1218,10 +1325,16 @@ $$;
 
 ALTER FUNCTION "public"."api_efcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_efcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_efcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_farm_options_rpc(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_farm_options_rpc"() RETURNS TABLE("id" "uuid", "label" "text", "location" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1236,10 +1349,16 @@ $$;
 
 ALTER FUNCTION "public"."api_farm_options_rpc"() OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_farm_options_rpc"(); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_farm_options_rpc"() IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_farm_user_invitations("uuid"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_farm_user_invitations"("p_farm_id" "uuid") RETURNS TABLE("id" "uuid", "farm_id" "uuid", "email" "text", "role" "text", "status" "text", "invited_by" "uuid", "invited_user_id" "uuid", "created_at" timestamp with time zone, "updated_at" timestamp with time zone, "last_sent_at" timestamp with time zone, "accepted_at" timestamp with time zone, "revoked_at" timestamp with time zone)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -1277,6 +1396,9 @@ $$;
 
 ALTER FUNCTION "public"."api_farm_user_invitations"("p_farm_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: api_fcr_trend("uuid", bigint, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer DEFAULT 180) RETURNS TABLE("period_start" "date", "period_end" "date", "total_feed_kg" numeric, "weight_gain_kg" numeric, "fcr" numeric, "abw_end_g" numeric, "days_interval" integer)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1294,6 +1416,9 @@ $$;
 
 ALTER FUNCTION "public"."api_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) OWNER TO "postgres";
 
+--
+-- Name: api_feed_demand_forecast("uuid", integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_feed_demand_forecast"("p_farm_id" "uuid", "p_days_ahead" integer DEFAULT 14) RETURNS TABLE("feed_type_id" bigint, "feed_line" "text", "feed_category" "text", "feed_pellet_size" "text", "avg_daily_kg" double precision, "forecast_7d_kg" double precision, "forecast_total_kg" double precision, "current_stock_kg" numeric, "days_of_stock" double precision, "stock_status" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -1390,10 +1515,16 @@ $$;
 
 ALTER FUNCTION "public"."api_feed_demand_forecast"("p_farm_id" "uuid", "p_days_ahead" integer) OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_feed_demand_forecast"("p_farm_id" "uuid", "p_days_ahead" integer); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_feed_demand_forecast"("p_farm_id" "uuid", "p_days_ahead" integer) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_feed_fcr_intervals("uuid", bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_date_from" "date" DEFAULT NULL::"date", "p_date_to" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "interval_start" "date", "interval_end" "date", "interval_days" integer, "abw_start_g" double precision, "abw_end_g" double precision, "live_fish" integer, "total_feed_kg" double precision, "weight_gain_kg" double precision, "fcr" double precision, "sgr_pct_per_day" double precision, "dominant_feed_type" "text", "warning" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -1444,34 +1575,13 @@ begin
     from samples sm
     window sample_window as (partition by sm.system_id, sm.cycle_id order by sm.sample_date)
   ),
-  complete_intervals as (
+  valid_intervals as (
     select iv.*
     from intervals iv
     where iv.interval_start is not null
       and iv.interval_days > 0
-  ),
-  overlapping_intervals as (
-    select ci.*
-    from complete_intervals ci
-    where (p_date_from is null or ci.interval_end >= p_date_from)
-      and (p_date_to is null or ci.interval_start <= p_date_to)
-  ),
-  latest_asof_intervals as (
-    select distinct on (ci.system_id) ci.*
-    from complete_intervals ci
-    where p_date_to is not null
-      and ci.interval_end <= p_date_to
-      and not exists (
-        select 1
-        from overlapping_intervals oi
-        where oi.system_id = ci.system_id
-      )
-    order by ci.system_id, ci.interval_end desc
-  ),
-  valid_intervals as (
-    select * from overlapping_intervals
-    union all
-    select * from latest_asof_intervals
+      and (p_date_from is null or iv.interval_end >= p_date_from)
+      and (p_date_to is null or iv.interval_start <= p_date_to)
   ),
   facts as (
     select d.*
@@ -1587,10 +1697,16 @@ $$;
 
 ALTER FUNCTION "public"."api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date"); Type: COMMENT; Schema: public; Owner: postgres
+--
 
-COMMENT ON FUNCTION "public"."api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks. Sampling intervals and feed/FCR metrics are sourced from canonical analytics objects; if a selected window has no interval, the latest completed interval as-of the end date is returned.';
+COMMENT ON FUNCTION "public"."api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks. Sampling intervals and feed/FCR metrics are sourced from canonical analytics objects.';
 
 
+--
+-- Name: api_feed_rate_analysis("uuid", bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_feed_rate_analysis"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_date_from" "date" DEFAULT NULL::"date", "p_date_to" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "feed_date" "date", "feed_kg" double precision, "biomass_kg" double precision, "abw_g" double precision, "live_fish" integer, "feed_rate_pct" double precision, "lower_band_pct" double precision, "upper_band_pct" double precision, "pellet_size" "text", "status" "text", "detail" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -1705,10 +1821,16 @@ $$;
 
 ALTER FUNCTION "public"."api_feed_rate_analysis"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_feed_rate_analysis"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date"); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_feed_rate_analysis"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_feed_type_options_rpc(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_feed_type_options_rpc"() RETURNS TABLE("id" bigint, "farm_id" "uuid", "feed_line" "text", "label" "text", "feed_category" "text", "feed_pellet_size" "text", "crude_protein_percentage" numeric, "crude_fat_percentage" numeric, "visibility_scope" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1718,10 +1840,16 @@ CREATE OR REPLACE FUNCTION "public"."api_feed_type_options_rpc"() RETURNS TABLE(
 
 ALTER FUNCTION "public"."api_feed_type_options_rpc"() OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_feed_type_options_rpc"(); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_feed_type_options_rpc"() IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_feed_type_options_rpc("uuid"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_feed_type_options_rpc"("p_farm_id" "uuid") RETURNS TABLE("id" bigint, "farm_id" "uuid", "feed_line" "text", "label" "text", "feed_category" "text", "feed_pellet_size" "text", "crude_protein_percentage" numeric, "crude_fat_percentage" numeric, "visibility_scope" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1786,45 +1914,48 @@ $$;
 
 ALTER FUNCTION "public"."api_feed_type_options_rpc"("p_farm_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_feed_type_options_rpc"("p_farm_id" "uuid"); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_feed_type_options_rpc"("p_farm_id" "uuid") IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_fingerling_batch_options_rpc("uuid"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" bigint, "farm_id" "uuid", "system_id" bigint, "label" "text", "date_of_delivery" "date", "abw" numeric, "number_of_fish" numeric, "supplier_id" bigint)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
     AS $$
-select
-  fb.id,
-  fb.farm_id,
-  fb.system_id,
-  coalesce(nullif(fb.name, ''), 'Batch #' || fb.id::text) as label,
-  fb.date_of_delivery,
-  fb.abw::numeric,
-  fb.number_of_fish::numeric,
-  fb.supplier_id
-from public.fingerling_batch fb
-where (p_farm_id is null or private.is_farm_member(p_farm_id))
-  and (p_farm_id is null or fb.farm_id = p_farm_id)
-  and exists (
-    select 1
-    from public.farm_user fu
-    where fu.farm_id = fb.farm_id
-      and fu.user_id = (select auth.uid())
-  )
-  and exists (
-    select 1
-    from public.production_cycle pc
-    where pc.batch_id = fb.id
-      and pc.ongoing_cycle = true
-  )
-order by fb.date_of_delivery desc nulls last;
+  select
+    fb.id,
+    fb.farm_id,
+    fb.system_id,
+    coalesce(nullif(fb.name, ''), 'Batch #' || fb.id::text) as label,
+    fb.date_of_delivery,
+    fb.abw::numeric,
+    fb.number_of_fish::numeric,
+    fb.supplier_id
+  from public.fingerling_batch fb
+  where (p_farm_id is null or private.is_farm_member(p_farm_id))
+    and (p_farm_id is null or fb.farm_id = p_farm_id)
+    and exists (
+      select 1
+      from public.farm_user fu
+      where fu.farm_id = fb.farm_id
+        and fu.user_id = (select auth.uid())
+    )
+  order by fb.date_of_delivery desc nulls last;
 $$;
 
 
 ALTER FUNCTION "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: api_growth_trend("uuid", bigint, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_growth_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer DEFAULT 180) RETURNS TABLE("sample_date" "date", "abw_g" numeric, "prev_abw_g" numeric, "weight_gain_g" numeric, "adg_g_day" numeric, "sgr_pct_day" numeric, "days_interval" integer)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1841,6 +1972,9 @@ $$;
 
 ALTER FUNCTION "public"."api_growth_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) OWNER TO "postgres";
 
+--
+-- Name: api_harvest_forecast("uuid", bigint); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_harvest_forecast"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "system_name" "text", "current_abw_g" double precision, "last_sample_date" "date", "sample_age_days" integer, "adg_g_day" double precision, "target_weight_g" double precision, "days_to_target" integer, "projected_harvest_date" "date", "status" "text", "confidence" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -1989,10 +2123,16 @@ $$;
 
 ALTER FUNCTION "public"."api_harvest_forecast"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_harvest_forecast"("p_farm_id" "uuid", "p_system_id" bigint); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_harvest_forecast"("p_farm_id" "uuid", "p_system_id" bigint) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_kpi_coverage("uuid", "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_kpi_coverage"("p_farm_id" "uuid", "p_date_from" "date" DEFAULT NULL::"date", "p_date_to" "date" DEFAULT NULL::"date") RETURNS TABLE("kpi_key" "text", "systems_covered" integer, "systems_total" integer, "coverage_label" "text", "data_source" "text", "basis" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -2118,10 +2258,16 @@ $$;
 
 ALTER FUNCTION "public"."api_kpi_coverage"("p_farm_id" "uuid", "p_date_from" "date", "p_date_to" "date") OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_kpi_coverage"("p_farm_id" "uuid", "p_date_from" "date", "p_date_to" "date"); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_kpi_coverage"("p_farm_id" "uuid", "p_date_from" "date", "p_date_to" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_latest_water_quality_status("uuid", bigint); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_latest_water_quality_status"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "system_name" "text", "rating_date" "date", "rating" "text", "rating_numeric" double precision, "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text", "low_do_threshold" numeric, "high_ammonia_threshold" numeric, "do_exceeded" boolean, "ammonia_exceeded" boolean)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -2179,8 +2325,11 @@ $$;
 
 ALTER FUNCTION "public"."api_latest_water_quality_status"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
+--
+-- Name: api_production_summary("uuid", bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
-CREATE OR REPLACE FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("cycle_id" integer, "date" "date", "system_id" bigint, "system_name" "text", "growth_stage" "text", "ongoing_cycle" boolean, "average_body_weight" double precision, "number_of_fish_inventory" double precision, "total_feed_amount_period" double precision, "activity" "text", "activity_rank" integer, "total_biomass" double precision, "biomass_increase_period" double precision, "total_feed_amount_aggregated" double precision, "biomass_increase_aggregated" double precision, "daily_mortality_count" double precision, "cumulative_mortality" double precision, "number_of_fish_transfer_out" double precision, "total_weight_transfer_out" double precision, "total_weight_transfer_out_aggregated" double precision, "number_of_fish_transfer_in" double precision, "total_weight_transfer_in" double precision, "total_weight_transfer_in_aggregated" double precision, "number_of_fish_harvested" double precision, "total_weight_harvested" double precision, "total_weight_harvested_aggregated" double precision, "number_of_fish_stocked" double precision, "total_weight_stocked" double precision, "total_weight_stocked_aggregated" double precision, "efcr_period" double precision, "efcr_aggregated" double precision)
+CREATE OR REPLACE FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("cycle_id" integer, "date" "date", "system_id" bigint, "system_name" "text", "growth_stage" "text", "ongoing_cycle" boolean, "average_body_weight" double precision, "number_of_fish_inventory" double precision, "total_feed_amount_period" double precision, "activity" "text", "activity_rank" integer, "total_biomass" double precision, "biomass_increase_period" double precision, "total_feed_amount_aggregated" double precision, "biomass_increase_aggregated" double precision, "daily_mortality_count" double precision, "cumulative_mortality" double precision, "number_of_fish_transfer_out" double precision, "total_weight_transfer_out" double precision, "total_weight_transfer_out_aggregated" double precision, "number_of_fish_transfer_in" double precision, "total_weight_transfer_in" double precision, "total_weight_transfer_in_aggregated" double precision, "number_of_fish_harvested" double precision, "total_weight_harvested" double precision, "total_weight_harvested_aggregated" double precision, "number_of_fish_stocked" double precision, "total_weight_stocked" double precision, "total_weight_stocked_aggregated" double precision, "efcr_period" double precision, "efcr_aggregated" double precision)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
     AS $$
@@ -2237,19 +2386,24 @@ begin
   join public.system s on s.id = ps.system_id
   where s.farm_id = p_farm_id
     and (p_system_id is null or ps.system_id = p_system_id)
-    and (p_stage is null or s.growth_stage = p_stage)
     and ps.date between v_start and v_end
   order by ps.system_id, ps.date, ps.activity_rank;
 end;
 $$;
 
 
-ALTER FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
+ALTER FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
+
+--
+-- Name: FUNCTION "api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Reads analytics.production_summary and enforces farm membership/scope checks.';
 
 
-COMMENT ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Reads analytics.production_summary and enforces farm membership/scope checks.';
-
-
+--
+-- Name: api_recommended_actions("uuid", bigint); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_recommended_actions"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "system_name" "text", "metric_name" "text", "current_value" numeric, "threshold_low" numeric, "threshold_high" numeric, "unit" "text", "severity" "text", "context_json" "jsonb")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -2423,6 +2577,9 @@ $$;
 
 ALTER FUNCTION "public"."api_recommended_actions"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
+--
+-- Name: api_running_stock("uuid"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_running_stock"("p_farm_id" "uuid") RETURNS TABLE("feed_type_id" bigint, "feed_type_name" "text", "pellet_size" "text", "current_stock_kg" numeric, "avg_daily_usage_kg" numeric, "days_remaining" numeric, "stock_status" "text", "last_delivery_date" "date")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -2436,6 +2593,9 @@ $$;
 
 ALTER FUNCTION "public"."api_running_stock"("p_farm_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: api_survival_trend("uuid", bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_survival_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date" DEFAULT CURRENT_DATE) RETURNS TABLE("event_date" "date", "daily_deaths" integer, "cum_deaths" integer, "stocked" integer, "live_count" integer, "survival_pct" numeric, "daily_mort_pct" numeric)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -2461,6 +2621,9 @@ $$;
 
 ALTER FUNCTION "public"."api_survival_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
+--
+-- Name: api_system_health_score("uuid", bigint); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_system_health_score"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "system_name" "text", "health_score" numeric, "health_grade" "text", "wq_score" numeric, "mortality_score" numeric, "fcr_score" numeric, "growth_score" numeric, "wq_rating_avg" double precision, "mortality_rate_pct" double precision, "latest_efcr" double precision, "adg_g_day" double precision, "latest_abw_g" double precision, "last_sample_date" "date", "wq_date" "date")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -2659,10 +2822,16 @@ $$;
 
 ALTER FUNCTION "public"."api_system_health_score"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_system_health_score"("p_farm_id" "uuid", "p_system_id" bigint); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_system_health_score"("p_farm_id" "uuid", "p_system_id" bigint) IS 'Dashboard system health score from canonical daily facts, recent water-quality ratings, 1-5 appetite response logs, mortality, and sampling freshness. Evaluated as of each system latest real fact date for historical production records.';
 
 
+--
+-- Name: api_system_options_rpc("uuid", "public"."system_growth_stage", boolean); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid" DEFAULT NULL::"uuid", "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_active_only" boolean DEFAULT true) RETURNS TABLE("id" bigint, "label" "text", "type" "text", "growth_stage" "public"."system_growth_stage", "is_active" boolean, "farm_id" "uuid", "farm_name" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -2702,6 +2871,9 @@ $$;
 
 ALTER FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_active_only" boolean) OWNER TO "postgres";
 
+--
+-- Name: api_system_timeline_bounds("uuid", bigint); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "resolved_start" "date", "resolved_end" "date", "resolved_ongoing" boolean, "snapshot_as_of" "date", "first_stocking_date" "date", "final_harvest_date" "date", "first_activity_date" "date", "last_activity_date" "date", "configured_cycle_start" "date", "configured_cycle_end" "date", "period_source" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -2808,12 +2980,18 @@ $$;
 
 ALTER FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
+--
+-- Name: api_time_period_bounds_scoped("uuid", "text", "text", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
-CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text" DEFAULT 'dashboard'::"text", "p_anchor_date" "date" DEFAULT NULL::"date", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("time_period" "text", "input_start_date" "date", "input_end_date" "date", "anchor_scope" "text", "latest_available_date" "date", "available_from_date" "date", "requested_days" integer, "available_days" integer, "resolved_days" integer, "staleness_days" integer, "is_truncated" boolean)
+CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text" DEFAULT 'dashboard'::"text", "p_anchor_date" "date" DEFAULT NULL::"date") RETURNS TABLE("time_period" "text", "input_start_date" "date", "input_end_date" "date", "anchor_scope" "text", "latest_available_date" "date", "available_from_date" "date", "requested_days" integer, "available_days" integer, "resolved_days" integer, "staleness_days" integer, "is_truncated" boolean)
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
     AS $$
@@ -2835,21 +3013,13 @@ CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" 
     end as anchor_scope
     from perm where perm.ok
   ),
-  requested_period as (
-    select lower(replace(coalesce(nullif(trim(p_time_period), ''), '2 weeks'), '-', ' ')) as value
-  ),
   tp as (
-    select
-      case when rp.value in ('all history', 'all_history') then 'all history' else dtp.time_period::text end as time_period,
-      case when rp.value in ('all history', 'all_history') then null::integer else greatest(dtp.days_since_start, 1) end as requested_days
-    from requested_period rp
+    select dtp.time_period::text as time_period,
+           greatest(dtp.days_since_start, 1) as requested_days
+    from public.dashboard_time_period dtp
     join perm on perm.ok
-    left join public.dashboard_time_period dtp on dtp.time_period::text = rp.value
-    where rp.value in ('all history', 'all_history') or dtp.time_period is not null
+    where dtp.time_period::text = p_time_period
     limit 1
-  ),
-  capped_anchor as (
-    select least(coalesce(p_anchor_date, current_date), current_date) as value
   ),
   scoped_dates as (
     select
@@ -2859,36 +3029,28 @@ CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" 
           select max(dwr.rating_date)
           from public.daily_water_quality_rating dwr
           join public.system s on s.id = dwr.system_id
-          cross join capped_anchor ca
           where s.farm_id = p_farm_id
-            and dwr.rating_date <= ca.value
-            and (p_system_id is null or s.id = p_system_id)
+            and (p_anchor_date is null or dwr.rating_date <= p_anchor_date)
         )
         when 'feeding' then (
           select max(fr.date)
           from public.feeding_record fr
           join public.system s on s.id = fr.system_id
-          cross join capped_anchor ca
           where s.farm_id = p_farm_id
-            and fr.date <= ca.value
-            and (p_system_id is null or s.id = p_system_id)
+            and (p_anchor_date is null or fr.date <= p_anchor_date)
         )
         when 'feed_inventory' then (
           select max(fi.inventory_date)
           from public.feed_inventory fi
-          cross join capped_anchor ca
           where fi.farm_id = p_farm_id
-            and fi.inventory_date <= ca.value
-            and p_system_id is null
+            and (p_anchor_date is null or fi.inventory_date <= p_anchor_date)
         )
         else (
           select max(d.inventory_date)
           from analytics.daily_system_facts d
           join public.system s on s.id = d.system_id
-          cross join capped_anchor ca
           where s.farm_id = p_farm_id
-            and d.inventory_date <= ca.value
-            and (p_system_id is null or s.id = p_system_id)
+            and (p_anchor_date is null or d.inventory_date <= p_anchor_date)
         )
       end as latest_available_date,
       case rs.anchor_scope
@@ -2897,76 +3059,66 @@ CREATE OR REPLACE FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" 
           from public.daily_water_quality_rating dwr
           join public.system s on s.id = dwr.system_id
           where s.farm_id = p_farm_id
-            and dwr.rating_date <= current_date
-            and (p_system_id is null or s.id = p_system_id)
         )
         when 'feeding' then (
           select min(fr.date)
           from public.feeding_record fr
           join public.system s on s.id = fr.system_id
           where s.farm_id = p_farm_id
-            and fr.date <= current_date
-            and (p_system_id is null or s.id = p_system_id)
         )
         when 'feed_inventory' then (
           select min(fi.inventory_date)
           from public.feed_inventory fi
           where fi.farm_id = p_farm_id
-            and fi.inventory_date <= current_date
-            and p_system_id is null
         )
         else (
           select min(d.inventory_date)
           from analytics.daily_system_facts d
           join public.system s on s.id = d.system_id
           where s.farm_id = p_farm_id
-            and d.inventory_date <= current_date
-            and (p_system_id is null or s.id = p_system_id)
         )
       end as available_from_date
     from resolved_scope rs
   ),
   bounded as (
     select
-      tp.time_period,
-      sd.anchor_scope,
+      tp.time_period, sd.anchor_scope,
       sd.latest_available_date as input_end_date,
-      sd.available_from_date,
-      tp.requested_days,
+      sd.available_from_date, tp.requested_days,
       case
         when sd.latest_available_date is null or sd.available_from_date is null then null::date
-        when tp.time_period = 'all history' then sd.available_from_date
         else greatest(sd.available_from_date, sd.latest_available_date - (tp.requested_days - 1))
       end as input_start_date
     from tp cross join scoped_dates sd
   )
   select
-    b.time_period,
-    b.input_start_date,
-    b.input_end_date,
-    case when p_system_id is null then b.anchor_scope else b.anchor_scope || ':system' end as anchor_scope,
+    b.time_period, b.input_start_date, b.input_end_date, b.anchor_scope,
     b.input_end_date as latest_available_date,
-    b.available_from_date,
-    b.requested_days,
+    b.available_from_date, b.requested_days,
     case when b.input_end_date is null or b.available_from_date is null then null::integer
          else (b.input_end_date - b.available_from_date + 1)::integer end as available_days,
     case when b.input_end_date is null or b.input_start_date is null then null::integer
          else (b.input_end_date - b.input_start_date + 1)::integer end as resolved_days,
     case when b.input_end_date is null then null::integer
          else greatest((current_date - b.input_end_date)::integer, 0) end as staleness_days,
-    case when b.time_period = 'all history' then false
-         when b.input_end_date is null or b.available_from_date is null or b.input_start_date is null then false
+    case when b.input_end_date is null or b.available_from_date is null or b.input_start_date is null then false
          else b.input_start_date > (b.input_end_date - (b.requested_days - 1)) end as is_truncated
   from bounded b;
 $$;
 
 
-ALTER FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date", "p_system_id" bigint) OWNER TO "postgres";
+ALTER FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date") OWNER TO "postgres";
+
+--
+-- Name: FUNCTION "api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date"); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date") IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
 
 
-COMMENT ON FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date", "p_system_id" bigint) IS 'Intentional app-facing SECURITY DEFINER RPC. Direct access to internal read models is revoked; callers must be authenticated and function body must enforce farm membership/scope checks.';
-
-
+--
+-- Name: api_water_quality_sync_status("uuid"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."api_water_quality_sync_status"("p_farm_id" "uuid") RETURNS TABLE("latest_rating_date" "date", "latest_measurement_ts" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -2993,6 +3145,9 @@ $$;
 
 ALTER FUNCTION "public"."api_water_quality_sync_status"("p_farm_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: assign_operation_lineage_from_system(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."assign_operation_lineage_from_system"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -3021,6 +3176,9 @@ $$;
 
 ALTER FUNCTION "public"."assign_operation_lineage_from_system"() OWNER TO "postgres";
 
+--
+-- Name: assign_transfer_lineage_from_origin(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."assign_transfer_lineage_from_origin"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -3053,6 +3211,9 @@ $$;
 
 ALTER FUNCTION "public"."assign_transfer_lineage_from_origin"() OWNER TO "postgres";
 
+--
+-- Name: claim_my_farm_user_invitations(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."claim_my_farm_user_invitations"() RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3072,6 +3233,9 @@ $$;
 
 ALTER FUNCTION "public"."claim_my_farm_user_invitations"() OWNER TO "postgres";
 
+--
+-- Name: classify_growth_stage_tanganicae(numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."classify_growth_stage_tanganicae"("p_abw_g" numeric) RETURNS "text"
     LANGUAGE "sql" IMMUTABLE
@@ -3089,6 +3253,9 @@ $$;
 
 ALTER FUNCTION "public"."classify_growth_stage_tanganicae"("p_abw_g" numeric) OWNER TO "postgres";
 
+--
+-- Name: classify_water_quality_measurement(double precision, "jsonb", "jsonb", "jsonb", "jsonb"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."classify_water_quality_measurement"("p_parameter_value" double precision, "p_optimal" "jsonb", "p_acceptable" "jsonb", "p_critical" "jsonb", "p_lethal" "jsonb") RETURNS TABLE("measurement_rating" "public"."water_quality_rating", "severity_rank" integer, "distance_from_next_better_band" double precision)
     LANGUAGE "plpgsql" IMMUTABLE
@@ -3141,6 +3308,9 @@ $$;
 
 ALTER FUNCTION "public"."classify_water_quality_measurement"("p_parameter_value" double precision, "p_optimal" "jsonb", "p_acceptable" "jsonb", "p_critical" "jsonb", "p_lethal" "jsonb") OWNER TO "postgres";
 
+--
+-- Name: close_cycle_on_final_harvest(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."close_cycle_on_final_harvest"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -3183,6 +3353,9 @@ $$;
 
 ALTER FUNCTION "public"."close_cycle_on_final_harvest"() OWNER TO "postgres";
 
+--
+-- Name: create_farm_user_invitation("uuid", "text", "text"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."create_farm_user_invitation"("p_farm_id" "uuid", "p_email" "text", "p_role" "text" DEFAULT 'viewer'::"text") RETURNS SETOF "public"."farm_user_invitation_rpc_result"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3265,6 +3438,9 @@ $$;
 
 ALTER FUNCTION "public"."create_farm_user_invitation"("p_farm_id" "uuid", "p_email" "text", "p_role" "text") OWNER TO "postgres";
 
+--
+-- Name: ensure_cycle_on_stocking(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."ensure_cycle_on_stocking"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -3319,6 +3495,9 @@ $$;
 
 ALTER FUNCTION "public"."ensure_cycle_on_stocking"() OWNER TO "postgres";
 
+--
+-- Name: feed_inventory_snapshot_kg(integer, integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."feed_inventory_snapshot_kg"("p_bag_weight" integer, "p_amount_of_bags" integer, "p_opened_bags" integer) RETURNS numeric
     LANGUAGE "sql" IMMUTABLE
@@ -3334,6 +3513,9 @@ $$;
 
 ALTER FUNCTION "public"."feed_inventory_snapshot_kg"("p_bag_weight" integer, "p_amount_of_bags" integer, "p_opened_bags" integer) OWNER TO "postgres";
 
+--
+-- Name: get_daily_feed_target_kg("uuid", bigint); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."get_daily_feed_target_kg"("p_farm_id" "uuid" DEFAULT NULL::"uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_name" "text", "growth_stage" "text", "estimated_biomass_kg" numeric, "feed_rate_min_pct" numeric, "feed_rate_max_pct" numeric, "daily_feed_min_kg" numeric, "daily_feed_target_kg" numeric, "daily_feed_max_kg" numeric, "sessions_per_day" integer, "pellet_size_mm" "text", "per_session_kg" numeric)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -3373,6 +3555,9 @@ $$;
 
 ALTER FUNCTION "public"."get_daily_feed_target_kg"("p_farm_id" "uuid", "p_system_id" bigint) OWNER TO "postgres";
 
+--
+-- Name: get_fcr_trend("uuid", bigint, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."get_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer DEFAULT 180) RETURNS TABLE("period_start" "date", "period_end" "date", "total_feed_kg" numeric, "weight_gain_kg" numeric, "fcr" numeric, "abw_end_g" numeric, "days_interval" integer)
     LANGUAGE "sql" STABLE
@@ -3407,6 +3592,9 @@ $$;
 
 ALTER FUNCTION "public"."get_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) OWNER TO "postgres";
 
+--
+-- Name: get_feed_rate_target("text"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."get_feed_rate_target"("p_growth_stage" "text") RETURNS TABLE("stage" "text", "abw_range_g" "text", "feed_rate_min_pct" numeric, "feed_rate_max_pct" numeric, "feed_rate_mid_pct" numeric, "sessions_per_day" integer, "pellet_size_mm" "text")
     LANGUAGE "sql" STABLE
@@ -3425,6 +3613,9 @@ $$;
 
 ALTER FUNCTION "public"."get_feed_rate_target"("p_growth_stage" "text") OWNER TO "postgres";
 
+--
+-- Name: get_growth_trend(bigint, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."get_growth_trend"("p_system_id" bigint, "p_days" integer DEFAULT 180) RETURNS TABLE("sample_date" "date", "abw_g" numeric, "prev_abw_g" numeric, "weight_gain_g" numeric, "adg_g_day" numeric, "sgr_pct_day" numeric, "days_interval" integer)
     LANGUAGE "sql" STABLE
@@ -3444,6 +3635,9 @@ $$;
 
 ALTER FUNCTION "public"."get_growth_trend"("p_system_id" bigint, "p_days" integer) OWNER TO "postgres";
 
+--
+-- Name: get_running_stock("uuid"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."get_running_stock"("p_farm_id" "uuid") RETURNS TABLE("feed_type_id" bigint, "feed_type_name" "text", "pellet_size" "text", "current_stock_kg" numeric, "avg_daily_usage_kg" numeric, "days_remaining" numeric, "stock_status" "text", "last_delivery_date" "date")
     LANGUAGE "sql" STABLE
@@ -3519,6 +3713,9 @@ $$;
 
 ALTER FUNCTION "public"."get_running_stock"("p_farm_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: get_survival_trend(bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."get_survival_trend"("p_system_id" bigint, "p_start_date" "date", "p_end_date" "date" DEFAULT CURRENT_DATE) RETURNS TABLE("event_date" "date", "daily_deaths" integer, "cum_deaths" integer, "stocked" integer, "live_count" integer, "survival_pct" numeric, "daily_mort_pct" numeric)
     LANGUAGE "sql" STABLE
@@ -3544,6 +3741,9 @@ $$;
 
 ALTER FUNCTION "public"."get_survival_trend"("p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
 
+--
+-- Name: handle_new_user(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3589,6 +3789,9 @@ $$;
 
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
+--
+-- Name: mark_farm_user_invitation_sent("uuid"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."mark_farm_user_invitation_sent"("p_invitation_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3622,13 +3825,16 @@ $$;
 
 ALTER FUNCTION "public"."mark_farm_user_invitation_sent"("p_invitation_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: prevent_system_name_update(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."prevent_system_name_update"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
 BEGIN
-  IF NEW.name <> OLD.name AND OLD.is_active = true THEN
+  IF NEW.name <> OLD.name THEN
     RAISE EXCEPTION 'system.name is immutable once created';
   END IF;
   RETURN NEW;
@@ -3638,6 +3844,9 @@ $$;
 
 ALTER FUNCTION "public"."prevent_system_name_update"() OWNER TO "postgres";
 
+--
+-- Name: process_inventory_queue(integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."process_inventory_queue"("p_limit" integer DEFAULT 50) RETURNS TABLE("processed_system_id" bigint, "processed_from_date" "date", "processed_to_date" "date", "upserted_days" integer)
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3683,6 +3892,9 @@ $$;
 
 ALTER FUNCTION "public"."process_inventory_queue"("p_limit" integer) OWNER TO "postgres";
 
+--
+-- Name: production_cycle_set_ongoing(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."production_cycle_set_ongoing"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -3697,6 +3909,9 @@ $$;
 
 ALTER FUNCTION "public"."production_cycle_set_ongoing"() OWNER TO "postgres";
 
+--
+-- Name: provision_default_farm_membership(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."provision_default_farm_membership"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3711,6 +3926,9 @@ $$;
 
 ALTER FUNCTION "public"."provision_default_farm_membership"() OWNER TO "postgres";
 
+--
+-- Name: refresh_after_system_if_needed(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."refresh_after_system_if_needed"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3735,6 +3953,9 @@ $$;
 
 ALTER FUNCTION "public"."refresh_after_system_if_needed"() OWNER TO "postgres";
 
+--
+-- Name: refresh_analytics_cache(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."refresh_analytics_cache"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3748,10 +3969,16 @@ $$;
 
 ALTER FUNCTION "public"."refresh_analytics_cache"() OWNER TO "postgres";
 
+--
+-- Name: FUNCTION "refresh_analytics_cache"(); Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON FUNCTION "public"."refresh_analytics_cache"() IS 'Refreshes the analytics.daily_system_facts_cache materialized view. Call after fish_mortality, fish_harvest, fish_stocking, fish_transfer, fish_sampling_weight, feeding_record or production_cycle data entry.';
 
 
+--
+-- Name: refresh_daily_water_quality_rating(bigint, "date", "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."refresh_daily_water_quality_rating"("p_system_id" bigint DEFAULT NULL::bigint, "p_from" "date" DEFAULT NULL::"date", "p_to" "date" DEFAULT NULL::"date") RETURNS "void"
     LANGUAGE "plpgsql"
@@ -3826,6 +4053,9 @@ $$;
 
 ALTER FUNCTION "public"."refresh_daily_water_quality_rating"("p_system_id" bigint, "p_from" "date", "p_to" "date") OWNER TO "postgres";
 
+--
+-- Name: request_matview_refresh(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."request_matview_refresh"() RETURNS "void"
     LANGUAGE "plpgsql"
@@ -3839,6 +4069,9 @@ $$;
 
 ALTER FUNCTION "public"."request_matview_refresh"() OWNER TO "postgres";
 
+--
+-- Name: resolve_cycle_batch_for_system_date(bigint, "date"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."resolve_cycle_batch_for_system_date"("p_system_id" bigint, "p_date" "date") RETURNS TABLE("cycle_id" integer, "batch_id" bigint)
     LANGUAGE "sql" STABLE
@@ -3886,6 +4119,9 @@ $$;
 
 ALTER FUNCTION "public"."resolve_cycle_batch_for_system_date"("p_system_id" bigint, "p_date" "date") OWNER TO "postgres";
 
+--
+-- Name: resolve_sampling_abw_g(double precision, double precision, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."resolve_sampling_abw_g"("p_abw" double precision, "p_total_weight_sampling" double precision, "p_number_of_fish_sampling" numeric) RETURNS numeric
     LANGUAGE "sql" IMMUTABLE
@@ -3901,6 +4137,9 @@ $$;
 
 ALTER FUNCTION "public"."resolve_sampling_abw_g"("p_abw" double precision, "p_total_weight_sampling" double precision, "p_number_of_fish_sampling" numeric) OWNER TO "postgres";
 
+--
+-- Name: resolve_sampling_abw_g(numeric, numeric, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."resolve_sampling_abw_g"("p_abw" numeric, "p_total_weight_sampling" numeric, "p_number_of_fish_sampling" numeric) RETURNS numeric
     LANGUAGE "sql" IMMUTABLE
@@ -3921,6 +4160,9 @@ $$;
 
 ALTER FUNCTION "public"."resolve_sampling_abw_g"("p_abw" numeric, "p_total_weight_sampling" numeric, "p_number_of_fish_sampling" numeric) OWNER TO "postgres";
 
+--
+-- Name: revoke_farm_user_invitation("uuid"); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."revoke_farm_user_invitation"("p_invitation_id" "uuid") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3964,6 +4206,9 @@ $$;
 
 ALTER FUNCTION "public"."revoke_farm_user_invitation"("p_invitation_id" "uuid") OWNER TO "postgres";
 
+--
+-- Name: set_harvest_abw(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."set_harvest_abw"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -3987,6 +4232,9 @@ $$;
 
 ALTER FUNCTION "public"."set_harvest_abw"() OWNER TO "postgres";
 
+--
+-- Name: set_sampling_weight_abw(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."set_sampling_weight_abw"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -4016,6 +4264,9 @@ $$;
 
 ALTER FUNCTION "public"."set_sampling_weight_abw"() OWNER TO "postgres";
 
+--
+-- Name: touch_affected_systems_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."touch_affected_systems_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -4030,6 +4281,9 @@ $$;
 
 ALTER FUNCTION "public"."touch_affected_systems_updated_at"() OWNER TO "postgres";
 
+--
+-- Name: transfer_impacts_efcr("public"."transfer_type", bigint, bigint); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
@@ -4047,6 +4301,9 @@ $$;
 
 ALTER FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) OWNER TO "postgres";
 
+--
+-- Name: transfer_weight_kg(double precision, double precision, double precision); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."transfer_weight_kg"("p_total_weight_transfer" double precision, "p_number_of_fish_transfer" double precision, "p_abw" double precision) RETURNS double precision
     LANGUAGE "sql" IMMUTABLE
@@ -4068,6 +4325,9 @@ $$;
 
 ALTER FUNCTION "public"."transfer_weight_kg"("p_total_weight_transfer" double precision, "p_number_of_fish_transfer" double precision, "p_abw" double precision) OWNER TO "postgres";
 
+--
+-- Name: trg_refresh_daily_water_quality_rating(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."trg_refresh_daily_water_quality_rating"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -4097,6 +4357,9 @@ $$;
 
 ALTER FUNCTION "public"."trg_refresh_daily_water_quality_rating"() OWNER TO "postgres";
 
+--
+-- Name: trg_refresh_daily_water_quality_rating_from_framework(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."trg_refresh_daily_water_quality_rating_from_framework"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -4106,6 +4369,9 @@ CREATE OR REPLACE FUNCTION "public"."trg_refresh_daily_water_quality_rating_from
 
 ALTER FUNCTION "public"."trg_refresh_daily_water_quality_rating_from_framework"() OWNER TO "postgres";
 
+--
+-- Name: trg_update_system_growth_stage(); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."trg_update_system_growth_stage"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -4136,6 +4402,9 @@ $$;
 
 ALTER FUNCTION "public"."trg_update_system_growth_stage"() OWNER TO "postgres";
 
+--
+-- Name: water_quality_rating_label(numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE FUNCTION "public"."water_quality_rating_label"("p_score" numeric) RETURNS "text"
     LANGUAGE "sql" IMMUTABLE PARALLEL SAFE
@@ -4159,6 +4428,9 @@ SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
 
+--
+-- Name: feeding_record; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."feeding_record" (
     "id" bigint NOT NULL,
@@ -4180,14 +4452,23 @@ CREATE TABLE IF NOT EXISTS "public"."feeding_record" (
 
 ALTER TABLE "public"."feeding_record" OWNER TO "postgres";
 
+--
+-- Name: COLUMN "feeding_record"."feed_type_id"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."feeding_record"."feed_type_id" IS 'Optional when no feed was given and feeding_amount is 0; required by the app for positive feeding entries.';
 
 
+--
+-- Name: COLUMN "feeding_record"."feeding_response"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."feeding_record"."feeding_response" IS 'Optional when no feed was given and feeding_amount is 0. Appetite level 1-5 for positive feeding entries.';
 
 
+--
+-- Name: fish_harvest; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."fish_harvest" (
     "id" bigint NOT NULL,
@@ -4207,6 +4488,9 @@ CREATE TABLE IF NOT EXISTS "public"."fish_harvest" (
 
 ALTER TABLE "public"."fish_harvest" OWNER TO "postgres";
 
+--
+-- Name: fish_mortality; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."fish_mortality" (
     "id" bigint NOT NULL,
@@ -4229,10 +4513,16 @@ CREATE TABLE IF NOT EXISTS "public"."fish_mortality" (
 
 ALTER TABLE "public"."fish_mortality" OWNER TO "postgres";
 
+--
+-- Name: COLUMN "fish_mortality"."total_weight_mortality"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."fish_mortality"."total_weight_mortality" IS 'Total dead fish weight in kg. Required for new mass mortality records of 100 or more fish.';
 
 
+--
+-- Name: fish_sampling_weight; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."fish_sampling_weight" (
     "id" bigint NOT NULL,
@@ -4253,18 +4543,30 @@ CREATE TABLE IF NOT EXISTS "public"."fish_sampling_weight" (
 
 ALTER TABLE "public"."fish_sampling_weight" OWNER TO "postgres";
 
+--
+-- Name: TABLE "fish_sampling_weight"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON TABLE "public"."fish_sampling_weight" IS 'Monthly fish growth sampling records. Each row stores the sampled fish count, total sample weight in kg, and derived ABW in grams for the stocked batch production cycle.';
 
 
+--
+-- Name: COLUMN "fish_sampling_weight"."total_weight_sampling"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."fish_sampling_weight"."total_weight_sampling" IS 'Total weight of sampled fish in kg.';
 
 
+--
+-- Name: COLUMN "fish_sampling_weight"."abw"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."fish_sampling_weight"."abw" IS 'Average body weight in grams, derived from total_weight_sampling and number_of_fish_sampling.';
 
 
+--
+-- Name: fish_stocking; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."fish_stocking" (
     "id" bigint NOT NULL,
@@ -4285,6 +4587,9 @@ CREATE TABLE IF NOT EXISTS "public"."fish_stocking" (
 
 ALTER TABLE "public"."fish_stocking" OWNER TO "postgres";
 
+--
+-- Name: fish_transfer; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."fish_transfer" (
     "id" bigint NOT NULL,
@@ -4308,6 +4613,9 @@ CREATE TABLE IF NOT EXISTS "public"."fish_transfer" (
 
 ALTER TABLE "public"."fish_transfer" OWNER TO "postgres";
 
+--
+-- Name: system; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."system" (
     "id" bigint NOT NULL,
@@ -4328,6 +4636,9 @@ CREATE TABLE IF NOT EXISTS "public"."system" (
 
 ALTER TABLE "public"."system" OWNER TO "postgres";
 
+--
+-- Name: daily_fish_inventory_table; Type: MATERIALIZED VIEW; Schema: analytics; Owner: postgres
+--
 
 CREATE MATERIALIZED VIEW "analytics"."daily_fish_inventory_table" AS
  WITH "system_start" AS (
@@ -4457,6 +4768,9 @@ CREATE MATERIALIZED VIEW "analytics"."daily_fish_inventory_table" AS
 
 ALTER TABLE "analytics"."daily_fish_inventory_table" OWNER TO "postgres";
 
+--
+-- Name: fingerling_batch; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."fingerling_batch" (
     "id" bigint NOT NULL,
@@ -4475,6 +4789,9 @@ CREATE TABLE IF NOT EXISTS "public"."fingerling_batch" (
 
 ALTER TABLE "public"."fingerling_batch" OWNER TO "postgres";
 
+--
+-- Name: daily_system_facts; Type: MATERIALIZED VIEW; Schema: analytics; Owner: postgres
+--
 
 CREATE MATERIALIZED VIEW "analytics"."daily_system_facts" AS
  WITH "activity_union" AS (
@@ -4755,6 +5072,9 @@ CREATE MATERIALIZED VIEW "analytics"."daily_system_facts" AS
 
 ALTER TABLE "analytics"."daily_system_facts" OWNER TO "postgres";
 
+--
+-- Name: production_cycle; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."production_cycle" (
     "cycle_id" integer NOT NULL,
@@ -4774,383 +5094,348 @@ CREATE TABLE IF NOT EXISTS "public"."production_cycle" (
 
 ALTER TABLE "public"."production_cycle" OWNER TO "postgres";
 
+--
+-- Name: COLUMN "production_cycle"."target_weight_g"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."production_cycle"."target_weight_g" IS 'Target market weight (grams) for this cycle. NULL = use farm/species default (400 g).';
 
 
-
-CREATE TABLE IF NOT EXISTS "public"."water_quality_measurement" (
-    "id" bigint NOT NULL,
-    "date" "date" NOT NULL,
-    "time" time without time zone NOT NULL,
-    "water_depth" double precision NOT NULL,
-    "parameter_value" double precision NOT NULL,
-    "system_id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "parameter_name" "public"."water_quality_parameters" NOT NULL,
-    "measured_at" timestamp with time zone NOT NULL,
-    "location_reference" "text",
-    "local_id" "text",
-    "synced_at" timestamp with time zone DEFAULT "now"()
-);
-
-
-ALTER TABLE "public"."water_quality_measurement" OWNER TO "postgres";
-
+--
+-- Name: production_summary; Type: MATERIALIZED VIEW; Schema: analytics; Owner: postgres
+--
 
 CREATE MATERIALIZED VIEW "analytics"."production_summary" AS
- WITH "real_events" AS (
+ WITH "stocking_agg" AS (
          SELECT "fs"."cycle_id",
-            "fs"."system_id",
-            "fs"."date",
-            'stocking'::"text" AS "activity",
-            10 AS "activity_rank",
-            ("sum"("fs"."number_of_fish_stocking"))::double precision AS "number_of_fish_stocked",
-            "sum"("fs"."total_weight_stocking") AS "total_weight_stocked",
-            (0)::double precision AS "total_feed_amount_period",
-            (0)::double precision AS "daily_mortality_count",
-            (0)::double precision AS "number_of_fish_transfer_out",
-            (0)::double precision AS "total_weight_transfer_out",
-            (0)::double precision AS "number_of_fish_transfer_in",
-            (0)::double precision AS "total_weight_transfer_in",
-            (0)::double precision AS "number_of_fish_harvested",
-            (0)::double precision AS "total_weight_harvested"
+            "min"("fs"."date") AS "stocking_date",
+            "sum"("fs"."number_of_fish_stocking") AS "n0",
+            "sum"(("fs"."total_weight_stocking")::numeric) AS "initial_biomass_kg",
+                CASE
+                    WHEN ("sum"("fs"."number_of_fish_stocking") > (0)::numeric) THEN ("sum"((("fs"."number_of_fish_stocking")::numeric * ("fs"."abw")::numeric)) / "sum"("fs"."number_of_fish_stocking"))
+                    ELSE NULL::numeric
+                END AS "abw_0_g"
            FROM "public"."fish_stocking" "fs"
           WHERE ("fs"."cycle_id" IS NOT NULL)
-          GROUP BY "fs"."cycle_id", "fs"."system_id", "fs"."date"
-        UNION ALL
-         SELECT "fr"."cycle_id",
-            "fr"."system_id",
-            "fr"."date",
-            'feeding'::"text" AS "activity",
-            20 AS "activity_rank",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            "sum"("fr"."feeding_amount") AS "sum",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8"
-           FROM "public"."feeding_record" "fr"
-          WHERE ("fr"."cycle_id" IS NOT NULL)
-          GROUP BY "fr"."cycle_id", "fr"."system_id", "fr"."date"
-        UNION ALL
-         SELECT "fsw"."cycle_id",
-            "fsw"."system_id",
-            "fsw"."date",
-            'sampling'::"text" AS "activity",
-            30 AS "activity_rank",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8"
-           FROM "public"."fish_sampling_weight" "fsw"
-          WHERE ("fsw"."cycle_id" IS NOT NULL)
-          GROUP BY "fsw"."cycle_id", "fsw"."system_id", "fsw"."date"
-        UNION ALL
+          GROUP BY "fs"."cycle_id"
+        ), "sampling_base" AS (
+         SELECT "sw"."id" AS "sampling_event_id",
+            "sw"."cycle_id",
+            "sw"."date" AS "sample_date",
+            ("sw"."abw")::numeric AS "abw_g",
+            "sw"."number_of_fish_sampling",
+            "pc"."system_id",
+            "s"."name" AS "cage",
+            ("s"."volume")::numeric AS "cage_volume_m3",
+            "pc"."target_weight_g",
+            "pc"."cycle_start" AS "cycle_start_date",
+            "sa"."stocking_date",
+            "sa"."n0",
+            "sa"."abw_0_g",
+            "sa"."initial_biomass_kg"
+           FROM ((("public"."fish_sampling_weight" "sw"
+             JOIN "public"."production_cycle" "pc" ON (("sw"."cycle_id" = "pc"."cycle_id")))
+             JOIN "public"."system" "s" ON (("s"."id" = "pc"."system_id")))
+             LEFT JOIN "stocking_agg" "sa" ON (("sa"."cycle_id" = "sw"."cycle_id")))
+          WHERE ("sw"."cycle_id" IS NOT NULL)
+        ), "mortality_cumulative" AS (
          SELECT "fm"."cycle_id",
-            "fm"."system_id",
             "fm"."date",
-            'mortality'::"text" AS "activity",
-            40 AS "activity_rank",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            ("sum"("fm"."number_of_fish_mortality"))::double precision AS "sum",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8"
+            "sum"("fm"."number_of_fish_mortality") OVER (PARTITION BY "fm"."cycle_id" ORDER BY "fm"."date" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS "cum_mortality"
            FROM "public"."fish_mortality" "fm"
           WHERE ("fm"."cycle_id" IS NOT NULL)
-          GROUP BY "fm"."cycle_id", "fm"."system_id", "fm"."date"
-        UNION ALL
+        ), "mortality_at_sample" AS (
+         SELECT DISTINCT ON ("sb"."sampling_event_id") "sb"."sampling_event_id",
+            COALESCE("mc"."cum_mortality", (0)::numeric) AS "cum_mortality"
+           FROM ("sampling_base" "sb"
+             LEFT JOIN "mortality_cumulative" "mc" ON ((("mc"."cycle_id" = "sb"."cycle_id") AND ("mc"."date" <= "sb"."sample_date"))))
+          ORDER BY "sb"."sampling_event_id", "mc"."date" DESC
+        ), "transfer_out_cumulative" AS (
          SELECT "ft"."cycle_id",
-            "ft"."origin_system_id" AS "system_id",
             "ft"."date",
-            'transfer out'::"text" AS "activity",
-            50 AS "activity_rank",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            "sum"("ft"."number_of_fish_transfer") AS "sum",
-            "sum"("public"."transfer_weight_kg"("ft"."total_weight_transfer", "ft"."number_of_fish_transfer", "ft"."abw")) AS "sum",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8"
+            "sum"("ft"."number_of_fish_transfer") OVER (PARTITION BY "ft"."cycle_id" ORDER BY "ft"."date" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS "cum_fish_out",
+            "sum"((COALESCE("ft"."total_weight_transfer", (0)::double precision))::numeric) OVER (PARTITION BY "ft"."cycle_id" ORDER BY "ft"."date" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS "cum_weight_out_kg"
            FROM "public"."fish_transfer" "ft"
-          WHERE (("ft"."origin_system_id" IS NOT NULL) AND ("ft"."cycle_id" IS NOT NULL) AND "public"."transfer_impacts_efcr"("ft"."transfer_type", "ft"."origin_system_id", "ft"."target_system_id"))
-          GROUP BY "ft"."cycle_id", "ft"."origin_system_id", "ft"."date"
-        UNION ALL
-         SELECT "ft"."cycle_id",
-            "ft"."target_system_id" AS "system_id",
-            "ft"."date",
-            'transfer in'::"text" AS "activity",
-            60 AS "activity_rank",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            "sum"("ft"."number_of_fish_transfer") AS "sum",
-            "sum"("public"."transfer_weight_kg"("ft"."total_weight_transfer", "ft"."number_of_fish_transfer", "ft"."abw")) AS "sum",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8"
-           FROM "public"."fish_transfer" "ft"
-          WHERE (("ft"."target_system_id" IS NOT NULL) AND ("ft"."cycle_id" IS NOT NULL) AND "public"."transfer_impacts_efcr"("ft"."transfer_type", "ft"."origin_system_id", "ft"."target_system_id"))
-          GROUP BY "ft"."cycle_id", "ft"."target_system_id", "ft"."date"
-        UNION ALL
+          WHERE (("ft"."cycle_id" IS NOT NULL) AND ("ft"."transfer_type" = ANY (ARRAY['transfer'::"public"."transfer_type", 'grading'::"public"."transfer_type", 'density_thinning'::"public"."transfer_type", 'external_out'::"public"."transfer_type", 'broodstock'::"public"."transfer_type", 'lab_sample'::"public"."transfer_type"])))
+        ), "transfer_out_at_sample" AS (
+         SELECT DISTINCT ON ("sb"."sampling_event_id") "sb"."sampling_event_id",
+            (COALESCE("toc"."cum_fish_out", (0)::double precision))::numeric AS "cum_fish_out",
+            COALESCE("toc"."cum_weight_out_kg", (0)::numeric) AS "cum_weight_out_kg"
+           FROM ("sampling_base" "sb"
+             LEFT JOIN "transfer_out_cumulative" "toc" ON ((("toc"."cycle_id" = "sb"."cycle_id") AND ("toc"."date" <= "sb"."sample_date"))))
+          ORDER BY "sb"."sampling_event_id", "toc"."date" DESC
+        ), "harvest_cumulative" AS (
          SELECT "fh"."cycle_id",
-            "fh"."system_id",
             "fh"."date",
-                CASE
-                    WHEN ("fh"."type_of_harvest" = 'final'::"public"."type_of_harvest") THEN 'final harvest'::"text"
-                    ELSE 'partial harvest'::"text"
-                END AS "activity",
-                CASE
-                    WHEN ("fh"."type_of_harvest" = 'final'::"public"."type_of_harvest") THEN 80
-                    ELSE 70
-                END AS "activity_rank",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            ("sum"(COALESCE("fh"."number_of_fish_harvest", (0)::bigint)))::double precision AS "sum",
-            "sum"("fh"."total_weight_harvest") AS "sum"
+            "sum"("fh"."number_of_fish_harvest") OVER (PARTITION BY "fh"."cycle_id" ORDER BY "fh"."date" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS "cum_fish_harvested",
+            "sum"((COALESCE("fh"."total_weight_harvest", (0)::double precision))::numeric) OVER (PARTITION BY "fh"."cycle_id" ORDER BY "fh"."date" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS "cum_weight_harvested_kg"
            FROM "public"."fish_harvest" "fh"
           WHERE ("fh"."cycle_id" IS NOT NULL)
-          GROUP BY "fh"."cycle_id", "fh"."system_id", "fh"."date", "fh"."type_of_harvest"
-        UNION ALL
-         SELECT "lineage"."cycle_id",
-            "wq"."system_id",
-            "wq"."date",
-            'water quality'::"text" AS "activity",
-            90 AS "activity_rank",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8",
-            (0)::double precision AS "float8"
-           FROM ("public"."water_quality_measurement" "wq"
-             JOIN LATERAL "public"."resolve_cycle_batch_for_system_date"("wq"."system_id", "wq"."date") "lineage"("cycle_id", "batch_id") ON (true))
-          GROUP BY "lineage"."cycle_id", "wq"."system_id", "wq"."date"
-        ), "events_with_cycles" AS (
-         SELECT "re"."cycle_id",
-            "pc"."ongoing_cycle",
-            "re"."date",
-            "re"."system_id",
-            "s"."name" AS "system_name",
-            ("s"."growth_stage")::"text" AS "growth_stage",
-            "re"."activity",
-            "re"."activity_rank",
-            "re"."number_of_fish_stocked",
-            "re"."total_weight_stocked",
-            "re"."total_feed_amount_period",
-            "re"."daily_mortality_count",
-            "re"."number_of_fish_transfer_out",
-            "re"."total_weight_transfer_out",
-            "re"."number_of_fish_transfer_in",
-            "re"."total_weight_transfer_in",
-            "re"."number_of_fish_harvested",
-            "re"."total_weight_harvested"
-           FROM (("real_events" "re"
-             JOIN "public"."production_cycle" "pc" ON (("pc"."cycle_id" = "re"."cycle_id")))
-             JOIN "public"."system" "s" ON (("s"."id" = "re"."system_id")))
-        ), "events_with_facts" AS (
-         SELECT "e"."cycle_id",
-            "e"."ongoing_cycle",
-            "e"."date",
-            "e"."system_id",
-            "e"."system_name",
-            "e"."growth_stage",
-            "e"."activity",
-            "e"."activity_rank",
-            "e"."number_of_fish_stocked",
-            "e"."total_weight_stocked",
-            "e"."total_feed_amount_period",
-            "e"."daily_mortality_count",
-            "e"."number_of_fish_transfer_out",
-            "e"."total_weight_transfer_out",
-            "e"."number_of_fish_transfer_in",
-            "e"."total_weight_transfer_in",
-            "e"."number_of_fish_harvested",
-            "e"."total_weight_harvested",
-            "dsf"."abw_last_sampling" AS "average_body_weight",
-            "dsf"."number_of_fish" AS "number_of_fish_inventory",
-            "dsf"."biomass_last_sampling" AS "total_biomass",
-            "lag"("dsf"."biomass_last_sampling") OVER (PARTITION BY "e"."cycle_id" ORDER BY "e"."date", "e"."activity_rank", "e"."system_id") AS "previous_total_biomass"
-           FROM ("events_with_cycles" "e"
-             LEFT JOIN "analytics"."daily_system_facts" "dsf" ON ((("dsf"."system_id" = "e"."system_id") AND ("dsf"."inventory_date" = "e"."date"))))
-        ), "consolidated" AS (
-         SELECT "e"."cycle_id",
-            "e"."ongoing_cycle",
-            "e"."date",
-            "e"."system_id",
-            "e"."system_name",
-            "e"."growth_stage",
-            "e"."activity",
-            "e"."activity_rank",
-            "e"."number_of_fish_stocked",
-            "e"."total_weight_stocked",
-            "e"."total_feed_amount_period",
-            "e"."daily_mortality_count",
-            "e"."number_of_fish_transfer_out",
-            "e"."total_weight_transfer_out",
-            "e"."number_of_fish_transfer_in",
-            "e"."total_weight_transfer_in",
-            "e"."number_of_fish_harvested",
-            "e"."total_weight_harvested",
-            "e"."average_body_weight",
-            "e"."number_of_fish_inventory",
-            "e"."total_biomass",
-            "e"."previous_total_biomass",
-                CASE
-                    WHEN (("e"."previous_total_biomass" IS NULL) OR ("e"."total_biomass" IS NULL)) THEN (0)::double precision
-                    ELSE ("e"."total_biomass" - "e"."previous_total_biomass")
-                END AS "biomass_increase_period",
-                CASE
-                    WHEN (("e"."previous_total_biomass" IS NULL) OR ("e"."total_biomass" IS NULL)) THEN NULL::double precision
-                    ELSE ((((("e"."total_biomass" - "e"."previous_total_biomass") + "e"."total_weight_transfer_out") - "e"."total_weight_transfer_in") + "e"."total_weight_harvested") - "e"."total_weight_stocked")
-                END AS "efcr_denominator_period"
-           FROM "events_with_facts" "e"
-        ), "final_rows" AS (
-         SELECT "c"."cycle_id",
-            "c"."ongoing_cycle",
-            "c"."date",
-            "c"."system_id",
-            "c"."system_name",
-            "c"."growth_stage",
-            "c"."activity",
-            "c"."activity_rank",
-            "c"."number_of_fish_stocked",
-            "c"."total_weight_stocked",
-            "c"."total_feed_amount_period",
-            "c"."daily_mortality_count",
-            "c"."number_of_fish_transfer_out",
-            "c"."total_weight_transfer_out",
-            "c"."number_of_fish_transfer_in",
-            "c"."total_weight_transfer_in",
-            "c"."number_of_fish_harvested",
-            "c"."total_weight_harvested",
-            "c"."average_body_weight",
-            "c"."number_of_fish_inventory",
-            "c"."total_biomass",
-            "c"."previous_total_biomass",
-            "c"."biomass_increase_period",
-            "c"."efcr_denominator_period",
-            "sum"("c"."total_feed_amount_period") OVER (PARTITION BY "c"."cycle_id" ORDER BY "c"."date", "c"."activity_rank", "c"."system_id") AS "total_feed_amount_aggregated",
-            "sum"("c"."biomass_increase_period") OVER (PARTITION BY "c"."cycle_id" ORDER BY "c"."date", "c"."activity_rank", "c"."system_id") AS "biomass_increase_aggregated",
-            "sum"("c"."daily_mortality_count") OVER (PARTITION BY "c"."cycle_id" ORDER BY "c"."date", "c"."activity_rank", "c"."system_id") AS "cumulative_mortality",
-            "sum"("c"."total_weight_transfer_out") OVER (PARTITION BY "c"."cycle_id" ORDER BY "c"."date", "c"."activity_rank", "c"."system_id") AS "total_weight_transfer_out_aggregated",
-            "sum"("c"."total_weight_transfer_in") OVER (PARTITION BY "c"."cycle_id" ORDER BY "c"."date", "c"."activity_rank", "c"."system_id") AS "total_weight_transfer_in_aggregated",
-            "sum"("c"."total_weight_harvested") OVER (PARTITION BY "c"."cycle_id" ORDER BY "c"."date", "c"."activity_rank", "c"."system_id") AS "total_weight_harvested_aggregated",
-            "sum"("c"."total_weight_stocked") OVER (PARTITION BY "c"."cycle_id" ORDER BY "c"."date", "c"."activity_rank", "c"."system_id") AS "total_weight_stocked_aggregated",
-            "sum"(COALESCE("c"."efcr_denominator_period", (0)::double precision)) OVER (PARTITION BY "c"."cycle_id" ORDER BY "c"."date", "c"."activity_rank", "c"."system_id") AS "efcr_denominator_aggregated"
-           FROM "consolidated" "c"
+        ), "harvest_at_sample" AS (
+         SELECT DISTINCT ON ("sb"."sampling_event_id") "sb"."sampling_event_id",
+            COALESCE("hc"."cum_fish_harvested", (0)::numeric) AS "cum_fish_harvested",
+            COALESCE("hc"."cum_weight_harvested_kg", (0)::numeric) AS "cum_weight_harvested_kg"
+           FROM ("sampling_base" "sb"
+             LEFT JOIN "harvest_cumulative" "hc" ON ((("hc"."cycle_id" = "sb"."cycle_id") AND ("hc"."date" <= "sb"."sample_date"))))
+          ORDER BY "sb"."sampling_event_id", "hc"."date" DESC
+        ), "transfer_in_cumulative" AS (
+         SELECT "ft"."cycle_id",
+            "ft"."date",
+            "sum"("ft"."number_of_fish_transfer") OVER (PARTITION BY "ft"."cycle_id" ORDER BY "ft"."date" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS "cum_fish_in",
+            "sum"((COALESCE("ft"."total_weight_transfer", (0)::double precision))::numeric) OVER (PARTITION BY "ft"."cycle_id" ORDER BY "ft"."date" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS "cum_weight_in_kg"
+           FROM "public"."fish_transfer" "ft"
+          WHERE (("ft"."cycle_id" IS NOT NULL) AND ("ft"."transfer_type" = 'transfer'::"public"."transfer_type") AND (EXISTS ( SELECT 1
+                   FROM ("public"."production_cycle" "pc2"
+                     JOIN "public"."system" "s2" ON (("s2"."id" = "pc2"."system_id")))
+                  WHERE (("pc2"."cycle_id" = "ft"."cycle_id") AND ("ft"."target_system_id" = "s2"."id") AND ("ft"."origin_system_id" <> "s2"."id")))) AND ("ft"."date" > ( SELECT COALESCE("min"("fs3"."date"), '1900-01-01'::"date") AS "coalesce"
+                   FROM "public"."fish_stocking" "fs3"
+                  WHERE ("fs3"."cycle_id" = "ft"."cycle_id"))))
+        ), "transfer_in_at_sample" AS (
+         SELECT DISTINCT ON ("sb"."sampling_event_id") "sb"."sampling_event_id",
+            (COALESCE("tic"."cum_fish_in", (0)::double precision))::numeric AS "cum_fish_in",
+            COALESCE("tic"."cum_weight_in_kg", (0)::numeric) AS "cum_weight_in_kg"
+           FROM ("sampling_base" "sb"
+             LEFT JOIN "transfer_in_cumulative" "tic" ON ((("tic"."cycle_id" = "sb"."cycle_id") AND ("tic"."date" <= "sb"."sample_date"))))
+          ORDER BY "sb"."sampling_event_id", "tic"."date" DESC
+        ), "fish_biomass" AS (
+         SELECT "sb"."sampling_event_id",
+            "sb"."cycle_id",
+            "sb"."sample_date",
+            "sb"."abw_g",
+            "sb"."number_of_fish_sampling",
+            "sb"."system_id",
+            "sb"."cage",
+            "sb"."cage_volume_m3",
+            "sb"."target_weight_g",
+            "sb"."cycle_start_date",
+            "sb"."stocking_date",
+            "sb"."n0",
+            "sb"."abw_0_g",
+            "sb"."initial_biomass_kg",
+            "mas"."cum_mortality",
+            "toas"."cum_fish_out",
+            "toas"."cum_weight_out_kg",
+            "has_"."cum_fish_harvested",
+            "has_"."cum_weight_harvested_kg",
+            "tias"."cum_fish_in",
+            "tias"."cum_weight_in_kg",
+            ("toas"."cum_fish_out" + "has_"."cum_fish_harvested") AS "cum_total_fish_out",
+            ("toas"."cum_weight_out_kg" + "has_"."cum_weight_harvested_kg") AS "cum_total_weight_out_kg",
+            GREATEST((((("sb"."n0" - "mas"."cum_mortality") - "toas"."cum_fish_out") - "has_"."cum_fish_harvested") + "tias"."cum_fish_in"), (0)::numeric) AS "fish_alive",
+            "round"(GREATEST((((((("sb"."n0" - "mas"."cum_mortality") - "toas"."cum_fish_out") - "has_"."cum_fish_harvested") + "tias"."cum_fish_in") * "sb"."abw_g") / 1000.0), (0)::numeric), 2) AS "biomass_kg"
+           FROM (((("sampling_base" "sb"
+             JOIN "mortality_at_sample" "mas" ON (("mas"."sampling_event_id" = "sb"."sampling_event_id")))
+             JOIN "transfer_out_at_sample" "toas" ON (("toas"."sampling_event_id" = "sb"."sampling_event_id")))
+             JOIN "harvest_at_sample" "has_" ON (("has_"."sampling_event_id" = "sb"."sampling_event_id")))
+             JOIN "transfer_in_at_sample" "tias" ON (("tias"."sampling_event_id" = "sb"."sampling_event_id")))
+        ), "fish_biomass_lagged" AS (
+         SELECT "fb"."sampling_event_id",
+            "fb"."cycle_id",
+            "fb"."sample_date",
+            "fb"."abw_g",
+            "fb"."number_of_fish_sampling",
+            "fb"."system_id",
+            "fb"."cage",
+            "fb"."cage_volume_m3",
+            "fb"."target_weight_g",
+            "fb"."cycle_start_date",
+            "fb"."stocking_date",
+            "fb"."n0",
+            "fb"."abw_0_g",
+            "fb"."initial_biomass_kg",
+            "fb"."cum_mortality",
+            "fb"."cum_fish_out",
+            "fb"."cum_weight_out_kg",
+            "fb"."cum_fish_harvested",
+            "fb"."cum_weight_harvested_kg",
+            "fb"."cum_fish_in",
+            "fb"."cum_weight_in_kg",
+            "fb"."cum_total_fish_out",
+            "fb"."cum_total_weight_out_kg",
+            "fb"."fish_alive",
+            "fb"."biomass_kg",
+            "lag"("fb"."abw_g") OVER "w" AS "prev_abw_g",
+            "lag"("fb"."biomass_kg") OVER "w" AS "prev_biomass_kg",
+            "lag"("fb"."fish_alive") OVER "w" AS "prev_fish_alive",
+            "lag"("fb"."sample_date") OVER "w" AS "prev_sample_date",
+            "lag"("fb"."cum_total_weight_out_kg") OVER "w" AS "prev_cum_total_weight_out_kg",
+            "lag"("fb"."cum_weight_in_kg") OVER "w" AS "prev_cum_weight_in_kg",
+            ("fb"."sample_date" - "lag"("fb"."sample_date") OVER "w") AS "days_since_prev"
+           FROM "fish_biomass" "fb"
+          WINDOW "w" AS (PARTITION BY "fb"."cycle_id" ORDER BY "fb"."sample_date")
+        ), "feed_cumulative" AS (
+         SELECT "fr"."cycle_id",
+            "fr"."date",
+            "sum"(("fr"."feeding_amount")::numeric) OVER (PARTITION BY "fr"."cycle_id" ORDER BY "fr"."date" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS "cum_feed_kg"
+           FROM "public"."feeding_record" "fr"
+          WHERE ("fr"."cycle_id" IS NOT NULL)
+        ), "feed_at_sample" AS (
+         SELECT DISTINCT ON ("fbl"."sampling_event_id") "fbl"."sampling_event_id",
+            "fbl"."cycle_id",
+            "fbl"."sample_date",
+            COALESCE("fc"."cum_feed_kg", (0)::numeric) AS "feed_kg_aggregated"
+           FROM ("fish_biomass_lagged" "fbl"
+             LEFT JOIN "feed_cumulative" "fc" ON ((("fc"."cycle_id" = "fbl"."cycle_id") AND ("fc"."date" <= "fbl"."sample_date"))))
+          ORDER BY "fbl"."sampling_event_id", "fc"."date" DESC
+        ), "feed_periods" AS (
+         SELECT "fas"."sampling_event_id",
+            "fas"."feed_kg_aggregated",
+            COALESCE(("fas"."feed_kg_aggregated" - "lag"("fas"."feed_kg_aggregated") OVER (PARTITION BY "fas"."cycle_id" ORDER BY "fas"."sample_date")), "fas"."feed_kg_aggregated") AS "feed_kg_period"
+           FROM "feed_at_sample" "fas"
+        ), "growth_calc" AS (
+         SELECT "fbl"."sampling_event_id",
+            "fbl"."cycle_id",
+            "fbl"."sample_date",
+            "fbl"."abw_g",
+            "fbl"."number_of_fish_sampling",
+            "fbl"."system_id",
+            "fbl"."cage",
+            "fbl"."cage_volume_m3",
+            "fbl"."target_weight_g",
+            "fbl"."cycle_start_date",
+            "fbl"."stocking_date",
+            "fbl"."n0",
+            "fbl"."abw_0_g",
+            "fbl"."initial_biomass_kg",
+            "fbl"."cum_mortality",
+            "fbl"."cum_fish_out",
+            "fbl"."cum_weight_out_kg",
+            "fbl"."cum_fish_harvested",
+            "fbl"."cum_weight_harvested_kg",
+            "fbl"."cum_fish_in",
+            "fbl"."cum_weight_in_kg",
+            "fbl"."cum_total_fish_out",
+            "fbl"."cum_total_weight_out_kg",
+            "fbl"."fish_alive",
+            "fbl"."biomass_kg",
+            "fbl"."prev_abw_g",
+            "fbl"."prev_biomass_kg",
+            "fbl"."prev_fish_alive",
+            "fbl"."prev_sample_date",
+            "fbl"."prev_cum_total_weight_out_kg",
+            "fbl"."prev_cum_weight_in_kg",
+            "fbl"."days_since_prev",
+            "fp"."feed_kg_period",
+            "fp"."feed_kg_aggregated",
+            "round"(((COALESCE(("fbl"."biomass_kg" - "fbl"."prev_biomass_kg"), (0)::numeric) + COALESCE(("fbl"."cum_total_weight_out_kg" - "fbl"."prev_cum_total_weight_out_kg"), (0)::numeric)) - COALESCE(("fbl"."cum_weight_in_kg" - "fbl"."prev_cum_weight_in_kg"), (0)::numeric)), 2) AS "growth_kg_period",
+            "round"(((("fbl"."biomass_kg" - COALESCE("fbl"."initial_biomass_kg", (("fbl"."n0" * "fbl"."abw_0_g") / 1000.0))) + "fbl"."cum_total_weight_out_kg") - "fbl"."cum_weight_in_kg"), 2) AS "growth_kg_aggregated"
+           FROM ("fish_biomass_lagged" "fbl"
+             JOIN "feed_periods" "fp" ON (("fp"."sampling_event_id" = "fbl"."sampling_event_id")))
         )
- SELECT "f"."cycle_id",
-    "f"."date",
-    "f"."system_id",
-    "f"."system_name",
-    "f"."growth_stage",
-    "f"."ongoing_cycle",
-    "f"."average_body_weight",
-    "f"."number_of_fish_inventory",
-    "f"."total_feed_amount_period",
-    "f"."activity",
-    "f"."activity_rank",
-    "f"."total_biomass",
-    "f"."biomass_increase_period",
-    "f"."total_feed_amount_aggregated",
-    "f"."biomass_increase_aggregated",
-    "f"."daily_mortality_count",
-    "f"."cumulative_mortality",
-    "f"."number_of_fish_transfer_out",
-    "f"."total_weight_transfer_out",
-    "f"."total_weight_transfer_out_aggregated",
-    "f"."number_of_fish_transfer_in",
-    "f"."total_weight_transfer_in",
-    "f"."total_weight_transfer_in_aggregated",
-    "f"."number_of_fish_harvested",
-    "f"."total_weight_harvested",
-    "f"."total_weight_harvested_aggregated",
-    "f"."number_of_fish_stocked",
-    "f"."total_weight_stocked",
-    "f"."total_weight_stocked_aggregated",
+ SELECT "gc"."sampling_event_id",
+    "gc"."cycle_id",
+    "gc"."cage",
+    "gc"."system_id",
+    "gc"."stocking_date",
+    "gc"."cycle_start_date",
+    "gc"."sample_date",
+    ("gc"."sample_date" - "gc"."stocking_date") AS "days_on_feed",
+    "gc"."n0",
+    "gc"."abw_0_g",
+    "gc"."abw_g",
+    ("gc"."fish_alive")::integer AS "fish_alive",
+    "gc"."biomass_kg",
+    "gc"."cage_volume_m3",
+    "gc"."target_weight_g",
+    "gc"."cum_mortality",
+    ("gc"."cum_fish_out")::integer AS "cum_fish_out",
+    ("gc"."cum_fish_harvested")::integer AS "cum_fish_harvested",
+    ("gc"."cum_fish_in")::integer AS "cum_fish_in",
+    "gc"."growth_kg_period",
+    "gc"."growth_kg_aggregated",
+    "round"("gc"."feed_kg_period", 2) AS "feed_kg_period",
+    "round"("gc"."feed_kg_aggregated", 2) AS "feed_kg_aggregated",
         CASE
-            WHEN ("f"."efcr_denominator_period" > (0)::double precision) THEN ("f"."total_feed_amount_period" / "f"."efcr_denominator_period")
-            ELSE NULL::double precision
+            WHEN ("gc"."growth_kg_period" > (0)::numeric) THEN "round"(("gc"."feed_kg_period" / "gc"."growth_kg_period"), 3)
+            ELSE NULL::numeric
         END AS "efcr_period",
         CASE
-            WHEN ("f"."efcr_denominator_aggregated" > (0)::double precision) THEN ("f"."total_feed_amount_aggregated" / "f"."efcr_denominator_aggregated")
-            ELSE NULL::double precision
-        END AS "efcr_aggregated"
-   FROM "final_rows" "f"
-  ORDER BY "f"."cycle_id", "f"."date", "f"."activity_rank", "f"."system_id"
+            WHEN ("gc"."growth_kg_aggregated" > (0)::numeric) THEN "round"(("gc"."feed_kg_aggregated" / "gc"."growth_kg_aggregated"), 3)
+            ELSE NULL::numeric
+        END AS "efcr_aggregated",
+        CASE
+            WHEN (("gc"."days_since_prev" > 0) AND ("gc"."prev_abw_g" IS NOT NULL)) THEN "round"((("gc"."abw_g" - "gc"."prev_abw_g") / ("gc"."days_since_prev")::numeric), 4)
+            ELSE NULL::numeric
+        END AS "adg_g_per_day",
+        CASE
+            WHEN (("gc"."days_since_prev" > 0) AND ("gc"."prev_abw_g" IS NOT NULL) AND ("gc"."prev_abw_g" > (0)::numeric) AND ("gc"."abw_g" > (0)::numeric)) THEN "round"(((("ln"("gc"."abw_g") - "ln"("gc"."prev_abw_g")) / ("gc"."days_since_prev")::numeric) * (100)::numeric), 4)
+            ELSE NULL::numeric
+        END AS "sgr_pct_per_day",
+        CASE
+            WHEN ("gc"."n0" > (0)::numeric) THEN "round"((("gc"."fish_alive" / "gc"."n0") * (100)::numeric), 2)
+            ELSE NULL::numeric
+        END AS "survival_rate_pct",
+        CASE
+            WHEN (("gc"."cage_volume_m3" IS NOT NULL) AND ("gc"."cage_volume_m3" > (0)::numeric)) THEN "round"(("gc"."biomass_kg" / "gc"."cage_volume_m3"), 3)
+            ELSE NULL::numeric
+        END AS "biomass_density_kg_m3",
+        CASE
+            WHEN (("gc"."cage_volume_m3" IS NOT NULL) AND ("gc"."cage_volume_m3" > (0)::numeric)) THEN "round"(("gc"."fish_alive" / "gc"."cage_volume_m3"), 2)
+            ELSE NULL::numeric
+        END AS "fish_density_per_m3",
+        CASE
+            WHEN (("gc"."cage_volume_m3" IS NOT NULL) AND ("gc"."cage_volume_m3" > (0)::numeric)) THEN "round"(("gc"."feed_kg_period" / "gc"."cage_volume_m3"), 3)
+            ELSE NULL::numeric
+        END AS "feed_intensity_kg_m3",
+        CASE
+            WHEN (("gc"."days_since_prev" > 0) AND ("gc"."prev_biomass_kg" IS NOT NULL) AND ((("gc"."biomass_kg" + "gc"."prev_biomass_kg") / (2)::numeric) > (0)::numeric)) THEN "round"(((("gc"."feed_kg_period" / (("gc"."biomass_kg" + "gc"."prev_biomass_kg") / (2)::numeric)) / ("gc"."days_since_prev")::numeric) * (100)::numeric), 3)
+            ELSE NULL::numeric
+        END AS "daily_feeding_rate_pct"
+   FROM "growth_calc" "gc"
+  ORDER BY "gc"."cage", "gc"."sample_date"
   WITH NO DATA;
 
 
 ALTER TABLE "analytics"."production_summary" OWNER TO "postgres";
 
+--
+-- Name: efcr_period_last_sampling_view; Type: MATERIALIZED VIEW; Schema: analytics; Owner: postgres
+--
 
 CREATE MATERIALIZED VIEW "analytics"."efcr_period_last_sampling_view" AS
- WITH "sampling_points" AS (
-         SELECT "ps"."system_id",
-            "ps"."cycle_id",
-            "ps"."date" AS "sampling_date",
-            "ps"."total_feed_amount_aggregated" AS "feed_cumulative",
-            "ps"."biomass_increase_aggregated" AS "growth_cumulative",
-            "ps"."total_biomass" AS "biomass_at_sampling",
-            "lag"("ps"."total_feed_amount_aggregated") OVER (PARTITION BY "ps"."cycle_id" ORDER BY "ps"."date") AS "prev_feed_cumulative",
-            "lag"("ps"."biomass_increase_aggregated") OVER (PARTITION BY "ps"."cycle_id" ORDER BY "ps"."date") AS "prev_growth_cumulative"
-           FROM "analytics"."production_summary" "ps"
-          WHERE ("ps"."activity" = 'sampling'::"text")
-        )
- SELECT "dsf"."system_id",
-    "dsf"."farm_id",
-    "dsf"."inventory_date",
-    "dsf"."last_sampling_date",
-        CASE
-            WHEN (("sp"."growth_cumulative" - COALESCE("sp"."prev_growth_cumulative", (0)::double precision)) > (0)::double precision) THEN "round"(((("sp"."feed_cumulative" - COALESCE("sp"."prev_feed_cumulative", (0)::double precision)) / ("sp"."growth_cumulative" - COALESCE("sp"."prev_growth_cumulative", (0)::double precision))))::numeric, 4)
-            ELSE NULL::numeric
-        END AS "efcr_period_last_sampling",
-        CASE
-            WHEN ("sp"."growth_cumulative" > (0)::double precision) THEN "round"((("sp"."feed_cumulative" / "sp"."growth_cumulative"))::numeric, 4)
-            ELSE NULL::numeric
-        END AS "efcr_aggregated_last_sampling",
-    ("dsf"."biomass_last_sampling")::numeric AS "biomass_last_sampling"
-   FROM ("analytics"."daily_system_facts" "dsf"
-     JOIN "sampling_points" "sp" ON ((("sp"."system_id" = "dsf"."system_id") AND ("sp"."cycle_id" = "dsf"."production_cycle_id") AND ("sp"."sampling_date" = "dsf"."last_sampling_date"))))
-  WHERE ("dsf"."last_sampling_date" IS NOT NULL)
-  ORDER BY "dsf"."system_id", "dsf"."inventory_date"
+ SELECT "ps"."cycle_id",
+    "ps"."cage",
+    "ps"."system_id",
+    "ps"."stocking_date",
+    "ps"."sample_date" AS "last_sample_date",
+    "ps"."days_on_feed",
+    "ps"."n0",
+    "ps"."abw_0_g",
+    "ps"."abw_g" AS "current_abw_g",
+    "ps"."fish_alive",
+    "ps"."biomass_kg",
+    "ps"."target_weight_g",
+    "ps"."cum_mortality",
+    "ps"."cum_fish_out",
+    "ps"."cum_fish_harvested",
+    "ps"."cum_fish_in",
+    "ps"."growth_kg_period",
+    "ps"."growth_kg_aggregated",
+    "ps"."feed_kg_period",
+    "ps"."feed_kg_aggregated",
+    "ps"."efcr_period",
+    "ps"."efcr_aggregated",
+    "ps"."adg_g_per_day",
+    "ps"."sgr_pct_per_day",
+    "ps"."survival_rate_pct",
+    "ps"."biomass_density_kg_m3",
+    "ps"."fish_density_per_m3",
+    "ps"."feed_intensity_kg_m3",
+    "ps"."daily_feeding_rate_pct",
+    "ps"."cage_volume_m3"
+   FROM "analytics"."production_summary" "ps"
+  WHERE ("ps"."sample_date" = ( SELECT "max"("ps2"."sample_date") AS "max"
+           FROM "analytics"."production_summary" "ps2"
+          WHERE ("ps2"."cycle_id" = "ps"."cycle_id")))
+  ORDER BY "ps"."cage"
   WITH NO DATA;
 
 
 ALTER TABLE "analytics"."efcr_period_last_sampling_view" OWNER TO "postgres";
 
+--
+-- Name: live; Type: TABLE; Schema: energy; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "energy"."live" (
     "id" bigint NOT NULL,
@@ -5186,6 +5471,9 @@ CREATE TABLE IF NOT EXISTS "energy"."live" (
 
 ALTER TABLE "energy"."live" OWNER TO "postgres";
 
+--
+-- Name: live_id_seq; Type: SEQUENCE; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE "energy"."live" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "energy"."live_id_seq"
@@ -5197,6 +5485,9 @@ ALTER TABLE "energy"."live" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
 );
 
 
+--
+-- Name: timeseries; Type: TABLE; Schema: energy; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "energy"."timeseries" (
     "id" bigint NOT NULL,
@@ -5228,6 +5519,9 @@ CREATE TABLE IF NOT EXISTS "energy"."timeseries" (
 
 ALTER TABLE "energy"."timeseries" OWNER TO "postgres";
 
+--
+-- Name: timeseries_id_seq; Type: SEQUENCE; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE "energy"."timeseries" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "energy"."timeseries_id_seq"
@@ -5239,6 +5533,9 @@ ALTER TABLE "energy"."timeseries" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDEN
 );
 
 
+--
+-- Name: farm_user_invitation; Type: TABLE; Schema: private; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "private"."farm_user_invitation" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
@@ -5258,6 +5555,9 @@ CREATE TABLE IF NOT EXISTS "private"."farm_user_invitation" (
 
 ALTER TABLE "private"."farm_user_invitation" OWNER TO "postgres";
 
+--
+-- Name: _affected_systems; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."_affected_systems" (
     "system_id" bigint NOT NULL,
@@ -5269,10 +5569,16 @@ CREATE TABLE IF NOT EXISTS "public"."_affected_systems" (
 
 ALTER TABLE "public"."_affected_systems" OWNER TO "postgres";
 
+--
+-- Name: TABLE "_affected_systems"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON TABLE "public"."_affected_systems" IS 'Internal queue of systems whose daily inventory needs recomputation after operational event changes.';
 
 
+--
+-- Name: alert_threshold; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."alert_threshold" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
@@ -5293,18 +5599,30 @@ CREATE TABLE IF NOT EXISTS "public"."alert_threshold" (
 
 ALTER TABLE "public"."alert_threshold" OWNER TO "postgres";
 
+--
+-- Name: COLUMN "alert_threshold"."low_sgr_threshold"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."alert_threshold"."low_sgr_threshold" IS 'SGR (%/day) below which a warning fires. Research brief: fingerlings ≥3%/day; grow-out ≥1%/day.';
 
 
+--
+-- Name: COLUMN "alert_threshold"."low_survival_pct"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."alert_threshold"."low_survival_pct" IS 'Cumulative survival (%) below which a WARNING fires. Research brief: investigate <80%.';
 
 
+--
+-- Name: COLUMN "alert_threshold"."critical_survival_pct"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."alert_threshold"."critical_survival_pct" IS 'Cumulative survival (%) below which a CRITICAL fires. Research brief: critical <70%.';
 
 
+--
+-- Name: farm_user; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."farm_user" (
     "farm_id" "uuid" NOT NULL,
@@ -5318,6 +5636,9 @@ CREATE TABLE IF NOT EXISTS "public"."farm_user" (
 
 ALTER TABLE "public"."farm_user" OWNER TO "postgres";
 
+--
+-- Name: api_alert_thresholds; Type: VIEW; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE VIEW "public"."api_alert_thresholds" WITH ("security_invoker"='true') AS
  SELECT "at"."id",
@@ -5343,6 +5664,9 @@ CREATE OR REPLACE VIEW "public"."api_alert_thresholds" WITH ("security_invoker"=
 
 ALTER TABLE "public"."api_alert_thresholds" OWNER TO "postgres";
 
+--
+-- Name: daily_water_quality_rating; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."daily_water_quality_rating" (
     "id" bigint NOT NULL,
@@ -5360,6 +5684,9 @@ CREATE TABLE IF NOT EXISTS "public"."daily_water_quality_rating" (
 
 ALTER TABLE "public"."daily_water_quality_rating" OWNER TO "postgres";
 
+--
+-- Name: user_profile; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."user_profile" (
     "user_id" "uuid" NOT NULL,
@@ -5377,6 +5704,9 @@ CREATE TABLE IF NOT EXISTS "public"."user_profile" (
 
 ALTER TABLE "public"."user_profile" OWNER TO "postgres";
 
+--
+-- Name: api_daily_water_quality_rating; Type: VIEW; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE VIEW "public"."api_daily_water_quality_rating" WITH ("security_invoker"='true') AS
  SELECT "dwr"."system_id",
@@ -5389,9 +5719,6 @@ CREATE OR REPLACE VIEW "public"."api_daily_water_quality_rating" WITH ("security
     ("dwr"."worst_parameter")::"text" AS "worst_parameter_normalized",
     "dwr"."worst_parameter_value",
     "dwr"."worst_parameter_unit",
-    ( SELECT "avg"("wqm"."parameter_value") AS "avg"
-           FROM "public"."water_quality_measurement" "wqm"
-          WHERE (("wqm"."system_id" = "dwr"."system_id") AND ("wqm"."date" = "dwr"."rating_date") AND ("wqm"."parameter_name" = 'temperature'::"public"."water_quality_parameters"))) AS "temperature_average",
     "dwr"."created_at"
    FROM ("public"."daily_water_quality_rating" "dwr"
      JOIN "public"."system" "s" ON (("s"."id" = "dwr"."system_id")))
@@ -5402,6 +5729,9 @@ CREATE OR REPLACE VIEW "public"."api_daily_water_quality_rating" WITH ("security
 
 ALTER TABLE "public"."api_daily_water_quality_rating" OWNER TO "postgres";
 
+--
+-- Name: water_quality_framework; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."water_quality_framework" (
     "id" bigint NOT NULL,
@@ -5417,6 +5747,31 @@ CREATE TABLE IF NOT EXISTS "public"."water_quality_framework" (
 
 ALTER TABLE "public"."water_quality_framework" OWNER TO "postgres";
 
+--
+-- Name: water_quality_measurement; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE IF NOT EXISTS "public"."water_quality_measurement" (
+    "id" bigint NOT NULL,
+    "date" "date" NOT NULL,
+    "time" time without time zone NOT NULL,
+    "water_depth" double precision NOT NULL,
+    "parameter_value" double precision NOT NULL,
+    "system_id" bigint NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "parameter_name" "public"."water_quality_parameters" NOT NULL,
+    "measured_at" timestamp with time zone NOT NULL,
+    "location_reference" "text",
+    "local_id" "text",
+    "synced_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."water_quality_measurement" OWNER TO "postgres";
+
+--
+-- Name: api_water_quality_measurements; Type: VIEW; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE VIEW "public"."api_water_quality_measurements" WITH ("security_invoker"='true') AS
  SELECT "wqm"."id",
@@ -5441,6 +5796,9 @@ CREATE OR REPLACE VIEW "public"."api_water_quality_measurements" WITH ("security
 
 ALTER TABLE "public"."api_water_quality_measurements" OWNER TO "postgres";
 
+--
+-- Name: app_config; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."app_config" (
     "key" "text" NOT NULL,
@@ -5450,6 +5808,9 @@ CREATE TABLE IF NOT EXISTS "public"."app_config" (
 
 ALTER TABLE "public"."app_config" OWNER TO "postgres";
 
+--
+-- Name: daily_water_quality_rating_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."daily_water_quality_rating" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."daily_water_quality_rating_id_seq"
@@ -5461,6 +5822,9 @@ ALTER TABLE "public"."daily_water_quality_rating" ALTER COLUMN "id" ADD GENERATE
 );
 
 
+--
+-- Name: dashboard_time_period; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."dashboard_time_period" (
     "time_period" "public"."time_period" NOT NULL,
@@ -5470,6 +5834,9 @@ CREATE TABLE IF NOT EXISTS "public"."dashboard_time_period" (
 
 ALTER TABLE "public"."dashboard_time_period" OWNER TO "postgres";
 
+--
+-- Name: energy_alarm_events; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."energy_alarm_events" (
     "id" bigint NOT NULL,
@@ -5496,6 +5863,9 @@ CREATE TABLE IF NOT EXISTS "public"."energy_alarm_events" (
 
 ALTER TABLE "public"."energy_alarm_events" OWNER TO "postgres";
 
+--
+-- Name: energy_alarm_events_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."energy_alarm_events" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."energy_alarm_events_id_seq"
@@ -5507,6 +5877,9 @@ ALTER TABLE "public"."energy_alarm_events" ALTER COLUMN "id" ADD GENERATED BY DE
 );
 
 
+--
+-- Name: energy_meter_timeseries; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."energy_meter_timeseries" (
     "id" bigint NOT NULL,
@@ -5535,6 +5908,9 @@ CREATE TABLE IF NOT EXISTS "public"."energy_meter_timeseries" (
 
 ALTER TABLE "public"."energy_meter_timeseries" OWNER TO "postgres";
 
+--
+-- Name: energy_meter_timeseries_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."energy_meter_timeseries" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."energy_meter_timeseries_id_seq"
@@ -5546,6 +5922,9 @@ ALTER TABLE "public"."energy_meter_timeseries" ALTER COLUMN "id" ADD GENERATED B
 );
 
 
+--
+-- Name: farm; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."farm" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
@@ -5558,6 +5937,9 @@ CREATE TABLE IF NOT EXISTS "public"."farm" (
 
 ALTER TABLE "public"."farm" OWNER TO "postgres";
 
+--
+-- Name: feed_inventory; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."feed_inventory" (
     "id" bigint NOT NULL,
@@ -5577,22 +5959,37 @@ CREATE TABLE IF NOT EXISTS "public"."feed_inventory" (
 
 ALTER TABLE "public"."feed_inventory" OWNER TO "postgres";
 
+--
+-- Name: TABLE "feed_inventory"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON TABLE "public"."feed_inventory" IS 'Manual feed inventory stock-count snapshots. These are the feed stock source of truth, normally counted at start of day and end of day.';
 
 
+--
+-- Name: COLUMN "feed_inventory"."inventory_time"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."feed_inventory"."inventory_time" IS 'Stock-count time. Operationally this is usually near 08:00 for start-of-day and near 16:00 for end-of-day.';
 
 
+--
+-- Name: COLUMN "feed_inventory"."amount_of_bags"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."feed_inventory"."amount_of_bags" IS 'Closed/full bags counted in the feed store.';
 
 
+--
+-- Name: COLUMN "feed_inventory"."opened_bags"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."feed_inventory"."opened_bags" IS 'Remaining feed in opened bags, recorded in grams in the historical AquaSmart data.';
 
 
+--
+-- Name: feed_inventory_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feed_inventory" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."feed_inventory_id_seq"
@@ -5604,6 +6001,9 @@ ALTER TABLE "public"."feed_inventory" ALTER COLUMN "id" ADD GENERATED BY DEFAULT
 );
 
 
+--
+-- Name: feed_supplier; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."feed_supplier" (
     "id" bigint NOT NULL,
@@ -5616,6 +6016,9 @@ CREATE TABLE IF NOT EXISTS "public"."feed_supplier" (
 
 ALTER TABLE "public"."feed_supplier" OWNER TO "postgres";
 
+--
+-- Name: feed_supplier_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feed_supplier" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."feed_supplier_id_seq"
@@ -5627,6 +6030,9 @@ ALTER TABLE "public"."feed_supplier" ALTER COLUMN "id" ADD GENERATED BY DEFAULT 
 );
 
 
+--
+-- Name: feed_type; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."feed_type" (
     "id" bigint NOT NULL,
@@ -5644,10 +6050,16 @@ CREATE TABLE IF NOT EXISTS "public"."feed_type" (
 
 ALTER TABLE "public"."feed_type" OWNER TO "postgres";
 
+--
+-- Name: COLUMN "feed_type"."is_active"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON COLUMN "public"."feed_type"."is_active" IS 'When false this feed type is retired and will not appear in form dropdowns, but historical records referencing it are preserved.';
 
 
+--
+-- Name: feed_type_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feed_type" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."feed_type_id_seq"
@@ -5659,6 +6071,9 @@ ALTER TABLE "public"."feed_type" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS I
 );
 
 
+--
+-- Name: feeding_record_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feeding_record" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."feeding_record_id_seq"
@@ -5670,6 +6085,9 @@ ALTER TABLE "public"."feeding_record" ALTER COLUMN "id" ADD GENERATED BY DEFAULT
 );
 
 
+--
+-- Name: feeding_response_level; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."feeding_response_level" (
     "level" smallint NOT NULL,
@@ -5684,10 +6102,16 @@ CREATE TABLE IF NOT EXISTS "public"."feeding_response_level" (
 
 ALTER TABLE "public"."feeding_response_level" OWNER TO "postgres";
 
+--
+-- Name: TABLE "feeding_response_level"; Type: COMMENT; Schema: public; Owner: postgres
+--
 
 COMMENT ON TABLE "public"."feeding_response_level" IS 'Official 1-5 appetite scale used by feeding_record.feeding_response.';
 
 
+--
+-- Name: fingerling_batch_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fingerling_batch" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."fingerling_batch_id_seq"
@@ -5699,6 +6123,9 @@ ALTER TABLE "public"."fingerling_batch" ALTER COLUMN "id" ADD GENERATED BY DEFAU
 );
 
 
+--
+-- Name: fingerling_supplier; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."fingerling_supplier" (
     "id" bigint NOT NULL,
@@ -5711,6 +6138,9 @@ CREATE TABLE IF NOT EXISTS "public"."fingerling_supplier" (
 
 ALTER TABLE "public"."fingerling_supplier" OWNER TO "postgres";
 
+--
+-- Name: fingerling_supplier_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fingerling_supplier" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."fingerling_supplier_id_seq"
@@ -5722,6 +6152,9 @@ ALTER TABLE "public"."fingerling_supplier" ALTER COLUMN "id" ADD GENERATED BY DE
 );
 
 
+--
+-- Name: fish_harvest_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_harvest" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."fish_harvest_id_seq"
@@ -5733,6 +6166,9 @@ ALTER TABLE "public"."fish_harvest" ALTER COLUMN "id" ADD GENERATED BY DEFAULT A
 );
 
 
+--
+-- Name: fish_mortality_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_mortality" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."fish_mortality_id_seq"
@@ -5744,6 +6180,9 @@ ALTER TABLE "public"."fish_mortality" ALTER COLUMN "id" ADD GENERATED BY DEFAULT
 );
 
 
+--
+-- Name: fish_sampling_weight_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_sampling_weight" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."fish_sampling_weight_id_seq"
@@ -5755,6 +6194,9 @@ ALTER TABLE "public"."fish_sampling_weight" ALTER COLUMN "id" ADD GENERATED BY D
 );
 
 
+--
+-- Name: fish_stocking_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_stocking" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."fish_stocking_id_seq"
@@ -5766,6 +6208,9 @@ ALTER TABLE "public"."fish_stocking" ALTER COLUMN "id" ADD GENERATED BY DEFAULT 
 );
 
 
+--
+-- Name: fish_transfer_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_transfer" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."fish_transfer_id_seq"
@@ -5777,6 +6222,9 @@ ALTER TABLE "public"."fish_transfer" ALTER COLUMN "id" ADD GENERATED BY DEFAULT 
 );
 
 
+--
+-- Name: normalization_review; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."normalization_review" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
@@ -5796,6 +6244,9 @@ CREATE TABLE IF NOT EXISTS "public"."normalization_review" (
 
 ALTER TABLE "public"."normalization_review" OWNER TO "postgres";
 
+--
+-- Name: organization; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."organization" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
@@ -5809,6 +6260,9 @@ CREATE TABLE IF NOT EXISTS "public"."organization" (
 
 ALTER TABLE "public"."organization" OWNER TO "postgres";
 
+--
+-- Name: production_cycle_cycle_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE IF NOT EXISTS "public"."production_cycle_cycle_id_seq"
     START WITH 1
@@ -5820,10 +6274,16 @@ CREATE SEQUENCE IF NOT EXISTS "public"."production_cycle_cycle_id_seq"
 
 ALTER TABLE "public"."production_cycle_cycle_id_seq" OWNER TO "postgres";
 
+--
+-- Name: production_cycle_cycle_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
 
 ALTER SEQUENCE "public"."production_cycle_cycle_id_seq" OWNED BY "public"."production_cycle"."cycle_id";
 
 
+--
+-- Name: raw_uploads; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."raw_uploads" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
@@ -5846,6 +6306,9 @@ CREATE TABLE IF NOT EXISTS "public"."raw_uploads" (
 
 ALTER TABLE "public"."raw_uploads" OWNER TO "postgres";
 
+--
+-- Name: system_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."system" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."system_id_seq"
@@ -5857,6 +6320,9 @@ ALTER TABLE "public"."system" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDEN
 );
 
 
+--
+-- Name: user_settings; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE IF NOT EXISTS "public"."user_settings" (
     "user_id" "uuid" NOT NULL,
@@ -5870,6 +6336,9 @@ CREATE TABLE IF NOT EXISTS "public"."user_settings" (
 
 ALTER TABLE "public"."user_settings" OWNER TO "postgres";
 
+--
+-- Name: water_quality_framework_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."water_quality_framework" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."water_quality_framework_id_seq"
@@ -5881,6 +6350,9 @@ ALTER TABLE "public"."water_quality_framework" ALTER COLUMN "id" ADD GENERATED B
 );
 
 
+--
+-- Name: water_quality_measurement_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."water_quality_measurement" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."water_quality_measurement_id_seq"
@@ -5892,6 +6364,9 @@ ALTER TABLE "public"."water_quality_measurement" ALTER COLUMN "id" ADD GENERATED
 );
 
 
+--
+-- Name: water_quality_measurements_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE IF NOT EXISTS "public"."water_quality_measurements_id_seq"
     START WITH 1
@@ -5903,942 +6378,1554 @@ CREATE SEQUENCE IF NOT EXISTS "public"."water_quality_measurements_id_seq"
 
 ALTER TABLE "public"."water_quality_measurements_id_seq" OWNER TO "postgres";
 
+--
+-- Name: water_quality_measurements_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
 
 ALTER SEQUENCE "public"."water_quality_measurements_id_seq" OWNED BY "public"."water_quality_measurement"."id";
 
 
+--
+-- Name: production_cycle cycle_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."production_cycle" ALTER COLUMN "cycle_id" SET DEFAULT "nextval"('"public"."production_cycle_cycle_id_seq"'::"regclass");
 
 
+--
+-- Name: live live_farm_id_meter_id_key; Type: CONSTRAINT; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE ONLY "energy"."live"
     ADD CONSTRAINT "live_farm_id_meter_id_key" UNIQUE ("farm_id", "meter_id");
 
 
+--
+-- Name: live live_pkey; Type: CONSTRAINT; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE ONLY "energy"."live"
     ADD CONSTRAINT "live_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: timeseries timeseries_pkey; Type: CONSTRAINT; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE ONLY "energy"."timeseries"
     ADD CONSTRAINT "timeseries_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: farm_user_invitation farm_user_invitation_pkey; Type: CONSTRAINT; Schema: private; Owner: postgres
+--
 
 ALTER TABLE ONLY "private"."farm_user_invitation"
     ADD CONSTRAINT "farm_user_invitation_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: _affected_systems _affected_systems_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."_affected_systems"
     ADD CONSTRAINT "_affected_systems_pkey" PRIMARY KEY ("system_id");
 
 
+--
+-- Name: alert_threshold alert_threshold_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."alert_threshold"
     ADD CONSTRAINT "alert_threshold_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: app_config app_config_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."app_config"
     ADD CONSTRAINT "app_config_pkey" PRIMARY KEY ("key");
 
 
+--
+-- Name: daily_water_quality_rating daily_water_quality_rating_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."daily_water_quality_rating"
     ADD CONSTRAINT "daily_water_quality_rating_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: daily_water_quality_rating daily_water_quality_rating_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."daily_water_quality_rating"
     ADD CONSTRAINT "daily_water_quality_rating_unique" UNIQUE ("system_id", "rating_date");
 
 
+--
+-- Name: dashboard_time_period dashboard_time_period_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."dashboard_time_period"
     ADD CONSTRAINT "dashboard_time_period_pkey" PRIMARY KEY ("time_period");
 
 
+--
+-- Name: energy_alarm_events energy_alarm_events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."energy_alarm_events"
     ADD CONSTRAINT "energy_alarm_events_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: energy_meter_timeseries energy_meter_timeseries_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."energy_meter_timeseries"
     ADD CONSTRAINT "energy_meter_timeseries_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: energy_meter_timeseries energy_meter_timeseries_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."energy_meter_timeseries"
     ADD CONSTRAINT "energy_meter_timeseries_unique" UNIQUE ("farm_id", "meter_id", "measured_at");
 
 
+--
+-- Name: farm farm_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."farm"
     ADD CONSTRAINT "farm_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: farm_user farm_user_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."farm_user"
     ADD CONSTRAINT "farm_user_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: feed_inventory feed_inventory_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feed_inventory"
     ADD CONSTRAINT "feed_inventory_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: feeding_record feed_record_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feeding_record"
     ADD CONSTRAINT "feed_record_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: feed_supplier feed_supplier_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feed_supplier"
     ADD CONSTRAINT "feed_supplier_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: feed_type feed_type_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feed_type"
     ADD CONSTRAINT "feed_type_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: feeding_record feeding_record_local_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feeding_record"
     ADD CONSTRAINT "feeding_record_local_id_key" UNIQUE ("local_id");
 
 
+--
+-- Name: feeding_response_level feeding_response_level_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feeding_response_level"
     ADD CONSTRAINT "feeding_response_level_pkey" PRIMARY KEY ("level");
 
 
+--
+-- Name: fingerling_batch fingerling_batch_name_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fingerling_batch"
     ADD CONSTRAINT "fingerling_batch_name_unique" UNIQUE ("name");
 
 
+--
+-- Name: fingerling_batch fingerling_batch_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fingerling_batch"
     ADD CONSTRAINT "fingerling_batch_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: fish_harvest fish_harvest_abw_matches_total; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_abw_matches_total" CHECK ((("number_of_fish_harvest" IS NULL) OR ("number_of_fish_harvest" <= 0) OR ("abs"(("abw" - (("total_weight_harvest" * (1000.0)::double precision) / ("number_of_fish_harvest")::double precision))) <= (0.01)::double precision))) NOT VALID;
 
 
+--
+-- Name: fish_harvest fish_harvest_batch_required; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_batch_required" CHECK (("batch_id" IS NOT NULL)) NOT VALID;
 
 
+--
+-- Name: fish_harvest fish_harvest_cycle_required; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_cycle_required" CHECK (("cycle_id" IS NOT NULL)) NOT VALID;
 
 
+--
+-- Name: fish_harvest fish_harvest_local_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_local_id_key" UNIQUE ("local_id");
 
 
+--
+-- Name: fish_harvest fish_harvest_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: fish_harvest fish_harvest_positive_count; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_positive_count" CHECK ((("number_of_fish_harvest" IS NOT NULL) AND ("number_of_fish_harvest" > 0))) NOT VALID;
 
 
+--
+-- Name: fish_harvest fish_harvest_positive_weight; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_positive_weight" CHECK (("total_weight_harvest" > (0)::double precision)) NOT VALID;
 
 
+--
+-- Name: fish_mortality fish_mortality_local_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_mortality"
     ADD CONSTRAINT "fish_mortality_local_id_key" UNIQUE ("local_id");
 
 
+--
+-- Name: fish_mortality fish_mortality_mass_weight_required; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_mortality"
     ADD CONSTRAINT "fish_mortality_mass_weight_required" CHECK ((("number_of_fish_mortality" < 100) OR ("total_weight_mortality" IS NOT NULL))) NOT VALID;
 
 
+--
+-- Name: fish_mortality fish_mortality_total_weight_nonnegative; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_mortality"
     ADD CONSTRAINT "fish_mortality_total_weight_nonnegative" CHECK ((("total_weight_mortality" IS NULL) OR ("total_weight_mortality" >= (0)::double precision))) NOT VALID;
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight_abw_matches_sample; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_sampling_weight_abw_matches_sample" CHECK (("abs"(("abw" - (("total_weight_sampling" * (1000.0)::double precision) / (NULLIF("number_of_fish_sampling", 0))::double precision))) <= (0.01)::double precision)) NOT VALID;
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight_batch_required; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_sampling_weight_batch_required" CHECK (("batch_id" IS NOT NULL)) NOT VALID;
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight_cycle_required; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_sampling_weight_cycle_required" CHECK (("cycle_id" IS NOT NULL)) NOT VALID;
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight_local_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_sampling_weight_local_id_key" UNIQUE ("local_id");
 
 
+--
+-- Name: fish_stocking fish_stocking_local_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_stocking"
     ADD CONSTRAINT "fish_stocking_local_id_key" UNIQUE ("local_id");
 
 
+--
+-- Name: fish_transfer fish_transfer_batch_required; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_batch_required" CHECK (("batch_id" IS NOT NULL)) NOT VALID;
 
 
+--
+-- Name: fish_transfer fish_transfer_cycle_required; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_cycle_required" CHECK (("cycle_id" IS NOT NULL)) NOT VALID;
 
 
+--
+-- Name: fish_transfer fish_transfer_local_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_local_id_key" UNIQUE ("local_id");
 
 
+--
+-- Name: fish_transfer fish_transfer_movement_type; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_movement_type" CHECK (("transfer_type" = ANY (ARRAY['transfer'::"public"."transfer_type", 'grading'::"public"."transfer_type", 'density_thinning'::"public"."transfer_type", 'external_out'::"public"."transfer_type"]))) NOT VALID;
 
 
+--
+-- Name: fish_transfer fish_transfer_no_external_origin; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_no_external_origin" CHECK (("external_origin_name" IS NULL)) NOT VALID;
 
 
+--
+-- Name: fish_transfer fish_transfer_origin_required; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_origin_required" CHECK (("origin_system_id" IS NOT NULL)) NOT VALID;
 
 
+--
+-- Name: fish_transfer fish_transfer_target_boundary; Type: CHECK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_target_boundary" CHECK (((("transfer_type" = 'external_out'::"public"."transfer_type") AND ("target_system_id" IS NULL) AND (NULLIF("btrim"("external_target_name"), ''::"text") IS NOT NULL)) OR (("transfer_type" = ANY (ARRAY['transfer'::"public"."transfer_type", 'grading'::"public"."transfer_type", 'density_thinning'::"public"."transfer_type"])) AND ("target_system_id" IS NOT NULL) AND ("target_system_id" <> "origin_system_id")))) NOT VALID;
 
 
+--
+-- Name: fish_sampling_weight fish_weight_sampling_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_weight_sampling_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: fish_mortality mortality_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_mortality"
     ADD CONSTRAINT "mortality_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: normalization_review normalization_review_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."normalization_review"
     ADD CONSTRAINT "normalization_review_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: organization organization_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."organization"
     ADD CONSTRAINT "organization_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: organization organization_slug_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."organization"
     ADD CONSTRAINT "organization_slug_key" UNIQUE ("slug");
 
 
+--
+-- Name: production_cycle production_cycle_no_overlap; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."production_cycle"
     ADD CONSTRAINT "production_cycle_no_overlap" EXCLUDE USING "gist" ("system_id" WITH =, "daterange"("cycle_start", COALESCE("cycle_end", 'infinity'::"date"), '[]'::"text") WITH &&);
 
 
+--
+-- Name: production_cycle production_cycle_pkey_cycle_id; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."production_cycle"
     ADD CONSTRAINT "production_cycle_pkey_cycle_id" PRIMARY KEY ("cycle_id");
 
 
+--
+-- Name: raw_uploads raw_uploads_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."raw_uploads"
     ADD CONSTRAINT "raw_uploads_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: fish_stocking stocking_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_stocking"
     ADD CONSTRAINT "stocking_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: fingerling_supplier supplier_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fingerling_supplier"
     ADD CONSTRAINT "supplier_name_key" UNIQUE ("company_name");
 
 
+--
+-- Name: fingerling_supplier supplier_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fingerling_supplier"
     ADD CONSTRAINT "supplier_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: system system_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."system"
     ADD CONSTRAINT "system_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: fish_transfer transfer_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_transfer"
     ADD CONSTRAINT "transfer_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: user_profile user_profile_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."user_profile"
     ADD CONSTRAINT "user_profile_pkey" PRIMARY KEY ("user_id");
 
 
+--
+-- Name: user_settings user_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."user_settings"
     ADD CONSTRAINT "user_settings_pkey" PRIMARY KEY ("user_id");
 
 
+--
+-- Name: water_quality_framework water_quality_framework_parameter_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."water_quality_framework"
     ADD CONSTRAINT "water_quality_framework_parameter_unique" UNIQUE ("parameter_name");
 
 
+--
+-- Name: water_quality_framework water_quality_framework_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."water_quality_framework"
     ADD CONSTRAINT "water_quality_framework_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: water_quality_measurement water_quality_measurement_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."water_quality_measurement"
     ADD CONSTRAINT "water_quality_measurement_unique" UNIQUE ("system_id", "parameter_name", "date", "time", "water_depth");
 
 
+--
+-- Name: water_quality_measurement water_quality_measurements_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."water_quality_measurement"
     ADD CONSTRAINT "water_quality_measurements_pkey" PRIMARY KEY ("id");
 
 
+--
+-- Name: daily_fish_inventory_table_id_idx; Type: INDEX; Schema: analytics; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "daily_fish_inventory_table_id_idx" ON "analytics"."daily_fish_inventory_table" USING "btree" ("id");
 
 
+--
+-- Name: idx_energy_live_farm_system; Type: INDEX; Schema: energy; Owner: postgres
+--
 
 CREATE INDEX "idx_energy_live_farm_system" ON "energy"."live" USING "btree" ("farm_id", "system_id");
 
 
+--
+-- Name: idx_energy_live_measured_at; Type: INDEX; Schema: energy; Owner: postgres
+--
 
 CREATE INDEX "idx_energy_live_measured_at" ON "energy"."live" USING "btree" ("measured_at" DESC);
 
 
+--
+-- Name: idx_energy_timeseries_farm_measured; Type: INDEX; Schema: energy; Owner: postgres
+--
 
 CREATE INDEX "idx_energy_timeseries_farm_measured" ON "energy"."timeseries" USING "btree" ("farm_id", "measured_at" DESC);
 
 
+--
+-- Name: idx_energy_timeseries_farm_system; Type: INDEX; Schema: energy; Owner: postgres
+--
 
 CREATE INDEX "idx_energy_timeseries_farm_system" ON "energy"."timeseries" USING "btree" ("farm_id", "system_id");
 
 
+--
+-- Name: idx_energy_timeseries_measured_at; Type: INDEX; Schema: energy; Owner: postgres
+--
 
 CREATE INDEX "idx_energy_timeseries_measured_at" ON "energy"."timeseries" USING "btree" ("measured_at" DESC);
 
 
+--
+-- Name: farm_user_invitation_active_unique; Type: INDEX; Schema: private; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "farm_user_invitation_active_unique" ON "private"."farm_user_invitation" USING "btree" ("farm_id", "email") WHERE (("revoked_at" IS NULL) AND ("accepted_at" IS NULL));
 
 
+--
+-- Name: farm_user_farm_id_user_id_key; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "farm_user_farm_id_user_id_key" ON "public"."farm_user" USING "btree" ("farm_id", "user_id");
 
 
+--
+-- Name: feed_supplier_identity_idx; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "feed_supplier_identity_idx" ON "public"."feed_supplier" USING "btree" ("lower"(TRIM(BOTH FROM "company_name")), "lower"(TRIM(BOTH FROM "location_country")), "lower"(COALESCE(TRIM(BOTH FROM "location_city"), ''::"text")));
 
 
+--
+-- Name: feed_type_identity_idx; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "feed_type_identity_idx" ON "public"."feed_type" USING "btree" (COALESCE("farm_id", '00000000-0000-0000-0000-000000000000'::"uuid"), "feed_supplier", "lower"(COALESCE(TRIM(BOTH FROM "feed_line"), ''::"text")), "feed_category", "feed_pellet_size", COALESCE("crude_protein_percentage", '-1'::double precision), COALESCE("crude_fat_percentage", '-1'::double precision));
 
 
+--
+-- Name: idx_daily_water_quality_rating_system_date_desc; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_daily_water_quality_rating_system_date_desc" ON "public"."daily_water_quality_rating" USING "btree" ("system_id", "rating_date" DESC, "created_at" DESC, "id" DESC);
 
 
+--
+-- Name: idx_daily_wq_rating_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_daily_wq_rating_date" ON "public"."daily_water_quality_rating" USING "btree" ("rating_date");
 
 
+--
+-- Name: idx_daily_wq_system_date_desc; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_daily_wq_system_date_desc" ON "public"."daily_water_quality_rating" USING "btree" ("system_id", "rating_date" DESC);
 
 
+--
+-- Name: idx_dwr_system_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_dwr_system_date" ON "public"."daily_water_quality_rating" USING "btree" ("system_id", "rating_date");
 
 
+--
+-- Name: idx_energy_alarm_events_active; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_energy_alarm_events_active" ON "public"."energy_alarm_events" USING "btree" ("farm_id", "status", "severity", "started_at" DESC) WHERE ("status" <> 'resolved'::"text");
 
 
+--
+-- Name: idx_energy_alarm_events_farm_started_at; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_energy_alarm_events_farm_started_at" ON "public"."energy_alarm_events" USING "btree" ("farm_id", "started_at" DESC);
 
 
+--
+-- Name: idx_energy_meter_timeseries_farm_meter_measured_at; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_energy_meter_timeseries_farm_meter_measured_at" ON "public"."energy_meter_timeseries" USING "btree" ("farm_id", "meter_id", "measured_at" DESC);
 
 
+--
+-- Name: idx_farm_org_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_farm_org_id" ON "public"."farm" USING "btree" ("organization_id");
 
 
+--
+-- Name: idx_farm_user_farm_user_role; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_farm_user_farm_user_role" ON "public"."farm_user" USING "btree" ("farm_id", "user_id", "role");
 
 
+--
+-- Name: idx_farm_user_user_farm; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_farm_user_user_farm" ON "public"."farm_user" USING "btree" ("user_id", "farm_id");
 
 
+--
+-- Name: idx_farm_user_user_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_farm_user_user_id" ON "public"."farm_user" USING "btree" ("user_id");
 
 
+--
+-- Name: idx_feed_inventory_farm_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_feed_inventory_farm_date" ON "public"."feed_inventory" USING "btree" ("farm_id", "inventory_date");
 
 
+--
+-- Name: idx_feed_inventory_feed_type_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_feed_inventory_feed_type_date" ON "public"."feed_inventory" USING "btree" ("feed_type_id", "inventory_date");
 
 
+--
+-- Name: idx_feed_type_farm_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_feed_type_farm_id" ON "public"."feed_type" USING "btree" ("farm_id");
 
 
+--
+-- Name: idx_feed_type_feed_supplier; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_feed_type_feed_supplier" ON "public"."feed_type" USING "btree" ("feed_supplier");
 
 
+--
+-- Name: idx_feeding_record_response_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_feeding_record_response_date" ON "public"."feeding_record" USING "btree" ("system_id", "date", "feeding_response");
 
 
+--
+-- Name: idx_feeding_record_system_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_feeding_record_system_date" ON "public"."feeding_record" USING "btree" ("system_id", "date");
 
 
+--
+-- Name: idx_fh_system_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fh_system_date" ON "public"."fish_harvest" USING "btree" ("system_id", "date");
 
 
+--
+-- Name: idx_fingerling_batch_farm_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fingerling_batch_farm_id" ON "public"."fingerling_batch" USING "btree" ("farm_id");
 
 
+--
+-- Name: idx_fingerling_batch_system_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fingerling_batch_system_id" ON "public"."fingerling_batch" USING "btree" ("system_id");
 
 
+--
+-- Name: idx_fish_harvest_batch_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fish_harvest_batch_id" ON "public"."fish_harvest" USING "btree" ("batch_id");
 
 
+--
+-- Name: idx_fish_harvest_system_date_desc; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fish_harvest_system_date_desc" ON "public"."fish_harvest" USING "btree" ("system_id", "date" DESC);
 
 
+--
+-- Name: idx_fish_mortality_batch_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fish_mortality_batch_id" ON "public"."fish_mortality" USING "btree" ("batch_id");
 
 
+--
+-- Name: idx_fish_mortality_system_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fish_mortality_system_date" ON "public"."fish_mortality" USING "btree" ("system_id", "date");
 
 
+--
+-- Name: idx_fish_sampling_system_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fish_sampling_system_date" ON "public"."fish_sampling_weight" USING "btree" ("system_id", "date");
 
 
+--
+-- Name: idx_fish_transfer_type_date_desc; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fish_transfer_type_date_desc" ON "public"."fish_transfer" USING "btree" ("transfer_type", "date" DESC);
 
 
+--
+-- Name: idx_fs_system_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_fs_system_date" ON "public"."fish_stocking" USING "btree" ("system_id", "date");
 
 
+--
+-- Name: idx_ft_origin_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_ft_origin_date" ON "public"."fish_transfer" USING "btree" ("origin_system_id", "date");
 
 
+--
+-- Name: idx_ft_target_date; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_ft_target_date" ON "public"."fish_transfer" USING "btree" ("target_system_id", "date");
 
 
+--
+-- Name: idx_norm_review_farm_unresolved; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_norm_review_farm_unresolved" ON "public"."normalization_review" USING "btree" ("farm_id", "resolved", "created_at" DESC);
 
 
+--
+-- Name: idx_raw_uploads_farm_status; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_raw_uploads_farm_status" ON "public"."raw_uploads" USING "btree" ("farm_id", "status", "uploaded_at" DESC);
 
 
+--
+-- Name: idx_system_farm_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_system_farm_id" ON "public"."system" USING "btree" ("farm_id");
 
 
+--
+-- Name: idx_system_farm_id_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_system_farm_id_id" ON "public"."system" USING "btree" ("farm_id", "id");
 
 
+--
+-- Name: idx_system_id_farm_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_system_id_farm_id" ON "public"."system" USING "btree" ("id", "farm_id");
 
 
+--
+-- Name: idx_wqm_system_date_time; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_wqm_system_date_time" ON "public"."water_quality_measurement" USING "btree" ("system_id", "date", "time");
 
 
+--
+-- Name: idx_wqm_system_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_wqm_system_id" ON "public"."water_quality_measurement" USING "btree" ("system_id");
 
 
+--
+-- Name: idx_wqm_system_measured_at; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE INDEX "idx_wqm_system_measured_at" ON "public"."water_quality_measurement" USING "btree" ("system_id", "measured_at");
 
 
+--
+-- Name: system_active_name_farm_unique; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "system_active_name_farm_unique" ON "public"."system" USING "btree" ("farm_id", "name") WHERE ("is_active" IS TRUE);
 
 
+--
+-- Name: uix_water_quality_local_id; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "uix_water_quality_local_id" ON "public"."water_quality_measurement" USING "btree" ("local_id") WHERE ("local_id" IS NOT NULL);
 
 
+--
+-- Name: uq_one_active_cycle_per_system; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "uq_one_active_cycle_per_system" ON "public"."production_cycle" USING "btree" ("system_id") WHERE ("ongoing_cycle" = true);
 
 
+--
+-- Name: water_quality_measurement_local_id_uidx; Type: INDEX; Schema: public; Owner: postgres
+--
 
 CREATE UNIQUE INDEX "water_quality_measurement_local_id_uidx" ON "public"."water_quality_measurement" USING "btree" ("local_id");
 
 
+--
+-- Name: feeding_record after_feeding_record_update_inventory; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "after_feeding_record_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."feeding_record" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
+--
+-- Name: fish_harvest after_fish_harvest_update_inventory; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "after_fish_harvest_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
+--
+-- Name: fish_mortality after_fish_mortality_update_inventory; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "after_fish_mortality_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_mortality" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
+--
+-- Name: fish_sampling_weight after_fish_sampling_weight_update_inventory; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "after_fish_sampling_weight_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
+--
+-- Name: fish_stocking after_fish_stocking_update_inventory; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "after_fish_stocking_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
+--
+-- Name: fish_transfer after_fish_transfer_update_inventory; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "after_fish_transfer_update_inventory" AFTER INSERT OR DELETE OR UPDATE ON "public"."fish_transfer" FOR EACH ROW EXECUTE FUNCTION "public"."after_event_update_inventory"();
 
 
+--
+-- Name: system prevent_system_name_change; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "prevent_system_name_change" BEFORE UPDATE ON "public"."system" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_system_name_update"();
 
 
+--
+-- Name: system refresh_after_system; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "refresh_after_system" AFTER INSERT OR DELETE OR UPDATE ON "public"."system" FOR EACH ROW EXECUTE FUNCTION "public"."refresh_after_system_if_needed"();
 
 
+--
+-- Name: _affected_systems touch_affected_systems_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "touch_affected_systems_updated_at" BEFORE UPDATE ON "public"."_affected_systems" FOR EACH ROW EXECUTE FUNCTION "public"."touch_affected_systems_updated_at"();
 
 
+--
+-- Name: fish_harvest trg_close_cycle_on_final_harvest; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_close_cycle_on_final_harvest" AFTER INSERT OR UPDATE OF "type_of_harvest", "date", "system_id" ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "public"."close_cycle_on_final_harvest"();
 
 
+--
+-- Name: fish_stocking trg_cycle_on_stocking; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_cycle_on_stocking" BEFORE INSERT OR UPDATE OF "system_id", "batch_id", "date", "cycle_id" ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "public"."ensure_cycle_on_stocking"();
 
 
+--
+-- Name: energy_alarm_events trg_energy_alarm_events_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_energy_alarm_events_updated_at" BEFORE UPDATE ON "public"."energy_alarm_events" FOR EACH ROW EXECUTE FUNCTION "private"."set_updated_at"();
 
 
+--
+-- Name: energy_meter_timeseries trg_energy_meter_timeseries_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_energy_meter_timeseries_updated_at" BEFORE UPDATE ON "public"."energy_meter_timeseries" FOR EACH ROW EXECUTE FUNCTION "private"."set_updated_at"();
 
 
+--
+-- Name: feeding_record trg_feeding_record_assign_lineage; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_feeding_record_assign_lineage" BEFORE INSERT OR UPDATE OF "system_id", "date", "cycle_id", "batch_id" ON "public"."feeding_record" FOR EACH ROW EXECUTE FUNCTION "public"."assign_operation_lineage_from_system"();
 
 
+--
+-- Name: fish_harvest trg_fish_harvest_assign_lineage; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_fish_harvest_assign_lineage" BEFORE INSERT OR UPDATE OF "system_id", "date", "cycle_id", "batch_id" ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "public"."assign_operation_lineage_from_system"();
 
 
+--
+-- Name: fish_harvest trg_fish_harvest_set_abw; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_fish_harvest_set_abw" BEFORE INSERT OR UPDATE OF "number_of_fish_harvest", "total_weight_harvest", "abw" ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "public"."set_harvest_abw"();
 
 
+--
+-- Name: fish_mortality trg_fish_mortality_assign_lineage; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_fish_mortality_assign_lineage" BEFORE INSERT OR UPDATE OF "system_id", "date", "cycle_id", "batch_id" ON "public"."fish_mortality" FOR EACH ROW EXECUTE FUNCTION "public"."assign_operation_lineage_from_system"();
 
 
+--
+-- Name: fish_sampling_weight trg_fish_sampling_weight_assign_lineage; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_fish_sampling_weight_assign_lineage" BEFORE INSERT OR UPDATE OF "system_id", "date", "cycle_id", "batch_id" ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "public"."assign_operation_lineage_from_system"();
 
 
+--
+-- Name: fish_sampling_weight trg_fish_sampling_weight_set_abw; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_fish_sampling_weight_set_abw" BEFORE INSERT OR UPDATE OF "number_of_fish_sampling", "total_weight_sampling", "abw" ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "public"."set_sampling_weight_abw"();
 
 
+--
+-- Name: fish_transfer trg_fish_transfer_assign_lineage; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_fish_transfer_assign_lineage" BEFORE INSERT OR UPDATE OF "origin_system_id", "date", "cycle_id", "batch_id" ON "public"."fish_transfer" FOR EACH ROW EXECUTE FUNCTION "public"."assign_transfer_lineage_from_origin"();
 
 
+--
+-- Name: fish_sampling_weight trg_growth_stage_on_sampling; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_growth_stage_on_sampling" AFTER INSERT OR UPDATE OF "abw", "total_weight_sampling", "number_of_fish_sampling" ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "public"."trg_update_system_growth_stage"();
 
 
+--
+-- Name: production_cycle trg_production_cycle_set_ongoing; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "trg_production_cycle_set_ongoing" BEFORE INSERT OR UPDATE OF "cycle_end" ON "public"."production_cycle" FOR EACH ROW EXECUTE FUNCTION "public"."production_cycle_set_ongoing"();
 
 
+--
+-- Name: water_quality_framework water_quality_framework_refresh_daily_rating; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "water_quality_framework_refresh_daily_rating" AFTER UPDATE ON "public"."water_quality_framework" FOR EACH ROW EXECUTE FUNCTION "public"."trg_refresh_daily_water_quality_rating_from_framework"();
 
 
+--
+-- Name: water_quality_measurement water_quality_measurement_refresh_daily_rating; Type: TRIGGER; Schema: public; Owner: postgres
+--
 
 CREATE OR REPLACE TRIGGER "water_quality_measurement_refresh_daily_rating" AFTER INSERT OR DELETE OR UPDATE ON "public"."water_quality_measurement" FOR EACH ROW EXECUTE FUNCTION "public"."trg_refresh_daily_water_quality_rating"();
 
 
+--
+-- Name: live live_farm_id_fkey; Type: FK CONSTRAINT; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE ONLY "energy"."live"
     ADD CONSTRAINT "live_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id");
 
 
+--
+-- Name: live live_system_id_fkey; Type: FK CONSTRAINT; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE ONLY "energy"."live"
     ADD CONSTRAINT "live_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: timeseries timeseries_farm_id_fkey; Type: FK CONSTRAINT; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE ONLY "energy"."timeseries"
     ADD CONSTRAINT "timeseries_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id");
 
 
+--
+-- Name: timeseries timeseries_system_id_fkey; Type: FK CONSTRAINT; Schema: energy; Owner: postgres
+--
 
 ALTER TABLE ONLY "energy"."timeseries"
     ADD CONSTRAINT "timeseries_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: farm_user_invitation farm_user_invitation_farm_id_fkey; Type: FK CONSTRAINT; Schema: private; Owner: postgres
+--
 
 ALTER TABLE ONLY "private"."farm_user_invitation"
     ADD CONSTRAINT "farm_user_invitation_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: _affected_systems _affected_systems_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."_affected_systems"
     ADD CONSTRAINT "_affected_systems_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: alert_threshold alert_threshold_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."alert_threshold"
     ADD CONSTRAINT "alert_threshold_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: alert_threshold alert_threshold_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."alert_threshold"
     ADD CONSTRAINT "alert_threshold_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: daily_water_quality_rating daily_water_quality_rating_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."daily_water_quality_rating"
     ADD CONSTRAINT "daily_water_quality_rating_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: energy_alarm_events energy_alarm_events_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."energy_alarm_events"
     ADD CONSTRAINT "energy_alarm_events_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: energy_meter_timeseries energy_meter_timeseries_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."energy_meter_timeseries"
     ADD CONSTRAINT "energy_meter_timeseries_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: farm farm_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."farm"
     ADD CONSTRAINT "farm_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id");
 
 
+--
+-- Name: farm_user farm_user_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."farm_user"
     ADD CONSTRAINT "farm_user_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: farm_user farm_user_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."farm_user"
     ADD CONSTRAINT "farm_user_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: feed_inventory feed_inventory_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feed_inventory"
     ADD CONSTRAINT "feed_inventory_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: feed_inventory feed_inventory_feed_type_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feed_inventory"
     ADD CONSTRAINT "feed_inventory_feed_type_id_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "public"."feed_type"("id") ON UPDATE CASCADE ON DELETE RESTRICT;
 
 
+--
+-- Name: feeding_record feed_record_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feeding_record"
     ADD CONSTRAINT "feed_record_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: feed_type feed_type_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feed_type"
     ADD CONSTRAINT "feed_type_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON UPDATE CASCADE ON DELETE SET NULL;
 
 
+--
+-- Name: feed_type feed_type_feed_supplier_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feed_type"
     ADD CONSTRAINT "feed_type_feed_supplier_fkey" FOREIGN KEY ("feed_supplier") REFERENCES "public"."feed_supplier"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: feeding_record feeding_record_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feeding_record"
     ADD CONSTRAINT "feeding_record_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: feeding_record feeding_record_cycle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feeding_record"
     ADD CONSTRAINT "feeding_record_cycle_id_fkey" FOREIGN KEY ("cycle_id") REFERENCES "public"."production_cycle"("cycle_id");
 
 
+--
+-- Name: feeding_record feeding_record_feed_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feeding_record"
     ADD CONSTRAINT "feeding_record_feed_id_fkey" FOREIGN KEY ("feed_type_id") REFERENCES "public"."feed_type"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fingerling_batch fingerling_batch_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fingerling_batch"
     ADD CONSTRAINT "fingerling_batch_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id");
 
 
+--
+-- Name: fingerling_batch fingerling_batch_supplier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fingerling_batch"
     ADD CONSTRAINT "fingerling_batch_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "public"."fingerling_supplier"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fingerling_batch fingerling_batch_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fingerling_batch"
     ADD CONSTRAINT "fingerling_batch_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fish_harvest fish_harvest_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fish_harvest fish_harvest_cycle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_cycle_id_fkey" FOREIGN KEY ("cycle_id") REFERENCES "public"."production_cycle"("cycle_id");
 
 
+--
+-- Name: fish_harvest fish_harvest_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_harvest"
     ADD CONSTRAINT "fish_harvest_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fish_mortality fish_mortality_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_mortality"
     ADD CONSTRAINT "fish_mortality_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fish_mortality fish_mortality_cycle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_mortality"
     ADD CONSTRAINT "fish_mortality_cycle_id_fkey" FOREIGN KEY ("cycle_id") REFERENCES "public"."production_cycle"("cycle_id");
 
 
+--
+-- Name: fish_mortality fish_mortality_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_mortality"
     ADD CONSTRAINT "fish_mortality_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id");
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_sampling_weight_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight_cycle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_sampling_weight_cycle_id_fkey" FOREIGN KEY ("cycle_id") REFERENCES "public"."production_cycle"("cycle_id");
 
 
+--
+-- Name: fish_stocking fish_stocking_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_stocking"
     ADD CONSTRAINT "fish_stocking_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fish_stocking fish_stocking_cycle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_stocking"
     ADD CONSTRAINT "fish_stocking_cycle_id_fkey" FOREIGN KEY ("cycle_id") REFERENCES "public"."production_cycle"("cycle_id");
 
 
+--
+-- Name: fish_transfer fish_transfer_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: fish_transfer fish_transfer_cycle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_transfer"
     ADD CONSTRAINT "fish_transfer_cycle_id_fkey" FOREIGN KEY ("cycle_id") REFERENCES "public"."production_cycle"("cycle_id");
 
 
+--
+-- Name: fish_sampling_weight fish_weight_sampling_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_weight_sampling_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: feeding_record fk_feeding_response_level; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."feeding_record"
     ADD CONSTRAINT "fk_feeding_response_level" FOREIGN KEY ("feeding_response") REFERENCES "public"."feeding_response_level"("level");
 
 
+--
+-- Name: fish_mortality mortality_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_mortality"
     ADD CONSTRAINT "mortality_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: normalization_review normalization_review_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."normalization_review"
     ADD CONSTRAINT "normalization_review_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: normalization_review normalization_review_raw_upload_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."normalization_review"
     ADD CONSTRAINT "normalization_review_raw_upload_id_fkey" FOREIGN KEY ("raw_upload_id") REFERENCES "public"."raw_uploads"("id") ON DELETE SET NULL;
 
 
+--
+-- Name: normalization_review normalization_review_resolved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."normalization_review"
     ADD CONSTRAINT "normalization_review_resolved_by_fkey" FOREIGN KEY ("resolved_by") REFERENCES "auth"."users"("id");
 
 
+--
+-- Name: organization organization_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."organization"
     ADD CONSTRAINT "organization_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: production_cycle production_cycle_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."production_cycle"
     ADD CONSTRAINT "production_cycle_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "public"."fingerling_batch"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: production_cycle production_cycle_previous_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."production_cycle"
     ADD CONSTRAINT "production_cycle_previous_system_id_fkey" FOREIGN KEY ("previous_system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: production_cycle production_cycle_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."production_cycle"
     ADD CONSTRAINT "production_cycle_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id") ON UPDATE CASCADE;
 
 
+--
+-- Name: raw_uploads raw_uploads_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."raw_uploads"
     ADD CONSTRAINT "raw_uploads_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE CASCADE;
 
 
+--
+-- Name: raw_uploads raw_uploads_reviewed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."raw_uploads"
     ADD CONSTRAINT "raw_uploads_reviewed_by_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "auth"."users"("id");
 
 
+--
+-- Name: raw_uploads raw_uploads_uploaded_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."raw_uploads"
     ADD CONSTRAINT "raw_uploads_uploaded_by_fkey" FOREIGN KEY ("uploaded_by") REFERENCES "auth"."users"("id");
 
 
+--
+-- Name: fish_stocking stocking_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_stocking"
     ADD CONSTRAINT "stocking_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: system system_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."system"
     ADD CONSTRAINT "system_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id") ON DELETE SET NULL;
 
 
+--
+-- Name: fish_transfer transfer_origin_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_transfer"
     ADD CONSTRAINT "transfer_origin_system_id_fkey" FOREIGN KEY ("origin_system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: fish_transfer transfer_target_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."fish_transfer"
     ADD CONSTRAINT "transfer_target_system_id_fkey" FOREIGN KEY ("target_system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: user_profile user_profile_farm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."user_profile"
     ADD CONSTRAINT "user_profile_farm_id_fkey" FOREIGN KEY ("farm_id") REFERENCES "public"."farm"("id");
 
 
+--
+-- Name: user_profile user_profile_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."user_profile"
     ADD CONSTRAINT "user_profile_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id");
 
 
+--
+-- Name: user_settings user_settings_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."user_settings"
     ADD CONSTRAINT "user_settings_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."user_profile"("user_id");
 
 
+--
+-- Name: water_quality_measurement water_quality_measurement_parameter_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."water_quality_measurement"
     ADD CONSTRAINT "water_quality_measurement_parameter_fkey" FOREIGN KEY ("parameter_name") REFERENCES "public"."water_quality_framework"("parameter_name");
 
 
+--
+-- Name: water_quality_measurement water_quality_measurements_system_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY "public"."water_quality_measurement"
     ADD CONSTRAINT "water_quality_measurements_system_id_fkey" FOREIGN KEY ("system_id") REFERENCES "public"."system"("id");
 
 
+--
+-- Name: water_quality_framework Authenticated users can read water_quality_framework; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "Authenticated users can read water_quality_framework" ON "public"."water_quality_framework" FOR SELECT TO "authenticated" USING (true);
 
 
+--
+-- Name: alert_threshold; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."alert_threshold" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: alert_threshold alert_threshold_delete; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "alert_threshold_delete" ON "public"."alert_threshold" FOR DELETE TO "authenticated" USING (((("scope" = 'farm'::"text") AND "private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))) OR (("scope" = 'system'::"text") AND (EXISTS ( SELECT 1
    FROM "public"."system" "s"
   WHERE (("s"."id" = "alert_threshold"."system_id") AND "private"."has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))))))));
 
 
+--
+-- Name: alert_threshold alert_threshold_select_farm_member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "alert_threshold_select_farm_member" ON "public"."alert_threshold" FOR SELECT TO "authenticated" USING (((("farm_id" IS NOT NULL) AND (EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
@@ -6848,6 +7935,9 @@ CREATE POLICY "alert_threshold_select_farm_member" ON "public"."alert_threshold"
   WHERE (("s"."id" = "alert_threshold"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))))));
 
 
+--
+-- Name: alert_threshold alert_threshold_update_admin_manager; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "alert_threshold_update_admin_manager" ON "public"."alert_threshold" FOR UPDATE TO "authenticated" USING (((("farm_id" IS NOT NULL) AND "private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
    FROM "public"."system" "s"
@@ -6856,29 +7946,50 @@ CREATE POLICY "alert_threshold_update_admin_manager" ON "public"."alert_threshol
   WHERE (("s"."id" = "alert_threshold"."system_id") AND "private"."has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])))))));
 
 
+--
+-- Name: alert_threshold alert_threshold_write_admin_manager; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "alert_threshold_write_admin_manager" ON "public"."alert_threshold" FOR INSERT TO "authenticated" WITH CHECK (((("farm_id" IS NOT NULL) AND "private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) OR (("system_id" IS NOT NULL) AND (EXISTS ( SELECT 1
    FROM "public"."system" "s"
   WHERE (("s"."id" = "alert_threshold"."system_id") AND "private"."has_farm_role"("s"."farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])))))));
 
 
+--
+-- Name: app_config; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."app_config" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: app_config app_config_select; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "app_config_select" ON "public"."app_config" FOR SELECT TO "authenticated" USING (true);
 
 
+--
+-- Name: daily_water_quality_rating; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."daily_water_quality_rating" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: dashboard_time_period; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."dashboard_time_period" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: dashboard_time_period dashboard_time_period: authenticated read; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "dashboard_time_period: authenticated read" ON "public"."dashboard_time_period" FOR SELECT TO "authenticated" USING (true);
 
 
+--
+-- Name: daily_water_quality_rating dwr_select_farm_member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "dwr_select_farm_member" ON "public"."daily_water_quality_rating" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -6886,92 +7997,161 @@ CREATE POLICY "dwr_select_farm_member" ON "public"."daily_water_quality_rating" 
   WHERE (("s"."id" = "daily_water_quality_rating"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: energy_alarm_events; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."energy_alarm_events" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: energy_alarm_events energy_alarm_events_farm_members_all; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "energy_alarm_events_farm_members_all" ON "public"."energy_alarm_events" TO "authenticated" USING ("private"."is_farm_member"("farm_id")) WITH CHECK ("private"."is_farm_member"("farm_id"));
 
 
+--
+-- Name: energy_meter_timeseries; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."energy_meter_timeseries" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: energy_meter_timeseries energy_meter_timeseries_farm_members_all; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "energy_meter_timeseries_farm_members_all" ON "public"."energy_meter_timeseries" TO "authenticated" USING ("private"."is_farm_member"("farm_id")) WITH CHECK ("private"."is_farm_member"("farm_id"));
 
 
+--
+-- Name: farm; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."farm" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: farm farm_delete; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "farm_delete" ON "public"."farm" FOR DELETE USING ("private"."has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: farm farm_insert; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "farm_insert" ON "public"."farm" FOR INSERT WITH CHECK ((( SELECT "auth"."uid"() AS "uid") IS NOT NULL));
 
 
+--
+-- Name: farm farm_select; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "farm_select" ON "public"."farm" FOR SELECT USING ("private"."is_farm_member"("id", ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: farm farm_update; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "farm_update" ON "public"."farm" FOR UPDATE USING ("private"."has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("private"."has_farm_role"("id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: farm_user; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."farm_user" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: farm_user farm_user: read own; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "farm_user: read own" ON "public"."farm_user" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: farm_user farm_user_delete; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "farm_user_delete" ON "public"."farm_user" FOR DELETE TO "authenticated" USING ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: farm_user farm_user_insert; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "farm_user_insert" ON "public"."farm_user" FOR INSERT TO "authenticated" WITH CHECK ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: farm_user farm_user_update; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "farm_user_update" ON "public"."farm_user" FOR UPDATE TO "authenticated" USING ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: feed_inventory; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feed_inventory" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: feed_inventory feed_inventory: delete managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_inventory: delete managers" ON "public"."feed_inventory" FOR DELETE TO "authenticated" USING ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"]));
 
 
+--
+-- Name: feed_inventory feed_inventory: insert write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_inventory: insert write roles" ON "public"."feed_inventory" FOR INSERT TO "authenticated" WITH CHECK ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text", 'farm_technician'::"text"]));
 
 
+--
+-- Name: feed_inventory feed_inventory: read farm members; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_inventory: read farm members" ON "public"."feed_inventory" FOR SELECT TO "authenticated" USING ("private"."is_farm_member"("farm_id"));
 
 
+--
+-- Name: feed_inventory feed_inventory: update managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_inventory: update managers" ON "public"."feed_inventory" FOR UPDATE TO "authenticated" USING ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])) WITH CHECK ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"]));
 
 
+--
+-- Name: feed_supplier; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feed_supplier" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: feed_supplier feed_supplier: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_supplier: delete by managers" ON "public"."feed_supplier" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: feed_supplier feed_supplier: insert by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_supplier: insert by managers" ON "public"."feed_supplier" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: feed_supplier feed_supplier: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_supplier: update by managers" ON "public"."feed_supplier" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
@@ -6980,32 +8160,56 @@ CREATE POLICY "feed_supplier: update by managers" ON "public"."feed_supplier" FO
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: feed_supplier feed_supplier_select; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_supplier_select" ON "public"."feed_supplier" FOR SELECT TO "authenticated" USING (true);
 
 
+--
+-- Name: feed_type; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feed_type" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: feed_type feed_type: delete by farm managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_type: delete by farm managers" ON "public"."feed_type" FOR DELETE TO "authenticated" USING ((("farm_id" IS NOT NULL) AND "private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])));
 
 
+--
+-- Name: feed_type feed_type: insert by farm managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_type: insert by farm managers" ON "public"."feed_type" FOR INSERT TO "authenticated" WITH CHECK ((("farm_id" IS NOT NULL) AND "private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])));
 
 
+--
+-- Name: feed_type feed_type: read shared or farm scoped; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_type: read shared or farm scoped" ON "public"."feed_type" FOR SELECT TO "authenticated" USING ((("farm_id" IS NULL) OR "private"."is_farm_member"("farm_id")));
 
 
+--
+-- Name: feed_type feed_type: update by farm managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feed_type: update by farm managers" ON "public"."feed_type" FOR UPDATE TO "authenticated" USING ((("farm_id" IS NOT NULL) AND "private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"]))) WITH CHECK ((("farm_id" IS NOT NULL) AND "private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"])));
 
 
+--
+-- Name: feeding_record; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feeding_record" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: feeding_record feeding_record: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feeding_record: delete by managers" ON "public"."feeding_record" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7013,6 +8217,9 @@ CREATE POLICY "feeding_record: delete by managers" ON "public"."feeding_record" 
   WHERE (("s"."id" = "feeding_record"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: feeding_record feeding_record: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feeding_record: insert by write roles" ON "public"."feeding_record" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7020,6 +8227,9 @@ CREATE POLICY "feeding_record: insert by write roles" ON "public"."feeding_recor
   WHERE (("s"."id" = "feeding_record"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]))))));
 
 
+--
+-- Name: feeding_record feeding_record: read if farm member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feeding_record: read if farm member" ON "public"."feeding_record" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7027,6 +8237,9 @@ CREATE POLICY "feeding_record: read if farm member" ON "public"."feeding_record"
   WHERE (("s"."id" = "feeding_record"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: feeding_record feeding_record: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feeding_record: update by managers" ON "public"."feeding_record" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7037,34 +8250,55 @@ CREATE POLICY "feeding_record: update by managers" ON "public"."feeding_record" 
   WHERE (("s"."id" = "feeding_record"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: feeding_response_level; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."feeding_response_level" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: feeding_response_level feeding_response_level: read authenticated; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "feeding_response_level: read authenticated" ON "public"."feeding_response_level" FOR SELECT TO "authenticated" USING (true);
 
 
+--
+-- Name: fingerling_batch; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fingerling_batch" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: fingerling_batch fingerling_batch: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fingerling_batch: delete by managers" ON "public"."fingerling_batch" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
   WHERE (("fu"."farm_id" = "fingerling_batch"."farm_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fingerling_batch fingerling_batch: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fingerling_batch: insert by write roles" ON "public"."fingerling_batch" FOR INSERT TO "authenticated" WITH CHECK ((("farm_id" IS NOT NULL) AND "private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]) AND (("system_id" IS NULL) OR (EXISTS ( SELECT 1
    FROM "public"."system" "s"
   WHERE (("s"."id" = "fingerling_batch"."system_id") AND ("s"."farm_id" = "fingerling_batch"."farm_id") AND ("s"."is_active" = true)))))));
 
 
+--
+-- Name: fingerling_batch fingerling_batch: read if user is farm member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fingerling_batch: read if user is farm member" ON "public"."fingerling_batch" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
   WHERE ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")))));
 
 
+--
+-- Name: fingerling_batch fingerling_batch: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fingerling_batch: update by managers" ON "public"."fingerling_batch" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
@@ -7073,21 +8307,33 @@ CREATE POLICY "fingerling_batch: update by managers" ON "public"."fingerling_bat
   WHERE (("fu"."farm_id" = "fingerling_batch"."farm_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fingerling_supplier; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fingerling_supplier" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: fingerling_supplier fingerling_supplier: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fingerling_supplier: delete by managers" ON "public"."fingerling_supplier" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fingerling_supplier fingerling_supplier: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fingerling_supplier: insert by write roles" ON "public"."fingerling_supplier" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]))))));
 
 
+--
+-- Name: fingerling_supplier fingerling_supplier: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fingerling_supplier: update by managers" ON "public"."fingerling_supplier" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."farm_user" "fu"
@@ -7096,13 +8342,22 @@ CREATE POLICY "fingerling_supplier: update by managers" ON "public"."fingerling_
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fingerling_supplier fingerling_supplier_select; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fingerling_supplier_select" ON "public"."fingerling_supplier" FOR SELECT TO "authenticated" USING (true);
 
 
+--
+-- Name: fish_harvest; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_harvest" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: fish_harvest fish_harvest: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_harvest: delete by managers" ON "public"."fish_harvest" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7110,6 +8365,9 @@ CREATE POLICY "fish_harvest: delete by managers" ON "public"."fish_harvest" FOR 
   WHERE (("s"."id" = "fish_harvest"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_harvest fish_harvest: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_harvest: insert by write roles" ON "public"."fish_harvest" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7117,6 +8375,9 @@ CREATE POLICY "fish_harvest: insert by write roles" ON "public"."fish_harvest" F
   WHERE (("s"."id" = "fish_harvest"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]))))));
 
 
+--
+-- Name: fish_harvest fish_harvest: read if farm member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_harvest: read if farm member" ON "public"."fish_harvest" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7124,6 +8385,9 @@ CREATE POLICY "fish_harvest: read if farm member" ON "public"."fish_harvest" FOR
   WHERE (("s"."id" = "fish_harvest"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: fish_harvest fish_harvest: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_harvest: update by managers" ON "public"."fish_harvest" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7134,9 +8398,15 @@ CREATE POLICY "fish_harvest: update by managers" ON "public"."fish_harvest" FOR 
   WHERE (("s"."id" = "fish_harvest"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_mortality; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_mortality" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: fish_mortality fish_mortality: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_mortality: delete by managers" ON "public"."fish_mortality" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7144,6 +8414,9 @@ CREATE POLICY "fish_mortality: delete by managers" ON "public"."fish_mortality" 
   WHERE (("s"."id" = "fish_mortality"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_mortality fish_mortality: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_mortality: insert by write roles" ON "public"."fish_mortality" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7151,6 +8424,9 @@ CREATE POLICY "fish_mortality: insert by write roles" ON "public"."fish_mortalit
   WHERE (("s"."id" = "fish_mortality"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]))))));
 
 
+--
+-- Name: fish_mortality fish_mortality: read if farm member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_mortality: read if farm member" ON "public"."fish_mortality" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7158,6 +8434,9 @@ CREATE POLICY "fish_mortality: read if farm member" ON "public"."fish_mortality"
   WHERE (("s"."id" = "fish_mortality"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: fish_mortality fish_mortality: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_mortality: update by managers" ON "public"."fish_mortality" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7168,9 +8447,15 @@ CREATE POLICY "fish_mortality: update by managers" ON "public"."fish_mortality" 
   WHERE (("s"."id" = "fish_mortality"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_sampling_weight; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_sampling_weight" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_sampling_weight: delete by managers" ON "public"."fish_sampling_weight" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7178,6 +8463,9 @@ CREATE POLICY "fish_sampling_weight: delete by managers" ON "public"."fish_sampl
   WHERE (("s"."id" = "fish_sampling_weight"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_sampling_weight: insert by write roles" ON "public"."fish_sampling_weight" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7185,6 +8473,9 @@ CREATE POLICY "fish_sampling_weight: insert by write roles" ON "public"."fish_sa
   WHERE (("s"."id" = "fish_sampling_weight"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]))))));
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight: read if farm member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_sampling_weight: read if farm member" ON "public"."fish_sampling_weight" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7192,6 +8483,9 @@ CREATE POLICY "fish_sampling_weight: read if farm member" ON "public"."fish_samp
   WHERE (("s"."id" = "fish_sampling_weight"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: fish_sampling_weight fish_sampling_weight: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_sampling_weight: update by managers" ON "public"."fish_sampling_weight" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7202,9 +8496,15 @@ CREATE POLICY "fish_sampling_weight: update by managers" ON "public"."fish_sampl
   WHERE (("s"."id" = "fish_sampling_weight"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_stocking; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_stocking" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: fish_stocking fish_stocking: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_stocking: delete by managers" ON "public"."fish_stocking" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7212,6 +8512,9 @@ CREATE POLICY "fish_stocking: delete by managers" ON "public"."fish_stocking" FO
   WHERE (("s"."id" = "fish_stocking"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_stocking fish_stocking: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_stocking: insert by write roles" ON "public"."fish_stocking" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7219,6 +8522,9 @@ CREATE POLICY "fish_stocking: insert by write roles" ON "public"."fish_stocking"
   WHERE (("s"."id" = "fish_stocking"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]))))));
 
 
+--
+-- Name: fish_stocking fish_stocking: read if farm member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_stocking: read if farm member" ON "public"."fish_stocking" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7226,6 +8532,9 @@ CREATE POLICY "fish_stocking: read if farm member" ON "public"."fish_stocking" F
   WHERE (("s"."id" = "fish_stocking"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: fish_stocking fish_stocking: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_stocking: update by managers" ON "public"."fish_stocking" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7236,9 +8545,15 @@ CREATE POLICY "fish_stocking: update by managers" ON "public"."fish_stocking" FO
   WHERE (("s"."id" = "fish_stocking"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_transfer; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."fish_transfer" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: fish_transfer fish_transfer: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_transfer: delete by managers" ON "public"."fish_transfer" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7246,6 +8561,9 @@ CREATE POLICY "fish_transfer: delete by managers" ON "public"."fish_transfer" FO
   WHERE (("s"."id" = "fish_transfer"."origin_system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: fish_transfer fish_transfer: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_transfer: insert by write roles" ON "public"."fish_transfer" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7253,6 +8571,9 @@ CREATE POLICY "fish_transfer: insert by write roles" ON "public"."fish_transfer"
   WHERE (("s"."id" = "fish_transfer"."origin_system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]))))));
 
 
+--
+-- Name: fish_transfer fish_transfer: read if farm member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_transfer: read if farm member" ON "public"."fish_transfer" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7260,6 +8581,9 @@ CREATE POLICY "fish_transfer: read if farm member" ON "public"."fish_transfer" F
   WHERE (("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND (("s"."id" = "fish_transfer"."origin_system_id") OR ("s"."id" = "fish_transfer"."target_system_id"))))));
 
 
+--
+-- Name: fish_transfer fish_transfer: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "fish_transfer: update by managers" ON "public"."fish_transfer" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7270,18 +8594,30 @@ CREATE POLICY "fish_transfer: update by managers" ON "public"."fish_transfer" FO
   WHERE (("s"."id" = "fish_transfer"."origin_system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: normalization_review norm_review_farm_isolation; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "norm_review_farm_isolation" ON "public"."normalization_review" USING (("farm_id" IN ( SELECT "farm_user"."farm_id"
    FROM "public"."farm_user"
   WHERE ("farm_user"."user_id" = ( SELECT "auth"."uid"() AS "uid")))));
 
 
+--
+-- Name: normalization_review; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."normalization_review" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: organization; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."organization" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: organization organization_select_owner_or_farm_member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "organization_select_owner_or_farm_member" ON "public"."organization" FOR SELECT TO "authenticated" USING ((("owner_id" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
    FROM ("public"."farm" "f"
@@ -7289,9 +8625,15 @@ CREATE POLICY "organization_select_owner_or_farm_member" ON "public"."organizati
   WHERE (("f"."organization_id" = "organization"."id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
+--
+-- Name: production_cycle; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."production_cycle" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: production_cycle production_cycle: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "production_cycle: delete by managers" ON "public"."production_cycle" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7299,6 +8641,9 @@ CREATE POLICY "production_cycle: delete by managers" ON "public"."production_cyc
   WHERE (("s"."id" = "production_cycle"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: production_cycle production_cycle_insert; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "production_cycle_insert" ON "public"."production_cycle" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7306,6 +8651,9 @@ CREATE POLICY "production_cycle_insert" ON "public"."production_cycle" FOR INSER
   WHERE (("s"."id" = "production_cycle"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: production_cycle production_cycle_select; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "production_cycle_select" ON "public"."production_cycle" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7313,6 +8661,9 @@ CREATE POLICY "production_cycle_select" ON "public"."production_cycle" FOR SELEC
   WHERE (("s"."id" = "production_cycle"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: production_cycle production_cycle_update; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "production_cycle_update" ON "public"."production_cycle" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7320,41 +8671,71 @@ CREATE POLICY "production_cycle_update" ON "public"."production_cycle" FOR UPDAT
   WHERE (("s"."id" = "production_cycle"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: raw_uploads; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."raw_uploads" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: raw_uploads raw_uploads_farm_isolation; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "raw_uploads_farm_isolation" ON "public"."raw_uploads" USING (("farm_id" IN ( SELECT "farm_user"."farm_id"
    FROM "public"."farm_user"
   WHERE ("farm_user"."user_id" = ( SELECT "auth"."uid"() AS "uid")))));
 
 
+--
+-- Name: system; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."system" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: system system_delete; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "system_delete" ON "public"."system" FOR DELETE USING ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: system system_insert; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "system_insert" ON "public"."system" FOR INSERT WITH CHECK ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: system system_select; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "system_select" ON "public"."system" FOR SELECT TO "authenticated" USING ("private"."is_farm_member"("farm_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: system system_update; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "system_update" ON "public"."system" FOR UPDATE USING ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"], ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("private"."has_farm_role"("farm_id", ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"], ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: user_profile; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."user_profile" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: user_profile user_profile_insert; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "user_profile_insert" ON "public"."user_profile" FOR INSERT WITH CHECK (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: user_profile user_profile_select; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "user_profile_select" ON "public"."user_profile" FOR SELECT TO "authenticated" USING ((("user_id" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
    FROM ("public"."farm_user" "fu1"
@@ -7362,19 +8743,34 @@ CREATE POLICY "user_profile_select" ON "public"."user_profile" FOR SELECT TO "au
   WHERE (("fu1"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu2"."user_id" = "user_profile"."user_id"))))));
 
 
+--
+-- Name: user_profile user_profile_update; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "user_profile_update" ON "public"."user_profile" FOR UPDATE USING (("user_id" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
+--
+-- Name: user_settings; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."user_settings" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: water_quality_framework; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."water_quality_framework" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: water_quality_measurement; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
 
 ALTER TABLE "public"."water_quality_measurement" ENABLE ROW LEVEL SECURITY;
 
+--
+-- Name: water_quality_measurement water_quality_measurement: delete by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "water_quality_measurement: delete by managers" ON "public"."water_quality_measurement" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7382,6 +8778,9 @@ CREATE POLICY "water_quality_measurement: delete by managers" ON "public"."water
   WHERE (("s"."id" = "water_quality_measurement"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: water_quality_measurement water_quality_measurement: insert by write roles; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "water_quality_measurement: insert by write roles" ON "public"."water_quality_measurement" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7389,6 +8788,9 @@ CREATE POLICY "water_quality_measurement: insert by write roles" ON "public"."wa
   WHERE (("s"."id" = "water_quality_measurement"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text", 'system_operator'::"text"]))))));
 
 
+--
+-- Name: water_quality_measurement water_quality_measurement: update by managers; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "water_quality_measurement: update by managers" ON "public"."water_quality_measurement" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7399,6 +8801,9 @@ CREATE POLICY "water_quality_measurement: update by managers" ON "public"."water
   WHERE (("s"."id" = "water_quality_measurement"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("fu"."role" = ANY (ARRAY['admin'::"text", 'farm_manager'::"text"]))))));
 
 
+--
+-- Name: water_quality_measurement wqm_select_farm_member; Type: POLICY; Schema: public; Owner: postgres
+--
 
 CREATE POLICY "wqm_select_farm_member" ON "public"."water_quality_measurement" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."system" "s"
@@ -7406,30 +8811,60 @@ CREATE POLICY "wqm_select_farm_member" ON "public"."water_quality_measurement" F
   WHERE (("s"."id" = "water_quality_measurement"."system_id") AND ("fu"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
+--
+-- Name: supabase_realtime; Type: PUBLICATION; Schema: -; Owner: postgres
+--
 
+-- CREATE PUBLICATION "supabase_realtime" WITH (publish = 'insert, update, delete, truncate');
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
+--
+-- Name: supabase_realtime_messages_publication; Type: PUBLICATION; Schema: -; Owner: supabase_admin
+--
+
+-- CREATE PUBLICATION "supabase_realtime_messages_publication" WITH (publish = 'insert, update, delete, truncate');
 
 
+-- ALTER PUBLICATION "supabase_realtime_messages_publication" OWNER TO "supabase_admin";
 
-
+--
+-- Name: SCHEMA "analytics"; Type: ACL; Schema: -; Owner: postgres
+--
 
 GRANT USAGE ON SCHEMA "analytics" TO "service_role";
 
 
+--
+-- Name: SCHEMA "cron"; Type: ACL; Schema: -; Owner: supabase_admin
+--
+
+-- GRANT USAGE ON SCHEMA "cron" TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: SCHEMA "net"; Type: ACL; Schema: -; Owner: supabase_admin
+--
+
+-- GRANT USAGE ON SCHEMA "net" TO "supabase_functions_admin";
+-- GRANT USAGE ON SCHEMA "net" TO "anon";
+-- GRANT USAGE ON SCHEMA "net" TO "authenticated";
+-- GRANT USAGE ON SCHEMA "net" TO "service_role";
+-- GRANT USAGE ON SCHEMA "net" TO "postgres";
 
 
-
-
+--
+-- Name: SCHEMA "private"; Type: ACL; Schema: -; Owner: postgres
+--
 
 GRANT USAGE ON SCHEMA "private" TO "service_role";
 GRANT USAGE ON SCHEMA "private" TO "authenticated";
 
 
+--
+-- Name: SCHEMA "public"; Type: ACL; Schema: -; Owner: pg_database_owner
+--
 
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
@@ -7437,1469 +8872,3515 @@ GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey16_in"("cstring"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey16_in"("cstring") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey16_in"("cstring") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey16_in"("cstring") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey16_in"("cstring") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey16_out"("extensions"."gbtreekey16"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey16_out"("extensions"."gbtreekey16") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey16_out"("extensions"."gbtreekey16") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey16_out"("extensions"."gbtreekey16") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey16_out"("extensions"."gbtreekey16") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey2_in"("cstring"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey2_in"("cstring") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey2_in"("cstring") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey2_in"("cstring") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey2_in"("cstring") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey2_out"("extensions"."gbtreekey2"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey2_out"("extensions"."gbtreekey2") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey2_out"("extensions"."gbtreekey2") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey2_out"("extensions"."gbtreekey2") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey2_out"("extensions"."gbtreekey2") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey32_in"("cstring"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey32_in"("cstring") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey32_in"("cstring") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey32_in"("cstring") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey32_in"("cstring") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey32_out"("extensions"."gbtreekey32"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey32_out"("extensions"."gbtreekey32") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey32_out"("extensions"."gbtreekey32") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey32_out"("extensions"."gbtreekey32") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey32_out"("extensions"."gbtreekey32") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey4_in"("cstring"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey4_in"("cstring") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey4_in"("cstring") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey4_in"("cstring") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey4_in"("cstring") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey4_out"("extensions"."gbtreekey4"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey4_out"("extensions"."gbtreekey4") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey4_out"("extensions"."gbtreekey4") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey4_out"("extensions"."gbtreekey4") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey4_out"("extensions"."gbtreekey4") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey8_in"("cstring"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey8_in"("cstring") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey8_in"("cstring") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey8_in"("cstring") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey8_in"("cstring") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey8_out"("extensions"."gbtreekey8"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey8_out"("extensions"."gbtreekey8") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey8_out"("extensions"."gbtreekey8") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey8_out"("extensions"."gbtreekey8") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey8_out"("extensions"."gbtreekey8") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey_var_in"("cstring"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey_var_in"("cstring") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey_var_in"("cstring") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey_var_in"("cstring") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey_var_in"("cstring") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbtreekey_var_out"("extensions"."gbtreekey_var"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey_var_out"("extensions"."gbtreekey_var") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey_var_out"("extensions"."gbtreekey_var") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey_var_out"("extensions"."gbtreekey_var") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbtreekey_var_out"("extensions"."gbtreekey_var") TO "service_role";
 
 
+--
+-- Name: FUNCTION "alter_job"("job_id" bigint, "schedule" "text", "command" "text", "database" "text", "username" "text", "active" boolean); Type: ACL; Schema: cron; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "cron"."alter_job"("job_id" bigint, "schedule" "text", "command" "text", "database" "text", "username" "text", "active" boolean) TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: FUNCTION "job_cache_invalidate"(); Type: ACL; Schema: cron; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "cron"."job_cache_invalidate"() TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: FUNCTION "schedule"("schedule" "text", "command" "text"); Type: ACL; Schema: cron; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "cron"."schedule"("schedule" "text", "command" "text") TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: FUNCTION "schedule"("job_name" "text", "schedule" "text", "command" "text"); Type: ACL; Schema: cron; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "cron"."schedule"("job_name" "text", "schedule" "text", "command" "text") TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: FUNCTION "schedule_in_database"("job_name" "text", "schedule" "text", "command" "text", "database" "text", "username" "text", "active" boolean); Type: ACL; Schema: cron; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "cron"."schedule_in_database"("job_name" "text", "schedule" "text", "command" "text", "database" "text", "username" "text", "active" boolean) TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: FUNCTION "unschedule"("job_id" bigint); Type: ACL; Schema: cron; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "cron"."unschedule"("job_id" bigint) TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: FUNCTION "unschedule"("job_name" "text"); Type: ACL; Schema: cron; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "cron"."unschedule"("job_name" "text") TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: FUNCTION "algorithm_sign"("signables" "text", "secret" "text", "algorithm" "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."algorithm_sign"("signables" "text", "secret" "text", "algorithm" "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."algorithm_sign"("signables" "text", "secret" "text", "algorithm" "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "armor"("bytea"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."armor"("bytea") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."armor"("bytea") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "armor"("bytea", "text"[], "text"[]); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."armor"("bytea", "text"[], "text"[]) TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."armor"("bytea", "text"[], "text"[]) TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "cash_dist"("money", "money"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."cash_dist"("money", "money") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."cash_dist"("money", "money") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."cash_dist"("money", "money") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."cash_dist"("money", "money") TO "service_role";
 
 
+--
+-- Name: FUNCTION "crypt"("text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."crypt"("text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."crypt"("text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "date_dist"("date", "date"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."date_dist"("date", "date") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."date_dist"("date", "date") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."date_dist"("date", "date") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."date_dist"("date", "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "dearmor"("text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."dearmor"("text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."dearmor"("text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "decrypt"("bytea", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."decrypt"("bytea", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."decrypt"("bytea", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "decrypt_iv"("bytea", "bytea", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."decrypt_iv"("bytea", "bytea", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."decrypt_iv"("bytea", "bytea", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "digest"("bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."digest"("bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."digest"("bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "digest"("text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."digest"("text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."digest"("text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "encrypt"("bytea", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."encrypt"("bytea", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."encrypt"("bytea", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "encrypt_iv"("bytea", "bytea", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."encrypt_iv"("bytea", "bytea", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."encrypt_iv"("bytea", "bytea", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "float4_dist"(real, real); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."float4_dist"(real, real) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."float4_dist"(real, real) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."float4_dist"(real, real) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."float4_dist"(real, real) TO "service_role";
 
 
+--
+-- Name: FUNCTION "float8_dist"(double precision, double precision); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."float8_dist"(double precision, double precision) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."float8_dist"(double precision, double precision) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."float8_dist"(double precision, double precision) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."float8_dist"(double precision, double precision) TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bit_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bit_consistent"("internal", bit, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_consistent"("internal", bit, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_consistent"("internal", bit, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_consistent"("internal", bit, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_consistent"("internal", bit, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bit_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bit_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bit_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bit_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bit_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bool_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bool_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bool_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bool_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bool_same"("extensions"."gbtreekey2", "extensions"."gbtreekey2", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_same"("extensions"."gbtreekey2", "extensions"."gbtreekey2", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_same"("extensions"."gbtreekey2", "extensions"."gbtreekey2", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_same"("extensions"."gbtreekey2", "extensions"."gbtreekey2", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_same"("extensions"."gbtreekey2", "extensions"."gbtreekey2", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bool_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bool_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bpchar_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bpchar_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bpchar_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bpchar_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bpchar_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bytea_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bytea_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bytea_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bytea_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_bytea_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_bytea_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_cash_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_cash_consistent"("internal", "money", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_consistent"("internal", "money", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_consistent"("internal", "money", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_consistent"("internal", "money", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_consistent"("internal", "money", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_cash_distance"("internal", "money", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_distance"("internal", "money", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_distance"("internal", "money", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_distance"("internal", "money", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_distance"("internal", "money", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_cash_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_cash_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_cash_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_cash_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_cash_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_cash_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_date_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_date_consistent"("internal", "date", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_consistent"("internal", "date", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_consistent"("internal", "date", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_consistent"("internal", "date", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_consistent"("internal", "date", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_date_distance"("internal", "date", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_distance"("internal", "date", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_distance"("internal", "date", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_distance"("internal", "date", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_distance"("internal", "date", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_date_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_date_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_date_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_date_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_date_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_date_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_decompress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_decompress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_decompress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_decompress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_decompress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_enum_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_enum_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_enum_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_enum_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_enum_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_enum_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_enum_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float4_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float4_consistent"("internal", real, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_consistent"("internal", real, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_consistent"("internal", real, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_consistent"("internal", real, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_consistent"("internal", real, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float4_distance"("internal", real, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_distance"("internal", real, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_distance"("internal", real, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_distance"("internal", real, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_distance"("internal", real, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float4_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float4_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float4_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float4_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float4_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float8_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float8_distance"("internal", double precision, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_distance"("internal", double precision, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_distance"("internal", double precision, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_distance"("internal", double precision, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_distance"("internal", double precision, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float8_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float8_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float8_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_float8_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_float8_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_inet_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_inet_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_inet_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_inet_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_inet_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_inet_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int2_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int2_distance"("internal", smallint, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_distance"("internal", smallint, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_distance"("internal", smallint, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_distance"("internal", smallint, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_distance"("internal", smallint, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int2_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int2_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int2_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int2_same"("extensions"."gbtreekey4", "extensions"."gbtreekey4", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_same"("extensions"."gbtreekey4", "extensions"."gbtreekey4", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_same"("extensions"."gbtreekey4", "extensions"."gbtreekey4", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_same"("extensions"."gbtreekey4", "extensions"."gbtreekey4", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_same"("extensions"."gbtreekey4", "extensions"."gbtreekey4", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int2_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int2_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int4_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int4_consistent"("internal", integer, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_consistent"("internal", integer, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_consistent"("internal", integer, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_consistent"("internal", integer, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_consistent"("internal", integer, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int4_distance"("internal", integer, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_distance"("internal", integer, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_distance"("internal", integer, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_distance"("internal", integer, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_distance"("internal", integer, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int4_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int4_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int4_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int4_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int4_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int8_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int8_distance"("internal", bigint, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_distance"("internal", bigint, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_distance"("internal", bigint, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_distance"("internal", bigint, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_distance"("internal", bigint, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int8_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int8_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int8_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_int8_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_int8_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_consistent"("internal", interval, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_consistent"("internal", interval, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_consistent"("internal", interval, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_consistent"("internal", interval, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_consistent"("internal", interval, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_decompress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_decompress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_decompress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_decompress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_decompress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_distance"("internal", interval, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_distance"("internal", interval, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_distance"("internal", interval, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_distance"("internal", interval, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_distance"("internal", interval, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_intv_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_intv_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad8_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad8_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad8_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad8_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad8_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad8_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_macad_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_macad_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_numeric_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_numeric_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_numeric_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_numeric_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_numeric_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_numeric_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_oid_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_oid_distance"("internal", "oid", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_distance"("internal", "oid", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_distance"("internal", "oid", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_distance"("internal", "oid", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_distance"("internal", "oid", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_oid_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_oid_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_oid_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_oid_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_same"("extensions"."gbtreekey8", "extensions"."gbtreekey8", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_oid_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_oid_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_text_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_text_consistent"("internal", "text", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_consistent"("internal", "text", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_consistent"("internal", "text", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_consistent"("internal", "text", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_consistent"("internal", "text", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_text_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_text_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_text_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_same"("extensions"."gbtreekey_var", "extensions"."gbtreekey_var", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_text_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_text_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_time_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_time_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_time_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_time_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_time_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_time_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_time_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_timetz_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_timetz_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_timetz_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_timetz_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_timetz_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_ts_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_ts_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_ts_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_ts_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_ts_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_same"("extensions"."gbtreekey16", "extensions"."gbtreekey16", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_ts_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_ts_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_tstz_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_uuid_compress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_compress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_compress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_compress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_compress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_uuid_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_uuid_penalty"("internal", "internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_penalty"("internal", "internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_penalty"("internal", "internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_penalty"("internal", "internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_penalty"("internal", "internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_uuid_picksplit"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_picksplit"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_picksplit"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_picksplit"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_picksplit"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_uuid_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_same"("extensions"."gbtreekey32", "extensions"."gbtreekey32", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_uuid_union"("internal", "internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_union"("internal", "internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_union"("internal", "internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_union"("internal", "internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_uuid_union"("internal", "internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_var_decompress"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_var_decompress"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_var_decompress"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_var_decompress"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_var_decompress"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gbt_var_fetch"("internal"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gbt_var_fetch"("internal") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_var_fetch"("internal") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_var_fetch"("internal") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."gbt_var_fetch"("internal") TO "service_role";
 
 
+--
+-- Name: FUNCTION "gen_random_bytes"(integer); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gen_random_bytes"(integer) TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."gen_random_bytes"(integer) TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "gen_random_uuid"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gen_random_uuid"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."gen_random_uuid"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "gen_salt"("text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gen_salt"("text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."gen_salt"("text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "gen_salt"("text", integer); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."gen_salt"("text", integer) TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."gen_salt"("text", integer) TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "hmac"("bytea", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."hmac"("bytea", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."hmac"("bytea", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "hmac"("text", "text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."hmac"("text", "text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."hmac"("text", "text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "int2_dist"(smallint, smallint); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."int2_dist"(smallint, smallint) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."int2_dist"(smallint, smallint) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."int2_dist"(smallint, smallint) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."int2_dist"(smallint, smallint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "int4_dist"(integer, integer); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."int4_dist"(integer, integer) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."int4_dist"(integer, integer) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."int4_dist"(integer, integer) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."int4_dist"(integer, integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "int8_dist"(bigint, bigint); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."int8_dist"(bigint, bigint) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."int8_dist"(bigint, bigint) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."int8_dist"(bigint, bigint) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."int8_dist"(bigint, bigint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "interval_dist"(interval, interval); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."interval_dist"(interval, interval) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."interval_dist"(interval, interval) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."interval_dist"(interval, interval) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."interval_dist"(interval, interval) TO "service_role";
 
 
+--
+-- Name: FUNCTION "oid_dist"("oid", "oid"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."oid_dist"("oid", "oid") TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."oid_dist"("oid", "oid") TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."oid_dist"("oid", "oid") TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."oid_dist"("oid", "oid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "pg_stat_statements"("showtext" boolean, OUT "userid" "oid", OUT "dbid" "oid", OUT "toplevel" boolean, OUT "queryid" bigint, OUT "query" "text", OUT "plans" bigint, OUT "total_plan_time" double precision, OUT "min_plan_time" double precision, OUT "max_plan_time" double precision, OUT "mean_plan_time" double precision, OUT "stddev_plan_time" double precision, OUT "calls" bigint, OUT "total_exec_time" double precision, OUT "min_exec_time" double precision, OUT "max_exec_time" double precision, OUT "mean_exec_time" double precision, OUT "stddev_exec_time" double precision, OUT "rows" bigint, OUT "shared_blks_hit" bigint, OUT "shared_blks_read" bigint, OUT "shared_blks_dirtied" bigint, OUT "shared_blks_written" bigint, OUT "local_blks_hit" bigint, OUT "local_blks_read" bigint, OUT "local_blks_dirtied" bigint, OUT "local_blks_written" bigint, OUT "temp_blks_read" bigint, OUT "temp_blks_written" bigint, OUT "blk_read_time" double precision, OUT "blk_write_time" double precision, OUT "temp_blk_read_time" double precision, OUT "temp_blk_write_time" double precision, OUT "wal_records" bigint, OUT "wal_fpi" bigint, OUT "wal_bytes" numeric, OUT "jit_functions" bigint, OUT "jit_generation_time" double precision, OUT "jit_inlining_count" bigint, OUT "jit_inlining_time" double precision, OUT "jit_optimization_count" bigint, OUT "jit_optimization_time" double precision, OUT "jit_emission_count" bigint, OUT "jit_emission_time" double precision); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pg_stat_statements"("showtext" boolean, OUT "userid" "oid", OUT "dbid" "oid", OUT "toplevel" boolean, OUT "queryid" bigint, OUT "query" "text", OUT "plans" bigint, OUT "total_plan_time" double precision, OUT "min_plan_time" double precision, OUT "max_plan_time" double precision, OUT "mean_plan_time" double precision, OUT "stddev_plan_time" double precision, OUT "calls" bigint, OUT "total_exec_time" double precision, OUT "min_exec_time" double precision, OUT "max_exec_time" double precision, OUT "mean_exec_time" double precision, OUT "stddev_exec_time" double precision, OUT "rows" bigint, OUT "shared_blks_hit" bigint, OUT "shared_blks_read" bigint, OUT "shared_blks_dirtied" bigint, OUT "shared_blks_written" bigint, OUT "local_blks_hit" bigint, OUT "local_blks_read" bigint, OUT "local_blks_dirtied" bigint, OUT "local_blks_written" bigint, OUT "temp_blks_read" bigint, OUT "temp_blks_written" bigint, OUT "blk_read_time" double precision, OUT "blk_write_time" double precision, OUT "temp_blk_read_time" double precision, OUT "temp_blk_write_time" double precision, OUT "wal_records" bigint, OUT "wal_fpi" bigint, OUT "wal_bytes" numeric, OUT "jit_functions" bigint, OUT "jit_generation_time" double precision, OUT "jit_inlining_count" bigint, OUT "jit_inlining_time" double precision, OUT "jit_optimization_count" bigint, OUT "jit_optimization_time" double precision, OUT "jit_emission_count" bigint, OUT "jit_emission_time" double precision) TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pg_stat_statements"("showtext" boolean, OUT "userid" "oid", OUT "dbid" "oid", OUT "toplevel" boolean, OUT "queryid" bigint, OUT "query" "text", OUT "plans" bigint, OUT "total_plan_time" double precision, OUT "min_plan_time" double precision, OUT "max_plan_time" double precision, OUT "mean_plan_time" double precision, OUT "stddev_plan_time" double precision, OUT "calls" bigint, OUT "total_exec_time" double precision, OUT "min_exec_time" double precision, OUT "max_exec_time" double precision, OUT "mean_exec_time" double precision, OUT "stddev_exec_time" double precision, OUT "rows" bigint, OUT "shared_blks_hit" bigint, OUT "shared_blks_read" bigint, OUT "shared_blks_dirtied" bigint, OUT "shared_blks_written" bigint, OUT "local_blks_hit" bigint, OUT "local_blks_read" bigint, OUT "local_blks_dirtied" bigint, OUT "local_blks_written" bigint, OUT "temp_blks_read" bigint, OUT "temp_blks_written" bigint, OUT "blk_read_time" double precision, OUT "blk_write_time" double precision, OUT "temp_blk_read_time" double precision, OUT "temp_blk_write_time" double precision, OUT "wal_records" bigint, OUT "wal_fpi" bigint, OUT "wal_bytes" numeric, OUT "jit_functions" bigint, OUT "jit_generation_time" double precision, OUT "jit_inlining_count" bigint, OUT "jit_inlining_time" double precision, OUT "jit_optimization_count" bigint, OUT "jit_optimization_time" double precision, OUT "jit_emission_count" bigint, OUT "jit_emission_time" double precision) TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pg_stat_statements_info"(OUT "dealloc" bigint, OUT "stats_reset" timestamp with time zone); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pg_stat_statements_info"(OUT "dealloc" bigint, OUT "stats_reset" timestamp with time zone) TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pg_stat_statements_info"(OUT "dealloc" bigint, OUT "stats_reset" timestamp with time zone) TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pg_stat_statements_reset"("userid" "oid", "dbid" "oid", "queryid" bigint); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pg_stat_statements_reset"("userid" "oid", "dbid" "oid", "queryid" bigint) TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pg_stat_statements_reset"("userid" "oid", "dbid" "oid", "queryid" bigint) TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_armor_headers"("text", OUT "key" "text", OUT "value" "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_armor_headers"("text", OUT "key" "text", OUT "value" "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_armor_headers"("text", OUT "key" "text", OUT "value" "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_key_id"("bytea"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_key_id"("bytea") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_key_id"("bytea") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_decrypt"("bytea", "bytea"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt"("bytea", "bytea") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt"("bytea", "bytea") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_decrypt"("bytea", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt"("bytea", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt"("bytea", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_decrypt"("bytea", "bytea", "text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt"("bytea", "bytea", "text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt"("bytea", "bytea", "text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_decrypt_bytea"("bytea", "bytea"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt_bytea"("bytea", "bytea") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt_bytea"("bytea", "bytea") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_decrypt_bytea"("bytea", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt_bytea"("bytea", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt_bytea"("bytea", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_decrypt_bytea"("bytea", "bytea", "text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt_bytea"("bytea", "bytea", "text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_decrypt_bytea"("bytea", "bytea", "text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_encrypt"("text", "bytea"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_encrypt"("text", "bytea") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_encrypt"("text", "bytea") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_encrypt"("text", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_encrypt"("text", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_encrypt"("text", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_encrypt_bytea"("bytea", "bytea"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_encrypt_bytea"("bytea", "bytea") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_encrypt_bytea"("bytea", "bytea") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_pub_encrypt_bytea"("bytea", "bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_encrypt_bytea"("bytea", "bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_pub_encrypt_bytea"("bytea", "bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_sym_decrypt"("bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_decrypt"("bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_decrypt"("bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_sym_decrypt"("bytea", "text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_decrypt"("bytea", "text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_decrypt"("bytea", "text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_sym_decrypt_bytea"("bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_decrypt_bytea"("bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_decrypt_bytea"("bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_sym_decrypt_bytea"("bytea", "text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_decrypt_bytea"("bytea", "text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_decrypt_bytea"("bytea", "text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_sym_encrypt"("text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_encrypt"("text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_encrypt"("text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_sym_encrypt"("text", "text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_encrypt"("text", "text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_encrypt"("text", "text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_sym_encrypt_bytea"("bytea", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_encrypt_bytea"("bytea", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_encrypt_bytea"("bytea", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "pgp_sym_encrypt_bytea"("bytea", "text", "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_encrypt_bytea"("bytea", "text", "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."pgp_sym_encrypt_bytea"("bytea", "text", "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "sign"("payload" "json", "secret" "text", "algorithm" "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."sign"("payload" "json", "secret" "text", "algorithm" "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."sign"("payload" "json", "secret" "text", "algorithm" "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "time_dist"(time without time zone, time without time zone); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."time_dist"(time without time zone, time without time zone) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."time_dist"(time without time zone, time without time zone) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."time_dist"(time without time zone, time without time zone) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."time_dist"(time without time zone, time without time zone) TO "service_role";
 
 
+--
+-- Name: FUNCTION "try_cast_double"("inp" "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."try_cast_double"("inp" "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."try_cast_double"("inp" "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "ts_dist"(timestamp without time zone, timestamp without time zone); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."ts_dist"(timestamp without time zone, timestamp without time zone) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."ts_dist"(timestamp without time zone, timestamp without time zone) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."ts_dist"(timestamp without time zone, timestamp without time zone) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."ts_dist"(timestamp without time zone, timestamp without time zone) TO "service_role";
 
 
+--
+-- Name: FUNCTION "tstz_dist"(timestamp with time zone, timestamp with time zone); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."tstz_dist"(timestamp with time zone, timestamp with time zone) TO "postgres";
+-- GRANT ALL ON FUNCTION "extensions"."tstz_dist"(timestamp with time zone, timestamp with time zone) TO "anon";
+-- GRANT ALL ON FUNCTION "extensions"."tstz_dist"(timestamp with time zone, timestamp with time zone) TO "authenticated";
+-- GRANT ALL ON FUNCTION "extensions"."tstz_dist"(timestamp with time zone, timestamp with time zone) TO "service_role";
 
 
+--
+-- Name: FUNCTION "url_decode"("data" "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."url_decode"("data" "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."url_decode"("data" "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "url_encode"("data" "bytea"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."url_encode"("data" "bytea") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."url_encode"("data" "bytea") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_generate_v1"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v1"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v1"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_generate_v1mc"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v1mc"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v1mc"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_generate_v3"("namespace" "uuid", "name" "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v3"("namespace" "uuid", "name" "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v3"("namespace" "uuid", "name" "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_generate_v4"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v4"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v4"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_generate_v5"("namespace" "uuid", "name" "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v5"("namespace" "uuid", "name" "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_generate_v5"("namespace" "uuid", "name" "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_nil"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_nil"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_nil"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_ns_dns"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_ns_dns"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_ns_dns"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_ns_oid"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_ns_oid"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_ns_oid"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_ns_url"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_ns_url"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_ns_url"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "uuid_ns_x500"(); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."uuid_ns_x500"() TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."uuid_ns_x500"() TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "verify"("token" "text", "secret" "text", "algorithm" "text"); Type: ACL; Schema: extensions; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "extensions"."verify"("token" "text", "secret" "text", "algorithm" "text") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "extensions"."verify"("token" "text", "secret" "text", "algorithm" "text") TO "dashboard_user";
 
 
+--
+-- Name: FUNCTION "crypto_aead_det_decrypt"("message" "bytea", "additional" "bytea", "key_uuid" "uuid", "nonce" "bytea"); Type: ACL; Schema: pgsodium; Owner: pgsodium_keymaker
+--
 
+-- GRANT ALL ON FUNCTION "pgsodium"."crypto_aead_det_decrypt"("message" "bytea", "additional" "bytea", "key_uuid" "uuid", "nonce" "bytea") TO "service_role";
 
 
+--
+-- Name: FUNCTION "crypto_aead_det_encrypt"("message" "bytea", "additional" "bytea", "key_uuid" "uuid", "nonce" "bytea"); Type: ACL; Schema: pgsodium; Owner: pgsodium_keymaker
+--
 
+-- GRANT ALL ON FUNCTION "pgsodium"."crypto_aead_det_encrypt"("message" "bytea", "additional" "bytea", "key_uuid" "uuid", "nonce" "bytea") TO "service_role";
 
 
+--
+-- Name: FUNCTION "crypto_aead_det_keygen"(); Type: ACL; Schema: pgsodium; Owner: supabase_admin
+--
 
+-- GRANT ALL ON FUNCTION "pgsodium"."crypto_aead_det_keygen"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "app_rpc_scope_ok"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: ACL; Schema: private; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "private"."app_rpc_scope_ok"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."app_rpc_scope_ok"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "private"."app_rpc_scope_ok"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "apply_pending_farm_user_invitations"("p_user_id" "uuid", "p_email" "text"); Type: ACL; Schema: private; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "private"."apply_pending_farm_user_invitations"("p_user_id" "uuid", "p_email" "text") TO "service_role";
 
 
+--
+-- Name: FUNCTION "assert_rpc_parameters"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: ACL; Schema: private; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "private"."assert_rpc_parameters"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."assert_rpc_parameters"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "private"."assert_rpc_parameters"("p_farm_id" "uuid", "p_system_id" bigint, "p_batch_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "clamp_rpc_limit"("p_limit" integer, "p_default" integer, "p_max" integer); Type: ACL; Schema: private; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "private"."clamp_rpc_limit"("p_limit" integer, "p_default" integer, "p_max" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."clamp_rpc_limit"("p_limit" integer, "p_default" integer, "p_max" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "private"."clamp_rpc_limit"("p_limit" integer, "p_default" integer, "p_max" integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "has_farm_role"("farm" "uuid", "roles" "text"[]); Type: ACL; Schema: private; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[]) TO "service_role";
 GRANT ALL ON FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[]) TO "authenticated";
 
 
+--
+-- Name: FUNCTION "has_farm_role"("farm" "uuid", "roles" "text"[], "_user_id" "uuid"); Type: ACL; Schema: private; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[], "_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[], "_user_id" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "private"."has_farm_role"("farm" "uuid", "roles" "text"[], "_user_id" "uuid") TO "authenticated";
 
 
+--
+-- Name: FUNCTION "is_farm_member"("farm" "uuid"); Type: ACL; Schema: private; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "private"."is_farm_member"("farm" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."is_farm_member"("farm" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "private"."is_farm_member"("farm" "uuid") TO "authenticated";
 
 
+--
+-- Name: FUNCTION "is_farm_member"("farm" "uuid", "_user_id" "uuid"); Type: ACL; Schema: private; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "private"."is_farm_member"("farm" "uuid", "_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."is_farm_member"("farm" "uuid", "_user_id" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "private"."is_farm_member"("farm" "uuid", "_user_id" "uuid") TO "authenticated";
 
 
+--
+-- Name: FUNCTION "after_event_update_inventory"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."after_event_update_inventory"() TO "anon";
 GRANT ALL ON FUNCTION "public"."after_event_update_inventory"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."after_event_update_inventory"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer); Type: ACL; Schema: public; Owner: postgres
+--
 
-REVOKE ALL ON FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."api_daily_fish_inventory_rpc"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_cursor_date" "date", "p_cursor_system_id" bigint, "p_order_asc" boolean, "p_limit" integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_daily_overlay"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_daily_overlay"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_daily_overlay"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_daily_overlay"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean); Type: ACL; Schema: public; Owner: postgres
+--
 
-REVOKE ALL ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_efcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_efcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_efcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_efcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_farm_options_rpc"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_farm_options_rpc"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_farm_options_rpc"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_farm_options_rpc"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_farm_user_invitations"("p_farm_id" "uuid"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_farm_user_invitations"("p_farm_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_farm_user_invitations"("p_farm_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_farm_user_invitations"("p_farm_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_feed_demand_forecast"("p_farm_id" "uuid", "p_days_ahead" integer); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_feed_demand_forecast"("p_farm_id" "uuid", "p_days_ahead" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_feed_demand_forecast"("p_farm_id" "uuid", "p_days_ahead" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_feed_demand_forecast"("p_farm_id" "uuid", "p_days_ahead" integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_feed_fcr_intervals"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_feed_rate_analysis"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_feed_rate_analysis"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_feed_rate_analysis"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_feed_rate_analysis"("p_farm_id" "uuid", "p_system_id" bigint, "p_date_from" "date", "p_date_to" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_feed_type_options_rpc"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_feed_type_options_rpc"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_feed_type_options_rpc"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_feed_type_options_rpc"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_feed_type_options_rpc"("p_farm_id" "uuid"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_feed_type_options_rpc"("p_farm_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_feed_type_options_rpc"("p_farm_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_feed_type_options_rpc"("p_farm_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_fingerling_batch_options_rpc"("p_farm_id" "uuid"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_growth_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_growth_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_growth_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_growth_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_harvest_forecast"("p_farm_id" "uuid", "p_system_id" bigint); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_harvest_forecast"("p_farm_id" "uuid", "p_system_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_harvest_forecast"("p_farm_id" "uuid", "p_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_harvest_forecast"("p_farm_id" "uuid", "p_system_id" bigint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_kpi_coverage"("p_farm_id" "uuid", "p_date_from" "date", "p_date_to" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_kpi_coverage"("p_farm_id" "uuid", "p_date_from" "date", "p_date_to" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_kpi_coverage"("p_farm_id" "uuid", "p_date_from" "date", "p_date_to" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_kpi_coverage"("p_farm_id" "uuid", "p_date_from" "date", "p_date_to" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_latest_water_quality_status"("p_farm_id" "uuid", "p_system_id" bigint); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_latest_water_quality_status"("p_farm_id" "uuid", "p_system_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_latest_water_quality_status"("p_farm_id" "uuid", "p_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_latest_water_quality_status"("p_farm_id" "uuid", "p_system_id" bigint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
-REVOKE ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_recommended_actions"("p_farm_id" "uuid", "p_system_id" bigint); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."api_recommended_actions"("p_farm_id" "uuid", "p_system_id" bigint) TO "authenticated";
 
 
+--
+-- Name: FUNCTION "api_running_stock"("p_farm_id" "uuid"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_running_stock"("p_farm_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_running_stock"("p_farm_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_running_stock"("p_farm_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_survival_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_survival_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_survival_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_survival_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_system_health_score"("p_farm_id" "uuid", "p_system_id" bigint); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_system_health_score"("p_farm_id" "uuid", "p_system_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_system_health_score"("p_farm_id" "uuid", "p_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_system_health_score"("p_farm_id" "uuid", "p_system_id" bigint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_active_only" boolean); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_active_only" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_active_only" boolean) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_system_options_rpc"("p_farm_id" "uuid", "p_stage" "public"."system_growth_stage", "p_active_only" boolean) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_system_timeline_bounds"("p_farm_id" "uuid", "p_system_id" bigint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
-REVOKE ALL ON FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date", "p_system_id" bigint) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date", "p_system_id" bigint) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date", "p_system_id" bigint) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."api_time_period_bounds_scoped"("p_farm_id" "uuid", "p_time_period" "text", "p_scope" "text", "p_anchor_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "api_water_quality_sync_status"("p_farm_id" "uuid"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."api_water_quality_sync_status"("p_farm_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_water_quality_sync_status"("p_farm_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_water_quality_sync_status"("p_farm_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "claim_my_farm_user_invitations"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."claim_my_farm_user_invitations"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."claim_my_farm_user_invitations"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."claim_my_farm_user_invitations"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "classify_growth_stage_tanganicae"("p_abw_g" numeric); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."classify_growth_stage_tanganicae"("p_abw_g" numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."classify_growth_stage_tanganicae"("p_abw_g" numeric) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."classify_growth_stage_tanganicae"("p_abw_g" numeric) TO "service_role";
 
 
+--
+-- Name: FUNCTION "classify_water_quality_measurement"("p_parameter_value" double precision, "p_optimal" "jsonb", "p_acceptable" "jsonb", "p_critical" "jsonb", "p_lethal" "jsonb"); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."classify_water_quality_measurement"("p_parameter_value" double precision, "p_optimal" "jsonb", "p_acceptable" "jsonb", "p_critical" "jsonb", "p_lethal" "jsonb") TO "anon";
 GRANT ALL ON FUNCTION "public"."classify_water_quality_measurement"("p_parameter_value" double precision, "p_optimal" "jsonb", "p_acceptable" "jsonb", "p_critical" "jsonb", "p_lethal" "jsonb") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."classify_water_quality_measurement"("p_parameter_value" double precision, "p_optimal" "jsonb", "p_acceptable" "jsonb", "p_critical" "jsonb", "p_lethal" "jsonb") TO "service_role";
 
 
+--
+-- Name: FUNCTION "close_cycle_on_final_harvest"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."close_cycle_on_final_harvest"() TO "anon";
 GRANT ALL ON FUNCTION "public"."close_cycle_on_final_harvest"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."close_cycle_on_final_harvest"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "create_farm_user_invitation"("p_farm_id" "uuid", "p_email" "text", "p_role" "text"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."create_farm_user_invitation"("p_farm_id" "uuid", "p_email" "text", "p_role" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."create_farm_user_invitation"("p_farm_id" "uuid", "p_email" "text", "p_role" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."create_farm_user_invitation"("p_farm_id" "uuid", "p_email" "text", "p_role" "text") TO "service_role";
 
 
+--
+-- Name: FUNCTION "ensure_cycle_on_stocking"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."ensure_cycle_on_stocking"() TO "anon";
 GRANT ALL ON FUNCTION "public"."ensure_cycle_on_stocking"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."ensure_cycle_on_stocking"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "get_daily_feed_target_kg"("p_farm_id" "uuid", "p_system_id" bigint); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."get_daily_feed_target_kg"("p_farm_id" "uuid", "p_system_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_daily_feed_target_kg"("p_farm_id" "uuid", "p_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_daily_feed_target_kg"("p_farm_id" "uuid", "p_system_id" bigint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "get_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."get_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_fcr_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_days" integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "get_growth_trend"("p_system_id" bigint, "p_days" integer); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."get_growth_trend"("p_system_id" bigint, "p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_growth_trend"("p_system_id" bigint, "p_days" integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "get_running_stock"("p_farm_id" "uuid"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."get_running_stock"("p_farm_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_running_stock"("p_farm_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "get_survival_trend"("p_system_id" bigint, "p_start_date" "date", "p_end_date" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."get_survival_trend"("p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_survival_trend"("p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "handle_new_user"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "mark_farm_user_invitation_sent"("p_invitation_id" "uuid"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."mark_farm_user_invitation_sent"("p_invitation_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."mark_farm_user_invitation_sent"("p_invitation_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."mark_farm_user_invitation_sent"("p_invitation_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "prevent_system_name_update"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."prevent_system_name_update"() TO "anon";
 GRANT ALL ON FUNCTION "public"."prevent_system_name_update"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."prevent_system_name_update"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "process_inventory_queue"("p_limit" integer); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."process_inventory_queue"("p_limit" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."process_inventory_queue"("p_limit" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."process_inventory_queue"("p_limit" integer) TO "service_role";
 
 
+--
+-- Name: FUNCTION "production_cycle_set_ongoing"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."production_cycle_set_ongoing"() TO "anon";
 GRANT ALL ON FUNCTION "public"."production_cycle_set_ongoing"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."production_cycle_set_ongoing"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "provision_default_farm_membership"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."provision_default_farm_membership"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."provision_default_farm_membership"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "refresh_after_system_if_needed"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."refresh_after_system_if_needed"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."refresh_after_system_if_needed"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "refresh_daily_water_quality_rating"("p_system_id" bigint, "p_from" "date", "p_to" "date"); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."refresh_daily_water_quality_rating"("p_system_id" bigint, "p_from" "date", "p_to" "date") TO "anon";
 GRANT ALL ON FUNCTION "public"."refresh_daily_water_quality_rating"("p_system_id" bigint, "p_from" "date", "p_to" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."refresh_daily_water_quality_rating"("p_system_id" bigint, "p_from" "date", "p_to" "date") TO "service_role";
 
 
+--
+-- Name: FUNCTION "request_matview_refresh"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."request_matview_refresh"() TO "anon";
 GRANT ALL ON FUNCTION "public"."request_matview_refresh"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."request_matview_refresh"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "resolve_sampling_abw_g"("p_abw" double precision, "p_total_weight_sampling" double precision, "p_number_of_fish_sampling" numeric); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."resolve_sampling_abw_g"("p_abw" double precision, "p_total_weight_sampling" double precision, "p_number_of_fish_sampling" numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."resolve_sampling_abw_g"("p_abw" double precision, "p_total_weight_sampling" double precision, "p_number_of_fish_sampling" numeric) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."resolve_sampling_abw_g"("p_abw" double precision, "p_total_weight_sampling" double precision, "p_number_of_fish_sampling" numeric) TO "service_role";
 
 
+--
+-- Name: FUNCTION "resolve_sampling_abw_g"("p_abw" numeric, "p_total_weight_sampling" numeric, "p_number_of_fish_sampling" numeric); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."resolve_sampling_abw_g"("p_abw" numeric, "p_total_weight_sampling" numeric, "p_number_of_fish_sampling" numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."resolve_sampling_abw_g"("p_abw" numeric, "p_total_weight_sampling" numeric, "p_number_of_fish_sampling" numeric) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."resolve_sampling_abw_g"("p_abw" numeric, "p_total_weight_sampling" numeric, "p_number_of_fish_sampling" numeric) TO "service_role";
 
 
+--
+-- Name: FUNCTION "revoke_farm_user_invitation"("p_invitation_id" "uuid"); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."revoke_farm_user_invitation"("p_invitation_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."revoke_farm_user_invitation"("p_invitation_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."revoke_farm_user_invitation"("p_invitation_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."transfer_impacts_efcr"("p_transfer_type" "public"."transfer_type", "p_origin_system_id" bigint, "p_target_system_id" bigint) TO "service_role";
 
 
+--
+-- Name: FUNCTION "transfer_weight_kg"("p_total_weight_transfer" double precision, "p_number_of_fish_transfer" double precision, "p_abw" double precision); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."transfer_weight_kg"("p_total_weight_transfer" double precision, "p_number_of_fish_transfer" double precision, "p_abw" double precision) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."transfer_weight_kg"("p_total_weight_transfer" double precision, "p_number_of_fish_transfer" double precision, "p_abw" double precision) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."transfer_weight_kg"("p_total_weight_transfer" double precision, "p_number_of_fish_transfer" double precision, "p_abw" double precision) TO "service_role";
 
 
+--
+-- Name: FUNCTION "trg_refresh_daily_water_quality_rating"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."trg_refresh_daily_water_quality_rating"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_refresh_daily_water_quality_rating"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_refresh_daily_water_quality_rating"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "trg_refresh_daily_water_quality_rating_from_framework"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."trg_refresh_daily_water_quality_rating_from_framework"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_refresh_daily_water_quality_rating_from_framework"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_refresh_daily_water_quality_rating_from_framework"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "trg_update_system_growth_stage"(); Type: ACL; Schema: public; Owner: postgres
+--
 
 REVOKE ALL ON FUNCTION "public"."trg_update_system_growth_stage"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."trg_update_system_growth_stage"() TO "service_role";
 
 
+--
+-- Name: FUNCTION "water_quality_rating_label"("p_score" numeric); Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON FUNCTION "public"."water_quality_rating_label"("p_score" numeric) TO "anon";
 GRANT ALL ON FUNCTION "public"."water_quality_rating_label"("p_score" numeric) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."water_quality_rating_label"("p_score" numeric) TO "service_role";
 
 
+--
+-- Name: FUNCTION "_crypto_aead_det_decrypt"("message" "bytea", "additional" "bytea", "key_id" bigint, "context" "bytea", "nonce" "bytea"); Type: ACL; Schema: vault; Owner: supabase_admin
+--
+
+-- GRANT ALL ON FUNCTION "vault"."_crypto_aead_det_decrypt"("message" "bytea", "additional" "bytea", "key_id" bigint, "context" "bytea", "nonce" "bytea") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "vault"."_crypto_aead_det_decrypt"("message" "bytea", "additional" "bytea", "key_id" bigint, "context" "bytea", "nonce" "bytea") TO "service_role";
 
 
+--
+-- Name: FUNCTION "create_secret"("new_secret" "text", "new_name" "text", "new_description" "text", "new_key_id" "uuid"); Type: ACL; Schema: vault; Owner: supabase_admin
+--
+
+-- GRANT ALL ON FUNCTION "vault"."create_secret"("new_secret" "text", "new_name" "text", "new_description" "text", "new_key_id" "uuid") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "vault"."create_secret"("new_secret" "text", "new_name" "text", "new_description" "text", "new_key_id" "uuid") TO "service_role";
 
 
+--
+-- Name: FUNCTION "update_secret"("secret_id" "uuid", "new_secret" "text", "new_name" "text", "new_description" "text", "new_key_id" "uuid"); Type: ACL; Schema: vault; Owner: supabase_admin
+--
+
+-- GRANT ALL ON FUNCTION "vault"."update_secret"("secret_id" "uuid", "new_secret" "text", "new_name" "text", "new_description" "text", "new_key_id" "uuid") TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON FUNCTION "vault"."update_secret"("secret_id" "uuid", "new_secret" "text", "new_name" "text", "new_description" "text", "new_key_id" "uuid") TO "service_role";
 
 
-
-
-
+--
+-- Name: TABLE "feeding_record"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."feeding_record" TO "authenticated";
 GRANT ALL ON TABLE "public"."feeding_record" TO "service_role";
 
 
+--
+-- Name: TABLE "fish_harvest"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."fish_harvest" TO "authenticated";
 GRANT ALL ON TABLE "public"."fish_harvest" TO "service_role";
 
 
+--
+-- Name: TABLE "fish_mortality"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."fish_mortality" TO "authenticated";
 GRANT ALL ON TABLE "public"."fish_mortality" TO "service_role";
 
 
+--
+-- Name: TABLE "fish_sampling_weight"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."fish_sampling_weight" TO "authenticated";
 GRANT ALL ON TABLE "public"."fish_sampling_weight" TO "service_role";
 
 
+--
+-- Name: TABLE "fish_stocking"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."fish_stocking" TO "authenticated";
 GRANT ALL ON TABLE "public"."fish_stocking" TO "service_role";
 
 
+--
+-- Name: TABLE "fish_transfer"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."fish_transfer" TO "authenticated";
 GRANT ALL ON TABLE "public"."fish_transfer" TO "service_role";
 
 
+--
+-- Name: TABLE "system"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."system" TO "authenticated";
 GRANT ALL ON TABLE "public"."system" TO "service_role";
 
 
+--
+-- Name: TABLE "daily_fish_inventory_table"; Type: ACL; Schema: analytics; Owner: postgres
+--
 
 GRANT ALL ON TABLE "analytics"."daily_fish_inventory_table" TO "service_role";
 
 
+--
+-- Name: TABLE "fingerling_batch"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."fingerling_batch" TO "authenticated";
 GRANT ALL ON TABLE "public"."fingerling_batch" TO "service_role";
 
 
+--
+-- Name: TABLE "production_cycle"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."production_cycle" TO "authenticated";
 GRANT ALL ON TABLE "public"."production_cycle" TO "service_role";
 
 
+--
+-- Name: TABLE "job"; Type: ACL; Schema: cron; Owner: supabase_admin
+--
 
-GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."water_quality_measurement" TO "authenticated";
-GRANT ALL ON TABLE "public"."water_quality_measurement" TO "service_role";
-
-
-
-
+-- GRANT SELECT ON TABLE "cron"."job" TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: TABLE "job_run_details"; Type: ACL; Schema: cron; Owner: supabase_admin
+--
+
+-- GRANT ALL ON TABLE "cron"."job_run_details" TO "postgres" WITH GRANT OPTION;
 
 
+--
+-- Name: TABLE "pg_stat_statements"; Type: ACL; Schema: extensions; Owner: supabase_admin
+--
+
+-- GRANT ALL ON TABLE "extensions"."pg_stat_statements" TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON TABLE "extensions"."pg_stat_statements" TO "dashboard_user";
 
 
+--
+-- Name: TABLE "pg_stat_statements_info"; Type: ACL; Schema: extensions; Owner: supabase_admin
+--
+
+-- GRANT ALL ON TABLE "extensions"."pg_stat_statements_info" TO "postgres" WITH GRANT OPTION;
+-- GRANT ALL ON TABLE "extensions"."pg_stat_statements_info" TO "dashboard_user";
 
 
+--
+-- Name: TABLE "decrypted_key"; Type: ACL; Schema: pgsodium; Owner: supabase_admin
+--
+
+-- GRANT ALL ON TABLE "pgsodium"."decrypted_key" TO "pgsodium_keyholder";
 
 
+--
+-- Name: TABLE "masking_rule"; Type: ACL; Schema: pgsodium; Owner: supabase_admin
+--
+
+-- GRANT ALL ON TABLE "pgsodium"."masking_rule" TO "pgsodium_keyholder";
 
 
+--
+-- Name: TABLE "mask_columns"; Type: ACL; Schema: pgsodium; Owner: supabase_admin
+--
+
+-- GRANT ALL ON TABLE "pgsodium"."mask_columns" TO "pgsodium_keyholder";
 
 
-
-
-
-
-
+--
+-- Name: TABLE "_affected_systems"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON TABLE "public"."_affected_systems" TO "service_role";
 
 
+--
+-- Name: TABLE "alert_threshold"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."alert_threshold" TO "authenticated";
 GRANT ALL ON TABLE "public"."alert_threshold" TO "service_role";
 
 
+--
+-- Name: TABLE "farm_user"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."farm_user" TO "authenticated";
 GRANT ALL ON TABLE "public"."farm_user" TO "service_role";
 
 
+--
+-- Name: TABLE "api_alert_thresholds"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT ON TABLE "public"."api_alert_thresholds" TO "authenticated";
 GRANT SELECT ON TABLE "public"."api_alert_thresholds" TO "service_role";
 
 
+--
+-- Name: TABLE "daily_water_quality_rating"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."daily_water_quality_rating" TO "authenticated";
 GRANT ALL ON TABLE "public"."daily_water_quality_rating" TO "service_role";
 
 
+--
+-- Name: TABLE "user_profile"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."user_profile" TO "authenticated";
 GRANT ALL ON TABLE "public"."user_profile" TO "service_role";
 
 
+--
+-- Name: TABLE "api_daily_water_quality_rating"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT ON TABLE "public"."api_daily_water_quality_rating" TO "authenticated";
 GRANT SELECT ON TABLE "public"."api_daily_water_quality_rating" TO "service_role";
 
 
+--
+-- Name: TABLE "water_quality_framework"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,REFERENCES,TRIGGER ON TABLE "public"."water_quality_framework" TO "authenticated";
 GRANT ALL ON TABLE "public"."water_quality_framework" TO "service_role";
 
 
+--
+-- Name: TABLE "water_quality_measurement"; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."water_quality_measurement" TO "authenticated";
+GRANT ALL ON TABLE "public"."water_quality_measurement" TO "service_role";
+
+
+--
+-- Name: TABLE "api_water_quality_measurements"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT ON TABLE "public"."api_water_quality_measurements" TO "authenticated";
 GRANT SELECT ON TABLE "public"."api_water_quality_measurements" TO "service_role";
 
 
+--
+-- Name: TABLE "app_config"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,REFERENCES,TRIGGER ON TABLE "public"."app_config" TO "authenticated";
 GRANT ALL ON TABLE "public"."app_config" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "daily_water_quality_rating_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."daily_water_quality_rating_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."daily_water_quality_rating_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."daily_water_quality_rating_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "dashboard_time_period"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,REFERENCES,TRIGGER ON TABLE "public"."dashboard_time_period" TO "authenticated";
 GRANT ALL ON TABLE "public"."dashboard_time_period" TO "service_role";
 
 
+--
+-- Name: TABLE "energy_alarm_events"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT REFERENCES,TRIGGER,TRUNCATE ON TABLE "public"."energy_alarm_events" TO "anon";
 GRANT ALL ON TABLE "public"."energy_alarm_events" TO "authenticated";
 GRANT ALL ON TABLE "public"."energy_alarm_events" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "energy_alarm_events_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT UPDATE ON SEQUENCE "public"."energy_alarm_events_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."energy_alarm_events_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."energy_alarm_events_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "energy_meter_timeseries"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT REFERENCES,TRIGGER,TRUNCATE ON TABLE "public"."energy_meter_timeseries" TO "anon";
 GRANT ALL ON TABLE "public"."energy_meter_timeseries" TO "authenticated";
 GRANT ALL ON TABLE "public"."energy_meter_timeseries" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "energy_meter_timeseries_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT UPDATE ON SEQUENCE "public"."energy_meter_timeseries_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."energy_meter_timeseries_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."energy_meter_timeseries_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "farm"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."farm" TO "authenticated";
 GRANT ALL ON TABLE "public"."farm" TO "service_role";
 
 
+--
+-- Name: TABLE "feed_inventory"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON TABLE "public"."feed_inventory" TO "service_role";
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."feed_inventory" TO "authenticated";
 
 
+--
+-- Name: SEQUENCE "feed_inventory_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT UPDATE ON SEQUENCE "public"."feed_inventory_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."feed_inventory_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."feed_inventory_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "feed_supplier"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."feed_supplier" TO "authenticated";
 GRANT ALL ON TABLE "public"."feed_supplier" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "feed_supplier_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."feed_supplier_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."feed_supplier_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."feed_supplier_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "feed_type"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."feed_type" TO "authenticated";
 GRANT ALL ON TABLE "public"."feed_type" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "feed_type_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."feed_type_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."feed_type_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."feed_type_id_seq" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "feeding_record_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."feeding_record_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."feeding_record_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."feeding_record_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "feeding_response_level"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON TABLE "public"."feeding_response_level" TO "service_role";
 GRANT SELECT ON TABLE "public"."feeding_response_level" TO "authenticated";
 
 
+--
+-- Name: SEQUENCE "fingerling_batch_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."fingerling_batch_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."fingerling_batch_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."fingerling_batch_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "fingerling_supplier"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,UPDATE ON TABLE "public"."fingerling_supplier" TO "authenticated";
 GRANT ALL ON TABLE "public"."fingerling_supplier" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "fingerling_supplier_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."fingerling_supplier_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."fingerling_supplier_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."fingerling_supplier_id_seq" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "fish_harvest_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."fish_harvest_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."fish_harvest_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."fish_harvest_id_seq" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "fish_mortality_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."fish_mortality_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."fish_mortality_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."fish_mortality_id_seq" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "fish_sampling_weight_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."fish_sampling_weight_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."fish_sampling_weight_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."fish_sampling_weight_id_seq" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "fish_stocking_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."fish_stocking_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."fish_stocking_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."fish_stocking_id_seq" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "fish_transfer_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."fish_transfer_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."fish_transfer_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."fish_transfer_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "normalization_review"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON TABLE "public"."normalization_review" TO "authenticated";
 GRANT ALL ON TABLE "public"."normalization_review" TO "service_role";
 
 
+--
+-- Name: TABLE "organization"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON TABLE "public"."organization" TO "authenticated";
 GRANT ALL ON TABLE "public"."organization" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "production_cycle_cycle_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."production_cycle_cycle_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."production_cycle_cycle_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."production_cycle_cycle_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "raw_uploads"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON TABLE "public"."raw_uploads" TO "authenticated";
 GRANT ALL ON TABLE "public"."raw_uploads" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "system_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."system_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."system_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."system_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "user_settings"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON TABLE "public"."user_settings" TO "authenticated";
 GRANT ALL ON TABLE "public"."user_settings" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "water_quality_framework_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."water_quality_framework_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."water_quality_framework_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."water_quality_framework_id_seq" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "water_quality_measurement_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."water_quality_measurement_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."water_quality_measurement_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."water_quality_measurement_id_seq" TO "service_role";
 
 
+--
+-- Name: SEQUENCE "water_quality_measurements_id_seq"; Type: ACL; Schema: public; Owner: postgres
+--
 
 GRANT ALL ON SEQUENCE "public"."water_quality_measurements_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."water_quality_measurements_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."water_quality_measurements_id_seq" TO "service_role";
 
 
+--
+-- Name: TABLE "secrets"; Type: ACL; Schema: vault; Owner: supabase_admin
+--
+
+-- GRANT SELECT,REFERENCES,DELETE,TRUNCATE ON TABLE "vault"."secrets" TO "postgres" WITH GRANT OPTION;
+-- GRANT SELECT,DELETE ON TABLE "vault"."secrets" TO "service_role";
 
 
+--
+-- Name: TABLE "decrypted_secrets"; Type: ACL; Schema: vault; Owner: supabase_admin
+--
+
+-- GRANT SELECT,REFERENCES,DELETE,TRUNCATE ON TABLE "vault"."decrypted_secrets" TO "postgres" WITH GRANT OPTION;
+-- GRANT SELECT,DELETE ON TABLE "vault"."decrypted_secrets" TO "service_role";
 
 
-
-
+--
+-- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: postgres
+--
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT UPDATE ON SEQUENCES  TO "anon";
@@ -8907,16 +12388,36 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT UPDATE ON 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT UPDATE ON SEQUENCES  TO "service_role";
 
 
+--
+-- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: supabase_admin
+--
+
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "postgres";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "anon";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "authenticated";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "service_role";
 
 
-
+--
+-- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: public; Owner: postgres
+--
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "postgres";
 
 
+--
+-- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: public; Owner: supabase_admin
+--
+
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "postgres";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "anon";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "authenticated";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "service_role";
 
 
-
+--
+-- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: postgres
+--
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT REFERENCES,TRIGGER,TRUNCATE ON TABLES  TO "anon";
@@ -8924,574 +12425,82 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT REFERENCES
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT REFERENCES,TRIGGER,TRUNCATE ON TABLES  TO "service_role";
 
 
+--
+-- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: supabase_admin
+--
 
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON TABLES  TO "postgres";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON TABLES  TO "anon";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON TABLES  TO "authenticated";
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin" IN SCHEMA "public" GRANT ALL ON TABLES  TO "service_role";
 
 
+--
+-- Name: issue_graphql_placeholder; Type: EVENT TRIGGER; Schema: -; Owner: supabase_admin
+--
 
+-- CREATE EVENT TRIGGER "issue_graphql_placeholder" ON "sql_drop"
+--          WHEN TAG IN ('DROP EXTENSION')
+--    EXECUTE FUNCTION "extensions"."set_graphql_placeholder"();
 
 
+-- ALTER EVENT TRIGGER "issue_graphql_placeholder" OWNER TO "supabase_admin";
 
+--
+-- Name: issue_pg_cron_access; Type: EVENT TRIGGER; Schema: -; Owner: supabase_admin
+--
 
+-- CREATE EVENT TRIGGER "issue_pg_cron_access" ON "ddl_command_end"
+--          WHEN TAG IN ('CREATE EXTENSION')
+--    EXECUTE FUNCTION "extensions"."grant_pg_cron_access"();
 
 
+-- ALTER EVENT TRIGGER "issue_pg_cron_access" OWNER TO "supabase_admin";
 
+--
+-- Name: issue_pg_graphql_access; Type: EVENT TRIGGER; Schema: -; Owner: supabase_admin
+--
 
+-- CREATE EVENT TRIGGER "issue_pg_graphql_access" ON "ddl_command_end"
+--          WHEN TAG IN ('CREATE FUNCTION')
+--    EXECUTE FUNCTION "extensions"."grant_pg_graphql_access"();
 
 
+-- ALTER EVENT TRIGGER "issue_pg_graphql_access" OWNER TO "supabase_admin";
 
+--
+-- Name: issue_pg_net_access; Type: EVENT TRIGGER; Schema: -; Owner: supabase_admin
+--
 
+-- CREATE EVENT TRIGGER "issue_pg_net_access" ON "ddl_command_end"
+--          WHEN TAG IN ('CREATE EXTENSION')
+--    EXECUTE FUNCTION "extensions"."grant_pg_net_access"();
 
 
+-- ALTER EVENT TRIGGER "issue_pg_net_access" OWNER TO "supabase_admin";
 
+--
+-- Name: pgrst_ddl_watch; Type: EVENT TRIGGER; Schema: -; Owner: supabase_admin
+--
 
+-- CREATE EVENT TRIGGER "pgrst_ddl_watch" ON "ddl_command_end"
+--    EXECUTE FUNCTION "extensions"."pgrst_ddl_watch"();
 
 
+-- ALTER EVENT TRIGGER "pgrst_ddl_watch" OWNER TO "supabase_admin";
 
+--
+-- Name: pgrst_drop_watch; Type: EVENT TRIGGER; Schema: -; Owner: supabase_admin
+--
 
+-- CREATE EVENT TRIGGER "pgrst_drop_watch" ON "sql_drop"
+--    EXECUTE FUNCTION "extensions"."pgrst_drop_watch"();
 
 
+-- ALTER EVENT TRIGGER "pgrst_drop_watch" OWNER TO "supabase_admin";
 
+--
+-- PostgreSQL database dump complete
+--
 
-
-
--- Reconcile privileges from linked backend db pull 20260603.
-
-revoke delete on table "public"."_affected_systems" from "anon";
-
-revoke insert on table "public"."_affected_systems" from "anon";
-
-revoke references on table "public"."_affected_systems" from "anon";
-
-revoke select on table "public"."_affected_systems" from "anon";
-
-revoke trigger on table "public"."_affected_systems" from "anon";
-
-revoke truncate on table "public"."_affected_systems" from "anon";
-
-revoke update on table "public"."_affected_systems" from "anon";
-
-revoke delete on table "public"."_affected_systems" from "authenticated";
-
-revoke insert on table "public"."_affected_systems" from "authenticated";
-
-revoke references on table "public"."_affected_systems" from "authenticated";
-
-revoke select on table "public"."_affected_systems" from "authenticated";
-
-revoke trigger on table "public"."_affected_systems" from "authenticated";
-
-revoke truncate on table "public"."_affected_systems" from "authenticated";
-
-revoke update on table "public"."_affected_systems" from "authenticated";
-
-revoke delete on table "public"."alert_threshold" from "anon";
-
-revoke insert on table "public"."alert_threshold" from "anon";
-
-revoke references on table "public"."alert_threshold" from "anon";
-
-revoke select on table "public"."alert_threshold" from "anon";
-
-revoke trigger on table "public"."alert_threshold" from "anon";
-
-revoke truncate on table "public"."alert_threshold" from "anon";
-
-revoke update on table "public"."alert_threshold" from "anon";
-
-revoke truncate on table "public"."alert_threshold" from "authenticated";
-
-revoke delete on table "public"."app_config" from "anon";
-
-revoke insert on table "public"."app_config" from "anon";
-
-revoke references on table "public"."app_config" from "anon";
-
-revoke select on table "public"."app_config" from "anon";
-
-revoke trigger on table "public"."app_config" from "anon";
-
-revoke truncate on table "public"."app_config" from "anon";
-
-revoke update on table "public"."app_config" from "anon";
-
-revoke delete on table "public"."app_config" from "authenticated";
-
-revoke insert on table "public"."app_config" from "authenticated";
-
-revoke truncate on table "public"."app_config" from "authenticated";
-
-revoke update on table "public"."app_config" from "authenticated";
-
-revoke delete on table "public"."daily_water_quality_rating" from "anon";
-
-revoke insert on table "public"."daily_water_quality_rating" from "anon";
-
-revoke references on table "public"."daily_water_quality_rating" from "anon";
-
-revoke select on table "public"."daily_water_quality_rating" from "anon";
-
-revoke trigger on table "public"."daily_water_quality_rating" from "anon";
-
-revoke truncate on table "public"."daily_water_quality_rating" from "anon";
-
-revoke update on table "public"."daily_water_quality_rating" from "anon";
-
-revoke truncate on table "public"."daily_water_quality_rating" from "authenticated";
-
-revoke delete on table "public"."dashboard_time_period" from "anon";
-
-revoke insert on table "public"."dashboard_time_period" from "anon";
-
-revoke references on table "public"."dashboard_time_period" from "anon";
-
-revoke select on table "public"."dashboard_time_period" from "anon";
-
-revoke trigger on table "public"."dashboard_time_period" from "anon";
-
-revoke truncate on table "public"."dashboard_time_period" from "anon";
-
-revoke update on table "public"."dashboard_time_period" from "anon";
-
-revoke delete on table "public"."dashboard_time_period" from "authenticated";
-
-revoke insert on table "public"."dashboard_time_period" from "authenticated";
-
-revoke truncate on table "public"."dashboard_time_period" from "authenticated";
-
-revoke update on table "public"."dashboard_time_period" from "authenticated";
-
-revoke delete on table "public"."energy_alarm_events" from "anon";
-
-revoke insert on table "public"."energy_alarm_events" from "anon";
-
-revoke select on table "public"."energy_alarm_events" from "anon";
-
-revoke update on table "public"."energy_alarm_events" from "anon";
-
-revoke delete on table "public"."energy_meter_timeseries" from "anon";
-
-revoke insert on table "public"."energy_meter_timeseries" from "anon";
-
-revoke select on table "public"."energy_meter_timeseries" from "anon";
-
-revoke update on table "public"."energy_meter_timeseries" from "anon";
-
-revoke delete on table "public"."farm" from "anon";
-
-revoke insert on table "public"."farm" from "anon";
-
-revoke references on table "public"."farm" from "anon";
-
-revoke select on table "public"."farm" from "anon";
-
-revoke trigger on table "public"."farm" from "anon";
-
-revoke truncate on table "public"."farm" from "anon";
-
-revoke update on table "public"."farm" from "anon";
-
-revoke truncate on table "public"."farm" from "authenticated";
-
-revoke delete on table "public"."farm_user" from "anon";
-
-revoke insert on table "public"."farm_user" from "anon";
-
-revoke references on table "public"."farm_user" from "anon";
-
-revoke select on table "public"."farm_user" from "anon";
-
-revoke trigger on table "public"."farm_user" from "anon";
-
-revoke truncate on table "public"."farm_user" from "anon";
-
-revoke update on table "public"."farm_user" from "anon";
-
-revoke truncate on table "public"."farm_user" from "authenticated";
-
-revoke delete on table "public"."feed_inventory" from "anon";
-
-revoke insert on table "public"."feed_inventory" from "anon";
-
-revoke references on table "public"."feed_inventory" from "anon";
-
-revoke select on table "public"."feed_inventory" from "anon";
-
-revoke trigger on table "public"."feed_inventory" from "anon";
-
-revoke truncate on table "public"."feed_inventory" from "anon";
-
-revoke update on table "public"."feed_inventory" from "anon";
-
-revoke references on table "public"."feed_inventory" from "authenticated";
-
-revoke trigger on table "public"."feed_inventory" from "authenticated";
-
-revoke truncate on table "public"."feed_inventory" from "authenticated";
-
-revoke delete on table "public"."feed_supplier" from "anon";
-
-revoke insert on table "public"."feed_supplier" from "anon";
-
-revoke references on table "public"."feed_supplier" from "anon";
-
-revoke select on table "public"."feed_supplier" from "anon";
-
-revoke trigger on table "public"."feed_supplier" from "anon";
-
-revoke truncate on table "public"."feed_supplier" from "anon";
-
-revoke update on table "public"."feed_supplier" from "anon";
-
-revoke truncate on table "public"."feed_supplier" from "authenticated";
-
-revoke delete on table "public"."feed_type" from "anon";
-
-revoke insert on table "public"."feed_type" from "anon";
-
-revoke references on table "public"."feed_type" from "anon";
-
-revoke select on table "public"."feed_type" from "anon";
-
-revoke trigger on table "public"."feed_type" from "anon";
-
-revoke truncate on table "public"."feed_type" from "anon";
-
-revoke update on table "public"."feed_type" from "anon";
-
-revoke truncate on table "public"."feed_type" from "authenticated";
-
-revoke delete on table "public"."feeding_record" from "anon";
-
-revoke insert on table "public"."feeding_record" from "anon";
-
-revoke references on table "public"."feeding_record" from "anon";
-
-revoke select on table "public"."feeding_record" from "anon";
-
-revoke trigger on table "public"."feeding_record" from "anon";
-
-revoke truncate on table "public"."feeding_record" from "anon";
-
-revoke update on table "public"."feeding_record" from "anon";
-
-revoke truncate on table "public"."feeding_record" from "authenticated";
-
-revoke delete on table "public"."feeding_response_level" from "anon";
-
-revoke insert on table "public"."feeding_response_level" from "anon";
-
-revoke references on table "public"."feeding_response_level" from "anon";
-
-revoke select on table "public"."feeding_response_level" from "anon";
-
-revoke trigger on table "public"."feeding_response_level" from "anon";
-
-revoke truncate on table "public"."feeding_response_level" from "anon";
-
-revoke update on table "public"."feeding_response_level" from "anon";
-
-revoke delete on table "public"."feeding_response_level" from "authenticated";
-
-revoke insert on table "public"."feeding_response_level" from "authenticated";
-
-revoke references on table "public"."feeding_response_level" from "authenticated";
-
-revoke trigger on table "public"."feeding_response_level" from "authenticated";
-
-revoke truncate on table "public"."feeding_response_level" from "authenticated";
-
-revoke update on table "public"."feeding_response_level" from "authenticated";
-
-revoke delete on table "public"."fingerling_batch" from "anon";
-
-revoke insert on table "public"."fingerling_batch" from "anon";
-
-revoke references on table "public"."fingerling_batch" from "anon";
-
-revoke select on table "public"."fingerling_batch" from "anon";
-
-revoke trigger on table "public"."fingerling_batch" from "anon";
-
-revoke truncate on table "public"."fingerling_batch" from "anon";
-
-revoke update on table "public"."fingerling_batch" from "anon";
-
-revoke truncate on table "public"."fingerling_batch" from "authenticated";
-
-revoke delete on table "public"."fingerling_supplier" from "anon";
-
-revoke insert on table "public"."fingerling_supplier" from "anon";
-
-revoke references on table "public"."fingerling_supplier" from "anon";
-
-revoke select on table "public"."fingerling_supplier" from "anon";
-
-revoke trigger on table "public"."fingerling_supplier" from "anon";
-
-revoke truncate on table "public"."fingerling_supplier" from "anon";
-
-revoke update on table "public"."fingerling_supplier" from "anon";
-
-revoke truncate on table "public"."fingerling_supplier" from "authenticated";
-
-revoke delete on table "public"."fish_harvest" from "anon";
-
-revoke insert on table "public"."fish_harvest" from "anon";
-
-revoke references on table "public"."fish_harvest" from "anon";
-
-revoke select on table "public"."fish_harvest" from "anon";
-
-revoke trigger on table "public"."fish_harvest" from "anon";
-
-revoke truncate on table "public"."fish_harvest" from "anon";
-
-revoke update on table "public"."fish_harvest" from "anon";
-
-revoke truncate on table "public"."fish_harvest" from "authenticated";
-
-revoke delete on table "public"."fish_mortality" from "anon";
-
-revoke insert on table "public"."fish_mortality" from "anon";
-
-revoke references on table "public"."fish_mortality" from "anon";
-
-revoke select on table "public"."fish_mortality" from "anon";
-
-revoke trigger on table "public"."fish_mortality" from "anon";
-
-revoke truncate on table "public"."fish_mortality" from "anon";
-
-revoke update on table "public"."fish_mortality" from "anon";
-
-revoke truncate on table "public"."fish_mortality" from "authenticated";
-
-revoke delete on table "public"."fish_sampling_weight" from "anon";
-
-revoke insert on table "public"."fish_sampling_weight" from "anon";
-
-revoke references on table "public"."fish_sampling_weight" from "anon";
-
-revoke select on table "public"."fish_sampling_weight" from "anon";
-
-revoke trigger on table "public"."fish_sampling_weight" from "anon";
-
-revoke truncate on table "public"."fish_sampling_weight" from "anon";
-
-revoke update on table "public"."fish_sampling_weight" from "anon";
-
-revoke truncate on table "public"."fish_sampling_weight" from "authenticated";
-
-revoke delete on table "public"."fish_stocking" from "anon";
-
-revoke insert on table "public"."fish_stocking" from "anon";
-
-revoke references on table "public"."fish_stocking" from "anon";
-
-revoke select on table "public"."fish_stocking" from "anon";
-
-revoke trigger on table "public"."fish_stocking" from "anon";
-
-revoke truncate on table "public"."fish_stocking" from "anon";
-
-revoke update on table "public"."fish_stocking" from "anon";
-
-revoke truncate on table "public"."fish_stocking" from "authenticated";
-
-revoke delete on table "public"."fish_transfer" from "anon";
-
-revoke insert on table "public"."fish_transfer" from "anon";
-
-revoke references on table "public"."fish_transfer" from "anon";
-
-revoke select on table "public"."fish_transfer" from "anon";
-
-revoke trigger on table "public"."fish_transfer" from "anon";
-
-revoke truncate on table "public"."fish_transfer" from "anon";
-
-revoke update on table "public"."fish_transfer" from "anon";
-
-revoke truncate on table "public"."fish_transfer" from "authenticated";
-
-revoke delete on table "public"."normalization_review" from "anon";
-
-revoke insert on table "public"."normalization_review" from "anon";
-
-revoke references on table "public"."normalization_review" from "anon";
-
-revoke select on table "public"."normalization_review" from "anon";
-
-revoke trigger on table "public"."normalization_review" from "anon";
-
-revoke truncate on table "public"."normalization_review" from "anon";
-
-revoke update on table "public"."normalization_review" from "anon";
-
-revoke delete on table "public"."organization" from "anon";
-
-revoke insert on table "public"."organization" from "anon";
-
-revoke references on table "public"."organization" from "anon";
-
-revoke select on table "public"."organization" from "anon";
-
-revoke trigger on table "public"."organization" from "anon";
-
-revoke truncate on table "public"."organization" from "anon";
-
-revoke update on table "public"."organization" from "anon";
-
-revoke delete on table "public"."production_cycle" from "anon";
-
-revoke insert on table "public"."production_cycle" from "anon";
-
-revoke references on table "public"."production_cycle" from "anon";
-
-revoke select on table "public"."production_cycle" from "anon";
-
-revoke trigger on table "public"."production_cycle" from "anon";
-
-revoke truncate on table "public"."production_cycle" from "anon";
-
-revoke update on table "public"."production_cycle" from "anon";
-
-revoke truncate on table "public"."production_cycle" from "authenticated";
-
-revoke delete on table "public"."raw_uploads" from "anon";
-
-revoke insert on table "public"."raw_uploads" from "anon";
-
-revoke references on table "public"."raw_uploads" from "anon";
-
-revoke select on table "public"."raw_uploads" from "anon";
-
-revoke trigger on table "public"."raw_uploads" from "anon";
-
-revoke truncate on table "public"."raw_uploads" from "anon";
-
-revoke update on table "public"."raw_uploads" from "anon";
-
-revoke delete on table "public"."system" from "anon";
-
-revoke insert on table "public"."system" from "anon";
-
-revoke references on table "public"."system" from "anon";
-
-revoke select on table "public"."system" from "anon";
-
-revoke trigger on table "public"."system" from "anon";
-
-revoke truncate on table "public"."system" from "anon";
-
-revoke update on table "public"."system" from "anon";
-
-revoke truncate on table "public"."system" from "authenticated";
-
-revoke delete on table "public"."user_profile" from "anon";
-
-revoke insert on table "public"."user_profile" from "anon";
-
-revoke references on table "public"."user_profile" from "anon";
-
-revoke select on table "public"."user_profile" from "anon";
-
-revoke trigger on table "public"."user_profile" from "anon";
-
-revoke truncate on table "public"."user_profile" from "anon";
-
-revoke update on table "public"."user_profile" from "anon";
-
-revoke truncate on table "public"."user_profile" from "authenticated";
-
-revoke delete on table "public"."user_settings" from "anon";
-
-revoke insert on table "public"."user_settings" from "anon";
-
-revoke references on table "public"."user_settings" from "anon";
-
-revoke select on table "public"."user_settings" from "anon";
-
-revoke trigger on table "public"."user_settings" from "anon";
-
-revoke truncate on table "public"."user_settings" from "anon";
-
-revoke update on table "public"."user_settings" from "anon";
-
-revoke delete on table "public"."water_quality_framework" from "anon";
-
-revoke insert on table "public"."water_quality_framework" from "anon";
-
-revoke references on table "public"."water_quality_framework" from "anon";
-
-revoke select on table "public"."water_quality_framework" from "anon";
-
-revoke trigger on table "public"."water_quality_framework" from "anon";
-
-revoke truncate on table "public"."water_quality_framework" from "anon";
-
-revoke update on table "public"."water_quality_framework" from "anon";
-
-revoke delete on table "public"."water_quality_framework" from "authenticated";
-
-revoke insert on table "public"."water_quality_framework" from "authenticated";
-
-revoke truncate on table "public"."water_quality_framework" from "authenticated";
-
-revoke update on table "public"."water_quality_framework" from "authenticated";
-
-revoke delete on table "public"."water_quality_measurement" from "anon";
-
-revoke insert on table "public"."water_quality_measurement" from "anon";
-
-revoke references on table "public"."water_quality_measurement" from "anon";
-
-revoke select on table "public"."water_quality_measurement" from "anon";
-
-revoke trigger on table "public"."water_quality_measurement" from "anon";
-
-revoke truncate on table "public"."water_quality_measurement" from "anon";
-
-revoke update on table "public"."water_quality_measurement" from "anon";
-
-revoke truncate on table "public"."water_quality_measurement" from "authenticated";
-
-CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
-
-  create policy "auth_insert_raw_uploads"
-  on "storage"."objects"
-  as permissive
-  for insert
-  to public
-with check (((bucket_id = 'raw-uploads'::text) AND (auth.role() = 'authenticated'::text)));
-
-
-
-  create policy "auth_read_raw_uploads"
-  on "storage"."objects"
-  as permissive
-  for select
-  to public
-using (((bucket_id = 'raw-uploads'::text) AND (auth.role() = 'authenticated'::text)));
-
-
-
-  create policy "auth_update_raw_uploads"
-  on "storage"."objects"
-  as permissive
-  for update
-  to public
-using (((bucket_id = 'raw-uploads'::text) AND (auth.role() = 'authenticated'::text)));
-
-
-
-  create policy "svc_all_raw_uploads"
-  on "storage"."objects"
-  as permissive
-  for all
-  to public
-using (((bucket_id = 'raw-uploads'::text) AND (auth.role() = 'service_role'::text)));
-
-
-
+-- \unrestrict m65J61fDTcB6y4HbeyrKLFokavmuZjjZjuuO3mLHO3kEVqG5nxQ4mOU3XbNSBom

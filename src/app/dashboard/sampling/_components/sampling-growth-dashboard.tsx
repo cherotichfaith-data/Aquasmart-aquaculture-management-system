@@ -2,490 +2,418 @@
 
 import { useMemo } from "react"
 import type { ChartData, ChartOptions } from "chart.js"
-import {
-  Bar as ChartBar,
-  Line as ChartLine,
-} from "@/components/charts/chartjs"
-import { Badge } from "@/components/app-ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
-import { getSemanticCalloutClass, getSemanticColor } from "@/lib/theme/semantic-colors"
+import { Bar as ChartBar, Line as ChartLine } from "@/components/charts/chartjs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import {
   buildCartesianOptions,
-  buildDailyDateDomain,
+  buildMetricAxisBounds,
   createVerticalGradient,
   getChartPalette,
-  getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
-import { formatFullDate, formatWithUnit } from "../_lib/formatters"
+import type { HarvestForecastRow } from "@/lib/types/insights"
+import { formatWithUnit } from "../_lib/formatters"
 
-type TrajectoryRow = {
+export type SamplingPoint = {
+  systemId: number
+  systemLabel: string
   date: string
-  label: string
   abw: number
+  fishSampled: number | null
+  totalWeight: number | null
 }
 
-type AbwRow = {
+export type BackendGrowthPoint = {
   systemId: number
-  label: string
-  abw: number
+  systemLabel: string
+  sampleDate: string
+  abwG: number
+  adgGDay: number | null
+  sgrPctDay: number | null
+  ageDays: number | null
+  expectedAbwG: number | null
+  growthDeviationPct: number | null
 }
 
-type SgrRow = {
+type SystemSummaryRow = {
   systemId: number
   label: string
-  sgr: number
-}
-
-type HarvestTimelineSystem = {
-  systemId: number
-  label: string
+  abw: number | null
+  expectedAbw: number | null
+  deviationPct: number | null
+  sgrPctDay: number | null
+  adgGDay: number | null
+  daysToHarvest: number | null
+  readiness: HarvestForecastRow["status"] | null
 }
 
 const chartCardClass = "rounded-2xl border border-border/80 bg-card"
+const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value)
 
 function EmptyChart({ label }: { label: string }) {
   return <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">{label}</div>
 }
 
-const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
-  const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-  return numeric.length ? Math.max(...numeric) : fallback
+function average(values: Array<number | null | undefined>) {
+  const numeric = values.filter(isFiniteNumber)
+  if (numeric.length === 0) return null
+  return numeric.reduce((sum, value) => sum + value, 0) / numeric.length
+}
+
+function formatPercent(value: number | null | undefined, decimals = 0) {
+  if (!isFiniteNumber(value)) return "N/A"
+  return `${value > 0 ? "+" : ""}${value.toFixed(decimals)}%`
+}
+
+function latestBySystem<T extends { systemId: number; sampleDate?: string; date?: string }>(rows: T[]) {
+  const map = new Map<number, T>()
+  rows.forEach((row) => {
+    const rowDate = row.sampleDate ?? row.date ?? ""
+    const current = map.get(row.systemId)
+    const currentDate = current?.sampleDate ?? current?.date ?? ""
+    if (!current || rowDate.localeCompare(currentDate) > 0) {
+      map.set(row.systemId, row)
+    }
+  })
+  return map
+}
+
+function readinessLabel(rows: HarvestForecastRow[]) {
+  if (rows.length === 0) return "N/A"
+  if (rows.some((row) => row.status === "ready")) return "Ready"
+  if (rows.some((row) => row.status === "slow_growth")) return "Slow"
+  if (rows.some((row) => row.status === "on_track")) return "On track"
+  return "No data"
+}
+
+function readinessText(status: HarvestForecastRow["status"] | null) {
+  if (status === "ready") return "Ready"
+  if (status === "on_track") return "On track"
+  if (status === "slow_growth") return "Slow"
+  return "No data"
+}
+
+function deviationTone(value: number | null) {
+  if (!isFiniteNumber(value)) return "text-muted-foreground"
+  if (value > 3) return "text-primary"
+  if (value < -3) return "text-destructive"
+  return "text-muted-foreground"
+}
+
+function buildSystemSummaryRows(
+  samplingPoints: SamplingPoint[],
+  growthPoints: BackendGrowthPoint[],
+  forecastRows: HarvestForecastRow[],
+): SystemSummaryRow[] {
+  const latestSamples = latestBySystem(samplingPoints)
+  const latestGrowth = latestBySystem(growthPoints)
+  const forecasts = new Map(forecastRows.map((row) => [row.system_id, row]))
+  const ids = new Set<number>([
+    ...Array.from(latestSamples.keys()),
+    ...Array.from(latestGrowth.keys()),
+    ...forecastRows.map((row) => row.system_id),
+  ])
+
+  return Array.from(ids)
+    .map((systemId) => {
+      const sample = latestSamples.get(systemId) ?? null
+      const growth = latestGrowth.get(systemId) ?? null
+      const forecast = forecasts.get(systemId) ?? null
+      return {
+        systemId,
+        label: growth?.systemLabel ?? sample?.systemLabel ?? forecast?.system_name ?? `System ${systemId}`,
+        abw: growth?.abwG ?? sample?.abw ?? forecast?.current_abw_g ?? null,
+        expectedAbw: growth?.expectedAbwG ?? null,
+        deviationPct: growth?.growthDeviationPct ?? null,
+        sgrPctDay: growth?.sgrPctDay ?? null,
+        adgGDay: growth?.adgGDay ?? forecast?.adg_g_day ?? null,
+        daysToHarvest: forecast?.days_to_target ?? null,
+        readiness: forecast?.status ?? null,
+      }
+    })
+    .sort((left, right) => left.label.localeCompare(right.label))
+}
+
+function buildCurveChart(
+  params: {
+    points: BackendGrowthPoint[]
+    chartColors: string[]
+    expectedColor: string
+    maxAbw?: number
+  },
+) {
+  const filtered = params.points.filter((point) => {
+    if (!isFiniteNumber(point.ageDays)) return false
+    if (!isFiniteNumber(point.expectedAbwG)) return false
+    if (params.maxAbw == null) return true
+    return point.abwG < params.maxAbw || (point.expectedAbwG ?? 0) < params.maxAbw
+  })
+  const ageDomain = Array.from(new Set(filtered.map((point) => point.ageDays as number))).sort((a, b) => a - b)
+  const byAge = new Map<number, Record<string, string | number | null>>()
+  filtered.forEach((point) => {
+    const age = point.ageDays as number
+    const current = byAge.get(age) ?? { age }
+    current[`actual_${point.systemId}`] = point.abwG
+    current.expectedAbwG = point.expectedAbwG
+    byAge.set(age, current)
+  })
+  const series = Array.from(new Map(filtered.map((point) => [point.systemId, point.systemLabel])).entries()).map(
+    ([systemId, label], index) => ({
+      systemId,
+      label,
+      color: params.chartColors[index % params.chartColors.length],
+    }),
+  )
+  const bounds = buildMetricAxisBounds(
+    filtered.flatMap((point) => [point.abwG, point.expectedAbwG]).filter(isFiniteNumber),
+    { minFloor: 0 },
+  )
+  const data: ChartData<"line"> = {
+    labels: ageDomain.map((age) => String(age)),
+    datasets: [
+      {
+        label: "Expected curve",
+        data: ageDomain.map((age) => {
+          const value = byAge.get(age)?.expectedAbwG
+          return typeof value === "number" ? value : null
+        }),
+        borderColor: params.expectedColor,
+        backgroundColor: createVerticalGradient(params.expectedColor, 0.14, 0.02),
+        borderDash: [6, 4],
+        borderWidth: 2.4,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        spanGaps: true,
+      },
+      ...series.map((item) => ({
+        label: item.label,
+        data: ageDomain.map((age) => {
+          const value = byAge.get(age)?.[`actual_${item.systemId}`]
+          return typeof value === "number" ? value : null
+        }),
+        borderColor: item.color,
+        backgroundColor: createVerticalGradient(item.color, 0.2, 0.03),
+        borderWidth: 2.4,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        spanGaps: true,
+      })),
+    ],
+  }
+
+  return { data, bounds, count: filtered.length, ageDomain }
 }
 
 export function SamplingGrowthDashboard({
-  filteredRowCount,
+  sampleCount,
   latestAbw,
-  abwCv,
-  avgSampleSize,
-  growthEfficiency,
-  efficiencyActionRequired,
-  projectionLabel,
-  projection,
-  targetWeightG,
-  resolvedStage,
-  targetDensityKgM3,
-  maxFish,
-  abwForCapacity,
-  utilizationLabel,
-  utilizationTone,
-  utilizationBadge,
-  currentFish,
-  hasSystem,
-  systemId,
-  systemName,
-  volumeM3,
-  targetBiomassKg,
+  latestSampleSize,
   loading,
-  bestGrowthSystem,
-  bestGrowthTrajectory,
-  currentAbwRows,
-  sgrRows,
-  harvestTimelineRows,
-  harvestTimelineSystems,
-  harvestGranularityLabel,
+  samplingPoints,
+  growthPoints,
+  harvestReadinessRows,
 }: {
-  filteredRowCount: number
+  sampleCount: number
   latestAbw: number | null
-  abwCv: number | null
-  avgSampleSize: number | null
-  growthEfficiency: number | null
-  efficiencyActionRequired: boolean
-  projectionLabel: string
-  projection:
-    | {
-        projectedDate: Date
-        daysToTarget: number
-        sgr: number
-        targetWeight: number
-        lowConfidence: boolean
-      }
-    | null
-  targetWeightG: number | null
-  resolvedStage: "fingerling" | "juvenile" | "sub_adult" | "broodstock" | null
-  targetDensityKgM3: number | null
-  maxFish: number | null
-  abwForCapacity: number | null
-  utilizationLabel: string
-  utilizationTone: string
-  utilizationBadge: string
-  currentFish: number | null
-  hasSystem: boolean
-  systemId: number | null | undefined
-  systemName: string | null
-  volumeM3: number | null
-  targetBiomassKg: number | null
+  latestSampleSize: number | null
   loading: boolean
-  bestGrowthSystem: {
-    systemId: number
-    label: string
-    samples: number
-    latestAbw: number | null
-    currentBiomass: number | null
-    overallSgr: number | null
-    totalHarvestKg: number
-  } | null
-  bestGrowthTrajectory: TrajectoryRow[]
-  currentAbwRows: AbwRow[]
-  sgrRows: SgrRow[]
-  harvestTimelineRows: Array<Record<string, string | number>>
-  harvestTimelineSystems: HarvestTimelineSystem[]
-  harvestGranularityLabel: string
+  samplingPoints: SamplingPoint[]
+  growthPoints: BackendGrowthPoint[]
+  harvestReadinessRows: HarvestForecastRow[]
 }) {
   const palette = getChartPalette()
   const chartColors = [palette.chart1, palette.chart2, palette.chart3, palette.chart4, palette.chart5]
-  const trajectoryDateDomain = useMemo(
-    () => buildDailyDateDomain(bestGrowthTrajectory.map((row) => row.date)),
-    [bestGrowthTrajectory],
-  )
-  const trajectoryRowsByDate = useMemo(
-    () => new Map(bestGrowthTrajectory.map((row) => [row.date, row])),
-    [bestGrowthTrajectory],
-  )
-  const trajectoryXAxisLimit = getDateAxisMaxTicks(trajectoryDateDomain.length)
-  const harvestTimeAxisTitle = useMemo(() => {
-    if (harvestGranularityLabel === "month") return "Month"
-    if (harvestGranularityLabel === "quarter") return "Quarter"
-    return "Date"
-  }, [harvestGranularityLabel])
-
-  const trajectoryMax = useMemo(
-    () => Math.max(1, Math.ceil(getMaxNumber(bestGrowthTrajectory.map((row) => row.abw)) * 1.12)),
-    [bestGrowthTrajectory],
+  const summaryRows = useMemo(
+    () => buildSystemSummaryRows(samplingPoints, growthPoints, harvestReadinessRows),
+    [growthPoints, harvestReadinessRows, samplingPoints],
   )
 
-  const currentAbwMax = useMemo(
-    () => Math.max(1, Math.ceil(getMaxNumber(currentAbwRows.map((row) => row.abw)) * 1.12)),
-    [currentAbwRows],
+  const averageAbw = average(summaryRows.map((row) => row.abw)) ?? latestAbw
+  const averageDeviation = average(summaryRows.map((row) => row.deviationPct))
+  const averageSgr = average(summaryRows.map((row) => row.sgrPctDay))
+  const averageAdg = average(summaryRows.map((row) => row.adgGDay))
+  const curveAll = useMemo(
+    () => buildCurveChart({ points: growthPoints, chartColors, expectedColor: palette.chart2 }),
+    [chartColors, growthPoints, palette.chart2],
   )
-
-  const sgrMax = useMemo(() => {
-    const maxValue = getMaxNumber(sgrRows.map((row) => row.sgr))
-    return Math.max(0.25, Math.ceil(maxValue * 1.15 * 1000) / 1000)
-  }, [sgrRows])
-
-  const harvestMax = useMemo(() => {
-    const values = harvestTimelineRows.flatMap((row) =>
-      harvestTimelineSystems.map((system) => {
-        const value = row[`system_${system.systemId}`]
-        return typeof value === "number" ? value : null
-      }),
-    )
-    return Math.max(1, Math.ceil(getMaxNumber(values) * 1.12))
-  }, [harvestTimelineRows, harvestTimelineSystems])
-
-  const trajectoryData = useMemo<ChartData<"line">>(
-    () => ({
-      labels: trajectoryDateDomain,
-      datasets: [
-        {
-          label: "ABW",
-          data: trajectoryDateDomain.map((date) => trajectoryRowsByDate.get(date)?.abw ?? null),
-          borderColor: palette.chart1,
-          backgroundColor: createVerticalGradient(palette.chart1, 0.36, 0.04),
-          borderWidth: 2.6,
-          fill: true,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-        },
-      ],
-    }),
-    [palette.chart1, trajectoryDateDomain, trajectoryRowsByDate],
+  const curveUnder100 = useMemo(
+    () => buildCurveChart({ points: growthPoints, chartColors, expectedColor: palette.chart2, maxAbw: 100 }),
+    [chartColors, growthPoints, palette.chart2],
   )
-
-  const trajectoryOptions = useMemo<ChartOptions<"line">>(
+  const curveOptions = useMemo<ChartOptions<"line">>(
     () =>
       buildCartesianOptions({
         palette,
-        min: 0,
-        max: trajectoryMax,
-        xTitle: "Date",
-        xMaxTicksLimit: trajectoryXAxisLimit,
+        legend: true,
+        min: curveAll.bounds.min,
+        max: curveAll.bounds.max,
+        xTitle: "Age (days)",
         yTitle: "ABW (g)",
         tooltip: {
           callbacks: {
-            title: (items: any) => formatFullDate(trajectoryDateDomain[items[0]?.dataIndex ?? 0] ?? ""),
-            label: (context: any) => `ABW: ${Number(context.parsed.y).toFixed(1)} g`,
+            title: (items: any) => `Age ${curveAll.ageDomain[items[0]?.dataIndex ?? 0] ?? "-"} days`,
+            label: (context: any) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} g`,
           },
         },
-        xTickFormatter: (_value, index) => {
-          const parsed = new Date(`${trajectoryDateDomain[index] ?? ""}T00:00:00`)
-          if (Number.isNaN(parsed.getTime())) return trajectoryDateDomain[index] ?? ""
-          return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(parsed)
+      }),
+    [curveAll.ageDomain, curveAll.bounds.max, curveAll.bounds.min, palette],
+  )
+  const curveUnder100Options = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: true,
+        min: curveUnder100.bounds.min,
+        max: Math.min(120, curveUnder100.bounds.max ?? 120),
+        xTitle: "Age (days)",
+        yTitle: "ABW (g)",
+        tooltip: {
+          callbacks: {
+            title: (items: any) => `Age ${curveUnder100.ageDomain[items[0]?.dataIndex ?? 0] ?? "-"} days`,
+            label: (context: any) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} g`,
+          },
         },
       }),
-    [palette, trajectoryDateDomain, trajectoryMax, trajectoryXAxisLimit],
+    [curveUnder100.ageDomain, curveUnder100.bounds.max, curveUnder100.bounds.min, palette],
   )
 
-  const currentAbwData = useMemo<ChartData<"bar">>(
+  const deviationRows = summaryRows.filter((row) => isFiniteNumber(row.deviationPct))
+  const deviationMax = Math.max(10, Math.max(...deviationRows.map((row) => Math.abs(row.deviationPct ?? 0)), 10) * 1.15)
+  const deviationData = useMemo<ChartData<"bar">>(
     () => ({
-      labels: currentAbwRows.map((row) => row.label),
+      labels: deviationRows.map((row) => row.label),
       datasets: [
         {
-          label: "Current ABW",
-          data: currentAbwRows.map((row) => row.abw),
-          backgroundColor: currentAbwRows.map((_, index) => chartColors[index % chartColors.length]),
+          label: "Deviation",
+          data: deviationRows.map((row) => row.deviationPct),
+          backgroundColor: deviationRows.map((row) =>
+            (row.deviationPct ?? 0) >= 0 ? palette.chart1 : palette.chart4,
+          ),
           borderRadius: 6,
         },
       ],
     }),
-    [chartColors, currentAbwRows],
+    [deviationRows, palette.chart1, palette.chart4],
   )
-
-  const currentAbwOptions = useMemo<ChartOptions<"bar">>(
+  const deviationOptions = useMemo<ChartOptions<"bar">>(
     () =>
       buildCartesianOptions({
         palette,
-        min: 0,
-        max: currentAbwMax,
-        xTitle: "Cage",
-        yTitle: "ABW (g)",
-        tooltip: {
-          callbacks: {
-            label: (context: any) => `Current ABW: ${Number(context.parsed.y).toFixed(1)} g`,
-          },
-        },
+        min: -deviationMax,
+        max: deviationMax,
+        xTitle: "System",
+        yTitle: "Deviation (%)",
+        yTickFormatter: (value) => `${Number(value).toFixed(0)}%`,
       }),
-    [currentAbwMax, palette],
+    [deviationMax, palette],
   )
 
+  const sgrRows = summaryRows.filter((row) => isFiniteNumber(row.sgrPctDay))
+  const sgrMax = Math.max(0.25, Math.max(...sgrRows.map((row) => row.sgrPctDay ?? 0), 0.25) * 1.15)
   const sgrData = useMemo<ChartData<"bar">>(
     () => ({
       labels: sgrRows.map((row) => row.label),
       datasets: [
         {
           label: "SGR",
-          data: sgrRows.map((row) => row.sgr),
-          backgroundColor: sgrRows.map((row) =>
-            row.sgr > 1.5
-              ? getSemanticColor("good")
-              : row.sgr > 0.8
-                ? getSemanticColor("info")
-                : getSemanticColor("warn"),
-          ),
+          data: sgrRows.map((row) => row.sgrPctDay),
+          backgroundColor: sgrRows.map((_, index) => chartColors[index % chartColors.length]),
           borderRadius: 6,
         },
       ],
     }),
-    [sgrRows],
+    [chartColors, sgrRows],
   )
-
   const sgrOptions = useMemo<ChartOptions<"bar">>(
     () =>
       buildCartesianOptions({
         palette,
         min: 0,
         max: sgrMax,
-        xTitle: "Cage",
-        yTickFormatter: (value) => `${Number(value).toFixed(2)}%`,
+        xTitle: "System",
         yTitle: "SGR (%/day)",
-        tooltip: {
-          callbacks: {
-            label: (context: any) => `SGR: ${Number(context.parsed.y).toFixed(3)}%/day`,
-          },
-        },
+        yTickFormatter: (value) => `${Number(value).toFixed(2)}%`,
       }),
     [palette, sgrMax],
   )
 
-  const harvestData = useMemo<ChartData<"line">>(
-    () => ({
-      labels: harvestTimelineRows.map((row) => String(row.label ?? "")),
-      datasets: harvestTimelineSystems.map((row, index) => ({
-        label: row.label,
-        data: harvestTimelineRows.map((item) => {
-          const value = item[`system_${row.systemId}`]
-          return typeof value === "number" ? value : null
-        }),
-        borderColor: chartColors[index % chartColors.length],
-        backgroundColor: chartColors[index % chartColors.length],
-        borderWidth: 2.4,
-        pointRadius: 0,
-        spanGaps: true,
-      })),
-    }),
-    [chartColors, harvestTimelineRows, harvestTimelineSystems],
-  )
-
-  const harvestOptions = useMemo<ChartOptions<"line">>(
-    () =>
-      buildCartesianOptions({
-        palette,
-        legend: true,
-        min: 0,
-        max: harvestMax,
-        xTitle: harvestTimeAxisTitle,
-        yTitle: "Cumulative harvest (kg)",
-        xTickFormatter: (_value, index) => String(harvestTimelineRows[index]?.label ?? ""),
-        tooltip: {
-          callbacks: {
-            label: (context: any) => `${context.dataset.label}: ${Number(context.parsed.y).toFixed(1)} kg`,
-          },
-        },
-      }),
-    [harvestMax, harvestTimeAxisTitle, harvestTimelineRows, palette],
-  )
-
   return (
-    <>
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Growth overview</h2>
-        <div className="kpi-grid md:grid-cols-4">
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">Total Samples</p>
-            <p className="kpi-card-value">{`${filteredRowCount.toLocaleString()} samples`}</p>
-          </div>
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">Latest ABW</p>
-            <p className="kpi-card-value">{latestAbw != null ? `${latestAbw.toFixed(1)} g` : "N/A"}</p>
-          </div>
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">ABW Volatility</p>
-            <p className="kpi-card-value">{abwCv != null ? `${abwCv.toFixed(1)}%` : "N/A"}</p>
-            <p className="kpi-card-meta">CV over time</p>
-          </div>
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">Avg Sample Size</p>
-            <p className="kpi-card-value">{avgSampleSize != null ? `${avgSampleSize.toFixed(0)} fish/sample` : "N/A"}</p>
-          </div>
+    <div className="space-y-6">
+      <div className="kpi-grid md:grid-cols-4">
+        <div className="kpi-card p-4">
+          <p className="kpi-card-title">Average ABW</p>
+          <p className="kpi-card-value">{formatWithUnit(averageAbw, 1, "g")}</p>
+          <p className="kpi-card-meta">{`${sampleCount.toLocaleString()} samples`}</p>
         </div>
-        <div className="kpi-grid md:grid-cols-3">
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">Growth Efficiency</p>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="kpi-card-value mt-0">
-                {growthEfficiency != null ? `${growthEfficiency.toFixed(0)}%` : "N/A"}
-              </p>
-              {efficiencyActionRequired ? (
-                <Badge variant="destructive" className="animate-pulse">
-                  Action Required
-                </Badge>
-              ) : null}
-            </div>
-            <p className="kpi-card-meta">Actual ABW vs target curve</p>
-          </div>
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">{projectionLabel}</p>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="kpi-card-value mt-0">
-                {projection
-                  ? new Intl.DateTimeFormat(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    }).format(projection.projectedDate)
-                  : "N/A"}
-              </p>
-              {projection?.lowConfidence ? (
-                  <Badge variant="outline" className="border-warning/40 text-warning">
-                    Low confidence
-                  </Badge>
-              ) : null}
-            </div>
-            <p className="kpi-card-meta">
-              {targetWeightG != null
-                ? `Target ${formatWithUnit(targetWeightG, 0, "g")} ${resolvedStage === "fingerling" ? "move" : "harvest"}`
-                : "No backend target configured"}
-            </p>
-          </div>
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">SGR (latest)</p>
-            <p className="kpi-card-value">{projection ? `${projection.sgr.toFixed(2)}%/day` : "N/A"}</p>
-            <p className="kpi-card-meta">Based on last two samples</p>
-          </div>
+        <div className="kpi-card p-4">
+          <p className="kpi-card-title">Growth deviation</p>
+          <p className={`kpi-card-value ${deviationTone(averageDeviation)}`}>{formatPercent(averageDeviation)}</p>
+          <p className="kpi-card-meta">DB benchmark</p>
         </div>
-      </div>
-
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Capacity Planning</h2>
-        <div className="kpi-grid md:grid-cols-3">
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">Target Density</p>
-            <p className="kpi-card-value">
-              {targetDensityKgM3 != null ? formatWithUnit(targetDensityKgM3, 1, "kg/m3") : "N/A"}
-            </p>
-            <p className="kpi-card-meta">Capacity planning baseline</p>
-          </div>
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">Max Fish @ Current ABW</p>
-            <p className="kpi-card-value">{maxFish != null ? `${Math.round(maxFish).toLocaleString()} fish` : "N/A"}</p>
-            <p className="kpi-card-meta">
-              {abwForCapacity != null
-                ? `ABW ${formatWithUnit(abwForCapacity, 1, "g")}`
-                : "Select a system to compute capacity"}
-            </p>
-          </div>
-          <div className="kpi-card p-4">
-            <p className="kpi-card-title">Utilization</p>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="kpi-card-value mt-0">{utilizationLabel}</p>
-              <span className={`rounded-full px-2 py-1 text-xs font-semibold ${utilizationTone}`}>
-                {utilizationBadge}
-              </span>
-            </div>
-            <p className="kpi-card-meta">
-              {currentFish != null ? `${currentFish.toLocaleString()} fish in system` : "No fish count available"}
-            </p>
-          </div>
+        <div className="kpi-card p-4">
+          <p className="kpi-card-title">SGR / ADG</p>
+          <p className="kpi-card-value">
+            {isFiniteNumber(averageSgr) ? `${averageSgr.toFixed(2)}%` : "N/A"}
+          </p>
+          <p className="kpi-card-meta">
+            {isFiniteNumber(averageAdg) ? `${averageAdg.toFixed(2)} g/day` : "No ADG"}
+          </p>
         </div>
-      </div>
-
-      {hasSystem && volumeM3 != null && abwForCapacity != null ? (
-        <div className="text-xs text-muted-foreground">
-          Capacity example for {systemName ?? `System ${systemId}`} ({volumeM3} m3): target biomass{" "}
-          {targetBiomassKg != null ? `${targetBiomassKg.toFixed(0)} kg` : "--"} at{" "}
-          {formatWithUnit(abwForCapacity, 1, "g")} &gt; max{" "}
-          {maxFish != null ? `${Math.round(maxFish).toLocaleString()} fish` : "--"}.
+        <div className="kpi-card p-4">
+          <p className="kpi-card-title">Harvest readiness</p>
+          <p className="kpi-card-value">{readinessLabel(harvestReadinessRows)}</p>
+          <p className="kpi-card-meta">
+            {latestSampleSize != null ? `${latestSampleSize.toLocaleString()} fish latest sample` : "Backend status"}
+          </p>
         </div>
-      ) : (
-        <div className="text-xs text-muted-foreground">
-          Select a system with volume data to compute density capacity and utilization.
-        </div>
-      )}
-      <div className={`rounded-xl border-l-4 px-4 py-3 text-sm leading-6 ${getSemanticCalloutClass("good")}`}>
-        <strong>{bestGrowthSystem?.label ?? "No cage"} is the best-documented growth trajectory.</strong>{" "}
-        {bestGrowthSystem
-          ? `${bestGrowthSystem.samples} growth samples captured in scope`
-          : "No growth trajectory is available in scope"}
-        {bestGrowthSystem?.overallSgr != null
-          ? `, with SGR ${bestGrowthSystem.overallSgr.toFixed(2)}%/day.`
-          : "."}
       </div>
 
       <Card className={chartCardClass}>
         <CardHeader className="space-y-1 border-b border-border/70 pb-4">
           <CardTitle className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {bestGrowthSystem
-              ? `ABW trajectory - ${bestGrowthSystem.label} (fingerling to grow-out)`
-              : "ABW trajectory (fingerling to grow-out)"}
+            Growth vs Expected
           </CardTitle>
-          <CardDescription>Observed sampling trajectory for the strongest documented system in the current scope.</CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
           {loading ? (
-            <EmptyChart label="Loading growth trajectory..." />
-          ) : bestGrowthTrajectory.length === 0 ? (
-            <EmptyChart label="No growth trajectory available in the selected scope." />
+            <EmptyChart label="Loading growth curve..." />
+          ) : curveAll.count === 0 ? (
+            <EmptyChart label="No DB-owned expected growth curve available for the selected scope." />
           ) : (
-            <div className="chart-canvas-shell h-[300px]">
-              <ChartLine data={trajectoryData} options={trajectoryOptions} />
+            <div className="chart-canvas-shell h-[340px]">
+              <ChartLine data={curveAll.data} options={curveOptions} />
             </div>
           )}
         </CardContent>
       </Card>
 
+      {curveUnder100.count > 0 ? (
+        <Card className={chartCardClass}>
+          <CardHeader className="space-y-1 border-b border-border/70 pb-4">
+            <CardTitle className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Growth vs Expected (&lt;100g)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="chart-canvas-shell h-[260px]">
+              <ChartLine data={curveUnder100.data} options={curveUnder100Options} />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className={chartCardClass}>
           <CardHeader className="space-y-1 border-b border-border/70 pb-4">
             <CardTitle className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Current ABW by cage (last sample)
+              Growth deviation
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            {currentAbwRows.length === 0 ? (
-              <EmptyChart label="No ABW samples in the selected scope." />
+            {deviationRows.length === 0 ? (
+              <EmptyChart label="No DB-owned growth deviation values in the selected scope." />
             ) : (
-              <div className="chart-canvas-shell h-[240px]">
-                <ChartBar data={currentAbwData} options={currentAbwOptions} />
+              <div className="chart-canvas-shell h-[260px]">
+                <ChartBar data={deviationData} options={deviationOptions} />
               </div>
             )}
           </CardContent>
@@ -494,14 +422,14 @@ export function SamplingGrowthDashboard({
         <Card className={chartCardClass}>
           <CardHeader className="space-y-1 border-b border-border/70 pb-4">
             <CardTitle className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              SGR (%/day) by cage (full observed period)
+              SGR comparison
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
             {sgrRows.length === 0 ? (
-              <EmptyChart label="No SGR values in the selected scope." />
+              <EmptyChart label="No backend SGR values in the selected scope." />
             ) : (
-              <div className="chart-canvas-shell h-[240px]">
+              <div className="chart-canvas-shell h-[260px]">
                 <ChartBar data={sgrData} options={sgrOptions} />
               </div>
             )}
@@ -512,23 +440,52 @@ export function SamplingGrowthDashboard({
       <Card className={chartCardClass}>
         <CardHeader className="space-y-1 border-b border-border/70 pb-4">
           <CardTitle className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Harvest weight distribution: cumulative harvest (kg) by cage over time
+            System growth table
           </CardTitle>
-          <CardDescription>
-            Harvest accumulation by {harvestGranularityLabel} for the top harvested systems in the current scope.
-          </CardDescription>
         </CardHeader>
-        <CardContent className="pt-4">
-          {harvestTimelineRows.length === 0 ? (
-            <EmptyChart label="No harvest history in the selected scope." />
-          ) : (
-            <div className="chart-canvas-shell h-[260px]">
-              <ChartLine data={harvestData} options={harvestOptions} />
-            </div>
-          )}
+        <CardContent className="overflow-x-auto pt-0">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="border-b border-border/70 text-xs uppercase tracking-[0.12em] text-muted-foreground">
+              <tr>
+                <th className="py-3 pr-4 text-left font-semibold">System</th>
+                <th className="px-4 py-3 text-right font-semibold">ABW</th>
+                <th className="px-4 py-3 text-right font-semibold">Expected ABW</th>
+                <th className="px-4 py-3 text-right font-semibold">Deviation</th>
+                <th className="px-4 py-3 text-right font-semibold">SGR</th>
+                <th className="px-4 py-3 text-right font-semibold">Days to harvest</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {summaryRows.length === 0 ? (
+                <tr>
+                  <td className="py-5 text-muted-foreground" colSpan={6}>
+                    No system growth rows in the selected scope.
+                  </td>
+                </tr>
+              ) : (
+                summaryRows.map((row) => (
+                  <tr key={row.systemId}>
+                    <td className="py-3 pr-4 font-medium">{row.label}</td>
+                    <td className="px-4 py-3 text-right">{formatWithUnit(row.abw, 1, "g")}</td>
+                    <td className="px-4 py-3 text-right">{formatWithUnit(row.expectedAbw, 1, "g")}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${deviationTone(row.deviationPct)}`}>
+                      {formatPercent(row.deviationPct)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {isFiniteNumber(row.sgrPctDay) ? `${row.sgrPctDay.toFixed(2)}%/day` : "N/A"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {isFiniteNumber(row.daysToHarvest)
+                        ? `${Math.ceil(row.daysToHarvest)}d`
+                        : readinessText(row.readiness)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </CardContent>
       </Card>
-    </>
+    </div>
   )
 }
-

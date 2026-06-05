@@ -26,7 +26,7 @@ export type SamplingInput = WithFarmId<Insert<"fish_sampling_weight">>
 export type StockingInput = WithFarmId<DbAssignedCycle<Insert<"fish_stocking">>>
 export type TransferInput = WithFarmId<Insert<"fish_transfer">>
 export type WaterQualityInput = Array<WithFarmId<Insert<"water_quality_measurement">>>
-export type MortalityInput = Insert<"fish_mortality">
+export type MortalityInput = WithFarmId<Insert<"fish_mortality">>
 
 export function recordHarvest(payload: HarvestInput) {
   return postJson<MutationResponse<"fish_harvest">, HarvestInput>("/api/harvest/record", payload)

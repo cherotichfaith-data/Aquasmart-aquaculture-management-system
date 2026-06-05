@@ -11,27 +11,18 @@ import { buildCartesianOptions, buildMetricAxisBounds, getChartPalette } from "@
 import { formatNumberValue } from "@/lib/analytics-format"
 import { formatStableDate } from "@/lib/deterministic-format"
 import { getErrorMessage } from "@/lib/utils/query-result"
-import { getFcrIntervals } from "@/lib/api/analytics"
+import { getProductionSummary } from "@/lib/api/production"
+import type { Database } from "@/lib/types/database"
 
-type EfcrInterval = {
-  system_id: number
-  system_name: string
-  interval_start: string
-  interval_end: string
-  interval_days: number
-  total_feed_kg: number
-  weight_gain_kg: number | null
-  fcr: number | null
-}
+type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value)
 
-function bucketLabel(start: string, end: string) {
-  if (!start || !end) return "Period"
-  const startDate = new Date(`${start}T00:00:00Z`)
-  const endDate = new Date(`${end}T00:00:00Z`)
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return `${start} - ${end}`
-  return `${formatStableDate(startDate, { month: "short", day: "numeric", year: undefined })} - ${formatStableDate(endDate, { month: "short", day: "numeric", year: undefined })}`
+function bucketLabel(date: string) {
+  if (!date) return "Period"
+  const value = new Date(`${date}T00:00:00Z`)
+  if (Number.isNaN(value.getTime())) return date
+  return formatStableDate(value, { month: "short", day: "numeric", year: undefined })
 }
 
 export default function EfcrByPeriod({
@@ -51,7 +42,7 @@ export default function EfcrByPeriod({
   const query = useQuery({
     queryKey: ["dashboard", "efcr-by-period", farmId, dateFrom, dateTo, scopeKey],
     queryFn: async ({ signal }) => {
-      const result = await getFcrIntervals({
+      const result = await getProductionSummary({
         farmId: farmId!,
         dateFrom: dateFrom ?? undefined,
         dateTo: dateTo ?? undefined,
@@ -59,8 +50,8 @@ export default function EfcrByPeriod({
       })
       if (result.status !== "success") throw new Error(result.error ?? "Unable to load eFCR intervals.")
       const scope = new Set(scopedSystemIds ?? [])
-      return (result.data as EfcrInterval[]).filter(
-        (row) => scope.has(row.system_id) && isFiniteNumber(row.fcr) && row.fcr > 0,
+      return (result.data as ProductionSummaryRow[]).filter(
+        (row) => scope.has(row.system_id) && isFiniteNumber(row.efcr_period) && row.efcr_period > 0,
       )
     },
     enabled,
@@ -69,33 +60,14 @@ export default function EfcrByPeriod({
 
   const chartRows = useMemo(() => {
     const rows = query.data ?? []
-    const byPeriod = new Map<string, { label: string; weightedFcr: number; weight: number; fallback: number; count: number }>()
-
-    rows.forEach((row) => {
-      const key = `${row.interval_start}:${row.interval_end}`
-      const current = byPeriod.get(key) ?? {
-        label: bucketLabel(row.interval_start, row.interval_end),
-        weightedFcr: 0,
-        weight: 0,
-        fallback: 0,
-        count: 0,
-      }
-      const weight = isFiniteNumber(row.weight_gain_kg) && row.weight_gain_kg > 0 ? row.weight_gain_kg : 0
-      if (weight > 0) {
-        current.weightedFcr += (row.fcr ?? 0) * weight
-        current.weight += weight
-      } else {
-        current.fallback += row.fcr ?? 0
-        current.count += 1
-      }
-      byPeriod.set(key, current)
-    })
-
-    return Array.from(byPeriod.entries())
-      .map(([key, value]) => ({
-        key,
-        label: value.label,
-        fcr: value.weight > 0 ? value.weightedFcr / value.weight : value.count > 0 ? value.fallback / value.count : null,
+    const includeSystemName = new Set(rows.map((row) => row.system_id)).size > 1
+    return rows
+      .map((row) => ({
+        key: `${row.date}:${row.system_id}:${row.activity_rank ?? 0}`,
+        label: includeSystemName
+          ? `${bucketLabel(row.date)} - ${row.system_name ?? `System ${row.system_id}`}`
+          : bucketLabel(row.date),
+        fcr: row.efcr_period,
       }))
       .filter((row) => row.fcr != null)
       .sort((left, right) => left.key.localeCompare(right.key))

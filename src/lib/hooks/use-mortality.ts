@@ -3,18 +3,19 @@
 import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { useAuth } from "@/components/providers/auth-provider"
-import { getAlertLog, getMortalityEvents, getSurvivalTrend } from "@/lib/api/mortality"
+import { getMortalityEvents } from "@/lib/api/mortality"
 import { invalidateAfterWrite } from "@/lib/cache/react-query"
 import type { MortalityInput } from "@/lib/commands/operations"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 import { buildOfflinePendingResult } from "@/lib/offline/pending-result"
 import { useOfflineMutation } from "@/lib/offline/use-offline-mutation"
-import type { AlertSeverity, MortalityCause } from "@/lib/mortality"
+import type { MortalityCause } from "@/lib/mortality"
 import type { Tables, TablesInsert } from "@/lib/types/database"
 
 type MortalityEventInsert = Omit<TablesInsert<"fish_mortality">, "cause"> & {
   cause?: MortalityCause
+  farm_id?: string | null
 }
 
 export function useMortalityEvents(params?: {
@@ -31,47 +32,6 @@ export function useMortalityEvents(params?: {
     queryKey: queryKeys.mortality.events(params),
     queryFn: ({ signal }) => getMortalityEvents({ ...params, signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
-    staleTime: 60_000,
-  })
-}
-
-export function useAlertLog(params?: {
-  farmId?: string | null
-  systemId?: number
-  severity?: AlertSeverity
-  ruleCodes?: string[]
-  unacknowledgedOnly?: boolean
-  limit?: number
-  enabled?: boolean
-}) {
-  const { session } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.mortality.alertLog(params),
-    queryFn: ({ signal }) => getAlertLog({ ...params, signal }),
-    enabled: Boolean(session) && (params?.enabled ?? true),
-    staleTime: 30_000,
-  })
-}
-
-export function useSurvivalTrend(params: {
-  farmId?: string | null
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-  enabled?: boolean
-}) {
-  const { session } = useAuth()
-  const activeFarm = useActiveFarm()
-  const farmId = params.farmId ?? activeFarm.farmId
-  return useQuery({
-    queryKey: queryKeys.mortality.survivalTrend({ ...params, farmId }),
-    queryFn: ({ signal }) => getSurvivalTrend({ ...params, farmId, signal }),
-    enabled:
-      Boolean(session) &&
-      Boolean(farmId) &&
-      Boolean(params.systemId) &&
-      Boolean(params.dateFrom) &&
-      (params.enabled ?? true),
     staleTime: 60_000,
   })
 }
@@ -100,7 +60,7 @@ export function useRecordMortality() {
     buildRecords: (payload) => [
       {
         systemId: payload.system_id,
-        farmId: payload.farm_id,
+        farmId,
         batchId: payload.batch_id ?? null,
         date: payload.date,
         numberOfFishMortality: payload.number_of_fish_mortality,
@@ -112,7 +72,7 @@ export function useRecordMortality() {
     buildPendingResult: ({ input, localIds }) =>
       buildOfflinePendingResult({
         data: { id: 0 } as Tables<"fish_mortality">,
-        farmId: input.farm_id ?? farmId,
+        farmId,
         systemId: input.system_id,
         date: input.date,
         localIds,

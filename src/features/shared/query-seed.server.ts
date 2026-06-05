@@ -1,16 +1,10 @@
 import type { Database } from "@/lib/types/database"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import {
-  buildSystemHealthScoreRpcArgs,
   type CycleBenchmarkRow,
-  type FeedDemandRow,
   type HarvestForecastRow,
-  type SystemHealthRow,
-  type SystemHealthScoreParams,
 } from "@/lib/types/insights"
-import { normalizeSystemHealthRow } from "@/lib/health-grade"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
-import { parseAlertThresholdSettings } from "@/lib/alert-thresholds"
 import { logSbError } from "@/lib/supabase/log"
 
 export type ServerClient = ReturnType<typeof createAccessTokenClient>
@@ -221,19 +215,8 @@ export async function listAlertThresholdRows(
   farmId: string,
   userId?: string | null,
 ): Promise<AlertThresholdRow[]> {
-  const [{ data: settingsRow, error: settingsError }, { data, error }] = await Promise.all([
-    userId
-      ? supabase.from("user_settings").select("alert_thresholds").eq("user_id", userId).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    supabase.from("alert_threshold").select("*").or(`farm_id.eq.${farmId},scope.eq.default`),
-  ])
-
-  if (settingsError) return []
-  const settingsThresholds = parseAlertThresholdSettings(settingsRow?.alert_thresholds ?? null, farmId)
-  if (settingsThresholds.length > 0) {
-    return settingsThresholds as unknown as AlertThresholdRow[]
-  }
-
+  void userId
+  const { data, error } = await supabase.from("alert_threshold").select("*").or(`farm_id.eq.${farmId},scope.eq.default`)
   if (error) return []
   return (data ?? []) as unknown as AlertThresholdRow[]
 }
@@ -327,18 +310,6 @@ export async function getFarmUserRole(
   return (data?.role ?? null) as Database["public"]["Tables"]["farm_user"]["Row"]["role"] | null
 }
 
-export async function listSystemHealthScoreRows(
-  supabase: ServerClient,
-  params: SystemHealthScoreParams,
-): Promise<SystemHealthRow[]> {
-  const { data, error } = await supabase.rpc("api_system_health_score", buildSystemHealthScoreRpcArgs(params))
-  if (error) {
-    logSbError("query-seed:listSystemHealthScoreRows", error)
-    return []
-  }
-  return ((data ?? []) as SystemHealthRow[]).map(normalizeSystemHealthRow)
-}
-
 export async function listHarvestForecastRows(
   supabase: ServerClient,
   params: { farmId: string; systemId?: number },
@@ -354,20 +325,6 @@ export async function listHarvestForecastRows(
   return (data ?? []) as HarvestForecastRow[]
 }
 
-export async function listFeedDemandForecastRows(
-  supabase: ServerClient,
-  params: { farmId: string; daysAhead?: number },
-): Promise<FeedDemandRow[]> {
-  const { data, error } = await supabase.rpc("api_feed_demand_forecast", {
-    p_farm_id: params.farmId,
-    p_days_ahead: params.daysAhead ?? 14,
-  })
-  if (error) {
-    logSbError("query-seed:listFeedDemandForecastRows", error)
-    return []
-  }
-  return (data ?? []) as FeedDemandRow[]
-}
 
 export async function listCycleBenchmarkRows(
   supabase: ServerClient,

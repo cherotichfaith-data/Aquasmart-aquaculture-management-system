@@ -145,9 +145,9 @@ The current product structure follows a simple aquaculture software pattern:
 
 ### Current Analytics Read Model
 
-- Canonical system-day analytics source: `analytics_system_day`
-- Materialized backing store and refresh orchestration exist for the analytics path
-- Dashboard RPCs and related analytics have been refactored to reduce repeated recomputation
+- Canonical daily analytics source: `analytics.daily_system_facts`
+- Canonical production rollup source: `analytics.production_summary`
+- Dashboard RPCs and related analytics read from backend-maintained analytics sources instead of frontend recomputation
 
 ### Time-Period Logic
 
@@ -180,15 +180,12 @@ The current product structure follows a simple aquaculture software pattern:
 - `api_daily_overlay`
 - `api_latest_water_quality_status`
 - `api_water_quality_sync_status`
-- `analytics_system_day` (view over `analytics_system_day_mv`)
-- `daily_fish_inventory` (view over `daily_fish_inventory_table`)
-- `production_summary` (matview)
-- `efcr_period_last_sampling_view` (matview)
+- `analytics.daily_system_facts`
+- `analytics.production_summary`
 
-### Refreshing materialized views
+### Analytics Refresh
 
-Call `public.refresh_all_materialized_views()` to refresh all four matviews in dependency order:
-`daily_fish_inventory_table` → `production_summary` → `analytics_system_day_mv` → `efcr_period_last_sampling_view`
+Analytics refresh is a backend concern. Frontend code and documentation should treat `analytics.daily_system_facts` and `analytics.production_summary` as the canonical read sources.
 
 ### Regenerating database types
 

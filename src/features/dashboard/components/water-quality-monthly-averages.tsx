@@ -181,9 +181,6 @@ export default function WaterQualityMonthlyAverages({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <span className="text-[1rem] font-semibold text-foreground">Water Quality Monthly Average</span>
-            <p className="mt-1 text-xs text-muted-foreground">
-              One parameter at a time, so the axis matches the farmer's recorded units.
-            </p>
           </div>
           <div className="flex items-center gap-3">
             <DataFetchingBadge isFetching={query.isFetching} isLoading={query.isLoading} />

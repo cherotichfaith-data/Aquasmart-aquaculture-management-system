@@ -7,14 +7,11 @@ export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
 export type DashboardTimePeriod = TimePeriod
 
 export type ProductionTrendRpcRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
-export type ProductionTrendRow = Omit<ProductionTrendRpcRow, "feeding_rate"> & {
-  feeding_rate: number | null
-}
+export type ProductionTrendRow = ProductionTrendRpcRow
 export type DashboardUserProfile = Database["public"]["Tables"]["user_profile"]["Row"]
 export type DashboardUserSettings = Database["public"]["Tables"]["user_settings"]["Row"]
 export type DashboardSystemOption = SystemOption
 export type DashboardWaterQualityMeasurement = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
-export type DashboardAlertThreshold = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 export type DashboardRecentEntriesData = {
   mortality: QueryResult<Database["public"]["Tables"]["fish_mortality"]["Row"]>
   feeding: QueryResult<Database["public"]["Tables"]["feeding_record"]["Row"]>
@@ -91,8 +88,6 @@ export type DashboardPageInitialData = {
     dateBounds: { start: string | null; end: string | null }
   }
   systemsTable: SystemsTableData
-  productionTrend: ProductionTrendRow[]
   waterQualityMeasurements: QueryResult<DashboardWaterQualityMeasurement>
-  alertThresholds: QueryResult<DashboardAlertThreshold>
   recommendedActions: RecommendedAction[]
 }

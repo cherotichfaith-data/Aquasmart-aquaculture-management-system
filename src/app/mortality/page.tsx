@@ -87,20 +87,13 @@ export default async function Page({
       initialData.events,
     )
     queryClient.setQueryData(
-      queryKeys.mortality.alertLog({
+      queryKeys.production.summary({
         farmId,
-        ruleCodes: ["MASS_MORTALITY", "ELEVATED_MORTALITY"],
-        limit: 200,
-      }),
-      initialData.alerts,
-    )
-    queryClient.setQueryData(
-      queryKeys.reports.survivalTrendScoped({
-        systemIds: scopedSystemIds,
+        stage: effectiveFilters.selectedStage === "all" ? undefined : effectiveFilters.selectedStage,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
       }),
-      initialData.survival,
+      initialData.productionSummary,
     )
     queryClient.setQueryData(
       queryKeys.reports.feedingRecords({

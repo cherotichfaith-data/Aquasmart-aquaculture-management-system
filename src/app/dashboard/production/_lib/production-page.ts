@@ -2,108 +2,40 @@
 
 import { sortByDateAsc } from "@/lib/utils"
 import { formatCompactDate } from "@/lib/analytics-format"
+import type { ProductionMetric } from "@/components/production/metrics"
+import type { Database } from "@/lib/types/database"
 
-function averageByDate(items: Array<{ date: string; value: number | null }>) {
-  const byDate = new Map<string, { sum: number; count: number }>()
-  items.forEach((item) => {
-    if (!item.date || typeof item.value !== "number") return
-    const current = byDate.get(item.date) ?? { sum: 0, count: 0 }
-    current.sum += item.value
-    current.count += 1
-    byDate.set(item.date, current)
-  })
-  return Array.from(byDate.entries()).map(([date, current]) => ({
-    date,
-    value: current.count > 0 ? current.sum / current.count : null,
-  }))
-}
-
-function weightedByDate(items: Array<{ date: string; value: number | null; weight: number | null }>) {
-  const byDate = new Map<string, { weighted: number; weight: number; fallback: number; fallbackCount: number }>()
-  items.forEach((item) => {
-    if (!item.date || typeof item.value !== "number") return
-    const current = byDate.get(item.date) ?? { weighted: 0, weight: 0, fallback: 0, fallbackCount: 0 }
-    const weight = item.weight ?? 0
-    if (weight > 0) {
-      current.weighted += item.value * weight
-      current.weight += weight
-    } else {
-      current.fallback += item.value
-      current.fallbackCount += 1
-    }
-    byDate.set(item.date, current)
-  })
-  return Array.from(byDate.entries()).map(([date, current]) => ({
-    date,
-    value:
-      current.weight > 0
-        ? current.weighted / current.weight
-        : current.fallbackCount > 0
-          ? current.fallback / current.fallbackCount
-          : null,
-  }))
-}
+type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 
 export function buildProductionChartRows(params: {
-  metricFilter: string
-  productionRows: any[]
-  inventoryRows: any[]
+  metricFilter: ProductionMetric
+  productionRows: ProductionSummaryRow[]
 }) {
-  const { metricFilter, productionRows, inventoryRows } = params
-
-  let chartRows: Array<{ date: string; value: number | null }> = []
-
-  if (metricFilter === "efcr_periodic") {
-    chartRows = weightedByDate(
-      productionRows.map((row) => ({
-        date: row.date ?? "",
-        value: row.efcr_period ?? null,
-        weight: row.total_feed_amount_period ?? null,
-      })),
-    )
-  } else if (metricFilter === "efcr_aggregated") {
-    chartRows = weightedByDate(
-      productionRows.map((row) => ({
-        date: row.date ?? "",
-        value: row.efcr_aggregated ?? null,
-        weight: row.total_feed_amount_period ?? null,
-      })),
-    )
-  } else if (metricFilter === "abw") {
-    chartRows = weightedByDate(
-      productionRows
-        .filter((row) => row.activity === "sampling")
-        .map((row) => ({
-          date: row.date ?? "",
-          value: row.average_body_weight ?? null,
-          weight: row.number_of_fish_inventory ?? null,
-        })),
-    )
-  } else if (metricFilter === "mortality") {
-    chartRows = averageByDate(
-      inventoryRows.map((row) => ({
-        date: row.inventory_date ?? "",
-        value: typeof row.mortality_rate === "number" ? row.mortality_rate * 100 : null,
-      })),
-    )
-  } else if (metricFilter === "feeding") {
-    chartRows = averageByDate(
-      inventoryRows.map((row) => ({
-        date: row.inventory_date ?? "",
-        value: typeof row.feeding_rate === "number" ? row.feeding_rate * 100 : null,
-      })),
-    )
-  } else if (metricFilter === "density") {
-    chartRows = averageByDate(
-      inventoryRows.map((row) => ({
-        date: row.inventory_date ?? "",
-        value: row.biomass_density ?? null,
-      })),
-    )
-  }
+  const { metricFilter, productionRows } = params
+  const chartRows = productionRows.map((row) => ({
+    date: row.date,
+    value: getProductionMetricValue(row, metricFilter),
+  }))
 
   return sortByDateAsc(chartRows, (row) => row.date).map((row) => ({
     ...row,
     label: formatCompactDate(row.date),
   }))
+}
+
+function getProductionMetricValue(row: ProductionSummaryRow, metric: ProductionMetric) {
+  switch (metric) {
+    case "efcr_periodic":
+      return row.efcr_period
+    case "efcr_aggregated":
+      return row.efcr_aggregated
+    case "abw":
+      return row.average_body_weight
+    case "density":
+      return row.biomass_density
+    case "biomass":
+      return row.total_biomass
+    case "feeding_rate":
+      return row.feeding_rate
+  }
 }

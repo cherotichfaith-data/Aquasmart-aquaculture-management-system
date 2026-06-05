@@ -6,21 +6,25 @@ import { createAccessTokenClient } from "@/lib/supabase/access-token-client"
 import { createClient } from "@/lib/supabase/client"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import type {
-  SystemHealthRow,
-  SystemHealthScoreParams,
   HarvestForecastRow,
-  FeedDemandRow,
   CycleBenchmarkRow,
   RecommendedActionRow,
   FcrIntervalRow,
   FeedRateRow,
-  KpiCoverageRow,
 } from "@/lib/types/insights"
-import { buildSystemHealthScoreRpcArgs } from "@/lib/types/insights"
-import { normalizeSystemHealthRow } from "@/lib/health-grade"
 import { getDashboardSystems } from "@/lib/api/dashboard"
 import { toSystemsOverviewRows } from "@/features/dashboard/systems-overview"
 import type { SystemsOverviewRow } from "@/features/dashboard/types"
+import type { Database } from "@/lib/types/database"
+
+export type EfcrTrendRow = Database["public"]["Functions"]["api_efcr_trend"]["Returns"][number]
+type AnalyticsRpcName =
+  | "api_harvest_forecast"
+  | "api_cycle_benchmarks"
+  | "api_recommended_actions"
+  | "api_efcr_trend"
+  | "api_feed_fcr_intervals"
+  | "api_feed_rate_analysis"
 
 const isQuietError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
@@ -34,17 +38,17 @@ async function getAuthenticatedClient(tag: string): Promise<
 
 // ── Shared RPC caller ─────────────────────────────────────────────────────────
 
-async function callAnalyticsRpc<T>(params: {
+async function callAnalyticsRpc<T, Name extends AnalyticsRpcName = AnalyticsRpcName>(params: {
   tag: string
-  rpcName: string
-  args: Record<string, unknown>
+  rpcName: Name
+  args: Database["public"]["Functions"][Name]["Args"]
   signal?: AbortSignal
 }): Promise<QueryResult<T>> {
   const clientResult = await getAuthenticatedClient(params.tag)
   if ("error" in clientResult) return clientResult.error as QueryResult<T>
   const { supabase } = clientResult
 
-  let q = supabase.rpc(params.rpcName as never, params.args as never)
+  let q = supabase.rpc(params.rpcName, params.args)
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
@@ -52,24 +56,10 @@ async function callAnalyticsRpc<T>(params: {
     if (isQuietError(error)) return toQuerySuccess<T>([])
     return toQueryError<T>(params.tag, error)
   }
-  return toQuerySuccess<T>((data ?? []) as T[])
+  return toQuerySuccess<T>((data ?? []) as unknown as T[])
 }
 
 // ── System Health Scores ──────────────────────────────────────────────────────
-
-export async function getSystemHealthScores(params: SystemHealthScoreParams & {
-  signal?: AbortSignal
-}): Promise<QueryResult<SystemHealthRow>> {
-  const result = await callAnalyticsRpc<SystemHealthRow>({
-    tag: "getSystemHealthScores",
-    rpcName: "api_system_health_score",
-    args: buildSystemHealthScoreRpcArgs(params),
-    signal: params.signal,
-  })
-  return result.status === "success"
-    ? { ...result, data: result.data.map(normalizeSystemHealthRow) }
-    : result
-}
 
 // ── Harvest Forecast ──────────────────────────────────────────────────────────
 
@@ -86,20 +76,7 @@ export async function getHarvestForecast(params: {
   })
 }
 
-// ── Feed Demand Forecast ──────────────────────────────────────────────────────
 
-export async function getFeedDemandForecast(params: {
-  farmId: string
-  daysAhead?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedDemandRow>> {
-  return callAnalyticsRpc<FeedDemandRow>({
-    tag: "getFeedDemandForecast",
-    rpcName: "api_feed_demand_forecast",
-    args: { p_farm_id: params.farmId, p_days_ahead: params.daysAhead ?? 14 },
-    signal: params.signal,
-  })
-}
 
 // ── Cycle Benchmarks ──────────────────────────────────────────────────────────
 
@@ -120,7 +97,7 @@ export async function getCycleBenchmarks(params: {
 
 export async function getRecommendedActions(params: {
   farmId: string
-  systemId?: number
+  systemId?: number | null
   signal?: AbortSignal
 }): Promise<QueryResult<RecommendedActionRow>> {
   return callAnalyticsRpc<RecommendedActionRow>({
@@ -131,34 +108,27 @@ export async function getRecommendedActions(params: {
   })
 }
 
-export async function getScopedRecommendedActions(params: {
-  farmId: string
-  systemIds?: number[] | null
-  signal?: AbortSignal
-}): Promise<QueryResult<RecommendedActionRow>> {
-  if (!Array.isArray(params.systemIds)) {
-    return getRecommendedActions({ farmId: params.farmId, signal: params.signal })
-  }
-
-  const systemIds = Array.from(
-    new Set(params.systemIds.filter((systemId): systemId is number => typeof systemId === "number" && Number.isFinite(systemId))),
-  )
-  if (!systemIds.length) return toQuerySuccess<RecommendedActionRow>([])
-  if (systemIds.length === 1) {
-    return getRecommendedActions({ farmId: params.farmId, systemId: systemIds[0], signal: params.signal })
-  }
-
-  const results = await Promise.all(
-    systemIds.map((systemId) => getRecommendedActions({ farmId: params.farmId, systemId, signal: params.signal })),
-  )
-  const rows = results.flatMap((result) => (result.status === "success" ? result.data : []))
-  if (rows.length > 0) return toQuerySuccess<RecommendedActionRow>(rows)
-
-  const firstError = results.find((result) => result.status === "error")
-  return firstError ?? toQuerySuccess<RecommendedActionRow>([])
-}
-
 // ── FCR Intervals ─────────────────────────────────────────────────────────────
+
+export async function getEfcrTrend(params: {
+  farmId: string
+  systemId?: number
+  dateFrom?: string
+  dateTo?: string
+  signal?: AbortSignal
+}): Promise<QueryResult<EfcrTrendRow>> {
+  return callAnalyticsRpc<EfcrTrendRow>({
+    tag: "getEfcrTrend",
+    rpcName: "api_efcr_trend",
+    args: {
+      p_farm_id: params.farmId,
+      ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
+      ...(params.dateFrom ? { p_start_date: params.dateFrom } : {}),
+      ...(params.dateTo ? { p_end_date: params.dateTo } : {}),
+    },
+    signal: params.signal,
+  })
+}
 
 export async function getFcrIntervals(params: {
   farmId: string
@@ -184,7 +154,7 @@ export async function getFcrIntervals(params: {
 
 export async function getFeedRateAnalysis(params: {
   farmId: string
-  systemId?: number
+  systemId?: number | null
   dateFrom?: string
   dateTo?: string
   signal?: AbortSignal
@@ -202,73 +172,7 @@ export async function getFeedRateAnalysis(params: {
   })
 }
 
-export async function getScopedFeedRateAnalysis(params: {
-  farmId: string
-  systemIds?: number[] | null
-  dateFrom?: string
-  dateTo?: string
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedRateRow>> {
-  if (!Array.isArray(params.systemIds)) {
-    return getFeedRateAnalysis({
-      farmId: params.farmId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-      signal: params.signal,
-    })
-  }
-
-  const systemIds = Array.from(
-    new Set(params.systemIds.filter((systemId): systemId is number => typeof systemId === "number" && Number.isFinite(systemId))),
-  )
-  if (!systemIds.length) return toQuerySuccess<FeedRateRow>([])
-  if (systemIds.length === 1) {
-    return getFeedRateAnalysis({
-      farmId: params.farmId,
-      systemId: systemIds[0],
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-      signal: params.signal,
-    })
-  }
-
-  const results = await Promise.all(
-    systemIds.map((systemId) =>
-      getFeedRateAnalysis({
-        farmId: params.farmId,
-        systemId,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-        signal: params.signal,
-      }),
-    ),
-  )
-  const rows = results.flatMap((result) => (result.status === "success" ? result.data : []))
-  if (rows.length > 0) return toQuerySuccess<FeedRateRow>(rows)
-
-  const firstError = results.find((result) => result.status === "error")
-  return firstError ?? toQuerySuccess<FeedRateRow>([])
-}
-
 // ── KPI Coverage ──────────────────────────────────────────────────────────────
-
-export async function getKpiCoverage(params: {
-  farmId: string
-  dateFrom?: string
-  dateTo?: string
-  signal?: AbortSignal
-}): Promise<QueryResult<KpiCoverageRow>> {
-  return callAnalyticsRpc<KpiCoverageRow>({
-    tag: "getKpiCoverage",
-    rpcName: "api_kpi_coverage",
-    args: {
-      p_farm_id: params.farmId,
-      ...(params.dateFrom ? { p_date_from: params.dateFrom } : {}),
-      ...(params.dateTo   ? { p_date_to:   params.dateTo   } : {}),
-    },
-    signal: params.signal,
-  })
-}
 
 export async function fetchSystemsOverview(
   farmId?: string | null,
@@ -278,7 +182,6 @@ export async function fetchSystemsOverview(
 
   const result = await getDashboardSystems({
     farmId,
-    allowFallback: true,
     signal,
   })
 

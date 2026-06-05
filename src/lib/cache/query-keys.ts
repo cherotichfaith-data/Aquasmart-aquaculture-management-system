@@ -190,21 +190,19 @@ export const queryKeys = {
         params?.limit ?? 100,
       ] as const
     },
-    fcrTrend(params?: {
+    efcrTrend(params?: {
       farmId?: string | null
       systemIds?: number[]
       dateFrom?: string
       dateTo?: string
-      days?: number
     }) {
       return [
         "reports",
-        "fcr-trend",
+        "efcr-trend",
         farmToken(params?.farmId),
         params?.systemIds?.join(",") ?? "",
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),
-        params?.days ?? 180,
       ] as const
     },
     growthTrend(params?: {
@@ -222,21 +220,6 @@ export const queryKeys = {
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),
         params?.days ?? 180,
-      ] as const
-    },
-    survivalTrendScoped(params?: {
-      farmId?: string | null
-      systemIds?: number[]
-      dateFrom?: string
-      dateTo?: string
-    }) {
-      return [
-        "reports",
-        "survival-trend-scoped",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
       ] as const
     },
     transfer(params?: {
@@ -300,45 +283,10 @@ export const queryKeys = {
         params?.limit ?? 100,
       ] as const
     },
-    alertLog(params?: {
-      farmId?: string | null
-      systemId?: number
-      severity?: string
-      ruleCodes?: string[]
-      unacknowledgedOnly?: boolean
-      limit?: number
-    }) {
-      return [
-        "alert-log",
-        farmToken(params?.farmId),
-        numberToken(params?.systemId),
-        params?.severity ?? "all",
-        params?.ruleCodes?.join(",") ?? "all-rules",
-        params?.unacknowledgedOnly ?? false,
-        params?.limit ?? 50,
-      ] as const
-    },
-    survivalTrend(params: {
-      farmId?: string | null
-      systemId?: number
-      dateFrom?: string
-      dateTo?: string
-    }) {
-      return [
-        "survival-trend",
-        farmToken(params.farmId),
-        numberToken(params.systemId),
-        stringToken(params.dateFrom),
-        stringToken(params.dateTo),
-      ] as const
-    },
   },
   waterQuality: {
     latestStatus(params?: { farmId?: string | null; systemId?: number | null }) {
       return ["wq", "latest_status", farmToken(params?.farmId), params?.systemId ?? null] as const
-    },
-    syncStatus(farmId?: string | null) {
-      return ["wq", "sync_status", farmToken(farmId)] as const
     },
     measurements(params?: {
       farmId?: string | null
@@ -374,21 +322,6 @@ export const queryKeys = {
         params?.dateFrom ?? null,
         params?.dateTo ?? null,
         params?.limit ?? null,
-      ] as const
-    },
-    overlay(params?: {
-      farmId?: string | null
-      systemId?: number | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "wq",
-        "overlay",
-        farmToken(params?.farmId),
-        params?.systemId ?? null,
-        params?.dateFrom ?? null,
-        params?.dateTo ?? null,
       ] as const
     },
     thresholds(farmId?: string | null) {
@@ -519,14 +452,8 @@ export const queryKeys = {
     },
   },
   analytics: {
-    healthScores(params: { farmId?: string | null; systemId?: number }) {
-      return ["analytics", "health-scores", farmToken(params.farmId), numberToken(params.systemId)] as const
-    },
     harvestForecast(params: { farmId?: string | null; systemId?: number }) {
       return ["analytics", "harvest-forecast", farmToken(params.farmId), numberToken(params.systemId)] as const
-    },
-    feedDemand(params: { farmId?: string | null; daysAhead?: number }) {
-      return ["analytics", "feed-demand", farmToken(params.farmId), params.daysAhead ?? 14] as const
     },
     cycleBenchmarks(params: { farmId?: string | null; systemId?: number }) {
       return ["analytics", "cycle-benchmarks", farmToken(params.farmId), numberToken(params.systemId)] as const
@@ -553,9 +480,6 @@ export const queryKeys = {
         params.dateFrom ?? null,
         params.dateTo ?? null,
       ] as const
-    },
-    kpiCoverage(params: { farmId?: string | null; dateFrom?: string; dateTo?: string }) {
-      return ["analytics", "kpi-coverage", farmToken(params.farmId), params.dateFrom ?? null, params.dateTo ?? null] as const
     },
   },
   appConfig(keys: string[], userId?: string | null) {

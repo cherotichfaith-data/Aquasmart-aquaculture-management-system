@@ -1,6 +1,5 @@
 import type { QueryResult } from "@/lib/supabase-client"
-import type { Database, Tables } from "@/lib/types/database"
-import type { AlertSeverity } from "@/lib/mortality"
+import type { Tables } from "@/lib/types/database"
 import { postJson } from "@/lib/commands/_utils"
 import { isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 
@@ -15,7 +14,6 @@ export type AlertLogRow = {
   fired_at: string | null
 }
 type MortalityEventRow = Tables<"fish_mortality">
-type SurvivalTrendRow = Database["public"]["Functions"]["api_survival_trend"]["Returns"][number]
 
 export async function getMortalityEvents(params?: {
   farmId?: string | null
@@ -46,59 +44,4 @@ export async function getMortalityEvents(params?: {
   }
 }
 
-export async function getAlertLog(params?: {
-  farmId?: string | null
-  systemId?: number
-  severity?: AlertSeverity
-  ruleCodes?: string[]
-  unacknowledgedOnly?: boolean
-  limit?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<AlertLogRow>> {
-  try {
-    const response = await postJson<{ data: AlertLogRow[] }, Omit<NonNullable<typeof params>, "signal">>(
-      "/api/mortality/alerts/query",
-      {
-        farmId: params?.farmId,
-        systemId: params?.systemId,
-        severity: params?.severity,
-        ruleCodes: params?.ruleCodes,
-        unacknowledgedOnly: params?.unacknowledgedOnly,
-        limit: params?.limit,
-      },
-      { signal: params?.signal },
-    )
-    return toQuerySuccess<AlertLogRow>(response.data)
-  } catch (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<AlertLogRow>([])
-    return toQueryError("getAlertLog", error)
-  }
-}
 
-export async function getSurvivalTrend(params: {
-  farmId?: string | null
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-  signal?: AbortSignal
-}): Promise<QueryResult<SurvivalTrendRow>> {
-  if (!params.farmId || !params.systemId || !params.dateFrom) {
-    return toQuerySuccess<SurvivalTrendRow>([])
-  }
-  try {
-    const response = await postJson<{ data: SurvivalTrendRow[] }, Omit<typeof params, "signal">>(
-      "/api/mortality/survival-trend/query",
-      {
-        farmId: params.farmId,
-        systemId: params.systemId,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-      },
-      { signal: params.signal },
-    )
-    return toQuerySuccess<SurvivalTrendRow>(response.data)
-  } catch (error) {
-    if (params.signal?.aborted || isAbortLikeError(error)) return toQuerySuccess<SurvivalTrendRow>([])
-    return toQueryError("getSurvivalTrend", error)
-  }
-}

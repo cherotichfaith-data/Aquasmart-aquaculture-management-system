@@ -5,7 +5,6 @@ import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
-type FcrTrendRow = Database["public"]["Functions"]["api_fcr_trend"]["Returns"][number]
 type GrowthTrendRow = Database["public"]["Functions"]["api_growth_trend"]["Returns"][number]
 type RunningStockRow = Database["public"]["Functions"]["api_running_stock"]["Returns"][number]
 type FishMortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
@@ -126,33 +125,6 @@ export async function listRunningStock(
   return (data ?? []) as RunningStockRow[]
 }
 
-export async function listFcrTrend(
-  supabase: ServerSupabaseClient,
-  params: {
-    farmId?: string | null
-    systemId?: number
-    days?: number
-    dateFrom?: string
-    dateTo?: string
-  },
-): Promise<FcrTrendRow[]> {
-  if (!params.farmId || !params.systemId) return []
-
-  const query = supabase.rpc("api_fcr_trend", {
-    p_farm_id: params.farmId,
-    p_system_id: params.systemId,
-    p_days: params.days,
-  })
-
-  const { data, error } = await query
-  if (error) {
-    if (isQuietReadError(error) || isInvalidBigintUuidError(error)) return []
-    throw error
-  }
-
-  return (data ?? []) as FcrTrendRow[]
-}
-
 export async function listGrowthTrend(
   supabase: ServerSupabaseClient,
   params: {
@@ -163,33 +135,7 @@ export async function listGrowthTrend(
     dateTo?: string
   },
 ): Promise<GrowthTrendRow[]> {
-  // G-08 fix: when no systemId is given but farmId is, aggregate across all farm systems
-  if (!params.systemId) {
-    if (!params.farmId) return []
-    const farmId = params.farmId
-    const { data: systems, error: sysErr } = await supabase
-      .from("system")
-      .select("id")
-      .eq("farm_id", farmId)
-      .eq("is_active", true)
-    if (sysErr || !systems?.length) return []
-    const results = await Promise.all(
-      systems
-        .filter((s): s is { id: number } => typeof s.id === "number")
-        .map((s) =>
-          runRpcRead<GrowthTrendRow>(
-            supabase.rpc("api_growth_trend", {
-              p_farm_id: farmId,
-              p_system_id: s.id,
-              p_days: params.days,
-            }),
-          ),
-        ),
-    )
-    return results.flat()
-  }
-
-  if (!params.farmId) return []
+  if (!params.farmId || !params.systemId) return []
 
   const query = supabase.rpc("api_growth_trend", {
     p_farm_id: params.farmId,

@@ -44,6 +44,8 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
 
   const [batchName, setBatchName] = useState("")
   const [dateOfDelivery, setDateOfDelivery] = useState(new Date().toISOString().split("T")[0])
+  const [numberOfFish, setNumberOfFish] = useState("")
+  const [abw, setAbw] = useState("")
   const [supplierId, setSupplierId] = useState("")
   const [showSupplierForm, setShowSupplierForm] = useState(false)
   const [supplierName, setSupplierName] = useState("")
@@ -102,8 +104,18 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
       setError("Select a cage before creating a batch.")
       return
     }
+    const fishCount = Number(numberOfFish)
+    const abwValue = Number(abw)
     if (!batchName.trim() || !dateOfDelivery || !supplierId) {
       setError("Batch name, delivery date, and supplier are required.")
+      return
+    }
+    if (!Number.isFinite(fishCount) || fishCount <= 0) {
+      setError("Number of fish must be greater than 0.")
+      return
+    }
+    if (!Number.isFinite(abwValue) || abwValue <= 0) {
+      setError("ABW must be greater than 0.")
       return
     }
 
@@ -116,11 +128,14 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
         name: batchName.trim(),
         date_of_delivery: dateOfDelivery,
         supplier_id: Number(supplierId),
-        system_id: systemId,
+        number_of_fish: fishCount,
+        abw: abwValue,
       })
 
       setBatchName("")
       setDateOfDelivery(new Date().toISOString().split("T")[0])
+      setNumberOfFish("")
+      setAbw("")
       onCreated?.({
         ...created.data,
         supplier_name: selectedSupplier?.company_name ?? null,
@@ -174,6 +189,14 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
           {!suppliersQuery.isLoading && suppliers.length === 0 ? (
             <p className="text-xs text-muted-foreground">No fingerling suppliers were found.</p>
           ) : null}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="batch-fish-count">Number of Fish</Label>
+          <Input id="batch-fish-count" type="number" value={numberOfFish} onChange={(event) => setNumberOfFish(event.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="batch-abw">ABW (g)</Label>
+          <Input id="batch-abw" type="number" step="0.01" value={abw} onChange={(event) => setAbw(event.target.value)} />
         </div>
       </div>
 

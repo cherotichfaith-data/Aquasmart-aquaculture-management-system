@@ -3,37 +3,31 @@ export const PRODUCTION_METRICS = {
     label: "eFCR periodic",
     unit: "",
     decimals: 2,
-    source: "summary",
   },
   efcr_aggregated: {
     label: "eFCR aggregated",
     unit: "",
     decimals: 2,
-    source: "summary",
-  },
-  mortality: {
-    label: "Mortality rate",
-    unit: "%/day",
-    decimals: 2,
-    source: "inventory",
   },
   abw: {
     label: "ABW",
     unit: "g",
     decimals: 1,
-    source: "summary",
-  },
-  feeding: {
-    label: "Feeding rate",
-    unit: "% BW/day",
-    decimals: 2,
-    source: "inventory",
   },
   density: {
     label: "Biomass density",
     unit: "kg/m3",
     decimals: 2,
-    source: "inventory",
+  },
+  biomass: {
+    label: "Biomass",
+    unit: "kg",
+    decimals: 1,
+  },
+  feeding_rate: {
+    label: "Feeding rate",
+    unit: "% BW/day",
+    decimals: 2,
   },
 } as const
 

@@ -6,10 +6,8 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { queryKeys } from "@/lib/cache/query-keys"
 import {
   getAlertThresholds,
-  getDailyOverlay,
   getDailyWaterQualityRating,
   getLatestWaterQualityStatus,
-  getWaterQualitySyncStatus,
   getWaterQualityMeasurements,
 } from "@/lib/api/water-quality"
 import { invalidateAfterWrite } from "@/lib/cache/react-query"
@@ -59,23 +57,6 @@ function useLatestWaterQualityStatusWithInitial(params?: {
       enabled,
       queryFn: ({ signal }) =>
         getLatestWaterQualityStatus({ farmId: resolvedFarmId!, systemId: params?.systemId, signal }),
-      staleTime: 30_000,
-    }),
-  )
-}
-
-export function useWaterQualitySyncStatus(params?: {
-  farmId?: string | null
-}) {
-  const { farmId } = useActiveFarm()
-  const { session } = useAuth()
-  const resolvedFarmId = params?.farmId ?? farmId
-  const enabled = Boolean(session) && Boolean(resolvedFarmId)
-  return useQuery(
-    waterQualityQueryOptions({
-      queryKey: queryKeys.waterQuality.syncStatus(resolvedFarmId),
-      enabled,
-      queryFn: ({ signal }) => getWaterQualitySyncStatus({ farmId: resolvedFarmId!, signal }),
       staleTime: 30_000,
     }),
   )
@@ -156,42 +137,6 @@ export function useDailyWaterQualityRating(params: {
           dateFrom: params.dateFrom,
           dateTo: params.dateTo,
           limit: params.limit,
-          signal,
-        }),
-      staleTime: 60_000,
-    }),
-  )
-}
-
-export function useWaterQualityOverlay(params: {
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-  requireSystem?: boolean
-  enabled?: boolean
-  farmId?: string | null
-}) {
-  const { farmId } = useActiveFarm()
-  const { session } = useAuth()
-  const resolvedFarmId = params.farmId ?? farmId
-  const enabledBase = Boolean(session) && Boolean(resolvedFarmId)
-  const enabledSystem = enabledBase && Boolean(params.systemId)
-  const enabled = Boolean(params.enabled ?? true) && (params.requireSystem ? enabledSystem : enabledBase)
-  return useQuery(
-    waterQualityQueryOptions({
-      queryKey: queryKeys.waterQuality.overlay({
-        farmId: resolvedFarmId,
-        systemId: params.systemId,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-      }),
-      enabled,
-      queryFn: ({ signal }) =>
-        getDailyOverlay({
-          farmId: resolvedFarmId!,
-          systemId: params.systemId,
-          dateFrom: params.dateFrom,
-          dateTo: params.dateTo,
           signal,
         }),
       staleTime: 60_000,

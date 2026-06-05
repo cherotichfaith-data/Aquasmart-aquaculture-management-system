@@ -4,12 +4,11 @@ import PageClient from "./page.client"
 import { QueryHydration } from "@/components/providers/query-hydration"
 import { resolveInitialFarmId } from "@/features/farm/queries.server"
 import { getFeedPageInitialData, parseFeedPageFilters } from "@/features/feed/queries.server"
-import { listFeedDemandForecastRows } from "@/features/shared/query-seed.server"
 import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createQueryClient } from "@/lib/react-query/query-client"
 import { requireUserContext } from "@/lib/supabase/require-user"
-import { createAccessTokenClient } from "@/lib/supabase/server"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type SearchParams = Record<string, string | string[] | undefined>
 
@@ -19,7 +18,7 @@ export default async function Page({
   searchParams?: Promise<SearchParams>
 }) {
   const resolvedSearchParams = (await searchParams) ?? {}
-  const { accessToken } = await requireUserContext("/feed")
+  await requireUserContext("/feed")
   const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
   const initialFilters = parseFeedPageFilters(resolvedSearchParams)
   const { farmId, farmName } = await resolveInitialFarmId(searchFarmId)
@@ -31,10 +30,8 @@ export default async function Page({
     initialData.systems.status === "success"
       ? cleanScopedFilterState(initialFilters, initialData.systems.data)
       : initialFilters
-  const feedDemandForecast = farmId
-    ? await listFeedDemandForecastRows(createAccessTokenClient(accessToken), { farmId, daysAhead: 14 })
-    : []
-  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
+  const systemOptions = initialData.systems.status === "success" ? initialData.systems.data : []
+  const selectedSystemId = resolveSystemIdFromFilterValue(effectiveFilters.selectedSystem, systemOptions)
   const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
   const scopedSystemIdList =
     selectedSystemId != null
@@ -106,17 +103,6 @@ export default async function Page({
       initialData.feedingRecords,
     )
     queryClient.setQueryData(
-      queryKeys.inventory.daily({
-        farmId,
-        systemId: selectedSystemId ?? undefined,
-        dateFrom: initialData.bounds.start,
-        dateTo: initialData.bounds.end,
-        limit: 5000,
-        orderAsc: true,
-      }),
-      initialData.inventory,
-    )
-    queryClient.setQueryData(
       queryKeys.analytics.feedRateAnalysis({
         farmId,
         systemIds: feedRateScopeIds,
@@ -126,10 +112,6 @@ export default async function Page({
       initialData.feedRateSummary,
     )
   }
-  queryClient.setQueryData(
-    queryKeys.analytics.feedDemand({ farmId, daysAhead: 14 }),
-    { status: "success", data: feedDemandForecast },
-  )
 
   return (
     <Suspense fallback={null}>
