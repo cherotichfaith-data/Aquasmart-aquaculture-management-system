@@ -5,7 +5,7 @@ import { apiRateLimits } from "@/lib/server/rate-limit"
 import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
-import type { Database } from "@/lib/types/database"
+import { Constants, type Database } from "@/lib/types/database"
 
 type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
 type DbAssignedStockingInsert = Omit<StockingInsert, "cycle_id"> & {
@@ -20,7 +20,7 @@ const stockingSchema = z.object({
   total_weight_stocking: z.number().positive(),
   abw: z.number().min(0),
   notes: z.string().max(500).nullable().optional(),
-  type_of_stocking: z.enum(["empty", "already_stocked"]),
+  type_of_stocking: z.enum(Constants.public.Enums.type_of_stocking),
   local_id: z.string().max(128).optional(),
 })
 

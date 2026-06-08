@@ -5,36 +5,16 @@ import { apiRateLimits } from "@/lib/server/rate-limit"
 import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
-
-const measurementSchema = z.object({
-  system_id: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  time: z.string().regex(/^\d{2}:\d{2}$/),
-  measured_at: z.string().min(1),
-  water_depth: z.number().min(0),
-  parameter_name: z.enum([
-    "temperature",
-    "dissolved_oxygen",
-    "pH",
-    "ammonia",
-    "nitrite",
-    "nitrate",
-    "salinity",
-    "secchi_disk_depth",
-  ]),
-  parameter_value: z.number(),
-  location_reference: z.string().max(200).nullable().optional(),
-  local_id: z.string().max(128).optional(),
-})
+import { recordWaterQualityRowsInputSchema } from "@/features/water-quality/schemas"
 
 export async function POST(request: Request) {
   const supabase = await createClient()
   const auth = await requireRateLimitedRouteUser(supabase, request, "water-quality:record", apiRateLimits.mutation)
   if ("response" in auth) return auth.response
 
-  let payload: Array<z.infer<typeof measurementSchema>>
+  let payload: z.infer<typeof recordWaterQualityRowsInputSchema>
   try {
-    payload = z.array(measurementSchema).min(1).parse(await request.json())
+    payload = recordWaterQualityRowsInputSchema.parse(await request.json())
   } catch (error) {
     const message =
       error instanceof z.ZodError ? error.issues[0]?.message ?? "Invalid water quality payload." : "Invalid request body."

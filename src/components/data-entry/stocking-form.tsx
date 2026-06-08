@@ -16,7 +16,7 @@ import {
 } from "@/components/app-ui/form"
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
-import type { Database } from "@/lib/types/database"
+import { Constants, type Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useRecordStocking } from "@/lib/hooks/use-stocking"
 import { logSbError } from "@/lib/supabase/log"
@@ -59,7 +59,7 @@ const formSchema = z.object({
   number_of_fish: z.coerce.number().min(1, "Quantity must be positive"),
   total_weight_kg: z.coerce.number().min(0.01, "Weight must be positive"),
   notes: z.string().max(500, "Notes must be 500 characters or fewer").optional(),
-  type_of_stocking: z.enum(["empty", "already_stocked"]),
+  type_of_stocking: z.enum(Constants.public.Enums.type_of_stocking),
 })
 
 interface StockingFormProps {

@@ -117,57 +117,12 @@ export async function listBatchOptionRows(
 ): Promise<BatchOptionRow[]> {
   const { data, error } = await supabase.rpc("api_fingerling_batch_options_rpc", {
     p_farm_id: params.farmId,
+    p_active_only: params.activeOnly ?? true,
   })
   if (error) return []
-  const rows = ((data ?? []) as BatchOptionRow[])
+  return ((data ?? []) as BatchOptionRow[])
     .slice()
     .sort((a, b) => String(b.date_of_delivery ?? "").localeCompare(String(a.date_of_delivery ?? "")))
-
-  const { data: activeSystems } = await supabase
-    .from("system")
-    .select("id, commissioned_at")
-    .eq("farm_id", params.farmId)
-    .eq("is_active", true)
-
-  const activeSystemStartById = new Map(
-    (activeSystems ?? [])
-      .filter((row): row is { id: number; commissioned_at: string | null } => typeof row.id === "number")
-      .map((row) => [row.id, row.commissioned_at ?? "0001-01-01"]),
-  )
-  const activeSystemIds = Array.from(activeSystemStartById.keys())
-  if (params.activeOnly === false) return rows
-
-  if (activeSystemIds.length === 0) return []
-  const batchIds = new Set<number>()
-  const { data: transfers } = await supabase
-    .from("fish_transfer")
-    .select("batch_id, target_system_id, date")
-    .in("target_system_id", activeSystemIds)
-
-  ;(transfers ?? []).forEach((row) => {
-    if (typeof row.batch_id !== "number" || typeof row.target_system_id !== "number") return
-    if (String(row.date ?? "") >= (activeSystemStartById.get(row.target_system_id) ?? "0001-01-01")) {
-      batchIds.add(row.batch_id)
-    }
-  })
-
-  const { data: stockings } = await supabase
-    .from("fish_stocking")
-    .select("batch_id, system_id, date")
-    .in("system_id", activeSystemIds)
-
-  ;(stockings ?? []).forEach((row) => {
-    if (typeof row.batch_id !== "number" || typeof row.system_id !== "number") return
-    if (String(row.date ?? "") >= (activeSystemStartById.get(row.system_id) ?? "0001-01-01")) {
-      batchIds.add(row.batch_id)
-    }
-  })
-
-  return rows.filter((row) => {
-    const systemStart = activeSystemStartById.get(row.system_id)
-    if (!systemStart) return false
-    return batchIds.has(row.id) || String(row.date_of_delivery ?? "") >= systemStart
-  })
 }
 
 export async function listFeedTypeOptionRows(
@@ -179,17 +134,8 @@ export async function listFeedTypeOptionRows(
   })
   if (error) return []
 
-  const { data: existingRows } = await supabase
-    .from("feed_type")
-    .select("id")
-    .or(`farm_id.eq.${params.farmId},farm_id.is.null`)
-
-  const existingIds = new Set(
-    (existingRows ?? []).map((row) => row.id).filter((id): id is number => typeof id === "number"),
-  )
-
   return ((data ?? []) as FeedTypeOptionRow[])
-    .filter((row) => typeof row.id === "number" && (existingIds.size === 0 || existingIds.has(row.id)))
+    .filter((row) => typeof row.id === "number")
     .slice()
     .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
 }

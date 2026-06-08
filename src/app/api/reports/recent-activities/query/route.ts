@@ -5,11 +5,12 @@ import { apiRateLimits } from "@/lib/server/rate-limit"
 import { requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { listRecentActivities } from "@/lib/server/report-reads"
 import { logSbError } from "@/lib/supabase/log"
+import { Constants } from "@/lib/types/database"
 
 const recentActivitiesSchema = z.object({
   farmId: z.string().uuid().nullable().optional(),
   tableName: z.string().trim().min(1).optional(),
-  changeType: z.enum(["INSERT", "UPDATE", "DELETE"]).optional(),
+  changeType: z.enum(Constants.public.Enums.change_type_enum).optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   limit: z.number().int().positive().optional(),

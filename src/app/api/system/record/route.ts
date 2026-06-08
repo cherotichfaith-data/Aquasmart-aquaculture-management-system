@@ -6,13 +6,14 @@ import { requireRateLimitedSessionRouteUser, revalidateWriteTags } from "@/lib/s
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { BIOLOGICAL_GROWTH_STAGE_VALUES } from "@/lib/stage-filter"
+import { FORM_SYSTEM_TYPES } from "@/lib/system-types"
 
 const systemSchema = z.object({
   farm_id: z.string().uuid(),
   commissioned_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   unit: z.string().max(120).nullable().optional(),
   name: z.string().min(1).max(120),
-  type: z.enum(["rectangular_cage", "circular_cage", "pond", "tank"]),
+  type: z.enum(FORM_SYSTEM_TYPES),
   growth_stage: z.enum(BIOLOGICAL_GROWTH_STAGE_VALUES),
   volume: z.number().min(0).nullable().optional(),
   depth: z.number().min(0).nullable().optional(),

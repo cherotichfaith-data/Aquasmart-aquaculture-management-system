@@ -6,6 +6,7 @@ import { revalidateWriteTags } from "@/lib/server/write-through"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { UI_FEED_CATEGORIES, UI_FEED_PELLET_SIZES } from "@/lib/feed-type-values"
 import type { Database } from "@/lib/types/database"
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
@@ -24,8 +25,8 @@ const feedSupplierSchema = z.object({
 const feedTypeSchema = z.object({
   farm_id: z.string().uuid(),
   feed_line: z.string().trim().max(255).nullable().optional(),
-  feed_category: z.enum(["pre-starter", "starter", "pre-grower", "grower", "finisher", "broodstock"]),
-  feed_pellet_size: z.enum(["mash_powder", "<0.49mm", "0.5-0.99mm", "1.0-1.5mm", "1.5-1.99mm", "2mm", "2.5mm", "3mm"]),
+  feed_category: z.enum(UI_FEED_CATEGORIES),
+  feed_pellet_size: z.enum(UI_FEED_PELLET_SIZES),
   crude_protein_percentage: z.number().finite().positive(),
   crude_fat_percentage: z.number().finite().min(0).nullable().optional(),
   feed_supplier_id: z.number().int().positive(),

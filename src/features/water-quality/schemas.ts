@@ -1,15 +1,7 @@
 import { z } from "zod"
+import { Constants } from "@/lib/types/database"
 
-const waterQualityParameterSchema = z.enum([
-  "pH",
-  "temperature",
-  "dissolved_oxygen",
-  "secchi_disk_depth",
-  "nitrite",
-  "nitrate",
-  "ammonia",
-  "salinity",
-])
+const waterQualityParameterSchema = z.enum(Constants.public.Enums.water_quality_parameters)
 
 export const listWaterQualityMeasurementsInputSchema = z.object({
   systemId: z.number().int().positive().optional(),
@@ -24,6 +16,21 @@ export const waterQualityMeasurementInputSchema = z.object({
   parameter_value: z.number(),
 })
 
+export const waterQualityRecordRowInputSchema = z.object({
+  farm_id: z.string().uuid().nullable().optional(),
+  system_id: z.number().int().positive(),
+  date: z.string().date(),
+  time: z.string().regex(/^\d{2}:\d{2}$/),
+  measured_at: z.string().min(1),
+  water_depth: z.number().nonnegative(),
+  parameter_name: waterQualityParameterSchema,
+  parameter_value: z.number(),
+  location_reference: z.string().max(200).nullable().optional(),
+  local_id: z.string().max(128).optional(),
+})
+
+export const recordWaterQualityRowsInputSchema = z.array(waterQualityRecordRowInputSchema).min(1)
+
 export const recordWaterQualityInputSchema = z.object({
   farmId: z.string().uuid(),
   system_id: z.number().int().positive(),
@@ -36,3 +43,5 @@ export const recordWaterQualityInputSchema = z.object({
 
 export type ListWaterQualityMeasurementsInput = z.infer<typeof listWaterQualityMeasurementsInputSchema>
 export type RecordWaterQualityInput = z.infer<typeof recordWaterQualityInputSchema>
+export type WaterQualityRecordRowInput = z.infer<typeof waterQualityRecordRowInputSchema>
+export type RecordWaterQualityRowsInput = z.infer<typeof recordWaterQualityRowsInputSchema>
