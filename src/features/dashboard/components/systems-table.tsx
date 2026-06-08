@@ -251,7 +251,7 @@ export default function SystemsTable({
   }
 
   return (
-    <Card>
+    <Card className="!border-0 !bg-transparent">
       {showHeader ? (
         <CardHeader className="pb-1">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -265,7 +265,7 @@ export default function SystemsTable({
         </CardHeader>
       ) : null}
 
-      <CardContent className={showHeader ? "pt-2" : undefined}>
+      <CardContent className={showHeader ? "!px-0 pt-2" : "!px-0"}>
         {loading ? (
           <div className="flex h-[240px] items-center justify-center text-muted-foreground">
             Loading table...
