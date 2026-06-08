@@ -24,7 +24,7 @@ import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
 import { useProductionSummary } from "@/lib/hooks/use-production"
 import { logSbError } from "@/lib/supabase/log"
-import type { Database } from "@/lib/types/database"
+import { Constants, type Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import {
@@ -43,7 +43,7 @@ const formSchema = z.object({
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Count must be positive"),
     amount_kg: z.coerce.number().min(0.01, "Weight must be positive"),
-    type_of_harvest: z.enum(["partial", "final"]).default("partial"),
+    type_of_harvest: z.enum(Constants.public.Enums.type_of_harvest).default("partial"),
 })
 
 const DAY_MS = 86_400_000

@@ -1,5 +1,6 @@
 import type { Database } from "@/lib/types/database"
 import { postJson } from "@/lib/commands/_utils"
+import type { RecordWaterQualityRowsInput } from "@/features/water-quality/schemas"
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
 type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"]
@@ -25,7 +26,7 @@ export type HarvestInput = WithFarmId<Insert<"fish_harvest">>
 export type SamplingInput = WithFarmId<Insert<"fish_sampling_weight">>
 export type StockingInput = WithFarmId<DbAssignedCycle<Insert<"fish_stocking">>>
 export type TransferInput = WithFarmId<Insert<"fish_transfer">>
-export type WaterQualityInput = Array<WithFarmId<Insert<"water_quality_measurement">>>
+export type WaterQualityInput = RecordWaterQualityRowsInput
 export type MortalityInput = WithFarmId<Insert<"fish_mortality">>
 
 export function recordHarvest(payload: HarvestInput) {

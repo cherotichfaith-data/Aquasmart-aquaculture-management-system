@@ -25,7 +25,6 @@ export type KpiRpcName =
   | "api_latest_water_quality_status"
   | "api_water_quality_trend"
   | "api_water_quality_index"
-  | "api_time_period_bounds_scoped"
   // Analytics layer RPCs
   | "api_harvest_forecast"
   | "api_cycle_benchmarks"

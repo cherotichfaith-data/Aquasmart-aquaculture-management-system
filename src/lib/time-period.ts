@@ -1,4 +1,4 @@
-import type { Database, Enums } from "@/lib/types/database"
+import { Constants, type Database, type Enums } from "@/lib/types/database"
 
 export type BaseTimePeriod = Enums<"time_period">
 export type TimePeriod = BaseTimePeriod | "all history"
@@ -10,16 +10,9 @@ export type AnalyticsTimeScope =
   | "feeding"
   | "feed_inventory"
 
-export const TIME_PERIODS: TimePeriod[] = [
-  "day",
-  "week",
-  "2 weeks",
-  "month",
-  "quarter",
-  "6 months",
-  "year",
-  "all history",
-]
+export const BASE_TIME_PERIODS = Constants.public.Enums.time_period
+
+export const TIME_PERIODS: TimePeriod[] = [...BASE_TIME_PERIODS, "all history"]
 
 export const DEFAULT_TIME_PERIOD: TimePeriod = "2 weeks"
 
@@ -34,21 +27,6 @@ export type TimeBounds = {
   resolvedDays?: number | null
   stalenessDays?: number | null
   isTruncated?: boolean | null
-}
-
-type TimePeriodBoundsRpc = Database["public"]["Functions"]["api_time_period_bounds_scoped"]
-type TimePeriodBoundsRpcRow = TimePeriodBoundsRpc["Returns"][number]
-type TimePeriodBoundsRpcResult = {
-  data: TimePeriodBoundsRpcRow | null
-  error: unknown
-}
-type TimePeriodBoundsRpcQuery = PromiseLike<TimePeriodBoundsRpcResult> & {
-  abortSignal?: (signal: AbortSignal) => TimePeriodBoundsRpcQuery
-}
-type RpcClient = {
-  rpc: (fn: string, args: Record<string, unknown>) => {
-    maybeSingle: () => TimePeriodBoundsRpcQuery
-  }
 }
 
 export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
@@ -96,26 +74,40 @@ export const isBaseTimePeriod = (value: unknown): value is BaseTimePeriod =>
 export const resolveTimePeriod = (value: unknown, fallback: TimePeriod = DEFAULT_TIME_PERIOD): TimePeriod =>
   parseTimePeriodUrlValue(value) ?? fallback
 
-const withAbortSignal = (query: TimePeriodBoundsRpcQuery, signal?: AbortSignal): TimePeriodBoundsRpcQuery => {
-  if (!signal || typeof query.abortSignal !== "function") return query
-  return query.abortSignal(signal)
+type TimePeriodBoundsRpc = Database["public"]["Functions"]["api_time_period_bounds_scoped"]
+type TimePeriodBoundsRpcRow = TimePeriodBoundsRpc["Returns"][number]
+
+type TimePeriodBoundsRpcQuery = PromiseLike<{
+  data: TimePeriodBoundsRpcRow[] | null
+  error: unknown
+}> & {
+  abortSignal?: (signal: AbortSignal) => TimePeriodBoundsRpcQuery
 }
 
-const mapTimeBoundsRow = (row: TimePeriodBoundsRpcRow | null): TimeBounds => ({
-  start: row?.input_start_date ?? null,
-  end: row?.input_end_date ?? null,
-  anchorScope: row?.anchor_scope ?? null,
-  latestAvailableDate: row?.latest_available_date ?? null,
-  availableFromDate: row?.available_from_date ?? null,
-  requestedDays: row?.requested_days ?? null,
-  availableDays: row?.available_days ?? null,
-  resolvedDays: row?.resolved_days ?? null,
-  stalenessDays: row?.staleness_days ?? null,
-  isTruncated: row?.is_truncated ?? null,
-})
+type TimePeriodBoundsRpcClient = {
+  rpc: (
+    name: "api_time_period_bounds_scoped",
+    args: TimePeriodBoundsRpc["Args"],
+  ) => TimePeriodBoundsRpcQuery
+}
+
+function mapTimeBoundsRow(row: TimePeriodBoundsRpcRow | null | undefined): TimeBounds {
+  return {
+    start: row?.input_start_date ?? null,
+    end: row?.input_end_date ?? null,
+    anchorScope: row?.anchor_scope ?? null,
+    latestAvailableDate: row?.latest_available_date ?? null,
+    availableFromDate: row?.available_from_date ?? null,
+    requestedDays: row?.requested_days ?? null,
+    availableDays: row?.available_days ?? null,
+    resolvedDays: row?.resolved_days ?? null,
+    stalenessDays: row?.staleness_days ?? null,
+    isTruncated: row?.is_truncated ?? null,
+  }
+}
 
 export async function fetchTimePeriodBounds(
-  supabase: RpcClient,
+  supabase: unknown,
   params: {
     farmId: string
     timePeriod: TimePeriod
@@ -125,24 +117,21 @@ export async function fetchTimePeriodBounds(
     signal?: AbortSignal
   },
 ): Promise<TimeBounds> {
-  const query = withAbortSignal(
-    supabase
-      .rpc("api_time_period_bounds_scoped", {
-        p_farm_id: params.farmId,
-        p_time_period: params.timePeriod,
-        p_anchor_date: params.anchorDate ?? null,
-        p_scope: params.scope ?? "dashboard",
-        p_system_id: params.systemId ?? null,
-      })
-      .maybeSingle(),
-    params.signal,
-  )
-
-  const { data, error } = await query
-
-  if (error) {
-    return { start: null, end: null }
+  const client = supabase as TimePeriodBoundsRpcClient
+  let query = client.rpc("api_time_period_bounds_scoped", {
+    p_farm_id: params.farmId,
+    p_time_period: params.timePeriod,
+    p_scope: params.scope ?? "dashboard",
+    p_anchor_date: params.anchorDate ?? undefined,
+    p_system_id: params.systemId ?? undefined,
+  })
+  if (params.signal && typeof query.abortSignal === "function") {
+    query = query.abortSignal(params.signal)
   }
 
-  return mapTimeBoundsRow(data as TimePeriodBoundsRpcRow | null)
+  const { data, error } = await query
+  if (params.signal?.aborted) return { start: null, end: null }
+  if (error) return { start: null, end: null }
+
+  return mapTimeBoundsRow(data?.[0])
 }

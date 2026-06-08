@@ -1,20 +1,10 @@
-import type { Enums } from "@/lib/types/database"
+import { Constants, type Enums } from "@/lib/types/database"
 
 export type StageFilter = "all" | Enums<"system_growth_stage">
 
-export const GROWTH_STAGE_VALUES = [
-  "fingerling",
-  "juvenile",
-  "sub_adult",
-  "broodstock",
-] as const satisfies readonly Enums<"system_growth_stage">[]
+export const GROWTH_STAGE_VALUES = Constants.public.Enums.system_growth_stage
 
-export const BIOLOGICAL_GROWTH_STAGE_VALUES = [
-  "fingerling",
-  "juvenile",
-  "sub_adult",
-  "broodstock",
-] as const satisfies readonly Enums<"system_growth_stage">[]
+export const BIOLOGICAL_GROWTH_STAGE_VALUES = Constants.public.Enums.system_growth_stage
 
 export function formatGrowthStage(value: StageFilter | string | null | undefined) {
   switch (value) {

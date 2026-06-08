@@ -19,6 +19,7 @@ import { toast } from "@/lib/hooks/app/use-toast"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useCreateSystem } from "@/lib/hooks/use-system"
 import { BIOLOGICAL_GROWTH_STAGE_VALUES, formatGrowthStage } from "@/lib/stage-filter"
+import { FORM_SYSTEM_TYPES } from "@/lib/system-types"
 import type { Database } from "@/lib/types/database"
 
 type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
@@ -31,8 +32,8 @@ const formSchema = z.object({
     commissioned_at: z.string().min(1, "Date is required"),
     unit: z.string().trim().min(1, "Cage Unit is required"),
     name: z.string().min(1, "Name is required"),
-    type: z.enum(["rectangular_cage", "circular_cage", "pond", "tank"]),
-    growth_stage: z.enum(["fingerling", "juvenile", "sub_adult", "broodstock"]),
+    type: z.enum(FORM_SYSTEM_TYPES),
+    growth_stage: z.enum(BIOLOGICAL_GROWTH_STAGE_VALUES),
     volume: z.coerce.number().min(0).optional(),
     depth: z.coerce.number().min(0).optional(),
 })

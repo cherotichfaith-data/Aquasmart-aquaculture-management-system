@@ -5,6 +5,7 @@ import { apiRateLimits } from "@/lib/server/rate-limit"
 import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { Constants } from "@/lib/types/database"
 
 const harvestSchema = z.object({
   system_id: z.number().int().positive(),
@@ -12,7 +13,7 @@ const harvestSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   number_of_fish_harvest: z.number().int().positive(),
   total_weight_harvest: z.number().positive(),
-  type_of_harvest: z.enum(["partial", "final"]),
+  type_of_harvest: z.enum(Constants.public.Enums.type_of_harvest),
   abw: z.number().positive().nullable().optional(),
   local_id: z.string().max(128).optional(),
 })

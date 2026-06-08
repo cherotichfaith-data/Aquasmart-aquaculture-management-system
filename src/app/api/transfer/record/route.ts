@@ -5,12 +5,13 @@ import { apiRateLimits } from "@/lib/server/rate-limit"
 import { getSystemFarmIds, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 
 const transferSchema = z.object({
   origin_system_id: z.number().int().positive(),
   target_system_id: z.number().int().positive().nullable().optional(),
   external_target_name: z.string().max(200).nullable().optional(),
-  transfer_type: z.enum(["transfer", "grading", "density_thinning", "external_out"]),
+  transfer_type: z.enum(UI_TRANSFER_TYPES),
   batch_id: z.number().int().positive().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   number_of_fish_transfer: z.number().positive(),

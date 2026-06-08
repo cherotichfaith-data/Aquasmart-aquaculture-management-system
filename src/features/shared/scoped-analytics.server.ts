@@ -70,22 +70,34 @@ export async function getScopedBatchSystems(
 ): Promise<Array<{ system_id: number }>> {
   if (!batchId || !Number.isFinite(batchId)) return []
 
-  const { data, error } = await supabase
-    .from("fish_stocking")
-    .select("system_id")
-    .eq("batch_id", batchId)
-    .not("system_id", "is", null)
+  const [cycles, stockings, feeding, sampling, mortality, harvests, transfers] = await Promise.all([
+    supabase.from("production_cycle").select("system_id").eq("batch_id", batchId),
+    supabase.from("fish_stocking").select("system_id").eq("batch_id", batchId),
+    supabase.from("feeding_record").select("system_id").eq("batch_id", batchId),
+    supabase.from("fish_sampling_weight").select("system_id").eq("batch_id", batchId),
+    supabase.from("fish_mortality").select("system_id").eq("batch_id", batchId),
+    supabase.from("fish_harvest").select("system_id").eq("batch_id", batchId),
+    supabase
+      .from("fish_transfer")
+      .select("origin_system_id, target_system_id")
+      .eq("batch_id", batchId),
+  ])
 
-  if (error) {
-    throw error
-  }
+  const firstError = [cycles, stockings, feeding, sampling, mortality, harvests, transfers].find((result) => result.error)
+  if (firstError?.error) throw firstError.error
 
-  const stockedIds = Array.from(
-    new Set((data ?? []).map((row) => row.system_id).filter((id): id is number => typeof id === "number")),
-  )
-  if (stockedIds.length === 0) return []
+  const lineageIds = new Set<number>()
+  ;[cycles.data, stockings.data, feeding.data, sampling.data, mortality.data, harvests.data].forEach((rows) => {
+    ;(rows ?? []).forEach((row) => {
+      if (typeof row.system_id === "number" && Number.isFinite(row.system_id)) lineageIds.add(row.system_id)
+    })
+  })
+  ;(transfers.data ?? []).forEach((row) => {
+    if (typeof row.origin_system_id === "number" && Number.isFinite(row.origin_system_id)) lineageIds.add(row.origin_system_id)
+    if (typeof row.target_system_id === "number" && Number.isFinite(row.target_system_id)) lineageIds.add(row.target_system_id)
+  })
+  if (lineageIds.size === 0) return []
 
-  const lineageIds = new Set(stockedIds)
   for (let depth = 0; depth < 3; depth += 1) {
     const sourceIds = Array.from(lineageIds)
     const { data: transferRows, error: transferError } = await supabase

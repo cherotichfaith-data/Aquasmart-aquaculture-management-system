@@ -1680,20 +1680,6 @@ export type Database = {
           system_volume: number
         }[]
       }
-      api_daily_overlay: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_id?: number
-        }
-        Returns: {
-          feeding_amount: number
-          inventory_date: string
-          number_of_fish_mortality: number
-          system_id: number
-        }[]
-      }
       api_dashboard_consolidated: {
         Args: {
           p_end_date?: string
@@ -1806,21 +1792,6 @@ export type Database = {
           updated_at: string
         }[]
       }
-      api_feed_demand_forecast: {
-        Args: { p_days_ahead?: number; p_farm_id: string }
-        Returns: {
-          avg_daily_kg: number
-          current_stock_kg: number
-          days_of_stock: number
-          feed_category: string
-          feed_line: string
-          feed_pellet_size: string
-          feed_type_id: number
-          forecast_7d_kg: number
-          forecast_total_kg: number
-          stock_status: string
-        }[]
-      }
       api_feed_fcr_intervals: {
         Args: {
           p_date_from?: string
@@ -1882,7 +1853,7 @@ export type Database = {
         }[]
       }
       api_fingerling_batch_options_rpc: {
-        Args: { p_farm_id?: string }
+        Args: { p_active_only?: boolean; p_farm_id?: string }
         Returns: {
           abw: number
           date_of_delivery: string
@@ -1926,11 +1897,11 @@ export type Database = {
         Args: { p_date_from?: string; p_date_to?: string; p_farm_id: string }
         Returns: {
           basis: string
-          coverage_label: string
-          data_source: string
+          covered: number
           kpi_key: string
-          systems_covered: number
-          systems_total: number
+          label: string
+          source: string
+          total: number
         }[]
       }
       api_latest_water_quality_status: {
@@ -2023,30 +1994,6 @@ export type Database = {
           unit: string
         }[]
       }
-      api_report_production_summary: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_id?: number
-        }
-        Returns: {
-          abw_period_count: number
-          avg_abw_g: number
-          biomass_density: number
-          efcr_aggregated: number
-          efcr_period: number
-          period_end: string
-          period_start: string
-          system_id: number
-          system_name: string
-          total_biomass_end_kg: number
-          total_biomass_start_kg: number
-          total_feed_kg: number
-          total_harvested_kg: number
-          total_mortality_count: number
-        }[]
-      }
       api_running_stock: {
         Args: { p_farm_id: string }
         Returns: {
@@ -2058,28 +2005,6 @@ export type Database = {
           last_delivery_date: string
           pellet_size: string
           stock_status: string
-        }[]
-      }
-      api_sampling_period_abw: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_id?: number
-        }
-        Returns: {
-          abw_count: number
-          abw_variance: number
-          avg_abw_g: number
-          last_abw_g: number
-          last_sample_date: string
-          max_abw_g: number
-          min_abw_g: number
-          period_end: string
-          period_start: string
-          system_id: number
-          system_name: string
-          total_fish: number
         }[]
       }
       api_system_options_rpc: {
@@ -2147,23 +2072,13 @@ export type Database = {
           p_system_id?: number
         }
         Returns: {
-          do_score: number
           measurement_days: number
           period_end: string
           period_start: string
-          ph_score: number
           system_id: number
           system_name: string
-          temp_score: number
           wqi_grade: string
           wqi_score: number
-        }[]
-      }
-      api_water_quality_sync_status: {
-        Args: { p_farm_id: string }
-        Returns: {
-          latest_measurement_ts: string
-          latest_rating_date: string
         }[]
       }
       api_water_quality_trend: {

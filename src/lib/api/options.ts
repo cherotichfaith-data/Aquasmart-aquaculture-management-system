@@ -11,10 +11,7 @@ import {
   type OptionsRpcName,
 } from "@/lib/api/_utils"
 import {
-  mapSystemRowToOption,
-  sortSystemsByCurrentProduction,
   type SystemOption,
-  type SystemOptionSource,
 } from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import type { WorkspaceContext } from "@/lib/context"
@@ -34,9 +31,6 @@ type FingerlingSupplierRow = Omit<FingerlingSupplierTableRow, "location_city"> &
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
-type FishStockingRow = Database["public"]["Tables"]["fish_stocking"]["Row"]
-type FishTransferRow = Database["public"]["Tables"]["fish_transfer"]["Row"]
-type ProductionCycleRow = Database["public"]["Tables"]["production_cycle"]["Row"]
 type OptionsRpcRow<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Returns"][number]
 type OptionsRpcArgs<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Args"]
 
@@ -57,69 +51,6 @@ function normalizeFingerlingSupplierOptions(
     location_city: row.location_city ?? "",
     location_country: row.location_country,
   }))
-}
-
-async function getFirstStockingDateBySystemId(
-  supabase: SupabaseClient<Database>,
-  systemIds: number[],
-  signal?: AbortSignal,
-) {
-  const firstStockingBySystemId = new Map<number, string>()
-  if (systemIds.length === 0) return firstStockingBySystemId
-
-  let stockingQuery = supabase
-    .from("fish_stocking")
-    .select("system_id, date")
-    .in("system_id", systemIds)
-    .order("date", { ascending: true })
-  if (signal) stockingQuery = stockingQuery.abortSignal(signal)
-
-  const stockingResult = await resolveClientReadQuery<Pick<FishStockingRow, "date" | "system_id">>({
-    tag: "getFirstStockingDateBySystemId",
-    query: stockingQuery,
-    signal,
-    quietWhen: isQuietTableError,
-  })
-  if (stockingResult.status !== "success") return firstStockingBySystemId
-
-  stockingResult.data.forEach((row) => {
-    if (typeof row.system_id !== "number" || !row.date || firstStockingBySystemId.has(row.system_id)) return
-    firstStockingBySystemId.set(row.system_id, row.date)
-  })
-
-  return firstStockingBySystemId
-}
-
-async function getProductionStartBySystemId(
-  supabase: SupabaseClient<Database>,
-  systemIds: number[],
-  signal?: AbortSignal,
-) {
-  const productionStartBySystemId = await getFirstStockingDateBySystemId(supabase, systemIds, signal)
-  const missingSystemIds = systemIds.filter((id) => !productionStartBySystemId.has(id))
-  if (missingSystemIds.length === 0) return productionStartBySystemId
-
-  let cycleQuery = supabase
-    .from("production_cycle")
-    .select("system_id, cycle_start")
-    .in("system_id", missingSystemIds)
-    .order("cycle_start", { ascending: false })
-  if (signal) cycleQuery = cycleQuery.abortSignal(signal)
-
-  const cycleResult = await resolveClientReadQuery<Pick<ProductionCycleRow, "cycle_start" | "system_id">>({
-    tag: "getProductionStartBySystemId:cycles",
-    query: cycleQuery,
-    signal,
-    quietWhen: isQuietTableError,
-  })
-  if (cycleResult.status !== "success") return productionStartBySystemId
-
-  cycleResult.data.forEach((row) => {
-    if (typeof row.system_id !== "number" || !row.cycle_start || productionStartBySystemId.has(row.system_id)) return
-    productionStartBySystemId.set(row.system_id, row.cycle_start)
-  })
-
-  return productionStartBySystemId
 }
 
 /**
@@ -175,27 +106,18 @@ export async function getSystemOptions(params?: {
   })
   if (result.status !== "success") return result
 
-  const sourceRows: SystemOptionSource[] = result.data.map((row) => ({
+  const rows: SystemListItem[] = result.data.map((row) => ({
     cage_status: null,
-    commissioned_at: null,
     farm_id: row.farm_id,
+    farm_name: row.farm_name ?? "",
     growth_stage: row.growth_stage,
     id: row.id,
     is_active: row.is_active,
+    label: row.label || row.name || row.unit || "Missing cage name",
     name: row.name ?? null,
-    type: row.type as SystemOptionSource["type"],
+    type: row.type,
     unit: row.unit ?? null,
   }))
-  const productionStartBySystemId = await getProductionStartBySystemId(
-    supabase,
-    sourceRows.map((row) => row.id).filter((id): id is number => typeof id === "number"),
-    params.signal,
-  )
-
-  const rows = sortSystemsByCurrentProduction(
-    sourceRows.map((row) => ({ ...row, production_start: productionStartBySystemId.get(row.id) ?? null })),
-  )
-    .map(mapSystemRowToOption)
   return toQuerySuccess<SystemListItem>(rows)
 }
 
@@ -210,130 +132,16 @@ export async function getBatchOptions(params?: {
   const res = await rpcOrEmpty(
     "getBatchOptions",
     "api_fingerling_batch_options_rpc",
-    { p_farm_id: farmId },
+    { p_farm_id: farmId, p_active_only: params.activeOnly ?? true },
     params?.signal,
   )
   if (res.status !== "success") return res
 
-  let rows = res.data
+  const rows = res.data
     .slice()
     .sort((a, b) => String(b.date_of_delivery ?? "").localeCompare(String(a.date_of_delivery ?? "")))
 
-  if (params.activeOnly ?? true) {
-    const currentBatchScope = await getCurrentProductionBatchScope(farmId, params.signal)
-    rows = rows.filter((row) => {
-      const systemStart = currentBatchScope.systemStartById.get(row.system_id)
-      if (!systemStart) return false
-      return currentBatchScope.batchIds.has(row.id) || String(row.date_of_delivery ?? "") >= systemStart
-    })
-  }
-
   return toQuerySuccess<BatchListItem>(rows)
-}
-
-async function getCurrentProductionBatchScope(
-  farmId: string,
-  signal?: AbortSignal,
-): Promise<{ batchIds: Set<number>; systemStartById: Map<number, string> }> {
-  const emptyScope = { batchIds: new Set<number>(), systemStartById: new Map<number, string>() }
-  const clientResult = await getClientOrError("getCurrentProductionBatchScope", { requireSession: true })
-  if ("error" in clientResult) return emptyScope
-  const { supabase } = clientResult
-
-  let activeQuery = supabase
-    .from("system")
-    .select("id, commissioned_at")
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
-  if (signal) activeQuery = activeQuery.abortSignal(signal)
-  const activeSystems = await resolveClientReadQuery<Pick<SystemRow, "id" | "commissioned_at">>({
-    tag: "getCurrentProductionBatchScope:systems",
-    query: activeQuery,
-    signal,
-    quietWhen: isQuietTableError,
-  })
-  if (activeSystems.status !== "success") return emptyScope
-
-  const activeSystemStartById = new Map(
-    activeSystems.data
-      .filter((row): row is Pick<SystemRow, "id" | "commissioned_at"> & { id: number } =>
-        typeof row.id === "number" && Number.isFinite(row.id),
-      )
-      .map((row) => [row.id, row.commissioned_at ?? "0001-01-01"]),
-  )
-  const activeSystemIds = Array.from(activeSystemStartById.keys())
-  if (activeSystemIds.length === 0) return emptyScope
-
-  const batchIds = new Set<number>()
-
-  let transferQuery = supabase
-    .from("fish_transfer")
-    .select("batch_id, target_system_id, date")
-    .in("target_system_id", activeSystemIds)
-  if (signal) transferQuery = transferQuery.abortSignal(signal)
-
-  const transfers = await resolveClientReadQuery<Pick<FishTransferRow, "batch_id" | "target_system_id" | "date">>({
-    tag: "getCurrentProductionBatchScope:transfers",
-    query: transferQuery,
-    signal,
-    quietWhen: isQuietTableError,
-  })
-  if (transfers.status === "success") {
-    transfers.data.forEach((row) => {
-      if (typeof row.batch_id !== "number" || typeof row.target_system_id !== "number") return
-      if (String(row.date ?? "") >= (activeSystemStartById.get(row.target_system_id) ?? "0001-01-01")) {
-        batchIds.add(row.batch_id)
-      }
-    })
-  }
-
-  let stockingQuery = supabase
-    .from("fish_stocking")
-    .select("batch_id, system_id, date")
-    .in("system_id", activeSystemIds)
-  if (signal) stockingQuery = stockingQuery.abortSignal(signal)
-
-  const stockings = await resolveClientReadQuery<Pick<FishStockingRow, "batch_id" | "system_id" | "date">>({
-    tag: "getCurrentProductionBatchScope:stocking",
-    query: stockingQuery,
-    signal,
-    quietWhen: isQuietTableError,
-  })
-  if (stockings.status === "success") {
-    stockings.data.forEach((row) => {
-      if (typeof row.batch_id !== "number" || typeof row.system_id !== "number") return
-      if (String(row.date ?? "") >= (activeSystemStartById.get(row.system_id) ?? "0001-01-01")) {
-        batchIds.add(row.batch_id)
-      }
-    })
-  }
-
-  return { batchIds, systemStartById: activeSystemStartById }
-}
-
-async function getExistingFeedTypeIds(
-  farmId: string,
-  signal?: AbortSignal,
-): Promise<Set<number> | null> {
-  const clientResult = await getClientOrError("getExistingFeedTypeIds", { requireSession: true })
-  if ("error" in clientResult) return null
-  const { supabase } = clientResult
-
-  let query = supabase
-    .from("feed_type")
-    .select("id")
-    .or(`farm_id.eq.${farmId},farm_id.is.null`)
-  if (signal) query = query.abortSignal(signal)
-
-  const result = await resolveClientReadQuery<Pick<Database["public"]["Tables"]["feed_type"]["Row"], "id">>({
-    tag: "getExistingFeedTypeIds",
-    query,
-    signal,
-    quietWhen: isQuietTableError,
-  })
-  if (result.status !== "success") return null
-
-  return new Set(result.data.map((row) => row.id).filter((id): id is number => typeof id === "number"))
 }
 
 export async function getDashboardTimePeriodOptions(params?: {
@@ -381,9 +189,8 @@ export async function getFeedTypeOptions(params?: {
   )
   if (res.status !== "success") return res
 
-  const existingFeedTypeIds = await getExistingFeedTypeIds(params.farmId, params.signal)
   const rows = res.data
-    .filter((row) => typeof row.id === "number" && (existingFeedTypeIds ? existingFeedTypeIds.has(row.id) : true))
+    .filter((row) => typeof row.id === "number")
     .slice()
     .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
   return toQuerySuccess<FeedTypeOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)

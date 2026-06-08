@@ -19,6 +19,7 @@ import type { Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
+import { TRANSFER_TYPE_LABELS, UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import {
   calculateAbw,
@@ -36,7 +37,7 @@ const formSchema = z.object({
   origin_system_id: z.string().min(1, "Origin cage is required"),
   target_system_id: z.string().optional(),
   external_target_name: z.string().optional(),
-  transfer_type: z.enum(["transfer", "grading", "density_thinning", "external_out"]),
+  transfer_type: z.enum(UI_TRANSFER_TYPES),
   batch_id: z.string().optional(),
   date: z.string().min(1, "Date is required"),
   number_of_fish: z.coerce.number().min(1, "Count must be positive"),
@@ -62,13 +63,6 @@ const formSchema = z.object({
     })
   }
 })
-
-const TRANSFER_TYPE_OPTIONS = [
-  { value: "transfer", label: "Transfer" },
-  { value: "grading", label: "Grading" },
-  { value: "density_thinning", label: "Density thinning" },
-  { value: "external_out", label: "External out" },
-] as const
 
 interface TransferFormProps {
   farmId: string | null
@@ -295,9 +289,9 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {TRANSFER_TYPE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                      {UI_TRANSFER_TYPES.map((transferType) => (
+                        <SelectItem key={transferType} value={transferType}>
+                          {TRANSFER_TYPE_LABELS[transferType]}
                         </SelectItem>
                       ))}
                     </SelectContent>
