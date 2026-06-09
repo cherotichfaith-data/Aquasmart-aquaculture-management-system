@@ -36,6 +36,7 @@ export type KpiRpcName =
  * Option RPCs (replacing PostgREST option views where possible).
  */
 export type OptionsRpcName =
+  | "api_batch_system_ids"
   | "api_farm_options_rpc"
   | "api_system_options_rpc"
   | "api_fingerling_batch_options_rpc"

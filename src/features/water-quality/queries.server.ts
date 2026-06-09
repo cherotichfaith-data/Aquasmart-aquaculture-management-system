@@ -19,9 +19,9 @@ import {
   getScopedSystemOptions,
   getScopedTimeBounds,
   parseSelectedNumericId,
-  resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
 import {
   DEFAULT_WQ_PARAMETER,
@@ -144,7 +144,7 @@ async function loadWaterQualityPageInitialData(
     >,
     getScopedBatchSystems(supabase, batchId),
   ])
-  const selectedSystemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systemOptions)
+  const selectedSystemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, systemOptions)
   const [bounds, latestStatus] = await Promise.all([
     getScopedTimeBounds(
       supabase,

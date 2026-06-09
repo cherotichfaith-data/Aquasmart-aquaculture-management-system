@@ -270,6 +270,93 @@ COMMENT ON FUNCTION "public"."after_event_update_inventory"() IS 'Registers affe
 
 
 
+CREATE OR REPLACE FUNCTION "public"."api_batch_system_ids"("p_batch_id" bigint) RETURNS TABLE("system_id" bigint)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
+    AS $$
+  with recursive
+  batch as (
+    select fb.id, fb.farm_id
+    from public.fingerling_batch fb
+    where fb.id = p_batch_id
+      and private.is_farm_member(fb.farm_id)
+  ),
+  direct_systems as (
+    select pc.system_id::bigint as system_id
+    from public.production_cycle pc
+    join batch b on b.id = pc.batch_id
+    where pc.system_id is not null
+
+    union
+    select fs.system_id::bigint
+    from public.fish_stocking fs
+    join batch b on b.id = fs.batch_id
+    where fs.system_id is not null
+
+    union
+    select fr.system_id::bigint
+    from public.feeding_record fr
+    join batch b on b.id = fr.batch_id
+    where fr.system_id is not null
+
+    union
+    select sw.system_id::bigint
+    from public.fish_sampling_weight sw
+    join batch b on b.id = sw.batch_id
+    where sw.system_id is not null
+
+    union
+    select fm.system_id::bigint
+    from public.fish_mortality fm
+    join batch b on b.id = fm.batch_id
+    where fm.system_id is not null
+
+    union
+    select fh.system_id::bigint
+    from public.fish_harvest fh
+    join batch b on b.id = fh.batch_id
+    where fh.system_id is not null
+
+    union
+    select ft.origin_system_id::bigint
+    from public.fish_transfer ft
+    join batch b on b.id = ft.batch_id
+    where ft.origin_system_id is not null
+
+    union
+    select ft.target_system_id::bigint
+    from public.fish_transfer ft
+    join batch b on b.id = ft.batch_id
+    where ft.target_system_id is not null
+  ),
+  lineage(system_id, depth) as (
+    select ds.system_id, 0
+    from direct_systems ds
+
+    union
+    select ft.target_system_id::bigint, l.depth + 1
+    from lineage l
+    join public.fish_transfer ft on ft.origin_system_id = l.system_id
+    join batch b on b.id = ft.batch_id
+    where ft.target_system_id is not null
+      and l.depth < 12
+  )
+  select distinct s.id::bigint as system_id
+  from lineage l
+  join public.system s on s.id = l.system_id
+  join batch b on b.farm_id = s.farm_id
+  where s.is_active = true
+  order by s.id;
+$$;
+
+
+ALTER FUNCTION "public"."api_batch_system_ids"("p_batch_id" bigint) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."api_batch_system_ids"("p_batch_id" bigint) IS 'Returns active system ids associated with a fingerling batch, including transfer lineage, with farm membership enforced in SQL.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "system_name" "text", "current_cycle_start" "date", "current_efcr" double precision, "current_adg_g_day" double precision, "current_survival_pct" double precision, "current_abw_g" double precision, "current_days_in_cycle" integer, "best_efcr" double precision, "best_efcr_cycle_start" "date", "best_adg_g_day" double precision, "best_survival_pct" double precision, "efcr_vs_best" double precision, "adg_vs_best" double precision, "survival_vs_best" double precision, "benchmark_label" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
@@ -630,10 +717,11 @@ $$;
 ALTER FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date", "p_time_period" "text", "p_limit" integer, "p_order_desc" boolean) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "growth_stage" "public"."system_growth_stage", "input_start_date" "date", "input_end_date" "date", "as_of_date" "date", "fish_end" double precision, "biomass_end" double precision, "sampling_end_date" "date", "sample_age_days" integer, "efcr" double precision, "efcr_date" "date", "feed_total" double precision, "abw" double precision, "abw_delta" double precision, "abw_trend" "text", "feeding_rate" double precision, "mortality_rate" double precision, "biomass_density" double precision, "missing_days_count" integer, "water_quality_rating_average" "text", "water_quality_rating_numeric_average" double precision, "water_quality_latest_date" "date", "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text")
+CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint, "p_stage" "public"."system_growth_stage" DEFAULT NULL::"public"."system_growth_stage", "p_start_date" "date" DEFAULT NULL::"date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS TABLE("system_id" bigint, "system_name" "text", "growth_stage" "public"."system_growth_stage", "input_start_date" "date", "input_end_date" "date", "as_of_date" "date", "fish_end" double precision, "biomass_end" double precision, "sampling_end_date" "date", "sample_age_days" integer, "efcr" double precision, "efcr_date" "date", "feed_total" double precision, "abw" double precision, "abw_delta" double precision, "abw_trend" "text", "feeding_rate" double precision, "mortality_rate" double precision, "biomass_density" double precision, "missing_days_count" integer, "water_quality_rating_average" "text", "water_quality_rating_numeric_average" double precision, "water_quality_latest_date" "date", "worst_parameter" "text", "worst_parameter_value" double precision, "worst_parameter_unit" "text", "is_complete" boolean)
     LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'pg_catalog', 'public', 'analytics'
+    SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
     AS $$
+
   WITH sys AS (
     SELECT s.id AS system_id, s.name AS system_name, s.growth_stage
     FROM public.system s
@@ -796,7 +884,16 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
     wl.latest_date AS water_quality_latest_date,
     wl.worst_parameter,
     wl.worst_parameter_value,
-    wl.worst_parameter_unit
+    wl.worst_parameter_unit,
+    -- H5: is_complete — frontend uses this instead of recomputing KPI completeness
+    CASE WHEN
+      snap.fish_end IS NOT NULL AND snap.fish_end > 0
+      AND snap.biomass_end IS NOT NULL
+      AND pf.feed_total IS NOT NULL
+      AND pl.efcr IS NOT NULL
+      AND snap.abw IS NOT NULL
+      AND snap.biomass_density IS NOT NULL
+    THEN true ELSE false END AS is_complete
   FROM sys
   CROSS JOIN bounds b
   LEFT JOIN snap ON snap.system_id = sys.system_id
@@ -808,6 +905,7 @@ CREATE OR REPLACE FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", 
   LEFT JOIN wq_avg wa ON wa.system_id = sys.system_id
   LEFT JOIN wq_latest wl ON wl.system_id = sys.system_id
   ORDER BY sys.system_name;
+
 $$;
 
 
@@ -1745,6 +1843,161 @@ $$;
 
 
 ALTER FUNCTION "public"."api_production_trend"("p_farm_id" "uuid", "p_system_id" bigint, "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."api_recent_activity_feed"("p_farm_id" "uuid", "p_limit" integer DEFAULT 50, "p_mode" "text" DEFAULT 'flat'::"text", "p_date_from" "date" DEFAULT NULL::"date", "p_date_to" "date" DEFAULT NULL::"date", "p_table" "text" DEFAULT NULL::"text") RETURNS TABLE("id" bigint, "table_name" "text", "activity_date" "date", "system_id" bigint, "batch_id" bigint, "notes" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'pg_temp'
+    AS $$
+WITH farm_systems AS (
+  SELECT s.id AS system_id
+  FROM public.system s
+  WHERE s.farm_id = p_farm_id
+),
+
+activity AS (
+
+  -- feeding_record
+  SELECT
+    fr.id::bigint,
+    'feeding_record'::text          AS table_name,
+    fr.date::date                   AS activity_date,
+    fr.system_id::bigint,
+    fr.batch_id::bigint,
+    fr.notes::text
+  FROM public.feeding_record fr
+  JOIN farm_systems fs ON fs.system_id = fr.system_id
+  WHERE (p_date_from IS NULL OR fr.date >= p_date_from)
+    AND (p_date_to   IS NULL OR fr.date <= p_date_to)
+    AND (p_table IS NULL OR p_table = 'feeding_record')
+
+  UNION ALL
+
+  -- fish_mortality
+  SELECT
+    fm.id::bigint,
+    'fish_mortality'::text,
+    fm.date::date,
+    fm.system_id::bigint,
+    fm.batch_id::bigint,
+    fm.notes::text
+  FROM public.fish_mortality fm
+  JOIN farm_systems fs ON fs.system_id = fm.system_id
+  WHERE (p_date_from IS NULL OR fm.date >= p_date_from)
+    AND (p_date_to   IS NULL OR fm.date <= p_date_to)
+    AND (p_table IS NULL OR p_table = 'fish_mortality')
+
+  UNION ALL
+
+  -- fish_sampling_weight
+  SELECT
+    sw.id::bigint,
+    'fish_sampling_weight'::text,
+    sw.date::date,
+    sw.system_id::bigint,
+    sw.batch_id::bigint,
+    sw.notes::text
+  FROM public.fish_sampling_weight sw
+  JOIN farm_systems fs ON fs.system_id = sw.system_id
+  WHERE (p_date_from IS NULL OR sw.date >= p_date_from)
+    AND (p_date_to   IS NULL OR sw.date <= p_date_to)
+    AND (p_table IS NULL OR p_table = 'fish_sampling_weight')
+
+  UNION ALL
+
+  -- fish_stocking
+  SELECT
+    fst.id::bigint,
+    'fish_stocking'::text,
+    fst.date::date,
+    fst.system_id::bigint,
+    fst.batch_id::bigint,
+    fst.notes::text
+  FROM public.fish_stocking fst
+  JOIN farm_systems fs ON fs.system_id = fst.system_id
+  WHERE (p_date_from IS NULL OR fst.date >= p_date_from)
+    AND (p_date_to   IS NULL OR fst.date <= p_date_to)
+    AND (p_table IS NULL OR p_table = 'fish_stocking')
+
+  UNION ALL
+
+  -- fish_harvest
+  SELECT
+    fh.id::bigint,
+    'fish_harvest'::text,
+    fh.date::date,
+    fh.system_id::bigint,
+    fh.batch_id::bigint,
+    NULL::text
+  FROM public.fish_harvest fh
+  JOIN farm_systems fs ON fs.system_id = fh.system_id
+  WHERE (p_date_from IS NULL OR fh.date >= p_date_from)
+    AND (p_date_to   IS NULL OR fh.date <= p_date_to)
+    AND (p_table IS NULL OR p_table = 'fish_harvest')
+
+  UNION ALL
+
+  -- fish_transfer (use origin system for scoping)
+  SELECT
+    ft.id::bigint,
+    'fish_transfer'::text,
+    ft.date::date,
+    ft.origin_system_id::bigint,
+    ft.batch_id::bigint,
+    ft.notes::text
+  FROM public.fish_transfer ft
+  JOIN farm_systems fs ON fs.system_id = ft.origin_system_id
+  WHERE (p_date_from IS NULL OR ft.date >= p_date_from)
+    AND (p_date_to   IS NULL OR ft.date <= p_date_to)
+    AND (p_table IS NULL OR p_table = 'fish_transfer')
+
+  UNION ALL
+
+  -- water_quality_measurement
+  SELECT
+    wq.id::bigint,
+    'water_quality_measurement'::text,
+    wq.date::date,
+    wq.system_id::bigint,
+    NULL::bigint,
+    NULL::text
+  FROM public.water_quality_measurement wq
+  JOIN farm_systems fs ON fs.system_id = wq.system_id
+  WHERE (p_date_from IS NULL OR wq.date >= p_date_from)
+    AND (p_date_to   IS NULL OR wq.date <= p_date_to)
+    AND (p_table IS NULL OR p_table = 'water_quality_measurement')
+
+  UNION ALL
+
+  -- feed_inventory (farm-scoped, no system_id)
+  SELECT
+    fi.id::bigint,
+    'feed_inventory'::text,
+    fi.inventory_date::date,
+    NULL::bigint,
+    NULL::bigint,
+    fi.comments::text
+  FROM public.feed_inventory fi
+  WHERE fi.farm_id = p_farm_id
+    AND (p_date_from IS NULL OR fi.inventory_date >= p_date_from)
+    AND (p_date_to   IS NULL OR fi.inventory_date <= p_date_to)
+    AND (p_table IS NULL OR p_table = 'feed_inventory')
+)
+
+SELECT
+  a.id,
+  a.table_name,
+  a.activity_date,
+  a.system_id,
+  a.batch_id,
+  a.notes
+FROM activity a
+ORDER BY a.activity_date DESC, a.table_name, a.id DESC
+LIMIT COALESCE(p_limit, 50);
+$$;
+
+
+ALTER FUNCTION "public"."api_recent_activity_feed"("p_farm_id" "uuid", "p_limit" integer, "p_mode" "text", "p_date_from" "date", "p_date_to" "date", "p_table" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."api_recommended_actions"("p_farm_id" "uuid", "p_system_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("system_id" bigint, "system_name" "text", "metric_name" "text", "current_value" numeric, "threshold_low" numeric, "threshold_high" numeric, "unit" "text", "severity" "text", "context_json" "jsonb")
@@ -3335,6 +3588,33 @@ $$;
 ALTER FUNCTION "public"."set_sampling_weight_abw"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."set_stocking_abw"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+begin
+  if new.number_of_fish_stocking is null or new.number_of_fish_stocking <= 0 then
+    raise exception 'number_of_fish_stocking must be greater than zero';
+  end if;
+
+  if new.total_weight_stocking is null or new.total_weight_stocking <= 0 then
+    raise exception 'total_weight_stocking must be greater than zero';
+  end if;
+
+  new.abw := (new.total_weight_stocking * 1000.0) / new.number_of_fish_stocking;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."set_stocking_abw"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."set_stocking_abw"() IS 'Computes fish_stocking.abw from total_weight_stocking and number_of_fish_stocking so clients do not provide derived ABW.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."touch_affected_systems_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
@@ -3385,6 +3665,60 @@ $$;
 
 
 ALTER FUNCTION "public"."transfer_weight_kg"("p_total_weight_transfer" double precision, "p_number_of_fish_transfer" double precision, "p_abw" double precision) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."trg_compute_abw_harvest"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  IF NEW.total_weight_harvest IS NOT NULL
+     AND NEW.number_of_fish_harvest IS NOT NULL
+     AND NEW.number_of_fish_harvest > 0
+  THEN
+    NEW.abw := (NEW.total_weight_harvest * 1000.0) / NEW.number_of_fish_harvest;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."trg_compute_abw_harvest"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."trg_compute_abw_sampling"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  IF NEW.total_weight_sampling IS NOT NULL
+     AND NEW.number_of_fish_sampling IS NOT NULL
+     AND NEW.number_of_fish_sampling > 0
+  THEN
+    NEW.abw := (NEW.total_weight_sampling * 1000.0) / NEW.number_of_fish_sampling;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."trg_compute_abw_sampling"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."trg_compute_abw_transfer"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  IF NEW.total_weight_transfer IS NOT NULL
+     AND NEW.number_of_fish_transfer IS NOT NULL
+     AND NEW.number_of_fish_transfer > 0
+  THEN
+    NEW.abw := (NEW.total_weight_transfer * 1000.0) / NEW.number_of_fish_transfer;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."trg_compute_abw_transfer"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."trg_refresh_daily_water_quality_rating"() RETURNS "trigger"
@@ -4602,6 +4936,7 @@ CREATE TABLE IF NOT EXISTS "public"."feed_inventory" (
     "amount_of_bags" integer,
     "opened_bags" integer,
     "comments" "text",
+    "snapshot_kg" numeric GENERATED ALWAYS AS ("public"."feed_inventory_snapshot_kg"("bag_weight", "amount_of_bags", "opened_bags")) STORED,
     CONSTRAINT "feed_inventory_nonnegative_values" CHECK (((("bag_weight" IS NULL) OR ("bag_weight" >= 0)) AND (("amount_of_bags" IS NULL) OR ("amount_of_bags" >= 0)) AND (("opened_bags" IS NULL) OR ("opened_bags" >= 0))))
 );
 
@@ -4622,6 +4957,10 @@ COMMENT ON COLUMN "public"."feed_inventory"."amount_of_bags" IS 'Closed/full bag
 
 
 COMMENT ON COLUMN "public"."feed_inventory"."opened_bags" IS 'Remaining feed in opened bags, recorded in grams in the historical AquaSmart data.';
+
+
+
+COMMENT ON COLUMN "public"."feed_inventory"."snapshot_kg" IS 'Derived feed stock in kg, computed from bag_weight, amount_of_bags, and opened_bags via public.feed_inventory_snapshot_kg.';
 
 
 
@@ -4967,16 +5306,6 @@ ALTER TABLE "public"."farm_user"
 
 
 
-ALTER TABLE "public"."fish_transfer"
-    ADD CONSTRAINT "chk_transfer_origin" CHECK ((("origin_system_id" IS NOT NULL) OR ("external_origin_name" IS NOT NULL))) NOT VALID;
-
-
-
-ALTER TABLE "public"."fish_transfer"
-    ADD CONSTRAINT "chk_transfer_target" CHECK ((("target_system_id" IS NOT NULL) OR ("external_target_name" IS NOT NULL))) NOT VALID;
-
-
-
 ALTER TABLE ONLY "public"."daily_water_quality_rating"
     ADD CONSTRAINT "daily_water_quality_rating_pkey" PRIMARY KEY ("id");
 
@@ -5109,36 +5438,6 @@ ALTER TABLE "public"."fish_sampling_weight"
 
 ALTER TABLE ONLY "public"."fish_sampling_weight"
     ADD CONSTRAINT "fish_sampling_weight_local_id_key" UNIQUE ("local_id");
-
-
-
-ALTER TABLE "public"."fish_transfer"
-    ADD CONSTRAINT "fish_transfer_batch_required" CHECK (("batch_id" IS NOT NULL)) NOT VALID;
-
-
-
-ALTER TABLE "public"."fish_transfer"
-    ADD CONSTRAINT "fish_transfer_cycle_required" CHECK (("cycle_id" IS NOT NULL)) NOT VALID;
-
-
-
-ALTER TABLE "public"."fish_transfer"
-    ADD CONSTRAINT "fish_transfer_movement_type" CHECK (("transfer_type" = ANY (ARRAY['transfer'::"public"."transfer_type", 'grading'::"public"."transfer_type", 'density_thinning'::"public"."transfer_type", 'external_out'::"public"."transfer_type"]))) NOT VALID;
-
-
-
-ALTER TABLE "public"."fish_transfer"
-    ADD CONSTRAINT "fish_transfer_no_external_origin" CHECK (("external_origin_name" IS NULL)) NOT VALID;
-
-
-
-ALTER TABLE "public"."fish_transfer"
-    ADD CONSTRAINT "fish_transfer_origin_required" CHECK (("origin_system_id" IS NOT NULL)) NOT VALID;
-
-
-
-ALTER TABLE "public"."fish_transfer"
-    ADD CONSTRAINT "fish_transfer_target_boundary" CHECK (((("transfer_type" = 'external_out'::"public"."transfer_type") AND ("target_system_id" IS NULL) AND (NULLIF("btrim"("external_target_name"), ''::"text") IS NOT NULL)) OR (("transfer_type" = ANY (ARRAY['transfer'::"public"."transfer_type", 'grading'::"public"."transfer_type", 'density_thinning'::"public"."transfer_type"])) AND ("target_system_id" IS NOT NULL) AND ("target_system_id" <> "origin_system_id")))) NOT VALID;
 
 
 
@@ -5533,11 +5832,7 @@ CREATE OR REPLACE TRIGGER "refresh_after_system" AFTER INSERT OR DELETE OR UPDAT
 
 
 
-CREATE OR REPLACE TRIGGER "set_harvest_abw" BEFORE INSERT OR UPDATE ON "public"."fish_harvest" FOR EACH ROW EXECUTE FUNCTION "public"."set_harvest_abw"();
-
-
-
-CREATE OR REPLACE TRIGGER "set_sampling_weight_abw" BEFORE INSERT OR UPDATE ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "public"."set_sampling_weight_abw"();
+CREATE OR REPLACE TRIGGER "trg_abw_transfer" BEFORE INSERT OR UPDATE OF "number_of_fish_transfer", "total_weight_transfer", "abw" ON "public"."fish_transfer" FOR EACH ROW EXECUTE FUNCTION "public"."trg_compute_abw_transfer"();
 
 
 
@@ -5578,6 +5873,10 @@ CREATE OR REPLACE TRIGGER "trg_fish_sampling_weight_assign_lineage" BEFORE INSER
 
 
 CREATE OR REPLACE TRIGGER "trg_fish_sampling_weight_set_abw" BEFORE INSERT OR UPDATE OF "number_of_fish_sampling", "total_weight_sampling", "abw" ON "public"."fish_sampling_weight" FOR EACH ROW EXECUTE FUNCTION "public"."set_sampling_weight_abw"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_fish_stocking_set_abw" BEFORE INSERT OR UPDATE OF "number_of_fish_stocking", "total_weight_stocking", "abw" ON "public"."fish_stocking" FOR EACH ROW EXECUTE FUNCTION "public"."set_stocking_abw"();
 
 
 
@@ -6456,6 +6755,12 @@ GRANT ALL ON FUNCTION "public"."after_event_update_inventory"() TO "service_role
 
 
 
+REVOKE ALL ON FUNCTION "public"."api_batch_system_ids"("p_batch_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."api_batch_system_ids"("p_batch_id" bigint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."api_batch_system_ids"("p_batch_id" bigint) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_cycle_benchmarks"("p_farm_id" "uuid", "p_system_id" bigint) TO "service_role";
@@ -6473,6 +6778,7 @@ GRANT ALL ON FUNCTION "public"."api_dashboard_consolidated"("p_farm_id" "uuid", 
 
 
 
+REVOKE ALL ON FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_dashboard_systems"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
@@ -6534,6 +6840,12 @@ GRANT ALL ON FUNCTION "public"."api_latest_water_quality_status"("p_farm_id" "uu
 
 GRANT ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."api_production_summary"("p_farm_id" "uuid", "p_system_id" bigint, "p_stage" "public"."system_growth_stage", "p_start_date" "date", "p_end_date" "date") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."api_recent_activity_feed"("p_farm_id" "uuid", "p_limit" integer, "p_mode" "text", "p_date_from" "date", "p_date_to" "date", "p_table" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."api_recent_activity_feed"("p_farm_id" "uuid", "p_limit" integer, "p_mode" "text", "p_date_from" "date", "p_date_to" "date", "p_table" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."api_recent_activity_feed"("p_farm_id" "uuid", "p_limit" integer, "p_mode" "text", "p_date_from" "date", "p_date_to" "date", "p_table" "text") TO "service_role";
 
 
 

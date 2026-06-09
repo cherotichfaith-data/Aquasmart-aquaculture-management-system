@@ -6,7 +6,6 @@ import {
   getScopedSystemOptions,
   getScopedTimeBounds,
   parseSelectedNumericId,
-  resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
 import { listMortalityEvents } from "@/lib/server/mortality-reads"
 import { listProductionSummaryRows } from "@/features/shared/query-seed.server"
@@ -15,6 +14,7 @@ import { createAccessTokenClient } from "@/lib/supabase/server"
 import type { QueryResult } from "@/lib/supabase-client"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { normalizeStageFilter } from "@/lib/stage-filter"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import type { Database, Enums } from "@/lib/types/database"
 import { resolveTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
 
@@ -117,7 +117,7 @@ async function loadMortalityPageInitialData(
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage),
     getScopedBatchSystems(supabase, batchId),
   ])
-  const selectedSystemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systems)
+  const selectedSystemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, systems)
   const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", selectedSystemId)
 
   if (!bounds.start || !bounds.end) {

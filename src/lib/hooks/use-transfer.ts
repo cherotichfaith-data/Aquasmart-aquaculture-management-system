@@ -23,7 +23,6 @@ export function useRecordTransfer() {
       date: string
       numberOfFishTransfer?: number | null
       totalWeightTransfer?: number | null
-      abw?: number | null
       transferType: TransferInput["transfer_type"]
       notes?: string | null
     },
@@ -44,7 +43,6 @@ export function useRecordTransfer() {
         date: payload.date,
         numberOfFishTransfer: payload.number_of_fish_transfer,
         totalWeightTransfer: payload.total_weight_transfer,
-        abw: payload.abw ?? null,
         transferType: payload.transfer_type,
         notes: payload.notes ?? null,
       },
@@ -74,7 +72,7 @@ export function useRecordTransfer() {
       batch_id: payload.batch_id ?? null,
       number_of_fish_transfer: payload.number_of_fish_transfer ?? null,
       total_weight_transfer: payload.total_weight_transfer ?? null,
-      abw: payload.abw ?? null,
+      abw: null,
       notes: payload.notes ?? null,
       created_at: new Date().toISOString(),
       status: "pending",

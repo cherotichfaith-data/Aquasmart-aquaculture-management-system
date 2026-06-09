@@ -29,8 +29,6 @@ import {
   getSystemsForUnit,
 } from "./form-support"
 import {
-  calculateAbw,
-  calculateAbwOrZero,
   parseRequiredNumericId,
   reportDataEntrySubmitError,
   requireActiveFarmId,
@@ -39,7 +37,8 @@ import {
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
-type StockingInsertWithNotes = Omit<StockingInsert, "cycle_id"> & {
+type StockingInsertWithNotes = Omit<StockingInsert, "abw" | "cycle_id"> & {
+  abw?: never
   cycle_id?: StockingInsert["cycle_id"]
   farm_id?: string | null
   notes?: string | null
@@ -103,9 +102,6 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   const selectedUnit = form.watch("unit")
   const selectedSystemId = form.watch("system_id")
   const selectedBatchId = form.watch("batch_id")
-  const numberOfFish = form.watch("number_of_fish")
-  const totalWeightKg = form.watch("total_weight_kg")
-  const computedAbw = calculateAbw(totalWeightKg, numberOfFish)
   const selectedSystemIdNumber = Number(selectedSystemId)
   const selectedSystemIdForBatch =
     Number.isFinite(selectedSystemIdNumber) && selectedSystemIdNumber > 0 ? selectedSystemIdNumber : null
@@ -163,7 +159,6 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
       const batchId = parseRequiredNumericId(values.batch_id, "Batch")
-      const abw = calculateAbwOrZero(values.total_weight_kg, values.number_of_fish)
 
       const payload: StockingInsertWithNotes = {
         farm_id: resolvedFarmId,
@@ -172,7 +167,6 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         date: values.stocking_date,
         number_of_fish_stocking: values.number_of_fish,
         total_weight_stocking: values.total_weight_kg,
-        abw,
         notes: values.notes?.trim() ? values.notes.trim() : null,
         type_of_stocking: values.type_of_stocking,
       }
@@ -417,10 +411,6 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 </FormItem>
               )}
             />
-          </div>
-
-          <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm text-muted-foreground">
-            Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter quantity and total weight"}
           </div>
 
           <FormField

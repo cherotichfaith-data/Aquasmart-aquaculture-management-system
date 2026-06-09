@@ -7,6 +7,7 @@ type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type GrowthTrendRow = Database["public"]["Functions"]["api_growth_trend"]["Returns"][number]
 type RunningStockRow = Database["public"]["Functions"]["api_running_stock"]["Returns"][number]
+type RecentActivityFeedRow = Database["public"]["Functions"]["api_recent_activity_feed"]["Returns"][number]
 type FishMortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
 type FeedingRecordRow = Database["public"]["Tables"]["feeding_record"]["Row"]
 type FishSamplingWeightRow = Database["public"]["Tables"]["fish_sampling_weight"]["Row"]
@@ -87,17 +88,7 @@ const projectFeedType = (row: FeedTypeProjection | null | undefined): FeedTypeRo
   }
 }
 
-async function runTableRead<Row>(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
-  const { data, error } = await query
-  if (error) {
-    if (isQuietReadError(error)) return []
-    throw error
-  }
-
-  return (data ?? []) as Row[]
-}
-
-async function runRpcRead<Row>(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
+async function runRead<Row>(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
   const { data, error } = await query
   if (error) {
     if (isQuietReadError(error)) return []
@@ -143,7 +134,7 @@ export async function listGrowthTrend(
     p_days: params.days,
   })
 
-  return runRpcRead<GrowthTrendRow>(query)
+  return runRead<GrowthTrendRow>(query)
 }
 
 export async function listFeedingRecords(
@@ -186,7 +177,7 @@ export async function listFeedingRecords(
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
 
-  const rows = await runTableRead<FeedingRecordJoinedRow>(query.order("date", { ascending: false }))
+  const rows = await runRead<FeedingRecordJoinedRow>(query.order("date", { ascending: false }))
 
   return rows.map((row) => ({
     id: row.id,
@@ -234,7 +225,7 @@ export async function listHarvests(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runTableRead<FishHarvestRow>(query.order("date", { ascending: false }))
+  return runRead<FishHarvestRow>(query.order("date", { ascending: false }))
 }
 
 export async function listStockings(
@@ -258,7 +249,7 @@ export async function listStockings(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runTableRead<FishStockingRow>(query.order("date", { ascending: false }))
+  return runRead<FishStockingRow>(query.order("date", { ascending: false }))
 }
 
 export async function listSamplingData(
@@ -282,7 +273,7 @@ export async function listSamplingData(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runTableRead<FishSamplingWeightRow>(query.order("date", { ascending: false }))
+  return runRead<FishSamplingWeightRow>(query.order("date", { ascending: false }))
 }
 
 export async function listMortalityData(
@@ -306,7 +297,7 @@ export async function listMortalityData(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runTableRead<FishMortalityRow>(query.order("date", { ascending: false }))
+  return runRead<FishMortalityRow>(query.order("date", { ascending: false }))
 }
 
 export async function listTransferData(
@@ -323,7 +314,7 @@ export async function listTransferData(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runTableRead<FishTransferRow>(query.order("date", { ascending: false }))
+  return runRead<FishTransferRow>(query.order("date", { ascending: false }))
 }
 
 /**
@@ -344,150 +335,48 @@ export async function listRecentActivities(
   if (!params?.farmId) return []
 
   const limit = params.limit ?? 50
-  const dateFrom = params.dateFrom
-  const dateTo = params.dateTo
-  const filterTable = params.tableName
+  const tableName = params.tableName && params.tableName !== "all" ? params.tableName : null
+  const { data, error } = await supabase.rpc("api_recent_activity_feed", {
+    p_farm_id: params.farmId,
+    p_limit: limit,
+    p_date_from: params.dateFrom,
+    p_date_to: params.dateTo,
+    p_table: tableName ?? undefined,
+  })
 
-  // Resolve all system IDs for this farm so we can scope per-system tables
-  const { data: systems, error: sysErr } = await supabase
-    .from("system")
-    .select("id")
-    .eq("farm_id", params.farmId)
-  if (sysErr) {
-    if (isQuietReadError(sysErr)) return []
-    throw sysErr
-  }
-  const systemIds = (systems ?? []).map((s) => s.id).filter((id): id is number => typeof id === "number")
-  if (systemIds.length === 0) return []
-
-  type RawEvent = { id: number | string; system_id?: number | null; batch_id?: number | null } & Record<string, unknown>
-
-  async function fetchTable<T extends RawEvent>(
-    table: RecentRowsTable,
-    tableName: string,
-    changeType: ChangeType,
-    useFarmId: boolean,
-    dateColumn = "date",
-  ): Promise<ChangeLogRow[]> {
-    if (filterTable && filterTable !== "all" && filterTable !== tableName) return []
-
-    const selectColumns = useFarmId ? `id, ${dateColumn}` : `id, ${dateColumn}, system_id, batch_id`
-    let q = supabase.from(table).select(selectColumns).order(dateColumn, { ascending: false }).limit(limit)
-
-    if (useFarmId) {
-      q = q.eq("farm_id", params!.farmId!)
-    } else {
-      if (systemIds.length === 0) return []
-      q = q.in("system_id", systemIds)
-    }
-    if (dateFrom) q = q.gte(dateColumn, dateFrom)
-    if (dateTo) q = q.lte(dateColumn, dateTo)
-
-    const { data, error } = await q
-    if (error) {
-      if (isQuietReadError(error)) return []
-      return []
-    }
-    return (data ?? []).map((row: any) => ({
-      id: row.id,
-      table_name: tableName,
-      change_type: changeType,
-      column_name: null,
-      change_time: typeof row[dateColumn] === "string" ? row[dateColumn] : null,
-      system_id: row.system_id ?? null,
-      batch_id: row.batch_id ?? null,
-    }))
+  if (error) {
+    if (isQuietReadError(error)) return []
+    throw error
   }
 
-  const results = await Promise.all([
-    fetchTable("feeding_record",         "feeding_record",         "INSERT", false),
-    fetchTable("fish_mortality",          "fish_mortality",         "INSERT", true),
-    fetchTable("fish_sampling_weight",    "fish_sampling_weight",   "INSERT", false),
-    fetchTable("fish_stocking",           "fish_stocking",          "INSERT", false),
-    fetchTable("fish_harvest",            "fish_harvest",           "INSERT", false),
-    fetchTable("fish_transfer",           "fish_transfer",          "INSERT", false),
-    fetchTable("water_quality_measurement","water_quality_measurement","INSERT",false),
-    fetchTable("feed_inventory",          "feed_inventory",         "INSERT", true, "inventory_date"),
-  ])
-
-  return results
-    .flat()
-    .sort((a, b) => String(b.change_time ?? "").localeCompare(String(a.change_time ?? "")))
-    .slice(0, limit)
+  return ((data ?? []) as RecentActivityFeedRow[]).map((row) => ({
+    id: row.id,
+    table_name: row.table_name,
+    change_type: "INSERT",
+    column_name: null,
+    change_time: row.activity_date,
+    system_id: row.system_id,
+    batch_id: row.batch_id,
+  }))
 }
 
 export async function listBatchSystemIds(
   supabase: ServerSupabaseClient,
   params: { batchId: number },
 ): Promise<Array<{ system_id: number }>> {
-  const [cycles, stockings, feeding, sampling, mortality, harvests, transfers] = await Promise.all([
-    supabase.from("production_cycle").select("system_id").eq("batch_id", params.batchId),
-    supabase.from("fish_stocking").select("system_id").eq("batch_id", params.batchId),
-    supabase.from("feeding_record").select("system_id").eq("batch_id", params.batchId),
-    supabase.from("fish_sampling_weight").select("system_id").eq("batch_id", params.batchId),
-    supabase.from("fish_mortality").select("system_id").eq("batch_id", params.batchId),
-    supabase.from("fish_harvest").select("system_id").eq("batch_id", params.batchId),
-    supabase
-      .from("fish_transfer")
-      .select("origin_system_id, target_system_id")
-      .eq("batch_id", params.batchId),
-  ])
-
-  const firstError = [cycles, stockings, feeding, sampling, mortality, harvests, transfers].find((result) => result.error)
-  if (firstError?.error) {
-    if (isQuietReadError(firstError.error)) return []
-    throw firstError.error
-  }
-
-  const lineageIds = new Set<number>()
-  ;[cycles.data, stockings.data, feeding.data, sampling.data, mortality.data, harvests.data].forEach((rows) => {
-    ;(rows ?? []).forEach((row) => {
-      if (typeof row.system_id === "number" && Number.isFinite(row.system_id)) lineageIds.add(row.system_id)
-    })
+  const { data, error } = await supabase.rpc("api_batch_system_ids", {
+    p_batch_id: params.batchId,
   })
-  ;(transfers.data ?? []).forEach((row) => {
-    if (typeof row.origin_system_id === "number" && Number.isFinite(row.origin_system_id)) lineageIds.add(row.origin_system_id)
-    if (typeof row.target_system_id === "number" && Number.isFinite(row.target_system_id)) lineageIds.add(row.target_system_id)
-  })
-  if (lineageIds.size === 0) return []
 
-  for (let depth = 0; depth < 3; depth += 1) {
-    const sourceIds = Array.from(lineageIds)
-    const { data: transfers, error: transferError } = await supabase
-      .from("fish_transfer")
-      .select("origin_system_id, target_system_id")
-      .in("origin_system_id", sourceIds)
-      .not("target_system_id", "is", null)
-
-    if (transferError) {
-      if (isQuietReadError(transferError)) break
-      throw transferError
-    }
-
-    const beforeSize = lineageIds.size
-    ;(transfers ?? []).forEach((row) => {
-      if (typeof row.target_system_id === "number" && Number.isFinite(row.target_system_id)) {
-        lineageIds.add(row.target_system_id)
-      }
-    })
-    if (lineageIds.size === beforeSize) break
+  if (error) {
+    if (isQuietReadError(error)) return []
+    throw error
   }
 
-  const { data: activeRows, error: activeError } = await supabase
-    .from("system")
-    .select("id")
-    .in("id", Array.from(lineageIds))
-    .eq("is_active", true)
-
-  if (activeError) {
-    if (isQuietReadError(activeError)) return []
-    throw activeError
-  }
-
-  const activeIds = Array.from(
-    new Set((activeRows ?? []).map((row) => row.id).filter((id): id is number => typeof id === "number")),
-  )
-  return activeIds.map((system_id) => ({ system_id }))
+  return ((data ?? []) as Array<{ system_id: number | null }>)
+    .map((row) => row.system_id)
+    .filter((system_id): system_id is number => typeof system_id === "number" && Number.isFinite(system_id))
+    .map((system_id) => ({ system_id }))
 }
 
 export const emptyRecentEntries = () => ({

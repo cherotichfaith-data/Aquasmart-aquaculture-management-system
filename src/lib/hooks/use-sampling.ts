@@ -20,7 +20,6 @@ export function useRecordSampling() {
       date: string
       numberOfFishSampling: number
       totalWeightSampling: number
-      abw: number
       notes?: string | null
     },
     {
@@ -37,7 +36,6 @@ export function useRecordSampling() {
         date: payload.date,
         numberOfFishSampling: payload.number_of_fish_sampling,
         totalWeightSampling: payload.total_weight_sampling,
-        abw: payload.abw,
         notes: payload.notes ?? null,
       },
     ],
@@ -62,7 +60,7 @@ export function useRecordSampling() {
       batch_id: payload.batch_id ?? null,
       number_of_fish_sampling: payload.number_of_fish_sampling ?? null,
       total_weight_sampling: payload.total_weight_sampling ?? null,
-      abw: payload.abw ?? null,
+      abw: null,
       notes: payload.notes ?? null,
       created_at: new Date().toISOString(),
       status: "pending",

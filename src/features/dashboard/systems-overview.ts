@@ -4,8 +4,7 @@ const toAbwTrend = (value: DashboardSystemRow["abw_trend"]): SystemsOverviewRow[
   value === "up" || value === "down" ? value : "flat"
 
 export function toSystemsOverviewRows(rows: DashboardSystemRow[]): SystemsOverviewRow[] {
-  return rows
-    .map((row) => ({
+  return rows.map((row) => ({
       system_id: row.system_id,
       system_name: row.system_name,
       abw: row.abw ?? null,
@@ -17,5 +16,4 @@ export function toSystemsOverviewRows(rows: DashboardSystemRow[]): SystemsOvervi
       last_sample_date: row.sampling_end_date ?? null,
       summaryRow: row,
     }))
-    .sort((left, right) => left.system_name.localeCompare(right.system_name))
 }

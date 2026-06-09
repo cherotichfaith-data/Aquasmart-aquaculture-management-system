@@ -5,6 +5,7 @@ import { apiRateLimits } from "@/lib/server/rate-limit"
 import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import type { Database } from "@/lib/types/database"
 
 const samplingSchema = z.object({
   system_id: z.number().int().positive(),
@@ -12,10 +13,10 @@ const samplingSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   number_of_fish_sampling: z.number().positive(),
   total_weight_sampling: z.number().positive(),
-  abw: z.number().min(0).optional(),
   notes: z.string().max(500).nullable().optional(),
   local_id: z.string().max(128).optional(),
 })
+type SamplingInsert = Database["public"]["Tables"]["fish_sampling_weight"]["Insert"]
 
 const normalizeSamplingWeightKg = (totalWeight: number, sampleCount: number) => {
   if (sampleCount <= 0) return totalWeight
@@ -40,7 +41,6 @@ export async function POST(request: Request) {
   if ("response" in systemScope) return systemScope.response
 
   const totalWeightSamplingKg = normalizeSamplingWeightKg(payload.total_weight_sampling, payload.number_of_fish_sampling)
-  const abw = (totalWeightSamplingKg * 1000) / payload.number_of_fish_sampling
 
   const insertPayload = {
     system_id: payload.system_id,
@@ -48,7 +48,6 @@ export async function POST(request: Request) {
     date: payload.date,
     number_of_fish_sampling: payload.number_of_fish_sampling,
     total_weight_sampling: totalWeightSamplingKg,
-    abw,
     notes: payload.notes?.trim() ? payload.notes.trim() : null,
     local_id: payload.local_id ?? null,
     synced_at: new Date().toISOString(),
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("fish_sampling_weight")
-    .upsert(insertPayload, { onConflict: "local_id" })
+    .upsert(insertPayload as unknown as SamplingInsert, { onConflict: "local_id" })
     .select()
     .maybeSingle()
 

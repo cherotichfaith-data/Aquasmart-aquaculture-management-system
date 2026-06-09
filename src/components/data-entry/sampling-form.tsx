@@ -32,8 +32,6 @@ import {
   getSystemsForUnit,
 } from "./form-support"
 import {
-  calculateAbw,
-  calculateAbwOrZero,
   parseOptionalNumericId,
   parseRequiredNumericId,
   reportDataEntrySubmitError,
@@ -103,9 +101,6 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
   const selectedBatchId =
     selectedBatchIdValue && selectedBatchIdValue !== "none" ? Number(selectedBatchIdValue) : null
   const selectedDate = form.watch("date")
-  const numberOfFish = form.watch("number_of_fish")
-  const totalWeightKg = form.watch("total_weight_kg")
-  const computedAbw = calculateAbw(totalWeightKg, numberOfFish)
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
 
   useEffect(() => {
@@ -159,15 +154,12 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
   )
   const daysSinceLastSample = diffDateDays(previousSample?.date, selectedDate)
   const isEarlierThanMonthlyCadence = daysSinceLastSample != null && daysSinceLastSample < 25
-  const abwDeltaPct =
-    projectedAbw && computedAbw ? Math.abs((computedAbw - projectedAbw) / projectedAbw) * 100 : null
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
       const batchId = parseOptionalNumericId(values.batch_id)
-      const abw = calculateAbwOrZero(values.total_weight_kg, values.number_of_fish)
 
       await mutation.mutateAsync({
         farm_id: resolvedFarmId,
@@ -176,7 +168,6 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
         date: values.date,
         number_of_fish_sampling: values.number_of_fish,
         total_weight_sampling: values.total_weight_kg,
-        abw,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
 
@@ -336,10 +327,6 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 />
               </div>
 
-              <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-                Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter sample count and total weight (kg)"}
-              </div>
-
               {isEarlierThanMonthlyCadence ? (
                 <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Last sampling was {formatRelativeDays(daysSinceLastSample)}. Sampling is normally done monthly because it stresses the fish.
@@ -386,10 +373,6 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
             <InfoStat
               label="Expected ABW Today"
               value={projectedAbw != null ? `${projectedAbw.toFixed(2)} g` : "Projection unavailable"}
-            />
-            <InfoStat
-              label="Projection Delta"
-              value={abwDeltaPct != null ? `${abwDeltaPct.toFixed(1)}%` : "No comparison"}
             />
           </InfoPanel>
         </div>

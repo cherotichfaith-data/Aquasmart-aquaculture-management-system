@@ -47,9 +47,7 @@ export async function getProductionSummary(params?: Omit<ProductionSummaryParams
     return toQueryError("getProductionSummary", error)
   }
 
-  let rows = ((data ?? []) as ProductionTrendRpcRow[])
-    .slice()
-    .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
+  let rows = ((data ?? []) as ProductionTrendRpcRow[]).slice()
 
   if (params?.limit) rows = rows.slice(0, params.limit)
 

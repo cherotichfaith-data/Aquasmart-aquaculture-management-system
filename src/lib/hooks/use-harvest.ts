@@ -20,7 +20,6 @@ export function useRecordHarvest() {
       date: string
       numberOfFishHarvest?: number | null
       totalWeightHarvest?: number | null
-      abw?: number | null
       typeOfHarvest: HarvestInput["type_of_harvest"]
     },
     {
@@ -37,7 +36,6 @@ export function useRecordHarvest() {
         date: payload.date,
         numberOfFishHarvest: payload.number_of_fish_harvest,
         totalWeightHarvest: payload.total_weight_harvest,
-        abw: payload.abw,
         typeOfHarvest: payload.type_of_harvest,
       },
     ],
@@ -63,7 +61,7 @@ export function useRecordHarvest() {
       number_of_fish_harvest: payload.number_of_fish_harvest ?? null,
       total_weight_harvest: payload.total_weight_harvest ?? null,
       type_of_harvest: payload.type_of_harvest ?? null,
-      abw: payload.abw ?? null,
+      abw: null,
       created_at: new Date().toISOString(),
       status: "pending",
     }),

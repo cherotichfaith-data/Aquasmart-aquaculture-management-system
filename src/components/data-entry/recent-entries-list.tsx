@@ -24,13 +24,26 @@ type FeedingRow = Omit<
 > & {
   feed_type_id: number | null
 } & PendingMeta
-type SamplingRow = Pick<Tables<"fish_sampling_weight">, "id" | "date" | "system_id" | "number_of_fish_sampling" | "abw" | "created_at"> & PendingMeta
+type SamplingRow = Omit<
+  Pick<Tables<"fish_sampling_weight">, "id" | "date" | "system_id" | "number_of_fish_sampling" | "abw" | "created_at">,
+  "abw"
+> & {
+  abw: number | null
+} & PendingMeta
 type TransferRow = Pick<Tables<"fish_transfer">, "id" | "date" | "origin_system_id" | "target_system_id" | "external_target_name" | "number_of_fish_transfer" | "created_at"> & PendingMeta
 type HarvestRow = Pick<Tables<"fish_harvest">, "id" | "date" | "system_id" | "type_of_harvest" | "total_weight_harvest" | "created_at"> & PendingMeta
 type WaterQualityRow = Pick<Tables<"water_quality_measurement">, "id" | "date" | "system_id" | "parameter_name" | "parameter_value" | "created_at"> & PendingMeta
 type FeedInventoryRow = Pick<
   Tables<"feed_inventory">,
-  "id" | "inventory_date" | "feed_type_id" | "feed_type_label" | "bag_weight" | "amount_of_bags" | "opened_bags" | "created_at"
+  | "id"
+  | "inventory_date"
+  | "feed_type_id"
+  | "feed_type_label"
+  | "bag_weight"
+  | "amount_of_bags"
+  | "opened_bags"
+  | "snapshot_kg"
+  | "created_at"
 > &
   PendingMeta
 type StockingRow = Pick<Tables<"fish_stocking">, "id" | "date" | "system_id" | "number_of_fish_stocking" | "type_of_stocking" | "created_at"> & PendingMeta
@@ -111,7 +124,7 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
               date: row.date,
               system_id: row.systemId,
               number_of_fish_sampling: row.numberOfFishSampling,
-              abw: row.abw,
+              abw: null,
               created_at: toCreatedAt(row.createdAtLocal),
             }))
         }
@@ -354,10 +367,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
     const rows = mergeRecentEntries(data, feedInventoryPendingEntries)
     pendingCount = feedInventoryPendingEntries.length
     cards = rows.map((row, index) => {
-      const baggedStock = Number(row.bag_weight ?? 0) * Number(row.amount_of_bags ?? 0)
-      const openStock = Number(row.bag_weight ?? 0) * Number(row.opened_bags ?? 0)
-      const totalStock = baggedStock + openStock
-
       return {
         key: String(row.localId ?? row.id ?? index),
         title: row.feed_type_label || `Feed ${row.feed_type_id}`,
@@ -365,9 +374,9 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
         meta: formatCreatedAt(row.created_at),
         pending: row.status === "pending",
         details: [
-          { label: "Bagged", value: `${baggedStock.toFixed(2)} kg` },
-          { label: "Open Bags", value: `${openStock.toFixed(2)} kg` },
-          { label: "Total", value: `${totalStock.toFixed(2)} kg` },
+          { label: "Closed Bags", value: String(row.amount_of_bags ?? 0) },
+          { label: "Open Feed", value: `${row.opened_bags ?? 0} g` },
+          { label: "Total", value: row.snapshot_kg != null ? `${row.snapshot_kg.toFixed(2)} kg` : "-" },
         ],
       }
     })

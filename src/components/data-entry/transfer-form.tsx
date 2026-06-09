@@ -22,7 +22,6 @@ import { logSbError } from "@/lib/supabase/log"
 import { TRANSFER_TYPE_LABELS, UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import {
-  calculateAbw,
   parseOptionalNumericId,
   parseRequiredNumericId,
   reportDataEntrySubmitError,
@@ -94,10 +93,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   const targetSystemId = form.watch("target_system_id")
   const selectedBatchId = form.watch("batch_id")
   const transferType = form.watch("transfer_type")
-  const numberOfFish = form.watch("number_of_fish")
-  const totalWeightKg = form.watch("total_weight_kg")
   const externalTargetName = form.watch("external_target_name")
-  const computedAbw = calculateAbw(totalWeightKg, numberOfFish)
   const isExternalOut = transferType === "external_out"
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -116,7 +112,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
           : null
       const batchId = parseOptionalNumericId(values.batch_id)
       const resolvedTransferType = isExternalTransfer ? "external_out" : values.transfer_type
-      const abw = calculateAbw(values.total_weight_kg, values.number_of_fish)
 
       await mutation.mutateAsync({
         farm_id: resolvedFarmId,
@@ -129,7 +124,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
         date: values.date,
         number_of_fish_transfer: values.number_of_fish,
         total_weight_transfer: values.total_weight_kg,
-        abw,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
 
@@ -370,10 +364,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 </FormItem>
               )}
             />
-          </div>
-
-          <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm text-muted-foreground">
-            Computed ABW: {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter count and total weight"}
           </div>
 
           <FormField

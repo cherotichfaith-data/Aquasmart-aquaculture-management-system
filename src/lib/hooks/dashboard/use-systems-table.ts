@@ -7,7 +7,6 @@ import { queryKeys } from "@/lib/cache/query-keys"
 import type { DashboardSystemRow, SystemsTableData } from "@/features/dashboard/types"
 import { getDashboardSystems } from "@/lib/api/dashboard"
 import type { TimePeriod } from "@/lib/time-period"
-import { hasCompleteSystemMetrics } from "./shared"
 
 export function useSystemsTable(params: {
   farmId?: string | null
@@ -86,7 +85,7 @@ export function useSystemsTable(params: {
       const rows = ((result.data ?? []) as DashboardSystemRow[]).filter((row) => {
         if (scopedSystemIds && !scopedSystemIds.includes(row.system_id)) return false
         if (params.includeIncomplete) return true
-        return hasCompleteSystemMetrics(row)
+        return row.is_complete
       })
 
       if (debugEnabled) {

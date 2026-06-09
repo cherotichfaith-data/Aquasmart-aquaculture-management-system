@@ -28,7 +28,6 @@ import { Constants, type Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import {
-    calculateAbw,
     parseNumericId,
     parseOptionalNumericId,
     parseRequiredNumericId,
@@ -182,8 +181,6 @@ export function HarvestForm({
     const selectedSystemId = form.watch("system_id")
     const selectedBatchId = form.watch("batch_id")
     const selectedDate = form.watch("date")
-    const numberOfFish = form.watch("number_of_fish")
-    const amountKg = form.watch("amount_kg")
     const harvestType = form.watch("type_of_harvest")
     const resolvedSystemId = parseNumericId(selectedSystemId)
     const selectedSystem = useMemo(
@@ -191,7 +188,6 @@ export function HarvestForm({
         [resolvedSystemId, systems],
     )
     const selectedCageLabel = resolvedSystemId ? formatCageLabel(selectedSystem) : "this system"
-    const computedAbw = calculateAbw(amountKg, numberOfFish)
 
     async function submitHarvest(values: z.infer<typeof formSchema>) {
         const resolvedFarmId = requireActiveFarmId(farmId)
@@ -206,7 +202,6 @@ export function HarvestForm({
             number_of_fish_harvest: values.number_of_fish,
             total_weight_harvest: values.amount_kg,
             type_of_harvest: values.type_of_harvest,
-            abw: calculateAbw(values.amount_kg, values.number_of_fish),
         })
 
         form.reset({
@@ -391,11 +386,6 @@ export function HarvestForm({
                                     </p>
                                 </div>
                             ) : null}
-
-                            <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm text-muted-foreground">
-                                Computed ABW (weight x 1000 / fish count):{" "}
-                                {computedAbw != null ? `${computedAbw.toFixed(2)} g` : "Enter count and weight"}
-                            </div>
 
                             <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
                                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
