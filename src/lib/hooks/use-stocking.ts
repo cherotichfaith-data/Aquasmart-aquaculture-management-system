@@ -22,7 +22,6 @@ export function useRecordStocking() {
       totalWeightStocking: number
       notes?: string | null
       typeOfStocking: StockingInput["type_of_stocking"]
-      abw: number
     },
     {
       data: Tables<"fish_stocking">
@@ -40,7 +39,6 @@ export function useRecordStocking() {
         totalWeightStocking: payload.total_weight_stocking,
         notes: payload.notes ?? null,
         typeOfStocking: payload.type_of_stocking,
-        abw: payload.abw,
       },
     ],
     buildPendingResult: ({ input, localIds }) =>
@@ -66,7 +64,6 @@ export function useRecordStocking() {
       total_weight_stocking: payload.total_weight_stocking ?? null,
       notes: payload.notes ?? null,
       type_of_stocking: payload.type_of_stocking ?? null,
-      abw: payload.abw ?? null,
       created_at: new Date().toISOString(),
       status: "pending",
     }),

@@ -4,7 +4,6 @@ import { queryOptions, useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { queryKeys } from "@/lib/cache/query-keys"
-import type { QueryResult } from "@/lib/supabase-client"
 import {
   getBatchSystemIds,
   getFeedingRecords,
@@ -16,7 +15,7 @@ import {
   getStockings,
   getTransferData,
 } from "@/lib/api/reports"
-import { getEfcrTrend, type EfcrTrendRow } from "@/lib/api/analytics"
+import { getEfcrTrend } from "@/lib/api/analytics"
 import type {
   FeedGrowthTrendRow,
   FeedingRecordWithType,
@@ -40,45 +39,6 @@ function reportsQueryOptions<TResult>(params: {
     refetchOnWindowFocus: params.refetchOnWindowFocus,
     refetchOnMount: params.refetchOnMount,
   })
-}
-
-const SCOPED_TREND_CONCURRENCY = 4
-
-async function collectScopedTrendRows<T>(params: {
-  systemIds: number[]
-  signal: AbortSignal
-  fetcher: (systemId: number) => Promise<QueryResult<T>>
-  errorMessage: string
-}): Promise<QueryResult<T & { system_id: number }>> {
-  const results: Array<{ system_id: number; rows: T[] }> = []
-
-  for (let index = 0; index < params.systemIds.length; index += SCOPED_TREND_CONCURRENCY) {
-    const chunk = params.systemIds.slice(index, index + SCOPED_TREND_CONCURRENCY)
-    const chunkResults = await Promise.all(
-      chunk.map(async (systemId) => {
-        const result = await params.fetcher(systemId)
-        return { systemId, result }
-      }),
-    )
-
-    const firstError = chunkResults.find((item) => item.result.status === "error")?.result
-    if (firstError?.status === "error") {
-      throw new Error(firstError.error ?? params.errorMessage)
-    }
-
-    results.push(
-      ...chunkResults.flatMap((item) =>
-        item.result.status === "success" ? [{ system_id: item.systemId, rows: item.result.data }] : [],
-      ),
-    )
-
-    if (params.signal.aborted) {
-      break
-    }
-  }
-
-  const data = results.flatMap((item) => item.rows.map((row) => ({ ...row, system_id: item.system_id })))
-  return { status: "success", data }
 }
 
 export function useRunningStock(params?: {
@@ -184,19 +144,19 @@ export function useScopedEfcrTrend(params?: {
         dateTo: params?.dateTo,
       }),
       queryFn: async ({ signal }) => {
-        return collectScopedTrendRows<EfcrTrendRow>({
-          systemIds,
+        const result = await getEfcrTrend({
+          farmId: resolvedFarmId!,
+          dateFrom: params?.dateFrom,
+          dateTo: params?.dateTo,
           signal,
-          fetcher: (systemId) =>
-            getEfcrTrend({
-              farmId: resolvedFarmId!,
-              systemId,
-              dateFrom: params?.dateFrom,
-              dateTo: params?.dateTo,
-              signal,
-            }),
-          errorMessage: "Failed to load eFCR trend",
         })
+        if (result.status !== "success") return result
+
+        const systemIdSet = new Set(systemIds)
+        return {
+          status: "success" as const,
+          data: result.data.filter((row) => systemIdSet.has(row.system_id)),
+        }
       },
       enabled: Boolean(session) && Boolean(resolvedFarmId) && systemIds.length > 0 && (params?.enabled ?? true),
       refetchOnWindowFocus: false,
@@ -227,10 +187,8 @@ export function useScopedGrowthTrend(params?: {
         days: params?.days,
       }),
       queryFn: async ({ signal }) => {
-        return collectScopedTrendRows<FeedGrowthTrendRow>({
-          systemIds,
-          signal,
-          fetcher: (systemId) =>
+        const results = await Promise.all(
+          systemIds.map((systemId) =>
             getGrowthTrend({
               farmId,
               systemId,
@@ -239,8 +197,21 @@ export function useScopedGrowthTrend(params?: {
               dateTo: params?.dateTo,
               signal,
             }),
-          errorMessage: "Failed to load growth trend",
-        })
+          ),
+        )
+        const firstError = results.find((result) => result.status === "error")
+        if (firstError?.status === "error") {
+          throw new Error(firstError.error ?? "Failed to load growth trend")
+        }
+
+        return {
+          status: "success" as const,
+          data: results.flatMap((result, index) =>
+            result.status === "success"
+              ? result.data.map((row) => ({ ...row, system_id: systemIds[index] }))
+              : [],
+          ),
+        }
       },
       enabled: Boolean(session) && Boolean(farmId) && systemIds.length > 0 && (params?.enabled ?? true),
       refetchOnWindowFocus: false,

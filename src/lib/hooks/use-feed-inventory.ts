@@ -20,6 +20,7 @@ export function useRecordFeedInventorySnapshot() {
         bag_weight: payload.bag_weight,
         amount_of_bags: payload.amount_of_bags,
         opened_bags: payload.opened_bags ?? null,
+        snapshot_kg: null,
         comments: payload.comments ?? null,
         created_at: new Date().toISOString(),
         status: "pending",

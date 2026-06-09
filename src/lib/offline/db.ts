@@ -65,7 +65,6 @@ export interface OfflineSamplingRecord extends OfflineBaseRecord {
   date: string
   numberOfFishSampling: number
   totalWeightSampling: number
-  abw: number
   notes?: string | null
 }
 
@@ -76,7 +75,6 @@ export interface OfflineStockingRecord extends OfflineBaseRecord {
   date: string
   numberOfFishStocking: number
   totalWeightStocking: number
-  abw: number
   typeOfStocking: StockingType
   notes?: string | null
 }
@@ -88,7 +86,6 @@ export interface OfflineHarvestRecord extends OfflineBaseRecord {
   date: string
   numberOfFishHarvest: number
   totalWeightHarvest: number
-  abw: number
   typeOfHarvest: HarvestType
 }
 
@@ -101,7 +98,6 @@ export interface OfflineTransferRecord extends OfflineBaseRecord {
   date: string
   numberOfFishTransfer: number
   totalWeightTransfer: number
-  abw?: number | null
   transferType: TransferType
   notes?: string | null
 }

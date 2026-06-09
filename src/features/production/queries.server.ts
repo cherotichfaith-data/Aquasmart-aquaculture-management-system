@@ -6,10 +6,10 @@ import {
   getScopedSystemOptions,
   getScopedTimeBounds,
   parseSelectedNumericId,
-  resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
 import { listProductionSummaryRows } from "@/features/shared/query-seed.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import type { Database, Enums } from "@/lib/types/database"
 import { resolveTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
 
@@ -62,7 +62,7 @@ async function loadProductionPageInitialData(
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage),
     getScopedBatchSystems(supabase, batchId),
   ])
-  const systemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, systems)
+  const systemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, systems)
   const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId)
 
   if (!bounds.start || !bounds.end) {

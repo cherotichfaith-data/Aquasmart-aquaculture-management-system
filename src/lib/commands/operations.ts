@@ -10,6 +10,9 @@ type WithFarmId<T> = T & {
 type DbAssignedCycle<T extends { cycle_id?: unknown }> = Omit<T, "cycle_id"> & {
   cycle_id?: T["cycle_id"]
 }
+type DbDerivedAbw<T extends { abw?: unknown }> = Omit<T, "abw"> & {
+  abw?: never
+}
 
 type MutationMeta = {
   farmId: string
@@ -22,10 +25,10 @@ type MutationResponse<T extends keyof Database["public"]["Tables"]> = {
   meta: MutationMeta
 }
 
-export type HarvestInput = WithFarmId<Insert<"fish_harvest">>
-export type SamplingInput = WithFarmId<Insert<"fish_sampling_weight">>
-export type StockingInput = WithFarmId<DbAssignedCycle<Insert<"fish_stocking">>>
-export type TransferInput = WithFarmId<Insert<"fish_transfer">>
+export type HarvestInput = WithFarmId<DbDerivedAbw<Insert<"fish_harvest">>>
+export type SamplingInput = WithFarmId<DbDerivedAbw<Insert<"fish_sampling_weight">>>
+export type StockingInput = WithFarmId<DbDerivedAbw<DbAssignedCycle<Insert<"fish_stocking">>>>
+export type TransferInput = WithFarmId<DbDerivedAbw<Insert<"fish_transfer">>>
 export type WaterQualityInput = RecordWaterQualityRowsInput
 export type MortalityInput = WithFarmId<Insert<"fish_mortality">>
 

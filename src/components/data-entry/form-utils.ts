@@ -31,22 +31,6 @@ export const requireActiveFarmId = (farmId: string | null | undefined): string =
   return farmId
 }
 
-export const calculateAbw = (totalWeightKg: number, numberOfFish: number): number | null => {
-  if (!Number.isFinite(totalWeightKg) || !Number.isFinite(numberOfFish)) return null
-  if (totalWeightKg <= 0 || numberOfFish <= 0) return null
-  return (totalWeightKg * 1000) / numberOfFish
-}
-
-export const calculateAbwOrZero = (totalWeightKg: number, numberOfFish: number): number =>
-  calculateAbw(totalWeightKg, numberOfFish) ?? 0
-
-export const calculateFeedAmount = (bagWeightKg: number, numberOfBags: number, openBagsKg: number): number => {
-  const resolvedBagWeightKg = Number.isFinite(bagWeightKg) ? bagWeightKg : 0
-  const resolvedNumberOfBags = Number.isFinite(numberOfBags) ? numberOfBags : 0
-  const resolvedOpenBagsKg = Number.isFinite(openBagsKg) ? openBagsKg : 0
-  return resolvedBagWeightKg * resolvedNumberOfBags + resolvedOpenBagsKg
-}
-
 export const reportDataEntrySubmitError = (error: unknown, fallback = "Unable to save this record.") => {
   toast({
     variant: "destructive",

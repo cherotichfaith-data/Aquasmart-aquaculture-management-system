@@ -18,9 +18,9 @@ import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
 import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics-rpc-shared"
+import { listWaterQualityMeasurementRows } from "@/features/shared/query-seed.server"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
-type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "month"
 
 function isSbStatementTimeout(error: unknown) {
@@ -95,19 +95,6 @@ async function getTimeBounds(
   )
 }
 
-async function resolveActiveSystemId(
-  supabase: ServerClient,
-  farmId: string,
-  selectedSystem?: string | number | null,
-): Promise<number | undefined> {
-  if (!selectedSystem || selectedSystem === "all") return undefined
-
-  const systems = await getScopedSystemOptions(supabase, farmId, "all")
-  const systemId = resolveSystemIdFromFilterValue(selectedSystem, systems)
-  if (!systemId || !Number.isFinite(systemId)) return undefined
-  return systemId
-}
-
 async function getDashboardSystemsRaw(
   supabase: ServerClient,
   params: {
@@ -136,36 +123,6 @@ async function getDashboardSystemsRaw(
 async function getBatchSystemIds(supabase: ServerClient, batchId?: number): Promise<number[]> {
   const rows = await getScopedBatchSystems(supabase, batchId)
   return rows.map((row) => row.system_id)
-}
-
-async function getWaterQualityMeasurements(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    systemId?: number
-    dateFrom?: string | null
-    dateTo?: string | null
-    limit?: number
-  },
-): Promise<WaterQualityMeasurementRow[]> {
-  let query = supabase
-    .from("api_water_quality_measurements")
-    .select("*")
-    .eq("farm_id", params.farmId)
-    .order("date", { ascending: true })
-    .order("time", { ascending: true })
-
-  if (params.systemId) query = query.eq("system_id", params.systemId)
-  if (params.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params.dateTo) query = query.lte("date", params.dateTo)
-  if (params.limit) query = query.limit(params.limit)
-
-  const { data, error } = await query
-  if (error) {
-    throw error
-  }
-
-  return (data ?? []) as WaterQualityMeasurementRow[]
 }
 
 async function getDashboardConsolidatedRows(
@@ -245,9 +202,12 @@ async function loadDashboardPageInitialData(
   if (!params.farmId) return empty
   const farmId = params.farmId
 
-  const selectedSystemId = await withNetworkFallback("dashboard:resolveActiveSystemId", undefined, () =>
-    resolveActiveSystemId(supabase, farmId, params.filters.selectedSystem),
-  )
+  const selectedSystemId = await withNetworkFallback("dashboard:resolveActiveSystemId", undefined, async () => {
+    if (!params.filters.selectedSystem || params.filters.selectedSystem === "all") return undefined
+    const systems = await getScopedSystemOptions(supabase, farmId, "all")
+    const systemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, systems)
+    return systemId && Number.isFinite(systemId) ? systemId : undefined
+  })
   const effectiveSelectedSystem = selectedSystemId != null ? String(selectedSystemId) : "all"
   const bounds = await getTimeBounds(supabase, farmId, params.filters.timePeriod)
   if (!bounds.start || !bounds.end) {
@@ -336,7 +296,7 @@ async function loadDashboardPageInitialData(
         { allowMissingObject: true },
       ),
       withNetworkFallback("dashboard:getWaterQualityMeasurements", [], () =>
-        getWaterQualityMeasurements(supabase, {
+        listWaterQualityMeasurementRows(supabase, {
           farmId,
           systemId: singleSystemId,
           dateFrom: startDate,

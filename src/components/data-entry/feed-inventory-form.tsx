@@ -20,7 +20,7 @@ import { useRecordFeedInventorySnapshot } from "@/lib/hooks/use-feed-inventory"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoPanel, InfoStat } from "./form-support"
-import { calculateFeedAmount, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 
 const formSchema = z.object({
   inventory_date: z.string().min(1, "Date is required"),
@@ -28,7 +28,7 @@ const formSchema = z.object({
   feed_id: z.string().min(1, "Feed type is required"),
   bag_weight_kg: z.coerce.number().min(0.01, "Bag weight must be positive"),
   number_of_bags: z.coerce.number().int().min(0, "Amount of bags cannot be negative"),
-  opened_bags: z.coerce.number().int().min(0, "Open bags cannot be negative"),
+  opened_bags: z.coerce.number().int().min(0, "Open feed cannot be negative"),
   comments: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 })
 
@@ -60,7 +60,6 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
   const openedBags = form.watch("opened_bags")
   const selectedFeed = feedInventoryFeeds.find((feed) => String(feed.id) === selectedFeedId) ?? null
   const selectedFeedLabel = selectedFeed?.label ?? selectedFeed?.feed_line ?? (selectedFeed ? `Feed ${selectedFeed.id}` : "")
-  const totalStockKg = calculateFeedAmount(bagWeightKg, numberOfBags + openedBags, 0)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -207,7 +206,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                   name="opened_bags"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Open Bags</FormLabel>
+                      <FormLabel>Open Feed (g)</FormLabel>
                       <FormControl>
                         <Input type="number" step="1" {...field} />
                       </FormControl>
@@ -243,9 +242,9 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
         </div>
 
         <InfoPanel title="Snapshot Totals">
-          <InfoStat label="Bagged Stock" value={`${calculateFeedAmount(bagWeightKg, numberOfBags, 0).toFixed(2)} kg`} />
-          <InfoStat label="Open Bags" value={`${calculateFeedAmount(bagWeightKg, openedBags, 0).toFixed(2)} kg`} />
-          <InfoStat label="Total Stock" tone="success" value={`${totalStockKg.toFixed(2)} kg`} />
+          <InfoStat label="Bag Weight" value={`${Number.isFinite(bagWeightKg) ? bagWeightKg : 0} kg`} />
+          <InfoStat label="Closed Bags" value={`${Number.isFinite(numberOfBags) ? numberOfBags : 0}`} />
+          <InfoStat label="Open Feed" tone="success" value={`${Number.isFinite(openedBags) ? openedBags : 0} g`} />
         </InfoPanel>
       </div>
     </div>

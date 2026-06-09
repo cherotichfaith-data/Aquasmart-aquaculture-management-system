@@ -390,6 +390,7 @@ export type Database = {
           inventory_date: string
           inventory_time: string | null
           opened_bags: number | null
+          snapshot_kg: number | null
         }
         Insert: {
           amount_of_bags?: number | null
@@ -403,6 +404,7 @@ export type Database = {
           inventory_date: string
           inventory_time?: string | null
           opened_bags?: number | null
+          snapshot_kg?: number | null
         }
         Update: {
           amount_of_bags?: number | null
@@ -416,6 +418,7 @@ export type Database = {
           inventory_date?: string
           inventory_time?: string | null
           opened_bags?: number | null
+          snapshot_kg?: number | null
         }
         Relationships: [
           {
@@ -1624,6 +1627,12 @@ export type Database = {
       }
     }
     Functions: {
+      api_batch_system_ids: {
+        Args: { p_batch_id: number }
+        Returns: {
+          system_id: number
+        }[]
+      }
       api_cycle_benchmarks: {
         Args: { p_farm_id: string; p_system_id?: number }
         Returns: {
@@ -1736,6 +1745,7 @@ export type Database = {
           growth_stage: Database["public"]["Enums"]["system_growth_stage"]
           input_end_date: string
           input_start_date: string
+          is_complete: boolean
           missing_days_count: number
           mortality_rate: number
           sample_age_days: number
@@ -1978,6 +1988,24 @@ export type Database = {
           total_feed_kg: number
           total_fish_count: number
           trend_date: string
+        }[]
+      }
+      api_recent_activity_feed: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_farm_id: string
+          p_limit?: number
+          p_mode?: string
+          p_table?: string
+        }
+        Returns: {
+          activity_date: string
+          batch_id: number
+          id: number
+          notes: string
+          system_id: number
+          table_name: string
         }[]
       }
       api_recommended_actions: {

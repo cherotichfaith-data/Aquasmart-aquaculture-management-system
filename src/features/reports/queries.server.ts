@@ -5,7 +5,6 @@ import {
   getScopedTimeBounds,
   getScopedSystemOptions,
   parseSelectedNumericId,
-  resolveScopedSelectedSystemId,
 } from "@/features/shared/scoped-analytics.server"
 import {
   listAlertThresholdRows,
@@ -17,6 +16,7 @@ import {
 import { listFeedingRecords, listGrowthTrend, listHarvests } from "@/lib/server/report-reads"
 import { listMortalityEvents } from "@/lib/server/mortality-reads"
 import { normalizeStageFilter } from "@/lib/stage-filter"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import type { Database, Enums } from "@/lib/types/database"
 import { resolveTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
 
@@ -119,7 +119,7 @@ async function loadReportsPageInitialData(
     listAppConfigRows(supabase, { keys: ["target_harvest_weight_g"] }),
     listAlertThresholdRows(supabase, params.farmId, params.userId),
   ])
-  const systemId = resolveScopedSelectedSystemId(params.filters.selectedSystem, growthSystems)
+  const systemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, growthSystems)
   const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId)
 
   if (!bounds.start || !bounds.end) {

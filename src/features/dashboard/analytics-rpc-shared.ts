@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/types/database"
+import { Constants, type Database, type Enums } from "@/lib/types/database"
 import type { DashboardPageInitialData, KPIOverviewMetric, RecommendedAction } from "./types"
 
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
@@ -9,23 +9,20 @@ const PRIORITY_ORDER: Record<RecommendedAction["priority"], number> = {
   Info: 2,
 }
 
-const WATER_QUALITY_BADGES: Record<string, { tone: KPIOverviewMetric["tone"]; badge: string }> = {
+const WATER_QUALITY_BADGES: Record<Enums<"water_quality_rating">, { tone: KPIOverviewMetric["tone"]; badge: string }> = {
   optimal: { tone: "good", badge: "Optimal" },
   acceptable: { tone: "warn", badge: "Acceptable" },
   critical: { tone: "bad", badge: "Critical" },
   lethal: { tone: "bad", badge: "Lethal" },
 }
+const WATER_QUALITY_RATINGS = new Set<string>(Constants.public.Enums.water_quality_rating)
 
 const isFiniteNumber = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value)
 
-const getRoundedWaterQualityLabel = (value: number | null) => {
-  if (!isFiniteNumber(value)) return null
-  const rounded = Math.round(value)
-  if (rounded <= 0) return "lethal"
-  if (rounded === 1) return "critical"
-  if (rounded === 2) return "acceptable"
-  return "optimal"
+const normalizeWaterQualityLabel = (value: string | null | undefined): Enums<"water_quality_rating"> | null => {
+  const normalized = value?.trim().toLowerCase()
+  return normalized && WATER_QUALITY_RATINGS.has(normalized) ? (normalized as Enums<"water_quality_rating">) : null
 }
 
 type RecommendedActionInputRow = {
@@ -107,7 +104,7 @@ export function buildKpiOverviewFromRpc(params: {
   const consolidated = consolidatedRows.find((row) => row.system_id == null) ?? consolidatedRows[0]
   const waterQuality = consolidated.water_quality_rating_numeric_average ?? null
 
-  const waterQualityLabel = getRoundedWaterQualityLabel(waterQuality)
+  const waterQualityLabel = normalizeWaterQualityLabel(consolidated.water_quality_rating_average)
   const waterQualityDisplay = waterQualityLabel ? WATER_QUALITY_BADGES[waterQualityLabel] : null
 
   const metrics: KPIOverviewMetric[] = [

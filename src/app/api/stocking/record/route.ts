@@ -8,7 +8,8 @@ import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { Constants, type Database } from "@/lib/types/database"
 
 type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
-type DbAssignedStockingInsert = Omit<StockingInsert, "cycle_id"> & {
+type DbAssignedStockingInsert = Omit<StockingInsert, "abw" | "cycle_id"> & {
+  abw?: never
   cycle_id?: StockingInsert["cycle_id"]
 }
 
@@ -18,7 +19,6 @@ const stockingSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   number_of_fish_stocking: z.number().positive(),
   total_weight_stocking: z.number().positive(),
-  abw: z.number().min(0),
   notes: z.string().max(500).nullable().optional(),
   type_of_stocking: z.enum(Constants.public.Enums.type_of_stocking),
   local_id: z.string().max(128).optional(),
@@ -48,7 +48,6 @@ export async function POST(request: Request) {
     number_of_fish_stocking: payload.number_of_fish_stocking,
     total_weight_stocking: payload.total_weight_stocking,
     type_of_stocking: payload.type_of_stocking,
-    abw: payload.abw,
     notes: payload.notes?.trim() ? payload.notes.trim() : null,
     local_id: payload.local_id ?? null,
     synced_at: new Date().toISOString(),
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("fish_stocking")
-    .upsert(insertPayload as StockingInsert, { onConflict: "local_id" })
+    .upsert(insertPayload as unknown as StockingInsert, { onConflict: "local_id" })
     .select()
     .maybeSingle()
 

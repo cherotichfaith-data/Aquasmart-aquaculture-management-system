@@ -16,7 +16,6 @@ const transferSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   number_of_fish_transfer: z.number().positive(),
   total_weight_transfer: z.number().positive(),
-  abw: z.number().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
   local_id: z.string().max(128).optional(),
 })
@@ -65,7 +64,6 @@ export async function POST(request: Request) {
       ...payload,
       target_system_id: isExternalOut ? null : payload.target_system_id,
       batch_id: payload.batch_id ?? null,
-      abw: payload.abw ?? null,
       external_target_name: isExternalOut ? externalTargetName : null,
       notes: payload.notes?.trim() ? payload.notes.trim() : null,
       local_id: payload.local_id ?? null,
