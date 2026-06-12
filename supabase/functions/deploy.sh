@@ -32,7 +32,7 @@ deploy_to() {
   echo "=== Deploying to project: $project_ref ==="
   for fn in "${FUNCTIONS[@]}"; do
     echo "  → Deploying $fn..."
-    supabase functions deploy "$fn" --project-ref "$project_ref" --no-verify-jwt
+    supabase functions deploy "$fn" --project-ref "$project_ref"
     echo "    ✓ $fn deployed"
   done
   echo "=== All functions deployed to $project_ref ==="

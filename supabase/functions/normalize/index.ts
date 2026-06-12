@@ -4,7 +4,7 @@
 // Request body: { raw_upload_id: string, data_type?: DataFileType }
 // data_type is optional — if omitted, auto-detected from column headers.
 
-import { supabase, corsHeaders, jsonResponse, errorResponse } from '../_shared/supabase.ts';
+import { supabase, corsHeaders, jsonResponse, errorResponse, requireUploadAccess } from '../_shared/supabase.ts';
 import { detectDataType } from '../_shared/resolve.ts';
 import { normalizeWaterRows }    from '../normalize-water/index.ts';
 import { normalizeFeedingRows }  from '../normalize-feeding/index.ts';
@@ -22,6 +22,12 @@ Deno.serve(async (req) => {
     const { raw_upload_id, data_type: hintType } = body as { raw_upload_id: string; data_type?: DataFileType };
 
     if (!raw_upload_id) return errorResponse('raw_upload_id required');
+
+    const access = await requireUploadAccess(req, raw_upload_id, {
+      allowedStatuses: ['approved'],
+      writeRoles: ['admin', 'farm_manager', 'system_operator'],
+    });
+    if (access instanceof Response) return access;
 
     // Load upload record
     const { data: upload, error: upErr } = await supabase
