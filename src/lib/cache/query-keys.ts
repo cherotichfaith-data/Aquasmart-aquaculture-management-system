@@ -341,6 +341,7 @@ export const queryKeys = {
       dateFrom?: string | null
       dateTo?: string | null
       includeIncomplete?: boolean
+      scopedSystemIds?: number[] | null
     }) {
       return [
         "systems-table",
@@ -352,6 +353,7 @@ export const queryKeys = {
         stringToken(params.dateFrom),
         stringToken(params.dateTo),
         params.includeIncomplete ?? false,
+        params.scopedSystemIds?.join(",") ?? "all-systems",
       ] as const
     },
     kpiOverview(params: {
@@ -362,6 +364,7 @@ export const queryKeys = {
       system?: string
       dateFrom?: string | null
       dateTo?: string | null
+      scopedSystemIds?: number[] | null
     }) {
       return [
         "kpi-overview",
@@ -372,6 +375,7 @@ export const queryKeys = {
         params.system ?? "all",
         stringToken(params.dateFrom),
         stringToken(params.dateTo),
+        params.scopedSystemIds?.join(",") ?? "all-systems",
       ] as const
     },
     recommendedActions(params: {
@@ -382,6 +386,7 @@ export const queryKeys = {
       timePeriod?: string
       dateFrom?: string | null
       dateTo?: string | null
+      scopedSystemIds?: number[] | null
     }) {
       return [
         "recommended-actions",
@@ -392,6 +397,7 @@ export const queryKeys = {
         params.timePeriod ?? "2 weeks",
         stringToken(params.dateFrom),
         stringToken(params.dateTo),
+        params.scopedSystemIds?.join(",") ?? "all-systems",
       ] as const
     },
     productionTrend(params: {
@@ -402,6 +408,7 @@ export const queryKeys = {
       timePeriod: string
       dateFrom?: string | null
       dateTo?: string | null
+      scopedSystemIds?: number[] | null
     }) {
       return [
         "production-trend",
@@ -412,6 +419,7 @@ export const queryKeys = {
         params.timePeriod,
         stringToken(params.dateFrom),
         stringToken(params.dateTo),
+        params.scopedSystemIds?.join(",") ?? "all-systems",
       ] as const
     },
   },
@@ -488,12 +496,19 @@ export const queryKeys = {
   farmUserRole(farmId?: string | null, userId?: string | null) {
     return ["farm-user-role", farmToken(farmId), userId ?? "anon"] as const
   },
-  timePeriodBounds(params: { farmId?: string | null; timePeriod: string; systemId?: number | null; scope?: string | null }) {
+  timePeriodBounds(params: {
+    farmId?: string | null
+    timePeriod: string
+    systemId?: number | null
+    batchId?: number | null
+    scope?: string | null
+  }) {
     return [
       "time-period-bounds",
       farmToken(params.farmId),
       params.timePeriod,
       numberToken(params.systemId),
+      numberToken(params.batchId),
       params.scope ?? "dashboard",
     ] as const
   },

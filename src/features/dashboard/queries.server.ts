@@ -10,7 +10,6 @@ import {
 import type {
   DashboardPageInitialData,
   DashboardPageInitialFilters,
-  DashboardSystemRow,
 } from "./types"
 import type { RecommendedActionRow } from "@/lib/types/insights"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/api/_utils"
@@ -18,7 +17,8 @@ import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
 import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics-rpc-shared"
-import { listWaterQualityMeasurementRows } from "@/features/shared/query-seed.server"
+import { listDailyFishInventoryRows, listWaterQualityMeasurementRows } from "@/features/shared/query-seed.server"
+import { toDashboardSystemRowsFromInventory } from "@/features/dashboard/dashboard-system-rows"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "month"
@@ -76,6 +76,7 @@ async function getTimeBounds(
   farmId: string,
   timePeriod: DashboardPageInitialFilters["timePeriod"],
   systemId?: number,
+  batchId?: number,
 ): Promise<TimeBounds> {
   return withNetworkFallback(
     "dashboard:getTimeBounds",
@@ -91,33 +92,8 @@ async function getTimeBounds(
       isTruncated: false,
       stalenessDays: null,
     },
-    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", systemId),
+    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", systemId, batchId),
   )
-}
-
-async function getDashboardSystemsRaw(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    stage?: DashboardPageInitialFilters["selectedStage"]
-    systemId?: number
-    dateFrom?: string | null
-    dateTo?: string | null
-  },
-): Promise<DashboardSystemRow[]> {
-  const { data, error } = await supabase.rpc("api_dashboard_systems", {
-    p_farm_id: params.farmId,
-    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
-    p_system_id: params.systemId,
-    p_start_date: params.dateFrom ?? undefined,
-    p_end_date: params.dateTo ?? undefined,
-  })
-
-  if (error) {
-    throw error
-  }
-
-  return (data ?? []) as DashboardSystemRow[]
 }
 
 async function getBatchSystemIds(supabase: ServerClient, batchId?: number): Promise<number[]> {
@@ -209,7 +185,11 @@ async function loadDashboardPageInitialData(
     return systemId && Number.isFinite(systemId) ? systemId : undefined
   })
   const effectiveSelectedSystem = selectedSystemId != null ? String(selectedSystemId) : "all"
-  const bounds = await getTimeBounds(supabase, farmId, params.filters.timePeriod)
+  const batchId =
+    params.filters.selectedBatch !== "all" && Number.isFinite(Number(params.filters.selectedBatch))
+      ? Number(params.filters.selectedBatch)
+      : undefined
+  const bounds = await getTimeBounds(supabase, farmId, params.filters.timePeriod, undefined, batchId)
   if (!bounds.start || !bounds.end) {
     return {
       ...empty,
@@ -232,35 +212,17 @@ async function loadDashboardPageInitialData(
     }
   }
 
-  const batchId =
-    params.filters.selectedBatch !== "all" && Number.isFinite(Number(params.filters.selectedBatch))
-      ? Number(params.filters.selectedBatch)
-      : undefined
   const startDate = bounds.start!
   const endDate = bounds.end!
 
-  const [systemOptions, batchSystems, dashboardSystemsRaw] = await Promise.all([
+  const [systemOptions, batchSystems] = await Promise.all([
     withNetworkFallback("dashboard:getScopedSystemOptions", [], () =>
       getScopedSystemOptions(supabase, farmId, params.filters.selectedStage),
     ),
     withNetworkFallback("dashboard:getScopedBatchSystems", [], () => getScopedBatchSystems(supabase, batchId)),
-    withNetworkFallback(
-      "dashboard:getDashboardSystemsRaw",
-      [],
-      () =>
-        getDashboardSystemsRaw(supabase, {
-          farmId,
-          stage: params.filters.selectedStage,
-          systemId: selectedSystemId,
-          dateFrom: startDate,
-          dateTo: endDate,
-        }),
-      { allowMissingObject: true },
-    ),
   ])
-  const dashboardSystems = dashboardSystemsRaw
-  const dashboardSystemIds = dashboardSystems
-    .map((row) => row.system_id)
+  const dashboardSystemIds = systemOptions
+    .map((row) => row.id)
     .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
   const batchScopedIds =
     params.filters.selectedBatch !== "all"
@@ -271,7 +233,7 @@ async function loadDashboardPageInitialData(
     : dashboardSystemIds
 
   const singleSystemId = activeScopedSystemIds.length === 1 ? activeScopedSystemIds[0] : undefined
-  const [consolidatedRows, recommendedActionRows, waterQualityMeasurements] =
+  const [consolidatedRows, recommendedActionRows, waterQualityMeasurements, inventoryRows] =
     await Promise.all([
       withNetworkFallback(
         "dashboard:getDashboardConsolidatedRows",
@@ -304,11 +266,24 @@ async function loadDashboardPageInitialData(
           limit: 2000,
         }),
       ),
+      withNetworkFallback("dashboard:listDailyFishInventoryRows", [], () =>
+        listDailyFishInventoryRows(supabase, {
+          farmId,
+          systemId: singleSystemId,
+          stage: params.filters.selectedStage === "all" ? undefined : params.filters.selectedStage,
+          dateFrom: startDate,
+          dateTo: endDate,
+          limit: 5000,
+        }),
+      ),
     ])
 
-  const systemsTableRows = dashboardSystems.filter((row) => {
-    if (!activeScopedSystemIds.includes(row.system_id)) return false
-    return true
+  const systemsTableRows = toDashboardSystemRowsFromInventory({
+    inventoryRows,
+    systemOptions,
+    activeScopedSystemIds,
+    dateFrom: startDate,
+    dateTo: endDate,
   })
 
   if (process.env.NEXT_PUBLIC_DEBUG === "true") {
@@ -320,7 +295,6 @@ async function loadDashboardPageInitialData(
     selectedBatch: params.filters.selectedBatch,
     selectedSystem: effectiveSelectedSystem,
       scopedSystemIds: activeScopedSystemIds,
-      dashboardSystemsCount: dashboardSystems.length,
       systemsTableRowsCount: systemsTableRows.length,
     })
   }
@@ -338,7 +312,7 @@ async function loadDashboardPageInitialData(
     systemsTable: {
       rows: systemsTableRows,
       meta: {
-        source: "api_dashboard_systems",
+        source: "api_daily_fish_inventory_rpc",
         start: startDate,
         end: endDate,
         reason: activeScopedSystemIds.length === 0 ? "No scoped systems" : undefined,

@@ -87,7 +87,7 @@ type TimePeriodBoundsRpcQuery = PromiseLike<{
 type TimePeriodBoundsRpcClient = {
   rpc: (
     name: "api_time_period_bounds_scoped",
-    args: TimePeriodBoundsRpc["Args"],
+    args: TimePeriodBoundsRpc["Args"] & { p_batch_id?: number },
   ) => TimePeriodBoundsRpcQuery
 }
 
@@ -114,6 +114,7 @@ export async function fetchTimePeriodBounds(
     scope?: AnalyticsTimeScope
     anchorDate?: string | null
     systemId?: number | null
+    batchId?: number | null
     signal?: AbortSignal
   },
 ): Promise<TimeBounds> {
@@ -124,6 +125,7 @@ export async function fetchTimePeriodBounds(
     p_scope: params.scope ?? "dashboard",
     p_anchor_date: params.anchorDate ?? undefined,
     p_system_id: params.systemId ?? undefined,
+    p_batch_id: params.batchId ?? undefined,
   })
   if (params.signal && typeof query.abortSignal === "function") {
     query = query.abortSignal(params.signal)

@@ -152,6 +152,7 @@ async function loadWaterQualityPageInitialData(
       params.filters.timePeriod,
       "water_quality",
       selectedSystemId,
+      batchId,
     ),
     getLatestStatus(supabase, params.farmId, selectedSystemId),
   ])

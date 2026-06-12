@@ -118,7 +118,14 @@ async function loadMortalityPageInitialData(
     getScopedBatchSystems(supabase, batchId),
   ])
   const selectedSystemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, systems)
-  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", selectedSystemId)
+  const bounds = await getScopedTimeBounds(
+    supabase,
+    params.farmId,
+    params.filters.timePeriod,
+    "production",
+    selectedSystemId,
+    batchId,
+  )
 
   if (!bounds.start || !bounds.end) {
     return {

@@ -239,10 +239,24 @@ export default function Header({
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
   const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
 
+  const selectedBatchAgeDays = useMemo(() => {
+    if (selectedBatch === "all") return null
+    const deliveryDate = allBatchesForChips.find((item) => String(item.id) === selectedBatch)?.date_of_delivery
+    if (!deliveryDate) return null
+    const [year, month, day] = deliveryDate.split("-").map(Number)
+    if (!year || !month || !day) return null
+    const deliveryUtc = Date.UTC(year, month - 1, day)
+    const now = new Date()
+    const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+    return Math.max(Math.floor((todayUtc - deliveryUtc) / 86_400_000) + 1, 1)
+  }, [allBatchesForChips, selectedBatch])
+
   const timePeriodOptions = useMemo(() => {
     if (timePeriodsQuery.data?.status !== "success") return undefined
-    return timePeriodsQuery.data.data.map((row) => row.time_period)
-  }, [timePeriodsQuery.data])
+    return timePeriodsQuery.data.data
+      .filter((row) => selectedBatchAgeDays == null || row.days_since_start == null || row.days_since_start <= selectedBatchAgeDays)
+      .map((row) => row.time_period)
+  }, [selectedBatchAgeDays, timePeriodsQuery.data])
 
   const activeSystemLabel = useMemo(() => {
     if (selectedSystem === "all") return null
@@ -337,6 +351,13 @@ export default function Header({
     setTimePeriod(value)
     replaceFilterParams({ timePeriod: value })
   }
+
+  useEffect(() => {
+    if (!timePeriodOptions?.length || timePeriodOptions.includes(timePeriod)) return
+    const nextPeriod = timePeriodOptions.includes("all history") ? "all history" : timePeriodOptions[0]
+    if (!nextPeriod) return
+    handleTimePeriodChange(nextPeriod)
+  }, [timePeriod, timePeriodOptions])
 
   const handleWaterQualityParameterChange = (value: string) => {
     if (!isWqParameter(value)) return

@@ -16,7 +16,7 @@ export function useRecordFeedInventorySnapshot() {
         inventory_date: payload.inventory_date,
         inventory_time: payload.inventory_time ?? null,
         feed_type_id: payload.feed_type_id ?? null,
-        feed_type_label: payload.feed_type_label,
+        feed_type_label: payload.feed_type_label ?? (payload.feed_type_id ? `Feed ${payload.feed_type_id}` : "Feed"),
         bag_weight: payload.bag_weight,
         amount_of_bags: payload.amount_of_bags,
         opened_bags: payload.opened_bags ?? null,

@@ -5,8 +5,10 @@ import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
 import { queryKeys } from "@/lib/cache/query-keys"
 import type { DashboardSystemRow, SystemsTableData } from "@/features/dashboard/types"
-import { getDashboardSystems } from "@/lib/api/dashboard"
 import type { TimePeriod } from "@/lib/time-period"
+import { useSystemOptions } from "@/lib/hooks/use-options"
+import { toDashboardSystemRowsFromInventory } from "@/features/dashboard/dashboard-system-rows"
+import { getDailyFishInventory } from "@/lib/api/inventory"
 
 export function useSystemsTable(params: {
   farmId?: string | null
@@ -22,6 +24,12 @@ export function useSystemsTable(params: {
   const { session, user } = useAuth()
   const hasBounds = Boolean(params.dateFrom) && Boolean(params.dateTo)
   const debugEnabled = process.env.NEXT_PUBLIC_DEBUG === "true"
+  const systemOptionsQuery = useSystemOptions({
+    farmId: params.farmId,
+    stage: params.stage,
+    activeOnly: true,
+  })
+  const systemOptions = systemOptionsQuery.data?.status === "success" ? systemOptionsQuery.data.data : []
 
   return useQuery({
     queryKey: queryKeys.dashboard.systemsTable(params),
@@ -44,10 +52,13 @@ export function useSystemsTable(params: {
         }
       }
 
-      const stage = params.stage === "all" ? null : params.stage
+      const stage = params.stage === "all" ? undefined : params.stage
       const parsedSystemId = params.system && params.system !== "all" ? Number(params.system) : null
-      const systemId = Number.isFinite(parsedSystemId) ? (parsedSystemId as number) : null
+      const systemId = Number.isFinite(parsedSystemId) ? (parsedSystemId as number) : undefined
       const scopedSystemIds = Array.isArray(params.scopedSystemIds) ? params.scopedSystemIds : null
+      const activeSystemIds =
+        scopedSystemIds ??
+        systemOptions.map((row) => row.id).filter((id): id is number => typeof id === "number" && Number.isFinite(id))
       if (debugEnabled) {
         console.debug("[dashboard][useSystemsTable]", {
           farmId,
@@ -57,6 +68,7 @@ export function useSystemsTable(params: {
           batch: params.batch ?? "all",
           system: params.system ?? "all",
           scopedSystemIds,
+          activeSystemIds,
         })
       }
       if (scopedSystemIds && scopedSystemIds.length === 0) {
@@ -65,13 +77,20 @@ export function useSystemsTable(params: {
           meta: { reason: "No scoped systems", start: startDate, end: endDate },
         }
       }
+      if (activeSystemIds.length === 0) {
+        return {
+          rows: [] as DashboardSystemRow[],
+          meta: { reason: "No active systems", start: startDate, end: endDate },
+        }
+      }
 
-      const result = await getDashboardSystems({
+      const result = await getDailyFishInventory({
         farmId,
         stage,
         systemId,
         dateFrom: startDate,
         dateTo: endDate,
+        limit: 5000,
         signal,
       })
 
@@ -82,8 +101,13 @@ export function useSystemsTable(params: {
         }
       }
 
-      const rows = ((result.data ?? []) as DashboardSystemRow[]).filter((row) => {
-        if (scopedSystemIds && !scopedSystemIds.includes(row.system_id)) return false
+      const rows = toDashboardSystemRowsFromInventory({
+        inventoryRows: result.data ?? [],
+        systemOptions,
+        activeScopedSystemIds: activeSystemIds,
+        dateFrom: startDate,
+        dateTo: endDate,
+      }).filter((row) => {
         if (params.includeIncomplete) return true
         return row.is_complete
       })
@@ -97,10 +121,14 @@ export function useSystemsTable(params: {
 
       return {
         rows,
-        meta: { source: "api_dashboard_systems", start: startDate, end: endDate },
+        meta: { source: "api_daily_fish_inventory_rpc", start: startDate, end: endDate },
       }
     },
-    enabled: (Boolean(session) || Boolean(user)) && Boolean(params.farmId) && hasBounds,
+    enabled:
+      (Boolean(session) || Boolean(user)) &&
+      Boolean(params.farmId) &&
+      hasBounds &&
+      (systemOptionsQuery.data?.status === "success" || Array.isArray(params.scopedSystemIds)),
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: true,

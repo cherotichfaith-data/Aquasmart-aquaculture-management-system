@@ -33,12 +33,14 @@ export async function getScopedTimeBounds(
   timePeriod: ScopedAnalyticsTimePeriod,
   scope: Parameters<typeof fetchTimePeriodBounds>[1]["scope"],
   systemId?: number,
+  batchId?: number,
 ) {
   return fetchTimePeriodBounds(supabase as never, {
     farmId,
     timePeriod,
     scope,
     systemId,
+    batchId,
   })
 }
 
