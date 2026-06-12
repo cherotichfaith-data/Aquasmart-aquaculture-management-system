@@ -15,6 +15,7 @@ export function useTimePeriodBounds(params: {
   farmId?: string | null
   timePeriod: TimePeriod
   systemId?: number
+  batchId?: number
   scope?: AnalyticsTimeScope
   enabled?: boolean
 }) {
@@ -30,6 +31,7 @@ export function useTimePeriodBounds(params: {
             timePeriod: params.timePeriod,
             scope: params.scope ?? "dashboard",
             systemId: params.systemId,
+            batchId: params.batchId,
             signal,
           }),
     enabled,

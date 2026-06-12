@@ -59,6 +59,14 @@ export const FEEDING_RESPONSE_LEVELS = [
   actionGuideline: string
 }>
 
+export const FEEDING_RESPONSE_LEVEL_COLORS: Record<FeedingResponseLabel, string> = {
+  "No Response": "#dc2626",
+  "Low Appetite": "#f97316",
+  "Ideal Appetite": "#22c55e",
+  "Good Appetite": "#16a34a",
+  "Aggressive Appetite": "#2563eb",
+}
+
 const LEGACY_RESPONSE_TO_LEVEL: Record<string, FeedingResponseLevel> = {
   excellent: 5,
   very_good: 4,

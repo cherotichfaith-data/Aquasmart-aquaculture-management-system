@@ -16,8 +16,8 @@ import { resolveTimePeriod, toTimePeriodUrlValue } from "@/lib/time-period"
 import KPIOverview from "./kpi-overview"
 import SystemsTable from "./systems-table"
 import RecommendedActions from "./recommended-actions"
-import EfcrByPeriod from "./efcr-by-period"
-import WaterQualityMonthlyAverages from "./water-quality-monthly-averages"
+import FeedInputByPeriod from "./feed-input-by-period"
+import FeedingResponseDonut from "./feeding-response-donut"
 import { parseDashboardStageParam } from "./dashboard-page-utils"
 
 function SectionLabel({
@@ -116,9 +116,17 @@ export default function DashboardPage({
     selectedBatch,
     selectedSystem,
   })
-  const shouldApplySystemIdScope = selectedBatch !== "all" || selectedSystemId != null
-  const appliedScopedSystemIds = shouldApplySystemIdScope ? scopedSystemIdList : null
-  const activeProductionSystemIds = scopedSystemIdList.length > 0 ? scopedSystemIdList : null
+  const numericSelectedSystemId =
+    selectedSystem !== "all" && Number.isFinite(Number(selectedSystem)) ? Number(selectedSystem) : null
+  const resolvedScopedSystemIdList =
+    selectedSystemId != null
+      ? [selectedSystemId]
+      : numericSelectedSystemId != null
+        ? [numericSelectedSystemId]
+        : scopedSystemIdList
+  const shouldApplySystemIdScope = selectedBatch !== "all" || numericSelectedSystemId != null
+  const appliedScopedSystemIds = shouldApplySystemIdScope ? resolvedScopedSystemIdList : null
+  const activeProductionSystemIds = resolvedScopedSystemIdList.length > 0 ? resolvedScopedSystemIdList : null
 
   useEffect(() => {
     if (selectedSystem === "all" || selectedSystemId != null) return
@@ -140,7 +148,9 @@ export default function DashboardPage({
       selectedBatch,
       selectedSystem,
       selectedSystemId,
+      numericSelectedSystemId,
       scopedSystemIdList,
+      resolvedScopedSystemIdList,
       hasScopeFilters,
       shouldApplySystemIdScope,
       appliedScopedSystemIds,
@@ -152,6 +162,8 @@ export default function DashboardPage({
     debugEnabled,
     farmId,
     hasScopeFilters,
+    numericSelectedSystemId,
+    resolvedScopedSystemIdList,
     scopedSystemIdList,
     selectedBatch,
     selectedStage,
@@ -180,16 +192,20 @@ export default function DashboardPage({
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, lg: 7 }}>
-          <EfcrByPeriod
+          <FeedInputByPeriod
             farmId={farmId}
+            batch={selectedBatch}
+            timePeriod={timePeriod}
             dateFrom={dateFrom}
             dateTo={dateTo}
             scopedSystemIds={activeProductionSystemIds}
+            mode="daily"
           />
         </Grid>
         <Grid size={{ xs: 12, lg: 5 }}>
-          <WaterQualityMonthlyAverages
+          <FeedingResponseDonut
             farmId={farmId}
+            batch={selectedBatch}
             dateFrom={dateFrom}
             dateTo={dateTo}
             scopedSystemIds={activeProductionSystemIds}

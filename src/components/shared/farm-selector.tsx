@@ -63,31 +63,54 @@ export default function FarmSelector({
   const allSystems = (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []).filter(
     (system) => system.id != null,
   )
+  const selectedSystemId =
+    selectedSystem !== "all" && Number.isFinite(Number(selectedSystem)) ? Number(selectedSystem) : null
+  const selectedSystemRow = useMemo(
+    () => (selectedSystemId == null ? null : allSystems.find((system) => system.id === selectedSystemId) ?? null),
+    [allSystems, selectedSystemId],
+  )
+  const systemsById = useMemo(() => new Map(allSystems.map((system) => [system.id, system])), [allSystems])
+  const selectedBatchSystemIds = useMemo(() => {
+    if (selectedBatch === "all" || batchSystemsQuery.data?.status !== "success") return null
+    return new Set(batchSystemsQuery.data.data.map((row) => row.system_id))
+  }, [batchSystemsQuery.data, selectedBatch])
   const systems = useMemo(() => {
     const stageFiltered =
       selectedStage === "all"
         ? allSystems
         : allSystems.filter((system) => system.growth_stage === selectedStage)
 
-    if (selectedBatch === "all" || batchSystemsQuery.data?.status !== "success") {
+    if (selectedBatchSystemIds == null) {
       return stageFiltered
     }
 
-    const batchSystemIds = new Set(batchSystemsQuery.data.data.map((row) => row.system_id))
-    return stageFiltered.filter((system) => batchSystemIds.has(system.id as number))
-  }, [allSystems, batchSystemsQuery.data, selectedBatch, selectedStage])
+    return stageFiltered.filter((system) => selectedBatchSystemIds.has(system.id as number))
+  }, [allSystems, selectedBatchSystemIds, selectedStage])
   const systemCount = systems.length
   const resolvedLayout = layout ?? (variant === "compact" ? "row" : "grid")
+  const filteredBatches = useMemo(() => {
+    return batches.filter((batch) => {
+      const batchSystemId = typeof batch.system_id === "number" ? batch.system_id : null
+      const batchSystem = batchSystemId == null ? null : systemsById.get(batchSystemId)
+      if (selectedSystemId != null && batchSystemId !== selectedSystemId) return false
+      if (selectedStage !== "all" && batchSystem?.growth_stage !== selectedStage) return false
+      return true
+    })
+  }, [batches, selectedStage, selectedSystemId, systemsById])
   const stages = useMemo(() => {
     const stageSet = new Set<Enums<"system_growth_stage">>()
-    allSystems.forEach((system) => {
+    const stageSystems =
+      selectedSystemRow != null
+        ? [selectedSystemRow]
+        : selectedBatchSystemIds != null
+          ? allSystems.filter((system) => selectedBatchSystemIds.has(system.id as number))
+          : allSystems
+
+    stageSystems.forEach((system) => {
       if (GROWTH_STAGE_VALUES.includes(system.growth_stage)) {
         stageSet.add(system.growth_stage)
       }
     })
-    if (selectedStage !== "all") {
-      stageSet.add(selectedStage as Enums<"system_growth_stage">)
-    }
     const ordered = GROWTH_STAGE_VALUES.filter((stage) => stageSet.has(stage))
     return [
       {
@@ -99,20 +122,20 @@ export default function FarmSelector({
         label: formatGrowthStage(value),
       })),
     ]
-  }, [allSystems, selectedStage])
+  }, [allSystems, selectedBatchSystemIds, selectedSystemRow])
   const batchOptions = useMemo(
     () => [
       {
         value: "all",
         label: "All Batches",
       },
-      ...batches.map((batch) => ({
+      ...filteredBatches.map((batch) => ({
         value: String(batch.id),
         label: batch.label || `Batch ${batch.id}`,
         keywords: [batch.label ?? "", String(batch.id), batch.date_of_delivery ?? ""],
       })),
     ],
-    [batches],
+    [filteredBatches],
   )
   const systemOptions = useMemo(
     () => [
@@ -138,10 +161,39 @@ export default function FarmSelector({
   useEffect(() => {
     if (!farmId || farmLoading || selectedBatch === "all") return
     if (batchesQuery.isLoading || batchesQuery.data?.status !== "success") return
-    if (!batches.some((batch) => String(batch.id) === selectedBatch)) {
+    if (!filteredBatches.some((batch) => String(batch.id) === selectedBatch)) {
       onBatchChange("all")
     }
-  }, [batches, batchesQuery.data?.status, batchesQuery.isLoading, farmId, farmLoading, onBatchChange, selectedBatch])
+  }, [
+    batchesQuery.data?.status,
+    batchesQuery.isLoading,
+    farmId,
+    farmLoading,
+    filteredBatches,
+    onBatchChange,
+    selectedBatch,
+  ])
+
+  useEffect(() => {
+    if (!farmId || farmLoading || selectedStage === "all") return
+    if (systemsQuery.isLoading || systemsQuery.data?.status !== "success") return
+    if (selectedBatch !== "all" && (batchSystemsQuery.isLoading || batchSystemsQuery.data?.status !== "success")) return
+    if (!stages.some((stage) => stage.value === selectedStage)) {
+      onStageChange(selectedSystemRow?.growth_stage ?? "all")
+    }
+  }, [
+    batchSystemsQuery.data?.status,
+    batchSystemsQuery.isLoading,
+    farmId,
+    farmLoading,
+    onStageChange,
+    selectedBatch,
+    selectedStage,
+    selectedSystemRow?.growth_stage,
+    stages,
+    systemsQuery.data?.status,
+    systemsQuery.isLoading,
+  ])
 
   useEffect(() => {
     if (!farmId || farmLoading || selectedSystem === "all") return

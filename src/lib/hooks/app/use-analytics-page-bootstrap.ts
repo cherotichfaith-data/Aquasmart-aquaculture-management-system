@@ -94,11 +94,16 @@ export function useAnalyticsPageBootstrap(params: {
     sharedFilters.selectedSystem !== "all" && Number.isFinite(Number(sharedFilters.selectedSystem))
       ? Number(sharedFilters.selectedSystem)
       : undefined
+  const selectedBatchId =
+    sharedFilters.selectedBatch !== "all" && Number.isFinite(Number(sharedFilters.selectedBatch))
+      ? Number(sharedFilters.selectedBatch)
+      : undefined
   const boundsSystemId = params.useSystemBounds === false ? undefined : selectedSystemId
   const boundsQuery = useTimePeriodBounds({
     farmId,
     timePeriod: sharedFilters.timePeriod,
     systemId: boundsSystemId,
+    batchId: selectedBatchId,
     scope: params.boundsScope ?? "dashboard",
     enabled: params.boundsEnabled,
   })

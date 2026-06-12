@@ -7,18 +7,10 @@ import { formatNumberValue } from "@/lib/analytics-format"
 import type { FeedingRecordWithType } from "@/lib/api/reports"
 import type { TimePeriod } from "@/lib/time-period"
 import { formatBucketLabel, formatGranularityLabel, getBucketGranularity, getBucketKey } from "@/lib/time-series"
-import { getSemanticColor } from "@/lib/theme/semantic-colors"
+import { FEEDING_RESPONSE_LEVEL_COLORS, type FeedingResponseLabel } from "@/lib/feeding-response"
 import { normalizeFeedingResponse, type EfcrTrendPoint, type FeedRatePoint } from "../_lib/feed-analytics"
 import { formatFeedTypeLabel } from "../_lib/feed-page"
 import { FeedCoreSection, FeedDashboardError } from "./feed-dashboard-sections"
-
-const RESPONSE_COLORS: Record<string, string> = {
-  "No Response": getSemanticColor("bad"),
-  "Low Appetite": getSemanticColor("warn"),
-  "Ideal Appetite": getSemanticColor("good"),
-  "Good Appetite": getSemanticColor("info"),
-  "Aggressive Appetite": getSemanticColor("neutral"),
-}
 
 const getMaxNumber = (values: Array<number | null | undefined>, fallback = 1) => {
   const numeric = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
@@ -81,7 +73,7 @@ export function FeedDashboard({
       counts.set(normalized, (counts.get(normalized) ?? 0) + 1)
     })
 
-    return ["No Response", "Low Appetite", "Ideal Appetite", "Good Appetite", "Aggressive Appetite"].map((label) => ({
+    return (["No Response", "Low Appetite", "Ideal Appetite", "Good Appetite", "Aggressive Appetite"] as FeedingResponseLabel[]).map((label) => ({
       name: label,
       value: counts.get(label) ?? 0,
     }))
@@ -141,7 +133,7 @@ export function FeedDashboard({
       datasets: [
         {
           data: responseRows.map((row) => row.value),
-          backgroundColor: responseRows.map((row) => RESPONSE_COLORS[row.name]),
+          backgroundColor: responseRows.map((row) => FEEDING_RESPONSE_LEVEL_COLORS[row.name]),
           borderWidth: 0,
           hoverOffset: 4,
         },
@@ -179,6 +171,7 @@ export function FeedDashboard({
           cornerRadius: 14,
           usePointStyle: true,
           callbacks: {
+            title: () => "",
             label: (context: any) => `${context.label}: ${formatMetric(Number(context.parsed), 0)} sessions`,
           },
         },

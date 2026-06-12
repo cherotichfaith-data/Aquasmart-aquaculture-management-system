@@ -14,7 +14,7 @@ type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["
 
 export type FeedSupplierInput = Insert<"feed_supplier">
 export type FeedTypeInput = Insert<"feed_type">
-export type FeedInventorySnapshotInput = Insert<"feed_inventory">
+export type FeedInventorySnapshotInput = Insert<"feed_inventory"> & { feed_type_label?: string }
 
 const feedSupplierSchema = z.object({
   company_name: z.string().trim().min(1).max(255),
@@ -39,7 +39,6 @@ const feedInventorySchema = z.object({
   inventory_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   inventory_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
   feed_type_id: z.number().int().positive(),
-  feed_type_label: z.string().trim().min(1).max(255),
   bag_weight: z.number().finite().positive(),
   amount_of_bags: z.number().int().min(0),
   opened_bags: z.number().int().min(0).nullable().optional(),
@@ -158,7 +157,6 @@ export async function recordFeedInventorySnapshotAction(
       inventory_date: parsedPayload.inventory_date,
       inventory_time: parsedPayload.inventory_time ?? null,
       feed_type_id: parsedPayload.feed_type_id,
-      feed_type_label: parsedPayload.feed_type_label.trim(),
       bag_weight: parsedPayload.bag_weight,
       amount_of_bags: parsedPayload.amount_of_bags,
       opened_bags: parsedPayload.opened_bags ?? null,

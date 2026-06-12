@@ -38,13 +38,14 @@ type FeedInventoryRow = Pick<
   | "id"
   | "inventory_date"
   | "feed_type_id"
-  | "feed_type_label"
   | "bag_weight"
   | "amount_of_bags"
   | "opened_bags"
   | "snapshot_kg"
   | "created_at"
-> &
+> & {
+  feed_type_label?: string | null
+} &
   PendingMeta
 type StockingRow = Pick<Tables<"fish_stocking">, "id" | "date" | "system_id" | "number_of_fish_stocking" | "type_of_stocking" | "created_at"> & PendingMeta
 
@@ -369,7 +370,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
     cards = rows.map((row, index) => {
       return {
         key: String(row.localId ?? row.id ?? index),
-        title: row.feed_type_label || `Feed ${row.feed_type_id}`,
+        title: row.feed_type_label?.trim() || `Feed ${row.feed_type_id}`,
         subtitle: formatDate(row.inventory_date),
         meta: formatCreatedAt(row.created_at),
         pending: row.status === "pending",

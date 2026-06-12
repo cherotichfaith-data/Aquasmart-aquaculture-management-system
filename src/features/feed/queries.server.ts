@@ -78,9 +78,10 @@ async function loadFeedPageInitialData(
     }
   }
 
+  const batchId = parseSelectedNumericId(params.filters.selectedBatch)
   const [systems, batchSystems] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage) as Promise<SystemOption[]>,
-    getScopedBatchSystems(supabase, parseSelectedNumericId(params.filters.selectedBatch)),
+    getScopedBatchSystems(supabase, batchId),
   ])
   const selectedSystemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, systems)
   const bounds = await getScopedTimeBounds(
@@ -89,6 +90,7 @@ async function loadFeedPageInitialData(
     params.filters.timePeriod,
     "feeding",
     selectedSystemId,
+    batchId,
   )
 
   if (!bounds.start || !bounds.end) {

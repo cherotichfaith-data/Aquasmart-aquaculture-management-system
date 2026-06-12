@@ -120,7 +120,7 @@ async function loadReportsPageInitialData(
     listAlertThresholdRows(supabase, params.farmId, params.userId),
   ])
   const systemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, growthSystems)
-  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId)
+  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId, batchId)
 
   if (!bounds.start || !bounds.end) {
     return {

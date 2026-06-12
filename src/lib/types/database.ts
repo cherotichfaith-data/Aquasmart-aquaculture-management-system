@@ -320,6 +320,7 @@ export type Database = {
           location: string | null
           name: string
           organization_id: string | null
+          updated_at: string
         }
         Insert: {
           created_at?: string | null
@@ -327,6 +328,7 @@ export type Database = {
           location?: string | null
           name: string
           organization_id?: string | null
+          updated_at?: string
         }
         Update: {
           created_at?: string | null
@@ -334,6 +336,7 @@ export type Database = {
           location?: string | null
           name?: string
           organization_id?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -385,12 +388,12 @@ export type Database = {
           created_at: string
           farm_id: string
           feed_type_id: number
-          feed_type_label: string
           id: number
           inventory_date: string
           inventory_time: string | null
           opened_bags: number | null
           snapshot_kg: number | null
+          updated_at: string
         }
         Insert: {
           amount_of_bags?: number | null
@@ -399,12 +402,12 @@ export type Database = {
           created_at?: string
           farm_id: string
           feed_type_id: number
-          feed_type_label: string
           id?: number
           inventory_date: string
           inventory_time?: string | null
           opened_bags?: number | null
           snapshot_kg?: number | null
+          updated_at?: string
         }
         Update: {
           amount_of_bags?: number | null
@@ -413,12 +416,12 @@ export type Database = {
           created_at?: string
           farm_id?: string
           feed_type_id?: number
-          feed_type_label?: string
           id?: number
           inventory_date?: string
           inventory_time?: string | null
           opened_bags?: number | null
           snapshot_kg?: number | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -473,6 +476,7 @@ export type Database = {
           feed_supplier_id: number
           id: number
           is_active: boolean
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -485,6 +489,7 @@ export type Database = {
           feed_supplier_id: number
           id?: number
           is_active?: boolean
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -497,6 +502,7 @@ export type Database = {
           feed_supplier_id?: number
           id?: number
           is_active?: boolean
+          updated_at?: string
         }
         Relationships: [
           {
@@ -529,6 +535,7 @@ export type Database = {
           notes: string | null
           synced_at: string | null
           system_id: number
+          updated_at: string
         }
         Insert: {
           batch_id?: number | null
@@ -543,6 +550,7 @@ export type Database = {
           notes?: string | null
           synced_at?: string | null
           system_id: number
+          updated_at?: string
         }
         Update: {
           batch_id?: number | null
@@ -557,6 +565,7 @@ export type Database = {
           notes?: string | null
           synced_at?: string | null
           system_id?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -633,6 +642,7 @@ export type Database = {
           name: string
           number_of_fish: number
           supplier_id: number
+          updated_at: string
         }
         Insert: {
           abw: number
@@ -643,6 +653,7 @@ export type Database = {
           name: string
           number_of_fish: number
           supplier_id: number
+          updated_at?: string
         }
         Update: {
           abw?: number
@@ -653,6 +664,7 @@ export type Database = {
           name?: string
           number_of_fish?: number
           supplier_id?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -704,11 +716,12 @@ export type Database = {
           date: string
           id: number
           local_id: string | null
-          number_of_fish_harvest: number | null
+          number_of_fish_harvest: number
           synced_at: string | null
           system_id: number
           total_weight_harvest: number
           type_of_harvest: Database["public"]["Enums"]["type_of_harvest"]
+          updated_at: string
         }
         Insert: {
           abw?: number | null
@@ -718,11 +731,12 @@ export type Database = {
           date: string
           id?: number
           local_id?: string | null
-          number_of_fish_harvest?: number | null
+          number_of_fish_harvest: number
           synced_at?: string | null
           system_id: number
           total_weight_harvest: number
           type_of_harvest: Database["public"]["Enums"]["type_of_harvest"]
+          updated_at?: string
         }
         Update: {
           abw?: number | null
@@ -732,11 +746,12 @@ export type Database = {
           date?: string
           id?: number
           local_id?: string | null
-          number_of_fish_harvest?: number | null
+          number_of_fish_harvest?: number
           synced_at?: string | null
           system_id?: number
           total_weight_harvest?: number
           type_of_harvest?: Database["public"]["Enums"]["type_of_harvest"]
+          updated_at?: string
         }
         Relationships: [
           {
@@ -765,7 +780,7 @@ export type Database = {
       fish_mortality: {
         Row: {
           batch_id: number | null
-          cause: string
+          cause: Database["public"]["Enums"]["mortality_cause"]
           created_at: string
           cycle_id: number | null
           date: string
@@ -777,10 +792,11 @@ export type Database = {
           synced_at: string | null
           system_id: number
           total_weight_mortality: number | null
+          updated_at: string
         }
         Insert: {
           batch_id?: number | null
-          cause?: string
+          cause?: Database["public"]["Enums"]["mortality_cause"]
           created_at?: string
           cycle_id?: number | null
           date: string
@@ -792,10 +808,11 @@ export type Database = {
           synced_at?: string | null
           system_id: number
           total_weight_mortality?: number | null
+          updated_at?: string
         }
         Update: {
           batch_id?: number | null
-          cause?: string
+          cause?: Database["public"]["Enums"]["mortality_cause"]
           created_at?: string
           cycle_id?: number | null
           date?: string
@@ -807,6 +824,7 @@ export type Database = {
           synced_at?: string | null
           system_id?: number
           total_weight_mortality?: number | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -846,6 +864,7 @@ export type Database = {
           synced_at: string | null
           system_id: number
           total_weight_sampling: number
+          updated_at: string
         }
         Insert: {
           abw: number
@@ -860,6 +879,7 @@ export type Database = {
           synced_at?: string | null
           system_id: number
           total_weight_sampling: number
+          updated_at?: string
         }
         Update: {
           abw?: number
@@ -874,6 +894,7 @@ export type Database = {
           synced_at?: string | null
           system_id?: number
           total_weight_sampling?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -914,6 +935,7 @@ export type Database = {
           system_id: number
           total_weight_stocking: number
           type_of_stocking: Database["public"]["Enums"]["type_of_stocking"]
+          updated_at: string
         }
         Insert: {
           abw: number
@@ -929,6 +951,7 @@ export type Database = {
           system_id: number
           total_weight_stocking: number
           type_of_stocking: Database["public"]["Enums"]["type_of_stocking"]
+          updated_at?: string
         }
         Update: {
           abw?: number
@@ -944,6 +967,7 @@ export type Database = {
           system_id?: number
           total_weight_stocking?: number
           type_of_stocking?: Database["public"]["Enums"]["type_of_stocking"]
+          updated_at?: string
         }
         Relationships: [
           {
@@ -987,6 +1011,7 @@ export type Database = {
           target_system_id: number | null
           total_weight_transfer: number | null
           transfer_type: Database["public"]["Enums"]["transfer_type"]
+          updated_at: string
         }
         Insert: {
           abw?: number | null
@@ -1005,6 +1030,7 @@ export type Database = {
           target_system_id?: number | null
           total_weight_transfer?: number | null
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
+          updated_at?: string
         }
         Update: {
           abw?: number | null
@@ -1023,6 +1049,7 @@ export type Database = {
           target_system_id?: number | null
           total_weight_transfer?: number | null
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1069,6 +1096,7 @@ export type Database = {
           resolved_by: string | null
           row_data: Json
           table_name: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -1083,6 +1111,7 @@ export type Database = {
           resolved_by?: string | null
           row_data: Json
           table_name: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -1097,6 +1126,7 @@ export type Database = {
           resolved_by?: string | null
           row_data?: Json
           table_name?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1117,28 +1147,31 @@ export type Database = {
       }
       organization: {
         Row: {
-          created_at: string | null
+          created_at: string
           id: string
-          is_active: boolean | null
+          is_active: boolean
           name: string
           owner_id: string | null
           slug: string
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           id?: string
-          is_active?: boolean | null
+          is_active?: boolean
           name: string
           owner_id?: string | null
           slug: string
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           id?: string
-          is_active?: boolean | null
+          is_active?: boolean
           name?: string
           owner_id?: string | null
           slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1152,6 +1185,7 @@ export type Database = {
           previous_system_id: number | null
           system_id: number
           target_weight_g: number | null
+          updated_at: string
         }
         Insert: {
           batch_id: number
@@ -1162,6 +1196,7 @@ export type Database = {
           previous_system_id?: number | null
           system_id: number
           target_weight_g?: number | null
+          updated_at?: string
         }
         Update: {
           batch_id?: number
@@ -1172,6 +1207,7 @@ export type Database = {
           previous_system_id?: number | null
           system_id?: number
           target_weight_g?: number | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1211,6 +1247,7 @@ export type Database = {
           row_count: number | null
           status: string
           storage_path: string
+          updated_at: string
           uploaded_at: string
           uploaded_by: string
         }
@@ -1227,6 +1264,7 @@ export type Database = {
           row_count?: number | null
           status?: string
           storage_path: string
+          updated_at?: string
           uploaded_at?: string
           uploaded_by: string
         }
@@ -1243,6 +1281,7 @@ export type Database = {
           row_count?: number | null
           status?: string
           storage_path?: string
+          updated_at?: string
           uploaded_at?: string
           uploaded_by?: string
         }
@@ -1270,6 +1309,7 @@ export type Database = {
           name: string
           type: Database["public"]["Enums"]["system_type"]
           unit: string | null
+          updated_at: string
           volume: number | null
         }
         Insert: {
@@ -1285,6 +1325,7 @@ export type Database = {
           name: string
           type: Database["public"]["Enums"]["system_type"]
           unit?: string | null
+          updated_at?: string
           volume?: number | null
         }
         Update: {
@@ -1300,6 +1341,7 @@ export type Database = {
           name?: string
           type?: Database["public"]["Enums"]["system_type"]
           unit?: string | null
+          updated_at?: string
           volume?: number | null
         }
         Relationships: [
@@ -1441,6 +1483,7 @@ export type Database = {
           synced_at: string | null
           system_id: number
           time: string
+          updated_at: string
           water_depth: number
         }
         Insert: {
@@ -1455,6 +1498,7 @@ export type Database = {
           synced_at?: string | null
           system_id: number
           time: string
+          updated_at?: string
           water_depth: number
         }
         Update: {
@@ -1469,6 +1513,7 @@ export type Database = {
           synced_at?: string | null
           system_id?: number
           time?: string
+          updated_at?: string
           water_depth?: number
         }
         Relationships: [
@@ -2302,6 +2347,16 @@ export type Database = {
         | "0.5mm"
         | "0.5-1.0mm"
         | "0.9-1.6mm"
+      mortality_cause:
+        | "unknown"
+        | "hypoxia"
+        | "disease"
+        | "injury"
+        | "handling"
+        | "predator"
+        | "starvation"
+        | "temperature"
+        | "other"
       system_growth_stage:
         | "fingerling"
         | "juvenile"
@@ -2515,6 +2570,17 @@ export const Constants = {
         "0.5mm",
         "0.5-1.0mm",
         "0.9-1.6mm",
+      ],
+      mortality_cause: [
+        "unknown",
+        "hypoxia",
+        "disease",
+        "injury",
+        "handling",
+        "predator",
+        "starvation",
+        "temperature",
+        "other",
       ],
       system_growth_stage: [
         "fingerling",
