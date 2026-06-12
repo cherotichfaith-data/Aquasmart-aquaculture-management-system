@@ -451,7 +451,7 @@ export default function SystemsTable({
                     <TableCell className="text-right">{formatUnitValue(row.biomass_density, 2, "kg/m3")}</TableCell>
                     <TableCell className="text-right">{formatUnitValue(row.abw, 1, "g")}</TableCell>
                     <TableCell className="text-right">
-                      {row.sample_age_days == null ? "--" : `${formatNumberValue(row.sample_age_days)}d ago`}
+                      {row.sample_age_days == null ? "Not sampled" : `${formatNumberValue(row.sample_age_days)}d ago`}
                     </TableCell>
                     <TableCell className="text-right">{formatNumberValue(row.efcr, { decimals: 2 })}</TableCell>
                     <TableCell className="text-right">{formatFeedRate(row.feeding_rate)}</TableCell>
