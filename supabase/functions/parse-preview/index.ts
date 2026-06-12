@@ -6,7 +6,7 @@
 // Request body: { raw_upload_id: string }
 // Response:     { headers, preview_rows, detected_type, issues, row_count, warnings }
 
-import { supabase, createUserClient, corsHeaders, jsonResponse, errorResponse } from '../_shared/supabase.ts'
+import { supabase, corsHeaders, jsonResponse, errorResponse, requireUploadAccess } from '../_shared/supabase.ts'
 import { resolveCageId, resolveWqParameter, resolveFeedTypeId, detectDataType } from '../_shared/resolve.ts';
 import { parseDate, parseTime } from '../_shared/parse-time.ts';
 import { detectFileType } from '../_shared/file-detect.ts';
@@ -21,11 +21,11 @@ Deno.serve(async (req) => {
     const { raw_upload_id } = await req.json()
     if (!raw_upload_id) return errorResponse('raw_upload_id required')
 
-    // Use user-context client so RLS ensures they can only see their own farm's uploads
-    const userClient = createUserClient(req)
-    const { data: upload, error: upErr } = await userClient
-      .from('raw_uploads').select('*').eq('id', raw_upload_id).single()
-    if (upErr || !upload) return errorResponse('Upload not found', 404)
+    const access = await requireUploadAccess(req, raw_upload_id, {
+      allowedStatuses: ['pending_review', 'in_review'],
+    })
+    if (access instanceof Response) return access
+    const { upload } = access
 
     if (!['pending_review', 'in_review'].includes(upload.status)) {
       return errorResponse(`Upload is already in status "${upload.status}"`);

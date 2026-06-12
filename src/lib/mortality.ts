@@ -1,7 +1,6 @@
 /**
- * Must stay in sync with the `fish_mortality_cause_check` constraint on
- * public.fish_mortality.cause. This is a CHECK constraint, not a DB enum, so
- * Supabase type generation cannot expose it through Constants.public.Enums.
+ * Must stay in sync with the public.mortality_cause enum used by
+ * public.fish_mortality.cause.
  */
 export const MORTALITY_CAUSES = [
   "unknown",

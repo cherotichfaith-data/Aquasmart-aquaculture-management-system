@@ -88,8 +88,7 @@ function Deploy-To {
             "deploy",
             $fn,
             "--project-ref",
-            $ProjectRef,
-            "--no-verify-jwt"
+            $ProjectRef
         )
         if (-not $UseDocker) {
             $deployArgs += "--use-api"

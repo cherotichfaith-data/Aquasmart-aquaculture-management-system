@@ -1,6 +1,6 @@
 // normalize-harvest: Inserts fish_harvest rows from parsed Excel data.
 
-import { supabase, corsHeaders, jsonResponse, errorResponse } from '../_shared/supabase.ts';
+import { supabase, corsHeaders, jsonResponse, errorResponse, requireUploadAccess } from '../_shared/supabase.ts';
 import { resolveCageId } from '../_shared/resolve.ts';
 import { parseDate, parseNumber, parseInteger } from '../_shared/parse-time.ts';
 import type { HarvestRow, HarvestType, NormalizeResult, ParseIssue } from '../_shared/types.ts';
@@ -129,6 +129,12 @@ Deno.serve(async (req) => {
   try {
     const { raw_upload_id } = await req.json();
     if (!raw_upload_id) return errorResponse('raw_upload_id required');
+
+    const access = await requireUploadAccess(req, raw_upload_id, {
+      allowedStatuses: ['approved'],
+      writeRoles: ['admin', 'farm_manager', 'system_operator'],
+    });
+    if (access instanceof Response) return access;
 
     const { data: upload, error: upErr } = await supabase
       .from('raw_uploads').select('*').eq('id', raw_upload_id).single();
