@@ -19,6 +19,7 @@ import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
 import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics-rpc-shared"
 import { listDailyFishInventoryRows, listWaterQualityMeasurementRows } from "@/features/shared/query-seed.server"
 import { toDashboardSystemRowsFromInventory } from "@/features/dashboard/dashboard-system-rows"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "month"
@@ -113,10 +114,14 @@ async function getDashboardConsolidatedRows(
 ): Promise<DashboardConsolidatedRow[]> {
   const { data, error } = await supabase.rpc("api_dashboard_consolidated", {
     p_farm_id: params.farmId,
-    p_system_id: params.systemId,
+    p_system_id: toRpcSystemId(params.systemId),
     p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
-    p_start_date: params.dateFrom ?? undefined,
-    p_end_date: params.dateTo ?? undefined,
+    p_start_date: toRpcDate(params.dateFrom),
+    p_end_date: toRpcDate(params.dateTo),
+  } as Database["public"]["Functions"]["api_dashboard_consolidated"]["Args"] & {
+    p_system_id: number | null
+    p_start_date: string | null
+    p_end_date: string | null
   })
 
   if (error) {
@@ -132,8 +137,8 @@ async function getRecommendedActionRows(
 ): Promise<RecommendedActionRow[]> {
   const { data, error } = await supabase.rpc("api_recommended_actions", {
     p_farm_id: params.farmId,
-    p_system_id: params.systemId,
-  })
+    p_system_id: toRpcSystemId(params.systemId),
+  } as Database["public"]["Functions"]["api_recommended_actions"]["Args"] & { p_system_id: number | null })
 
   if (error) {
     throw error

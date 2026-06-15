@@ -18,6 +18,7 @@ import {
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 
 const DEFAULT_TIME_PERIOD: FeedPageInitialFilters["timePeriod"] = "quarter"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
@@ -51,10 +52,10 @@ async function loadFeedRateSummary(
 ): Promise<FeedRateRow[]> {
   const { data, error } = await supabase.rpc("api_feed_rate_analysis", {
     p_farm_id: params.farmId,
-    ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
-    p_date_from: params.dateFrom,
-    p_date_to: params.dateTo,
-  })
+    p_system_id: toRpcSystemId(params.systemId),
+    p_date_from: toRpcDate(params.dateFrom),
+    p_date_to: toRpcDate(params.dateTo),
+  } as never)
   if (error) {
     logSbError("feed:loadFeedRateSummary", error)
     return []

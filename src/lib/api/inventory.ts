@@ -2,17 +2,18 @@ import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, isAbortLikeError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
+import { toRpcDate, toRpcSystemId, type RpcDate, type RpcSystemId } from "@/lib/rpc-params"
 
 type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 
 type DailyInventoryRpcArgs = {
   p_farm_id: string
-  p_system_id?: number
+  p_system_id: RpcSystemId
   p_stage?: Enums<"system_growth_stage">
-  p_start_date?: string
-  p_end_date?: string
+  p_start_date: RpcDate
+  p_end_date: RpcDate
   // NEW (server-side paging/order)
-  p_cursor_date?: string
+  p_cursor_date: RpcDate
   p_cursor_system_id?: number
   p_order_asc?: boolean
   p_limit?: number
@@ -29,11 +30,11 @@ const dailyInventoryRpcArgs = (params: {
   limit?: number
 }): DailyInventoryRpcArgs => ({
   p_farm_id: params.farmId,
-  p_system_id: params.systemId ?? undefined,
+  p_system_id: toRpcSystemId(params.systemId),
   p_stage: params.stage ?? undefined,
-  p_start_date: params.dateFrom ?? undefined,
-  p_end_date: params.dateTo ?? undefined,
-  p_cursor_date: params.cursorDate ?? undefined,
+  p_start_date: toRpcDate(params.dateFrom),
+  p_end_date: toRpcDate(params.dateTo),
+  p_cursor_date: toRpcDate(params.cursorDate),
   p_order_asc: params.orderAsc ?? false,
   p_limit: params.limit ?? 5000,
 })

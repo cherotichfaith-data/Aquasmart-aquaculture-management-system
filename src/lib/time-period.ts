@@ -1,4 +1,5 @@
 import { Constants, type Database, type Enums } from "@/lib/types/database"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 
 export type BaseTimePeriod = Enums<"time_period">
 export type TimePeriod = BaseTimePeriod | "all history"
@@ -123,10 +124,10 @@ export async function fetchTimePeriodBounds(
     p_farm_id: params.farmId,
     p_time_period: params.timePeriod,
     p_scope: params.scope ?? "dashboard",
-    p_anchor_date: params.anchorDate ?? undefined,
-    p_system_id: params.systemId ?? undefined,
+    p_anchor_date: toRpcDate(params.anchorDate),
+    p_system_id: toRpcSystemId(params.systemId),
     p_batch_id: params.batchId ?? undefined,
-  })
+  } as TimePeriodBoundsRpc["Args"] & { p_batch_id?: number; p_anchor_date?: string | null; p_system_id: number | null })
   if (params.signal && typeof query.abortSignal === "function") {
     query = query.abortSignal(params.signal)
   }

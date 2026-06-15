@@ -16,6 +16,7 @@ import { getDashboardSystems } from "@/lib/api/dashboard"
 import { toSystemsOverviewRows } from "@/features/dashboard/systems-overview"
 import type { SystemsOverviewRow } from "@/features/dashboard/types"
 import type { Database } from "@/lib/types/database"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 
 export type EfcrTrendRow = Database["public"]["Functions"]["api_efcr_trend"]["Returns"][number]
 type AnalyticsRpcName =
@@ -41,14 +42,14 @@ async function getAuthenticatedClient(tag: string): Promise<
 async function callAnalyticsRpc<T, Name extends AnalyticsRpcName = AnalyticsRpcName>(params: {
   tag: string
   rpcName: Name
-  args: Database["public"]["Functions"][Name]["Args"]
+  args: Database["public"]["Functions"][Name]["Args"] | Record<string, unknown>
   signal?: AbortSignal
 }): Promise<QueryResult<T>> {
   const clientResult = await getAuthenticatedClient(params.tag)
   if ("error" in clientResult) return clientResult.error as QueryResult<T>
   const { supabase } = clientResult
 
-  let q = supabase.rpc(params.rpcName, params.args)
+  let q = supabase.rpc(params.rpcName, params.args as Database["public"]["Functions"][Name]["Args"])
   if (params.signal) q = q.abortSignal(params.signal)
 
   const { data, error } = await q
@@ -71,7 +72,7 @@ export async function getHarvestForecast(params: {
   return callAnalyticsRpc<HarvestForecastRow>({
     tag: "getHarvestForecast",
     rpcName: "api_harvest_forecast",
-    args: { p_farm_id: params.farmId, ...(params.systemId != null ? { p_system_id: params.systemId } : {}) },
+    args: { p_farm_id: params.farmId, p_system_id: toRpcSystemId(params.systemId) },
     signal: params.signal,
   })
 }
@@ -88,7 +89,7 @@ export async function getCycleBenchmarks(params: {
   return callAnalyticsRpc<CycleBenchmarkRow>({
     tag: "getCycleBenchmarks",
     rpcName: "api_cycle_benchmarks",
-    args: { p_farm_id: params.farmId, ...(params.systemId != null ? { p_system_id: params.systemId } : {}) },
+    args: { p_farm_id: params.farmId, p_system_id: toRpcSystemId(params.systemId) },
     signal: params.signal,
   })
 }
@@ -103,7 +104,7 @@ export async function getRecommendedActions(params: {
   return callAnalyticsRpc<RecommendedActionRow>({
     tag: "getRecommendedActions",
     rpcName: "api_recommended_actions",
-    args: { p_farm_id: params.farmId, ...(params.systemId != null ? { p_system_id: params.systemId } : {}) },
+    args: { p_farm_id: params.farmId, p_system_id: toRpcSystemId(params.systemId) },
     signal: params.signal,
   })
 }
@@ -122,9 +123,9 @@ export async function getEfcrTrend(params: {
     rpcName: "api_efcr_trend",
     args: {
       p_farm_id: params.farmId,
-      ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
-      ...(params.dateFrom ? { p_start_date: params.dateFrom } : {}),
-      ...(params.dateTo ? { p_end_date: params.dateTo } : {}),
+      p_system_id: toRpcSystemId(params.systemId),
+      p_start_date: toRpcDate(params.dateFrom),
+      p_end_date: toRpcDate(params.dateTo),
     },
     signal: params.signal,
   })
@@ -142,9 +143,9 @@ export async function getFcrIntervals(params: {
     rpcName: "api_feed_fcr_intervals",
     args: {
       p_farm_id: params.farmId,
-      ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
-      ...(params.dateFrom ? { p_date_from: params.dateFrom } : {}),
-      ...(params.dateTo ? { p_date_to: params.dateTo } : {}),
+      p_system_id: toRpcSystemId(params.systemId),
+      p_date_from: toRpcDate(params.dateFrom),
+      p_date_to: toRpcDate(params.dateTo),
     },
     signal: params.signal,
   })
@@ -164,9 +165,9 @@ export async function getFeedRateAnalysis(params: {
     rpcName: "api_feed_rate_analysis",
     args: {
       p_farm_id: params.farmId,
-      ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
-      ...(params.dateFrom ? { p_date_from: params.dateFrom } : {}),
-      ...(params.dateTo ? { p_date_to: params.dateTo } : {}),
+      p_system_id: toRpcSystemId(params.systemId),
+      p_date_from: toRpcDate(params.dateFrom),
+      p_date_to: toRpcDate(params.dateTo),
     },
     signal: params.signal,
   })

@@ -6,6 +6,7 @@ import {
 } from "@/lib/types/insights"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
 import { logSbError } from "@/lib/supabase/log"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 
 export type ServerClient = ReturnType<typeof createAccessTokenClient>
 
@@ -33,7 +34,7 @@ export async function listProductionSummaryRows(
   supabase: ServerClient,
   params: ProductionSummaryParams,
 ): Promise<ProductionSummaryRow[]> {
-  const { data, error } = await supabase.rpc("api_production_summary", buildProductionSummaryRpcArgs(params))
+  const { data, error } = await supabase.rpc("api_production_summary", buildProductionSummaryRpcArgs(params) as never)
   if (error) return []
 
   let rows = ((data ?? []) as ProductionSummaryRow[])
@@ -61,13 +62,18 @@ export async function listDailyFishInventoryRows(
 ): Promise<DailyFishInventoryRow[]> {
   const { data, error } = await supabase.rpc("api_daily_fish_inventory_rpc", {
     p_farm_id: params.farmId,
-    p_system_id: params.systemId,
+    p_system_id: toRpcSystemId(params.systemId),
     p_stage: params.stage,
-    p_start_date: params.dateFrom,
-    p_end_date: params.dateTo,
-    p_cursor_date: params.cursorDate,
+    p_start_date: toRpcDate(params.dateFrom),
+    p_end_date: toRpcDate(params.dateTo),
+    p_cursor_date: toRpcDate(params.cursorDate),
     p_order_asc: params.orderAsc ?? false,
     p_limit: params.limit ?? 5000,
+  } as Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Args"] & {
+    p_system_id: number | null
+    p_start_date: string | null
+    p_end_date: string | null
+    p_cursor_date: string | null
   })
   if (error) return []
   return (data ?? []) as DailyFishInventoryRow[]
@@ -203,9 +209,13 @@ export async function listDashboardSystemsRows(
   const { data, error } = await supabase.rpc("api_dashboard_systems", {
     p_farm_id: params.farmId,
     p_stage: params.stage ?? undefined,
-    p_system_id: params.systemId ?? undefined,
-    p_start_date: params.dateFrom ?? undefined,
-    p_end_date: params.dateTo ?? undefined,
+    p_system_id: toRpcSystemId(params.systemId),
+    p_start_date: toRpcDate(params.dateFrom),
+    p_end_date: toRpcDate(params.dateTo),
+  } as Database["public"]["Functions"]["api_dashboard_systems"]["Args"] & {
+    p_system_id: number | null
+    p_start_date: string | null
+    p_end_date: string | null
   })
   if (error) return []
   return (data ?? []) as DashboardSystemRow[]
@@ -262,8 +272,8 @@ export async function listHarvestForecastRows(
 ): Promise<HarvestForecastRow[]> {
   const { data, error } = await supabase.rpc("api_harvest_forecast", {
     p_farm_id: params.farmId,
-    ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
-  })
+    p_system_id: toRpcSystemId(params.systemId),
+  } as Database["public"]["Functions"]["api_harvest_forecast"]["Args"] & { p_system_id: number | null })
   if (error) {
     logSbError("query-seed:listHarvestForecastRows", error)
     return []
@@ -278,8 +288,8 @@ export async function listCycleBenchmarkRows(
 ): Promise<CycleBenchmarkRow[]> {
   const { data, error } = await supabase.rpc("api_cycle_benchmarks", {
     p_farm_id: params.farmId,
-    ...(params.systemId != null ? { p_system_id: params.systemId } : {}),
-  })
+    p_system_id: toRpcSystemId(params.systemId),
+  } as Database["public"]["Functions"]["api_cycle_benchmarks"]["Args"] & { p_system_id: number | null })
   if (error) {
     logSbError("query-seed:listCycleBenchmarkRows", error)
     return []

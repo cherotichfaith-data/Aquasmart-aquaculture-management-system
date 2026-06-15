@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/types/database"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 import { createClient } from "@/lib/supabase/server"
 import { toQuerySuccess, isInvalidBigintUuidError, isMissingObjectError } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
@@ -130,7 +131,7 @@ export async function listGrowthTrend(
 
   const query = supabase.rpc("api_growth_trend", {
     p_farm_id: params.farmId,
-    p_system_id: params.systemId,
+    p_system_id: toRpcSystemId(params.systemId) ?? params.systemId,
     p_days: params.days,
   })
 
@@ -339,9 +340,12 @@ export async function listRecentActivities(
   const { data, error } = await supabase.rpc("api_recent_activity_feed", {
     p_farm_id: params.farmId,
     p_limit: limit,
-    p_date_from: params.dateFrom,
-    p_date_to: params.dateTo,
+    p_date_from: toRpcDate(params.dateFrom),
+    p_date_to: toRpcDate(params.dateTo),
     p_table: tableName ?? undefined,
+  } as Database["public"]["Functions"]["api_recent_activity_feed"]["Args"] & {
+    p_date_from: string | null
+    p_date_to: string | null
   })
 
   if (error) {

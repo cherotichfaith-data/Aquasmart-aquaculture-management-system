@@ -23,6 +23,7 @@ import {
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { toRpcSystemId } from "@/lib/rpc-params"
 import {
   DEFAULT_WQ_PARAMETER,
   isWqParameter,
@@ -93,8 +94,8 @@ async function getLatestStatus(
 ): Promise<WaterQualityLatestStatusRow[]> {
   const { data, error } = await supabase.rpc("api_latest_water_quality_status", {
     p_farm_id: farmId,
-    p_system_id: systemId,
-  })
+    p_system_id: toRpcSystemId(systemId),
+  } as never)
   if (error) return []
   return (data ?? []) as WaterQualityLatestStatusRow[]
 }

@@ -63,9 +63,9 @@ type ErrorLike = {
 export function queryKpiRpc<Name extends KpiRpcName>(
   supabase: SupabaseClient,
   name: Name,
-  args: PublicFunctions[Name]["Args"],
+  args: PublicFunctions[Name]["Args"] | Record<string, unknown>,
 ) {
-  return supabase.rpc(name, args)
+  return supabase.rpc(name, args as PublicFunctions[Name]["Args"])
 }
 
 /**
