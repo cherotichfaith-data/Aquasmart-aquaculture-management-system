@@ -2118,6 +2118,7 @@ export type Database = {
       api_time_period_bounds_scoped: {
         Args: {
           p_anchor_date?: string
+          p_batch_id?: number
           p_farm_id: string
           p_scope?: string
           p_system_id?: number
