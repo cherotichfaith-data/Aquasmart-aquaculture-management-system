@@ -15,6 +15,8 @@ import {
 } from "@/components/charts/chartjs-theme"
 import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import { LazyRender } from "@/components/shared/lazy-render"
+import type { Tables } from "@/lib/types/database"
+import type { ProductionTrendRpcRow } from "@/features/dashboard/types"
 import type { EfcrTrendPoint, FeedRatePoint } from "./feed-analytics"
 
 const CHART_COLORS = [
@@ -28,6 +30,20 @@ const CHART_COLORS = [
 
 const getValueOrNull = (value: string | number | null | undefined) =>
   typeof value === "number" && Number.isFinite(value) ? value : null
+
+type FeedRateByDateRow = {
+  date: string
+  feedRateSum: number
+  feedRateCount: number
+}
+
+type FeedRateBiomassByDateRow = FeedRateByDateRow & {
+  biomassKg?: number
+}
+
+type FeedRateMortalityByDateRow = FeedRateByDateRow & {
+  mortalityCount?: number
+}
 
 function ChartFrame({
   children,
@@ -298,6 +314,264 @@ export function FeedEfcrSection({
       </CardHeader>
       <CardContent className="pt-2">
         <ChartFrame loading={loading} emptyLabel="No eFCR trend available for the selected scope." hasData={chartRows.length > 0}>
+          <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+            <Line data={chartData} options={chartOptions} />
+          </LazyRender>
+        </ChartFrame>
+      </CardContent>
+    </Card>
+  )
+}
+
+function buildAverageFeedRateByDate(points: FeedRatePoint[]) {
+  const byDate = new Map<string, FeedRateByDateRow>()
+
+  points.forEach((point) => {
+    if (point.feedRatePct == null || !Number.isFinite(point.feedRatePct)) return
+    const current = byDate.get(point.date) ?? { date: point.date, feedRateSum: 0, feedRateCount: 0 }
+    current.feedRateSum += point.feedRatePct
+    current.feedRateCount += 1
+    byDate.set(point.date, current)
+  })
+
+  return byDate
+}
+
+export function FeedRateBiomassSection({
+  loading,
+  feedRatePoints,
+  productionRows,
+}: {
+  loading: boolean
+  feedRatePoints: FeedRatePoint[]
+  productionRows: ProductionTrendRpcRow[]
+}) {
+  const chartRows = useMemo(() => {
+    const byDate = buildAverageFeedRateByDate(feedRatePoints) as Map<string, FeedRateBiomassByDateRow>
+
+    productionRows.forEach((row) => {
+      const current = byDate.get(row.date) ?? { date: row.date, feedRateSum: 0, feedRateCount: 0, biomassKg: 0 }
+      current.biomassKg = (current.biomassKg ?? 0) + (row.total_biomass ?? 0)
+      byDate.set(row.date, current)
+    })
+
+    return Array.from(byDate.values())
+      .map((row) => {
+        return {
+          date: row.date,
+          feedRatePct: row.feedRateCount > 0 ? row.feedRateSum / row.feedRateCount : null,
+          biomassKg: row.biomassKg ?? null,
+        }
+      })
+      .filter((row) => row.feedRatePct != null || row.biomassKg != null)
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [feedRatePoints, productionRows])
+
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+
+  const chartData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "Feed rate",
+          data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.feedRatePct)),
+          borderColor: palette.chart1,
+          backgroundColor: createVerticalGradient(palette.chart1, 0.16, 0.02),
+          borderWidth: 2.4,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          spanGaps: true,
+          yAxisID: "y",
+        },
+        {
+          label: "Biomass",
+          data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.biomassKg)),
+          borderColor: palette.chart3,
+          backgroundColor: createVerticalGradient(palette.chart3, 0.16, 0.02),
+          borderWidth: 2.4,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          spanGaps: true,
+          yAxisID: "y1",
+        },
+      ],
+    }),
+    [dateDomain, palette.chart1, palette.chart3, rowsByDate],
+  )
+
+  const chartOptions = useMemo<ChartOptions<"line">>(() => {
+    const leftBounds = buildMetricAxisBounds(chartRows.map((row) => row.feedRatePct), { minFloor: 0 })
+    const rightBounds = buildMetricAxisBounds(chartRows.map((row) => row.biomassKg), { minFloor: 0 })
+
+    return buildCartesianOptions({
+      palette,
+      legend: true,
+      min: leftBounds.min,
+      max: leftBounds.max,
+      rightMin: rightBounds.min,
+      rightMax: rightBounds.max,
+      xMaxTicksLimit: xLimit,
+      xTitle: "Date",
+      yTitle: "Feed rate (% biomass)",
+      yRightTitle: "Biomass (kg)",
+      yTickFormatter: (value) => `${Number(value).toFixed(1)}%`,
+      yRightTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 0, fallback: "0" }),
+      tooltip: {
+        callbacks: {
+          title: (items: any) => {
+            const value = String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")
+            return formatDateOnly(value, value)
+          },
+          label: (context: any) =>
+            context.dataset.yAxisID === "y1"
+              ? `Biomass: ${formatNumberValue(Number(context.parsed.y), { decimals: 1, fallback: "N/A" })} kg`
+              : `Feed rate: ${formatNumberValue(Number(context.parsed.y), { decimals: 2, fallback: "N/A" })}%`,
+        },
+      },
+      xTickFormatter: (_value, index) =>
+        new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+          new Date(`${String(dateDomain[index] ?? "")}T00:00:00`),
+        ),
+    })
+  }, [chartRows, dateDomain, palette, xLimit])
+
+  return (
+    <Card>
+      <CardHeader className="pb-1">
+        <CardTitle>Feed rate with biomass growth trend</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-2">
+        <ChartFrame
+          loading={loading}
+          emptyLabel="No feed-rate or biomass data available for the selected scope."
+          hasData={chartRows.length > 0}
+        >
+          <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+            <Line data={chartData} options={chartOptions} />
+          </LazyRender>
+        </ChartFrame>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function FeedRateMortalitySection({
+  loading,
+  feedRatePoints,
+  mortalityRows,
+}: {
+  loading: boolean
+  feedRatePoints: FeedRatePoint[]
+  mortalityRows: Tables<"fish_mortality">[]
+}) {
+  const chartRows = useMemo(() => {
+    const byDate = buildAverageFeedRateByDate(feedRatePoints) as Map<string, FeedRateMortalityByDateRow>
+
+    mortalityRows.forEach((row) => {
+      const current = byDate.get(row.date) ?? { date: row.date, feedRateSum: 0, feedRateCount: 0, mortalityCount: 0 }
+      current.mortalityCount = (current.mortalityCount ?? 0) + (row.number_of_fish_mortality ?? 0)
+      byDate.set(row.date, current)
+    })
+
+    return Array.from(byDate.values())
+      .map((row) => {
+        return {
+          date: row.date,
+          feedRatePct: row.feedRateCount > 0 ? row.feedRateSum / row.feedRateCount : null,
+          mortalityCount: row.mortalityCount ?? null,
+        }
+      })
+      .filter((row) => row.feedRatePct != null || row.mortalityCount != null)
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [feedRatePoints, mortalityRows])
+
+  const palette = getChartPalette()
+  const dateDomain = useMemo(() => buildDailyDateDomain(chartRows.map((row) => row.date)), [chartRows])
+  const rowsByDate = useMemo(() => new Map(chartRows.map((row) => [row.date, row])), [chartRows])
+  const xLimit = getDateAxisMaxTicks(dateDomain.length)
+
+  const chartData = useMemo<ChartData<"line">>(
+    () => ({
+      labels: dateDomain,
+      datasets: [
+        {
+          label: "Feed rate",
+          data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.feedRatePct)),
+          borderColor: palette.chart1,
+          backgroundColor: createVerticalGradient(palette.chart1, 0.16, 0.02),
+          borderWidth: 2.4,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          spanGaps: true,
+          yAxisID: "y",
+        },
+        {
+          label: "Mortality",
+          data: dateDomain.map((date) => getValueOrNull(rowsByDate.get(date)?.mortalityCount)),
+          borderColor: palette.destructive,
+          backgroundColor: createVerticalGradient(palette.destructive, 0.16, 0.02),
+          borderWidth: 2.4,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          spanGaps: true,
+          yAxisID: "y1",
+        },
+      ],
+    }),
+    [dateDomain, palette.chart1, palette.destructive, rowsByDate],
+  )
+
+  const chartOptions = useMemo<ChartOptions<"line">>(() => {
+    const leftBounds = buildMetricAxisBounds(chartRows.map((row) => row.feedRatePct), { minFloor: 0 })
+    const rightBounds = buildMetricAxisBounds(chartRows.map((row) => row.mortalityCount), { minFloor: 0 })
+
+    return buildCartesianOptions({
+      palette,
+      legend: true,
+      min: leftBounds.min,
+      max: leftBounds.max,
+      rightMin: rightBounds.min,
+      rightMax: rightBounds.max,
+      xMaxTicksLimit: xLimit,
+      xTitle: "Date",
+      yTitle: "Feed rate (% biomass)",
+      yRightTitle: "Mortality count",
+      yTickFormatter: (value) => `${Number(value).toFixed(1)}%`,
+      yRightTickFormatter: (value) => formatNumberValue(Number(value), { decimals: 0, fallback: "0" }),
+      tooltip: {
+        callbacks: {
+          title: (items: any) => {
+            const value = String(dateDomain[items[0]?.dataIndex ?? 0] ?? "")
+            return formatDateOnly(value, value)
+          },
+          label: (context: any) =>
+            context.dataset.yAxisID === "y1"
+              ? `Mortality: ${formatNumberValue(Number(context.parsed.y), { decimals: 0, fallback: "N/A" })} fish`
+              : `Feed rate: ${formatNumberValue(Number(context.parsed.y), { decimals: 2, fallback: "N/A" })}%`,
+        },
+      },
+      xTickFormatter: (_value, index) =>
+        new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+          new Date(`${String(dateDomain[index] ?? "")}T00:00:00`),
+        ),
+    })
+  }, [chartRows, dateDomain, palette, xLimit])
+
+  return (
+    <Card>
+      <CardHeader className="pb-1">
+        <CardTitle>Feed rate with mortality trend</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-2">
+        <ChartFrame
+          loading={loading}
+          emptyLabel="No feed-rate or mortality data available for the selected scope."
+          hasData={chartRows.length > 0}
+        >
           <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
             <Line data={chartData} options={chartOptions} />
           </LazyRender>

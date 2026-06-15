@@ -33,6 +33,12 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
   const createSupplier = useCreateFingerlingSupplier()
 
   const loadedSuppliers = suppliersQuery.data?.status === "success" ? suppliersQuery.data.data : []
+  const suppliersError =
+    suppliersQuery.data?.status === "error"
+      ? suppliersQuery.data.error
+      : suppliersQuery.error instanceof Error
+        ? suppliersQuery.error.message
+        : null
   const [createdSuppliers, setCreatedSuppliers] = useState<FingerlingSupplierOption[]>([])
   const suppliers = useMemo(() => {
     const existingIds = new Set(loadedSuppliers.map((supplier) => supplier.id))
@@ -163,12 +169,18 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
         </div>
         <div className="space-y-2">
           <Label>Supplier</Label>
-          <Select value={supplierId} onValueChange={setSupplierId} disabled={suppliersQuery.isLoading || suppliers.length === 0}>
+          <Select
+            value={supplierId}
+            onValueChange={setSupplierId}
+            disabled={suppliersQuery.isLoading || Boolean(suppliersError) || suppliers.length === 0}
+          >
             <SelectTrigger>
               <SelectValue
                 placeholder={
                   suppliersQuery.isLoading
                     ? "Loading suppliers..."
+                    : suppliersError
+                      ? "Unable to load suppliers"
                     : suppliers.length === 0
                       ? "No suppliers found"
                       : "Select supplier"
@@ -183,11 +195,14 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
               ))}
             </SelectContent>
           </Select>
-          {suppliersQuery.data?.status === "error" ? (
-            <p className="text-xs text-destructive">{suppliersQuery.data.error}</p>
-          ) : null}
+          {suppliersError ? <p className="text-xs text-destructive">{suppliersError}</p> : null}
           {!suppliersQuery.isLoading && suppliers.length === 0 ? (
             <p className="text-xs text-muted-foreground">No fingerling suppliers were found.</p>
+          ) : null}
+          {suppliersError ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => suppliersQuery.refetch()}>
+              Retry suppliers
+            </Button>
           ) : null}
         </div>
         <div className="space-y-2">

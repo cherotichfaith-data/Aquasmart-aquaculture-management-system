@@ -16,12 +16,15 @@ export type Database = {
     Tables: {
       _affected_systems: {
         Row: {
+          min_affected_date: string
           system_id: number
         }
         Insert: {
+          min_affected_date?: string
           system_id: number
         }
         Update: {
+          min_affected_date?: string
           system_id?: number
         }
         Relationships: [
@@ -527,7 +530,7 @@ export type Database = {
           created_at: string
           cycle_id: number | null
           date: string
-          feed_type_id: number
+          feed_type_id: number | null
           feeding_amount: number
           feeding_response: number | null
           id: number
@@ -542,7 +545,7 @@ export type Database = {
           created_at?: string
           cycle_id?: number | null
           date: string
-          feed_type_id: number
+          feed_type_id?: number | null
           feeding_amount: number
           feeding_response?: number | null
           id?: number
@@ -557,7 +560,7 @@ export type Database = {
           created_at?: string
           cycle_id?: number | null
           date?: string
-          feed_type_id?: number
+          feed_type_id?: number | null
           feeding_amount?: number
           feeding_response?: number | null
           id?: number
