@@ -8,8 +8,10 @@ import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import {
   useFeedingRecords,
+  useMortalityData,
   useScopedEfcrTrend,
 } from "@/lib/hooks/use-reports"
+import { useProductionSummary } from "@/lib/hooks/use-production"
 import { useFeedRateAnalysis } from "@/lib/hooks/use-analytics"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import type { FeedPageInitialFilters } from "@/features/feed/types"
@@ -132,6 +134,24 @@ export default function FeedManagementPage({
     dateTo,
     enabled: feedingEnabled,
   })
+  const productionSummaryQuery = useProductionSummary({
+    farmId,
+    systemId: hasSystem ? (systemId as number) : undefined,
+    stage: selectedStage !== "all" ? selectedStage : undefined,
+    dateFrom,
+    dateTo,
+    limit: 5000,
+    enabled: feedingEnabled,
+  })
+  const mortalityQuery = useMortalityData({
+    systemId: hasSystem ? (systemId as number) : undefined,
+    systemIds: !hasSystem ? scopedSystemIdList : undefined,
+    batchId: Number.isFinite(batchId) ? (batchId as number) : undefined,
+    dateFrom,
+    dateTo,
+    limit: 5000,
+    enabled: feedingEnabled,
+  })
 
   const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
   const systemNameById = useMemo(() => {
@@ -146,6 +166,8 @@ export default function FeedManagementPage({
   const feedingRecordsRaw = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
   const efcrTrendRowsRaw = efcrTrendQuery.data?.status === "success" ? efcrTrendQuery.data.data : []
   const feedRateAnalysisRowsRaw = feedRateAnalysisQuery.data?.status === "success" ? feedRateAnalysisQuery.data.data : []
+  const productionRowsRaw = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const mortalityRowsRaw = mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : []
 
   const feedingRecords = useMemo(() => {
     return feedingRecordsRaw
@@ -178,6 +200,14 @@ export default function FeedManagementPage({
         .sort((a, b) => (a.systemId === b.systemId ? a.date.localeCompare(b.date) : a.systemId - b.systemId)),
     [efcrTrendRowsRaw, scopedSystemIds],
   )
+  const productionRows = useMemo(
+    () => productionRowsRaw.filter((row) => scopedSystemIds.has(row.system_id)),
+    [productionRowsRaw, scopedSystemIds],
+  )
+  const mortalityRows = useMemo(
+    () => mortalityRowsRaw.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id)),
+    [mortalityRowsRaw, scopedSystemIds],
+  )
 
   const errorMessages = [
     getErrorMessage(feedingRecordsQuery.error),
@@ -186,13 +216,22 @@ export default function FeedManagementPage({
     getQueryResultError(efcrTrendQuery.data),
     getErrorMessage(feedRateAnalysisQuery.error),
     getQueryResultError(feedRateAnalysisQuery.data),
+    getErrorMessage(productionSummaryQuery.error),
+    getQueryResultError(productionSummaryQuery.data),
+    getErrorMessage(mortalityQuery.error),
+    getQueryResultError(mortalityQuery.data),
     getErrorMessage(systemsQuery.error),
     getQueryResultError(systemsQuery.data),
     getErrorMessage(batchSystemsQuery.error),
     getQueryResultError(batchSystemsQuery.data),
   ].filter(Boolean) as string[]
 
-  const loading = feedingRecordsQuery.isLoading || efcrTrendQuery.isLoading || feedRateAnalysisQuery.isLoading
+  const loading =
+    feedingRecordsQuery.isLoading ||
+    efcrTrendQuery.isLoading ||
+    feedRateAnalysisQuery.isLoading ||
+    productionSummaryQuery.isLoading ||
+    mortalityQuery.isLoading
 
   return (
     <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName}>
@@ -204,6 +243,8 @@ export default function FeedManagementPage({
             feedingRecordsQuery.refetch()
             efcrTrendQuery.refetch()
             feedRateAnalysisQuery.refetch()
+            productionSummaryQuery.refetch()
+            mortalityQuery.refetch()
             systemsQuery.refetch()
             batchSystemsQuery.refetch()
           }}
@@ -212,6 +253,8 @@ export default function FeedManagementPage({
           feedingRecords={feedingRecords}
           feedRatePoints={feedRatePoints}
           efcrTrendPoints={efcrTrendPoints}
+          productionRows={productionRows}
+          mortalityRows={mortalityRows}
         />
       </div>
     </DashboardLayout>

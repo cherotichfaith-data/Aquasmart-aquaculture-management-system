@@ -290,27 +290,32 @@ export async function getFeedSupplierOptions(params?: {
 export async function getFingerlingSupplierOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<FingerlingSupplierRow>> {
-  const clientResult = await getClientOrError("getFingerlingSupplierOptions", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
+  try {
+    const response = await fetch("/api/options/fingerling-suppliers", {
+      credentials: "include",
+      cache: "no-store",
+      signal: params?.signal,
+    })
 
-  let query = supabase
-    .from("fingerling_supplier")
-    .select("id, company_name, location_country, location_city")
-    .order("company_name", { ascending: true })
-  if (params?.signal) query = query.abortSignal(params.signal)
+    const body = response.headers.get("content-type")?.includes("application/json")
+      ? ((await response.json()) as { data?: FingerlingSupplierTableRow[]; error?: string })
+      : null
 
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isQuietTableError(error)) {
+    if (!response.ok) {
+      return {
+        status: "error",
+        data: null,
+        error: body?.error ?? `Unable to load fingerling suppliers (${response.status}).`,
+      }
+    }
+
+    return toQuerySuccess<FingerlingSupplierRow>(normalizeFingerlingSupplierOptions(body?.data ?? []))
+  } catch (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) {
       return toQuerySuccess<FingerlingSupplierRow>([])
     }
     return { status: "error", data: null, error: getErrorMessage(error) }
   }
-
-  return toQuerySuccess<FingerlingSupplierRow>(
-    normalizeFingerlingSupplierOptions((data ?? []) as FingerlingSupplierTableRow[]),
-  )
 }
 
 export async function getFarmOptions(params?: {
