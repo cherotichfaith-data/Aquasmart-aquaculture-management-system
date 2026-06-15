@@ -9,6 +9,7 @@ import {
   toQuerySuccess,
 } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 
 type LatestStatusRow = Database["public"]["Functions"]["api_latest_water_quality_status"]["Returns"][number]
 export type WaterQualityTrendRow = Database["public"]["Functions"]["api_water_quality_trend"]["Returns"][number]
@@ -35,7 +36,7 @@ export async function getLatestWaterQualityStatus(params: {
 
   let q = queryKpiRpc(supabase, "api_latest_water_quality_status", {
     p_farm_id: params.farmId,
-    p_system_id: params.systemId ?? undefined,
+    p_system_id: toRpcSystemId(params.systemId),
   })
   if (params.signal) q = q.abortSignal(params.signal)
 
@@ -149,9 +150,9 @@ export async function getWaterQualityTrend(params: {
 
   let q = queryKpiRpc(supabase, "api_water_quality_trend", {
     p_farm_id: params.farmId,
-    p_system_id: params.systemId ?? undefined,
-    p_start_date: params.dateFrom ?? undefined,
-    p_end_date: params.dateTo ?? undefined,
+    p_system_id: toRpcSystemId(params.systemId),
+    p_start_date: toRpcDate(params.dateFrom),
+    p_end_date: toRpcDate(params.dateTo),
   })
   if (params.signal) q = q.abortSignal(params.signal)
 
@@ -177,9 +178,9 @@ export async function getWaterQualityIndex(params: {
 
   let q = queryKpiRpc(supabase, "api_water_quality_index", {
     p_farm_id: params.farmId,
-    p_system_id: params.systemId ?? undefined,
-    p_start_date: params.dateFrom ?? undefined,
-    p_end_date: params.dateTo ?? undefined,
+    p_system_id: toRpcSystemId(params.systemId),
+    p_start_date: toRpcDate(params.dateFrom),
+    p_end_date: toRpcDate(params.dateTo),
   })
   if (params.signal) q = q.abortSignal(params.signal)
 

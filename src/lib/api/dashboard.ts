@@ -3,6 +3,7 @@ import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, isAbortLikeError, isMissingObjectError, queryKpiRpc, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import type { TimePeriod } from "@/lib/time-period"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 
 export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
@@ -32,9 +33,9 @@ export async function getDashboardSystems(params?: {
     {
       p_farm_id: params.farmId,
       p_stage: params.stage ?? undefined,
-      p_system_id: params.systemId ?? undefined,
-      p_start_date: params.dateFrom ?? undefined,
-      p_end_date: params.dateTo ?? undefined,
+      p_system_id: toRpcSystemId(params.systemId),
+      p_start_date: toRpcDate(params.dateFrom),
+      p_end_date: toRpcDate(params.dateTo),
     },
   )
   if (params?.signal) query = query.abortSignal(params.signal)
@@ -62,18 +63,20 @@ export async function getDashboardConsolidated(params?: {
   const clientResult = await getClientOrError("getDashboardConsolidated", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
+  const dateFrom = toRpcDate(params.dateFrom)
+  const dateTo = toRpcDate(params.dateTo)
 
   let query = queryKpiRpc(
     supabase,
     "api_dashboard_consolidated",
     {
       p_farm_id: params.farmId,
-      p_system_id: params.systemId ?? undefined,
+      p_system_id: toRpcSystemId(params.systemId),
       p_stage: params.stage ?? undefined,
-      p_start_date: params.dateFrom ?? undefined,
-      p_end_date: params.dateTo ?? undefined,
+      p_start_date: dateFrom,
+      p_end_date: dateTo,
       p_time_period:
-        !params.dateFrom && !params.dateTo ? (params.timePeriod ?? undefined) : undefined,
+        !dateFrom && !dateTo ? (params.timePeriod ?? undefined) : undefined,
     },
   )
   if (params?.signal) query = query.abortSignal(params.signal)
