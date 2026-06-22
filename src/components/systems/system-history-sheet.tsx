@@ -21,14 +21,19 @@ import {
 } from "@/components/charts/chartjs-theme"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/app-ui/tabs"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
-import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
-import { useMortalityData, useFeedingRecords, useSamplingData, useStockingData, useTransferData } from "@/lib/hooks/use-reports"
-import { useProductionSummary } from "@/lib/hooks/use-production"
-import { useDailyWaterQualityRating, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
-import { getHarvests } from "@/lib/api/reports"
-import { getWaterQualityTrend } from "@/lib/api/water-quality"
+import {
+  useMortalityData,
+  useFeedingRecords,
+  useHarvests,
+  useSamplingData,
+  useStockingData,
+  useTransferData,
+} from "@/features/reports/hooks"
+import { useProductionSummary } from "@/features/production/hooks"
+import { useDailyWaterQualityRating, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
+import { getWaterQualityTrend } from "@/features/water-quality/queries.client"
 import { deriveSurvivalSeriesFromProductionSummary } from "@/lib/survival-series"
-import type { DashboardSystemRow } from "@/features/dashboard/types"
+import type { DashboardSystemRpcRow } from "@/features/dashboard/types"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import { DATA_ENTRY_PATH } from "@/lib/app-entry"
 import { formatCageLabel } from "@/lib/system-options"
@@ -74,7 +79,7 @@ export default function SystemHistorySheet({
   systemLabel?: string | null
   dateFrom?: string
   dateTo?: string
-  summaryRow?: DashboardSystemRow | null
+  summaryRow?: DashboardSystemRpcRow | null
 }) {
   const router = useRouter()
   const enabled = open && Boolean(farmId) && Boolean(systemId)
@@ -91,15 +96,6 @@ export default function SystemHistorySheet({
   const snapshotLabel = formatDateOnly(summaryRow?.as_of_date ?? summaryRow?.input_end_date)
   const hasResolvedTimeline = Boolean(effectiveDateFrom && effectiveDateTo)
 
-  const inventoryQuery = useDailyFishInventory({
-    farmId,
-    systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 120,
-    orderAsc: true,
-    enabled: enabled && hasResolvedTimeline,
-  })
   const feedingQuery = useFeedingRecords({
     farmId,
     systemId: systemId ?? undefined,
@@ -135,18 +131,12 @@ export default function SystemHistorySheet({
     limit: 60,
     enabled: enabled && hasResolvedTimeline,
   })
-  const harvestQuery = useQuery({
-    queryKey: ["system-history", "harvests", systemId ?? "all", effectiveDateFrom ?? "", effectiveDateTo ?? ""],
-    queryFn: ({ signal }) =>
-      getHarvests({
-        systemId: systemId ?? undefined,
-        dateFrom: effectiveDateFrom,
-        dateTo: effectiveDateTo,
-        limit: 20,
-        signal,
-      }),
+  const harvestQuery = useHarvests({
+    systemId: systemId ?? undefined,
+    dateFrom: effectiveDateFrom,
+    dateTo: effectiveDateTo,
+    limit: 20,
     enabled: enabled && hasResolvedTimeline,
-    staleTime: 60_000,
   })
   const productionSummaryQuery = useProductionSummary({
     farmId,
@@ -185,7 +175,6 @@ export default function SystemHistorySheet({
     enabled: enabled && hasResolvedTimeline,
   })
 
-  const inventoryRows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
   const feedingRows = feedingQuery.data?.status === "success" ? feedingQuery.data.data : []
   const stockingRows = stockingQuery.data?.status === "success" ? stockingQuery.data.data : []
   const samplingRows = samplingQuery.data?.status === "success" ? samplingQuery.data.data : []
@@ -205,7 +194,10 @@ export default function SystemHistorySheet({
   const waterTrendRowsRpc = waterTrendQuery.data?.status === "success" ? waterTrendQuery.data.data : []
   const measurementRows = measurementQuery.data?.status === "success" ? measurementQuery.data.data : []
 
-  const latestInventory = inventoryRows[inventoryRows.length - 1] ?? null
+  const latestProductionSummary =
+    productionSummaryRows
+      .slice()
+      .sort((left, right) => String(left.date).localeCompare(String(right.date)))[productionSummaryRows.length - 1] ?? null
   const latestSampling = [...samplingRows].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] ?? null
   const latestSurvival = survivalRows[survivalRows.length - 1] ?? null
   const latestRating = waterRatingRows[waterRatingRows.length - 1] ?? null
@@ -216,14 +208,14 @@ export default function SystemHistorySheet({
 
   const inventoryTrendRows = useMemo(
     () =>
-      inventoryRows.map((row) => ({
-        date: row.inventory_date,
-        label: formatCompactDate(row.inventory_date),
-        biomass: row.biomass_last_sampling,
-        abw: row.abw_last_sampling,
-        feed: row.feeding_amount,
+      productionSummaryRows.map((row) => ({
+        date: row.date,
+        label: formatCompactDate(row.date),
+        biomass: row.total_biomass,
+        abw: row.average_body_weight,
+        feed: row.total_feed_amount_period,
       })),
-    [inventoryRows],
+    [productionSummaryRows],
   )
 
   const waterTrendRows = useMemo(
@@ -322,8 +314,6 @@ export default function SystemHistorySheet({
   }, [feedingRows, harvestRows, mortalityRows, samplingRows, stockingRows, systemId, transferRows])
 
   const errorMessages = [
-    getErrorMessage(inventoryQuery.error),
-    getQueryResultError(inventoryQuery.data),
     getErrorMessage(feedingQuery.error),
     getQueryResultError(feedingQuery.data),
     getErrorMessage(stockingQuery.error),
@@ -347,7 +337,6 @@ export default function SystemHistorySheet({
   ].filter(Boolean) as string[]
 
   const loading =
-    inventoryQuery.isLoading ||
     feedingQuery.isLoading ||
     stockingQuery.isLoading ||
     samplingQuery.isLoading ||
@@ -360,7 +349,6 @@ export default function SystemHistorySheet({
     measurementQuery.isLoading
 
   const fetching =
-    inventoryQuery.isFetching ||
     feedingQuery.isFetching ||
     stockingQuery.isFetching ||
     samplingQuery.isFetching ||
@@ -558,15 +546,15 @@ export default function SystemHistorySheet({
           <div className="kpi-grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Card className="kpi-card">
               <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Live Fish</CardTitle></CardHeader>
-              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatNumberValue(latestInventory?.number_of_fish ?? summaryRow?.fish_end)}</p></CardContent>
+              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatNumberValue(latestProductionSummary?.number_of_fish_inventory ?? summaryRow?.fish_end)}</p></CardContent>
             </Card>
             <Card className="kpi-card">
               <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Biomass</CardTitle></CardHeader>
-              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(latestInventory?.biomass_last_sampling ?? summaryRow?.biomass_end, 1, "kg")}</p></CardContent>
+              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(latestProductionSummary?.total_biomass ?? summaryRow?.biomass_end, 1, "kg")}</p></CardContent>
             </Card>
             <Card className="kpi-card">
               <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">ABW</CardTitle></CardHeader>
-              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(latestSampling?.abw ?? latestInventory?.abw_last_sampling ?? summaryRow?.abw, 1, "g")}</p></CardContent>
+              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(latestSampling?.abw ?? latestProductionSummary?.average_body_weight ?? summaryRow?.abw, 1, "g")}</p></CardContent>
             </Card>
             <Card className="kpi-card">
               <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Survival</CardTitle></CardHeader>

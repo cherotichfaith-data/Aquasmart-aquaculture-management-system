@@ -7,8 +7,7 @@ import { queryKeys } from "@/lib/cache/query-keys"
 import type { DashboardSystemRow, SystemsTableData } from "@/features/dashboard/types"
 import type { TimePeriod } from "@/lib/time-period"
 import { useSystemOptions } from "@/lib/hooks/use-options"
-import { toDashboardSystemRowsFromInventory } from "@/features/dashboard/dashboard-system-rows"
-import { getDailyFishInventory } from "@/lib/api/inventory"
+import { getDashboardSystems } from "@/lib/api/dashboard"
 
 export function useSystemsTable(params: {
   farmId?: string | null
@@ -54,11 +53,16 @@ export function useSystemsTable(params: {
 
       const stage = params.stage === "all" ? undefined : params.stage
       const parsedSystemId = params.system && params.system !== "all" ? Number(params.system) : null
-      const systemId = Number.isFinite(parsedSystemId) ? (parsedSystemId as number) : undefined
       const scopedSystemIds = Array.isArray(params.scopedSystemIds) ? params.scopedSystemIds : null
       const activeSystemIds =
         scopedSystemIds ??
         systemOptions.map((row) => row.id).filter((id): id is number => typeof id === "number" && Number.isFinite(id))
+      const systemId =
+        Number.isFinite(parsedSystemId)
+          ? (parsedSystemId as number)
+          : activeSystemIds.length === 1
+            ? activeSystemIds[0]
+            : undefined
       if (debugEnabled) {
         console.debug("[dashboard][useSystemsTable]", {
           farmId,
@@ -84,13 +88,13 @@ export function useSystemsTable(params: {
         }
       }
 
-      const result = await getDailyFishInventory({
+      const requestedSystemIds = systemId != null ? [systemId] : activeSystemIds
+      const result = await getDashboardSystems({
         farmId,
         stage,
-        systemId,
+        systemIds: requestedSystemIds,
         dateFrom: startDate,
         dateTo: endDate,
-        limit: 5000,
         signal,
       })
 
@@ -101,13 +105,9 @@ export function useSystemsTable(params: {
         }
       }
 
-      const rows = toDashboardSystemRowsFromInventory({
-        inventoryRows: result.data ?? [],
-        systemOptions,
-        activeScopedSystemIds: activeSystemIds,
-        dateFrom: startDate,
-        dateTo: endDate,
-      }).filter((row) => {
+      const requestedSet = new Set(requestedSystemIds)
+      const rows = (result.data ?? []).filter((row) => {
+        if (!requestedSet.has(row.system_id)) return false
         if (params.includeIncomplete) return true
         return row.is_complete
       })
@@ -121,7 +121,7 @@ export function useSystemsTable(params: {
 
       return {
         rows,
-        meta: { source: "api_daily_fish_inventory_rpc", start: startDate, end: endDate },
+        meta: { source: "api_dashboard_systems", start: startDate, end: endDate },
       }
     },
     enabled:

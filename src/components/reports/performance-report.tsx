@@ -1,10 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useProductionSummary } from "@/lib/hooks/use-production"
+import { useProductionSummary } from "@/features/production/hooks"
+import { usePerformanceRecords, usePerformanceSummary } from "@/features/reports/hooks"
 import { sortByDateAsc } from "@/lib/utils"
 import type { Enums } from "@/lib/types/database"
-import type { ProductionTrendRow } from "@/features/dashboard/types"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
 import {
@@ -15,24 +15,8 @@ import {
   SystemBiomassComparisonSection,
 } from "./performance-report-sections"
 
-type ProductionSummaryRow = ProductionTrendRow
-
 const isFiniteNumber = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value)
-
-const selectLatestRowsPerCycle = (rows: ProductionSummaryRow[]) => {
-  const byCycle = new Map<string, ProductionSummaryRow>()
-
-  rows.forEach((row) => {
-    const cycleKey = `${row.cycle_id ?? "no-cycle"}-${row.system_id ?? "no-system"}`
-    const current = byCycle.get(cycleKey)
-    if (!current || String(row.date ?? "") > String(current.date ?? "")) {
-      byCycle.set(cycleKey, row)
-    }
-  })
-
-  return Array.from(byCycle.values()).sort((left, right) => String(right.date ?? "").localeCompare(String(left.date ?? "")))
-}
 
 export default function PerformanceReport({
   farmId,
@@ -61,7 +45,7 @@ export default function PerformanceReport({
     enabled: boundsReady,
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
-  const performanceTableQuery = useProductionSummary({
+  const performanceTableQuery = usePerformanceRecords({
     systemId,
     stage: stage && stage !== "all" ? stage : undefined,
     dateFrom: dateRange?.from,
@@ -70,18 +54,27 @@ export default function PerformanceReport({
     limit: tableLimitValue,
     enabled: boundsReady && showPerformanceRecords,
   })
+  const performanceSummaryQuery = usePerformanceSummary({
+    farmId: farmId ?? null,
+    systemId,
+    stage,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    enabled: boundsReady,
+  })
   const rows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
   const tableRows = performanceTableQuery.data?.status === "success" ? performanceTableQuery.data.data : []
-  const latestCycleRows = useMemo(() => selectLatestRowsPerCycle(rows), [rows])
-  const latestCycleTableRows = useMemo(() => selectLatestRowsPerCycle(tableRows), [tableRows])
-  const loading = productionSummaryQuery.isLoading
+  const summary = performanceSummaryQuery.data?.status === "success" ? performanceSummaryQuery.data.data[0] ?? null : null
+  const loading = productionSummaryQuery.isLoading || performanceSummaryQuery.isLoading
   const tableLoading = performanceTableQuery.isLoading
   const errorMessages = getCombinedQueryMessages(
     { error: productionSummaryQuery.error, result: productionSummaryQuery.data },
+    { error: performanceSummaryQuery.error, result: performanceSummaryQuery.data },
     { error: performanceTableQuery.error, result: performanceTableQuery.data },
   )
   const latestUpdatedAt = Math.max(
     productionSummaryQuery.dataUpdatedAt ?? 0,
+    performanceSummaryQuery.dataUpdatedAt ?? 0,
     performanceTableQuery.dataUpdatedAt ?? 0,
   )
   const chartRows = useMemo(() => {
@@ -117,57 +110,6 @@ export default function PerformanceReport({
     return Array.from(bySystem.values())
   }, [rows])
 
-  const summary = useMemo(() => {
-    if (!latestCycleRows.length) return null
-    const totals = latestCycleRows.reduce(
-      (acc, row) => {
-        acc.totalBiomass += row.total_biomass ?? 0
-        acc.totalFish += row.number_of_fish_inventory ?? 0
-        acc.totalMortality += row.daily_mortality_count ?? 0
-        acc.totalHarvestKg += row.total_weight_harvested_aggregated ?? 0
-        acc.totalHarvestFish += row.number_of_fish_harvested ?? 0
-        acc.totalStockedFish += row.number_of_fish_stocked ?? 0
-        acc.totalCumulativeMortality += row.cumulative_mortality ?? 0
-        acc.totalTransferOutFish += row.number_of_fish_transfer_out ?? 0
-        if (acc.backendFeedingRate == null && isFiniteNumber(row.feeding_rate)) {
-          acc.backendFeedingRate = row.feeding_rate
-        }
-        if (acc.efcrAggregated == null && isFiniteNumber(row.efcr_aggregated)) {
-          acc.efcrAggregated = row.efcr_aggregated
-        }
-        return acc
-      },
-      {
-        totalBiomass: 0,
-        totalFish: 0,
-        totalMortality: 0,
-        totalHarvestKg: 0,
-        totalHarvestFish: 0,
-        totalStockedFish: 0,
-        totalCumulativeMortality: 0,
-        totalTransferOutFish: 0,
-        backendFeedingRate: null as number | null,
-        efcrAggregated: null as number | null,
-      },
-    )
-
-    const mortalityRate =
-      totals.totalFish > 0 ? totals.totalMortality / totals.totalFish : null
-    const survivalRatePct =
-      totals.totalStockedFish > 0
-        ? ((totals.totalStockedFish - totals.totalCumulativeMortality - totals.totalTransferOutFish) / totals.totalStockedFish) * 100
-        : null
-
-    return {
-      efcr_aggregated_consolidated: totals.efcrAggregated,
-      feeding_rate: totals.backendFeedingRate,
-      average_biomass: totals.totalBiomass,
-      mortality_rate: mortalityRate,
-      survival_rate_pct: survivalRatePct,
-      total_harvest_kg: totals.totalHarvestKg,
-      total_harvest_fish: totals.totalHarvestFish,
-    }
-  }, [latestCycleRows])
   const efcrAppTarget = 1.5
   const efcrIndustryBenchmark = 2
   const mortalityBenchmark = 0.0002
@@ -217,6 +159,7 @@ export default function PerformanceReport({
       errorMessage={errorMessages[0]}
       onRetry={() => {
         productionSummaryQuery.refetch()
+        performanceSummaryQuery.refetch()
         performanceTableQuery.refetch()
       }}
       updatedAt={latestUpdatedAt}
@@ -235,8 +178,8 @@ export default function PerformanceReport({
         dateRange={dateRange}
         farmName={farmName}
         summary={summary}
-        rows={latestCycleRows}
-        tableRows={latestCycleTableRows}
+        rows={tableRows}
+        tableRows={tableRows}
         tableLimitValue={tableLimitValue}
         tableLoading={tableLoading}
       />

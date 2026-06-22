@@ -171,7 +171,6 @@ export async function createWorkspaceClientSide(params: {
     farm_id: farm.id,
     user_id: user.id,
     role: "admin",
-    organization_id: org.id,
   })
 
   if (memberError) {

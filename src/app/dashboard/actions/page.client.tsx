@@ -22,7 +22,7 @@ export default function ActionsPage({
       selectedBatch: searchParams.get("batch") ?? "all",
       selectedSystem: searchParams.get("system") ?? "all",
       selectedStage: parseDashboardStageParam(searchParams.get("stage")),
-      timePeriod: resolveTimePeriod(searchParams.get("period"), "2 weeks"),
+      timePeriod: resolveTimePeriod(searchParams.get("period"), "month"),
     }),
     [searchParams],
   )
@@ -37,7 +37,7 @@ export default function ActionsPage({
   } = useAnalyticsPageBootstrap({
     initialFarmId,
     initialFarmName,
-    defaultTimePeriod: "2 weeks",
+    defaultTimePeriod: "month",
     boundsScope: "dashboard",
     filterOverrides,
   })

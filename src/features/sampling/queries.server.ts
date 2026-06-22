@@ -7,7 +7,7 @@ import {
   getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
-import { listSamplingData } from "@/lib/server/report-reads"
+import { listSamplingData } from "@/features/shared/queries.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import type { Database, Enums } from "@/lib/types/database"
 import { resolveTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
@@ -22,7 +22,18 @@ export type SamplingPageFilters = {
 
 type SamplingSystemOption = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
 type SamplingRow = Database["public"]["Tables"]["fish_sampling_weight"]["Row"]
-type GrowthTrendRow = Database["public"]["Functions"]["api_growth_trend"]["Returns"][number] & { system_id: number }
+type GrowthTrendRow = {
+  system_id: number
+  sample_date: string
+  abw_g: number | null
+  adg_g_day: number | null
+  sgr_pct_day: number | null
+  days_interval: number | null
+  weight_gain_g: number | null
+  age_days?: number | null
+  expected_abw_g?: number | null
+  growth_deviation_pct?: number | null
+}
 
 export type SamplingPageInitialData = {
   bounds: TimeBounds
@@ -32,7 +43,7 @@ export type SamplingPageInitialData = {
   growthTrend: ReturnType<typeof toQuerySuccess<GrowthTrendRow>>
 }
 
-const DEFAULT_TIME_PERIOD: SamplingPageFilters["timePeriod"] = "quarter"
+const DEFAULT_TIME_PERIOD: SamplingPageFilters["timePeriod"] = "month"
 export function parseSamplingPageFilters(
   searchParams?: Record<string, string | string[] | undefined>,
 ): SamplingPageFilters {
@@ -55,12 +66,12 @@ async function listScopedGrowthTrendRows(
 ): Promise<GrowthTrendRow[]> {
   const rows = await Promise.all(
     params.systemIds.map(async (systemId) => {
-      const { data, error } = await supabase.rpc("api_growth_trend", {
+      const { data, error } = await supabase.rpc("api_growth_trend" as never, {
         p_farm_id: params.farmId,
         p_system_id: systemId,
-      })
+      } as never)
       if (error) return []
-      return (data ?? []).map((row) => ({ ...row, system_id: systemId })) as GrowthTrendRow[]
+      return ((data ?? []) as GrowthTrendRow[]).map((row) => ({ ...row, system_id: systemId }))
     }),
   )
 

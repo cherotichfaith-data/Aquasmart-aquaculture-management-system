@@ -10,6 +10,7 @@ import { Button } from "@/components/app-ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { Dialog } from "@/components/app-ui/dialog"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { useProductionSummary } from "@/features/production/hooks"
 import {
     Form,
     FormControl,
@@ -22,7 +23,6 @@ import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
-import { useProductionSummary } from "@/lib/hooks/use-production"
 import { logSbError } from "@/lib/supabase/log"
 import { Constants, type Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"

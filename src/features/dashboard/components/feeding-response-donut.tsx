@@ -5,9 +5,9 @@ import type { ChartData, ChartOptions } from "chart.js"
 import { Doughnut } from "@/components/charts/chartjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { DataFetchingBadge } from "@/components/shared/data-states"
+import { useFeedingRecords } from "@/features/reports/hooks"
 import { formatNumberValue } from "@/lib/analytics-format"
 import { FEEDING_RESPONSE_LEVEL_COLORS, parseFeedingResponseLevel } from "@/lib/feeding-response"
-import { useFeedingRecords } from "@/lib/hooks/use-reports"
 import { getChartPalette } from "@/components/charts/chartjs-theme"
 
 const RESPONSE_LABELS = ["No Response", "Low Appetite", "Ideal Appetite", "Good Appetite", "Aggressive Appetite"] as const

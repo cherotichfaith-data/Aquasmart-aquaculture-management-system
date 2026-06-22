@@ -1,31 +1,15 @@
-// ─── Client-side API calls for analytics layer RPCs ──────────────────────────
+"use client"
 
 import type { QueryResult } from "@/lib/supabase-client"
 import { getClientOrError, isAbortLikeError, toQueryError, toQuerySuccess } from "@/lib/api/_utils"
 import { createAccessTokenClient } from "@/lib/supabase/access-token-client"
 import { createClient } from "@/lib/supabase/client"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import type {
-  HarvestForecastRow,
-  CycleBenchmarkRow,
-  RecommendedActionRow,
-  FcrIntervalRow,
-  FeedRateRow,
-} from "@/lib/types/insights"
+import type { RecommendedActionRow } from "@/lib/types/insights"
 import { getDashboardSystems } from "@/lib/api/dashboard"
 import { toSystemsOverviewRows } from "@/features/dashboard/systems-overview"
 import type { SystemsOverviewRow } from "@/features/dashboard/types"
-import type { Database } from "@/lib/types/database"
-import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
-
-export type EfcrTrendRow = Database["public"]["Functions"]["api_efcr_trend"]["Returns"][number]
-type AnalyticsRpcName =
-  | "api_harvest_forecast"
-  | "api_cycle_benchmarks"
-  | "api_recommended_actions"
-  | "api_efcr_trend"
-  | "api_feed_fcr_intervals"
-  | "api_feed_rate_analysis"
+import { toRpcSystemId } from "@/lib/rpc-params"
 
 const isQuietError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
@@ -37,64 +21,27 @@ async function getAuthenticatedClient(tag: string): Promise<
   return getClientOrError(`analytics:${tag}`, { requireSession: true })
 }
 
-// ── Shared RPC caller ─────────────────────────────────────────────────────────
-
-async function callAnalyticsRpc<T, Name extends AnalyticsRpcName = AnalyticsRpcName>(params: {
+async function callAnalyticsRpc<T>(params: {
   tag: string
-  rpcName: Name
-  args: Database["public"]["Functions"][Name]["Args"] | Record<string, unknown>
+  rpcName: string
+  args: Record<string, unknown>
   signal?: AbortSignal
 }): Promise<QueryResult<T>> {
   const clientResult = await getAuthenticatedClient(params.tag)
   if ("error" in clientResult) return clientResult.error as QueryResult<T>
   const { supabase } = clientResult
 
-  let q = supabase.rpc(params.rpcName, params.args as Database["public"]["Functions"][Name]["Args"])
-  if (params.signal) q = q.abortSignal(params.signal)
+  let query = supabase.rpc(params.rpcName as never, params.args as never)
+  if (params.signal) query = query.abortSignal(params.signal)
 
-  const { data, error } = await q
+  const { data, error } = await query
   if (error) {
     if (isQuietError(error)) return toQuerySuccess<T>([])
     return toQueryError<T>(params.tag, error)
   }
+
   return toQuerySuccess<T>((data ?? []) as unknown as T[])
 }
-
-// ── System Health Scores ──────────────────────────────────────────────────────
-
-// ── Harvest Forecast ──────────────────────────────────────────────────────────
-
-export async function getHarvestForecast(params: {
-  farmId: string
-  systemId?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<HarvestForecastRow>> {
-  return callAnalyticsRpc<HarvestForecastRow>({
-    tag: "getHarvestForecast",
-    rpcName: "api_harvest_forecast",
-    args: { p_farm_id: params.farmId, p_system_id: toRpcSystemId(params.systemId) },
-    signal: params.signal,
-  })
-}
-
-
-
-// ── Cycle Benchmarks ──────────────────────────────────────────────────────────
-
-export async function getCycleBenchmarks(params: {
-  farmId: string
-  systemId?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<CycleBenchmarkRow>> {
-  return callAnalyticsRpc<CycleBenchmarkRow>({
-    tag: "getCycleBenchmarks",
-    rpcName: "api_cycle_benchmarks",
-    args: { p_farm_id: params.farmId, p_system_id: toRpcSystemId(params.systemId) },
-    signal: params.signal,
-  })
-}
-
-// ── Recommended Actions ───────────────────────────────────────────────────────
 
 export async function getRecommendedActions(params: {
   farmId: string
@@ -108,72 +55,6 @@ export async function getRecommendedActions(params: {
     signal: params.signal,
   })
 }
-
-// ── FCR Intervals ─────────────────────────────────────────────────────────────
-
-export async function getEfcrTrend(params: {
-  farmId: string
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-  signal?: AbortSignal
-}): Promise<QueryResult<EfcrTrendRow>> {
-  return callAnalyticsRpc<EfcrTrendRow>({
-    tag: "getEfcrTrend",
-    rpcName: "api_efcr_trend",
-    args: {
-      p_farm_id: params.farmId,
-      p_system_id: toRpcSystemId(params.systemId),
-      p_start_date: toRpcDate(params.dateFrom),
-      p_end_date: toRpcDate(params.dateTo),
-    },
-    signal: params.signal,
-  })
-}
-
-export async function getFcrIntervals(params: {
-  farmId: string
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-  signal?: AbortSignal
-}): Promise<QueryResult<FcrIntervalRow>> {
-  return callAnalyticsRpc<FcrIntervalRow>({
-    tag: "getFcrIntervals",
-    rpcName: "api_feed_fcr_intervals",
-    args: {
-      p_farm_id: params.farmId,
-      p_system_id: toRpcSystemId(params.systemId),
-      p_date_from: toRpcDate(params.dateFrom),
-      p_date_to: toRpcDate(params.dateTo),
-    },
-    signal: params.signal,
-  })
-}
-
-// ── Feed Rate Analysis ────────────────────────────────────────────────────────
-
-export async function getFeedRateAnalysis(params: {
-  farmId: string
-  systemId?: number | null
-  dateFrom?: string
-  dateTo?: string
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedRateRow>> {
-  return callAnalyticsRpc<FeedRateRow>({
-    tag: "getFeedRateAnalysis",
-    rpcName: "api_feed_rate_analysis",
-    args: {
-      p_farm_id: params.farmId,
-      p_system_id: toRpcSystemId(params.systemId),
-      p_date_from: toRpcDate(params.dateFrom),
-      p_date_to: toRpcDate(params.dateTo),
-    },
-    signal: params.signal,
-  })
-}
-
-// ── KPI Coverage ──────────────────────────────────────────────────────────────
 
 export async function fetchSystemsOverview(
   farmId?: string | null,

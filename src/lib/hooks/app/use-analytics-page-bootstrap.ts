@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import type { AnalyticsTimeScope, TimeBounds } from "@/lib/time-period"
+import { DEFAULT_TIME_PERIOD, type AnalyticsTimeScope, type TimeBounds } from "@/lib/time-period"
 import {
   useSharedFilters,
   type SharedFiltersState,
@@ -86,7 +86,7 @@ export function useAnalyticsPageBootstrap(params: {
     params.initialFilters?.timePeriod,
   ])
 
-  const sharedFilters = useSharedFilters(params.defaultTimePeriod ?? "2 weeks", sharedFilterInitialValues, {
+  const sharedFilters = useSharedFilters(params.defaultTimePeriod ?? DEFAULT_TIME_PERIOD, sharedFilterInitialValues, {
     urlValues: params.filterUrlValues,
     urlKeys: params.filterUrlKeys,
   })

@@ -3,10 +3,11 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { apiRateLimits } from "@/lib/server/rate-limit"
 import { requireRateLimitedRouteUser } from "@/lib/server/write-through"
-import { listMortalityData } from "@/lib/server/report-reads"
+import { listMortalityData } from "@/features/shared/queries.server"
 import { logSbError } from "@/lib/supabase/log"
 
 const mortalitySchema = z.object({
+  farmId: z.string().uuid().nullable().optional(),
   systemId: z.number().int().positive().optional(),
   systemIds: z.array(z.number().int().positive()).optional(),
   batchId: z.number().int().positive().optional(),

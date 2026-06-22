@@ -5,10 +5,9 @@ import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataErrorState } from "@/components/shared/data-states"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
+import { useSamplingData, useScopedGrowthTrend } from "@/features/reports/hooks"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
-import { useSamplingData, useScopedGrowthTrend } from "@/lib/hooks/use-reports"
-import { useHarvestForecast } from "@/lib/hooks/use-analytics"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
@@ -47,7 +46,7 @@ export default function SamplingPage({
       selectedBatch: batchParam ?? "all",
       selectedSystem: selectedSystemId != null ? String(selectedSystemId) : systemParam ?? "all",
       selectedStage: normalizeStageFilter(stageParam),
-      timePeriod: resolveTimePeriod(periodParam, initialFilters?.timePeriod ?? "quarter"),
+      timePeriod: resolveTimePeriod(periodParam, initialFilters?.timePeriod ?? "month"),
     }
   }, [batchParam, filterSystemOptions, initialFilters?.timePeriod, periodParam, stageParam, systemParam])
   const filterUrlValues = useMemo(() => {
@@ -69,7 +68,7 @@ export default function SamplingPage({
   } = useAnalyticsPageBootstrap({
     initialFarmId,
     initialFarmName,
-    defaultTimePeriod: "quarter",
+    defaultTimePeriod: "month",
     initialFilters,
     boundsScope: "production",
     filterOverrides,
@@ -108,11 +107,6 @@ export default function SamplingPage({
     dateTo,
     enabled: samplingEnabled,
   })
-  const harvestReadinessQuery = useHarvestForecast({
-    farmId,
-    systemId: hasSystem ? (systemId as number) : undefined,
-  })
-
   const systemNameById = useMemo(() => {
     const map = new Map<number, string>()
     if (systemsQuery.data?.status === "success") {
@@ -158,6 +152,13 @@ export default function SamplingPage({
     () =>
       growthRowsRaw
         .filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id))
+        .filter(
+          (row): row is typeof row & {
+            abw_g: number
+            adg_g_day: number | null
+            sgr_pct_day: number | null
+          } => row.abw_g != null,
+        )
         .map((row) => {
           const benchmark = row as typeof row & {
             age_days?: number | null
@@ -189,19 +190,14 @@ export default function SamplingPage({
     getQueryResultError(samplingQuery.data),
     getErrorMessage(growthTrendQuery.error),
     getQueryResultError(growthTrendQuery.data),
-    getErrorMessage(harvestReadinessQuery.error),
-    getQueryResultError(harvestReadinessQuery.data),
     getErrorMessage(systemsQuery.error),
     getQueryResultError(systemsQuery.data),
     getErrorMessage(batchSystemsQuery.error),
     getQueryResultError(batchSystemsQuery.data),
   ].filter(Boolean) as string[]
-  const harvestReadinessRows =
-    harvestReadinessQuery.data?.status === "success" ? harvestReadinessQuery.data.data : []
   const loading =
     samplingQuery.isLoading ||
     growthTrendQuery.isLoading ||
-    harvestReadinessQuery.isLoading ||
     systemsQuery.isLoading ||
     batchSystemsQuery.isLoading
 
@@ -215,7 +211,6 @@ export default function SamplingPage({
             onRetry={() => {
               samplingQuery.refetch()
               growthTrendQuery.refetch()
-              harvestReadinessQuery.refetch()
               systemsQuery.refetch()
               batchSystemsQuery.refetch()
             }}
@@ -228,7 +223,6 @@ export default function SamplingPage({
           loading={loading}
           samplingPoints={samplingPoints}
           growthPoints={growthPoints}
-          harvestReadinessRows={harvestReadinessRows}
         />
       </div>
     </DashboardLayout>

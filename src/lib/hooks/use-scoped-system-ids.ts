@@ -1,9 +1,9 @@
 "use client"
 
 import { useMemo } from "react"
+import { useBatchSystemIds } from "@/features/reports/hooks"
 import type { Enums } from "@/lib/types/database"
 import { useSystemOptions } from "@/lib/hooks/use-options"
-import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type Params = {
@@ -11,6 +11,7 @@ type Params = {
   selectedStage: Enums<"system_growth_stage"> | "all"
   selectedBatch: string
   selectedSystem: string
+  activeOnly?: boolean
   enabled?: boolean
 }
 
@@ -20,7 +21,7 @@ export function useScopedSystemIds(params: Params) {
   const systemsQuery = useSystemOptions({
     farmId: params.farmId,
     stage: params.selectedStage,
-    activeOnly: true,
+    activeOnly: params.activeOnly ?? true,
     enabled: params.enabled,
   })
   const selectedSystemId =

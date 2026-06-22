@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/app-ui/card"
 import { Input } from "@/components/app-ui/input"
-import { useAlertThresholds, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
+import { useAlertThresholds, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { formatNumberValue } from "@/lib/analytics-format"

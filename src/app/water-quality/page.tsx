@@ -42,6 +42,7 @@ export default async function Page({
         farmId,
         timePeriod: effectiveFilters.timePeriod,
         systemId: selectedSystemId,
+        batchId,
         scope: "water_quality",
       }),
       initialData.bounds,

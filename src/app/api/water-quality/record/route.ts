@@ -25,7 +25,13 @@ export async function POST(request: Request) {
   if ("response" in systemScope) return systemScope.response
 
   const normalized = payload.map((row) => ({
-    ...row,
+    system_id: row.system_id,
+    date: row.date,
+    time: row.time,
+    measured_at: row.measured_at,
+    water_depth: row.water_depth,
+    parameter_name: row.parameter_name,
+    parameter_value: row.parameter_value,
     location_reference: row.location_reference?.trim() ? row.location_reference.trim() : null,
     local_id: row.local_id ?? null,
     synced_at: new Date().toISOString(),

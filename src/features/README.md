@@ -5,7 +5,7 @@ This folder contains only feature slices that are actively wired into the app.
 Each active feature should own:
 
 - route-level server reads in `queries.server.ts`
-- explicit writes in `commands.server.ts` when the feature is server-first
+- explicit writes in `mutations.server.ts`
 - feature types and schemas
 - feature-local mapping and shaping logic
 
@@ -14,7 +14,7 @@ Recommended shape:
 ```text
 src/features/<domain>/
   queries.server.ts
-  commands.server.ts
+  mutations.server.ts
   types.ts
   schemas.ts
 ```
@@ -25,6 +25,8 @@ Ownership rules:
 - `src/features/` owns domain-facing server logic.
 - `src/components/app-ui/` contains shared MUI-backed primitives only.
 - `src/lib/` contains infra, client hooks, and generic helpers.
+- `src/lib/api/*` is legacy client transport only; table and RPC reads do not belong there anymore.
+- `src/lib/server/*` is infra only; transactional and analytics reads belong in feature `queries.server.ts` files.
 
 Current active slices:
 
@@ -44,6 +46,7 @@ Notes:
 
 - Dashboard-specific components live in `src/features/dashboard/components`
 - Shared analytics types were moved out of a feature slice and now live in `src/lib/types/insights.ts`
+- Shared transactional reads now live in `src/features/shared/queries.server.ts`
 - App routing is canonical under `src/app/*`, with auth and onboarding flow enforced in `src/proxy.ts`
 - Online-only mutations now live in feature-scoped `mutations.server.ts` files; offline-critical writes stay on API routes
 - Feed inventory now also lives in the Server Action bucket; API write routes remain only for offline-critical capture paths
@@ -80,3 +83,4 @@ Rule for cleanup:
 
 - do not keep scaffold-only slices in `src/features/`
 - add a slice only when a route or component imports it
+- frontend reads must flow through feature `queries.server.ts` boundaries; direct table/RPC reads in UI code are not allowed

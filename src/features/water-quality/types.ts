@@ -21,8 +21,13 @@ export type WaterQualityPageFilters = {
   selectedParameter: WqParameter
 }
 export type WaterQualitySystemOption = SystemOption
-export type WaterQualityLatestStatusRow =
+type WaterQualityLatestStatusBaseRow =
   Database["public"]["Functions"]["api_latest_water_quality_status"]["Returns"][number]
+export type WaterQualityLatestStatusRow = WaterQualityLatestStatusBaseRow & {
+  do_exceeded: boolean
+  ammonia_exceeded: boolean
+  low_do_threshold: number | null
+}
 export type WaterQualityMeasurementViewRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 export type WaterQualityThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 export type WaterQualityPageInitialData = {

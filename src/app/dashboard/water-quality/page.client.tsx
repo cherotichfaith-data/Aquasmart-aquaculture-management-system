@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import type { WaterQualityPageFilters } from "@/features/water-quality/types"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import {
   useLatestWaterQualityStatus,
   useWaterQualityMeasurements,
-} from "@/lib/hooks/use-water-quality"
-import { getWaterQualityIndex } from "@/lib/api/water-quality"
+} from "@/features/water-quality/hooks"
+import { getWaterQualityIndex } from "@/features/water-quality/queries.client"
+import type { WaterQualityPageFilters } from "@/features/water-quality/types"
+import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import {
   DEFAULT_WQ_PARAMETER,

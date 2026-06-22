@@ -1,17 +1,12 @@
 import type { Database } from "@/lib/types/database"
 import { createAccessTokenClient } from "@/lib/supabase/server"
-import {
-  type CycleBenchmarkRow,
-  type HarvestForecastRow,
-} from "@/lib/types/insights"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
-import { logSbError } from "@/lib/supabase/log"
-import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
+import { toRpcDate, toRpcSystemIds } from "@/lib/rpc-params"
+import type { DashboardSystemRow } from "@/features/dashboard/types"
 
 export type ServerClient = ReturnType<typeof createAccessTokenClient>
 
 type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
-type DailyFishInventoryRow = Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Returns"][number]
 type SystemVolumeRow = Pick<
   Database["public"]["Tables"]["system"]["Row"],
   "commissioned_at" | "growth_stage" | "id" | "is_active" | "name" | "volume"
@@ -22,7 +17,6 @@ type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_
 type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
-type DashboardSystemRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 type FarmMember = {
   user_id: string
   role: string
@@ -45,38 +39,6 @@ export async function listProductionSummaryRows(
     rows = rows.slice(0, params.limit)
   }
   return rows
-}
-
-export async function listDailyFishInventoryRows(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    systemId?: number
-    stage?: Database["public"]["Enums"]["system_growth_stage"]
-    dateFrom?: string
-    dateTo?: string
-    cursorDate?: string
-    orderAsc?: boolean
-    limit?: number
-  },
-): Promise<DailyFishInventoryRow[]> {
-  const { data, error } = await supabase.rpc("api_daily_fish_inventory_rpc", {
-    p_farm_id: params.farmId,
-    p_system_id: toRpcSystemId(params.systemId),
-    p_stage: params.stage,
-    p_start_date: toRpcDate(params.dateFrom),
-    p_end_date: toRpcDate(params.dateTo),
-    p_cursor_date: toRpcDate(params.cursorDate),
-    p_order_asc: params.orderAsc ?? false,
-    p_limit: params.limit ?? 5000,
-  } as Database["public"]["Functions"]["api_daily_fish_inventory_rpc"]["Args"] & {
-    p_system_id: number | null
-    p_start_date: string | null
-    p_end_date: string | null
-    p_cursor_date: string | null
-  })
-  if (error) return []
-  return (data ?? []) as DailyFishInventoryRow[]
 }
 
 export async function listSystemVolumeRows(
@@ -209,16 +171,41 @@ export async function listDashboardSystemsRows(
   const { data, error } = await supabase.rpc("api_dashboard_systems", {
     p_farm_id: params.farmId,
     p_stage: params.stage ?? undefined,
-    p_system_id: toRpcSystemId(params.systemId),
+    p_system_ids: toRpcSystemIds(params.systemId),
     p_start_date: toRpcDate(params.dateFrom),
     p_end_date: toRpcDate(params.dateTo),
   } as Database["public"]["Functions"]["api_dashboard_systems"]["Args"] & {
-    p_system_id: number | null
+    p_system_ids: number[] | null
     p_start_date: string | null
     p_end_date: string | null
   })
   if (error) return []
-  return (data ?? []) as DashboardSystemRow[]
+
+  const rows = (data ?? []) as DashboardSystemRow[]
+  const batchOptionsResult = await supabase.rpc("api_fingerling_batch_options_rpc", {
+    p_farm_id: params.farmId,
+    p_active_only: true,
+  })
+  const batchLabelById = new Map(
+    ((batchOptionsResult.data ?? []) as Array<{ id: number; label: string | null }>).map((row) => [
+      row.id,
+      row.label || `Batch ${row.id}`,
+    ]),
+  )
+
+  return await Promise.all(
+    rows.map(async (row) => {
+      const { data: cycleRows } = await supabase.rpc("resolve_cycle_batch_for_system_date", {
+        p_system_id: row.system_id,
+        p_date: row.as_of_date,
+      })
+      const batchId = cycleRows?.[0]?.batch_id ?? null
+      return {
+        ...row,
+        batch_name: batchId != null ? batchLabelById.get(batchId) ?? `Batch ${batchId}` : null,
+      }
+    }),
+  )
 }
 
 export async function listFarmMembers(
@@ -264,35 +251,4 @@ export async function getFarmUserRole(
     .maybeSingle()
 
   return (data?.role ?? null) as Database["public"]["Tables"]["farm_user"]["Row"]["role"] | null
-}
-
-export async function listHarvestForecastRows(
-  supabase: ServerClient,
-  params: { farmId: string; systemId?: number },
-): Promise<HarvestForecastRow[]> {
-  const { data, error } = await supabase.rpc("api_harvest_forecast", {
-    p_farm_id: params.farmId,
-    p_system_id: toRpcSystemId(params.systemId),
-  } as Database["public"]["Functions"]["api_harvest_forecast"]["Args"] & { p_system_id: number | null })
-  if (error) {
-    logSbError("query-seed:listHarvestForecastRows", error)
-    return []
-  }
-  return (data ?? []) as HarvestForecastRow[]
-}
-
-
-export async function listCycleBenchmarkRows(
-  supabase: ServerClient,
-  params: { farmId: string; systemId?: number },
-): Promise<CycleBenchmarkRow[]> {
-  const { data, error } = await supabase.rpc("api_cycle_benchmarks", {
-    p_farm_id: params.farmId,
-    p_system_id: toRpcSystemId(params.systemId),
-  } as Database["public"]["Functions"]["api_cycle_benchmarks"]["Args"] & { p_system_id: number | null })
-  if (error) {
-    logSbError("query-seed:listCycleBenchmarkRows", error)
-    return []
-  }
-  return (data ?? []) as CycleBenchmarkRow[]
 }

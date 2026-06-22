@@ -100,6 +100,7 @@ export default async function DashboardPage({
         farmId,
         timePeriod: effectiveFilters.timePeriod,
         systemId: undefined,
+        batchId,
         scope: "dashboard",
       }),
       initialData.bounds,

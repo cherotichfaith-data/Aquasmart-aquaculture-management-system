@@ -340,9 +340,6 @@ export async function bootstrapOnboardingWorkspaceAction(
     .insert({
       name: payload.farmName,
       location: payload.location,
-      owner: payload.owner,
-      email: payload.email,
-      phone: payload.phone || null,
     })
     .select("id")
     .single()

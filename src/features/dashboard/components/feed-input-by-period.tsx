@@ -6,8 +6,8 @@ import { Bar } from "@/components/charts/chartjs"
 import { buildCartesianOptions, getChartPalette } from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { DataFetchingBadge } from "@/components/shared/data-states"
+import { useFeedingRecords } from "@/features/reports/hooks"
 import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
-import { useFeedingRecords } from "@/lib/hooks/use-reports"
 import type { TimePeriod } from "@/lib/time-period"
 import { formatBucketLabel, formatGranularityLabel, getBucketGranularity, getBucketKey } from "@/lib/time-series"
 
@@ -42,7 +42,7 @@ export default function FeedInputByPeriod({
     enabled,
   })
   const records = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
-  const granularity = useMemo(() => getBucketGranularity(timePeriod), [timePeriod])
+  const granularity = useMemo(() => getBucketGranularity(timePeriod, dateFrom, dateTo), [dateFrom, dateTo, timePeriod])
   const granularityLabel = useMemo(() => formatGranularityLabel(granularity), [granularity])
   const palette = getChartPalette()
 
@@ -85,7 +85,7 @@ export default function FeedInputByPeriod({
         palette,
         min: 0,
         max: Math.max(1, Math.ceil(getMaxNumber(rows.map((row) => row.feedKg)) * 1.12)),
-        xTitle: mode === "daily" ? "Date" : granularity === "month" ? "Month" : granularity === "quarter" ? "Quarter" : "Date",
+        xTitle: mode === "daily" ? "Date" : granularity === "month" ? "Month" : granularity === "week" ? "Week" : "Date",
         yTitle: "Feed (kg)",
         xTickFormatter: (_value, index) => rows[index]?.label ?? "",
         tooltip: {

@@ -4,16 +4,15 @@ import Link from "next/link"
 import { useMemo } from "react"
 import Grid from "@mui/material/Grid"
 import Box from "@mui/material/Box"
-import type { Database, Enums } from "@/lib/types/database"
+import type { Enums } from "@/lib/types/database"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
-import type { TimePeriod } from "@/lib/time-period"
+import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import { formatNumberValue } from "@/lib/analytics-format"
 import { toDashboardPath } from "@/lib/app-entry"
+import type { ProductionSummaryMetricsRow } from "@/features/production/types"
 
 const formatWholeNumber = (value: number) => formatNumberValue(Math.round(value))
 const formatKg = (value: number) => `${formatNumberValue(value, { decimals: 1 })} kg`
-type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
-
 const metricCardClass =
   "rounded-2xl border border-border bg-card p-4"
 
@@ -21,8 +20,8 @@ export default function ProductionSummaryMetrics({
   stage,
   batch,
   system,
-  timePeriod = "2 weeks",
-  rows,
+  timePeriod = "month",
+  summary,
   isLoading,
   isFetching,
   updatedAt,
@@ -34,7 +33,7 @@ export default function ProductionSummaryMetrics({
   batch?: string
   system?: string
   timePeriod?: TimePeriod
-  rows: ProductionSummaryRow[]
+  summary: ProductionSummaryMetricsRow | null
   isLoading: boolean
   isFetching: boolean
   updatedAt?: number | null
@@ -47,42 +46,32 @@ export default function ProductionSummaryMetrics({
     if (system && system !== "all") params.set("system", system)
     if (stage !== "all") params.set("stage", stage)
     if (batch && batch !== "all") params.set("batch", batch)
-    params.set("period", timePeriod)
+    params.set("period", toTimePeriodUrlValue(timePeriod))
     return `${toDashboardPath("/production")}?${params.toString()}`
   }, [batch, stage, system, timePeriod])
 
   const metrics = useMemo(() => {
-    const totals = rows.reduce(
-      (acc, row) => {
-        acc.totalStockedFish += row.number_of_fish_stocked ?? 0
-        acc.cumulativeMortality += row.daily_mortality_count ?? 0
-        acc.transferOutFish += row.number_of_fish_transfer_out ?? 0
-        acc.totalHarvestedFish += row.number_of_fish_harvested ?? 0
-        acc.totalHarvestedKg += row.total_weight_harvested ?? 0
-        return acc
-      },
-      {
-        totalStockedFish: 0,
-        cumulativeMortality: 0,
-        transferOutFish: 0,
-        totalHarvestedFish: 0,
-        totalHarvestedKg: 0,
-      },
-    )
+    const totals = summary ?? {
+      total_stocked_fish: 0,
+      cumulative_mortality_fish: 0,
+      total_transfer_out_fish: 0,
+      total_harvested_kg: 0,
+      total_harvested_fish: 0,
+    }
 
     return [
-      { label: "Total Stocked", value: `${formatWholeNumber(totals.totalStockedFish)} fish` },
-      { label: "Cumulative Mortality", value: `${formatWholeNumber(totals.cumulativeMortality)} fish` },
+      { label: "Total Stocked", value: `${formatWholeNumber(totals.total_stocked_fish)} fish` },
+      { label: "Cumulative Mortality", value: `${formatWholeNumber(totals.cumulative_mortality_fish)} fish` },
       {
         label: "Transfer Out",
-        value: `${formatWholeNumber(totals.transferOutFish)} fish`,
+        value: `${formatWholeNumber(totals.total_transfer_out_fish)} fish`,
       },
       {
         label: "Total Harvested",
-        value: `${formatKg(totals.totalHarvestedKg)} | ${formatWholeNumber(totals.totalHarvestedFish)} fish`,
+        value: `${formatKg(totals.total_harvested_kg)} | ${formatWholeNumber(totals.total_harvested_fish)} fish`,
       },
     ]
-  }, [rows])
+  }, [summary])
 
   if (error) {
     return (

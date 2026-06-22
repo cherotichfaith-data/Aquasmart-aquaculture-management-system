@@ -1,8 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useMortalityEvents } from "@/lib/hooks/use-mortality"
-import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
+import { useMortalityData } from "@/features/reports/hooks"
+import { useDashboardSystems } from "@/lib/hooks/use-dashboard-systems"
 import { sortByDateAsc } from "@/lib/utils"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
@@ -43,7 +43,7 @@ export default function MortalityReport({
   const [tableLimit, setTableLimit] = useState("100")
   const [showMortalityRecords, setShowMortalityRecords] = useState(false)
   const boundsReady = Boolean(dateRange?.from && dateRange?.to)
-  const mortalityQuery = useMortalityEvents({
+  const mortalityQuery = useMortalityData({
     farmId,
     systemId,
     batchId,
@@ -52,16 +52,15 @@ export default function MortalityReport({
     dateTo: dateRange?.to,
     enabled: boundsReady,
   })
-  const inventoryQuery = useDailyFishInventory({
+  const systemsQuery = useDashboardSystems({
     farmId,
     systemId,
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
-    limit: chartLimit,
     enabled: boundsReady,
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
-  const mortalityTableQuery = useMortalityEvents({
+  const mortalityTableQuery = useMortalityData({
     farmId,
     systemId,
     batchId,
@@ -72,17 +71,17 @@ export default function MortalityReport({
   })
   const rows = mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : []
   const tableRows = mortalityTableQuery.data?.status === "success" ? mortalityTableQuery.data.data : []
-  const inventoryRows = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
+  const systemRows = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
   const loading = mortalityQuery.isLoading
   const tableLoading = mortalityTableQuery.isLoading
   const errorMessages = getCombinedQueryMessages(
     { error: mortalityQuery.error, result: mortalityQuery.data },
-    { error: inventoryQuery.error, result: inventoryQuery.data },
+    { error: systemsQuery.error, result: systemsQuery.data },
     { error: mortalityTableQuery.error, result: mortalityTableQuery.data },
   )
   const latestUpdatedAt = Math.max(
     mortalityQuery.dataUpdatedAt ?? 0,
-    inventoryQuery.dataUpdatedAt ?? 0,
+    systemsQuery.dataUpdatedAt ?? 0,
     mortalityTableQuery.dataUpdatedAt ?? 0,
   )
   const chartRows = useMemo(() => {
@@ -103,8 +102,8 @@ export default function MortalityReport({
     [rows],
   )
   const totalInventory = useMemo(
-    () => inventoryRows.reduce((sum, row) => sum + (row.number_of_fish ?? 0), 0),
-    [inventoryRows],
+    () => systemRows.reduce((sum, row) => sum + (row.fish_end ?? 0), 0),
+    [systemRows],
   )
   const mortalityPercent = totalInventory > 0 ? (totalMortality / totalInventory) * 100 : null
 
@@ -126,11 +125,11 @@ export default function MortalityReport({
       errorMessage={errorMessages[0]}
       onRetry={() => {
         mortalityQuery.refetch()
-        inventoryQuery.refetch()
+        systemsQuery.refetch()
         mortalityTableQuery.refetch()
       }}
       updatedAt={latestUpdatedAt}
-      isFetching={mortalityQuery.isFetching || inventoryQuery.isFetching || mortalityTableQuery.isFetching}
+      isFetching={mortalityQuery.isFetching || systemsQuery.isFetching || mortalityTableQuery.isFetching}
       isLoading={loading}
     >
       <MortalitySummaryCards

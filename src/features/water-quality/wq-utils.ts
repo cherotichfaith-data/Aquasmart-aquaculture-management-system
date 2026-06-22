@@ -1,6 +1,10 @@
-import type { Enums } from "@/lib/types/database"
-
-export type WqParameter = Enums<"water_quality_parameters">
+export type WqParameter =
+  | "dissolved_oxygen"
+  | "temperature"
+  | "pH"
+  | "ammonia"
+  | "nitrite"
+  | "nitrate"
 export type StatusTone = "green" | "yellow" | "red"
 export const DEFAULT_WQ_PARAMETER: WqParameter = "dissolved_oxygen"
 
@@ -27,8 +31,6 @@ export const parameterLabels: Record<WqParameter, string> = {
   ammonia: "Ammonia (mg/L)",
   nitrite: "Nitrite (mg/L)",
   nitrate: "Nitrate (mg/L)",
-  salinity: "Salinity (ppt)",
-  secchi_disk_depth: "Secchi Depth",
 }
 
 export const isWqParameter = (value: string | null | undefined): value is WqParameter =>

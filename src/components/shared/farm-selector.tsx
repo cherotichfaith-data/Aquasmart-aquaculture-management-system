@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo } from "react"
 import Box from "@mui/material/Box"
+import { useBatchSystemIds } from "@/features/reports/hooks"
 import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
-import { useBatchSystemIds } from "@/lib/hooks/use-reports"
 import { FilterPopover } from "@/components/shared/filter-popover"
 import { formatGrowthStage, GROWTH_STAGE_VALUES } from "@/lib/stage-filter"
 import { formatCageLabel } from "@/lib/system-options"
@@ -20,6 +20,7 @@ interface FarmSelectorProps {
   onBatchChange: (batch: string) => void
   onSystemChange: (system: string) => void
   onStageChange: (stage: StageFilter) => void
+  showBatch?: boolean
   showStage?: boolean
   showCounts?: boolean
   variant?: "default" | "compact"
@@ -37,6 +38,7 @@ export default function FarmSelector({
   onBatchChange,
   onSystemChange,
   onStageChange,
+  showBatch = true,
   showStage = true,
   showCounts = true,
   variant = "default",
@@ -265,18 +267,20 @@ export default function FarmSelector({
         />
       ) : null}
 
-      <FilterPopover
-        label="Batch"
-        value={selectedBatch}
-        options={batchOptions}
-        placeholder={batchesQuery.isLoading ? "Loading batches..." : "All batches"}
-        onChange={onBatchChange}
-        disabled={batchesQuery.isLoading}
-        searchable
-        searchPlaceholder="Search batch"
-        emptyMessage="No batches found."
-        triggerSx={resolvedLayout === "row" ? { width: { xs: "100%", sm: 180 } } : { width: "100%", minWidth: 0 }}
-      />
+      {showBatch ? (
+        <FilterPopover
+          label="Batch"
+          value={selectedBatch}
+          options={batchOptions}
+          placeholder={batchesQuery.isLoading ? "Loading batches..." : "All batches"}
+          onChange={onBatchChange}
+          disabled={batchesQuery.isLoading}
+          searchable
+          searchPlaceholder="Search batch"
+          emptyMessage="No batches found."
+          triggerSx={resolvedLayout === "row" ? { width: { xs: "100%", sm: 180 } } : { width: "100%", minWidth: 0 }}
+        />
+      ) : null}
 
       <FilterPopover
         label={systemLabel}
