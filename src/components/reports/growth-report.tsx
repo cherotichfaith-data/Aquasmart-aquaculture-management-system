@@ -1,8 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useProductionSummary } from "@/lib/hooks/use-production"
-import { useScopedGrowthTrend } from "@/lib/hooks/use-reports"
+import { useProductionSummary } from "@/features/production/hooks"
+import { useScopedGrowthTrend } from "@/features/reports/hooks"
 import { useAppConfig, useSystemOptions } from "@/lib/hooks/use-options"
 import type { Enums } from "@/lib/types/database"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
@@ -135,18 +135,18 @@ export default function GrowthReport({
         if (!row.sample_date) return false
         if (dateRange?.from && row.sample_date < dateRange.from) return false
         if (dateRange?.to && row.sample_date > dateRange.to) return false
-        return true
+        return row.abw_g != null
       })
       .map((row) => ({
         system_id: row.system_id,
         system_name: systemNameById.get(row.system_id) ?? `Cage ${row.system_id}`,
         sample_date: row.sample_date,
-        abw_g: row.abw_g,
-        weight_gain_g: row.weight_gain_g,
-        days_interval: row.days_interval,
-        sgr_pct_day: row.sgr_pct_day,
-        adg_g_day: row.adg_g_day,
-        days_to_harvest: projectDaysToHarvest(row.abw_g, row.adg_g_day, row.sgr_pct_day, targetHarvestWeightG),
+        abw_g: row.abw_g!,
+        weight_gain_g: row.weight_gain_g ?? null,
+        days_interval: row.days_interval ?? null,
+        sgr_pct_day: row.sgr_pct_day ?? null,
+        adg_g_day: row.adg_g_day ?? null,
+        days_to_harvest: projectDaysToHarvest(row.abw_g!, row.adg_g_day ?? 0, row.sgr_pct_day ?? 0, targetHarvestWeightG),
       }))
       .sort((left, right) => {
         if (left.sample_date === right.sample_date) return left.system_name.localeCompare(right.system_name)

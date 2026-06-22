@@ -18,8 +18,6 @@ export type EnvParameter =
   | "ammonia"
   | "nitrite"
   | "nitrate"
-  | "salinity"
-  | "secchi_disk_depth"
 
 export type CurrentReadings = Partial<Record<EnvParameter, number>>
 
@@ -107,8 +105,6 @@ const ENV_PARAMETERS = new Set<EnvParameter>([
   "ammonia",
   "nitrite",
   "nitrate",
-  "salinity",
-  "secchi_disk_depth",
 ])
 
 export { getWqiLabel, selectThresholdRow }

@@ -1,9 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { useFeedingRecords } from "@/lib/hooks/use-reports"
-import { getProductionSummary } from "@/lib/api/production"
+import { useProductionSummary } from "@/features/production/hooks"
+import { useFeedingBreakdown, useFeedingRecords, useFeedingSummary } from "@/features/reports/hooks"
 import { sortByDateAsc } from "@/lib/utils"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
@@ -52,18 +51,29 @@ export default function FeedingReport({
     dateTo: dateRange?.to,
     enabled: boundsReady,
   })
-  const summaryQuery = useQuery({
-    queryKey: ["reports", "feeding", "production-summary", farmId, systemId ?? "all", dateRange?.from, dateRange?.to],
-    queryFn: ({ signal }) =>
-      getProductionSummary({
-        farmId,
-        systemId,
-        dateFrom: dateRange?.from,
-        dateTo: dateRange?.to,
-        signal,
-      }),
-    enabled: Boolean(farmId) && boundsReady,
-    staleTime: 5 * 60_000,
+  const productionSummaryQuery = useProductionSummary({
+    farmId,
+    systemId,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    enabled: boundsReady,
+    limit: chartLimit,
+  })
+  const feedingSummaryQuery = useFeedingSummary({
+    farmId,
+    systemId,
+    batchId,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    enabled: boundsReady,
+  })
+  const feedingBreakdownQuery = useFeedingBreakdown({
+    farmId,
+    systemId,
+    batchId,
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    enabled: boundsReady,
   })
   const tableLimitValue = Number.isFinite(Number(tableLimit)) ? Number(tableLimit) : 100
   const feedingTableQuery = useFeedingRecords({
@@ -78,12 +88,16 @@ export default function FeedingReport({
 
   const records = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
   const tableRecords = feedingTableQuery.data?.status === "success" ? feedingTableQuery.data.data : []
-  const summaryRows = summaryQuery.data?.status === "success" ? summaryQuery.data.data : []
-  const loading = feedingRecordsQuery.isLoading || summaryQuery.isLoading
-  const tableLoading = feedingTableQuery.isLoading
+  const summaryRows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const summary = feedingSummaryQuery.data?.status === "success" ? feedingSummaryQuery.data.data[0] ?? null : null
+  const breakdownRows = feedingBreakdownQuery.data?.status === "success" ? feedingBreakdownQuery.data.data : []
+  const loading = feedingRecordsQuery.isLoading || productionSummaryQuery.isLoading || feedingSummaryQuery.isLoading
+  const tableLoading = feedingTableQuery.isLoading || feedingBreakdownQuery.isLoading
   const errorMessages = getCombinedQueryMessages(
     { error: feedingRecordsQuery.error, result: feedingRecordsQuery.data },
-    { error: summaryQuery.error, result: summaryQuery.data },
+    { error: productionSummaryQuery.error, result: productionSummaryQuery.data },
+    { error: feedingSummaryQuery.error, result: feedingSummaryQuery.data },
+    { error: feedingBreakdownQuery.error, result: feedingBreakdownQuery.data },
     { error: feedingTableQuery.error, result: feedingTableQuery.data },
   )
 
@@ -146,102 +160,36 @@ export default function FeedingReport({
     return sortByDateAsc(Array.from(byDate.values()), (row) => String(row.date ?? ""))
   }, [summaryRows])
 
-  const totalKgFed = useMemo(() => records.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0), [records])
-
-  const avgProtein = useMemo(() => {
-    const relevantRows = records.filter((row) => (row.feeding_amount ?? 0) > 0)
-    if (relevantRows.some((row) => typeof row.feed_type?.crude_protein_percentage !== "number")) {
-      return null
-    }
-
-    const weighted = relevantRows.reduce(
-      (acc, row) => {
-        const amount = row.feeding_amount ?? 0
-        acc.proteinMass += (row.feed_type?.crude_protein_percentage ?? 0) * amount
-        acc.amount += amount
-        return acc
-      },
-      { proteinMass: 0, amount: 0 },
-    )
-
-    return weighted.amount > 0 ? weighted.proteinMass / weighted.amount : null
-  }, [records])
-
-  const avgEfcr = useMemo(() => {
-    const weighted = summaryRows.reduce(
-      (acc, row) => {
-        if (typeof row.efcr_period !== "number") return acc
-        const weight = row.total_feed_amount_period ?? 0
-        if (weight <= 0) return acc
-        acc.value += row.efcr_period * weight
-        acc.weight += weight
-        return acc
-      },
-      { value: 0, weight: 0 },
-    )
-    return weighted.weight > 0 ? weighted.value / weighted.weight : null
-  }, [summaryRows])
-
-  const biomassGain = useMemo(() => {
-    return summaryRows.reduce(
-      (sum, row) => sum + Math.max(0, row.biomass_increase_period ?? 0),
-      0,
-    )
-  }, [summaryRows])
-
-  const systemBreakdownRows = useMemo(() => {
-    const bySystem = new Map<number, { totalKg: number; entries: number; proteinMass: number; proteinWeight: number; lastDate: string | null }>()
-
-    records.forEach((row) => {
-      if (row.system_id == null) return
-      const bucket = bySystem.get(row.system_id) ?? {
-        totalKg: 0,
-        entries: 0,
-        proteinMass: 0,
-        proteinWeight: 0,
-        lastDate: null,
-      }
-      const amount = row.feeding_amount ?? 0
-      bucket.totalKg += amount
-      bucket.entries += 1
-      if (typeof row.feed_type?.crude_protein_percentage === "number") {
-        bucket.proteinMass += row.feed_type.crude_protein_percentage * amount
-        bucket.proteinWeight += amount
-      }
-      if (!bucket.lastDate || String(row.date ?? "") > bucket.lastDate) {
-        bucket.lastDate = row.date ?? null
-      }
-      bySystem.set(row.system_id, bucket)
-    })
-
-    return Array.from(bySystem.entries())
-      .map(([id, bucket]) => ({
-        systemId: id,
-        systemLabel: systemNameById.get(id) ?? `Cage ${id}`,
-        totalKg: bucket.totalKg,
-        entries: bucket.entries,
-        avgProtein: bucket.proteinWeight > 0 ? bucket.proteinMass / bucket.proteinWeight : null,
-        lastDate: bucket.lastDate,
-      }))
-      .sort((left, right) => right.totalKg - left.totalKg)
-  }, [records, systemNameById])
-
   return (
     <AnalyticsSection
       errorTitle="Unable to load feeding report"
       errorMessage={errorMessages[0]}
       onRetry={() => {
         feedingRecordsQuery.refetch()
-        summaryQuery.refetch()
+        productionSummaryQuery.refetch()
+        feedingSummaryQuery.refetch()
         feedingTableQuery.refetch()
       }}
     >
-      <FeedingSummaryCards totalKgFed={totalKgFed} avgEfcr={avgEfcr} avgProtein={avgProtein} />
+      <FeedingSummaryCards
+        totalKgFed={summary?.total_kg_fed ?? 0}
+        avgEfcr={summary?.average_efcr ?? null}
+        avgProtein={summary?.average_protein_pct ?? null}
+      />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <FeedByCageSection loading={loading} rows={feedByCageRows} cageSeries={cageSeries} />
         <EfcrByCageSection loading={loading} rows={efcrByCageRows} cageSeries={cageSeries} />
       </div>
-      <FeedingBreakdownSection rows={systemBreakdownRows} />
+      <FeedingBreakdownSection
+        rows={breakdownRows.map((row) => ({
+          systemId: row.system_id,
+          systemLabel: row.system_label,
+          totalKg: row.total_kg,
+          entries: row.entries,
+          avgProtein: row.avg_protein,
+          lastDate: row.last_date,
+        }))}
+      />
       <FeedingRecordsSection
         tableLimit={tableLimit}
         onTableLimitChange={setTableLimit}
@@ -249,10 +197,10 @@ export default function FeedingReport({
         onToggleRecords={() => setShowFeedingRecords((prev) => !prev)}
         dateRange={dateRange}
         farmName={farmName}
-        totalKgFed={totalKgFed}
-        avgEfcr={avgEfcr}
-        avgProtein={avgProtein}
-        biomassGain={biomassGain}
+        totalKgFed={summary?.total_kg_fed ?? 0}
+        avgEfcr={summary?.average_efcr ?? null}
+        avgProtein={summary?.average_protein_pct ?? null}
+        biomassGain={summary?.biomass_gain_kg ?? 0}
         tableRecords={tableRecords}
         records={records}
         tableLimitValue={tableLimitValue}

@@ -1,4 +1,5 @@
 export type RpcSystemId = number | null
+export type RpcSystemIds = number[] | null
 export type RpcDate = string | null
 
 const DATE_ONLY_RE = /^(\d{4}-\d{2}-\d{2})/
@@ -17,6 +18,16 @@ export function toRpcSystemId(value: unknown): RpcSystemId {
 
   const parsed = Number(trimmed)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+export function toRpcSystemIds(value: unknown): RpcSystemIds {
+  if (Array.isArray(value)) {
+    const ids = Array.from(new Set(value.map(toRpcSystemId).filter((id): id is number => id != null)))
+    return ids.length > 0 ? ids : null
+  }
+
+  const id = toRpcSystemId(value)
+  return id == null ? null : [id]
 }
 
 export function toRpcDate(value: unknown): RpcDate {

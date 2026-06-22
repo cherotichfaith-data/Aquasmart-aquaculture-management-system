@@ -3,7 +3,7 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { apiRateLimits } from "@/lib/server/rate-limit"
 import { requireRateLimitedRouteUser } from "@/lib/server/write-through"
-import { listGrowthTrend } from "@/lib/server/report-reads"
+import { listGrowthTrend } from "@/features/shared/queries.server"
 import { logSbError } from "@/lib/supabase/log"
 
 const growthTrendSchema = z.object({

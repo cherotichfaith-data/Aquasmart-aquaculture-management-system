@@ -21,7 +21,7 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/lib/hooks/app/use-toast"
 import { useSystemOptions } from "@/lib/hooks/use-options"
-import { useRecordWaterQuality } from "@/lib/hooks/use-water-quality"
+import { useRecordWaterQuality } from "@/features/water-quality/hooks"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoPanel, InfoStat } from "./form-support"
@@ -41,12 +41,10 @@ const formSchema = z.object({
   water_depth: z.coerce.number().min(0, "Depth must be positive"),
   temperature: optionalNumber,
   dissolved_oxygen: optionalNumber,
-  ph: optionalNumber,
+  pH: optionalNumber,
   total_ammonia: optionalNumber,
   no2: optionalNumber,
   no3: optionalNumber,
-  salinity: optionalNumber,
-  secchi_disk: optionalNumber,
 })
 
 type MeasurementParameter =
@@ -95,12 +93,10 @@ export function WaterQualityForm({
       water_depth: 1,
       temperature: undefined,
       dissolved_oxygen: undefined,
-      ph: undefined,
+      pH: undefined,
       total_ammonia: undefined,
       no2: undefined,
       no3: undefined,
-      salinity: undefined,
-      secchi_disk: undefined,
     },
   })
 
@@ -170,12 +166,10 @@ export function WaterQualityForm({
 
       if (typeof values.temperature === "number") measurements.push({ parameter_name: "temperature", parameter_value: values.temperature })
       if (typeof values.dissolved_oxygen === "number") measurements.push({ parameter_name: "dissolved_oxygen", parameter_value: values.dissolved_oxygen })
-      if (typeof values.ph === "number") measurements.push({ parameter_name: "pH", parameter_value: values.ph })
+      if (typeof values.pH === "number") measurements.push({ parameter_name: "pH", parameter_value: values.pH })
       if (typeof values.total_ammonia === "number") measurements.push({ parameter_name: "ammonia", parameter_value: values.total_ammonia })
       if (typeof values.no2 === "number") measurements.push({ parameter_name: "nitrite", parameter_value: values.no2 })
       if (typeof values.no3 === "number") measurements.push({ parameter_name: "nitrate", parameter_value: values.no3 })
-      if (typeof values.salinity === "number") measurements.push({ parameter_name: "salinity", parameter_value: values.salinity })
-      if (typeof values.secchi_disk === "number") measurements.push({ parameter_name: "secchi_disk_depth", parameter_value: values.secchi_disk })
 
       if (measurements.length === 0) {
         throw new Error("Enter at least one water quality measurement.")
@@ -202,12 +196,10 @@ export function WaterQualityForm({
         water_depth: values.water_depth,
         temperature: undefined,
         dissolved_oxygen: undefined,
-        ph: undefined,
+        pH: undefined,
         total_ammonia: undefined,
         no2: undefined,
         no3: undefined,
-        salinity: undefined,
-        secchi_disk: undefined,
       })
     } catch (error) {
       logSbError("dataEntry:waterQuality:submit", error)
@@ -357,7 +349,7 @@ export function WaterQualityForm({
                 />
                 <FormField
                   control={form.control}
-                  name="ph"
+                  name="pH"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>pH</FormLabel>
@@ -400,32 +392,6 @@ export function WaterQualityForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Nitrate (mg/L)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="salinity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Salinity (ppt)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.1" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="secchi_disk"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Secchi Disk (m)</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
                       </FormControl>

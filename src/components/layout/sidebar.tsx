@@ -27,7 +27,6 @@ import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
 import {
   Activity,
-  AlertTriangle,
   BarChart3,
   ChevronDown,
   Droplets,
@@ -50,15 +49,14 @@ const ALL_NAV_SECTIONS = [
     title: "Operate",
     items: [
       { name: "Dashboard", href: toDashboardPath("/"), icon: LayoutDashboard },
-      { name: "Feed", href: toDashboardPath("/feed"), icon: Fish },
       { name: "Growth", href: toDashboardPath("/sampling"), icon: TestTube },
-      { name: "Mortality", href: toDashboardPath("/mortality"), icon: AlertTriangle },
       { name: "Water Quality", href: toDashboardPath("/water-quality"), icon: Droplets },
     ],
   },
   {
     title: "Analyze",
     items: [
+      { name: "Feed", href: toDashboardPath("/feed"), icon: Fish },
       { name: "Production", href: toDashboardPath("/production"), icon: BarChart3 },
       { name: "Reports", href: toDashboardPath("/reports"), icon: Activity },
     ],
@@ -79,10 +77,9 @@ const ALL_NAV_SECTIONS = [
 const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
   admin: new Set([
     toDashboardPath("/"),
-    toDashboardPath("/feed"),
     toDashboardPath("/sampling"),
-    toDashboardPath("/mortality"),
     toDashboardPath("/water-quality"),
+    toDashboardPath("/feed"),
     toDashboardPath("/production"),
     toDashboardPath("/reports"),
     DATA_ENTRY_PATH,
@@ -91,10 +88,9 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
   ]),
   farm_manager: new Set([
     toDashboardPath("/"),
-    toDashboardPath("/feed"),
     toDashboardPath("/sampling"),
-    toDashboardPath("/mortality"),
     toDashboardPath("/water-quality"),
+    toDashboardPath("/feed"),
     toDashboardPath("/production"),
     toDashboardPath("/reports"),
     DATA_ENTRY_PATH,
@@ -102,13 +98,11 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
   ]),
   system_operator: new Set([
     DATA_ENTRY_PATH,
-    toDashboardPath("/feed"),
     toDashboardPath("/sampling"),
-    toDashboardPath("/mortality"),
     toDashboardPath("/water-quality"),
   ]),
-  data_analyst: new Set([toDashboardPath("/"), toDashboardPath("/production"), toDashboardPath("/reports")]),
-  viewer: new Set([toDashboardPath("/"), toDashboardPath("/reports")]),
+  data_analyst: new Set([toDashboardPath("/"), toDashboardPath("/feed"), toDashboardPath("/production"), toDashboardPath("/reports")]),
+  viewer: new Set([toDashboardPath("/"), toDashboardPath("/feed"), toDashboardPath("/reports")]),
 }
 
 const ROLE_ITEM_LABELS: Record<string, Record<string, string>> = {

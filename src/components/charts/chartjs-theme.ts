@@ -78,6 +78,14 @@ export function buildDailyDateDomain(values: Array<string | null | undefined>) {
   return domain
 }
 
+export function buildSparseDateDomain(values: Array<string | null | undefined>) {
+  return values
+    .filter((value): value is string => Boolean(value))
+    .filter((value) => parseIsoDay(value) != null)
+    .sort((left, right) => left.localeCompare(right))
+    .filter((value, index, array) => index === 0 || value !== array[index - 1])
+}
+
 export function getDateAxisMaxTicks(domainLength: number) {
   if (domainLength <= 14) return domainLength
   if (domainLength <= 31) return 8

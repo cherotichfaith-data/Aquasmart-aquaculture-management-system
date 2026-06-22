@@ -53,6 +53,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
         farmId,
         timePeriod: effectiveFilters.timePeriod,
         systemId: selectedSystemId,
+        batchId,
         scope: "production",
       }),
       initialData.bounds,

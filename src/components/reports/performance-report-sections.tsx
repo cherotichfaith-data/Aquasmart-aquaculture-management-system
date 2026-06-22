@@ -319,8 +319,8 @@ export function PerformanceRecordsSection({
     total_harvest_kg: number | null
     total_harvest_fish: number | null
   } | null
-  rows: any[]
-  tableRows: any[]
+  rows: Array<{ date: string | null; system_name?: string | null; system_id?: number | null; cycle_id?: number | null; efcr_aggregated?: number | null; survival_rate_pct?: number | null; total_weight_harvested_aggregated?: number | null; number_of_fish_harvested?: number | null; daily_mortality_count?: number | null; number_of_fish_stocked?: number | null; cumulative_mortality?: number | null; number_of_fish_transfer_out?: number | null }>
+  tableRows: Array<{ date: string | null; system_name?: string | null; system_id?: number | null; cycle_id?: number | null; efcr_aggregated?: number | null; survival_rate_pct?: number | null; total_weight_harvested_aggregated?: number | null; number_of_fish_harvested?: number | null; daily_mortality_count?: number | null; number_of_fish_stocked?: number | null; cumulative_mortality?: number | null; number_of_fish_transfer_out?: number | null }>
   tableLimitValue: number
   tableLoading: boolean
 }) {
@@ -329,9 +329,7 @@ export function PerformanceRecordsSection({
     row.system_name ?? row.system_id,
     row.cycle_id,
     row.efcr_aggregated,
-    typeof row.number_of_fish_stocked === "number" && row.number_of_fish_stocked > 0
-      ? ((row.number_of_fish_stocked - (row.cumulative_mortality ?? 0) - (row.number_of_fish_transfer_out ?? 0)) / row.number_of_fish_stocked) * 100
-      : null,
+    row.survival_rate_pct ?? null,
     row.total_weight_harvested_aggregated,
     row.number_of_fish_harvested,
     row.daily_mortality_count,
@@ -415,12 +413,7 @@ export function PerformanceRecordsSection({
                       <td className="px-4 py-2 text-center">{row.cycle_id ?? "-"}</td>
                       <td className="px-4 py-2 text-center">{formatNumberValue(row.efcr_aggregated, { decimals: 2, minimumDecimals: 2, fallback: "-" })}</td>
                       <td className="px-4 py-2 text-center">
-                        {typeof row.number_of_fish_stocked === "number" && row.number_of_fish_stocked > 0
-                          ? formatNumberValue(
-                              ((row.number_of_fish_stocked - (row.cumulative_mortality ?? 0) - (row.number_of_fish_transfer_out ?? 0)) / row.number_of_fish_stocked) * 100,
-                              { decimals: 2, minimumDecimals: 2, fallback: "-" },
-                            )
-                          : "-"}
+                        {formatNumberValue(row.survival_rate_pct, { decimals: 2, minimumDecimals: 2, fallback: "-" })}
                       </td>
                       <td className="px-4 py-2 text-center">{formatNumberValue(row.total_weight_harvested_aggregated, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
                       <td className="px-4 py-2 text-center">{formatNumberValue(row.number_of_fish_harvested, { decimals: 0, fallback: "-" })}</td>

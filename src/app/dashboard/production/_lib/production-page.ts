@@ -1,41 +1,63 @@
 "use client"
 
-import { sortByDateAsc } from "@/lib/utils"
-import { formatCompactDate } from "@/lib/analytics-format"
 import type { ProductionMetric } from "@/components/production/metrics"
-import type { Database } from "@/lib/types/database"
+import type { ProductionChartRow } from "@/components/production/production-chart"
+import { formatCompactDate } from "@/lib/analytics-format"
+import { sortByDateAsc } from "@/lib/utils"
+import type { ProductionPeriodViewRow } from "@/features/production/period-view"
 
-type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+export type { ProductionPeriodViewRow } from "@/features/production/period-view"
 
-export function buildProductionChartRows(params: {
-  metricFilter: ProductionMetric
-  productionRows: ProductionSummaryRow[]
-}) {
-  const { metricFilter, productionRows } = params
-  const chartRows = productionRows.map((row) => ({
-    date: row.date,
-    value: getProductionMetricValue(row, metricFilter),
-  }))
+export type ProductionEfcrChartRow = {
+  date: string
+  label: string
+  periodEfcr: number | null
+  aggregatedEfcr: number | null
+}
 
-  return sortByDateAsc(chartRows, (row) => row.date).map((row) => ({
+export function buildProductionMetricRows(
+  rows: ProductionPeriodViewRow[],
+  metric: Exclude<ProductionMetric, "efcr">,
+): ProductionChartRow[] {
+  return sortByDateAsc(
+    rows.map((row) => ({
+      date: row.date,
+      value: getSingleMetricValue(row, metric),
+    })),
+    (row) => row.date,
+  ).map((row) => ({
     ...row,
     label: formatCompactDate(row.date),
   }))
 }
 
-function getProductionMetricValue(row: ProductionSummaryRow, metric: ProductionMetric) {
+export function buildProductionEfcrRows(rows: ProductionPeriodViewRow[]): ProductionEfcrChartRow[] {
+  return sortByDateAsc(
+    rows.map((row) => ({
+      date: row.date,
+      periodEfcr: row.periodEfcr,
+      aggregatedEfcr: row.aggregatedEfcr,
+    })),
+    (row) => row.date,
+  ).map((row) => ({
+    ...row,
+    label: formatCompactDate(row.date),
+  }))
+}
+
+function getSingleMetricValue(row: ProductionPeriodViewRow, metric: Exclude<ProductionMetric, "efcr">) {
   switch (metric) {
-    case "efcr_periodic":
-      return row.efcr_period
-    case "efcr_aggregated":
-      return row.efcr_aggregated
     case "abw":
-      return row.average_body_weight
-    case "density":
-      return row.biomass_density
+      return row.abwG
     case "biomass":
-      return row.total_biomass
+      return row.biomassKg
+    case "mortality":
+      return row.mortalityFish
     case "feeding_rate":
-      return row.feeding_rate
+      return row.feedingRate
+    case "biomass_density":
+      return row.biomassDensity
+    case "sgr":
+      return row.sgr
   }
 }

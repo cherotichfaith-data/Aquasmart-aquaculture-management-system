@@ -214,7 +214,7 @@ export default function DashboardPage({
       </Grid>
 
       <section>
-        <SectionLabel title="System Status" />
+        <SectionLabel title="Production" />
         <SystemsTable
           farmId={farmId}
           stage={selectedStage}

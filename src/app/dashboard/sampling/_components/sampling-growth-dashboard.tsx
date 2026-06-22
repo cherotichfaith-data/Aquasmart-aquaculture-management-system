@@ -10,7 +10,6 @@ import {
   createVerticalGradient,
   getChartPalette,
 } from "@/components/charts/chartjs-theme"
-import type { HarvestForecastRow } from "@/lib/types/insights"
 import { formatWithUnit } from "../_lib/formatters"
 
 export type SamplingPoint = {
@@ -42,8 +41,6 @@ type SystemSummaryRow = {
   deviationPct: number | null
   sgrPctDay: number | null
   adgGDay: number | null
-  daysToHarvest: number | null
-  readiness: HarvestForecastRow["status"] | null
 }
 
 const chartCardClass = "rounded-2xl border border-border/80 bg-card"
@@ -77,21 +74,6 @@ function latestBySystem<T extends { systemId: number; sampleDate?: string; date?
   return map
 }
 
-function readinessLabel(rows: HarvestForecastRow[]) {
-  if (rows.length === 0) return "N/A"
-  if (rows.some((row) => row.status === "ready")) return "Ready"
-  if (rows.some((row) => row.status === "slow_growth")) return "Slow"
-  if (rows.some((row) => row.status === "on_track")) return "On track"
-  return "No data"
-}
-
-function readinessText(status: HarvestForecastRow["status"] | null) {
-  if (status === "ready") return "Ready"
-  if (status === "on_track") return "On track"
-  if (status === "slow_growth") return "Slow"
-  return "No data"
-}
-
 function deviationTone(value: number | null) {
   if (!isFiniteNumber(value)) return "text-muted-foreground"
   if (value > 3) return "text-primary"
@@ -102,32 +84,26 @@ function deviationTone(value: number | null) {
 function buildSystemSummaryRows(
   samplingPoints: SamplingPoint[],
   growthPoints: BackendGrowthPoint[],
-  forecastRows: HarvestForecastRow[],
 ): SystemSummaryRow[] {
   const latestSamples = latestBySystem(samplingPoints)
   const latestGrowth = latestBySystem(growthPoints)
-  const forecasts = new Map(forecastRows.map((row) => [row.system_id, row]))
   const ids = new Set<number>([
     ...Array.from(latestSamples.keys()),
     ...Array.from(latestGrowth.keys()),
-    ...forecastRows.map((row) => row.system_id),
   ])
 
   return Array.from(ids)
     .map((systemId) => {
       const sample = latestSamples.get(systemId) ?? null
       const growth = latestGrowth.get(systemId) ?? null
-      const forecast = forecasts.get(systemId) ?? null
       return {
         systemId,
-        label: growth?.systemLabel ?? sample?.systemLabel ?? forecast?.system_name ?? `System ${systemId}`,
-        abw: growth?.abwG ?? sample?.abw ?? forecast?.current_abw_g ?? null,
+        label: growth?.systemLabel ?? sample?.systemLabel ?? `System ${systemId}`,
+        abw: growth?.abwG ?? sample?.abw ?? null,
         expectedAbw: growth?.expectedAbwG ?? null,
         deviationPct: growth?.growthDeviationPct ?? null,
         sgrPctDay: growth?.sgrPctDay ?? null,
-        adgGDay: growth?.adgGDay ?? forecast?.adg_g_day ?? null,
-        daysToHarvest: forecast?.days_to_target ?? null,
-        readiness: forecast?.status ?? null,
+        adgGDay: growth?.adgGDay ?? null,
       }
     })
     .sort((left, right) => left.label.localeCompare(right.label))
@@ -210,7 +186,6 @@ export function SamplingGrowthDashboard({
   loading,
   samplingPoints,
   growthPoints,
-  harvestReadinessRows,
 }: {
   sampleCount: number
   latestAbw: number | null
@@ -218,13 +193,12 @@ export function SamplingGrowthDashboard({
   loading: boolean
   samplingPoints: SamplingPoint[]
   growthPoints: BackendGrowthPoint[]
-  harvestReadinessRows: HarvestForecastRow[]
 }) {
   const palette = getChartPalette()
   const chartColors = [palette.chart1, palette.chart2, palette.chart3, palette.chart4, palette.chart5]
   const summaryRows = useMemo(
-    () => buildSystemSummaryRows(samplingPoints, growthPoints, harvestReadinessRows),
-    [growthPoints, harvestReadinessRows, samplingPoints],
+    () => buildSystemSummaryRows(samplingPoints, growthPoints),
+    [growthPoints, samplingPoints],
   )
 
   const averageAbw = average(summaryRows.map((row) => row.abw)) ?? latestAbw
@@ -359,11 +333,11 @@ export function SamplingGrowthDashboard({
           </p>
         </div>
         <div className="kpi-card p-4">
-          <p className="kpi-card-title">Harvest readiness</p>
-          <p className="kpi-card-value">{readinessLabel(harvestReadinessRows)}</p>
-          <p className="kpi-card-meta">
-            {latestSampleSize != null ? `${latestSampleSize.toLocaleString()} fish latest sample` : "Backend status"}
+          <p className="kpi-card-title">Latest sample size</p>
+          <p className="kpi-card-value">
+            {latestSampleSize != null ? latestSampleSize.toLocaleString() : "N/A"}
           </p>
+          <p className="kpi-card-meta">Fish in latest sample</p>
         </div>
       </div>
 
@@ -452,7 +426,7 @@ export function SamplingGrowthDashboard({
                 <th className="px-4 py-3 text-right font-semibold">Expected ABW</th>
                 <th className="px-4 py-3 text-right font-semibold">Deviation</th>
                 <th className="px-4 py-3 text-right font-semibold">SGR</th>
-                <th className="px-4 py-3 text-right font-semibold">Days to harvest</th>
+                <th className="px-4 py-3 text-right font-semibold">ADG</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -474,11 +448,7 @@ export function SamplingGrowthDashboard({
                     <td className="px-4 py-3 text-right">
                       {isFiniteNumber(row.sgrPctDay) ? `${row.sgrPctDay.toFixed(2)}%/day` : "N/A"}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      {isFiniteNumber(row.daysToHarvest)
-                        ? `${Math.ceil(row.daysToHarvest)}d`
-                        : readinessText(row.readiness)}
-                    </td>
+                    <td className="px-4 py-3 text-right">{formatWithUnit(row.adgGDay, 2, "g/day")}</td>
                   </tr>
                 ))
               )}

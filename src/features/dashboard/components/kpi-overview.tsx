@@ -9,13 +9,15 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useKpiOverview } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
-import type { TimePeriod } from "@/lib/time-period"
+import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import { toDashboardPath } from "@/lib/app-entry"
+import type { KPIOverviewMetric } from "../types"
 
 const kpiProductionFilterMap: Record<string, string | null> = {
   efcr: "efcr_periodic",
   mortality: "mortality",
   abw: "abw",
+  sgr: "sgr",
   biomass: null,
   biomass_density: "density",
   feeding: "feeding",
@@ -34,7 +36,7 @@ interface KPIOverviewProps {
 
 export default function KPIOverview({
   stage,
-  timePeriod = "2 weeks",
+  timePeriod = "month",
   batch = "all",
   system = "all",
   scopedSystemIds,
@@ -55,7 +57,7 @@ export default function KPIOverview({
     dateTo: dateTo ?? null,
   })
 
-  const metrics = metricsQuery.data?.metrics ?? []
+  const metrics: KPIOverviewMetric[] = metricsQuery.data?.metrics ?? []
   const errorMessage = getErrorMessage(metricsQuery.error)
   const waitingForBounds = !dateFrom || !dateTo
   const buildProductionHref = (metricKey: string) => {
@@ -63,7 +65,7 @@ export default function KPIOverview({
     if (system !== "all") params.set("system", system)
     if (stage !== "all") params.set("stage", stage)
     if (batch !== "all") params.set("batch", batch)
-    params.set("period", timePeriod)
+    params.set("period", toTimePeriodUrlValue(timePeriod))
 
     const mappedFilter = kpiProductionFilterMap[metricKey]
     if (mappedFilter) params.set("filter", mappedFilter)

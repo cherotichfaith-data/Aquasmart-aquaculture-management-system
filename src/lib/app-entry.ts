@@ -33,7 +33,6 @@ export const WORKSPACE_SELECT_PATH = "/onboarding/select-workspace"
 const STANDALONE_FEATURE_PREFIXES = [
   "/feed",
   "/sampling",
-  "/mortality",
   "/water-quality",
   "/production",
   "/reports",

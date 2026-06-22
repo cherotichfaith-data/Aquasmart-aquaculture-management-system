@@ -29,10 +29,10 @@ type GrowthIntervalRow = {
   system_name: string
   sample_date: string
   abw_g: number
-  weight_gain_g: number
-  days_interval: number
-  sgr_pct_day: number
-  adg_g_day: number
+  weight_gain_g: number | null
+  days_interval: number | null
+  sgr_pct_day: number | null
+  adg_g_day: number | null
   days_to_harvest: number | null
 }
 

@@ -10,7 +10,7 @@ import { PRODUCTION_METRICS, type ProductionMetric } from "@/components/producti
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
 import {
   buildCartesianOptions,
-  buildDailyDateDomain,
+  buildSparseDateDomain,
   createVerticalGradient,
   getChartPalette,
   getDateAxisMaxTicks,
@@ -22,6 +22,8 @@ export type ProductionChartRow = {
   value: number | null
 }
 
+const PRODUCTION_SIDEBAR_BLUE = "#0f4c81"
+
 const PRODUCTION_CHART_STYLE = {
   fill: true,
   gradient: [0.16, 0.02] as [number, number],
@@ -29,12 +31,14 @@ const PRODUCTION_CHART_STYLE = {
 
 export default function ProductionChart({
   metric,
+  title,
   rows,
   isLoading,
   error,
   onRetry,
 }: {
   metric: ProductionMetric
+  title?: string
   rows: ProductionChartRow[]
   isLoading: boolean
   isFetching: boolean
@@ -44,8 +48,8 @@ export default function ProductionChart({
 }) {
   const meta = PRODUCTION_METRICS[metric]
   const palette = getChartPalette()
-  const chartColor = palette.primary
-  const dateDomain = useMemo(() => buildDailyDateDomain(rows.map((row) => row.date)), [rows])
+  const chartColor = PRODUCTION_SIDEBAR_BLUE
+  const dateDomain = useMemo(() => buildSparseDateDomain(rows.map((row) => row.date)), [rows])
   const rowsByDate = useMemo(() => new Map(rows.map((row) => [row.date, row])), [rows])
   const xLimit = getDateAxisMaxTicks(dateDomain.length)
 
@@ -81,9 +85,9 @@ export default function ProductionChart({
     () =>
       buildCartesianOptions({
         palette,
-        xGrid: true,
+        xGrid: false,
         xMaxTicksLimit: xLimit,
-        xTitle: "Date",
+        xTitle: "DATE",
         yTitle: meta.unit ? `${meta.label} (${meta.unit})` : meta.label,
         yTickFormatter: (value) => formatNumberValue(Number(value), { decimals: meta.decimals }),
         tooltip: {
@@ -118,7 +122,7 @@ export default function ProductionChart({
   return (
     <Card>
       <CardHeader className="pb-1">
-        <CardTitle>{meta.label}</CardTitle>
+        <CardTitle>{title ?? meta.label}</CardTitle>
       </CardHeader>
       <CardContent className="pt-2">
         {isLoading ? (

@@ -15,7 +15,7 @@ export const BASE_TIME_PERIODS = Constants.public.Enums.time_period
 
 export const TIME_PERIODS: TimePeriod[] = [...BASE_TIME_PERIODS, "all history"]
 
-export const DEFAULT_TIME_PERIOD: TimePeriod = "2 weeks"
+export const DEFAULT_TIME_PERIOD: TimePeriod = "month"
 
 export type TimeBounds = {
   start: string | null
@@ -31,13 +31,13 @@ export type TimeBounds = {
 }
 
 export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
-  day: "Today",
-  week: "Week",
-  "2 weeks": "2 Weeks",
-  month: "Month",
-  quarter: "Quarter",
-  "6 months": "6 Months",
-  year: "Year",
+  day: "Last day",
+  week: "Last 7 days",
+  "2 weeks": "Last 14 days",
+  month: "Last 30 days",
+  quarter: "Last 90 days",
+  "6 months": "Last 180 days",
+  year: "Last 365 days",
   "all history": "All History",
 }
 
@@ -74,6 +74,57 @@ export const isBaseTimePeriod = (value: unknown): value is BaseTimePeriod =>
 
 export const resolveTimePeriod = (value: unknown, fallback: TimePeriod = DEFAULT_TIME_PERIOD): TimePeriod =>
   parseTimePeriodUrlValue(value) ?? fallback
+
+const TIME_PERIOD_DAY_COUNTS: Record<BaseTimePeriod, number> = {
+  day: 1,
+  week: 7,
+  "2 weeks": 14,
+  month: 30,
+  quarter: 90,
+  "6 months": 180,
+  year: 365,
+}
+
+export function getTimePeriodDays(value: TimePeriod): number | null {
+  if (value === "all history") return null
+  return TIME_PERIOD_DAY_COUNTS[value]
+}
+
+function parseDateOnly(value: string | null | undefined) {
+  if (!value) return null
+  const parsed = new Date(`${value}T00:00:00`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function formatRangeDate(value: Date, includeYear: boolean) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(includeYear ? { year: "numeric" } : {}),
+  }).format(value)
+}
+
+export function formatResolvedDateRange(start: string | null | undefined, end: string | null | undefined) {
+  const startDate = parseDateOnly(start)
+  const endDate = parseDateOnly(end)
+  if (!startDate || !endDate) return null
+  if (startDate.getTime() === endDate.getTime()) {
+    return formatRangeDate(endDate, true)
+  }
+
+  const sameYear = startDate.getFullYear() === endDate.getFullYear()
+  return `${formatRangeDate(startDate, !sameYear)} - ${formatRangeDate(endDate, true)}`
+}
+
+export function formatResolvedTimeWindow(
+  timePeriod: TimePeriod,
+  start: string | null | undefined,
+  end: string | null | undefined,
+) {
+  const label = TIME_PERIOD_LABELS[timePeriod]
+  const range = formatResolvedDateRange(start, end)
+  return range ? `${range} (${label})` : label
+}
 
 type TimePeriodBoundsRpc = Database["public"]["Functions"]["api_time_period_bounds_scoped"]
 type TimePeriodBoundsRpcRow = TimePeriodBoundsRpc["Returns"][number]

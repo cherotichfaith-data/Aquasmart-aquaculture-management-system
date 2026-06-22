@@ -16,21 +16,22 @@ type PublicFunctions = Database["public"]["Functions"]
 export type KpiRpcName =
   | "api_dashboard_consolidated"
   | "api_dashboard_systems"
-  | "api_daily_fish_inventory_rpc"
-  | "api_efcr_trend"
+  | "api_feed_dashboard_kpis"
+  | "api_feed_efcr_trend"
+  | "api_feed_plan_vs_actual"
+  | "api_feed_recommendations"
+  | "api_feed_vs_biomass_gain"
+  | "api_feeding_alerts"
+  | "api_feeding_rate_vs_target"
+  | "api_feeding_response_distribution"
   | "api_growth_trend"
   | "api_production_summary"
   | "api_recommended_actions"
   | "api_running_stock"
+  | "api_system_feed_status"
   | "api_latest_water_quality_status"
   | "api_water_quality_trend"
   | "api_water_quality_index"
-  // Analytics layer RPCs
-  | "api_harvest_forecast"
-  | "api_cycle_benchmarks"
-  // Compute layer RPCs
-  | "api_feed_fcr_intervals"
-  | "api_feed_rate_analysis"
 
 /**
  * Option RPCs (replacing PostgREST option views where possible).
@@ -63,9 +64,9 @@ type ErrorLike = {
 export function queryKpiRpc<Name extends KpiRpcName>(
   supabase: SupabaseClient,
   name: Name,
-  args: PublicFunctions[Name]["Args"] | Record<string, unknown>,
+  args: Record<string, unknown>,
 ) {
-  return supabase.rpc(name, args as PublicFunctions[Name]["Args"])
+  return supabase.rpc(name as never, args as never)
 }
 
 /**

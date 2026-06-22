@@ -44,16 +44,49 @@ import {
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useSharedFilters } from "@/lib/hooks/app/use-shared-filters"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
+import { useTimePeriodBounds } from "@/lib/hooks/app/use-time-period-bounds"
 import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { useBatchOptions, useDashboardTimePeriodOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { formatStableDateTime } from "@/lib/deterministic-format"
 import { formatGrowthStage, normalizeStageFilter } from "@/lib/stage-filter"
-import { resolveTimePeriod, toTimePeriodUrlValue } from "@/lib/time-period"
+import {
+  formatResolvedTimeWindow,
+  resolveTimePeriod,
+  toTimePeriodUrlValue,
+  type AnalyticsTimeScope,
+} from "@/lib/time-period"
 
 type PageMeta = {
   title: string
   description?: string
+}
+
+type PageTimeConfig = {
+  defaultPeriod: TimePeriod
+  scope: AnalyticsTimeScope
+  useSystemBounds: boolean
+  showBatchFilter: boolean
+  showStageFilter: boolean
+}
+
+const getPageTimeConfig = (pathname: string): PageTimeConfig => {
+  if (pathname.startsWith("/feed")) {
+    return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
+  }
+  if (pathname.startsWith("/sampling") || pathname.startsWith("/production") || pathname.startsWith("/reports")) {
+    if (pathname.startsWith("/production")) {
+      return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: false, showStageFilter: false }
+    }
+    return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
+  }
+  if (pathname.startsWith("/water-quality")) {
+    return { defaultPeriod: "month", scope: "water_quality", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
+  }
+  if (pathname.startsWith("/actions")) {
+    return { defaultPeriod: "month", scope: "dashboard", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
+  }
+  return { defaultPeriod: "month", scope: "dashboard", useSystemBounds: false, showBatchFilter: true, showStageFilter: true }
 }
 
 const getPageMeta = (pathname: string, tab: string | null): PageMeta | null => {
@@ -63,22 +96,16 @@ const getPageMeta = (pathname: string, tab: string | null): PageMeta | null => {
       description: "Live production, feed, water-quality, and activity signals across the farm.",
     }
   }
-  if (pathname.startsWith("/feed")) {
-    return {
-      title: "Feed Performance Dashboard",
-      description: "Feed efficiency, response quality, and inventory pressure across the selected scope.",
-    }
-  }
   if (pathname.startsWith("/sampling")) {
     return {
       title: "Growth Dashboard",
       description: "Growth sampling trends, biomass progress, and harvest-readiness indicators.",
     }
   }
-  if (pathname.startsWith("/mortality")) {
+  if (pathname.startsWith("/feed")) {
     return {
-      title: "Mortality Dashboard",
-      description: "Risk signals, driver correlation, and recent loss events in one operational view.",
+      title: "Feed Management Dashboard",
+      description: "Model-guided feed planning, actual feed execution, feeding response, and feed-risk alerts.",
     }
   }
   if (pathname.startsWith("/water-quality")) {
@@ -98,7 +125,7 @@ const getPageMeta = (pathname: string, tab: string | null): PageMeta | null => {
   }
   if (pathname.startsWith("/production")) {
     return {
-      title: "Production Analysis",
+      title: "Production",
       description: "System-level production trends with snapshot-safe reporting across the selected period.",
     }
   }
@@ -178,6 +205,7 @@ export default function Header({
   const [addDataAnchor, setAddDataAnchor] = useState<HTMLElement | null>(null)
 
   const pageMeta = getPageMeta(appPathname, searchParams.get("tab"))
+  const pageTimeConfig = useMemo(() => getPageTimeConfig(appPathname), [appPathname])
   const resolvedRole = (activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const resolvedUser = user ?? null
   const resolvedUnreadCount = unreadCount ?? 0
@@ -185,17 +213,15 @@ export default function Header({
   const allowDataEntry = canAccessDataEntry(resolvedRole)
   const showAddData = appPathname === "/" && allowDataEntry
   const isWaterQualityPage = appPathname.startsWith("/water-quality")
-  const defaultPeriod: TimePeriod = (() => {
-    if (appPathname.startsWith("/feed") || appPathname.startsWith("/sampling")) return "quarter"
-    if (appPathname.startsWith("/water-quality")) return "month"
-    return "2 weeks"
-  })()
+  const defaultPeriod: TimePeriod = pageTimeConfig.defaultPeriod
   const selectedParameter =
     isWaterQualityPage && isWqParameter(searchParams.get("parameter"))
       ? (searchParams.get("parameter") as WqParameter)
       : DEFAULT_WQ_PARAMETER
   const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
-  const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
+  const systemsQuery = useSystemOptions(
+    farmId ? { farmId, activeOnly: appPathname.startsWith("/feed") ? false : true } : undefined,
+  )
   const timePeriodsQuery = useDashboardTimePeriodOptions()
   const allSystemsForChips = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
   const allBatchesForChips = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
@@ -238,6 +264,26 @@ export default function Header({
 
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
   const batchParam = selectedBatch !== "all" ? `&batch=${selectedBatch}` : ""
+  const selectedSystemId = useMemo(
+    () => resolveSystemIdFromFilterValue(selectedSystem, allSystemsForChips),
+    [allSystemsForChips, selectedSystem],
+  )
+  const selectedBatchId = useMemo(
+    () => (selectedBatch !== "all" && Number.isFinite(Number(selectedBatch)) ? Number(selectedBatch) : undefined),
+    [selectedBatch],
+  )
+  const timeWindowBoundsQuery = useTimePeriodBounds({
+    farmId,
+    timePeriod,
+    systemId: pageTimeConfig.useSystemBounds ? selectedSystemId : undefined,
+    batchId: selectedBatchId,
+    scope: pageTimeConfig.scope,
+    enabled: showToolbar,
+  })
+  const timeWindowSummary = useMemo(
+    () => formatResolvedTimeWindow(timePeriod, timeWindowBoundsQuery.start, timeWindowBoundsQuery.end),
+    [timePeriod, timeWindowBoundsQuery.end, timeWindowBoundsQuery.start],
+  )
 
   const selectedBatchAgeDays = useMemo(() => {
     if (selectedBatch === "all") return null
@@ -264,15 +310,17 @@ export default function Header({
   }, [allSystemsForChips, selectedSystem])
 
   const activeBatchLabel = useMemo(() => {
+    if (!pageTimeConfig.showBatchFilter) return null
     if (selectedBatch === "all") return null
     const batch = allBatchesForChips.find((item) => String(item.id) === selectedBatch)
     return batch?.label || `Batch ${selectedBatch}`
-  }, [allBatchesForChips, selectedBatch])
+  }, [allBatchesForChips, pageTimeConfig.showBatchFilter, selectedBatch])
 
   const activeStageLabel = useMemo(() => {
+    if (!pageTimeConfig.showStageFilter) return null
     if (selectedStage === "all") return null
     return formatGrowthStage(selectedStage)
-  }, [selectedStage])
+  }, [pageTimeConfig.showStageFilter, selectedStage])
 
   const activeParameterLabel = useMemo(() => {
     if (!isWaterQualityPage) return null
@@ -358,6 +406,16 @@ export default function Header({
     if (!nextPeriod) return
     handleTimePeriodChange(nextPeriod)
   }, [timePeriod, timePeriodOptions])
+
+  useEffect(() => {
+    if (pageTimeConfig.showBatchFilter || selectedBatch === "all") return
+    handleBatchChange("all")
+  }, [pageTimeConfig.showBatchFilter, selectedBatch])
+
+  useEffect(() => {
+    if (pageTimeConfig.showStageFilter || selectedStage === "all") return
+    handleStageChange("all")
+  }, [pageTimeConfig.showStageFilter, selectedStage])
 
   const handleWaterQualityParameterChange = (value: string) => {
     if (!isWqParameter(value)) return
@@ -491,6 +549,13 @@ export default function Header({
                   >
                     {pageMeta.title}
                   </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mt: 0.35, fontWeight: 500 }}
+                  >
+                    {timeWindowSummary}
+                  </Typography>
                 </Box>
               ) : null}
             </Box>
@@ -572,7 +637,8 @@ export default function Header({
                       onBatchChange={handleBatchChange}
                       onSystemChange={handleSystemChange}
                       onStageChange={handleStageChange}
-                      showStage
+                      showBatch={pageTimeConfig.showBatchFilter}
+                      showStage={pageTimeConfig.showStageFilter}
                       showCounts={false}
                       variant="compact"
                       layout="row"
@@ -843,7 +909,8 @@ export default function Header({
             onBatchChange={handleBatchChange}
             onSystemChange={handleSystemChange}
             onStageChange={handleStageChange}
-            showStage
+            showBatch={pageTimeConfig.showBatchFilter}
+            showStage={pageTimeConfig.showStageFilter}
             showCounts={false}
             variant="compact"
             layout="grid"

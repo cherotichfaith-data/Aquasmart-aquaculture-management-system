@@ -4,7 +4,7 @@ import { toQuerySuccess } from "@/lib/api/_utils"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { getScopedSystemOptions } from "@/features/shared/scoped-analytics.server"
 import { listBatchOptionRows, listFeedTypeOptionRows } from "@/features/shared/query-seed.server"
-import { emptyRecentEntries, listRecentEntries } from "@/lib/server/report-reads"
+import { emptyRecentEntries, listRecentEntries } from "@/features/shared/queries.server"
 import { logSbError } from "@/lib/supabase/log"
 
 type DataEntrySupabaseClient = ReturnType<typeof createAccessTokenClient>

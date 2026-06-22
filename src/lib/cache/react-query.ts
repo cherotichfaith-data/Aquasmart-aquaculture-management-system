@@ -69,10 +69,6 @@ async function invalidateFeedingWriteQueries(
   await Promise.all([
     queryClient.invalidateQueries({
       predicate: ({ queryKey }) =>
-        hasPrefix(queryKey, ["inventory", "daily"]) && toStringValue(queryKey[2]) === params.farmId,
-    }),
-    queryClient.invalidateQueries({
-      predicate: ({ queryKey }) =>
         toStringValue(queryKey[0]) === "options" &&
         toStringValue(queryKey[1]) === "feeds" &&
         toStringValue(queryKey[2]) === params.farmId,
@@ -106,10 +102,6 @@ async function invalidateInventoryWriteQueries(
         toStringValue(queryKey[0]) === "options" &&
         toStringValue(queryKey[1]) === "systems" &&
         toStringValue(queryKey[2]) === params.farmId,
-    }),
-    queryClient.invalidateQueries({
-      predicate: ({ queryKey }) =>
-        hasPrefix(queryKey, ["inventory", "daily"]) && toStringValue(queryKey[2]) === params.farmId,
     }),
     queryClient.invalidateQueries({
       predicate: ({ queryKey }) => isFarmScopedReportsQuery(queryKey, params.farmId),
@@ -169,10 +161,6 @@ async function invalidateFeedInventoryWriteQueries(
       predicate: ({ queryKey }) => isFarmScopedDashboardFeedbackQuery(queryKey, params.farmId),
     }),
     queryClient.invalidateQueries({
-      predicate: ({ queryKey }) =>
-        hasPrefix(queryKey, ["inventory", "daily"]) && toStringValue(queryKey[2]) === params.farmId,
-    }),
-    queryClient.invalidateQueries({
       predicate: ({ queryKey }) => isFarmScopedReportsQuery(queryKey, params.farmId),
     }),
     invalidateRecentActivityQueries(queryClient, { tableName: "feed_inventory", date: params.date }),
@@ -183,17 +171,11 @@ async function invalidateMortalityWriteQueries(
   queryClient: QueryClient,
   params: { farmId: string; systemId: number; date: string },
 ) {
-  await Promise.all([
-    invalidateInventoryWriteQueries(queryClient, {
-      farmId: params.farmId,
-      date: params.date,
-      tableName: "fish_mortality",
-    }),
-    queryClient.invalidateQueries({
-      predicate: ({ queryKey }) =>
-        toStringValue(queryKey[0]) === "mortality-events" && toStringValue(queryKey[1]) === params.farmId,
-    }),
-  ])
+  await invalidateInventoryWriteQueries(queryClient, {
+    farmId: params.farmId,
+    date: params.date,
+    tableName: "fish_mortality",
+  })
 }
 
 async function invalidateSystemWriteQueries(

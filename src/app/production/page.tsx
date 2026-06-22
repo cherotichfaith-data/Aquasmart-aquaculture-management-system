@@ -29,13 +29,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
         farmId,
         timePeriod: effectiveFilters.timePeriod,
         systemId: selectedSystemId,
+        batchId,
         scope: "production",
       }),
       initialData.bounds,
     )
   }
   queryClient.setQueryData(
-    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: false }),
+    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: true }),
     initialData.systems,
   )
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)

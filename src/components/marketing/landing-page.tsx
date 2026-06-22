@@ -59,7 +59,7 @@ const modules = [
     category: "FEED CONTROL",
     title: "Feeding Operations",
     description:
-      "Connect feed plans, actual issue records, and performance outcomes so operators can act before waste compounds.",
+      "Connect feed issue records, stock movement, and performance outcomes so operators can act before waste compounds.",
     metric: "1.42",
     metricLabel: "rolling eFCR",
     imageSrc: "/tanga_tilapia4.jpg",

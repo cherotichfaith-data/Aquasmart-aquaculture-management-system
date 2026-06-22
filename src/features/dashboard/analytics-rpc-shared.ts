@@ -2,6 +2,7 @@ import { Constants, type Database, type Enums } from "@/lib/types/database"
 import type { DashboardPageInitialData, KPIOverviewMetric, RecommendedAction } from "./types"
 
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
+type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 
 const PRIORITY_ORDER: Record<RecommendedAction["priority"], number> = {
   High: 0,
@@ -19,6 +20,16 @@ const WATER_QUALITY_RATINGS = new Set<string>(Constants.public.Enums.water_quali
 
 const isFiniteNumber = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value)
+
+const pickLatestFiniteNumber = (rows: ProductionSummaryRow[], key: keyof ProductionSummaryRow): number | null => {
+  for (const row of rows) {
+    const value = row[key]
+    if (isFiniteNumber(value as number | null | undefined)) {
+      return value as number
+    }
+  }
+  return null
+}
 
 const normalizeWaterQualityLabel = (value: string | null | undefined): Enums<"water_quality_rating"> | null => {
   const normalized = value?.trim().toLowerCase()
@@ -85,6 +96,7 @@ export function mergeRecommendedActionRows(rows: RecommendedActionInputRow[]): R
 export function buildKpiOverviewFromRpc(params: {
   scopedSystemIds: number[]
   consolidatedRows: DashboardConsolidatedRow[]
+  productionRows: ProductionSummaryRow[]
   dateFrom: string
   dateTo: string
 }): DashboardPageInitialData["kpiOverview"] {
@@ -103,6 +115,7 @@ export function buildKpiOverviewFromRpc(params: {
 
   const consolidated = consolidatedRows.find((row) => row.system_id == null) ?? consolidatedRows[0]
   const waterQuality = consolidated.water_quality_rating_numeric_average ?? null
+  const sgr = pickLatestFiniteNumber(params.productionRows, "sgr")
 
   const waterQualityLabel = normalizeWaterQualityLabel(consolidated.water_quality_rating_average)
   const waterQualityDisplay = waterQualityLabel ? WATER_QUALITY_BADGES[waterQualityLabel] : null
@@ -140,6 +153,15 @@ export function buildKpiOverviewFromRpc(params: {
       trendFormat: "delta",
       trendDecimals: 1,
       trendUnit: "g",
+      invertTrend: false,
+    },
+    {
+      key: "sgr",
+      label: "SGR",
+      value: sgr,
+      unit: "%/day",
+      decimals: 2,
+      trend: null,
       invertTrend: false,
     },
     {

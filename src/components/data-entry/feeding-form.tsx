@@ -16,13 +16,13 @@ import {
 } from "@/components/app-ui/form"
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
+import { useRecordFeeding } from "@/features/feed/hooks"
+import { useFeedingRecords } from "@/features/reports/hooks"
 import type { Database } from "@/lib/types/database"
 import { FEEDING_RESPONSE_LEVELS, type FeedingResponseLevel } from "@/lib/feeding-response"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
-import { useRecordFeeding } from "@/lib/hooks/use-feeding"
-import { useFeedingRecords } from "@/lib/hooks/use-reports"
-import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
-import { useLatestWaterQualityStatus, useWaterQualityMeasurements } from "@/lib/hooks/use-water-quality"
+import { useDashboardSystems } from "@/lib/hooks/use-dashboard-systems"
+import { useLatestWaterQualityStatus, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
 import { useFeedTypeOptions } from "@/lib/hooks/use-options"
 import { diffDateDays } from "@/lib/time-series"
 import { logSbError } from "@/lib/supabase/log"
@@ -238,13 +238,11 @@ export function FeedingForm({
     limit: 20,
     enabled: Boolean(previousDate) && hasValidSystemId,
   })
-  const inventoryQuery = useDailyFishInventory({
+  const systemStatusQuery = useDashboardSystems({
     farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
-    limit: 7,
-    orderAsc: false,
     enabled: Boolean(farmId) && Boolean(selectedDate) && hasValidSystemId,
   })
   const latestWaterStatusQuery = useLatestWaterQualityStatus(
@@ -261,7 +259,7 @@ export function FeedingForm({
 
   const existingDailyRecords = duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []
   const yesterdayRecords = yesterdayFeedQuery.data?.status === "success" ? yesterdayFeedQuery.data.data : []
-  const latestInventoryRow = inventoryQuery.data?.status === "success" ? inventoryQuery.data.data[0] ?? null : null
+  const latestSystemStatus = systemStatusQuery.data?.status === "success" ? systemStatusQuery.data.data[0] ?? null : null
   const latestDoReading = useMemo(() => {
     const rows = doQuery.data?.status === "success" ? doQuery.data.data : []
     return rows
@@ -291,9 +289,6 @@ export function FeedingForm({
       const batchId = parseOptionalNumericId(values.batch_id)
       const existingTotal = existingDailyRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
       const dailyTotal = existingTotal + values.amount_kg
-      const biomassKg = latestInventoryRow?.biomass_last_sampling ?? null
-      const feedRatePct = biomassKg && biomassKg > 0 ? (dailyTotal / biomassKg) * 100 : null
-
       const payload = {
         farm_id: resolvedFarmId,
         system_id: systemId,
@@ -307,9 +302,7 @@ export function FeedingForm({
 
       await mutation.mutateAsync(payload)
       setSubmissionSummary(
-        `Saved for ${formatCageLabel(selectedSystem)}. Daily total: ${dailyTotal.toFixed(2)} kg${
-          feedRatePct != null ? ` (${feedRatePct.toFixed(2)}% BW/day).` : "."
-        }`,
+        `Saved for ${formatCageLabel(selectedSystem)}. Daily total: ${dailyTotal.toFixed(2)} kg.`,
       )
       form.reset({
         date: toIsoDate(new Date()),
@@ -331,7 +324,7 @@ export function FeedingForm({
     <div>
       <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
-        <p className="text-sm text-muted-foreground">Fast cage-first feeding entry with live feed target context.</p>
+        <p className="text-sm text-muted-foreground">Fast cage-first feeding entry for daily farm operations.</p>
       </div>
 
       <div className="data-entry-status">
@@ -591,8 +584,8 @@ export function FeedingForm({
             <InfoStat
               label="ABW / Biomass"
               value={
-                latestInventoryRow?.abw_last_sampling != null && latestInventoryRow?.biomass_last_sampling != null
-                  ? `${latestInventoryRow.abw_last_sampling.toFixed(2)} g · ${latestInventoryRow.biomass_last_sampling.toFixed(2)} kg`
+                latestSystemStatus?.abw != null && latestSystemStatus?.biomass_end != null
+                  ? `${latestSystemStatus.abw.toFixed(2)} g · ${latestSystemStatus.biomass_end.toFixed(2)} kg`
                   : "No recent sampling snapshot"
               }
             />

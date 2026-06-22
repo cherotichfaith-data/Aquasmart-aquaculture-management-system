@@ -38,6 +38,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
         farmId,
         timePeriod: effectiveFilters.timePeriod,
         systemId: selectedSystemId,
+        batchId,
         scope: "production",
       }),
       initialData.bounds,
@@ -78,7 +79,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
       initialData.feedingRecords,
     )
     queryClient.setQueryData(
-      queryKeys.mortality.events({
+      queryKeys.reports.mortality({
         farmId,
         systemId: selectedSystemId,
         batchId,
@@ -87,16 +88,6 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
         limit: 2000,
       }),
       initialData.mortalityEvents,
-    )
-    queryClient.setQueryData(
-      queryKeys.inventory.daily({
-        farmId,
-        systemId: selectedSystemId,
-        dateFrom: initialData.bounds.start,
-        dateTo: initialData.bounds.end,
-        limit: 2000,
-      }),
-      initialData.mortalityInventory,
     )
     queryClient.setQueryData(
       queryKeys.reports.growthTrend({

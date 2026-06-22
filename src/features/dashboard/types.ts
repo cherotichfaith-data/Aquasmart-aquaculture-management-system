@@ -6,8 +6,9 @@ import type { SystemOption } from "@/lib/system-options"
 export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
 export type DashboardTimePeriod = TimePeriod
 
-export type ProductionTrendRpcRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
-export type ProductionTrendRow = ProductionTrendRpcRow
+export type ProductionSummaryRpcRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
+export type ProductionTrendRpcRow = ProductionSummaryRpcRow
+export type ProductionTrendRow = ProductionSummaryRpcRow
 export type DashboardUserProfile = Database["public"]["Tables"]["user_profile"]["Row"]
 export type DashboardUserSettings = Database["public"]["Tables"]["user_settings"]["Row"]
 export type DashboardSystemOption = SystemOption
@@ -46,18 +47,21 @@ export type RecommendedAction = {
   due: string
 }
 
-export type DashboardSystemRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
+export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
+export type DashboardSystemRow = DashboardSystemRpcRow & {
+  batch_name?: string | null
+}
 
 export type SystemsOverviewRow = {
   system_id: number
   system_name: string
-  abw: number | null
-  abw_trend: "up" | "down" | "flat"
-  mortality_rate: number | null
-  efcr: number | null
-  feeding_rate: number | null
-  water_quality_rating: string | null
-  last_sample_date: string | null
+  abw: DashboardSystemRpcRow["abw"]
+  abw_arrow: DashboardSystemRpcRow["abw_arrow"]
+  mortality_rate: DashboardSystemRpcRow["mortality_rate"]
+  efcr: DashboardSystemRpcRow["efcr"]
+  feeding_rate: DashboardSystemRpcRow["feeding_rate"]
+  water_quality_rating: DashboardSystemRpcRow["water_quality_rating_average"]
+  last_sample_date: DashboardSystemRpcRow["abw_latest_date"]
   summaryRow: DashboardSystemRow
 }
 
