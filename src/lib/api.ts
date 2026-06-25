@@ -1,5 +1,5 @@
-import type { WorkspaceContext } from "@/lib/context"
 import type { OrganizationSummary } from "@/lib/context"
+import type { FarmSummary } from "@/lib/context"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import { ONBOARDING_PATH, WORKSPACE_SELECT_PATH } from "@/lib/app-entry"
 
@@ -79,15 +79,6 @@ export async function getMe() {
   return parseResponse<{ token: string; user: Record<string, unknown> }>(response)
 }
 
-export async function getContext() {
-  const response = await fetch("/api/context", {
-    credentials: "include",
-    cache: "no-store",
-  })
-
-  return parseResponse<WorkspaceContext>(response)
-}
-
 export async function getOrganizations() {
   const response = await fetch("/api/organizations", {
     credentials: "include",
@@ -109,9 +100,25 @@ export async function getFarmsByOrganization(orgId: string) {
     body: JSON.stringify({ orgId }),
   })
 
-  return parseResponse<Array<{ id: string; name: string; location: string | null; organizationId: string | null }>>(
-    response,
-  )
+  return parseResponse<FarmSummary[]>(response)
+}
+
+export async function createWorkspace(params: {
+  organizationName: string
+  farmName: string
+  location: string
+  organizationId?: string | null
+}): Promise<{ organizationId: string; farmId: string }> {
+  const response = await fetch("/api/workspaces", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(params),
+  })
+
+  return parseResponse<{ organizationId: string; farmId: string }>(response)
 }
 
 export async function selectWorkspace(orgId: string, farmId: string) {

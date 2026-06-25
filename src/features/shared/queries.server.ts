@@ -93,8 +93,8 @@ const projectFeedType = (row: FeedTypeProjection | null | undefined): FeedTypeRo
 
   return {
     id: row.feed_type_id,
-    label: row.feed_label ?? row.feed_line ?? `Feed ${row.feed_type_id}`,
-    feed_line: row.feed_line ?? row.feed_label ?? `Feed ${row.feed_type_id}`,
+    label: row.feed_label as FeedTypeRow["label"],
+    feed_line: row.feed_line as FeedTypeRow["feed_line"],
     crude_protein_percentage: row.crude_protein_percentage ?? 0,
     crude_fat_percentage: row.crude_fat_percentage ?? 0,
     feed_category: String(row.feed_category ?? ""),
