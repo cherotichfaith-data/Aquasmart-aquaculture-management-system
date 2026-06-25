@@ -39,7 +39,7 @@ const formSchema = z.object({
   transfer_type: z.enum(UI_TRANSFER_TYPES),
   batch_id: z.string().optional(),
   date: z.string().min(1, "Date is required"),
-  number_of_fish: z.coerce.number().min(1, "Count must be positive"),
+  number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Count must be positive"),
   total_weight_kg: z.coerce.number().min(0.01, "Weight must be positive"),
   notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 }).superRefine((values, ctx) => {
@@ -311,7 +311,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                       <SelectItem value="none">No batch</SelectItem>
                       {batches.map((batch) => (
                         <SelectItem key={batch.id} value={String(batch.id)}>
-                          {batch.label || `Batch ${batch.id}`}
+                          {batch.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -344,7 +344,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Number of Fish</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" step="1" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -50,7 +50,6 @@ function asSbErrorLike(err: unknown): SbErrorLike {
 }
 
 export function logSbError(tag: string, err: unknown) {
-  if (tag === "getDashboardConsolidated") return
   if (!err) return
   const safeErr = asSbErrorLike(err)
   if (

@@ -18,8 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/lib/hooks/app/use-toast"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useCreateSystem } from "@/lib/hooks/use-system"
-import { BIOLOGICAL_GROWTH_STAGE_VALUES, formatGrowthStage } from "@/lib/stage-filter"
-import { FORM_SYSTEM_TYPES } from "@/lib/system-types"
+import { GROWTH_STAGE_VALUES, formatGrowthStage } from "@/lib/stage-filter"
+import { FORM_SYSTEM_TYPES, FORM_SYSTEM_TYPE_OPTIONS } from "@/lib/system-types"
 import type { Database } from "@/lib/types/database"
 
 type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
@@ -33,7 +33,7 @@ const formSchema = z.object({
     unit: z.string().trim().min(1, "Cage Unit is required"),
     name: z.string().min(1, "Name is required"),
     type: z.enum(FORM_SYSTEM_TYPES),
-    growth_stage: z.enum(BIOLOGICAL_GROWTH_STAGE_VALUES),
+    growth_stage: z.enum(GROWTH_STAGE_VALUES),
     volume: z.coerce.number().min(0).optional(),
     depth: z.coerce.number().min(0).optional(),
 })
@@ -162,10 +162,11 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="rectangular_cage">Rectangular Cage</SelectItem>
-                                            <SelectItem value="circular_cage">Circular Cage</SelectItem>
-                                            <SelectItem value="pond">Pond</SelectItem>
-                                            <SelectItem value="tank">Tank</SelectItem>
+                                            {FORM_SYSTEM_TYPE_OPTIONS.map((type) => (
+                                                <SelectItem key={type.value} value={type.value}>
+                                                    {type.label}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -186,7 +187,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            {BIOLOGICAL_GROWTH_STAGE_VALUES.map((stage) => (
+                                            {GROWTH_STAGE_VALUES.map((stage) => (
                                                 <SelectItem key={stage} value={stage}>
                                                     {formatGrowthStage(stage)}
                                                 </SelectItem>

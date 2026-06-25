@@ -20,16 +20,12 @@ export const queryKeys = {
     feeds(
       farmId?: string | null,
       userId?: string | null,
-      scope?: { dateFrom?: string | null; dateTo?: string | null; inventoryOnly?: boolean },
     ) {
       return [
         "options",
         "feeds",
         farmToken(farmId),
         userId ?? "anon",
-        scope?.inventoryOnly ? "inventory-week" : "all",
-        stringToken(scope?.dateFrom),
-        stringToken(scope?.dateTo),
       ] as const
     },
     feedSuppliers(userId?: string | null) {

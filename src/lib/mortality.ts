@@ -1,20 +1,7 @@
-/**
- * Must stay in sync with the public.mortality_cause enum used by
- * public.fish_mortality.cause.
- */
-export const MORTALITY_CAUSES = [
-  "unknown",
-  "hypoxia",
-  "disease",
-  "injury",
-  "handling",
-  "predator",
-  "starvation",
-  "temperature",
-  "other",
-] as const
+import { Constants, type Enums } from "@/lib/types/database"
 
-export type MortalityCause = (typeof MORTALITY_CAUSES)[number]
+export const MORTALITY_CAUSES = Constants.public.Enums.mortality_cause
+export type MortalityCause = Enums<"mortality_cause">
 
 export const ALERT_SEVERITIES = ["info", "warning", "critical"] as const
 
@@ -32,5 +19,5 @@ export type DerivedSurvivalSeriesRow = {
 }
 
 export function isMortalityCause(value: string): value is MortalityCause {
-  return (MORTALITY_CAUSES as readonly string[]).includes(value)
+  return MORTALITY_CAUSES.includes(value as MortalityCause)
 }

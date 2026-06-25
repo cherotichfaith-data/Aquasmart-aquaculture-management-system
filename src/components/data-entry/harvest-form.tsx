@@ -366,7 +366,7 @@ export function HarvestForm({
                                                     <SelectItem value="none">No batch</SelectItem>
                                                     {batches.map((batch) => (
                                                         <SelectItem key={batch.id} value={String(batch.id)}>
-                                                            {batch.label || `Batch ${batch.id}`}
+                                                            {batch.label}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>

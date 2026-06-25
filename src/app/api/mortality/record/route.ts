@@ -12,7 +12,7 @@ const mortalitySchema = z.object({
   system_id: z.number().int().positive(),
   batch_id: z.number().int().positive().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  number_of_fish_mortality: z.number().positive(),
+  number_of_fish_mortality: z.number().int("Dead fish count must be a whole number.").positive(),
   total_weight_mortality: z.number().min(0).nullable().optional(),
   cause: z.enum(MORTALITY_CAUSES),
   notes: z.string().max(500).nullable().optional(),

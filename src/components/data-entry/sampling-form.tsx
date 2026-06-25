@@ -45,7 +45,7 @@ const formSchema = z.object({
   system_id: z.string().min(1, "Cage number is required"),
   batch_id: z.string().optional(),
   date: z.string().min(1, "Date is required"),
-  number_of_fish: z.coerce.number().min(1, "Sample count must be at least 1"),
+  number_of_fish: z.coerce.number().int("Sample count must be a whole number").min(1, "Sample count must be at least 1"),
   total_weight_kg: z.coerce.number().min(0.001, "Weight must be positive"),
   notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 })
@@ -87,6 +87,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
     defaultValues: {
       date: toIsoDate(new Date()),
       unit: defaultUnit,
+      number_of_fish: 0,
       total_weight_kg: 0,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       batch_id: defaultBatchId ? String(defaultBatchId) : "none",
@@ -174,6 +175,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
       form.reset({
         date: toIsoDate(new Date()),
         unit: values.unit,
+        number_of_fish: 0,
         total_weight_kg: 0,
         system_id: values.system_id,
         batch_id: values.batch_id,
@@ -281,7 +283,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                           <SelectItem value="none">No batch</SelectItem>
                           {batches.map((batch) => (
                             <SelectItem key={batch.id} value={String(batch.id)}>
-                              {batch.label || `Batch ${batch.id}`}
+                              {batch.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -298,14 +300,14 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
               </div>
 
               <div className="data-entry-secondary-grid">
-                <FormField
+              <FormField
                   control={form.control}
                   name="number_of_fish"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Number of Fish Sampled</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" step="1" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

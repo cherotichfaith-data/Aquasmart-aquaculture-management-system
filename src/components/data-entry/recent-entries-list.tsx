@@ -370,7 +370,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
     cards = rows.map((row, index) => {
       return {
         key: String(row.localId ?? row.id ?? index),
-        title: row.feed_type_label?.trim() || `Feed ${row.feed_type_id}`,
+        title: row.feed_type_label?.trim() as string,
         subtitle: formatDate(row.inventory_date),
         meta: formatCreatedAt(row.created_at),
         pending: row.status === "pending",
