@@ -113,7 +113,7 @@ export async function getSystemOptions(params?: {
     growth_stage: row.growth_stage,
     id: row.id,
     is_active: row.is_active,
-    label: row.label || row.name || row.unit || "Missing cage name",
+    label: row.label,
     name: row.name ?? null,
     type: row.type,
     unit: row.unit ?? null,
@@ -136,12 +136,7 @@ export async function getBatchOptions(params?: {
     params?.signal,
   )
   if (res.status !== "success") return res
-
-  const rows = res.data
-    .slice()
-    .sort((a, b) => String(b.date_of_delivery ?? "").localeCompare(String(a.date_of_delivery ?? "")))
-
-  return toQuerySuccess<BatchListItem>(rows)
+  return toQuerySuccess<BatchListItem>(res.data)
 }
 
 export async function getDashboardTimePeriodOptions(params?: {
@@ -190,83 +185,7 @@ export async function getFeedTypeOptions(params?: {
   if (res.status !== "success") return res
 
   const rows = res.data
-    .filter((row) => typeof row.id === "number")
-    .slice()
-    .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
   return toQuerySuccess<FeedTypeOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
-}
-
-export async function getWeeklyInventoryFeedTypeOptions(params?: {
-  farmId?: string | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedTypeOptionRow>> {
-  if (!params?.farmId || !params.dateFrom || !params.dateTo) return empty<FeedTypeOptionRow>()
-
-  const clientResult = await getClientOrError("getWeeklyInventoryFeedTypeOptions", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-
-  let query = clientResult.supabase
-    .from("feed_inventory")
-    .select("feed_type_id, amount_of_bags, bag_weight, opened_bags, inventory_date, inventory_time, created_at")
-    .eq("farm_id", params.farmId)
-    .lte("inventory_date", params.dateTo)
-    .not("feed_type_id", "is", null)
-
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const inventoryResult = await resolveClientReadQuery<
-    Pick<
-      Database["public"]["Tables"]["feed_inventory"]["Row"],
-      "feed_type_id" | "amount_of_bags" | "bag_weight" | "opened_bags" | "inventory_date" | "inventory_time" | "created_at"
-    >
-  >({
-    tag: "getWeeklyInventoryFeedTypeOptions",
-    query,
-    signal: params.signal,
-    quietWhen: isQuietTableError,
-  })
-  if (inventoryResult.status !== "success") return inventoryResult
-
-  const latestByFeedType = new Map<number, (typeof inventoryResult.data)[number]>()
-  inventoryResult.data.forEach((row) => {
-    if (typeof row.feed_type_id !== "number" || !Number.isFinite(row.feed_type_id)) return
-    const current = latestByFeedType.get(row.feed_type_id)
-    const rowSortKey = `${row.inventory_date ?? ""}T${row.inventory_time ?? "00:00"}:${row.created_at ?? ""}`
-    const currentSortKey = current
-      ? `${current.inventory_date ?? ""}T${current.inventory_time ?? "00:00"}:${current.created_at ?? ""}`
-      : ""
-    if (!current || rowSortKey > currentSortKey) {
-      latestByFeedType.set(row.feed_type_id, row)
-    }
-  })
-
-  const stockedFeedTypeIds = new Set(
-    Array.from(latestByFeedType.values())
-      .filter((row) => {
-        const baggedKg = (row.amount_of_bags ?? 0) * (row.bag_weight ?? 0)
-        const openKg = (row.opened_bags ?? 0) / 1000
-        return baggedKg + openKg > 0
-      })
-      .map((row) => row.feed_type_id)
-      .filter((feedTypeId): feedTypeId is number => typeof feedTypeId === "number" && Number.isFinite(feedTypeId)),
-  )
-  if (stockedFeedTypeIds.size === 0) return toQuerySuccess<FeedTypeOptionRow>([])
-
-  const feedTypesResult = await rpcOrEmpty(
-    "getWeeklyInventoryFeedTypeOptions:feedTypes",
-    "api_feed_type_options_rpc",
-    { p_farm_id: params.farmId },
-    params.signal,
-  )
-  if (feedTypesResult.status !== "success") return feedTypesResult
-
-  return toQuerySuccess(
-    feedTypesResult.data
-      .filter((feedType) => stockedFeedTypeIds.has(feedType.id))
-      .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? ""))),
-  )
 }
 
 export async function getFeedSupplierOptions(params?: {
@@ -322,42 +241,23 @@ export async function getFarmOptions(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FarmOptionRow>> {
-  try {
-    const response = await fetch("/api/context", {
-      credentials: "include",
-      cache: "no-store",
-      signal: params?.signal,
-    })
+  const res = await rpcOrEmpty(
+    "getFarmOptions",
+    "api_farm_options_rpc",
+    undefined,
+    params?.signal,
+  )
+  if (res.status !== "success") return res
 
-    if (!response.ok) {
-      const body = response.headers.get("content-type")?.includes("application/json")
-        ? ((await response.json()) as { error?: string })
-        : null
-      return { status: "error", data: null, error: body?.error ?? `Request failed (${response.status})` }
-    }
+  const rows = res.data
+    .map((row) => ({
+      id: row.id,
+      label: row.label,
+      location: row.location ?? "",
+    }))
+    .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
 
-    const body = (await response.json()) as WorkspaceContext
-    const rows = body.farms
-      .map((farm) => ({
-        id: farm.id,
-        label: farm.name,
-        location: farm.location ?? "",
-      }))
-      .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
-
-    return toQuerySuccess<FarmOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
-  } catch (error) {
-    if (
-      params?.signal?.aborted ||
-      isAbortLikeError(error) ||
-      isSbPermissionDenied(error) ||
-      isSbAuthMissing(error)
-    ) {
-      return empty<FarmOptionRow>()
-    }
-
-    return { status: "error", data: null, error: getErrorMessage(error) }
-  }
+  return toQuerySuccess<FarmOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
 }
 
 export async function getSystemVolumes(params?: {

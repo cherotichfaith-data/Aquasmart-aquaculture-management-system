@@ -133,8 +133,8 @@ export default function FarmSelector({
       },
       ...filteredBatches.map((batch) => ({
         value: String(batch.id),
-        label: batch.label || `Batch ${batch.id}`,
-        keywords: [batch.label ?? "", String(batch.id), batch.date_of_delivery ?? ""],
+        label: batch.label,
+        keywords: [batch.label, String(batch.id), batch.date_of_delivery ?? ""],
       })),
     ],
     [filteredBatches],

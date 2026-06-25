@@ -48,11 +48,12 @@ export async function getScopedSystemOptions(
   supabase: ServerClient,
   farmId: string,
   stage: ScopedAnalyticsStage,
+  activeOnly = true,
 ): Promise<ScopedSystemOption[]> {
   const { data, error } = await supabase.rpc("api_system_options_rpc", {
     p_farm_id: farmId,
     p_stage: stage === "all" ? undefined : stage,
-    p_active_only: true,
+    p_active_only: activeOnly,
   })
 
   if (error) throw error

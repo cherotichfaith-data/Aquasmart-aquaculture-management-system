@@ -88,9 +88,7 @@ export async function listBatchOptionRows(
     p_active_only: params.activeOnly ?? true,
   })
   if (error) return []
-  return ((data ?? []) as BatchOptionRow[])
-    .slice()
-    .sort((a, b) => String(b.date_of_delivery ?? "").localeCompare(String(a.date_of_delivery ?? "")))
+  return (data ?? []) as BatchOptionRow[]
 }
 
 export async function listFeedTypeOptionRows(
@@ -102,10 +100,7 @@ export async function listFeedTypeOptionRows(
   })
   if (error) return []
 
-  return ((data ?? []) as FeedTypeOptionRow[])
-    .filter((row) => typeof row.id === "number")
-    .slice()
-    .sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")))
+  return (data ?? []) as FeedTypeOptionRow[]
 }
 
 export async function listDashboardTimePeriodRows(
@@ -180,32 +175,7 @@ export async function listDashboardSystemsRows(
     p_end_date: string | null
   })
   if (error) return []
-
-  const rows = (data ?? []) as DashboardSystemRow[]
-  const batchOptionsResult = await supabase.rpc("api_fingerling_batch_options_rpc", {
-    p_farm_id: params.farmId,
-    p_active_only: true,
-  })
-  const batchLabelById = new Map(
-    ((batchOptionsResult.data ?? []) as Array<{ id: number; label: string | null }>).map((row) => [
-      row.id,
-      row.label || `Batch ${row.id}`,
-    ]),
-  )
-
-  return await Promise.all(
-    rows.map(async (row) => {
-      const { data: cycleRows } = await supabase.rpc("resolve_cycle_batch_for_system_date", {
-        p_system_id: row.system_id,
-        p_date: row.as_of_date,
-      })
-      const batchId = cycleRows?.[0]?.batch_id ?? null
-      return {
-        ...row,
-        batch_name: batchId != null ? batchLabelById.get(batchId) ?? `Batch ${batchId}` : null,
-      }
-    }),
-  )
+  return (data ?? []) as DashboardSystemRow[]
 }
 
 export async function listFarmMembers(

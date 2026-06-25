@@ -9,12 +9,9 @@ import {
   getBatchOptions,
   getDashboardTimePeriodOptions,
   getFarmOptions,
-  getFeedSupplierOptions,
   getFeedTypeOptions,
-  getWeeklyInventoryFeedTypeOptions,
   getFingerlingSupplierOptions,
   getAppConfig,
-  getSystemVolumes,
   getSystemOptions,
 } from "@/lib/api/options"
 
@@ -61,38 +58,17 @@ export function useDashboardTimePeriodOptions(params?: { enabled?: boolean }) {
 
 export function useFeedTypeOptions(params?: {
   farmId?: string | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  inventoryOnly?: boolean
   enabled?: boolean
 }) {
   const { session, user } = useAuth()
   const enabled =
     (Boolean(session) || Boolean(user)) &&
     Boolean(params?.farmId) &&
-    (params?.inventoryOnly ? Boolean(params.dateFrom) && Boolean(params.dateTo) : true) &&
     (params?.enabled ?? true)
   return useQuery({
-    queryKey: queryKeys.options.feeds(params?.farmId, user?.id, {
-      inventoryOnly: params?.inventoryOnly,
-      dateFrom: params?.dateFrom,
-      dateTo: params?.dateTo,
-    }),
-    queryFn: ({ signal }) =>
-      params?.inventoryOnly
-        ? getWeeklyInventoryFeedTypeOptions({ ...params, signal })
-        : getFeedTypeOptions({ ...params, signal }),
+    queryKey: queryKeys.options.feeds(params?.farmId, user?.id),
+    queryFn: ({ signal }) => getFeedTypeOptions({ ...params, signal }),
     enabled,
-    staleTime: 5 * 60_000,
-  })
-}
-
-export function useFeedSupplierOptions(params?: { enabled?: boolean }) {
-  const { session, user } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.options.feedSuppliers(user?.id),
-    queryFn: ({ signal }) => getFeedSupplierOptions({ signal }),
-    enabled: (Boolean(session) || Boolean(user)) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
   })
 }
@@ -113,21 +89,6 @@ export function useFarmOptions(params?: { enabled?: boolean }) {
     queryKey: queryKeys.options.farms(user?.id),
     queryFn: ({ signal }) => getFarmOptions({ signal }),
     enabled: Boolean(session) && (params?.enabled ?? true),
-    staleTime: 5 * 60_000,
-  })
-}
-
-export function useSystemVolumes(params?: {
-  farmId?: string | null
-  stage?: Enums<"system_growth_stage"> | "all"
-  activeOnly?: boolean
-}) {
-  const { session, user } = useAuth()
-  const enabled = (Boolean(session) || Boolean(user)) && Boolean(params?.farmId)
-  return useQuery({
-    queryKey: queryKeys.options.systemVolumes(params),
-    queryFn: ({ signal }) => getSystemVolumes({ ...params, signal }),
-    enabled,
     staleTime: 5 * 60_000,
   })
 }

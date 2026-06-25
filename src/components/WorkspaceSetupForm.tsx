@@ -5,9 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { OnboardingShell } from "@/components/onboarding/onboarding-shell"
 import { useAuth } from "@/components/providers/auth-provider"
 import { ONBOARDING_PATH, WORKSPACE_SELECT_PATH, sanitizeNextPath } from "@/lib/app-entry"
-import { selectWorkspace } from "@/lib/api"
+import { createWorkspace, getOrganizations, selectWorkspace } from "@/lib/api"
 import { setBrowserWorkspaceContext } from "@/lib/context"
-import { createWorkspaceClientSide, fetchOrganizationsForUser } from "@/lib/workspace-client"
 
 const inputCls =
   "w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
@@ -52,7 +51,7 @@ export default function WorkspaceSetupForm() {
   useEffect(() => {
     let active = true
 
-    fetchOrganizationsForUser()
+    getOrganizations()
       .then((organizations) => {
         if (!active) return
         if (organizations.length > 0) {
@@ -108,7 +107,7 @@ export default function WorkspaceSetupForm() {
     setIsSaving(true)
 
     try {
-      const result = await createWorkspaceClientSide({
+      const result = await createWorkspace({
         organizationName: organizationName.trim(),
         farmName: farmName.trim(),
         location: location.trim(),
