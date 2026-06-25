@@ -313,7 +313,7 @@ export default function Header({
     if (!pageTimeConfig.showBatchFilter) return null
     if (selectedBatch === "all") return null
     const batch = allBatchesForChips.find((item) => String(item.id) === selectedBatch)
-    return batch?.label || `Batch ${selectedBatch}`
+    return batch?.label ?? null
   }, [allBatchesForChips, pageTimeConfig.showBatchFilter, selectedBatch])
 
   const activeStageLabel = useMemo(() => {

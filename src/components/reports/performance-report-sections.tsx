@@ -319,8 +319,8 @@ export function PerformanceRecordsSection({
     total_harvest_kg: number | null
     total_harvest_fish: number | null
   } | null
-  rows: Array<{ date: string | null; system_name?: string | null; system_id?: number | null; cycle_id?: number | null; efcr_aggregated?: number | null; survival_rate_pct?: number | null; total_weight_harvested_aggregated?: number | null; number_of_fish_harvested?: number | null; daily_mortality_count?: number | null; number_of_fish_stocked?: number | null; cumulative_mortality?: number | null; number_of_fish_transfer_out?: number | null }>
-  tableRows: Array<{ date: string | null; system_name?: string | null; system_id?: number | null; cycle_id?: number | null; efcr_aggregated?: number | null; survival_rate_pct?: number | null; total_weight_harvested_aggregated?: number | null; number_of_fish_harvested?: number | null; daily_mortality_count?: number | null; number_of_fish_stocked?: number | null; cumulative_mortality?: number | null; number_of_fish_transfer_out?: number | null }>
+  rows: Array<{ date: string | null; system_name?: string | null; system_id?: number | null; cycle_id?: number | null; efcr_aggregated?: number | null; survival_rate_pct?: number | null; total_weight_harvested_aggregated?: number | null; number_of_fish_harvested?: number | null; mortality_count_period?: number | null }>
+  tableRows: Array<{ date: string | null; system_name?: string | null; system_id?: number | null; cycle_id?: number | null; efcr_aggregated?: number | null; survival_rate_pct?: number | null; total_weight_harvested_aggregated?: number | null; number_of_fish_harvested?: number | null; mortality_count_period?: number | null }>
   tableLimitValue: number
   tableLoading: boolean
 }) {
@@ -332,7 +332,7 @@ export function PerformanceRecordsSection({
     row.survival_rate_pct ?? null,
     row.total_weight_harvested_aggregated,
     row.number_of_fish_harvested,
-    row.daily_mortality_count,
+    row.mortality_count_period,
   ])
 
   return (
@@ -348,7 +348,7 @@ export function PerformanceRecordsSection({
             onExportCsv={() =>
               downloadCsv({
                 filename: `performance-report-${dateRange?.from ?? "start"}-to-${dateRange?.to ?? "end"}.csv`,
-                headers: ["date", "system_name", "cycle_id", "efcr_aggregated", "survival_rate_pct", "total_harvest_kg", "total_harvest_fish", "daily_mortality_count"],
+                headers: ["date", "system_name", "cycle_id", "efcr_aggregated", "survival_rate_pct", "total_harvest_kg", "total_harvest_fish", "mortality_count_period"],
                 rows: exportRows,
               })
             }
@@ -365,7 +365,7 @@ export function PerformanceRecordsSection({
                   `Farm Biomass: ${formatNumberValue(summary?.average_biomass, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg`,
                   `Total harvest: ${formatNumberValue(summary?.total_harvest_kg, { decimals: 1, minimumDecimals: 1, fallback: "N/A" })} kg / ${formatNumberValue(summary?.total_harvest_fish, { decimals: 0, fallback: "N/A" })} fish`,
                 ],
-                tableHeaders: ["Date", "System", "Cycle", "eFCR", "Survival (%)", "Harvest (kg)", "Harvest (fish)", "Mortality (%/day)"],
+                tableHeaders: ["Date", "System", "Cycle", "eFCR", "Survival (%)", "Harvest (kg)", "Harvest (fish)", "Mortality (fish)"],
                 tableRows: exportRows.map((row) => [
                   row[0],
                   row[1],
@@ -395,7 +395,7 @@ export function PerformanceRecordsSection({
                   <th className="px-4 py-2 text-center font-semibold text-foreground">Survival (%)</th>
                   <th className="px-4 py-2 text-center font-semibold text-foreground">Harvest (kg)</th>
                   <th className="px-4 py-2 text-center font-semibold text-foreground">Harvest (fish)</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality (%/day)</th>
+                      <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality (fish)</th>
                 </tr>
               </thead>
               <tbody>
@@ -417,7 +417,7 @@ export function PerformanceRecordsSection({
                       </td>
                       <td className="px-4 py-2 text-center">{formatNumberValue(row.total_weight_harvested_aggregated, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
                       <td className="px-4 py-2 text-center">{formatNumberValue(row.number_of_fish_harvested, { decimals: 0, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.daily_mortality_count, { decimals: 0, fallback: "-" })}</td>
+                      <td className="px-4 py-2 text-center">{formatNumberValue(row.mortality_count_period, { decimals: 0, fallback: "-" })}</td>
                     </tr>
                   ))
                 ) : (

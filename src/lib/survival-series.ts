@@ -12,7 +12,7 @@ export function deriveSurvivalSeriesFromProductionSummary(rows: ProductionSummar
       const liveCount = toNumber(row.number_of_fish_inventory)
       const cumulativeMortality = toNumber(row.cumulative_mortality)
       const stocked = liveCount + cumulativeMortality
-      const dailyDeaths = toNumber(row.daily_mortality_count)
+      const dailyDeaths = toNumber(row.mortality_count_period)
 
       return {
         system_id: row.system_id,

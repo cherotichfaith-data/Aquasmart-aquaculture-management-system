@@ -114,8 +114,9 @@ export function buildKpiOverviewFromRpc(params: {
   }
 
   const consolidated = consolidatedRows.find((row) => row.system_id == null) ?? consolidatedRows[0]
+  const fallbackPeriodicEfcr = pickLatestFiniteNumber(params.productionRows, "efcr_period")
+  const periodicEfcr = consolidated.efcr_period_consolidated ?? fallbackPeriodicEfcr
   const waterQuality = consolidated.water_quality_rating_numeric_average ?? null
-  const sgr = pickLatestFiniteNumber(params.productionRows, "sgr")
 
   const waterQualityLabel = normalizeWaterQualityLabel(consolidated.water_quality_rating_average)
   const waterQualityDisplay = waterQualityLabel ? WATER_QUALITY_BADGES[waterQualityLabel] : null
@@ -124,9 +125,9 @@ export function buildKpiOverviewFromRpc(params: {
     {
       key: "efcr",
       label: "eFCR",
-      value: consolidated.efcr_period_consolidated ?? null,
+      value: periodicEfcr,
       decimals: 2,
-      trend: consolidated.efcr_period_consolidated_delta ?? null,
+      trend: consolidated.efcr_period_consolidated != null ? (consolidated.efcr_period_consolidated_delta ?? null) : null,
       trendFormat: "delta",
       trendDecimals: 2,
       invertTrend: true,
@@ -158,19 +159,34 @@ export function buildKpiOverviewFromRpc(params: {
     {
       key: "sgr",
       label: "SGR",
-      value: sgr,
+      value: consolidated.sgr ?? null,
       unit: "%/day",
       decimals: 2,
-      trend: null,
+      trend: consolidated.sgr_delta ?? null,
+      trendFormat: "delta",
+      trendDecimals: 2,
+      trendUnit: "%/day",
+      invertTrend: false,
+    },
+    {
+      key: "agr",
+      label: "AGR",
+      value: consolidated.agr ?? null,
+      unit: "g/day",
+      decimals: 2,
+      trend: consolidated.agr_delta ?? null,
+      trendFormat: "delta",
+      trendDecimals: 2,
+      trendUnit: "g/day",
       invertTrend: false,
     },
     {
       key: "biomass",
       label: "Total Biomass",
-      value: consolidated.average_biomass ?? null,
+      value: consolidated.total_biomass ?? null,
       unit: "kg",
       decimals: 1,
-      trend: consolidated.average_biomass_delta ?? null,
+      trend: consolidated.total_biomass_delta ?? null,
       trendFormat: "delta",
       trendDecimals: 1,
       trendUnit: "kg",

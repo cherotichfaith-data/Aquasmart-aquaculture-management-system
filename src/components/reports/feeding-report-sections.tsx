@@ -317,7 +317,7 @@ export function FeedingRecordsSection({
     row.date,
     row.system_id,
     row.batch_id,
-    row.feed_type?.feed_line ?? row.feed_type_id,
+    row.feed_type?.feed_line,
     row.feeding_amount,
     formatFeedingResponseLevel(row.feeding_response),
     row.feed_type?.crude_protein_percentage,
@@ -373,7 +373,7 @@ export function FeedingRecordsSection({
                 ) : tableRecords.length > 0 ? (
                   tableRecords.map((row) => (
                     <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
-                      <td className="font-medium">{row.date}</td><td>{row.system_id}</td><td>{row.batch_id ?? "-"}</td><td>{row.feed_type?.feed_line ?? row.feed_type_id}</td><td>{row.feeding_amount}</td><td>{formatFeedingResponseLevel(row.feeding_response)}</td>
+                      <td className="font-medium">{row.date}</td><td>{row.system_id}</td><td>{row.batch_id ?? "-"}</td><td>{row.feed_type?.feed_line}</td><td>{row.feeding_amount}</td><td>{formatFeedingResponseLevel(row.feeding_response)}</td>
                     </tr>
                   ))
                 ) : (

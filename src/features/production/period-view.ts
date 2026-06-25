@@ -38,7 +38,6 @@ type ConsolidatedAccumulator = {
   date: string
   numberOfFish: number
   biomassKg: number
-  totalStockedFish: number
   feedPeriodKg: number
   feedAggKg: number
   growthKg: number
@@ -54,6 +53,8 @@ type ConsolidatedAccumulator = {
   weightedSgrNumerator: number
   weightedFeedingRateNumerator: number
   weightedBiomassForAverages: number
+  weightedSurvivalPctNumerator: number
+  survivalWeight: number
   feedTypes: Set<string>
 }
 
@@ -70,17 +71,6 @@ const getOptionalNumber = (row: ProductionSummaryRpcRow, key: string) => {
 
 const buildSystemDateKey = (systemId: number | null | undefined, date: string | null | undefined) =>
   `${systemId ?? "system"}|${date ?? ""}`
-
-function buildSurvivalRatePct(params: {
-  numberOfFishStocked: number | null
-  cumulativeMortality: number | null
-  transferOutFishAggregated: number | null
-}) {
-  const stocked = params.numberOfFishStocked ?? 0
-  if (stocked <= 0) return null
-  const survivors = stocked - (params.cumulativeMortality ?? 0) - (params.transferOutFishAggregated ?? 0)
-  return (survivors / stocked) * 100
-}
 
 type ProductionRowEnrichment = {
   totalScopedVolumeM3?: number | null
@@ -103,7 +93,6 @@ function mapProductionSummaryRow(
   const feedPeriodKg = asFiniteNumber(row.total_feed_amount_period)
   const feedAggKg = asFiniteNumber(row.total_feed_amount_aggregated)
   const transferInFish = getOptionalNumber(row, "number_of_fish_transfer_in")
-  const transferOutFishAggregated = asFiniteNumber(row.number_of_fish_transfer_out_aggregated)
 
   return {
     date: row.date,
@@ -118,22 +107,18 @@ function mapProductionSummaryRow(
     growthKg: asFiniteNumber(row.biomass_increase_period),
     cumulativeGrowthKg: asFiniteNumber(row.biomass_increase_aggregated),
     harvestKg: asFiniteNumber(row.total_weight_harvested),
-    mortalityFish: asFiniteNumber(row.daily_mortality_count),
+    mortalityFish: asFiniteNumber(row.mortality_count_period),
     transferInFish,
     transferOutFish: asFiniteNumber(row.number_of_fish_transfer_out),
     harvestFish: asFiniteNumber(row.number_of_fish_harvested),
     adgGDay: growth?.adgGDay ?? null,
     sgr: growth?.sgrPctDay ?? getOptionalNumber(row, "sgr"),
-    feedingRate: asFiniteNumber(row.feeding_rate),
+    feedingRate: asFiniteNumber(row.feeding_rate_on_date),
     biomassDensity: asFiniteNumber(row.biomass_density) ?? (volumeM3 ? divideOrNull(biomassKg ?? 0, volumeM3) : null),
     periodEfcr: asFiniteNumber(row.efcr_period),
     aggregatedEfcr: asFiniteNumber(row.efcr_aggregated),
     cumulativeMortality: asFiniteNumber(row.cumulative_mortality),
-    survivalRatePct: buildSurvivalRatePct({
-      numberOfFishStocked: asFiniteNumber(row.number_of_fish_stocked),
-      cumulativeMortality: asFiniteNumber(row.cumulative_mortality),
-      transferOutFishAggregated,
-    }),
+    survivalRatePct: asFiniteNumber(row.survival_rate_pct),
     feedType: enrichment.feedTypeBySystemDate?.get(key) ?? null,
   }
 }
@@ -154,7 +139,6 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
         date: row.date,
         numberOfFish: 0,
         biomassKg: 0,
-        totalStockedFish: 0,
         feedPeriodKg: 0,
         feedAggKg: 0,
         feedTypes: new Set<string>(),
@@ -171,19 +155,21 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
         weightedSgrNumerator: 0,
         weightedFeedingRateNumerator: 0,
         weightedBiomassForAverages: 0,
+        weightedSurvivalPctNumerator: 0,
+        survivalWeight: 0,
       }
 
     const biomassWeight = row.total_biomass ?? 0
     const transferInFish = getOptionalNumber(row, "number_of_fish_transfer_in") ?? 0
+    const survivalWeight = row.fish_count_period_start ?? 0
     current.numberOfFish += row.number_of_fish_inventory ?? 0
     current.biomassKg += row.total_biomass ?? 0
-    current.totalStockedFish += row.number_of_fish_stocked ?? 0
     current.feedPeriodKg += row.total_feed_amount_period ?? 0
     current.feedAggKg += row.total_feed_amount_aggregated ?? 0
     current.growthKg += row.biomass_increase_period ?? 0
     current.cumulativeGrowthKg += row.biomass_increase_aggregated ?? 0
     current.harvestKg += row.total_weight_harvested ?? 0
-    current.mortalityFish += row.daily_mortality_count ?? 0
+    current.mortalityFish += row.mortality_count_period ?? 0
     current.cumulativeMortality += row.cumulative_mortality ?? 0
     current.transferInFish += transferInFish
     current.transferOutFish += row.number_of_fish_transfer_out ?? 0
@@ -191,8 +177,10 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
     current.harvestFish += row.number_of_fish_harvested ?? 0
     current.weightedAdgNumerator += (growth?.adgGDay ?? 0) * biomassWeight
     current.weightedSgrNumerator += ((growth?.sgrPctDay ?? getOptionalNumber(row, "sgr") ?? 0) * biomassWeight)
-    current.weightedFeedingRateNumerator += (row.feeding_rate ?? 0) * biomassWeight
+    current.weightedFeedingRateNumerator += (row.feeding_rate_on_date ?? 0) * biomassWeight
     current.weightedBiomassForAverages += biomassWeight
+    current.weightedSurvivalPctNumerator += (row.survival_rate_pct ?? 0) * survivalWeight
+    current.survivalWeight += survivalWeight
     if (feedType) current.feedTypes.add(feedType)
 
     byDate.set(row.date, current)
@@ -231,11 +219,7 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
     periodEfcr: divideOrNull(row.feedPeriodKg, row.growthKg),
     aggregatedEfcr: divideOrNull(row.feedAggKg, row.cumulativeGrowthKg),
     cumulativeMortality: row.cumulativeMortality,
-    survivalRatePct: buildSurvivalRatePct({
-      numberOfFishStocked: row.totalStockedFish,
-      cumulativeMortality: row.cumulativeMortality,
-      transferOutFishAggregated: row.transferOutFishAggregated,
-    }),
+    survivalRatePct: divideOrNull(row.weightedSurvivalPctNumerator, row.survivalWeight),
     feedType:
       row.feedTypes.size === 0 ? null : row.feedTypes.size === 1 ? Array.from(row.feedTypes)[0] ?? null : "Mixed",
   }))

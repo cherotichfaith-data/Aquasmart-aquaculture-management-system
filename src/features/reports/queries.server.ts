@@ -281,12 +281,14 @@ export async function listPerformanceSummaryRows(
     (acc, row) => {
       acc.totalBiomass += row.total_biomass ?? 0
       acc.totalFish += row.number_of_fish_inventory ?? 0
-      acc.totalMortality += row.daily_mortality_count ?? 0
+      acc.totalMortality += row.mortality_count_period ?? 0
       acc.totalHarvestKg += row.total_weight_harvested_aggregated ?? 0
-      acc.totalHarvestFish += row.number_of_fish_harvested ?? 0
-      acc.totalStockedFish += row.number_of_fish_stocked ?? 0
-      acc.totalCumulativeMortality += row.cumulative_mortality ?? 0
-      acc.totalTransferOutFish += row.number_of_fish_transfer_out ?? 0
+      acc.totalHarvestFish += row.number_of_fish_harvested_aggregated ?? 0
+      const survivalWeight = row.fish_count_period_start ?? 0
+      if (survivalWeight > 0 && typeof row.survival_rate_pct === "number") {
+        acc.survivalWeightedValue += row.survival_rate_pct * survivalWeight
+        acc.survivalWeight += survivalWeight
+      }
       if (acc.efcrAggregated == null && isFiniteNumber(row.efcr_aggregated)) {
         acc.efcrAggregated = row.efcr_aggregated
       }
@@ -298,20 +300,14 @@ export async function listPerformanceSummaryRows(
       totalMortality: 0,
       totalHarvestKg: 0,
       totalHarvestFish: 0,
-      totalStockedFish: 0,
-      totalCumulativeMortality: 0,
-      totalTransferOutFish: 0,
       efcrAggregated: null as number | null,
+      survivalWeightedValue: 0,
+      survivalWeight: 0,
     },
   )
 
   const mortalityRate = totals.totalFish > 0 ? totals.totalMortality / totals.totalFish : null
-  const survivalRatePct =
-    totals.totalStockedFish > 0
-      ? ((totals.totalStockedFish - totals.totalCumulativeMortality - totals.totalTransferOutFish) /
-          totals.totalStockedFish) *
-        100
-      : null
+  const survivalRatePct = totals.survivalWeight > 0 ? totals.survivalWeightedValue / totals.survivalWeight : null
 
   return [
     {
@@ -353,15 +349,10 @@ export async function listPerformanceRecordRows(
     system_name: row.system_name ?? null,
     cycle_id: row.cycle_id ?? null,
     efcr_aggregated: row.efcr_aggregated ?? null,
-    survival_rate_pct:
-      typeof row.number_of_fish_stocked === "number" && row.number_of_fish_stocked > 0
-        ? ((row.number_of_fish_stocked - (row.cumulative_mortality ?? 0) - (row.number_of_fish_transfer_out ?? 0)) /
-            row.number_of_fish_stocked) *
-          100
-        : null,
+    survival_rate_pct: row.survival_rate_pct ?? null,
     total_weight_harvested_aggregated: row.total_weight_harvested_aggregated ?? null,
     number_of_fish_harvested: row.number_of_fish_harvested ?? null,
-    daily_mortality_count: row.daily_mortality_count ?? null,
+    mortality_count_period: row.mortality_count_period ?? null,
   }))
 }
 

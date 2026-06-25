@@ -18,6 +18,7 @@ const kpiProductionFilterMap: Record<string, string | null> = {
   mortality: "mortality",
   abw: "abw",
   sgr: "sgr",
+  agr: null,
   biomass: null,
   biomass_density: "density",
   feeding: "feeding",
