@@ -1,19 +1,22 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowDownRight, ArrowRight, ArrowUpDown, ArrowUpRight, type LucideIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowUpDown, Clock, TriangleAlert, type LucideIcon } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
 import MuiButton from "@mui/material/Button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/app-ui/table"
+import type { DashboardSystemRow } from "@/features/dashboard/types"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useSystemsTable } from "@/lib/hooks/use-dashboard"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
-import SystemHistorySheet from "@/components/systems/system-history-sheet"
 import type { TimePeriod } from "@/lib/time-period"
-import { formatDateOnly, formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
-import type { DashboardSystemRow } from "@/features/dashboard/types"
+import { toTimePeriodUrlValue } from "@/lib/time-period"
+import { formatAsOfDate, formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
+import { formatCageLabel } from "@/lib/system-options"
+import { toDashboardPath } from "@/lib/app-entry"
 
 interface SystemsTableProps {
   stage: Enums<"system_growth_stage"> | "all"
@@ -31,109 +34,102 @@ const PAGE_SIZE = 10
 
 type SortKey =
   | "system_name"
+  | "fish_end"
   | "efcr"
   | "abw"
-  | "feeding_rate"
+  | "sgr"
+  | "feed_total"
   | "mortality_rate"
+  | "biomass_end"
   | "biomass_density"
-  | "water_quality_rating_average"
+  | "water_quality"
 
 type SortDirection = "asc" | "desc"
-type MetricKey = Exclude<SortKey, "system_name">
-type TrendArrow = NonNullable<DashboardSystemRow["efcr_arrow"]>
 
-const metricColumns = [
-  {
-    key: "efcr" as const,
-    label: "eFCR",
-    width: "w-[140px]",
-    value: (row: DashboardSystemRow) => formatNumberValue(row.efcr, { decimals: 2, fallback: "" }),
-    date: (row: DashboardSystemRow) => row.efcr_latest_date,
-    arrow: (row: DashboardSystemRow) => row.efcr_arrow,
-  },
-  {
-    key: "abw" as const,
-    label: "ABW",
-    width: "w-[135px]",
-    value: (row: DashboardSystemRow) => formatUnitValue(row.abw, 1, "g", ""),
-    date: (row: DashboardSystemRow) => row.abw_latest_date,
-    arrow: (row: DashboardSystemRow) => row.abw_arrow,
-  },
-  {
-    key: "feeding_rate" as const,
-    label: "Feeding rate",
-    width: "w-[150px]",
-    value: (row: DashboardSystemRow) => formatUnitValue(row.feeding_rate, 2, "% BW/day", ""),
-    date: (row: DashboardSystemRow) => row.feeding_rate_latest_date,
-    arrow: (row: DashboardSystemRow) => row.feeding_rate_arrow,
-  },
-  {
-    key: "mortality_rate" as const,
-    label: "Mortality rate",
-    width: "w-[145px]",
-    value: (row: DashboardSystemRow) => formatUnitValue(row.mortality_rate, 2, "%", ""),
-    date: (row: DashboardSystemRow) => row.mortality_rate_latest_date,
-    arrow: (row: DashboardSystemRow) => row.mortality_rate_arrow,
-  },
-  {
-    key: "biomass_density" as const,
-    label: "Density",
-    width: "w-[135px]",
-    value: (row: DashboardSystemRow) => formatUnitValue(row.biomass_density, 2, "kg/m3", ""),
-    date: (row: DashboardSystemRow) => row.biomass_density_latest_date,
-    arrow: (row: DashboardSystemRow) => row.biomass_density_arrow,
-  },
-  {
-    key: "water_quality_rating_average" as const,
-    label: "Water quality",
-    width: "w-[145px]",
-    value: (row: DashboardSystemRow) => waterQualityLabel(row.water_quality_rating_average),
-    date: (row: DashboardSystemRow) => row.water_quality_latest_date,
-    arrow: (row: DashboardSystemRow) => row.water_quality_arrow,
-  },
-] as const
+type SystemFlag = {
+  key: string
+  title: string
+  icon: LucideIcon
+  className: string
+}
+
+const isFiniteNumber = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value)
+
+const normalizeWaterQuality = (value: string | null | undefined) => value?.trim().toLowerCase() ?? null
 
 const waterQualityLabel = (value: string | null | undefined) => {
-  if (value === "optimal") return "Good"
-  if (value === "acceptable") return "Fair"
-  if (value === "critical") return "Poor"
-  if (value === "lethal") return "Critical"
-  return value ?? ""
+  const normalized = normalizeWaterQuality(value)
+  if (normalized === "optimal") return "Optimal"
+  if (normalized === "acceptable") return "Acceptable"
+  if (normalized === "critical") return "Critical"
+  if (normalized === "lethal") return "Lethal"
+  return value ?? "Unknown"
 }
 
-const formatMetricDate = (value: string | null | undefined) =>
-  value ? formatDateOnly(value, "", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""
-
-const getTrendIcon = (arrow: TrendArrow): LucideIcon | null => {
-  if (arrow === "up") return ArrowUpRight
-  if (arrow === "down") return ArrowDownRight
-  if (arrow === "straight") return ArrowRight
-  return null
+const ratingToneClass = (value: string | null | undefined) => {
+  const normalized = normalizeWaterQuality(value)
+  if (normalized === "optimal") return "bg-success/15 text-success"
+  if (normalized === "acceptable") return "bg-warning/15 text-warning"
+  if (normalized === "critical" || normalized === "lethal") return "bg-destructive/15 text-destructive"
+  return "bg-muted text-muted-foreground"
 }
 
-const trendToneClass = (metric: MetricKey, arrow: TrendArrow) => {
-  if (metric === "water_quality_rating_average" || metric === "efcr") return "text-primary"
-  if (!arrow || arrow === "straight") return "text-muted-foreground"
-  if (metric === "mortality_rate") return arrow === "down" ? "text-emerald-600" : "text-rose-500"
-  return arrow === "up" ? "text-emerald-600" : "text-rose-500"
+const formatPercent = (value: number | null | undefined, decimals = 1, suffix = "%") => {
+  if (!isFiniteNumber(value)) return "--"
+  return `${formatNumberValue(value, { decimals, minimumDecimals: decimals })}${suffix}`
+}
+
+const formatSampleAgeText = (value: number | null | undefined) => {
+  if (!isFiniteNumber(value)) return "No sample"
+  if (value === 0) return "Today"
+  if (value === 1) return "Yesterday"
+  return `${formatNumberValue(value)}d ago`
+}
+
+const hasWaterQualityData = (value: string | null | undefined) => Boolean(normalizeWaterQuality(value))
+
+const worstParameterLabel = (value: string | null | undefined) => {
+  const normalized = String(value ?? "").trim().toLowerCase()
+  if (normalized === "dissolved_oxygen") return "DO"
+  if (normalized === "temperature") return "Temp"
+  if (normalized === "ph") return "pH"
+  if (normalized === "ammonia") return "Ammonia"
+  if (normalized === "nitrite") return "Nitrite"
+  if (normalized === "nitrate") return "Nitrate"
+  return value ?? null
+}
+
+const formatWorstParameterText = (row: DashboardSystemRow) => {
+  const label = worstParameterLabel(row.worst_parameter)
+  if (!label || !isFiniteNumber(row.worst_parameter_value)) return null
+  const unit = row.worst_parameter_unit ? ` ${row.worst_parameter_unit}` : ""
+  return `${label} ${formatNumberValue(row.worst_parameter_value, { decimals: 1, minimumDecimals: 1 })}${unit}`
+}
+
+const median = (values: number[]) => {
+  if (values.length === 0) return null
+  const sorted = [...values].sort((left, right) => left - right)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
 export default function SystemsTable({
   stage,
   batch = "all",
   system = "all",
-  timePeriod = "month",
+  timePeriod = "2 weeks",
   dateFrom,
   dateTo,
   scopedSystemIds,
   farmId: initialFarmId,
   showHeader = true,
 }: SystemsTableProps) {
+  const router = useRouter()
   const { farmId: activeFarmId } = useActiveFarm()
   const farmId = initialFarmId ?? activeFarmId
   const boundsReady = Boolean(dateFrom && dateTo)
   const [pageIndex, setPageIndex] = useState(0)
-  const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>("system_name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
@@ -153,21 +149,13 @@ export default function SystemsTable({
   const loading = !boundsReady || systemsQuery.isLoading
   const errorMessage = getErrorMessage(systemsQuery.error)
   const emptyReason = systemsQuery.data?.meta.reason ?? null
-  const emptyMessage =
-    emptyReason === "Missing time bounds"
-      ? "No time range selected"
-      : emptyReason === "No scoped systems"
-        ? "No systems match the selected filters"
-        : emptyReason === "No active systems"
-          ? "No active cages match the selected filters"
-          : emptyReason === "RPC error"
-            ? systemsQuery.data?.meta.error ?? "Unable to load system inventory"
-            : "No active cages found"
+
+  const farmMedianEfcr = useMemo(() => median(systems.map((row) => row.efcr).filter(isFiniteNumber)), [systems])
 
   const sortedSystems = useMemo(() => {
     const getSortValue = (row: DashboardSystemRow) => {
-      if (sortKey === "system_name") return row.system_name.toLowerCase()
-      if (sortKey === "water_quality_rating_average") return row.water_quality_rating_average?.toLowerCase() ?? ""
+      if (sortKey === "system_name") return row.system_name?.toLowerCase() ?? ""
+      if (sortKey === "water_quality") return row.water_quality_rating_numeric_average ?? -1
       return row[sortKey] ?? -1
     }
 
@@ -194,7 +182,6 @@ export default function SystemsTable({
   const endIndex = Math.min(startIndex + PAGE_SIZE, totalRows)
   const pagedSystems = sortedSystems.slice(startIndex, endIndex)
   const showPagination = totalRows > PAGE_SIZE
-  const selectedSystem = sortedSystems.find((row) => row.system_id === selectedSystemId) ?? null
 
   const combinedUpdatedAt = systemsQuery.dataUpdatedAt ?? 0
   const combinedFetching = systemsQuery.isFetching
@@ -202,13 +189,6 @@ export default function SystemsTable({
   useEffect(() => {
     setPageIndex(0)
   }, [batch, farmId, stage, system, timePeriod, sortDirection, sortKey])
-
-  useEffect(() => {
-    if (selectedSystemId === null) return
-    if (!sortedSystems.some((row) => row.system_id === selectedSystemId)) {
-      setSelectedSystemId(null)
-    }
-  }, [selectedSystemId, sortedSystems])
 
   const handleSort = (nextKey: SortKey) => {
     if (sortKey === nextKey) {
@@ -219,40 +199,74 @@ export default function SystemsTable({
     setSortDirection(nextKey === "system_name" ? "asc" : "desc")
   }
 
+  const openSystemDetailPage = (systemId: number) => {
+    const params = new URLSearchParams()
+    if (farmId) params.set("farmId", farmId)
+    if (batch && batch !== "all") params.set("batch", batch)
+    if (stage && stage !== "all") params.set("stage", stage)
+    if (timePeriod) params.set("period", toTimePeriodUrlValue(timePeriod))
+
+    const nextPath = `${toDashboardPath(`/systems/${systemId}`)}${params.toString() ? `?${params.toString()}` : ""}`
+    router.push(nextPath)
+  }
+
   const renderSortHead = (label: string, key: SortKey, align: "left" | "right" = "left") => (
     <button
       type="button"
       onClick={() => handleSort(key)}
-      className={`inline-flex w-full items-center gap-1 text-[11px] font-semibold text-foreground/85 ${
-        align === "right" ? "justify-end md:justify-start" : "justify-start"
+      className={`inline-flex w-full items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/80 ${
+        align === "right" ? "justify-end" : "justify-start"
       }`}
     >
       <span>{label}</span>
-      {key === "system_name" || sortKey === key ? <ArrowUpDown className="h-3 w-3 text-muted-foreground" /> : null}
+      <ArrowUpDown className="h-3 w-3" />
     </button>
   )
 
-  const renderMetricCell = (row: DashboardSystemRow, metric: (typeof metricColumns)[number]) => {
-    const arrow = metric.arrow(row)
-    const TrendIcon = getTrendIcon(arrow)
-    const isWaterQuality = metric.key === "water_quality_rating_average"
-    const value = metric.value(row)
+  const renderValueBlock = (value: string, subtitle?: string | null, align: "left" | "right" = "left") => (
+    <div className={`space-y-1 ${align === "right" ? "text-right" : "text-left"}`}>
+      <p className="text-sm font-medium leading-5 text-foreground">{value}</p>
+      {subtitle ? <p className="text-[11px] leading-4 text-muted-foreground">{subtitle}</p> : <p className="text-[11px] leading-4 opacity-0">.</p>}
+    </div>
+  )
 
-    return (
-      <div className="flex flex-col items-start gap-1 text-left md:items-start md:text-left">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`text-sm font-semibold leading-5 ${
-              isWaterQuality ? "text-primary underline decoration-primary/40 underline-offset-2" : "text-foreground"
-            }`}
-          >
-            {value}
-          </span>
-          {TrendIcon ? <TrendIcon className={`h-3.5 w-3.5 ${trendToneClass(metric.key, arrow)}`} /> : null}
-        </div>
-        <span className="text-[10px] leading-4 text-muted-foreground">{formatMetricDate(metric.date(row))}</span>
-      </div>
-    )
+  const buildFlags = (row: DashboardSystemRow): SystemFlag[] => {
+    const staleSample = (row.sample_age_days ?? 0) > 30
+    const wqBreach =
+      isFiniteNumber(row.water_quality_rating_numeric_average) &&
+      row.water_quality_rating_numeric_average <= 1
+    const efcrOutlier =
+      isFiniteNumber(row.efcr) &&
+      isFiniteNumber(farmMedianEfcr) &&
+      farmMedianEfcr > 0 &&
+      row.efcr > farmMedianEfcr * 3
+
+    return [
+      staleSample
+        ? {
+            key: "stale-sample",
+            title: `Sample is ${row.sample_age_days} days old.`,
+            icon: Clock,
+            className: "bg-warning/15 text-warning",
+          }
+        : null,
+      wqBreach
+        ? {
+            key: "wq-breach",
+            title: `Water quality is ${row.water_quality_rating_average}. Immediate action required.`,
+            icon: TriangleAlert,
+            className: "bg-destructive/15 text-destructive",
+          }
+        : null,
+      efcrOutlier
+        ? {
+            key: "efcr-outlier",
+            title: "eFCR is above 3x the farm median.",
+            icon: TriangleAlert,
+            className: "bg-destructive/15 text-destructive",
+          }
+        : null,
+    ].filter(Boolean) as SystemFlag[]
   }
 
   if (systemsQuery.isError) {
@@ -276,12 +290,12 @@ export default function SystemsTable({
   }
 
   return (
-    <Card className="soft-panel gap-0 overflow-hidden !py-0">
+    <Card className="!border-0 !bg-transparent">
       {showHeader ? (
-        <CardHeader className="border-b border-border/60 pb-3 pt-4">
+        <CardHeader className="pb-1">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle>Production</CardTitle>
+              <CardTitle>System Status</CardTitle>
               <p className="mt-1 text-[11px] font-medium text-muted-foreground">{totalRows} active cages in scope</p>
             </div>
             <DataFetchingBadge isFetching={combinedFetching} isLoading={loading} />
@@ -290,102 +304,250 @@ export default function SystemsTable({
         </CardHeader>
       ) : null}
 
-      <CardContent className={showHeader ? "!px-0 pt-0" : "!px-0 !pt-0"}>
+      <CardContent className={showHeader ? "!px-0 pt-2" : "!px-0"}>
         {loading ? (
           <div className="flex h-[240px] items-center justify-center text-muted-foreground">Loading table...</div>
         ) : (
           <>
-            <div className="grid gap-3 p-3 md:hidden">
+            <div className="grid gap-3 md:hidden">
               {pagedSystems.length > 0 ? (
-                pagedSystems.map((row) => (
-                  <button
-                    key={row.system_id}
-                    type="button"
-                    onClick={() => setSelectedSystemId(row.system_id)}
-                    className="group w-full rounded-[1rem] border border-border/70 bg-background p-3.5 text-left transition-colors hover:bg-muted/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" aria-hidden="true" />
-                      <p className="truncate text-sm font-semibold leading-5 text-foreground group-hover:underline">
-                        {row.system_name}
-                      </p>
-                    </div>
+                pagedSystems.map((row) => {
+                  const asOf = formatAsOfDate(row.as_of_date ?? row.input_end_date)
+                  const flags = buildFlags(row)
+                  const showWaterQuality = hasWaterQualityData(row.water_quality_rating_average)
+                  const thresholdFlag = flags.find((flag) => flag.key === "wq-breach") ?? null
+                  const displayFlags = showWaterQuality ? flags.filter((flag) => flag.key !== "wq-breach") : flags
+                  const worstParameterText = formatWorstParameterText(row)
 
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {metricColumns.map((metric) => (
-                        <div key={metric.key} className="rounded-xl border border-border/60 bg-muted/[0.18] px-2.5 py-2.5">
-                          <p className="text-[10px] font-semibold text-muted-foreground">{metric.label}</p>
-                          <div className="mt-1">{renderMetricCell(row, metric)}</div>
+                  return (
+                    <button
+                      key={row.system_id}
+                      type="button"
+                      onClick={() => openSystemDetailPage(row.system_id)}
+                      className="w-full rounded-lg border border-border/70 bg-background p-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold leading-5 text-foreground">
+                          {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
+                        </p>
+                        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">As of {asOf ?? "N/A"}</p>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Fish</p>
+                          <p className="mt-0.5 font-semibold text-foreground">{formatNumberValue(row.fish_end)}</p>
                         </div>
-                      ))}
-                    </div>
-                  </button>
-                ))
+                        <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">eFCR</p>
+                          <p className="mt-0.5 font-semibold text-foreground">{formatNumberValue(row.efcr, { decimals: 2 })}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">ABW</p>
+                          <p className="mt-0.5 font-semibold text-foreground">{formatUnitValue(row.abw, 1, "g")}</p>
+                          <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">{formatSampleAgeText(row.sample_age_days)}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">SGR</p>
+                          <p className="mt-0.5 font-semibold text-foreground">{formatPercent(row.sgr, 2, "%/day")}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Feed kg</p>
+                          <p className="mt-0.5 font-semibold text-foreground">{formatUnitValue(row.feed_total, 1, "kg")}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mortality</p>
+                          <p className="mt-0.5 font-semibold text-foreground">{formatPercent(row.mortality_rate, 2)}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Biomass</p>
+                          <p className="mt-0.5 font-semibold text-foreground">{formatUnitValue(row.biomass_end, 1, "kg")}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Density</p>
+                          <p className="mt-0.5 font-semibold text-foreground">{formatUnitValue(row.biomass_density, 2, "kg/m3")}</p>
+                        </div>
+                        <div className="col-span-2 rounded-md bg-muted/45 px-2.5 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">WQ / Flags</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {showWaterQuality ? (
+                              <span className="relative inline-flex">
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}
+                                >
+                                  {waterQualityLabel(row.water_quality_rating_average)}
+                                </span>
+                                {thresholdFlag ? (
+                                  <span
+                                    title={thresholdFlag.title}
+                                    aria-label={thresholdFlag.title}
+                                    className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+                                  >
+                                    <TriangleAlert className="h-2.5 w-2.5" />
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : null}
+                            {displayFlags.map((flag) => {
+                              const Icon = flag.icon
+                              return (
+                                <span
+                                  key={flag.key}
+                                  title={flag.title}
+                                  aria-label={flag.title}
+                                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${flag.className}`}
+                                >
+                                  <Icon className="h-3.5 w-3.5" />
+                                </span>
+                              )
+                            })}
+                            {!showWaterQuality && displayFlags.length === 0 ? (
+                              <span className="text-[11px] text-muted-foreground">-</span>
+                            ) : null}
+                          </div>
+                          {worstParameterText ? <p className="mt-1 text-[11px] text-muted-foreground">{worstParameterText}</p> : null}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })
               ) : (
                 <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                  {emptyMessage}
+                  {emptyReason === "Missing time bounds"
+                    ? "No time range selected"
+                    : emptyReason === "No scoped systems"
+                      ? "No systems match the selected filters"
+                      : "No active cages found"}
                 </div>
               )}
             </div>
 
-            <div className="soft-table-shell hidden max-h-[520px] rounded-none border-0 md:block">
-              <Table className="min-w-[1030px] table-fixed">
+            <div className="soft-table-shell hidden max-h-[480px] md:block">
+              <Table className="w-[1124px] min-w-[1124px] table-fixed">
                 <colgroup>
-                  <col className="w-[170px]" />
-                  {metricColumns.map((metric) => (
-                    <col key={metric.key} className={metric.width} />
-                  ))}
+                  <col className="w-[160px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[88px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[92px]" />
+                  <col className="w-[96px]" />
+                  <col className="w-[104px]" />
+                  <col className="w-[104px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[168px]" />
                 </colgroup>
-                <TableHeader className="bg-background">
-                  <TableRow className="hover:bg-background">
-                    <TableHead className="w-[170px] border-b border-border/60 bg-background normal-case tracking-normal">
-                      {renderSortHead("System", "system_name")}
-                    </TableHead>
-                    {metricColumns.map((metric) => (
-                      <TableHead
-                        key={metric.key}
-                        className="border-b border-border/60 bg-background text-left normal-case tracking-normal"
-                      >
-                        {renderSortHead(metric.label, metric.key as SortKey, "right")}
-                      </TableHead>
-                    ))}
+                <TableHeader className="bg-muted/60">
+                  <TableRow>
+                    <TableHead className="py-3 align-middle">{renderSortHead("Cage", "system_name")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("Fish Count", "fish_end")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("eFCR", "efcr")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("ABW g", "abw")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("SGR", "sgr")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("Feed kg", "feed_total")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("Mortality %", "mortality_rate")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("Biomass kg", "biomass_end")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("Density", "biomass_density")}</TableHead>
+                    <TableHead className="py-3 align-middle">{renderSortHead("WQ / Flags", "water_quality")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pagedSystems.length > 0 ? (
-                    pagedSystems.map((row) => (
-                      <TableRow
-                        key={row.system_id}
-                        className="group cursor-pointer bg-background hover:bg-muted/15"
-                        onClick={() => setSelectedSystemId(row.system_id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault()
-                            setSelectedSystemId(row.system_id)
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <TableCell className="w-[170px] py-3 align-top">
-                          <div className="flex items-center gap-2">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" aria-hidden="true" />
-                            <span className="text-sm font-medium leading-5 text-foreground group-hover:underline">
-                              {row.system_name}
-                            </span>
-                          </div>
-                        </TableCell>
-                        {metricColumns.map((metric) => (
-                          <TableCell key={metric.key} className="py-3 align-top text-left">
-                            {renderMetricCell(row, metric)}
+                    pagedSystems.map((row) => {
+                      const asOf = formatAsOfDate(row.as_of_date ?? row.input_end_date)
+                      const flags = buildFlags(row)
+                      const showWaterQuality = hasWaterQualityData(row.water_quality_rating_average)
+                      const thresholdFlag = flags.find((flag) => flag.key === "wq-breach") ?? null
+                      const displayFlags = showWaterQuality ? flags.filter((flag) => flag.key !== "wq-breach") : flags
+                      const worstParameterText = formatWorstParameterText(row)
+
+                      return (
+                        <TableRow
+                          key={row.system_id}
+                          className="cursor-pointer"
+                          onClick={() => openSystemDetailPage(row.system_id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault()
+                              openSystemDetailPage(row.system_id)
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          <TableCell className="py-3 align-middle">
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium text-foreground">
+                                {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">As of {asOf ?? "N/A"}</p>
+                            </div>
                           </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
+                          <TableCell className="py-3 align-middle">{renderValueBlock(formatNumberValue(row.fish_end))}</TableCell>
+                          <TableCell className="py-3 align-middle">{renderValueBlock(formatNumberValue(row.efcr, { decimals: 2 }))}</TableCell>
+                          <TableCell className="py-3 align-middle">
+                            {renderValueBlock(formatUnitValue(row.abw, 1, "g"), formatSampleAgeText(row.sample_age_days))}
+                          </TableCell>
+                          <TableCell className="py-3 align-middle">{renderValueBlock(formatPercent(row.sgr, 2, "%/day"))}</TableCell>
+                          <TableCell className="py-3 align-middle">{renderValueBlock(formatUnitValue(row.feed_total, 1, "kg"))}</TableCell>
+                          <TableCell className="py-3 align-middle">{renderValueBlock(formatPercent(row.mortality_rate, 2))}</TableCell>
+                          <TableCell className="py-3 align-middle">{renderValueBlock(formatUnitValue(row.biomass_end, 1, "kg"))}</TableCell>
+                          <TableCell className="py-3 align-middle">{renderValueBlock(formatUnitValue(row.biomass_density, 2, "kg/m3"))}</TableCell>
+                          <TableCell className="py-3 align-middle">
+                            <div className="space-y-1 text-left">
+                              <div className="flex min-h-5 items-center justify-start gap-1.5">
+                                {showWaterQuality ? (
+                                  <span className="relative inline-flex">
+                                    <span
+                                      className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}
+                                    >
+                                      {waterQualityLabel(row.water_quality_rating_average)}
+                                    </span>
+                                    {thresholdFlag ? (
+                                      <span
+                                        title={thresholdFlag.title}
+                                        aria-label={thresholdFlag.title}
+                                        className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+                                      >
+                                        <TriangleAlert className="h-2.5 w-2.5" />
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                ) : null}
+                                {displayFlags.map((flag) => {
+                                  const Icon = flag.icon
+                                  return (
+                                    <span
+                                      key={flag.key}
+                                      title={flag.title}
+                                      aria-label={flag.title}
+                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${flag.className}`}
+                                    >
+                                      <Icon className="h-3.5 w-3.5" />
+                                    </span>
+                                  )
+                                })}
+                                {!showWaterQuality && displayFlags.length === 0 ? (
+                                  <span className="text-[11px] text-muted-foreground">-</span>
+                                ) : null}
+                              </div>
+                              {worstParameterText ? (
+                                <p className="text-[11px] leading-4 text-muted-foreground">{worstParameterText}</p>
+                              ) : (
+                                <p className="text-[11px] leading-4 opacity-0">.</p>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                        {emptyMessage}
+                      <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                        {emptyReason === "Missing time bounds"
+                          ? "No time range selected"
+                          : emptyReason === "No scoped systems"
+                            ? "No systems match the selected filters"
+                            : "No active cages found"}
                       </TableCell>
                     </TableRow>
                   )}
@@ -396,7 +558,7 @@ export default function SystemsTable({
         )}
 
         {showPagination && !loading ? (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-3 pb-3 text-[11px] text-muted-foreground md:px-0 md:pb-0">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
             <span>
               Showing {startIndex + 1}-{endIndex} of {totalRows}
             </span>
@@ -421,17 +583,6 @@ export default function SystemsTable({
           </div>
         ) : null}
       </CardContent>
-
-      <SystemHistorySheet
-        open={selectedSystemId !== null}
-        onOpenChange={(open) => !open && setSelectedSystemId(null)}
-        farmId={farmId}
-        systemId={selectedSystemId}
-        systemLabel={selectedSystem?.system_name ?? null}
-        dateFrom={dateFrom ?? undefined}
-        dateTo={dateTo ?? undefined}
-        summaryRow={selectedSystem}
-      />
     </Card>
   )
 }

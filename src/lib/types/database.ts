@@ -386,6 +386,7 @@ export type Database = {
       feed_inventory: {
         Row: {
           amount_of_bags: number | null
+          bag_number: string | null
           bag_weight: number | null
           comments: string | null
           created_at: string
@@ -400,6 +401,7 @@ export type Database = {
         }
         Insert: {
           amount_of_bags?: number | null
+          bag_number?: string | null
           bag_weight?: number | null
           comments?: string | null
           created_at?: string
@@ -414,6 +416,7 @@ export type Database = {
         }
         Update: {
           amount_of_bags?: number | null
+          bag_number?: string | null
           bag_weight?: number | null
           comments?: string | null
           created_at?: string
@@ -1823,8 +1826,8 @@ export type Database = {
         Returns: {
           abw_asof_end: number
           abw_asof_end_delta: number
-          average_biomass: number
-          average_biomass_delta: number
+          agr: number
+          agr_delta: number
           biomass_density: number
           biomass_density_delta: number
           efcr_period_consolidated: number
@@ -1835,8 +1838,12 @@ export type Database = {
           input_start_date: string
           mortality_rate: number
           mortality_rate_delta: number
+          sgr: number
+          sgr_delta: number
           system_id: number
           time_period: string
+          total_biomass: number
+          total_biomass_delta: number
           water_quality_rating_average: string
           water_quality_rating_numeric_average: number
           water_quality_rating_numeric_delta: number
@@ -1854,11 +1861,14 @@ export type Database = {
           abw: number
           abw_arrow: string
           abw_latest_date: string
+          agr: number
+          agr_arrow: string
           as_of_date: string
           biomass_density: number
           biomass_density_arrow: string
           biomass_density_latest_date: string
           biomass_end: number
+          cycle_day: number
           efcr: number
           efcr_arrow: string
           efcr_latest_date: string
@@ -1877,8 +1887,12 @@ export type Database = {
           mortality_rate_latest_date: string
           sample_age_days: number
           sampling_end_date: string
+          sgr: number
+          sgr_arrow: string
           system_id: number
           system_name: string
+          target_weight_g: number
+          target_weight_progress_pct: number
           water_quality_arrow: string
           water_quality_latest_date: string
           water_quality_rating_average: string
@@ -1940,6 +1954,20 @@ export type Database = {
         Returns: {
           date: string
           efcr_period: number
+        }[]
+      }
+      api_feed_inventory_feed_type_options_rpc: {
+        Args: { p_date_to?: string; p_farm_id: string }
+        Returns: {
+          crude_fat_percentage: number
+          crude_protein_percentage: number
+          farm_id: string
+          feed_category: string
+          feed_line: string
+          feed_pellet_size: string
+          id: number
+          label: string
+          visibility_scope: string
         }[]
       }
       api_feed_plan_vs_actual: {
@@ -2097,31 +2125,35 @@ export type Database = {
           biomass_increase_aggregated: number
           biomass_increase_period: number
           cumulative_mortality: number
+          cycle_end: string
           cycle_id: number
-          daily_mortality_count: number
+          cycle_start: string
           date: string
+          days_in_period: number
           efcr_aggregated: number
           efcr_period: number
-          feeding_rate: number
+          feeding_rate_on_date: number
+          fish_count_period_start: number
           growth_stage: string
+          mortality_count_period: number
           number_of_fish_harvested: number
           number_of_fish_harvested_aggregated: number
           number_of_fish_inventory: number
-          number_of_fish_stocked: number
           number_of_fish_transfer_in: number
+          number_of_fish_transfer_in_aggregated: number
           number_of_fish_transfer_out: number
           number_of_fish_transfer_out_aggregated: number
           ongoing_cycle: boolean
           sgr: number
+          survival_rate_pct: number
           system_id: number
           system_name: string
+          target_weight_g: number
           total_biomass: number
           total_feed_amount_aggregated: number
           total_feed_amount_period: number
           total_weight_harvested: number
           total_weight_harvested_aggregated: number
-          total_weight_stocked: number
-          total_weight_transfer_in_aggregated: number
         }[]
       }
       api_production_trend: {
@@ -2133,11 +2165,11 @@ export type Database = {
         }
         Returns: {
           avg_abw_g: number
-          daily_mortality: number
           system_count: number
           total_biomass_kg: number
           total_feed_kg: number
           total_fish_count: number
+          total_mortality_period: number
           trend_date: string
         }[]
       }
@@ -2314,14 +2346,23 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      feed_inventory_snapshot_kg: {
-        Args: {
-          p_amount_of_bags: number
-          p_bag_weight: number
-          p_opened_bags: number
-        }
-        Returns: number
-      }
+      feed_inventory_snapshot_kg:
+        | {
+            Args: {
+              p_amount_of_bags: number
+              p_bag_weight: number
+              p_opened_bags: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_amount_of_bags: number
+              p_bag_weight: number
+              p_opened_bags: number
+            }
+            Returns: number
+          }
       get_running_stock: {
         Args: { p_farm_id: string }
         Returns: {

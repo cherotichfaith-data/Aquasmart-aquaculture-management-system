@@ -47,10 +47,10 @@ export type RecommendedAction = {
   due: string
 }
 
-export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
-export type DashboardSystemRow = DashboardSystemRpcRow & {
+export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number] & {
   batch_name?: string | null
 }
+export type DashboardSystemRow = DashboardSystemRpcRow
 
 export type SystemsOverviewRow = {
   system_id: number
