@@ -55,7 +55,7 @@ function ProductionContent({
   const systemOptionsQuery = useSystemOptions({
     farmId,
     stage: selectedStage,
-    activeOnly: true,
+    activeOnly: false,
   })
   const systemOptions: SystemOption[] =
     systemOptionsQuery.data?.status === "success" ? systemOptionsQuery.data.data : []

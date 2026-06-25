@@ -6,9 +6,6 @@ import { createAccessTokenClient } from "@/lib/supabase/access-token-client"
 import { createClient } from "@/lib/supabase/client"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import type { RecommendedActionRow } from "@/lib/types/insights"
-import { getDashboardSystems } from "@/lib/api/dashboard"
-import { toSystemsOverviewRows } from "@/features/dashboard/systems-overview"
-import type { SystemsOverviewRow } from "@/features/dashboard/types"
 import { toRpcSystemId } from "@/lib/rpc-params"
 
 const isQuietError = (err: unknown): boolean =>
@@ -54,22 +51,4 @@ export async function getRecommendedActions(params: {
     args: { p_farm_id: params.farmId, p_system_id: toRpcSystemId(params.systemId) },
     signal: params.signal,
   })
-}
-
-export async function fetchSystemsOverview(
-  farmId?: string | null,
-  signal?: AbortSignal,
-): Promise<SystemsOverviewRow[]> {
-  if (!farmId) return []
-
-  const result = await getDashboardSystems({
-    farmId,
-    signal,
-  })
-
-  if (result.status !== "success") {
-    throw new Error(result.error || "Unable to load systems overview")
-  }
-
-  return toSystemsOverviewRows(result.data)
 }

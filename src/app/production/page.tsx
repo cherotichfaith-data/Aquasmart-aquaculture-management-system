@@ -36,7 +36,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     )
   }
   queryClient.setQueryData(
-    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: true }),
+    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: false }),
     initialData.systems,
   )
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)

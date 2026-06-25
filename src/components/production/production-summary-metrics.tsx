@@ -52,19 +52,19 @@ export default function ProductionSummaryMetrics({
 
   const metrics = useMemo(() => {
     const totals = summary ?? {
-      total_stocked_fish: 0,
-      cumulative_mortality_fish: 0,
-      total_transfer_out_fish: 0,
+      period_start_fish: 0,
+      mortality_fish: 0,
+      transfer_out_fish: 0,
       total_harvested_kg: 0,
       total_harvested_fish: 0,
     }
 
     return [
-      { label: "Total Stocked", value: `${formatWholeNumber(totals.total_stocked_fish)} fish` },
-      { label: "Cumulative Mortality", value: `${formatWholeNumber(totals.cumulative_mortality_fish)} fish` },
+      { label: "Period Start Fish", value: `${formatWholeNumber(totals.period_start_fish)} fish` },
+      { label: "Mortality In Window", value: `${formatWholeNumber(totals.mortality_fish)} fish` },
       {
         label: "Transfer Out",
-        value: `${formatWholeNumber(totals.total_transfer_out_fish)} fish`,
+        value: `${formatWholeNumber(totals.transfer_out_fish)} fish`,
       },
       {
         label: "Total Harvested",

@@ -102,7 +102,7 @@ export function ProductionSections({
       <div className="space-y-4">
         <SectionHeading
           title="Production Summary Metrics"
-          description="Summary totals for stocked fish, mortalities, transfer adjustments, and harvest output."
+          description="Summary totals for period-start fish, mortalities, transfer adjustments, and harvest output."
         />
         <ProductionSummaryMetrics
           stage={selectedStage}

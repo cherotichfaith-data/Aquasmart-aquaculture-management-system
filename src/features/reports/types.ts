@@ -68,5 +68,5 @@ export type PerformanceRecordRow = {
   survival_rate_pct: number | null
   total_weight_harvested_aggregated: number | null
   number_of_fish_harvested: number | null
-  daily_mortality_count: number | null
+  mortality_count_period: number | null
 }
