@@ -55,7 +55,7 @@ const formSchema = z.object({
   system_id: z.string().min(1, "Cage number is required"),
   batch_id: z.string().min(1, "Batch is required"),
   stocking_date: z.string().min(1, "Date is required"),
-  number_of_fish: z.coerce.number().min(1, "Quantity must be positive"),
+  number_of_fish: z.coerce.number().int("Quantity must be a whole number").min(1, "Quantity must be positive"),
   total_weight_kg: z.coerce.number().min(0.01, "Weight must be positive"),
   notes: z.string().max(500, "Notes must be 500 characters or fewer").optional(),
   type_of_stocking: z.enum(Constants.public.Enums.type_of_stocking),
@@ -365,7 +365,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                         <SelectContent>
                           {batchOptions.map((batch) => (
                             <SelectItem key={batch.id} value={String(batch.id)}>
-                              {batch.label || `Batch ${batch.id}`}
+                              {batch.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -391,7 +391,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Number of Fish</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" step="1" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

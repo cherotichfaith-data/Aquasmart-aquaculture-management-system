@@ -17,7 +17,7 @@ const stockingSchema = z.object({
   system_id: z.number().int().positive(),
   batch_id: z.number().int().positive(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  number_of_fish_stocking: z.number().positive(),
+  number_of_fish_stocking: z.number().int("Stocking count must be a whole number.").positive(),
   total_weight_stocking: z.number().positive(),
   notes: z.string().max(500).nullable().optional(),
   type_of_stocking: z.enum(Constants.public.Enums.type_of_stocking),

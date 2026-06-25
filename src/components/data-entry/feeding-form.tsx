@@ -23,7 +23,6 @@ import { FEEDING_RESPONSE_LEVELS, type FeedingResponseLevel } from "@/lib/feedin
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useDashboardSystems } from "@/lib/hooks/use-dashboard-systems"
 import { useLatestWaterQualityStatus, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
-import { useFeedTypeOptions } from "@/lib/hooks/use-options"
 import { diffDateDays } from "@/lib/time-series"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
@@ -103,21 +102,6 @@ const shiftDate = (dateString: string, days: number) => {
   return toIsoDate(next)
 }
 
-const getSelectedWeekBounds = (dateString: string | null | undefined) => {
-  if (!dateString) return { start: null, end: null }
-  const date = new Date(`${dateString}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return { start: null, end: null }
-
-  const day = date.getDay()
-  const mondayOffset = day === 0 ? -6 : 1 - day
-  const start = new Date(date)
-  start.setDate(date.getDate() + mondayOffset)
-  const end = new Date(start)
-  end.setDate(start.getDate() + 6)
-
-  return { start: toIsoDate(start), end: toIsoDate(end) }
-}
-
 export function FeedingForm({
   farmId,
   systems,
@@ -159,27 +143,7 @@ export function FeedingForm({
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
   const previousDate = selectedDate ? shiftDate(selectedDate, -1) : undefined
-  const selectedWeek = useMemo(() => getSelectedWeekBounds(selectedDate), [selectedDate])
-  const availableFeedsQuery = useFeedTypeOptions({
-    farmId,
-    dateFrom: selectedWeek.start,
-    dateTo: selectedWeek.end,
-    inventoryOnly: true,
-    enabled: Boolean(farmId) && Boolean(selectedWeek.start) && Boolean(selectedWeek.end),
-  })
-  const allFeedsQuery = useFeedTypeOptions({
-    farmId,
-    enabled: Boolean(farmId),
-  })
-  const inventoryFeeds =
-    availableFeedsQuery.data?.status === "success"
-      ? availableFeedsQuery.data.data
-      : []
-  const allFeeds =
-    allFeedsQuery.data?.status === "success"
-      ? allFeedsQuery.data.data
-      : []
-  const feedOptions = inventoryFeeds.length > 0 ? inventoryFeeds : allFeeds
+  const feedOptions = feeds
   const selectedFeed = feedOptions.find((feed) => feed.id === selectedFeedId) ?? null
 
   useEffect(() => {
@@ -210,17 +174,12 @@ export function FeedingForm({
 
   useEffect(() => {
     const currentFeedId = form.getValues("feed_id")
-    if (
-      !currentFeedId ||
-      currentFeedId === OPTIONAL_SELECT_VALUE ||
-      availableFeedsQuery.isLoading ||
-      allFeedsQuery.isLoading
-    ) return
-    const existsThisWeek = feedOptions.some((feed) => String(feed.id) === currentFeedId)
-    if (!existsThisWeek) {
+    if (!currentFeedId || currentFeedId === OPTIONAL_SELECT_VALUE) return
+    const existsInOptions = feedOptions.some((feed) => String(feed.id) === currentFeedId)
+    if (!existsInOptions) {
       form.setValue("feed_id", OPTIONAL_SELECT_VALUE, { shouldValidate: true })
     }
-  }, [allFeedsQuery.isLoading, availableFeedsQuery.isLoading, feedOptions, form])
+  }, [feedOptions, form])
 
   const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
 
@@ -343,9 +302,9 @@ export function FeedingForm({
               {submissionSummary}
             </div>
           ) : null}
-          {!availableFeedsQuery.isLoading && !allFeedsQuery.isLoading && inventoryFeeds.length === 0 ? (
+          {feedOptions.length === 0 ? (
             <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
-              No feed inventory is available for this week. Feed types are still available, but record feed inventory to track stock.
+              No feed types are available for this farm yet.
             </div>
           ) : null}
 
@@ -438,7 +397,7 @@ export function FeedingForm({
                           <SelectItem value={OPTIONAL_SELECT_VALUE}>No feed selected</SelectItem>
                           {feedOptions.map((feed) => (
                             <SelectItem key={feed.id} value={String(feed.id)}>
-                              {feed.label ?? feed.feed_line ?? `Feed ${feed.id}`}
+                              {feed.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -545,7 +504,7 @@ export function FeedingForm({
                               <SelectItem value={OPTIONAL_SELECT_VALUE}>No batch</SelectItem>
                               {batches.map((batch) => (
                                 <SelectItem key={batch.id} value={String(batch.id)}>
-                                  {batch.label || `Batch ${batch.id}`}
+                                  {batch.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>

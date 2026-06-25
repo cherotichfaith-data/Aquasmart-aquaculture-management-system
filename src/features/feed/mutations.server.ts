@@ -40,7 +40,7 @@ const feedInventorySchema = z.object({
   inventory_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
   feed_type_id: z.number().int().positive(),
   bag_weight: z.number().finite().positive(),
-  amount_of_bags: z.number().int().min(0),
+  amount_of_bags: z.number().finite().min(0),
   opened_bags: z.number().int().min(0).nullable().optional(),
   comments: z.string().trim().max(500).nullable().optional(),
 })

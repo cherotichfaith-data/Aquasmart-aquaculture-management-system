@@ -27,7 +27,7 @@ const formSchema = z.object({
   inventory_time: z.string().min(1, "Time is required"),
   feed_id: z.string().min(1, "Feed type is required"),
   bag_weight_kg: z.coerce.number().min(0.01, "Bag weight must be positive"),
-  number_of_bags: z.coerce.number().int().min(0, "Amount of bags cannot be negative"),
+  number_of_bags: z.coerce.number().finite().min(0, "Amount of bags cannot be negative"),
   opened_bags: z.coerce.number().int().min(0, "Open feed cannot be negative"),
   comments: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 })
@@ -59,12 +59,15 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
   const numberOfBags = form.watch("number_of_bags")
   const openedBags = form.watch("opened_bags")
   const selectedFeed = feedInventoryFeeds.find((feed) => String(feed.id) === selectedFeedId) ?? null
-  const selectedFeedLabel = selectedFeed?.label ?? selectedFeed?.feed_line ?? (selectedFeed ? `Feed ${selectedFeed.id}` : "")
+  const selectedFeedLabel = selectedFeed?.label
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const resolvedFarmId = requireActiveFarmId(farmId)
       const feedTypeId = parseRequiredNumericId(values.feed_id, "Feed type")
+      if (!selectedFeedLabel) {
+        throw new Error("Feed type label is missing from the feed type options RPC.")
+      }
 
       await mutation.mutateAsync({
         farm_id: resolvedFarmId,
@@ -162,7 +165,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                         <SelectContent>
                           {feedInventoryFeeds.map((feed) => (
                             <SelectItem key={feed.id} value={String(feed.id)}>
-                              {feed.label ?? feed.feed_line ?? `Feed ${feed.id}`}
+                              {feed.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -194,7 +197,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                     <FormItem>
                       <FormLabel>Amount of Bags</FormLabel>
                       <FormControl>
-                        <Input type="number" step="1" {...field} />
+                        <Input type="number" step="0.01" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

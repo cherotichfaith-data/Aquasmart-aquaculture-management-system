@@ -14,7 +14,7 @@ const transferSchema = z.object({
   transfer_type: z.enum(UI_TRANSFER_TYPES),
   batch_id: z.number().int().positive().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  number_of_fish_transfer: z.number().positive(),
+  number_of_fish_transfer: z.number().int("Transfer count must be a whole number.").positive(),
   total_weight_transfer: z.number().positive(),
   notes: z.string().max(500).nullable().optional(),
   local_id: z.string().max(128).optional(),

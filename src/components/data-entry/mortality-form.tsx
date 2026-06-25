@@ -28,7 +28,7 @@ const formSchema = z.object({
   system_id: z.string().min(1, "Cage number is required"),
   batch_id: z.string().optional(),
   date: z.string().min(1, "Date is required"),
-  number_of_fish: z.coerce.number().min(1, "Must be positive"),
+  number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Must be positive"),
   cause: z.enum(MORTALITY_CAUSES, { errorMap: () => ({ message: "Cause is required" }) }),
   total_weight_mortality: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().min(0).optional()),
   notes: z.string().max(500, "Notes must be 500 characters or fewer").optional(),
@@ -186,7 +186,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                       <SelectItem value="none">No batch</SelectItem>
                       {batches.map((batch) => (
                         <SelectItem key={batch.id} value={String(batch.id)}>
-                          {batch.label || `Batch ${batch.id}`}
+                          {batch.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -203,7 +203,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 <FormItem>
                   <FormLabel>Number of Dead Fish</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" step="1" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
