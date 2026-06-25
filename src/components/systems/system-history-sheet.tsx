@@ -2,64 +2,70 @@
 
 import { useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
 import type { ChartData, ChartOptions } from "chart.js"
-import {
-  Chart,
-  Line,
-} from "@/components/charts/chartjs"
-import { Fish, Skull, TestTube, TrendingUp } from "lucide-react"
+import { Fish, Skull, TrendingUp } from "lucide-react"
+import { Badge } from "@/components/app-ui/badge"
 import { Button } from "@/components/app-ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
-import { Badge } from "@/components/app-ui/badge"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/app-ui/sheet"
-import {
-  buildCartesianOptions,
-  buildDailyDateDomain,
-  getChartPalette,
-  getDateAxisMaxTicks,
-} from "@/components/charts/chartjs-theme"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/app-ui/tabs"
+import { Line } from "@/components/charts/chartjs"
+import { buildCartesianOptions, buildSparseDateDomain, getChartPalette, getDateAxisMaxTicks } from "@/components/charts/chartjs-theme"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
-import {
-  useMortalityData,
-  useFeedingRecords,
-  useHarvests,
-  useSamplingData,
-  useStockingData,
-  useTransferData,
-} from "@/features/reports/hooks"
-import { useProductionSummary } from "@/features/production/hooks"
-import { useDailyWaterQualityRating, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
-import { getWaterQualityTrend } from "@/features/water-quality/queries.client"
-import { deriveSurvivalSeriesFromProductionSummary } from "@/lib/survival-series"
 import type { DashboardSystemRpcRow } from "@/features/dashboard/types"
-import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
+import { useProductionSummary } from "@/features/production/hooks"
 import { DATA_ENTRY_PATH } from "@/lib/app-entry"
+import { formatCompactDate, formatDateOnly, formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
-import {
-  formatCompactDate,
-  formatDateOnly,
-  formatDateTimeValue,
-  formatNumberValue,
-  formatUnitValue,
-} from "@/lib/analytics-format"
-import { formatFeedingResponseLevel } from "@/lib/feeding-response"
+import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 
-type OperationRow = {
-  id: string
-  date: string
-  createdAt: string | null
-  type: "Stocking" | "Feeding" | "Sampling" | "Mortality" | "Transfer" | "Harvest"
-  detail: string
+const isFiniteNumber = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value)
+
+const formatPercent = (value: number | null | undefined, decimals = 1, suffix = "%") => {
+  if (!isFiniteNumber(value)) return "--"
+  return `${formatNumberValue(value, { decimals, minimumDecimals: decimals })}${suffix}`
 }
 
 const ratingToneClass = (rating: string | null | undefined) => {
-  if (rating === "optimal") return "bg-success/15 text-success"
-  if (rating === "acceptable") return "bg-warning/15 text-warning"
-  if (rating === "critical") return "bg-warning/15 text-warning"
-  if (rating === "lethal") return "bg-destructive/15 text-destructive"
+  const normalized = rating?.trim().toLowerCase()
+  if (normalized === "optimal") return "bg-success/15 text-success"
+  if (normalized === "acceptable") return "bg-warning/15 text-warning"
+  if (normalized === "critical") return "bg-warning/15 text-warning"
+  if (normalized === "lethal") return "bg-destructive/15 text-destructive"
   return "bg-muted text-muted-foreground"
+}
+
+const worstParameterLabel = (value: string | null | undefined) => {
+  const normalized = String(value ?? "").trim().toLowerCase()
+  if (normalized === "dissolved_oxygen") return "DO"
+  if (normalized === "temperature") return "Temp"
+  if (normalized === "ph") return "pH"
+  if (normalized === "ammonia") return "Ammonia"
+  if (normalized === "nitrite") return "Nitrite"
+  if (normalized === "nitrate") return "Nitrate"
+  return value ?? null
+}
+
+function MetricCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string
+  value: string
+  hint?: string | null
+}) {
+  return (
+    <Card className="gap-2 py-3">
+      <CardHeader className="px-4">
+        <CardTitle className="text-sm font-medium">{label}</CardTitle>
+      </CardHeader>
+      <CardContent className="px-4">
+        <p className="text-lg font-semibold leading-6 text-foreground">{value}</p>
+        {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function SystemHistorySheet({
@@ -82,648 +88,288 @@ export default function SystemHistorySheet({
   summaryRow?: DashboardSystemRpcRow | null
 }) {
   const router = useRouter()
-  const enabled = open && Boolean(farmId) && Boolean(systemId)
+  const enabled = open && Boolean(farmId) && Boolean(systemId) && Boolean(dateFrom && dateTo)
 
-  const effectiveDateFrom = dateFrom
-  const effectiveDateTo = dateTo
-  const sourceLabel = "Selected period"
-  const periodLabel =
-    effectiveDateFrom && effectiveDateTo
-      ? `${formatDateOnly(effectiveDateFrom)} to ${formatDateOnly(effectiveDateTo)}`
-      : effectiveDateFrom
-        ? formatDateOnly(effectiveDateFrom)
-        : "No selected period"
-  const snapshotLabel = formatDateOnly(summaryRow?.as_of_date ?? summaryRow?.input_end_date)
-  const hasResolvedTimeline = Boolean(effectiveDateFrom && effectiveDateTo)
-
-  const feedingQuery = useFeedingRecords({
-    farmId,
-    systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 40,
-    enabled: enabled && hasResolvedTimeline,
-  })
-  const stockingQuery = useStockingData({
-    systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 40,
-    enabled: enabled && hasResolvedTimeline,
-  })
-  const samplingQuery = useSamplingData({
-    systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 24,
-    enabled: enabled && hasResolvedTimeline,
-  })
-  const mortalityQuery = useMortalityData({
-    systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 24,
-    enabled: enabled && hasResolvedTimeline,
-  })
-  const transferQuery = useTransferData({
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 60,
-    enabled: enabled && hasResolvedTimeline,
-  })
-  const harvestQuery = useHarvests({
-    systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 20,
-    enabled: enabled && hasResolvedTimeline,
-  })
   const productionSummaryQuery = useProductionSummary({
     farmId,
     systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    enabled: enabled && hasResolvedTimeline,
-  })
-  const waterRatingQuery = useDailyWaterQualityRating({
-    farmId,
-    systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 60,
-    enabled: enabled && hasResolvedTimeline,
-  })
-  const waterTrendQuery = useQuery({
-    queryKey: ["system-history", "water-quality-trend", farmId, systemId ?? "all", effectiveDateFrom ?? "", effectiveDateTo ?? ""],
-    queryFn: ({ signal }) =>
-      getWaterQualityTrend({
-        farmId: farmId!,
-        systemId: systemId ?? undefined,
-        dateFrom: effectiveDateFrom,
-        dateTo: effectiveDateTo,
-        signal,
-      }),
-    enabled: enabled && hasResolvedTimeline,
-    staleTime: 60_000,
-  })
-  const measurementQuery = useWaterQualityMeasurements({
-    farmId,
-    systemId: systemId ?? undefined,
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    limit: 200,
-    enabled: enabled && hasResolvedTimeline,
+    dateFrom,
+    dateTo,
+    enabled,
   })
 
-  const feedingRows = feedingQuery.data?.status === "success" ? feedingQuery.data.data : []
-  const stockingRows = stockingQuery.data?.status === "success" ? stockingQuery.data.data : []
-  const samplingRows = samplingQuery.data?.status === "success" ? samplingQuery.data.data : []
-  const mortalityRows = mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : []
-  const rawTransferRows = transferQuery.data?.status === "success" ? transferQuery.data.data : []
-  const transferRows = useMemo(
-    () => rawTransferRows.filter((row) => row.origin_system_id === systemId || row.target_system_id === systemId),
-    [rawTransferRows, systemId],
-  )
-  const harvestRows = harvestQuery.data?.status === "success" ? harvestQuery.data.data : []
-  const productionSummaryRows = productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
-  const survivalRows = useMemo(
-    () => deriveSurvivalSeriesFromProductionSummary(productionSummaryRows),
-    [productionSummaryRows],
-  )
-  const waterRatingRows = waterRatingQuery.data?.status === "success" ? waterRatingQuery.data.data : []
-  const waterTrendRowsRpc = waterTrendQuery.data?.status === "success" ? waterTrendQuery.data.data : []
-  const measurementRows = measurementQuery.data?.status === "success" ? measurementQuery.data.data : []
+  const productionSummaryRows =
+    productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
+  const errorMessage =
+    getErrorMessage(productionSummaryQuery.error) ??
+    getQueryResultError(productionSummaryQuery.data) ??
+    null
 
-  const latestProductionSummary =
-    productionSummaryRows
-      .slice()
-      .sort((left, right) => String(left.date).localeCompare(String(right.date)))[productionSummaryRows.length - 1] ?? null
-  const latestSampling = [...samplingRows].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] ?? null
-  const latestSurvival = survivalRows[survivalRows.length - 1] ?? null
-  const latestRating = waterRatingRows[waterRatingRows.length - 1] ?? null
-
-  const totalFeedKg = productionSummaryRows.reduce((sum, row) => sum + (row.total_feed_amount_period ?? 0), 0)
-  const totalMortality = productionSummaryRows.reduce((sum, row) => sum + (row.daily_mortality_count ?? 0), 0)
-  const totalHarvestKg = productionSummaryRows.reduce((sum, row) => sum + (row.total_weight_harvested ?? 0), 0)
-
-  const inventoryTrendRows = useMemo(
+  const orderedSummaryRows = useMemo(
     () =>
-      productionSummaryRows.map((row) => ({
-        date: row.date,
-        label: formatCompactDate(row.date),
-        biomass: row.total_biomass,
-        abw: row.average_body_weight,
-        feed: row.total_feed_amount_period,
-      })),
+      productionSummaryRows
+        .filter((row) => Boolean(row.date))
+        .slice()
+        .sort((left, right) => String(left.date).localeCompare(String(right.date))),
     [productionSummaryRows],
   )
 
-  const waterTrendRows = useMemo(
-    () =>
-      waterTrendRowsRpc
-        .map((row) => ({
-          date: row.wq_date,
-          label: formatCompactDate(row.wq_date),
-          dissolvedOxygen: row.do_avg,
-          temperature: row.temp_avg,
-        }))
-        .sort((left, right) => left.date.localeCompare(right.date)),
-    [waterTrendRowsRpc],
-  )
-
-  const latestMeasurements = useMemo(() => {
-    const byParameter = new Map<string, (typeof measurementRows)[number]>()
-    measurementRows
-      .slice()
-      .sort((a, b) => String(b.created_at ?? b.date ?? "").localeCompare(String(a.created_at ?? a.date ?? "")))
-      .forEach((row) => {
-        if (!row.parameter_name || byParameter.has(row.parameter_name)) return
-        byParameter.set(row.parameter_name, row)
-      })
-    return Array.from(byParameter.values())
-  }, [measurementRows])
-
-  const operations = useMemo<OperationRow[]>(() => {
-    const items: OperationRow[] = []
-    stockingRows.forEach((row) => {
-      items.push({
-        id: `stocking-${row.id}`,
-        date: row.date,
-        createdAt: row.created_at,
-        type: "Stocking",
-        detail: `Stocking | ${formatNumberValue(row.number_of_fish_stocking)} fish | ${formatUnitValue(row.total_weight_stocking, 1, "kg")}`,
-      })
-    })
-    feedingRows.forEach((row) => {
-      items.push({
-        id: `feeding-${row.id}`,
-        date: row.date,
-        createdAt: row.created_at,
-        type: "Feeding",
-        detail: `${formatUnitValue(row.feeding_amount, 1, "kg")} | ${formatFeedingResponseLevel(row.feeding_response)}`,
-      })
-    })
-    samplingRows.forEach((row) => {
-      items.push({
-        id: `sampling-${row.id}`,
-        date: row.date,
-        createdAt: row.created_at,
-        type: "Sampling",
-        detail: `ABW ${formatUnitValue(row.abw, 1, "g")} from ${formatNumberValue(row.number_of_fish_sampling)} fish`,
-      })
-    })
-    mortalityRows.forEach((row) => {
-      items.push({
-        id: `mortality-${row.id}`,
-        date: row.date,
-        createdAt: row.created_at,
-        type: "Mortality",
-        detail: `${formatNumberValue(row.number_of_fish_mortality)} fish`,
-      })
-    })
-    transferRows.forEach((row) => {
-      const direction = row.origin_system_id === systemId ? "Out" : "In"
-      const counterpart =
-        row.origin_system_id === systemId
-          ? row.external_target_name?.trim() || row.target_system_id || "external location"
-          : row.origin_system_id
-      items.push({
-        id: `transfer-${row.id}`,
-        date: row.date,
-        createdAt: row.created_at,
-        type: "Transfer",
-        detail: `${direction} ${formatNumberValue(row.number_of_fish_transfer)} fish ${direction === "Out" ? "to" : "from"} ${direction === "Out" && typeof counterpart === "string" ? counterpart : `system ${counterpart}`}`,
-      })
-    })
-    harvestRows.forEach((row) => {
-      items.push({
-        id: `harvest-${row.id}`,
-        date: row.date,
-        createdAt: row.created_at,
-        type: "Harvest",
-        detail: `${row.type_of_harvest === "final" ? "Final harvest" : "Partial harvest"} | ${formatUnitValue(row.total_weight_harvest, 1, "kg")} | ${formatNumberValue(row.number_of_fish_harvest)} fish`,
-      })
-    })
-    return items
-      .sort((a, b) => {
-        const dateCompare = String(b.date).localeCompare(String(a.date))
-        if (dateCompare !== 0) return dateCompare
-        return String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? ""))
-      })
-      .slice(0, 20)
-  }, [feedingRows, harvestRows, mortalityRows, samplingRows, stockingRows, systemId, transferRows])
-
-  const errorMessages = [
-    getErrorMessage(feedingQuery.error),
-    getQueryResultError(feedingQuery.data),
-    getErrorMessage(stockingQuery.error),
-    getQueryResultError(stockingQuery.data),
-    getErrorMessage(samplingQuery.error),
-    getQueryResultError(samplingQuery.data),
-    getErrorMessage(mortalityQuery.error),
-    getQueryResultError(mortalityQuery.data),
-    getErrorMessage(transferQuery.error),
-    getQueryResultError(transferQuery.data),
-    getErrorMessage(harvestQuery.error),
-    getQueryResultError(harvestQuery.data),
-    getErrorMessage(productionSummaryQuery.error),
-    getQueryResultError(productionSummaryQuery.data),
-    getErrorMessage(waterRatingQuery.error),
-    getQueryResultError(waterRatingQuery.data),
-    getErrorMessage(waterTrendQuery.error),
-    getQueryResultError(waterTrendQuery.data),
-    getErrorMessage(measurementQuery.error),
-    getQueryResultError(measurementQuery.data),
-  ].filter(Boolean) as string[]
-
-  const loading =
-    feedingQuery.isLoading ||
-    stockingQuery.isLoading ||
-    samplingQuery.isLoading ||
-    mortalityQuery.isLoading ||
-    transferQuery.isLoading ||
-    harvestQuery.isLoading ||
-    productionSummaryQuery.isLoading ||
-    waterRatingQuery.isLoading ||
-    waterTrendQuery.isLoading ||
-    measurementQuery.isLoading
-
-  const fetching =
-    feedingQuery.isFetching ||
-    stockingQuery.isFetching ||
-    samplingQuery.isFetching ||
-    mortalityQuery.isFetching ||
-    transferQuery.isFetching ||
-    harvestQuery.isFetching ||
-    productionSummaryQuery.isFetching ||
-    waterRatingQuery.isFetching ||
-    waterTrendQuery.isFetching ||
-    measurementQuery.isFetching
-
+  const latestProductionSummary = orderedSummaryRows[orderedSummaryRows.length - 1] ?? null
   const title =
     systemId != null
       ? formatCageLabel({ id: systemId, label: systemLabel ?? summaryRow?.system_name ?? null, unit: null })
       : "System"
+
+  const snapshotDate = summaryRow?.as_of_date ?? summaryRow?.input_end_date ?? latestProductionSummary?.date ?? dateTo ?? null
+  const snapshotLabel = snapshotDate ? formatDateOnly(snapshotDate) : "N/A"
+  const periodLabel =
+    dateFrom && dateTo
+      ? `${formatDateOnly(dateFrom)} to ${formatDateOnly(dateTo)}`
+      : dateFrom
+        ? formatDateOnly(dateFrom)
+        : "No selected period"
+
+  const daysInCycle = useMemo(() => {
+    if (isFiniteNumber(summaryRow?.cycle_day)) return summaryRow.cycle_day
+    if (!snapshotDate || !latestProductionSummary?.cycle_start) return null
+    const end = new Date(`${snapshotDate}T00:00:00Z`)
+    const start = new Date(`${latestProductionSummary.cycle_start}T00:00:00Z`)
+    if (Number.isNaN(end.getTime()) || Number.isNaN(start.getTime())) return null
+    return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86_400_000))
+  }, [latestProductionSummary?.cycle_start, snapshotDate, summaryRow?.cycle_day])
+
+  const targetWeightG = summaryRow?.target_weight_g ?? latestProductionSummary?.target_weight_g ?? null
+  const currentAbw = summaryRow?.abw ?? latestProductionSummary?.average_body_weight ?? null
+  const targetWeightProgressPct = useMemo(() => {
+    if (isFiniteNumber(summaryRow?.target_weight_progress_pct)) return summaryRow.target_weight_progress_pct
+    if (!isFiniteNumber(targetWeightG) || !isFiniteNumber(currentAbw) || targetWeightG <= 0) return null
+    return Math.round((currentAbw / targetWeightG) * 1000) / 10
+  }, [currentAbw, summaryRow?.target_weight_progress_pct, targetWeightG])
+
+  const density = summaryRow?.biomass_density ?? latestProductionSummary?.biomass_density ?? null
+  const feedingRatePct = summaryRow?.feeding_rate ?? latestProductionSummary?.feeding_rate_on_date ?? null
+  const agr = summaryRow?.agr ?? latestProductionSummary?.agr ?? null
+  const fishCount = summaryRow?.fish_end ?? latestProductionSummary?.number_of_fish_inventory ?? null
+  const missingDays = summaryRow?.missing_days_count ?? null
+  const cycleEfcr = latestProductionSummary?.efcr_aggregated ?? null
+
+  const worstParameterText = useMemo(() => {
+    const label = worstParameterLabel(summaryRow?.worst_parameter)
+    if (!label || !isFiniteNumber(summaryRow?.worst_parameter_value)) return "No issue recorded"
+    const unit = summaryRow?.worst_parameter_unit ? ` ${summaryRow.worst_parameter_unit}` : ""
+    return `${label} ${formatNumberValue(summaryRow.worst_parameter_value, { decimals: 1, minimumDecimals: 1 })}${unit}`
+  }, [summaryRow?.worst_parameter, summaryRow?.worst_parameter_unit, summaryRow?.worst_parameter_value])
+
+  const sampleHistoryRows = useMemo(
+    () => orderedSummaryRows.filter((row) => isFiniteNumber(row.average_body_weight)),
+    [orderedSummaryRows],
+  )
+  const sampleDateDomain = useMemo(
+    () => buildSparseDateDomain(sampleHistoryRows.map((row) => row.date)),
+    [sampleHistoryRows],
+  )
+  const sampleRowsByDate = useMemo(
+    () => new Map(sampleHistoryRows.map((row) => [row.date, row])),
+    [sampleHistoryRows],
+  )
+
   const palette = getChartPalette()
-  const inventoryDateDomain = useMemo(
-    () => buildDailyDateDomain(inventoryTrendRows.map((row) => row.date)),
-    [inventoryTrendRows],
-  )
-  const inventoryRowsByDate = useMemo(
-    () => new Map(inventoryTrendRows.map((row) => [row.date, row])),
-    [inventoryTrendRows],
-  )
-  const inventoryXAxisLimit = getDateAxisMaxTicks(inventoryDateDomain.length)
-  const waterDateDomain = useMemo(
-    () => buildDailyDateDomain(waterTrendRows.map((row) => row.date)),
-    [waterTrendRows],
-  )
-  const waterRowsByDate = useMemo(
-    () => new Map(waterTrendRows.map((row) => [row.date, row])),
-    [waterTrendRows],
-  )
-  const waterXAxisLimit = getDateAxisMaxTicks(waterDateDomain.length)
+  const sampleXAxisLimit = getDateAxisMaxTicks(sampleDateDomain.length)
 
-  const inventoryChartData = useMemo<ChartData<any>>(
+  const sampleHistoryChartData = useMemo<ChartData<"line">>(
     () => ({
-      labels: inventoryDateDomain,
+      labels: sampleDateDomain,
       datasets: [
         {
-          type: "bar",
-          label: "Feed (kg)",
-          data: inventoryDateDomain.map((date) => inventoryRowsByDate.get(date)?.feed ?? null),
-          backgroundColor: palette.chart3,
-          yAxisID: "y",
-          order: 3,
-        },
-        {
-          type: "line",
-          label: "Biomass (kg)",
-          data: inventoryDateDomain.map((date) => inventoryRowsByDate.get(date)?.biomass ?? null),
-          borderColor: palette.chart1,
-          backgroundColor: palette.chart1,
-          borderWidth: 2.4,
-          pointRadius: 0,
-          spanGaps: true,
-          yAxisID: "y",
-          order: 1,
-        },
-        {
-          type: "line",
           label: "ABW (g)",
-          data: inventoryDateDomain.map((date) => inventoryRowsByDate.get(date)?.abw ?? null),
-          borderColor: palette.chart2,
-          backgroundColor: palette.chart2,
-          borderWidth: 2.4,
-          pointRadius: 0,
-          spanGaps: true,
-          yAxisID: "y1",
-          order: 2,
-        },
-      ],
-    }),
-    [inventoryDateDomain, inventoryRowsByDate, palette.chart1, palette.chart2, palette.chart3],
-  )
-
-  const inventoryChartOptions = useMemo<ChartOptions<"bar">>(() => {
-    return buildCartesianOptions({
-      palette,
-      legend: true,
-      xTitle: "Date",
-      xMaxTicksLimit: inventoryXAxisLimit,
-      yTitle: "Biomass / Feed (kg)",
-      yRightTitle: "ABW (g)",
-      tooltip: {
-        callbacks: {
-          title: (items: any) => formatDateOnly(inventoryDateDomain[items[0]?.dataIndex ?? 0] ?? ""),
-          label: (context: any) => {
-            const label = context.dataset.label ?? ""
-            const numeric = Number(context.parsed.y)
-            const unit = label.includes("ABW") ? "g" : "kg"
-            return `${label}: ${formatNumberValue(numeric, { decimals: 1 })} ${unit}`
-          },
-        },
-      },
-      xTickFormatter: (_value, index) => formatCompactDate(inventoryDateDomain[index] ?? ""),
-    })
-  }, [inventoryDateDomain, inventoryXAxisLimit, palette])
-
-  const waterChartData = useMemo<ChartData<"line">>(
-    () => ({
-      labels: waterDateDomain,
-      datasets: [
-        {
-          label: "DO (mg/L)",
-          data: waterDateDomain.map((date) => waterRowsByDate.get(date)?.dissolvedOxygen ?? null),
+          data: sampleDateDomain.map((date) => sampleRowsByDate.get(date)?.average_body_weight ?? null),
           borderColor: palette.chart1,
           backgroundColor: palette.chart1,
-          borderWidth: 2.4,
+          borderWidth: 2.5,
           pointRadius: 0,
+          pointHoverRadius: 4,
           spanGaps: true,
-          yAxisID: "y",
-        },
-        {
-          label: "Temperature (C)",
-          data: waterDateDomain.map((date) => waterRowsByDate.get(date)?.temperature ?? null),
-          borderColor: palette.chart4,
-          backgroundColor: palette.chart4,
-          borderWidth: 2.4,
-          pointRadius: 0,
-          spanGaps: true,
-          yAxisID: "y1",
         },
       ],
     }),
-    [palette.chart1, palette.chart4, waterDateDomain, waterRowsByDate],
+    [palette.chart1, sampleDateDomain, sampleRowsByDate],
   )
 
-  const waterChartOptions = useMemo<ChartOptions<"line">>(() => {
-    return buildCartesianOptions({
-      palette,
-      legend: true,
-      xTitle: "Date",
-      xMaxTicksLimit: waterXAxisLimit,
-      yTitle: "DO (mg/L)",
-      tooltip: {
-        callbacks: {
-          title: (items: any) => formatDateOnly(waterDateDomain[items[0]?.dataIndex ?? 0] ?? ""),
-          label: (context: any) => {
-            const label = context.dataset.label ?? ""
-            const unit = label.includes("DO") ? "mg/L" : "C"
-            return `${label}: ${formatNumberValue(Number(context.parsed.y), { decimals: 2 })} ${unit}`
+  const sampleHistoryChartOptions = useMemo<ChartOptions<"line">>(
+    () =>
+      buildCartesianOptions({
+        palette,
+        legend: false,
+        xTitle: "Sampling date",
+        yTitle: "ABW (g)",
+        xMaxTicksLimit: sampleXAxisLimit,
+        tooltip: {
+          callbacks: {
+            title: (items: any[]) => formatDateOnly(sampleDateDomain[items[0]?.dataIndex ?? 0] ?? ""),
+            label: (context: any) => `ABW: ${formatNumberValue(Number(context.parsed.y), { decimals: 1, minimumDecimals: 1 })} g`,
           },
         },
-      },
-      xTickFormatter: (_value, index) => formatCompactDate(waterDateDomain[index] ?? ""),
-      extraScales: {
-        y1: {
-          position: "right",
-          border: { display: false },
-          grid: { drawOnChartArea: false, drawTicks: false },
-          ticks: {
-            color: palette.muted,
-            padding: 10,
-            font: { size: 11, weight: 500 },
-            callback(value: number | string) {
-              return `${Number(value).toFixed(1)} C`
-            },
-          },
-          title: {
-            display: true,
-            text: "Temperature (C)",
-            color: palette.muted,
-            font: { size: 11, weight: 500 },
-          },
-        },
-      },
-    })
-  }, [palette, waterDateDomain, waterXAxisLimit])
+        xTickFormatter: (_value, index) => formatCompactDate(sampleDateDomain[index] ?? ""),
+      }),
+    [palette, sampleDateDomain, sampleXAxisLimit],
+  )
+
+  const progressWidth = Math.max(0, Math.min(targetWeightProgressPct ?? 0, 100))
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-[760px]">
-        <SheetHeader>
-          <div className="flex items-start justify-between gap-3 pr-8">
-            <div>
+        <SheetHeader className="border-b border-border pb-4">
+          <div className="flex items-start justify-between gap-4 pr-8">
+            <div className="space-y-1">
               <SheetTitle>{title}</SheetTitle>
-              <SheetDescription>{sourceLabel}: {periodLabel}. Snapshot as of {snapshotLabel}.</SheetDescription>
+              <SheetDescription>Selected period: {periodLabel}</SheetDescription>
+              <SheetDescription>Snapshot as of {snapshotLabel}</SheetDescription>
             </div>
-            <DataFetchingBadge isFetching={fetching} isLoading={loading} />
+            <DataFetchingBadge isFetching={productionSummaryQuery.isFetching} isLoading={productionSummaryQuery.isLoading} />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            {summaryRow?.growth_stage ? <Badge variant="outline">{summaryRow.growth_stage}</Badge> : null}
+            <Badge className={ratingToneClass(summaryRow?.water_quality_rating_average)}>
+              {summaryRow?.water_quality_rating_average ?? "No WQ rating"}
+            </Badge>
           </div>
         </SheetHeader>
 
-        <div className="space-y-4 px-4 pb-4">
-          {errorMessages.length > 0 ? <DataErrorState title="Unable to load system history" description={errorMessages[0]} /> : null}
-          {!loading && !hasResolvedTimeline && errorMessages.length === 0 ? (
+        <div className="space-y-4 px-4 py-4">
+          {!dateFrom || !dateTo ? (
+            <DataErrorState title="No selected period" description="Choose a date range to load this system detail." />
+          ) : null}
+
+          {dateFrom && dateTo && errorMessage ? (
             <DataErrorState
-              title="No selected period"
-              description="Choose a date range to load this system history."
+              title="Unable to load system detail"
+              description={errorMessage}
+              onRetry={() => productionSummaryQuery.refetch()}
             />
           ) : null}
 
-          {hasResolvedTimeline ? (
+          {dateFrom && dateTo ? (
             <>
-          <div className="kpi-grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Card className="kpi-card">
-              <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Live Fish</CardTitle></CardHeader>
-              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatNumberValue(latestProductionSummary?.number_of_fish_inventory ?? summaryRow?.fish_end)}</p></CardContent>
-            </Card>
-            <Card className="kpi-card">
-              <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Biomass</CardTitle></CardHeader>
-              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(latestProductionSummary?.total_biomass ?? summaryRow?.biomass_end, 1, "kg")}</p></CardContent>
-            </Card>
-            <Card className="kpi-card">
-              <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">ABW</CardTitle></CardHeader>
-              <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(latestSampling?.abw ?? latestProductionSummary?.average_body_weight ?? summaryRow?.abw, 1, "g")}</p></CardContent>
-            </Card>
-            <Card className="kpi-card">
-              <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Survival</CardTitle></CardHeader>
-              <CardContent className="kpi-card-content"><p className="kpi-card-value">{latestSurvival ? `${formatNumberValue(latestSurvival.survival_pct, { decimals: 1, minimumDecimals: 1 })}%` : "--"}</p></CardContent>
-            </Card>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {summaryRow?.growth_stage ? <Badge variant="outline">{summaryRow.growth_stage}</Badge> : null}
-            <Badge variant="outline">{sourceLabel}</Badge>
-            <Badge className={ratingToneClass(latestRating?.rating ?? summaryRow?.water_quality_rating_average)}>
-              {latestRating?.rating ?? summaryRow?.water_quality_rating_average ?? "No WQ rating"}
-            </Badge>
-            {summaryRow?.worst_parameter ? (
-              <Badge variant="outline">
-                {summaryRow.worst_parameter}: {formatNumberValue(summaryRow.worst_parameter_value, { decimals: 2 })} {summaryRow.worst_parameter_unit ?? ""}
-              </Badge>
-            ) : null}
-            {(summaryRow?.missing_days_count ?? 0) > 0 ? <Badge variant="outline">Missing {summaryRow?.missing_days_count} day(s)</Badge> : null}
-          </div>
-
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="water">Water</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-4">
-              <div className="kpi-grid gap-3 md:grid-cols-3">
-                <Card className="kpi-card">
-                  <CardHeader className="kpi-card-header">
-                    <CardTitle className="kpi-card-title">Feed In Range</CardTitle>
-                    <CardDescription>{periodLabel}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(totalFeedKg, 1, "kg")}</p></CardContent>
-                </Card>
-                <Card className="kpi-card">
-                  <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Mortality In Range</CardTitle><CardDescription>Recorded losses</CardDescription></CardHeader>
-                  <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatNumberValue(totalMortality)} fish</p></CardContent>
-                </Card>
-                <Card className="kpi-card">
-                  <CardHeader className="kpi-card-header"><CardTitle className="kpi-card-title">Harvest In Range</CardTitle><CardDescription>Recorded harvests</CardDescription></CardHeader>
-                  <CardContent className="kpi-card-content"><p className="kpi-card-value">{formatUnitValue(totalHarvestKg, 1, "kg")}</p></CardContent>
-                </Card>
-              </div>
-
               <Card>
                 <CardHeader>
-                  <CardTitle>Biomass and ABW Trend</CardTitle>
-                  <CardDescription>How this unit progressed across the selected period.</CardDescription>
+                  <CardTitle>Target Weight</CardTitle>
+                  <CardDescription>Current ABW against the configured cycle target.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {inventoryTrendRows.length === 0 ? (
-                    <EmptyState title="No inventory trend available" description="Daily inventory points for this unit will appear here." icon={TrendingUp} />
-                  ) : (
-                    <div className="chart-canvas-shell h-[280px]">
-                      <Chart type="bar" data={inventoryChartData} options={inventoryChartOptions} />
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Target</p>
+                      <p className="mt-1 text-2xl font-semibold text-foreground">
+                        {isFiniteNumber(targetWeightG) ? formatUnitValue(targetWeightG, 0, "g") : "--"}
+                      </p>
                     </div>
-                  )}
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Current ABW</p>
+                      <p className="mt-1 text-2xl font-semibold text-foreground">
+                        {isFiniteNumber(currentAbw) ? formatUnitValue(currentAbw, 1, "g") : "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Progress</p>
+                      <p className="mt-1 text-2xl font-semibold text-foreground">
+                        {isFiniteNumber(targetWeightProgressPct)
+                          ? `${formatNumberValue(targetWeightProgressPct, { decimals: 1, minimumDecimals: 1 })}%`
+                          : "--"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width]"
+                      style={{ width: `${progressWidth}%` }}
+                    />
+                  </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="timeline" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Operations</CardTitle>
-                  <CardDescription>Initial stocking, additions, transfers, feedings, samples, mortalities, and harvests inside the resolved period.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {operations.length === 0 ? (
-                    <EmptyState title="No operations in range" description="Once this unit has recent activity, it will appear here." icon={Fish} />
-                  ) : (
-                    <div className="space-y-3">
-                      {operations.map((item) => (
-                        <div key={item.id} className="rounded-md border border-border/80 bg-muted/20 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold">{item.type}</p>
-                              <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
-                            </div>
-                            <div className="text-right text-xs text-muted-foreground">
-                              <p>{formatDateOnly(item.date)}</p>
-                              <p>{formatDateTimeValue(item.createdAt)}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="water" className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
-                <Card className="gap-2 py-3">
-                  <CardHeader className="px-3"><CardTitle className="text-sm">Latest Water Rating</CardTitle><CardDescription>Most recent daily classification</CardDescription></CardHeader>
-                  <CardContent className="px-3">
-                    <div className="flex items-center gap-2">
-                      <Badge className={ratingToneClass(latestRating?.rating)}>{latestRating?.rating ?? "Unknown"}</Badge>
-                      {latestRating?.rating_date ? <span className="text-xs text-muted-foreground">{formatDateOnly(latestRating.rating_date)}</span> : null}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="gap-2 py-3">
-                  <CardHeader className="px-3"><CardTitle className="text-sm">Latest Worst Parameter</CardTitle><CardDescription>Most limiting reading in the daily rating</CardDescription></CardHeader>
-                  <CardContent className="px-3">
-                    <p className="text-base font-semibold">
-                      {latestRating?.worst_parameter ? `${latestRating.worst_parameter} ${formatNumberValue(latestRating.worst_parameter_value, { decimals: 2 })} ${latestRating.worst_parameter_unit ?? ""}` : "No issue recorded"}
-                    </p>
-                  </CardContent>
-                </Card>
+                <MetricCard
+                  label="Density"
+                  value={formatUnitValue(density, 2, "kg/m3")}
+                />
+                <MetricCard
+                  label="Feeding Rate"
+                  value={formatPercent(feedingRatePct, 2, "% BW/day")}
+                />
+                <MetricCard
+                  label="Days in Cycle"
+                  value={isFiniteNumber(daysInCycle) ? formatNumberValue(daysInCycle) : "--"}
+                />
+                <MetricCard
+                  label="AGR"
+                  value={isFiniteNumber(agr) ? `${formatNumberValue(agr, { decimals: 2, minimumDecimals: 2 })} g/day` : "--"}
+                />
+                <MetricCard
+                  label="Fish Count"
+                  value={formatNumberValue(fishCount)}
+                />
+                <MetricCard
+                  label="Missing Days"
+                  value={isFiniteNumber(missingDays) ? formatNumberValue(missingDays) : "--"}
+                />
+                <MetricCard
+                  label="Cycle eFCR"
+                  value={isFiniteNumber(cycleEfcr) ? formatNumberValue(cycleEfcr, { decimals: 2, minimumDecimals: 2 }) : "--"}
+                />
+                <MetricCard
+                  label="WQ Worst Parameter"
+                  value={worstParameterText}
+                />
               </div>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>DO and Temperature Trend</CardTitle>
-                  <CardDescription>Daily average water conditions for this unit.</CardDescription>
+                  <CardTitle>Sample History</CardTitle>
+                  <CardDescription>ABW progression over the selected period.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {waterTrendRows.length === 0 ? (
-                    <EmptyState title="No water trend available" description="Recent oxygen and temperature measurements will appear here." icon={TestTube} />
+                  {sampleHistoryRows.length === 0 ? (
+                    <EmptyState
+                      title="No sample history"
+                      description="Sampling records inside the selected period will appear here."
+                      icon={TrendingUp}
+                    />
                   ) : (
-                    <div className="chart-canvas-shell h-[280px]">
-                      <Line data={waterChartData} options={waterChartOptions} />
+                    <div className="chart-canvas-shell h-[220px]">
+                      <Line data={sampleHistoryChartData} options={sampleHistoryChartOptions} />
                     </div>
                   )}
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Latest Measurements</CardTitle>
-                  <CardDescription>Newest reading per parameter.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {latestMeasurements.length === 0 ? (
-                    <EmptyState title="No recent measurements" description="Capture water quality to populate this unit history." icon={TestTube} />
-                  ) : (
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {latestMeasurements.map((row) => (
-                        <div key={`${row.parameter_name}-${row.created_at}`} className="rounded-md border border-border/80 px-3 py-2">
-                          <p className="text-sm font-medium">{row.parameter_name}</p>
-                          <p className="text-sm text-muted-foreground">{formatNumberValue(row.parameter_value, { decimals: 2 })} {row.unit ?? ""}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{formatDateOnly(row.date)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
             </>
           ) : null}
         </div>
 
-        <SheetFooter className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Button variant="outline" onClick={() => router.push(`${DATA_ENTRY_PATH}?type=feeding&system=${systemId ?? ""}`)} className="cursor-pointer">
+        <SheetFooter className="grid grid-cols-1 gap-2 border-t border-border bg-background sm:grid-cols-3">
+          <Button
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => router.push(`${DATA_ENTRY_PATH}?type=feeding&system=${systemId ?? ""}`)}
+          >
             <Fish className="mr-2 h-4 w-4" />
             Record Feeding
           </Button>
-          <Button variant="outline" onClick={() => router.push(`${DATA_ENTRY_PATH}?type=sampling&system=${systemId ?? ""}`)} className="cursor-pointer">
+          <Button
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => router.push(`${DATA_ENTRY_PATH}?type=sampling&system=${systemId ?? ""}`)}
+          >
             <TrendingUp className="mr-2 h-4 w-4" />
             Record Sampling
           </Button>
-          <Button variant="outline" onClick={() => router.push(`${DATA_ENTRY_PATH}?type=mortality&system=${systemId ?? ""}`)} className="cursor-pointer">
+          <Button
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => router.push(`${DATA_ENTRY_PATH}?type=mortality&system=${systemId ?? ""}`)}
+          >
             <Skull className="mr-2 h-4 w-4" />
             Record Mortality
           </Button>
@@ -732,5 +378,3 @@ export default function SystemHistorySheet({
     </Sheet>
   )
 }
-
-
