@@ -13,6 +13,15 @@ type SystemVolumeRow = Pick<
 >
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type BatchOptionRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
+type ProductionCycleBatchRow = Pick<
+  Database["public"]["Tables"]["production_cycle"]["Row"],
+  "batch_id" | "cycle_end" | "cycle_start" | "system_id"
+>
+type BatchActivityRow = {
+  batch_id: number
+  date: string
+  system_id: number
+}
 type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
@@ -22,6 +31,110 @@ type FarmMember = {
   role: string
   created_at: string
   full_name?: string | null
+}
+
+const dateFitsCycle = (asOfDate: string | null, cycle: ProductionCycleBatchRow) => {
+  if (!asOfDate) return false
+  if (cycle.cycle_start > asOfDate) return false
+  if (cycle.cycle_end && cycle.cycle_end < asOfDate) return false
+  return true
+}
+
+function attachBatchNamesToDashboardRows<T extends { system_id: number; as_of_date: string | null; batch_name?: string | null }>(
+  rows: T[],
+  cycles: ProductionCycleBatchRow[],
+  activities: BatchActivityRow[],
+  batchLabelById: Map<number, string>,
+): T[] {
+  if (!rows.length || !batchLabelById.size) return rows
+
+  const cyclesBySystemId = new Map<number, ProductionCycleBatchRow[]>()
+  cycles.forEach((cycle) => {
+    const current = cyclesBySystemId.get(cycle.system_id) ?? []
+    current.push(cycle)
+    cyclesBySystemId.set(cycle.system_id, current)
+  })
+
+  cyclesBySystemId.forEach((systemCycles) => {
+    systemCycles.sort((left, right) => right.cycle_start.localeCompare(left.cycle_start))
+  })
+
+  const activitiesBySystemId = new Map<number, BatchActivityRow[]>()
+  activities.forEach((activity) => {
+    const current = activitiesBySystemId.get(activity.system_id) ?? []
+    current.push(activity)
+    activitiesBySystemId.set(activity.system_id, current)
+  })
+
+  activitiesBySystemId.forEach((systemActivities) => {
+    systemActivities.sort((left, right) => right.date.localeCompare(left.date))
+  })
+
+  return rows.map((row) => {
+    const systemCycles = cyclesBySystemId.get(row.system_id) ?? []
+    const match = systemCycles.find((cycle) => dateFitsCycle(row.as_of_date, cycle))
+    const directBatchId = match?.batch_id ?? null
+    const fallbackBatchId =
+      directBatchId == null
+        ? (activitiesBySystemId.get(row.system_id) ?? []).find((activity) => row.as_of_date && activity.date <= row.as_of_date)?.batch_id ?? null
+        : null
+    const batchId = directBatchId ?? fallbackBatchId
+    if (batchId == null) return row
+
+    const batchName = batchLabelById.get(batchId) ?? `Batch ${batchId}`
+    return {
+      ...row,
+      batch_name: batchName,
+    }
+  })
+}
+
+async function listDashboardBatchActivityRows(
+  supabase: ServerClient,
+  params: {
+    systemIds: number[]
+    maxDate: string
+  },
+): Promise<BatchActivityRow[]> {
+  const [feedingResult, samplingResult, mortalityResult, harvestResult, stockingResult, transferResult] = await Promise.all([
+    supabase.from("feeding_record").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
+    supabase.from("fish_sampling_weight").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
+    supabase.from("fish_mortality").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
+    supabase.from("fish_harvest").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
+    supabase.from("fish_stocking").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
+    supabase
+      .from("fish_transfer")
+      .select("origin_system_id, target_system_id, batch_id, date")
+      .or(`origin_system_id.in.(${params.systemIds.join(",")}),target_system_id.in.(${params.systemIds.join(",")})`)
+      .lte("date", params.maxDate),
+  ])
+
+  const results = [feedingResult, samplingResult, mortalityResult, harvestResult, stockingResult, transferResult]
+  for (const result of results) {
+    if (result.error) return []
+  }
+
+  const baseActivities = [feedingResult.data, samplingResult.data, mortalityResult.data, harvestResult.data, stockingResult.data]
+    .flatMap((rows) => rows ?? [])
+    .flatMap((row) =>
+      typeof row.system_id === "number" && typeof row.batch_id === "number" && typeof row.date === "string"
+        ? [{ system_id: row.system_id, batch_id: row.batch_id, date: row.date }]
+        : [],
+    )
+
+  const transferActivities = (transferResult.data ?? []).flatMap((row) => {
+    if (typeof row.batch_id !== "number" || typeof row.date !== "string") return []
+    const activities: BatchActivityRow[] = []
+    if (typeof row.origin_system_id === "number") {
+      activities.push({ system_id: row.origin_system_id, batch_id: row.batch_id, date: row.date })
+    }
+    if (typeof row.target_system_id === "number") {
+      activities.push({ system_id: row.target_system_id, batch_id: row.batch_id, date: row.date })
+    }
+    return activities
+  })
+
+  return [...baseActivities, ...transferActivities]
 }
 
 export async function listProductionSummaryRows(
@@ -159,6 +272,7 @@ export async function listDashboardSystemsRows(
     farmId: string
     stage?: Database["public"]["Enums"]["system_growth_stage"] | null
     systemId?: number | null
+    systemIds?: number[] | null
     dateFrom?: string | null
     dateTo?: string | null
   },
@@ -166,7 +280,7 @@ export async function listDashboardSystemsRows(
   const { data, error } = await supabase.rpc("api_dashboard_systems", {
     p_farm_id: params.farmId,
     p_stage: params.stage ?? undefined,
-    p_system_ids: toRpcSystemIds(params.systemId),
+    p_system_ids: toRpcSystemIds(params.systemIds ?? params.systemId),
     p_start_date: toRpcDate(params.dateFrom),
     p_end_date: toRpcDate(params.dateTo),
   } as Database["public"]["Functions"]["api_dashboard_systems"]["Args"] & {
@@ -175,7 +289,36 @@ export async function listDashboardSystemsRows(
     p_end_date: string | null
   })
   if (error) return []
-  return (data ?? []) as DashboardSystemRow[]
+  const rows = ((data ?? []) as DashboardSystemRow[]).slice()
+  const systemIds = Array.from(
+    new Set(rows.map((row) => row.system_id).filter((id): id is number => typeof id === "number" && Number.isFinite(id))),
+  )
+  const asOfDates = rows.map((row) => row.as_of_date).filter((value): value is string => typeof value === "string" && value.length > 0)
+  if (!rows.length || !systemIds.length || !asOfDates.length) return rows
+
+  const minDate = asOfDates.reduce((current, value) => (value < current ? value : current))
+  const maxDate = asOfDates.reduce((current, value) => (value > current ? value : current))
+
+  const [batchOptions, activityRows, cycleRowsResponse] = await Promise.all([
+    supabase.rpc("api_fingerling_batch_options_rpc", {
+      p_farm_id: params.farmId,
+      p_active_only: false,
+    }),
+    listDashboardBatchActivityRows(supabase, { systemIds, maxDate }),
+    supabase
+      .from("production_cycle")
+      .select("system_id, batch_id, cycle_start, cycle_end")
+      .in("system_id", systemIds)
+      .lte("cycle_start", maxDate)
+      .or(`cycle_end.is.null,cycle_end.gte.${minDate}`),
+  ])
+
+  const batchLabelById = new Map(
+    ((batchOptions.data ?? []) as BatchOptionRow[]).map((row) => [row.id, row.label || `Batch ${row.id}`]),
+  )
+  const cycleRows = (cycleRowsResponse.data ?? []) as ProductionCycleBatchRow[]
+
+  return attachBatchNamesToDashboardRows(rows, cycleRows, activityRows, batchLabelById)
 }
 
 export async function listFarmMembers(

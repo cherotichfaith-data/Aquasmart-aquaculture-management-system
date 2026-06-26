@@ -118,13 +118,12 @@ export default function DashboardPage({
   })
   const numericSelectedSystemId =
     selectedSystem !== "all" && Number.isFinite(Number(selectedSystem)) ? Number(selectedSystem) : null
+  const resolvedSelectedSystemScopeId = selectedSystemId ?? numericSelectedSystemId
   const resolvedScopedSystemIdList =
-    selectedSystemId != null
-      ? [selectedSystemId]
-      : numericSelectedSystemId != null
-        ? [numericSelectedSystemId]
-        : scopedSystemIdList
-  const shouldApplySystemIdScope = selectedBatch !== "all" || numericSelectedSystemId != null
+    resolvedSelectedSystemScopeId != null
+      ? [resolvedSelectedSystemScopeId]
+      : scopedSystemIdList
+  const shouldApplySystemIdScope = selectedBatch !== "all" || resolvedSelectedSystemScopeId != null
   const appliedScopedSystemIds = shouldApplySystemIdScope ? resolvedScopedSystemIdList : null
   const activeProductionSystemIds = resolvedScopedSystemIdList.length > 0 ? resolvedScopedSystemIdList : null
 
@@ -149,6 +148,7 @@ export default function DashboardPage({
       selectedSystem,
       selectedSystemId,
       numericSelectedSystemId,
+      resolvedSelectedSystemScopeId,
       scopedSystemIdList,
       resolvedScopedSystemIdList,
       hasScopeFilters,
@@ -163,6 +163,7 @@ export default function DashboardPage({
     farmId,
     hasScopeFilters,
     numericSelectedSystemId,
+    resolvedSelectedSystemScopeId,
     resolvedScopedSystemIdList,
     scopedSystemIdList,
     selectedBatch,

@@ -8,6 +8,7 @@ import type { DashboardSystemRow, SystemsTableData } from "@/features/dashboard/
 import type { TimePeriod } from "@/lib/time-period"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { getDashboardSystems } from "@/lib/api/dashboard"
+import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 export function useSystemsTable(params: {
   farmId?: string | null
@@ -52,14 +53,18 @@ export function useSystemsTable(params: {
       }
 
       const stage = params.stage === "all" ? undefined : params.stage
-      const parsedSystemId = params.system && params.system !== "all" ? Number(params.system) : null
+      const resolvedSystemId =
+        params.system && params.system !== "all"
+          ? (resolveSystemIdFromFilterValue(params.system, systemOptions) ??
+            (Number.isFinite(Number(params.system)) ? Number(params.system) : null))
+          : null
       const scopedSystemIds = Array.isArray(params.scopedSystemIds) ? params.scopedSystemIds : null
       const activeSystemIds =
         scopedSystemIds ??
         systemOptions.map((row) => row.id).filter((id): id is number => typeof id === "number" && Number.isFinite(id))
       const systemId =
-        Number.isFinite(parsedSystemId)
-          ? (parsedSystemId as number)
+        Number.isFinite(resolvedSystemId)
+          ? (resolvedSystemId as number)
           : activeSystemIds.length === 1
             ? activeSystemIds[0]
             : undefined

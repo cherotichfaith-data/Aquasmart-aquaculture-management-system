@@ -92,6 +92,27 @@ export default async function DashboardPage({
   const initialFarmName = farmRow?.name ?? null
   const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
   const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
+  const hydratedSystemIds =
+    initialData.systemOptions.status === "success"
+      ? initialData.systemOptions.data
+          .map((row) => row.id)
+          .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
+      : []
+  const hydratedBatchScopedIds =
+    effectiveFilters.selectedBatch !== "all"
+      ? new Set(
+          initialData.batchSystems.status === "success"
+            ? initialData.batchSystems.data.map((row) => row.system_id)
+            : [],
+        )
+      : null
+  const hydratedScopedSystemIds = selectedSystemId != null
+    ? hydratedSystemIds.includes(selectedSystemId)
+      ? [selectedSystemId]
+      : []
+    : hydratedBatchScopedIds
+      ? hydratedSystemIds.filter((id) => hydratedBatchScopedIds.has(id))
+      : null
   const queryClient = createQueryClient()
 
   if (initialData.bounds.start && initialData.bounds.end) {
@@ -153,6 +174,7 @@ export default async function DashboardPage({
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
         includeIncomplete: true,
+        scopedSystemIds: hydratedScopedSystemIds,
       }),
       initialData.systemsTable,
     )

@@ -394,7 +394,7 @@ async function loadDashboardPageInitialData(
       withNetworkFallback("dashboard:listDashboardSystemsRows", [], () =>
         listDashboardSystemsRows(supabase, {
           farmId,
-          systemId: singleSystemId,
+          systemIds: activeScopedSystemIds,
           stage: params.filters.selectedStage === "all" ? undefined : params.filters.selectedStage,
           dateFrom: startDate,
           dateTo: endDate,
