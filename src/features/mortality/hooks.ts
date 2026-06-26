@@ -38,7 +38,7 @@ export function useRecordMortality() {
     buildRecords: (payload) => [
       {
         systemId: payload.system_id,
-        farmId,
+        farmId: payload.farm_id ?? farmId,
         batchId: payload.batch_id ?? null,
         date: payload.date,
         numberOfFishMortality: payload.number_of_fish_mortality,
@@ -50,7 +50,7 @@ export function useRecordMortality() {
     buildPendingResult: ({ input, localIds }) =>
       buildOfflinePendingResult({
         data: { id: 0 } as Tables<"fish_mortality">,
-        farmId,
+        farmId: input.farm_id ?? farmId,
         systemId: input.system_id,
         date: input.date,
         localIds,
