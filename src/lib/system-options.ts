@@ -21,23 +21,36 @@ export type SystemOptionSource = Pick<
   unit: string | null
 }
 
+function hasDuplicatedUnitPrefix(unit: string, name: string) {
+  return name.toLowerCase().startsWith(unit.toLowerCase())
+}
+
 export function formatSystemOptionLabel(system: Pick<SystemOptionSource, "id" | "name" | "unit">): string {
   const unit = system.unit?.trim()
   const name = system.name?.trim()
 
-  if (unit && name) return `${unit} - ${name}`
+  if (unit && name) {
+    if (hasDuplicatedUnitPrefix(unit, name)) return name
+    return `${unit} - ${name}`
+  }
   if (name) return name
   if (unit) return unit
   return "Missing cage name"
 }
 
 export function formatCageLabel(
-  system: { id: number; label?: string | null; unit?: string | null } | null | undefined,
+  system: { id: number; label?: string | null; name?: string | null; unit?: string | null } | null | undefined,
 ): string {
   const label = system?.label?.trim()
   if (label) return label
 
+  const name = system?.name?.trim()
   const unit = system?.unit?.trim()
+  if (unit && name) {
+    if (hasDuplicatedUnitPrefix(unit, name)) return name
+    return `${unit} - ${name}`
+  }
+  if (name) return name
   if (unit) return unit
 
   return "Missing cage name"

@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowUpDown, Clock, TriangleAlert, type LucideIcon } from "lucide-react"
+import { Clock, TriangleAlert, type LucideIcon } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
-import MuiButton from "@mui/material/Button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/app-ui/table"
 import type { DashboardSystemRow } from "@/features/dashboard/types"
@@ -14,7 +13,7 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/s
 import { getErrorMessage } from "@/lib/utils/query-result"
 import type { TimePeriod } from "@/lib/time-period"
 import { toTimePeriodUrlValue } from "@/lib/time-period"
-import { formatAsOfDate, formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
+import { formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
 import { toDashboardPath } from "@/lib/app-entry"
 
@@ -29,8 +28,6 @@ interface SystemsTableProps {
   farmId?: string | null
   showHeader?: boolean
 }
-
-const PAGE_SIZE = 10
 
 type SortKey =
   | "system_name"
@@ -78,6 +75,11 @@ const ratingToneClass = (value: string | null | undefined) => {
 const formatPercent = (value: number | null | undefined, decimals = 1, suffix = "%") => {
   if (!isFiniteNumber(value)) return "--"
   return `${formatNumberValue(value, { decimals, minimumDecimals: decimals })}${suffix}`
+}
+
+const formatMetricValue = (value: number | null | undefined, decimals = 1) => {
+  if (!isFiniteNumber(value)) return "--"
+  return formatNumberValue(value, { decimals, minimumDecimals: decimals })
 }
 
 const formatSampleAgeText = (value: number | null | undefined) => {
@@ -129,7 +131,6 @@ export default function SystemsTable({
   const { farmId: activeFarmId } = useActiveFarm()
   const farmId = initialFarmId ?? activeFarmId
   const boundsReady = Boolean(dateFrom && dateTo)
-  const [pageIndex, setPageIndex] = useState(0)
   const [sortKey, setSortKey] = useState<SortKey>("system_name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
@@ -154,7 +155,7 @@ export default function SystemsTable({
 
   const sortedSystems = useMemo(() => {
     const getSortValue = (row: DashboardSystemRow) => {
-      if (sortKey === "system_name") return row.system_name?.toLowerCase() ?? ""
+      if (sortKey === "system_name") return (row.batch_name ?? row.system_name ?? "").toLowerCase()
       if (sortKey === "water_quality") return row.water_quality_rating_numeric_average ?? -1
       return row[sortKey] ?? -1
     }
@@ -176,19 +177,9 @@ export default function SystemsTable({
   }, [sortDirection, sortKey, systems])
 
   const totalRows = sortedSystems.length
-  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
-  const currentPage = Math.min(pageIndex, totalPages - 1)
-  const startIndex = currentPage * PAGE_SIZE
-  const endIndex = Math.min(startIndex + PAGE_SIZE, totalRows)
-  const pagedSystems = sortedSystems.slice(startIndex, endIndex)
-  const showPagination = totalRows > PAGE_SIZE
 
   const combinedUpdatedAt = systemsQuery.dataUpdatedAt ?? 0
   const combinedFetching = systemsQuery.isFetching
-
-  useEffect(() => {
-    setPageIndex(0)
-  }, [batch, farmId, stage, system, timePeriod, sortDirection, sortKey])
 
   const handleSort = (nextKey: SortKey) => {
     if (sortKey === nextKey) {
@@ -210,25 +201,37 @@ export default function SystemsTable({
     router.push(nextPath)
   }
 
-  const renderSortHead = (label: string, key: SortKey, align: "left" | "right" = "left") => (
+  const SortChevron = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) {
+      return <span className="ml-1 text-[10px] text-slate-400">↕</span>
+    }
+
+    return <span className="ml-1 text-[10px] text-slate-600">{sortDirection === "asc" ? "↑" : "↓"}</span>
+  }
+
+  const renderSortHead = (label: string, key: SortKey, unit?: string, align: "left" | "right" = "left") => (
     <button
       type="button"
       onClick={() => handleSort(key)}
-      className={`inline-flex w-full items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/80 ${
+      className={`inline-flex w-full items-center gap-0.5 text-[11px] font-semibold text-slate-700 transition-colors hover:text-slate-900 ${
         align === "right" ? "justify-end" : "justify-start"
       }`}
     >
       <span>{label}</span>
-      <ArrowUpDown className="h-3 w-3" />
+      {unit ? <span className="font-medium text-slate-500">({unit})</span> : null}
+      <SortChevron col={key} />
     </button>
   )
 
   const renderValueBlock = (value: string, subtitle?: string | null, align: "left" | "right" = "left") => (
-    <div className={`space-y-1 ${align === "right" ? "text-right" : "text-left"}`}>
-      <p className="text-sm font-medium leading-5 text-foreground">{value}</p>
-      {subtitle ? <p className="text-[11px] leading-4 text-muted-foreground">{subtitle}</p> : <p className="text-[11px] leading-4 opacity-0">.</p>}
+    <div className={align === "right" ? "text-right" : "text-left"}>
+      <p className="text-sm leading-5 text-foreground">{value}</p>
+      {subtitle ? <p className="mt-0.5 text-[10px] leading-3 text-muted-foreground">{subtitle}</p> : null}
     </div>
   )
+
+  const headerCellClass = "py-2.5 align-middle normal-case tracking-normal text-slate-700"
+  const borderedHeaderCellClass = `border-r border-slate-200 ${headerCellClass}`
 
   const buildFlags = (row: DashboardSystemRow): SystemFlag[] => {
     const staleSample = (row.sample_age_days ?? 0) > 30
@@ -310,9 +313,11 @@ export default function SystemsTable({
         ) : (
           <>
             <div className="grid gap-3 md:hidden">
-              {pagedSystems.length > 0 ? (
-                pagedSystems.map((row) => {
-                  const asOf = formatAsOfDate(row.as_of_date ?? row.input_end_date)
+              {sortedSystems.length > 0 ? (
+                sortedSystems.map((row) => {
+                  const cageLabel = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
+                  const title = row.batch_name ?? cageLabel
+                  const subtitle = row.batch_name ? cageLabel : null
                   const flags = buildFlags(row)
                   const showWaterQuality = hasWaterQualityData(row.water_quality_rating_average)
                   const thresholdFlag = flags.find((flag) => flag.key === "wq-breach") ?? null
@@ -327,12 +332,9 @@ export default function SystemsTable({
                       className="w-full rounded-lg border border-border/70 bg-background p-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold leading-5 text-foreground">
-                          {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
-                        </p>
-                        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">As of {asOf ?? "N/A"}</p>
+                        <p className="text-sm font-semibold leading-5 text-foreground">{title}</p>
+                        {subtitle ? <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{subtitle}</p> : null}
                       </div>
-
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-md bg-muted/45 px-2.5 py-2">
                           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Fish</p>
@@ -372,9 +374,7 @@ export default function SystemsTable({
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             {showWaterQuality ? (
                               <span className="relative inline-flex">
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}
-                                >
+                                <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}>
                                   {waterQualityLabel(row.water_quality_rating_average)}
                                 </span>
                                 {thresholdFlag ? (
@@ -425,35 +425,57 @@ export default function SystemsTable({
             <div className="soft-table-shell hidden max-h-[480px] md:block">
               <Table className="w-[1124px] min-w-[1124px] table-fixed">
                 <colgroup>
-                  <col className="w-[160px]" />
-                  <col className="w-[100px]" />
-                  <col className="w-[88px]" />
-                  <col className="w-[100px]" />
-                  <col className="w-[92px]" />
+                  <col className="w-[146px]" />
+                  <col className="w-[94px]" />
+                  <col className="w-[82px]" />
+                  <col className="w-[94px]" />
+                  <col className="w-[86px]" />
+                  <col className="w-[90px]" />
                   <col className="w-[96px]" />
-                  <col className="w-[104px]" />
-                  <col className="w-[104px]" />
-                  <col className="w-[100px]" />
-                  <col className="w-[168px]" />
+                  <col className="w-[96px]" />
+                  <col className="w-[94px]" />
+                  <col className="w-[152px]" />
                 </colgroup>
-                <TableHeader className="bg-muted/60">
-                  <TableRow>
-                    <TableHead className="py-3 align-middle">{renderSortHead("Cage", "system_name")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("Fish Count", "fish_end")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("eFCR", "efcr")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("ABW g", "abw")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("SGR", "sgr")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("Feed kg", "feed_total")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("Mortality %", "mortality_rate")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("Biomass kg", "biomass_end")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("Density", "biomass_density")}</TableHead>
-                    <TableHead className="py-3 align-middle">{renderSortHead("WQ / Flags", "water_quality")}</TableHead>
+
+                <TableHeader>
+                  <TableRow className="border-b border-slate-200 bg-[#eef3f7] hover:bg-[#eef3f7]">
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("Batch", "system_name")}
+                    </TableHead>
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("Fish count", "fish_end")}
+                    </TableHead>
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("eFCR", "efcr")}
+                    </TableHead>
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("ABW", "abw", "g")}
+                    </TableHead>
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("SGR", "sgr", "%/day")}
+                    </TableHead>
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("Feed", "feed_total", "kg")}
+                    </TableHead>
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("Mortality", "mortality_rate", "%")}
+                    </TableHead>
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("Biomass", "biomass_end", "kg")}
+                    </TableHead>
+                    <TableHead className={borderedHeaderCellClass}>
+                      {renderSortHead("Density", "biomass_density", "kg/m³")}
+                    </TableHead>
+                    <TableHead className={headerCellClass}>{renderSortHead("WQ / Flags", "water_quality")}</TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
-                  {pagedSystems.length > 0 ? (
-                    pagedSystems.map((row) => {
-                      const asOf = formatAsOfDate(row.as_of_date ?? row.input_end_date)
+                  {sortedSystems.length > 0 ? (
+                    sortedSystems.map((row) => {
+                      const cageLabel = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
+                      const title = row.batch_name ?? cageLabel
+                      const subtitle = row.batch_name ? cageLabel : null
                       const flags = buildFlags(row)
                       const showWaterQuality = hasWaterQualityData(row.water_quality_rating_average)
                       const thresholdFlag = flags.find((flag) => flag.key === "wq-breach") ?? null
@@ -463,7 +485,7 @@ export default function SystemsTable({
                       return (
                         <TableRow
                           key={row.system_id}
-                          className="cursor-pointer"
+                          className="cursor-pointer border-b border-border/50 transition-colors hover:bg-blue-50/40 dark:hover:bg-blue-950/20"
                           onClick={() => openSystemDetailPage(row.system_id)}
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") {
@@ -474,67 +496,63 @@ export default function SystemsTable({
                           role="button"
                           tabIndex={0}
                         >
-                          <TableCell className="py-3 align-middle">
-                            <div className="space-y-1">
-                              <p className="text-sm font-medium text-foreground">
-                                {formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">As of {asOf ?? "N/A"}</p>
+                          <TableCell className="py-2 align-middle">
+                            <div>
+                              <p className="text-sm font-medium leading-5 text-foreground">{title}</p>
+                              {subtitle ? <p className="mt-0.5 text-[10px] leading-3 text-muted-foreground">{subtitle}</p> : null}
                             </div>
                           </TableCell>
-                          <TableCell className="py-3 align-middle">{renderValueBlock(formatNumberValue(row.fish_end))}</TableCell>
-                          <TableCell className="py-3 align-middle">{renderValueBlock(formatNumberValue(row.efcr, { decimals: 2 }))}</TableCell>
-                          <TableCell className="py-3 align-middle">
-                            {renderValueBlock(formatUnitValue(row.abw, 1, "g"), formatSampleAgeText(row.sample_age_days))}
+                          <TableCell className="py-2 align-middle">{renderValueBlock(formatNumberValue(row.fish_end))}</TableCell>
+                          <TableCell className="py-2 align-middle">
+                            {renderValueBlock(formatNumberValue(row.efcr, { decimals: 2 }))}
                           </TableCell>
-                          <TableCell className="py-3 align-middle">{renderValueBlock(formatPercent(row.sgr, 2, "%/day"))}</TableCell>
-                          <TableCell className="py-3 align-middle">{renderValueBlock(formatUnitValue(row.feed_total, 1, "kg"))}</TableCell>
-                          <TableCell className="py-3 align-middle">{renderValueBlock(formatPercent(row.mortality_rate, 2))}</TableCell>
-                          <TableCell className="py-3 align-middle">{renderValueBlock(formatUnitValue(row.biomass_end, 1, "kg"))}</TableCell>
-                          <TableCell className="py-3 align-middle">{renderValueBlock(formatUnitValue(row.biomass_density, 2, "kg/m3"))}</TableCell>
-                          <TableCell className="py-3 align-middle">
-                            <div className="space-y-1 text-left">
-                              <div className="flex min-h-5 items-center justify-start gap-1.5">
-                                {showWaterQuality ? (
-                                  <span className="relative inline-flex">
-                                    <span
-                                      className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}
-                                    >
-                                      {waterQualityLabel(row.water_quality_rating_average)}
-                                    </span>
-                                    {thresholdFlag ? (
-                                      <span
-                                        title={thresholdFlag.title}
-                                        aria-label={thresholdFlag.title}
-                                        className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
-                                      >
-                                        <TriangleAlert className="h-2.5 w-2.5" />
-                                      </span>
-                                    ) : null}
+                          <TableCell className="py-2 align-middle" title={formatSampleAgeText(row.sample_age_days)}>
+                            {renderValueBlock(formatMetricValue(row.abw, 1))}
+                          </TableCell>
+                          <TableCell className="py-2 align-middle">{renderValueBlock(formatPercent(row.sgr, 2, ""))}</TableCell>
+                          <TableCell className="py-2 align-middle">{renderValueBlock(formatMetricValue(row.feed_total, 1))}</TableCell>
+                          <TableCell className="py-2 align-middle">{renderValueBlock(formatPercent(row.mortality_rate, 2, ""))}</TableCell>
+                          <TableCell className="py-2 align-middle">{renderValueBlock(formatMetricValue(row.biomass_end, 1))}</TableCell>
+                          <TableCell className="py-2 align-middle">
+                            {renderValueBlock(formatMetricValue(row.biomass_density, 2))}
+                          </TableCell>
+                          <TableCell className="py-2 align-middle">
+                            <div className="flex flex-wrap items-center gap-1">
+                              {showWaterQuality ? (
+                                <span className="relative inline-flex">
+                                  <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ratingToneClass(row.water_quality_rating_average)}`}>
+                                    {waterQualityLabel(row.water_quality_rating_average)}
                                   </span>
-                                ) : null}
-                                {displayFlags.map((flag) => {
-                                  const Icon = flag.icon
-                                  return (
+                                  {thresholdFlag ? (
                                     <span
-                                      key={flag.key}
-                                      title={flag.title}
-                                      aria-label={flag.title}
-                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${flag.className}`}
+                                      title={thresholdFlag.title}
+                                      aria-label={thresholdFlag.title}
+                                      className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
                                     >
-                                      <Icon className="h-3.5 w-3.5" />
+                                      <TriangleAlert className="h-2 w-2" />
                                     </span>
-                                  )
-                                })}
-                                {!showWaterQuality && displayFlags.length === 0 ? (
-                                  <span className="text-[11px] text-muted-foreground">-</span>
-                                ) : null}
-                              </div>
+                                  ) : null}
+                                </span>
+                              ) : null}
+                              {displayFlags.map((flag) => {
+                                const Icon = flag.icon
+                                return (
+                                  <span
+                                    key={flag.key}
+                                    title={flag.title}
+                                    aria-label={flag.title}
+                                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${flag.className}`}
+                                  >
+                                    <Icon className="h-3 w-3" />
+                                  </span>
+                                )
+                              })}
+                              {!showWaterQuality && displayFlags.length === 0 ? (
+                                <span className="text-[10px] text-muted-foreground">—</span>
+                              ) : null}
                               {worstParameterText ? (
-                                <p className="text-[11px] leading-4 text-muted-foreground">{worstParameterText}</p>
-                              ) : (
-                                <p className="text-[11px] leading-4 opacity-0">.</p>
-                              )}
+                                <p className="mt-0.5 w-full text-[10px] leading-3 text-muted-foreground">{worstParameterText}</p>
+                              ) : null}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -557,31 +575,6 @@ export default function SystemsTable({
           </>
         )}
 
-        {showPagination && !loading ? (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
-            <span>
-              Showing {startIndex + 1}-{endIndex} of {totalRows}
-            </span>
-            <div className="flex items-center gap-2">
-              <MuiButton
-                variant="outlined"
-                size="small"
-                onClick={() => setPageIndex((current) => Math.max(current - 1, 0))}
-                disabled={currentPage === 0}
-              >
-                Previous
-              </MuiButton>
-              <MuiButton
-                variant="outlined"
-                size="small"
-                onClick={() => setPageIndex((current) => Math.min(current + 1, totalPages - 1))}
-                disabled={currentPage >= totalPages - 1}
-              >
-                Next
-              </MuiButton>
-            </div>
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   )
