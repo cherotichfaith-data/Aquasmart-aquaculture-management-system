@@ -94,19 +94,13 @@ async function getScopedGrowthTrendRows(
   params: { farmId: string | null; systemIds: number[]; dateFrom: string; dateTo: string; days?: number | null },
 ) {
   if (!params.farmId) return []
-  const rows = await Promise.all(
-    params.systemIds.map(async (systemId) => {
-      const result = await listGrowthTrend(supabase, {
-        farmId: params.farmId,
-        systemId,
-        days: params.days ?? undefined,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-      })
-      return result.map((row) => ({ ...row, system_id: systemId }))
-    }),
-  )
-  return rows.flat()
+  return listGrowthTrend(supabase, {
+    farmId: params.farmId,
+    systemIds: params.systemIds,
+    days: params.days ?? undefined,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+  })
 }
 
 function selectLatestRowsPerCycle(rows: ProductionSummaryRow[]) {
@@ -142,6 +136,7 @@ export async function listFeedingSummaryRows(
 
   const [records, productionRows] = await Promise.all([
     listFeedingRecords(supabase, {
+      farmId: params.farmId,
       systemId: params.systemId,
       batchId: params.batchId,
       dateFrom: params.dateFrom,
@@ -210,6 +205,7 @@ export async function listFeedingBreakdownRows(
   if (!params.farmId || !params.dateFrom || !params.dateTo) return []
 
   const records = await listFeedingRecords(supabase, {
+    farmId: params.farmId,
     systemId: params.systemId,
     batchId: params.batchId,
     dateFrom: params.dateFrom,
@@ -412,6 +408,7 @@ async function loadReportsPageInitialData(
         limit: 5000,
       }),
       listFeedingRecords(supabase, {
+        farmId: params.farmId,
         systemId,
         batchId,
         dateFrom: bounds.start,
@@ -428,6 +425,7 @@ async function loadReportsPageInitialData(
       }),
       // G-15: include harvest records so the harvest section has aggregated data
       listHarvests(supabase, {
+        farmId: params.farmId,
         systemId,
         batchId,
         dateFrom: bounds.start,

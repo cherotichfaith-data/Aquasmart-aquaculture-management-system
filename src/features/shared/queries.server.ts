@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/types/database"
-import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
+import { toRpcDate, toRpcSystemId, toRpcSystemIds } from "@/lib/rpc-params"
 import { isInvalidBigintUuidError, isMissingObjectError, toQuerySuccess } from "@/lib/api/_utils"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
@@ -114,6 +114,46 @@ async function runRead<Row>(query: PromiseLike<{ data: Row[] | null; error: unkn
   return (data ?? []) as Row[]
 }
 
+const normalizeSystemIdList = (systemIds?: number[]): number[] =>
+  Array.from(
+    new Set((systemIds ?? []).filter((id): id is number => typeof id === "number" && Number.isFinite(id) && id > 0)),
+  )
+
+async function getFarmSystemIds(supabase: SharedSupabaseClient, farmId: string): Promise<number[]> {
+  const { data, error } = await supabase.from("system").select("id").eq("farm_id", farmId)
+  if (error) {
+    if (isQuietReadError(error)) return []
+    throw error
+  }
+
+  return normalizeSystemIdList((data ?? []).map((row) => row.id))
+}
+
+async function resolveScopedSystemIds(
+  supabase: SharedSupabaseClient,
+  params: {
+    farmId?: string | null
+    systemId?: number
+    systemIds?: number[]
+  },
+): Promise<number[] | null> {
+  const requestedIds = normalizeSystemIdList([
+    ...normalizeSystemIdList(params.systemIds),
+    ...(typeof params.systemId === "number" ? [params.systemId] : []),
+  ])
+
+  if (!params.farmId) {
+    return requestedIds.length > 0 ? requestedIds : null
+  }
+
+  const farmSystemIds = await getFarmSystemIds(supabase, params.farmId)
+  if (farmSystemIds.length === 0) return []
+  if (requestedIds.length === 0) return farmSystemIds
+
+  const farmSystemIdSet = new Set(farmSystemIds)
+  return requestedIds.filter((id) => farmSystemIdSet.has(id))
+}
+
 export async function listRunningStock(
   supabase: SharedSupabaseClient,
   params: { farmId?: string | null },
@@ -137,25 +177,41 @@ export async function listGrowthTrend(
   params: {
     farmId?: string | null
     systemId?: number
+    systemIds?: number[]
     days?: number
     dateFrom?: string
     dateTo?: string
   },
 ): Promise<GrowthTrendRow[]> {
-  if (!params.farmId || !params.systemId) return []
+  if (!params.farmId) return []
 
+  const systemIds = await resolveScopedSystemIds(supabase, params)
+  if (!systemIds || systemIds.length === 0) return []
+
+  const startDate = toRpcDate(params.dateFrom)
+  const endDate = toRpcDate(params.dateTo)
   const query = supabase.rpc("api_growth_trend" as never, {
     p_farm_id: params.farmId,
-    p_system_id: toRpcSystemId(params.systemId) ?? params.systemId,
-    p_days: params.days,
+    p_system_ids: toRpcSystemIds(systemIds),
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_days: startDate || endDate ? undefined : params.days,
   } as never)
 
-  return runRead<GrowthTrendRow>(query)
+  const rows = await runRead<GrowthTrendRow>(query)
+  if (systemIds.length !== 1) return rows
+
+  const [onlySystemId] = systemIds
+  return rows.map((row) => ({
+    ...row,
+    system_id: typeof row.system_id === "number" ? row.system_id : onlySystemId,
+  }))
 }
 
 export async function listFeedingRecords(
   supabase: SharedSupabaseClient,
   params?: {
+    farmId?: string | null
     systemId?: number
     systemIds?: number[]
     batchId?: number
@@ -164,6 +220,13 @@ export async function listFeedingRecords(
     limit?: number
   },
 ): Promise<FeedingRecordWithType[]> {
+  const scopedSystemIds = await resolveScopedSystemIds(supabase, {
+    farmId: params?.farmId,
+    systemId: params?.systemId,
+    systemIds: params?.systemIds,
+  })
+  if (params?.farmId && (!scopedSystemIds || scopedSystemIds.length === 0)) return []
+
   let query = supabase.from("feeding_record").select(`
       id,
       created_at,
@@ -183,10 +246,8 @@ export async function listFeedingRecords(
       )
     `)
 
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
+  if (scopedSystemIds && scopedSystemIds.length > 0) {
+    query = query.in("system_id", scopedSystemIds)
   }
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
@@ -223,6 +284,7 @@ export async function listFeedingRecords(
 export async function listHarvests(
   supabase: SharedSupabaseClient,
   params?: {
+    farmId?: string | null
     systemId?: number
     systemIds?: number[]
     batchId?: number
@@ -231,11 +293,16 @@ export async function listHarvests(
     limit?: number
   },
 ): Promise<FishHarvestRow[]> {
+  const scopedSystemIds = await resolveScopedSystemIds(supabase, {
+    farmId: params?.farmId,
+    systemId: params?.systemId,
+    systemIds: params?.systemIds,
+  })
+  if (params?.farmId && (!scopedSystemIds || scopedSystemIds.length === 0)) return []
+
   let query = supabase.from("fish_harvest").select("*")
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
+  if (scopedSystemIds && scopedSystemIds.length > 0) {
+    query = query.in("system_id", scopedSystemIds)
   }
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
@@ -247,6 +314,7 @@ export async function listHarvests(
 export async function listStockings(
   supabase: SharedSupabaseClient,
   params?: {
+    farmId?: string | null
     systemId?: number
     systemIds?: number[]
     batchId?: number
@@ -255,11 +323,16 @@ export async function listStockings(
     limit?: number
   },
 ): Promise<FishStockingRow[]> {
+  const scopedSystemIds = await resolveScopedSystemIds(supabase, {
+    farmId: params?.farmId,
+    systemId: params?.systemId,
+    systemIds: params?.systemIds,
+  })
+  if (params?.farmId && (!scopedSystemIds || scopedSystemIds.length === 0)) return []
+
   let query = supabase.from("fish_stocking").select("*")
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
+  if (scopedSystemIds && scopedSystemIds.length > 0) {
+    query = query.in("system_id", scopedSystemIds)
   }
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
@@ -271,6 +344,7 @@ export async function listStockings(
 export async function listSamplingData(
   supabase: SharedSupabaseClient,
   params?: {
+    farmId?: string | null
     systemId?: number
     systemIds?: number[]
     batchId?: number
@@ -279,11 +353,16 @@ export async function listSamplingData(
     limit?: number
   },
 ): Promise<FishSamplingWeightRow[]> {
+  const scopedSystemIds = await resolveScopedSystemIds(supabase, {
+    farmId: params?.farmId,
+    systemId: params?.systemId,
+    systemIds: params?.systemIds,
+  })
+  if (params?.farmId && (!scopedSystemIds || scopedSystemIds.length === 0)) return []
+
   let query = supabase.from("fish_sampling_weight").select("*")
-  if (params?.systemId) {
-    query = query.eq("system_id", params.systemId)
-  } else if (params?.systemIds && params.systemIds.length > 0) {
-    query = query.in("system_id", params.systemIds)
+  if (scopedSystemIds && scopedSystemIds.length > 0) {
+    query = query.in("system_id", scopedSystemIds)
   }
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
@@ -321,13 +400,20 @@ export async function listMortalityData(
 export async function listTransferData(
   supabase: SharedSupabaseClient,
   params?: {
+    farmId?: string | null
     batchId?: number
     dateFrom?: string
     dateTo?: string
     limit?: number
   },
 ): Promise<FishTransferRow[]> {
+  const scopedSystemIds = params?.farmId ? await resolveScopedSystemIds(supabase, { farmId: params.farmId }) : null
+  if (params?.farmId && (!scopedSystemIds || scopedSystemIds.length === 0)) return []
+
   let query = supabase.from("fish_transfer").select("*")
+  if (scopedSystemIds && scopedSystemIds.length > 0) {
+    query = query.or(`origin_system_id.in.(${scopedSystemIds.join(",")}),target_system_id.in.(${scopedSystemIds.join(",")})`)
+  }
   if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
@@ -376,25 +462,6 @@ export async function listRecentActivities(
   }))
 }
 
-export async function listBatchSystemIds(
-  supabase: SharedSupabaseClient,
-  params: { batchId: number },
-): Promise<Array<{ system_id: number }>> {
-  const { data, error } = await supabase.rpc("api_batch_system_ids", {
-    p_batch_id: params.batchId,
-  })
-
-  if (error) {
-    if (isQuietReadError(error)) return []
-    throw error
-  }
-
-  return ((data ?? []) as Array<{ system_id: number | null }>)
-    .map((row) => row.system_id)
-    .filter((system_id): system_id is number => typeof system_id === "number" && Number.isFinite(system_id))
-    .map((system_id) => ({ system_id }))
-}
-
 export const emptyRecentEntries = () => ({
   mortality: toQuerySuccess<FishMortalityRow>([]),
   feeding: toQuerySuccess<FeedingRecordRow>([]),
@@ -406,18 +473,6 @@ export const emptyRecentEntries = () => ({
   stocking: toQuerySuccess<FishStockingRow>([]),
   systems: toQuerySuccess<SystemRow>([]),
 })
-
-async function getFarmSystemIdsForRecent(supabase: SharedSupabaseClient, farmId: string): Promise<number[]> {
-  const { data, error } = await supabase.from("system").select("id").eq("farm_id", farmId)
-  if (error) {
-    if (isQuietReadError(error)) return []
-    throw error
-  }
-
-  return Array.from(
-    new Set((data ?? []).map((row) => row.id).filter((id): id is number => typeof id === "number" && Number.isFinite(id))),
-  )
-}
 
 async function getRecentRows<T>(
   supabase: SharedSupabaseClient,
@@ -469,7 +524,7 @@ export async function listRecentEntries(supabase: SharedSupabaseClient, farmId?:
 
   let farmSystemIds: number[]
   try {
-    farmSystemIds = await getFarmSystemIdsForRecent(supabase, farmId)
+    farmSystemIds = await getFarmSystemIds(supabase, farmId)
   } catch {
     return emptyRecentEntries()
   }

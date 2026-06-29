@@ -161,6 +161,7 @@ export default async function DashboardPage({
         system: effectiveFilters.selectedSystem,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
+        scopedSystemIds: hydratedScopedSystemIds,
       }),
       initialData.kpiOverview,
     )
@@ -187,6 +188,7 @@ export default async function DashboardPage({
         timePeriod: effectiveFilters.timePeriod,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
+        scopedSystemIds: hydratedScopedSystemIds,
       }),
       initialData.recommendedActions,
     )

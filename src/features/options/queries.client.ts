@@ -1,26 +1,22 @@
+"use client"
+
 import type { Database, Enums } from "@/lib/types/database"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
   getClientOrError,
-  getErrorMessage,
   isAbortLikeError,
   queryOptionsRpc,
   resolveClientReadQuery,
   toQuerySuccess,
   type OptionsRpcName,
 } from "@/lib/api/_utils"
-import {
-  type SystemOption,
-} from "@/lib/system-options"
+import type { SystemOption } from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import type { WorkspaceContext } from "@/lib/context"
 
 type SystemListItem = SystemOption
 type BatchListItem = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type FarmOptionRow = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
-type FeedSupplierRow = Database["public"]["Tables"]["feed_supplier"]["Row"]
 type FingerlingSupplierTableRow = Pick<
   Database["public"]["Tables"]["fingerling_supplier"]["Row"],
   "company_name" | "id" | "location_city" | "location_country"
@@ -28,7 +24,6 @@ type FingerlingSupplierTableRow = Pick<
 type FingerlingSupplierRow = Omit<FingerlingSupplierTableRow, "location_city"> & {
   location_city: string
 }
-type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
 type OptionsRpcRow<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Returns"][number]
@@ -53,11 +48,6 @@ function normalizeFingerlingSupplierOptions(
   }))
 }
 
-/**
- * Helper for RPC calls:
- * - requires session (options are user-specific)
- * - returns [] on quiet errors
- */
 async function rpcOrEmpty<Name extends OptionsRpcName>(
   tag: string,
   name: Name,
@@ -127,13 +117,12 @@ export async function getBatchOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<BatchListItem>> {
   if (!params?.farmId) return empty<BatchListItem>()
-  const farmId = params.farmId
 
   const res = await rpcOrEmpty(
     "getBatchOptions",
     "api_fingerling_batch_options_rpc",
-    { p_farm_id: farmId, p_active_only: params.activeOnly ?? true },
-    params?.signal,
+    { p_farm_id: params.farmId, p_active_only: params.activeOnly ?? true },
+    params.signal,
   )
   if (res.status !== "success") return res
   return toQuerySuccess<BatchListItem>(res.data)
@@ -180,7 +169,7 @@ export async function getFeedTypeOptions(params?: {
     "getFeedTypeOptions",
     "api_feed_type_options_rpc",
     { p_farm_id: params.farmId },
-    params?.signal,
+    params.signal,
   )
   if (res.status !== "success") return res
 
@@ -188,65 +177,35 @@ export async function getFeedTypeOptions(params?: {
   return toQuerySuccess<FeedTypeOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
 }
 
-export async function getFeedSupplierOptions(params?: {
+export async function getFingerlingSupplierOptions(params?: {
   signal?: AbortSignal
-}): Promise<QueryResult<FeedSupplierRow>> {
-  const clientResult = await getClientOrError("getFeedSupplierOptions", { requireSession: true })
+}): Promise<QueryResult<FingerlingSupplierRow>> {
+  const clientResult = await getClientOrError("getFingerlingSupplierOptions", { requireSession: true })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  let query = supabase.from("feed_supplier").select("*").order("company_name", { ascending: true })
+  let query = supabase
+    .from("fingerling_supplier")
+    .select("id, company_name, location_country, location_city")
+    .order("company_name", { ascending: true })
   if (params?.signal) query = query.abortSignal(params.signal)
 
-  return resolveClientReadQuery<FeedSupplierRow>({
-    tag: "getFeedSupplierOptions",
+  const result = await resolveClientReadQuery<FingerlingSupplierTableRow>({
+    tag: "getFingerlingSupplierOptions",
     query,
     signal: params?.signal,
     quietWhen: isQuietTableError,
   })
-}
+  if (result.status !== "success") return result
 
-export async function getFingerlingSupplierOptions(params?: {
-  signal?: AbortSignal
-}): Promise<QueryResult<FingerlingSupplierRow>> {
-  try {
-    const response = await fetch("/api/options/fingerling-suppliers", {
-      credentials: "include",
-      cache: "no-store",
-      signal: params?.signal,
-    })
-
-    const body = response.headers.get("content-type")?.includes("application/json")
-      ? ((await response.json()) as { data?: FingerlingSupplierTableRow[]; error?: string })
-      : null
-
-    if (!response.ok) {
-      return {
-        status: "error",
-        data: null,
-        error: body?.error ?? `Unable to load fingerling suppliers (${response.status}).`,
-      }
-    }
-
-    return toQuerySuccess<FingerlingSupplierRow>(normalizeFingerlingSupplierOptions(body?.data ?? []))
-  } catch (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error)) {
-      return toQuerySuccess<FingerlingSupplierRow>([])
-    }
-    return { status: "error", data: null, error: getErrorMessage(error) }
-  }
+  return toQuerySuccess<FingerlingSupplierRow>(normalizeFingerlingSupplierOptions(result.data))
 }
 
 export async function getFarmOptions(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FarmOptionRow>> {
-  const res = await rpcOrEmpty(
-    "getFarmOptions",
-    "api_farm_options_rpc",
-    undefined,
-    params?.signal,
-  )
+  const res = await rpcOrEmpty("getFarmOptions", "api_farm_options_rpc", undefined, params?.signal)
   if (res.status !== "success") return res
 
   const rows = res.data
@@ -260,38 +219,6 @@ export async function getFarmOptions(params?: {
   return toQuerySuccess<FarmOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
 }
 
-export async function getSystemVolumes(params?: {
-  farmId?: string | null
-  stage?: Enums<"system_growth_stage"> | "all"
-  activeOnly?: boolean
-  signal?: AbortSignal
-}): Promise<QueryResult<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>> {
-  if (!params?.farmId) return empty<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>()
-  const clientResult = await getClientOrError("getSystemVolumes", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase
-    .from("system")
-    .select("id, name, volume, growth_stage, is_active, farm_id")
-    .eq("farm_id", params.farmId)
-
-  if (params.stage && params.stage !== "all") {
-    query = query.eq("growth_stage", params.stage)
-  }
-  if (params.activeOnly ?? true) {
-    query = query.eq("is_active", true)
-  }
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  return resolveClientReadQuery<Pick<SystemRow, "id" | "name" | "volume" | "growth_stage">>({
-    tag: "getSystemVolumes",
-    query,
-    signal: params.signal,
-    quietWhen: isQuietTableError,
-  })
-}
-
 export async function getAppConfig(params: {
   keys: string[]
   signal?: AbortSignal
@@ -303,6 +230,7 @@ export async function getAppConfig(params: {
 
   let query = supabase.from("app_config").select("key, value").in("key", params.keys)
   if (params.signal) query = query.abortSignal(params.signal)
+
   return resolveClientReadQuery<AppConfigRow>({
     tag: "getAppConfig",
     query,
