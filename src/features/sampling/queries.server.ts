@@ -7,7 +7,7 @@ import {
   getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
-import { listSamplingData } from "@/features/shared/queries.server"
+import { listGrowthTrend, listSamplingData } from "@/features/shared/queries.server"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import type { Database, Enums } from "@/lib/types/database"
 import { resolveTimePeriod, type TimeBounds, type TimePeriod } from "@/lib/time-period"
@@ -58,24 +58,6 @@ export function parseSamplingPageFilters(
     selectedStage: normalizeStageFilter(selectedStageRaw),
     timePeriod: resolveTimePeriod(timePeriodRaw, DEFAULT_TIME_PERIOD),
   }
-}
-
-async function listScopedGrowthTrendRows(
-  supabase: ReturnType<typeof createAccessTokenClient>,
-  params: { farmId: string; systemIds: number[] },
-): Promise<GrowthTrendRow[]> {
-  const rows = await Promise.all(
-    params.systemIds.map(async (systemId) => {
-      const { data, error } = await supabase.rpc("api_growth_trend" as never, {
-        p_farm_id: params.farmId,
-        p_system_id: systemId,
-      } as never)
-      if (error) return []
-      return ((data ?? []) as GrowthTrendRow[]).map((row) => ({ ...row, system_id: systemId }))
-    }),
-  )
-
-  return rows.flat()
 }
 
 function buildScopedSystemIdList(params: {
@@ -136,6 +118,7 @@ async function loadSamplingPageInitialData(
   const [sampling, growthTrend] = await Promise.all([
     scopedSystemIds.length > 0
       ? listSamplingData(supabase, {
+          farmId: params.farmId,
           systemId: hasSystem ? systemId : undefined,
           systemIds: !hasSystem ? scopedSystemIds : undefined,
           batchId,
@@ -145,9 +128,11 @@ async function loadSamplingPageInitialData(
         })
       : Promise.resolve([]),
     scopedSystemIds.length > 0
-      ? listScopedGrowthTrendRows(supabase, {
+      ? listGrowthTrend(supabase, {
           farmId: params.farmId,
           systemIds: scopedSystemIds,
+          dateFrom: bounds.start,
+          dateTo: bounds.end,
         })
       : Promise.resolve([]),
   ])

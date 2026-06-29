@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/auth-provider"
-import { getDashboardSystems } from "@/lib/api/dashboard"
+import { getDashboardSystems } from "@/features/dashboard/queries.client"
 import { queryKeys } from "@/lib/cache/query-keys"
 import type { Enums } from "@/lib/types/database"
 

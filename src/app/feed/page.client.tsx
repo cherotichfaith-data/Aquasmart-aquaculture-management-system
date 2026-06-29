@@ -1,12 +1,13 @@
 "use client"
 
-import { useMemo } from "react"
-import { useSearchParams } from "next/navigation"
+import { useEffect, useMemo } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataErrorState, EmptyState } from "@/components/shared/data-states"
 import { FeedManagementDashboard } from "./_components/feed-management-dashboard"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useFeedDashboardKpis, useFeedEfcrTrend, useFeedPlanVsActual, useFeedVsBiomassGain, useFeedingAlerts, useFeedingRateVsTarget, useFeedingResponseDistribution, useSystemFeedStatus } from "@/features/feed-management/hooks"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
@@ -25,13 +26,17 @@ export default function FeedPageClient({
   initialFarmName?: string | null
   initialFilters?: FeedDashboardFilters
 }) {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const { isLoading: authLoading } = useAuth()
+  const activeFarm = useActiveFarm({ initialFarmId, initialFarmName })
+  const currentFarmId = activeFarm.farmId ?? initialFarmId ?? null
   const periodParam = searchParams.get("period")
   const systemParam = searchParams.get("cage") ?? searchParams.get("system")
   const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")
-  const filterSystemsQuery = useSystemOptions({ farmId: initialFarmId, activeOnly: false })
+  const filterSystemsQuery = useSystemOptions({ farmId: currentFarmId, activeOnly: false })
   const filterSystemOptions = filterSystemsQuery.data?.status === "success" ? filterSystemsQuery.data.data : []
   const selectedSystemUrlValue = useMemo(() => {
     const systemId = resolveSystemIdFromFilterValue(systemParam, filterSystemOptions)
@@ -73,10 +78,11 @@ export default function FeedPageClient({
     initialFilters,
     filterOverrides,
     filterUrlValues,
-    boundsScope: "production",
+    boundsScope: "feeding",
   })
 
   const {
+    selectedSystemId,
     scopedSystemIdList,
     hasScopeFilters,
     systemsQuery,
@@ -89,6 +95,16 @@ export default function FeedPageClient({
     activeOnly: false,
     enabled: boundsReady,
   })
+
+  useEffect(() => {
+    if (selectedSystem === "all" || selectedSystemId != null) return
+    const params = new URLSearchParams(searchParams.toString())
+    if ((params.get("cage") ?? params.get("system")) !== selectedSystem) return
+    params.delete("system")
+    params.delete("cage")
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+  }, [pathname, router, searchParams, selectedSystem, selectedSystemId])
 
   const scopeQueriesLoading =
     filterSystemsQuery.isLoading ||
@@ -161,20 +177,12 @@ export default function FeedPageClient({
     getQueryResultError(alertsQuery.data),
   ].filter(Boolean) as string[]
 
-  const loading =
+  const pageBootstrapping =
     authLoading ||
     boundsQuery.isLoading ||
     filterSystemsQuery.isLoading ||
     systemsQuery.isLoading ||
-    batchSystemsQuery.isLoading ||
-    kpisQuery.isLoading ||
-    planQuery.isLoading ||
-    statusQuery.isLoading ||
-    efcrQuery.isLoading ||
-    rateQuery.isLoading ||
-    responseQuery.isLoading ||
-    scatterQuery.isLoading ||
-    alertsQuery.isLoading
+    batchSystemsQuery.isLoading
 
   const showEmptyScopeState =
     boundsReady &&
@@ -233,7 +241,14 @@ export default function FeedPageClient({
             responseRows={responseRows}
             scatterRows={scatterRows}
             alertRows={alertRows}
-            loading={loading}
+            kpiLoading={pageBootstrapping || kpisQuery.isLoading}
+            planLoading={pageBootstrapping || planQuery.isLoading}
+            statusLoading={pageBootstrapping || statusQuery.isLoading}
+            efcrLoading={pageBootstrapping || efcrQuery.isLoading}
+            rateLoading={pageBootstrapping || rateQuery.isLoading}
+            responseLoading={pageBootstrapping || responseQuery.isLoading}
+            scatterLoading={pageBootstrapping || scatterQuery.isLoading}
+            alertsLoading={pageBootstrapping || alertsQuery.isLoading}
           />
         )}
       </div>

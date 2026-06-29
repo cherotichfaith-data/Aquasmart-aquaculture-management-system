@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/ca
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/app-ui/table"
 import type { DashboardSystemRow } from "@/features/dashboard/types"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { useSystemsTable } from "@/lib/hooks/use-dashboard"
+import { useSystemsTable } from "@/features/dashboard/hooks"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
 import type { TimePeriod } from "@/lib/time-period"

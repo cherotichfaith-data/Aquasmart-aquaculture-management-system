@@ -7,7 +7,6 @@ import {
   getScopedSystemOptions,
   getScopedTimeBounds,
 } from "@/features/shared/scoped-analytics.server"
-import { listProductionSummaryRows } from "@/features/shared/query-seed.server"
 import type {
   DashboardPageInitialData,
   DashboardPageInitialFilters,
@@ -22,7 +21,6 @@ import { listDashboardSystemsRows, listWaterQualityMeasurementRows } from "@/fea
 import { toRpcDate, toRpcSystemId, toRpcSystemIds } from "@/lib/rpc-params"
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
-type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "month"
 
 function isSbStatementTimeout(error: unknown) {
@@ -109,6 +107,7 @@ async function getDashboardConsolidatedRows(
     farmId: string
     stage?: DashboardPageInitialFilters["selectedStage"]
     systemIds?: number[]
+    timePeriod?: DashboardPageInitialFilters["timePeriod"]
     dateFrom?: string | null
     dateTo?: string | null
   },
@@ -119,6 +118,7 @@ async function getDashboardConsolidatedRows(
     p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
     p_start_date: toRpcDate(params.dateFrom),
     p_end_date: toRpcDate(params.dateTo),
+    p_time_period: params.timePeriod ?? undefined,
   } as Database["public"]["Functions"]["api_dashboard_consolidated"]["Args"] & {
     p_system_ids: number[] | null
     p_start_date: string | null
@@ -132,48 +132,9 @@ async function getDashboardConsolidatedRows(
   return (data ?? []) as DashboardConsolidatedRow[]
 }
 
-async function getProductionSummaryRows(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    stage?: DashboardPageInitialFilters["selectedStage"]
-    systemIds?: number[]
-    dateFrom?: string | null
-    dateTo?: string | null
-  },
-): Promise<ProductionSummaryRow[]> {
-  const systemIds = Array.isArray(params.systemIds) ? params.systemIds.filter((id) => Number.isFinite(id)) : []
-
-  if (systemIds.length === 0) {
-    return listProductionSummaryRows(supabase, {
-      farmId: params.farmId,
-      stage: params.stage && params.stage !== "all" ? params.stage : undefined,
-      dateFrom: params.dateFrom ?? undefined,
-      dateTo: params.dateTo ?? undefined,
-    })
-  }
-
-  const rows = await Promise.all(
-    systemIds.map((systemId) =>
-      listProductionSummaryRows(supabase, {
-        farmId: params.farmId,
-        systemId,
-        stage: params.stage && params.stage !== "all" ? params.stage : undefined,
-        dateFrom: params.dateFrom ?? undefined,
-        dateTo: params.dateTo ?? undefined,
-      }),
-    ),
-  )
-
-  return rows
-    .flat()
-    .slice()
-    .sort((left, right) => String(right.date ?? "").localeCompare(String(left.date ?? "")))
-}
-
 async function getRecommendedActionRows(
   supabase: ServerClient,
-  params: { farmId: string; systemId?: number },
+  params: { farmId: string; systemId?: number; systemIds?: number[] },
 ): Promise<RecommendedActionRow[]> {
   const { data, error } = await supabase.rpc("api_recommended_actions", {
     p_farm_id: params.farmId,
@@ -184,13 +145,19 @@ async function getRecommendedActionRows(
     throw error
   }
 
-  return (data ?? []) as RecommendedActionRow[]
+  const rows = (data ?? []) as RecommendedActionRow[]
+  const scopedSystemIds =
+    params.systemIds?.filter((systemId): systemId is number => typeof systemId === "number" && Number.isFinite(systemId)) ?? null
+  if (!scopedSystemIds || scopedSystemIds.length === 0) return rows
+
+  return rows.filter(
+    (row) => typeof row === "object" && row !== null && "system_id" in row && scopedSystemIds.includes((row as { system_id: number }).system_id),
+  )
 }
 
 function buildKpiOverview(params: {
   scopedSystemIds: number[]
   consolidatedRows: DashboardConsolidatedRow[]
-  productionRows: ProductionSummaryRow[]
   dateFrom: string
   dateTo: string
 }): DashboardPageInitialData["kpiOverview"] {
@@ -212,51 +179,6 @@ function buildKpiOverview(params: {
   return buildKpiOverviewFromRpc({
     scopedSystemIds,
     consolidatedRows: params.consolidatedRows,
-    productionRows: params.productionRows,
-    dateFrom: params.dateFrom,
-    dateTo: params.dateTo,
-  })
-}
-
-export async function getDashboardKpiOverviewData(
-  supabase: ServerClient,
-  params: {
-    farmId: string
-    stage?: DashboardPageInitialFilters["selectedStage"]
-    systemIds?: number[]
-    dateFrom: string
-    dateTo: string
-  },
-): Promise<DashboardPageInitialData["kpiOverview"]> {
-  const scopedSystemIds = Array.isArray(params.systemIds)
-    ? params.systemIds.filter((id) => Number.isFinite(id))
-    : undefined
-
-  if (params.systemIds && (!scopedSystemIds || scopedSystemIds.length === 0)) {
-    return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }
-  }
-
-  const [consolidatedRows, productionRows] = await Promise.all([
-    getDashboardConsolidatedRows(supabase, {
-      farmId: params.farmId,
-      stage: params.stage,
-      systemIds: scopedSystemIds,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    }),
-    getProductionSummaryRows(supabase, {
-      farmId: params.farmId,
-      stage: params.stage,
-      systemIds: scopedSystemIds,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    }),
-  ])
-
-  return buildKpiOverview({
-    scopedSystemIds: scopedSystemIds ?? [],
-    consolidatedRows,
-    productionRows,
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
   })
@@ -345,7 +267,7 @@ async function loadDashboardPageInitialData(
       : stageBatchScopedIds
 
   const singleSystemId = activeScopedSystemIds.length === 1 ? activeScopedSystemIds[0] : undefined
-  const [consolidatedRows, productionRows, recommendedActionRows, waterQualityMeasurements, systemsTableRows] =
+  const [consolidatedRows, recommendedActionRows, waterQualityMeasurements, systemsTableRows] =
     await Promise.all([
       withNetworkFallback(
         "dashboard:getDashboardConsolidatedRows",
@@ -355,19 +277,7 @@ async function loadDashboardPageInitialData(
             farmId,
             stage: params.filters.selectedStage,
             systemIds: activeScopedSystemIds,
-            dateFrom: startDate,
-            dateTo: endDate,
-          }),
-        { allowMissingObject: true },
-      ),
-      withNetworkFallback(
-        "dashboard:getProductionSummaryRows",
-        [],
-        () =>
-          getProductionSummaryRows(supabase, {
-            farmId,
-            stage: params.filters.selectedStage,
-            systemIds: activeScopedSystemIds,
+            timePeriod: params.filters.timePeriod,
             dateFrom: startDate,
             dateTo: endDate,
           }),
@@ -378,7 +288,11 @@ async function loadDashboardPageInitialData(
         [],
         async () => {
           if (activeScopedSystemIds.length === 0) return []
-          return getRecommendedActionRows(supabase, { farmId, systemId: singleSystemId })
+          return getRecommendedActionRows(supabase, {
+            farmId,
+            systemId: singleSystemId,
+            systemIds: activeScopedSystemIds,
+          })
         },
         { allowMissingObject: true },
       ),
@@ -422,7 +336,6 @@ async function loadDashboardPageInitialData(
     kpiOverview: buildKpiOverview({
       scopedSystemIds: activeScopedSystemIds,
       consolidatedRows,
-      productionRows,
       dateFrom: startDate,
       dateTo: endDate,
     }),

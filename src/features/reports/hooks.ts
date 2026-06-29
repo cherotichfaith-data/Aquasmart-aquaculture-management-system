@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/cache/query-keys"
 import type { Enums } from "@/lib/types/database"
 import type { FeedGrowthTrendRow } from "./types"
 import {
+  getFeedingActivityRecords,
   getBatchSystemIds,
   getFeedingBreakdown,
   getFeedingRecords,
@@ -79,7 +80,31 @@ export function useFeedingRecords(params?: {
       queryKey: queryKeys.reports.feedingRecords({ ...params, farmId: resolvedFarmId }),
       queryFn: ({ signal }) => getFeedingRecords({ ...params, farmId: resolvedFarmId, signal }),
       staleTime: 5 * 60_000,
-      enabled: Boolean(session) && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
+    }),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useFeedingActivityRecords(params?: {
+  systemId?: number
+  systemIds?: number[]
+  batchId?: number
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  enabled?: boolean
+  farmId?: string | null
+}) {
+  const { session } = useAuth()
+  const { farmId } = useActiveFarm()
+  const resolvedFarmId = params?.farmId ?? farmId
+  return useQuery({
+    ...reportsQueryOptions({
+      queryKey: queryKeys.reports.feedingActivity({ ...params, farmId: resolvedFarmId }),
+      queryFn: ({ signal }) => getFeedingActivityRecords({ ...params, farmId: resolvedFarmId, signal }),
+      staleTime: 5 * 60_000,
+      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
     }),
     placeholderData: (previous) => previous,
   })
@@ -171,7 +196,7 @@ export function useSamplingData(params?: {
       queryKey: queryKeys.reports.sampling({ ...params, farmId }),
       queryFn: ({ signal }) => getSamplingData({ ...params, farmId, signal }),
       staleTime: 5 * 60_000,
-      enabled: Boolean(session) && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(farmId) && (params?.enabled ?? true),
     }),
   )
 }
@@ -192,12 +217,13 @@ export function useStockingData(params?: {
       queryKey: queryKeys.reports.stocking({ ...params, farmId }),
       queryFn: ({ signal }) => getStockings({ ...params, farmId, signal }),
       staleTime: 5 * 60_000,
-      enabled: Boolean(session) && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(farmId) && (params?.enabled ?? true),
     }),
   )
 }
 
 export function useHarvests(params?: {
+  farmId?: string | null
   systemId?: number
   systemIds?: number[]
   batchId?: number
@@ -207,11 +233,14 @@ export function useHarvests(params?: {
   enabled?: boolean
 }) {
   const { session } = useAuth()
+  const { farmId } = useActiveFarm()
+  const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
       queryKey: [
         "reports",
         "harvests",
+        resolvedFarmId ?? "all",
         params?.systemId ?? "all",
         params?.systemIds?.join(",") ?? "all-systems",
         params?.batchId ?? "all",
@@ -219,9 +248,9 @@ export function useHarvests(params?: {
         params?.dateTo ?? "",
         params?.limit ?? 100,
       ] as const,
-      queryFn: ({ signal }) => getHarvests({ ...params, signal }),
+      queryFn: ({ signal }) => getHarvests({ ...params, farmId: resolvedFarmId, signal }),
       staleTime: 5 * 60_000,
-      enabled: Boolean(session) && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
     }),
   )
 }
@@ -247,33 +276,15 @@ export function useScopedGrowthTrend(params?: {
         dateTo: params?.dateTo,
         days: params?.days,
       }),
-      queryFn: async ({ signal }) => {
-        const results = await Promise.all(
-          systemIds.map((systemId) =>
-            getGrowthTrend({
-              farmId,
-              systemId,
-              days: params?.days,
-              dateFrom: params?.dateFrom,
-              dateTo: params?.dateTo,
-              signal,
-            }),
-          ),
-        )
-        const firstError = results.find((result) => result.status === "error")
-        if (firstError?.status === "error") {
-          throw new Error(firstError.error ?? "Failed to load growth trend")
-        }
-
-        return {
-          status: "success" as const,
-          data: results.flatMap((result, index) =>
-            result.status === "success"
-              ? result.data.map((row) => ({ ...row, system_id: systemIds[index] }))
-              : [],
-          ),
-        }
-      },
+      queryFn: ({ signal }) =>
+        getGrowthTrend({
+          farmId,
+          systemIds,
+          days: params?.days,
+          dateFrom: params?.dateFrom,
+          dateTo: params?.dateTo,
+          signal,
+        }),
       enabled: Boolean(session) && Boolean(farmId) && systemIds.length > 0 && (params?.enabled ?? true),
       refetchOnWindowFocus: false,
       staleTime: 60_000,
@@ -368,7 +379,7 @@ export function useTransferData(params?: {
       queryKey: queryKeys.reports.transfer({ ...params, farmId }),
       queryFn: ({ signal }) => getTransferData({ ...params, farmId, signal }),
       staleTime: 5 * 60_000,
-      enabled: Boolean(session) && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(farmId) && (params?.enabled ?? true),
     }),
   )
 }

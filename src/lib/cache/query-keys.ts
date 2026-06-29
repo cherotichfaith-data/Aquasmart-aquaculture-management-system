@@ -267,6 +267,27 @@ export const queryKeys = {
         params?.limit ?? 100,
       ] as const
     },
+    feedingActivity(params?: {
+      farmId?: string | null
+      systemId?: number
+      systemIds?: number[]
+      batchId?: number
+      dateFrom?: string
+      dateTo?: string
+      limit?: number
+    }) {
+      return [
+        "reports",
+        "feeding-activity",
+        farmToken(params?.farmId),
+        numberToken(params?.systemId),
+        params?.systemIds?.join(",") ?? "all-systems",
+        numberToken(params?.batchId),
+        stringToken(params?.dateFrom),
+        stringToken(params?.dateTo),
+        params?.limit ?? 100,
+      ] as const
+    },
     feedingSummary(params?: {
       farmId?: string | null
       systemId?: number

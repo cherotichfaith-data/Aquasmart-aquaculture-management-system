@@ -13,7 +13,7 @@ import {
   getFingerlingSupplierOptions,
   getAppConfig,
   getSystemOptions,
-} from "@/lib/api/options"
+} from "@/features/options/queries.client"
 
 export function useSystemOptions(params?: {
   farmId?: string | null

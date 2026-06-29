@@ -724,34 +724,41 @@ export function FeedManagementDashboard(props: {
   responseRows: FeedingResponseDistributionRow[]
   scatterRows: FeedVsBiomassGainRow[]
   alertRows: FeedingAlertRow[]
-  loading?: boolean
+  kpiLoading?: boolean
+  planLoading?: boolean
+  statusLoading?: boolean
+  efcrLoading?: boolean
+  rateLoading?: boolean
+  responseLoading?: boolean
+  scatterLoading?: boolean
+  alertsLoading?: boolean
 }) {
   return (
     <Box sx={{ p: { xs: 1.5, md: 2 }, display: "flex", flexDirection: "column", gap: 2 }}>
-      <FeedKpiOverview row={props.kpiRow} isLoading={props.loading} />
+      <FeedKpiOverview row={props.kpiRow} isLoading={props.kpiLoading} />
 
-      <FeedPlanVsActualChart rows={props.planRows} isLoading={props.loading} />
+      <FeedPlanVsActualChart rows={props.planRows} isLoading={props.planLoading} />
 
-      <SystemFeedStatusTable rows={props.statusRows} isLoading={props.loading} />
+      <SystemFeedStatusTable rows={props.statusRows} isLoading={props.statusLoading} />
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, lg: 6 }}>
-          <EfcrTrendChart rows={props.efcrRows} isLoading={props.loading} />
+          <EfcrTrendChart rows={props.efcrRows} isLoading={props.efcrLoading} />
         </Grid>
         <Grid size={{ xs: 12, lg: 6 }}>
-          <FeedingRateVsTargetChart rows={props.rateRows} isLoading={props.loading} />
+          <FeedingRateVsTargetChart rows={props.rateRows} isLoading={props.rateLoading} />
         </Grid>
       </Grid>
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, lg: 4 }}>
-          <FeedingResponseCard rows={props.responseRows} isLoading={props.loading} />
+          <FeedingResponseCard rows={props.responseRows} isLoading={props.responseLoading} />
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
-          <FeedVsBiomassGainChart rows={props.scatterRows} isLoading={props.loading} />
+          <FeedVsBiomassGainChart rows={props.scatterRows} isLoading={props.scatterLoading} />
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
-          <FeedAlertsPanel rows={props.alertRows} isLoading={props.loading} />
+          <FeedAlertsPanel rows={props.alertRows} isLoading={props.alertsLoading} />
         </Grid>
       </Grid>
     </Box>

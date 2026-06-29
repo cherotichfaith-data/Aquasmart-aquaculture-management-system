@@ -8,6 +8,7 @@ import Typography from "@mui/material/Typography"
 
 import type { DashboardPageInitialFilters } from "@/features/dashboard/types"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
@@ -59,12 +60,14 @@ export default function DashboardPage({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const activeFarm = useActiveFarm({ initialFarmId, initialFarmName })
+  const currentFarmId = activeFarm.farmId ?? initialFarmId ?? null
   const periodParam = searchParams.get("period")
   const systemParam = searchParams.get("cage") ?? searchParams.get("system")
   const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")
   const systemsQuery = useSystemOptions({
-    farmId: initialFarmId,
+    farmId: currentFarmId,
     activeOnly: true,
   })
   const systemOptions = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
@@ -123,7 +126,7 @@ export default function DashboardPage({
     resolvedSelectedSystemScopeId != null
       ? [resolvedSelectedSystemScopeId]
       : scopedSystemIdList
-  const shouldApplySystemIdScope = selectedBatch !== "all" || resolvedSelectedSystemScopeId != null
+  const shouldApplySystemIdScope = hasScopeFilters
   const appliedScopedSystemIds = shouldApplySystemIdScope ? resolvedScopedSystemIdList : null
   const activeProductionSystemIds = resolvedScopedSystemIdList.length > 0 ? resolvedScopedSystemIdList : null
 
