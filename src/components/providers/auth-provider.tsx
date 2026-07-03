@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const previousUserIdRef = useRef<string | null>(null);
     const userContextRequestRef = useRef(0);
     const deriveRole = (authUser: User | null): UserRole => {
-        const raw = authUser?.user_metadata?.role ?? authUser?.app_metadata?.role ?? null;
+        const raw = authUser?.user_metadata?.farm_role ?? null;
         return normalizeRole(typeof raw === "string" ? raw : null);
     };
 
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const fallbackProfile = deriveFallbackProfile(authUser);
 
-        const [profileResult, settingsResult, membershipResult] = await Promise.all([
+        const [profileResult, settingsResult] = await Promise.all([
             supabase
                 .from("user_profile")
                 .select("user_id, email, full_name, notifications_enabled, created_at, updated_at")
@@ -137,13 +137,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .from("user_settings")
                 .select("user_id, theme, default_views, created_at, updated_at")
                 .eq("user_id", authUser.id)
-                .maybeSingle(),
-            supabase
-                .from("farm_user")
-                .select("role")
-                .eq("user_id", authUser.id)
-                .order("created_at", { ascending: true })
-                .limit(1)
                 .maybeSingle(),
         ]);
 
@@ -155,13 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             logSbError("authProvider:loadSettings", settingsResult.error);
         }
 
-        if (membershipResult.error && !isSbNetworkError(membershipResult.error) && !isSbPermissionDenied(membershipResult.error) && !isSbAuthMissing(membershipResult.error)) {
-            logSbError("authProvider:loadFarmRole", membershipResult.error);
-        }
-
         const profileRow = profileResult.data ?? null;
         const settingsRow = settingsResult.data ?? null;
-        const membershipRole = membershipResult.data?.role ?? null;
         const mergedContext = mergeUserContext({
             profile: profileRow
                 ? {
@@ -174,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         const resolvedProfile = mergedContext.profile ?? fallbackProfile;
         const resolvedSettings = mergedContext.settings;
-        const resolvedRole = normalizeRole(membershipRole ?? deriveRole(authUser));
+        const resolvedRole = deriveRole(authUser);
 
         return {
             resolvedRole,

@@ -21,10 +21,6 @@ import { getErrorMessage } from "@/lib/utils/query-result"
 type SettingsFormState = {
   farmName: string
   location: string
-  owner: string
-  email: string
-  phone: string
-  role: AquaSmartRole
   lowDoThreshold: number
   highAmmoniaThreshold: number
   highMortalityThreshold: number
@@ -33,10 +29,6 @@ type SettingsFormState = {
 const DEFAULT_SETTINGS: SettingsFormState = {
   farmName: "",
   location: "",
-  owner: "",
-  email: "",
-  phone: "",
-  role: "farm_manager",
   lowDoThreshold: 5.0,
   highAmmoniaThreshold: 0.05,
   highMortalityThreshold: 2.0,
@@ -252,13 +244,23 @@ function SettingsLoadingState({
 function FarmInformationSection({
   settings,
   handleChange,
+  displayName,
+  accountEmail,
+  farmRole,
 }: {
   settings: SettingsFormState
   handleChange: (field: string, value: string | number) => void
+  displayName: string
+  accountEmail: string
+  farmRole: AquaSmartRole
 }) {
   return (
     <div className="soft-panel p-5 sm:p-6">
       <h2 className="mb-4 text-lg font-semibold leading-tight sm:text-xl">Farm Information</h2>
+      <p className="mb-5 text-sm leading-6 text-muted-foreground">
+        Farm settings are edited here. Your account details and active farm role are shown for context and are managed
+        separately from farm configuration.
+      </p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className="mb-2 block text-sm font-medium text-foreground/90">Farm Name</label>
@@ -269,21 +271,21 @@ function FarmInformationSection({
           <input type="text" value={settings.location} onChange={(e) => handleChange("location", e.target.value)} className={inputClassName} />
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-foreground/90">Owner Name</label>
-          <input type="text" value={settings.owner} onChange={(e) => handleChange("owner", e.target.value)} className={inputClassName} />
+          <p className="mb-2 text-sm font-medium text-foreground/90">Your Name</p>
+          <div className="flex items-center rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-foreground">
+            {displayName || "-"}
+          </div>
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-foreground/90">Email</label>
-          <input type="email" value={settings.email} onChange={(e) => handleChange("email", e.target.value)} className={inputClassName} />
+          <p className="mb-2 text-sm font-medium text-foreground/90">Account Email</p>
+          <div className="flex items-center rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-foreground">
+            {accountEmail || "-"}
+          </div>
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-foreground/90">Phone</label>
-          <input type="tel" value={settings.phone} onChange={(e) => handleChange("phone", e.target.value)} className={inputClassName} />
-        </div>
-        <div>
-          <p className="mb-2 text-sm font-medium text-foreground/90">Role</p>
+          <p className="mb-2 text-sm font-medium text-foreground/90">Active Farm Role</p>
           <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5">
-            <span className="text-sm text-foreground">{formatRoleLabel(settings.role)}</span>
+            <span className="text-sm text-foreground">{formatRoleLabel(farmRole)}</span>
             <span className="ml-auto text-xs text-muted-foreground">Managed by admin</span>
           </div>
         </div>
@@ -418,7 +420,6 @@ export default function SettingsPage({
   const [settings, setSettings] = useState<SettingsFormState>(() => ({
     ...DEFAULT_SETTINGS,
     farmName: initialFarmName ?? "",
-    role: initialFarmRole ?? DEFAULT_SETTINGS.role,
     lowDoThreshold: initialThresholdRow?.low_do_threshold ?? DEFAULT_SETTINGS.lowDoThreshold,
     highAmmoniaThreshold: initialThresholdRow?.high_ammonia_threshold ?? DEFAULT_SETTINGS.highAmmoniaThreshold,
     highMortalityThreshold: initialThresholdRow?.high_mortality_threshold ?? DEFAULT_SETTINGS.highMortalityThreshold,
@@ -432,7 +433,7 @@ export default function SettingsPage({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const hasMountedRef = useRef(false)
 
-  const { user, profile, role } = useAuth()
+  const { user, profile } = useAuth()
   const resolvedUserId = user?.id ?? initialUserId ?? null
   const { farm, farmId, loading: farmLoading } = useActiveFarm({ initialFarmId, initialFarmName })
   const resolvedFarmId = farmId ?? initialFarmId ?? null
@@ -441,6 +442,16 @@ export default function SettingsPage({
   const missingFarmAssignment = Boolean(resolvedUserId) && !farmLoading && !resolvedFarmId
   const router = useRouter()
   const canAccessSettings = !farmRole || farmRole === "admin" || farmRole === "farm_manager"
+  const profileDisplayName =
+    (typeof profile?.full_name === "string" && profile.full_name.trim()) ||
+    (typeof user?.user_metadata?.full_name === "string" && user.user_metadata.full_name.trim()) ||
+    (typeof user?.user_metadata?.name === "string" && user.user_metadata.name.trim()) ||
+    user?.email ||
+    ""
+  const accountEmail =
+    (typeof user?.email === "string" && user.email.trim()) ||
+    (typeof profile?.email === "string" && profile.email.trim()) ||
+    ""
 
   useEffect(() => {
     if (farmRole && !canAccessSettings) {
@@ -500,32 +511,24 @@ export default function SettingsPage({
     setThresholdId(thresholdRow?.id ?? null)
     setSettings((prev) => ({
       ...prev,
-      farmName: farm?.name ?? initialFarmName ?? profile?.farm_name ?? prev.farmName,
-      location: farm?.location ?? profile?.location ?? prev.location,
-      owner: farm?.owner ?? profile?.owner ?? prev.owner,
-      email: farm?.email ?? profile?.email ?? prev.email,
-      phone: farm?.phone ?? profile?.phone ?? prev.phone,
-      role: farmRole ?? role ?? prev.role,
+      farmName: farm?.name ?? initialFarmName ?? prev.farmName,
+      location: farm?.location ?? prev.location,
       lowDoThreshold: thresholdRow?.low_do_threshold ?? prev.lowDoThreshold,
       highAmmoniaThreshold: thresholdRow?.high_ammonia_threshold ?? prev.highAmmoniaThreshold,
       highMortalityThreshold: thresholdRow?.high_mortality_threshold ?? prev.highMortalityThreshold,
     }))
     setHasLoadedSettings(true)
     setLoading(false)
-  }, [farm, farmRole, hasLoadedSettings, initialFarmName, profile, resolvedUserId, role, settingsLoadData, settingsLoadFetched, settingsLoadLoading, settingsLoadSuccess])
+  }, [farm, hasLoadedSettings, initialFarmName, resolvedUserId, settingsLoadData, settingsLoadFetched, settingsLoadLoading, settingsLoadSuccess])
 
   useEffect(() => {
     if (!hasLoadedSettings) return
     setSettings((prev) => ({
       ...prev,
       farmName: farm?.name ?? initialFarmName ?? prev.farmName,
-      location: prev.location || farm?.location || profile?.location || "",
-      owner: prev.owner || farm?.owner || profile?.owner || "",
-      email: prev.email || farm?.email || profile?.email || "",
-      phone: prev.phone || farm?.phone || profile?.phone || "",
-      role: farmRole ?? role ?? prev.role,
+      location: prev.location || farm?.location || "",
     }))
-  }, [farm, farmRole, hasLoadedSettings, initialFarmName, profile, role])
+  }, [farm, hasLoadedSettings, initialFarmName])
 
   useEffect(() => {
     if (resolvedUserId) return
@@ -565,7 +568,6 @@ export default function SettingsPage({
           setThresholdId(result.thresholdId ?? null)
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId: result.resolvedFarmId } }))
-            window.dispatchEvent(new Event("profile-updated"))
           }
           setSaved(true)
           setTimeout(() => setSaved(false), 3000)
@@ -636,7 +638,13 @@ export default function SettingsPage({
           ) : null}
           {missingFarmAssignment ? null : (
             <>
-              <FarmInformationSection settings={settings} handleChange={handleChange} />
+              <FarmInformationSection
+                settings={settings}
+                handleChange={handleChange}
+                displayName={profileDisplayName}
+                accountEmail={accountEmail}
+                farmRole={farmRole}
+              />
               <AlertThresholdsSection settings={settings} handleChange={handleChange} />
               <SaveSettingsButton isSaving={isSaving} saved={saved} disabled={missingFarmAssignment} onSave={handleSave} />
             </>
