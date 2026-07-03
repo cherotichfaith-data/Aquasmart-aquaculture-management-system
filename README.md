@@ -177,7 +177,6 @@ Generated service worker files can change when the app is built because the cach
 - `src/lib/types`: generated Supabase database types and shared app types.
 - `src/lib/supabase`: Supabase browser, server, admin, auth, and access-token clients.
 - `src/lib/offline`: offline storage and sync support.
-- `supabase/migrations`: database migrations.
 - `supabase/functions`: Supabase Edge Functions, maintained outside the Next.js TypeScript app build.
 - `public`: static assets and generated PWA files.
 

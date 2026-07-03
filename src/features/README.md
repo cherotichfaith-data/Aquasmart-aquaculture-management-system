@@ -76,7 +76,6 @@ src/lib/hooks/**/*.ts
 Intentional client-first exceptions:
 
 - `src/components/notifications/notifications-provider.tsx` remains provider-scoped and lazy-loaded; it is not page-hydrated so global notifications do not force app-wide SSR prefetching
-- `src/components/systems/system-history-sheet.tsx` remains an on-demand drilldown fetch path; it should only be server-seeded if it becomes a high-traffic default view
 - `src/lib/hooks/app/use-active-farm.tsx` and `src/lib/hooks/use-active-farm-role.ts` remain app-state/session hooks; dashboard pages should preseed their query keys when SSR parity matters, but the hooks still support client-side farm switching and refresh flows
 
 Rule for cleanup:

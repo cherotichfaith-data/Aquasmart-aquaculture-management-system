@@ -166,6 +166,8 @@ export default function UsersPageClient({
         role: editingRole,
       })
       setMembers(nextMembers)
+      window.dispatchEvent(new Event("profile-updated"))
+      window.dispatchEvent(new Event("farm-memberships-updated"))
       setEditingUserId(null)
       showSuccess("Member role updated.")
     } catch (error) {
@@ -191,6 +193,8 @@ export default function UsersPageClient({
         userId: member.user_id,
       })
       setMembers(nextMembers)
+      window.dispatchEvent(new Event("profile-updated"))
+      window.dispatchEvent(new Event("farm-memberships-updated"))
       showSuccess("Member removed.")
     } catch (error) {
       setPageError(error instanceof Error ? error.message : "Unable to remove the member.")

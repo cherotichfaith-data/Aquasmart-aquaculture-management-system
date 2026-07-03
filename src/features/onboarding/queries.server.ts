@@ -98,7 +98,7 @@ export async function getOnboardingPageInitialData(params: { linkedFarmId: strin
       const supabase = createAccessTokenClient(accessToken)
       const [{ data: profileRow, error: profileError }, { data: membershipRows, error: membershipError }] =
         await Promise.all([
-          supabase.from("user_profile").select("full_name, role").eq("user_id", user.id).maybeSingle(),
+          supabase.from("user_profile").select("full_name").eq("user_id", user.id).maybeSingle(),
           supabase
             .from("farm_user")
             .select("farm_id, role")

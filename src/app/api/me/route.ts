@@ -65,7 +65,7 @@ export async function GET() {
     const activeMembership =
       (activeFarmId ? memberships.find((membership) => membership.farmId === activeFarmId) : null) ?? memberships[0] ?? null
     const farmRole = activeMembership?.role ?? null
-    const resolvedFarmId = activeFarmId ?? activeMembership?.farmId ?? null
+    const resolvedFarmId = activeMembership?.farmId ?? null
 
     return NextResponse.json(
       {

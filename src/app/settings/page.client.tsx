@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/app-ui/skeleton"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { queryKeys } from "@/lib/cache/query-keys"
-import { formatRoleLabel, normalizeRole, resolveAppEntryPath, type AquaSmartRole } from "@/lib/app-entry"
+import { formatRoleLabel, resolveAppEntryPath, type AquaSmartRole } from "@/lib/app-entry"
 import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { getSessionUser } from "@/lib/supabase/session"
@@ -432,7 +432,7 @@ export default function SettingsPage({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const hasMountedRef = useRef(false)
 
-  const { user, profile } = useAuth()
+  const { user, profile, role } = useAuth()
   const resolvedUserId = user?.id ?? initialUserId ?? null
   const { farm, farmId, loading: farmLoading } = useActiveFarm({ initialFarmId, initialFarmName })
   const resolvedFarmId = farmId ?? initialFarmId ?? null
@@ -505,14 +505,14 @@ export default function SettingsPage({
       owner: farm?.owner ?? profile?.owner ?? prev.owner,
       email: farm?.email ?? profile?.email ?? prev.email,
       phone: farm?.phone ?? profile?.phone ?? prev.phone,
-      role: normalizeRole(profile?.role) ?? prev.role,
+      role: farmRole ?? role ?? prev.role,
       lowDoThreshold: thresholdRow?.low_do_threshold ?? prev.lowDoThreshold,
       highAmmoniaThreshold: thresholdRow?.high_ammonia_threshold ?? prev.highAmmoniaThreshold,
       highMortalityThreshold: thresholdRow?.high_mortality_threshold ?? prev.highMortalityThreshold,
     }))
     setHasLoadedSettings(true)
     setLoading(false)
-  }, [farm, hasLoadedSettings, initialFarmName, profile, resolvedUserId, settingsLoadData, settingsLoadFetched, settingsLoadLoading, settingsLoadSuccess])
+  }, [farm, farmRole, hasLoadedSettings, initialFarmName, profile, resolvedUserId, role, settingsLoadData, settingsLoadFetched, settingsLoadLoading, settingsLoadSuccess])
 
   useEffect(() => {
     if (!hasLoadedSettings) return
@@ -523,9 +523,9 @@ export default function SettingsPage({
       owner: prev.owner || farm?.owner || profile?.owner || "",
       email: prev.email || farm?.email || profile?.email || "",
       phone: prev.phone || farm?.phone || profile?.phone || "",
-      role: normalizeRole(profile?.role) ?? prev.role,
+      role: farmRole ?? role ?? prev.role,
     }))
-  }, [farm, hasLoadedSettings, initialFarmName, profile])
+  }, [farm, farmRole, hasLoadedSettings, initialFarmName, profile, role])
 
   useEffect(() => {
     if (resolvedUserId) return

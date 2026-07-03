@@ -53,28 +53,20 @@ export async function POST(request: NextRequest) {
       { data: membership, error: membershipError },
       { data: farm, error: farmError },
       { data: organization, error: organizationError },
-      { data: profile, error: profileError },
     ] = await Promise.all([
       supabase.from("farm_user").select("role").eq("user_id", user.id).eq("farm_id", payload.farmId).maybeSingle(),
       supabase.from("farm").select("id, organization_id").eq("id", payload.farmId).maybeSingle(),
       supabase.from("organization").select("id, owner_id").eq("id", payload.orgId).maybeSingle(),
-      supabase
-        .from("user_profile")
-        .select("organization_id, farm_id, role")
-        .eq("user_id", user.id)
-        .maybeSingle(),
     ])
 
-    if (membershipError || farmError || organizationError || profileError) {
-      throw membershipError ?? farmError ?? organizationError ?? profileError
+    if (membershipError || farmError || organizationError) {
+      throw membershipError ?? farmError ?? organizationError
     }
 
-    const profileAllowsWorkspace =
-      profile?.organization_id === payload.orgId && (profile.farm_id == null || profile.farm_id === payload.farmId)
     const ownerAllowsWorkspace = organization?.owner_id === user.id
     const hasAccess =
       farm?.organization_id === payload.orgId &&
-      (Boolean(membership?.role) || profileAllowsWorkspace || ownerAllowsWorkspace)
+      (Boolean(membership?.role) || ownerAllowsWorkspace)
 
     if (!hasAccess) {
       return NextResponse.json({ error: "You do not have access to that workspace." }, { status: 403 })
@@ -85,7 +77,7 @@ export async function POST(request: NextRequest) {
         ok: true,
         organization: { id: payload.orgId },
         farm: { id: payload.farmId },
-        role: membership?.role ?? profile?.role ?? null,
+        role: membership?.role ?? null,
       },
       {
         headers: {
