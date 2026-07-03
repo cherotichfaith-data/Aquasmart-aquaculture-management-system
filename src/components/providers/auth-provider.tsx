@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const [profileResult, settingsResult, membershipResult] = await Promise.all([
             supabase
                 .from("user_profile")
-                .select("user_id, email, full_name, role, notifications_enabled, organization_id, farm_id, created_at, updated_at")
+                .select("user_id, email, full_name, notifications_enabled, created_at, updated_at")
                 .eq("user_id", authUser.id)
                 .maybeSingle(),
             supabase
@@ -174,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         const resolvedProfile = mergedContext.profile ?? fallbackProfile;
         const resolvedSettings = mergedContext.settings;
-        const resolvedRole = normalizeRole(membershipRole ?? profileRow?.role ?? deriveRole(authUser));
+        const resolvedRole = normalizeRole(membershipRole ?? deriveRole(authUser));
 
         return {
             resolvedRole,
@@ -341,7 +341,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (typeof window !== 'undefined') {
             window.addEventListener('profile-updated', handler);
-            return () => window.removeEventListener('profile-updated', handler);
+            window.addEventListener('farm-memberships-updated', handler);
+            return () => {
+                window.removeEventListener('profile-updated', handler);
+                window.removeEventListener('farm-memberships-updated', handler);
+            };
         }
     }, [refreshProfile]);
     

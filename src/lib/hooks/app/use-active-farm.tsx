@@ -6,7 +6,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { useFarmOptions } from "@/lib/hooks/use-options"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createClient } from "@/lib/supabase/client"
-import { ACTIVE_FARM_COOKIE, setBrowserWorkspaceContext } from "@/lib/context"
+import { ACTIVE_FARM_COOKIE, clearBrowserWorkspaceContext, setBrowserWorkspaceContext } from "@/lib/context"
 
 type FarmOption = {
   id: string
@@ -44,6 +44,11 @@ const readBrowserCookie = (name: string) => {
   return match.slice(prefix.length) || null
 }
 
+const clearStoredActiveFarmId = (userId?: string | null) => {
+  if (!userId || typeof window === "undefined") return
+  window.localStorage.removeItem(getStorageKey(userId))
+}
+
 export function useActiveFarm(params?: { initialFarmId?: string | null; initialFarmName?: string | null }) {
   const { user, session, isLoading } = useAuth()
   const [activeFarmId, setActiveFarmId] = useState<string | null>(normalizeFarmId(params?.initialFarmId))
@@ -77,12 +82,16 @@ export function useActiveFarm(params?: { initialFarmId?: string | null; initialF
     }
 
     if (!session) {
+      clearStoredActiveFarmId(user?.id)
+      clearBrowserWorkspaceContext()
       setActiveFarmId(null)
       return
     }
 
     const farms = (farmsQuery.data?.status === "success" ? farmsQuery.data.data : []) as FarmOption[]
     if (!farms.length) {
+      clearStoredActiveFarmId(user?.id)
+      clearBrowserWorkspaceContext()
       setActiveFarmId(null)
       return
     }
@@ -111,13 +120,16 @@ export function useActiveFarm(params?: { initialFarmId?: string | null; initialF
     if (resolvedFarmId && user?.id && typeof window !== "undefined") {
       window.localStorage.setItem(getStorageKey(user.id), resolvedFarmId)
       setBrowserWorkspaceContext({ farmId: resolvedFarmId })
+    } else {
+      clearStoredActiveFarmId(user?.id)
+      clearBrowserWorkspaceContext()
     }
 
     setActiveFarmId(resolvedFarmId)
   }, [farmsQuery.data, isLoading, session, user?.id])
 
   useEffect(() => {
-    const handler = (event: Event) => {
+    const handleFarmUpdated = (event: Event) => {
       const maybeCustom = event as CustomEvent<{ farmId?: string }>
       const nextFarmId = normalizeFarmId(maybeCustom?.detail?.farmId) ?? null
       setActiveFarmId(nextFarmId)
@@ -125,9 +137,18 @@ export function useActiveFarm(params?: { initialFarmId?: string | null; initialF
       void farmDetailsQuery.refetch()
     }
 
+    const handleMembershipUpdated = () => {
+      void farmsQuery.refetch()
+      void farmDetailsQuery.refetch()
+    }
+
     if (typeof window !== "undefined") {
-      window.addEventListener("farm-updated", handler)
-      return () => window.removeEventListener("farm-updated", handler)
+      window.addEventListener("farm-updated", handleFarmUpdated)
+      window.addEventListener("farm-memberships-updated", handleMembershipUpdated)
+      return () => {
+        window.removeEventListener("farm-updated", handleFarmUpdated)
+        window.removeEventListener("farm-memberships-updated", handleMembershipUpdated)
+      }
     }
   }, [farmDetailsQuery, farmsQuery])
 

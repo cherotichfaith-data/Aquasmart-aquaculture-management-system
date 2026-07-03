@@ -13,12 +13,6 @@ type MembershipRow = {
   role: string | null
 }
 
-type ProfileWorkspaceRow = {
-  farm_id: string | null
-  organization_id: string | null
-  role: string | null
-}
-
 type MembershipQueryRow = {
   farm_id: string | null
   role: string | null
@@ -33,23 +27,26 @@ function createWorkspaceClient(accessToken?: string | null) {
   return accessToken ? createAccessTokenClient(accessToken) : createAdminClient()
 }
 
+function isFetchLikeWorkspaceError(error: unknown) {
+  if (!error) return false
+  if (error instanceof TypeError) {
+    return error.message.toLowerCase().includes("fetch failed")
+  }
+  if (error instanceof Error) {
+    return error.message.toLowerCase().includes("fetch failed")
+  }
+  return false
+}
+
 async function loadWorkspaceMembershipRows(userId: string, accessToken?: string | null) {
   const admin = createWorkspaceClient(accessToken)
-  const [{ data: memberships, error: membershipError }, { data: profile, error: profileError }] = await Promise.all([
-    admin.from("farm_user").select("farm_id, role").eq("user_id", userId),
-    admin.from("user_profile").select("farm_id, organization_id, role").eq("user_id", userId).maybeSingle(),
-  ])
+  const { data: memberships, error: membershipError } = await admin.from("farm_user").select("farm_id, role").eq("user_id", userId)
 
   if (membershipError) {
     throw new Error(membershipError.message)
   }
 
-  if (profileError) {
-    throw new Error(profileError.message)
-  }
-
   const baseRows = (memberships ?? []) as MembershipQueryRow[]
-  const profileRow = (profile ?? null) as ProfileWorkspaceRow | null
   const membershipFarmIds = Array.from(
     new Set(
       baseRows
@@ -76,42 +73,6 @@ async function loadWorkspaceMembershipRows(userId: string, accessToken?: string 
     ),
     role: row.role ?? null,
   }))
-  const profileFarmId = normalizeContextValue(profileRow?.farm_id)
-  const organizationIdFromMembershipFarm =
-    rows.find((row) => normalizeContextValue(row.farm_id) === profileFarmId)?.organization_id ?? null
-  const farmIds = profileFarmId && !organizationIdFromMembershipFarm ? [profileFarmId] : []
-  const { data: farmRows, error: farmError } =
-    farmIds.length > 0
-      ? await admin.from("farm").select("id, organization_id").in("id", farmIds)
-      : { data: [], error: null }
-
-  if (farmError) {
-    throw new Error(farmError.message)
-  }
-
-  const farmOrganizationMap = new Map(
-    ((farmRows ?? []) as FarmOrganizationRow[]).map((row) => [row.id, normalizeContextValue(row.organization_id)]),
-  )
-  const profileOrganizationId =
-    normalizeContextValue(profileRow?.organization_id) ??
-    organizationIdFromMembershipFarm ??
-    (profileFarmId ? (farmOrganizationMap.get(profileFarmId) ?? null) : null)
-
-  if (profileRow && (profileOrganizationId || profileFarmId)) {
-    const alreadyIncluded = rows.some(
-      (row) =>
-        normalizeContextValue(row.organization_id) === profileOrganizationId &&
-        normalizeContextValue(row.farm_id) === profileFarmId,
-    )
-
-    if (!alreadyIncluded) {
-      rows.push({
-        farm_id: profileFarmId,
-        organization_id: profileOrganizationId,
-        role: profileRow.role,
-      })
-    }
-  }
 
   return { admin, memberships: rows }
 }
@@ -179,11 +140,22 @@ async function loadWorkspaceAssets(userId: string, accessToken?: string | null) 
   }
 }
 
+async function loadWorkspaceAssetsWithFallback(userId: string, accessToken?: string | null) {
+  try {
+    return await loadWorkspaceAssets(userId, accessToken)
+  } catch (error) {
+    if (!accessToken || !isFetchLikeWorkspaceError(error)) {
+      throw error
+    }
+    return loadWorkspaceAssets(userId, null)
+  }
+}
+
 export async function loadWorkspaceOrganizationsForUser(
   userId: string,
   accessToken?: string | null,
 ): Promise<OrganizationSummary[]> {
-  const { organizations } = await loadWorkspaceAssets(userId, accessToken)
+  const { organizations } = await loadWorkspaceAssetsWithFallback(userId, accessToken)
   return organizations
 }
 
@@ -192,7 +164,7 @@ export async function loadWorkspaceFarmsForUser(
   organizationId: string,
   accessToken?: string | null,
 ): Promise<FarmSummary[]> {
-  const { farms } = await loadWorkspaceAssets(userId, accessToken)
+  const { farms } = await loadWorkspaceAssetsWithFallback(userId, accessToken)
   return farms.filter((farm) => farm.organizationId === organizationId)
 }
 
@@ -204,7 +176,10 @@ export async function loadWorkspaceContextForUser(params: {
   cookieOrganizationId?: string | null
   cookieFarmId?: string | null
 }): Promise<WorkspaceContext> {
-  const { memberships, organizations, farms } = await loadWorkspaceAssets(params.userId, params.accessToken)
+  const { memberships, organizations, farms } = await loadWorkspaceAssetsWithFallback(
+    params.userId,
+    params.accessToken,
+  )
   const organizationIdSet = new Set(organizations.map((row) => row.id))
   const farmMap = new Map(farms.map((row) => [row.id, row]))
 

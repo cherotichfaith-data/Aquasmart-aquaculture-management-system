@@ -35,22 +35,12 @@ export async function login(email: string, password: string): Promise<{ ok: true
 
   await supabase.rpc("claim_my_farm_user_invitations")
 
-  // Determine post-login redirect by querying membership tables client-side.
-  const [{ data: memberships }, { data: profile }] = await Promise.all([
-    supabase.from("farm_user").select("farm_id, role").eq("user_id", data.user.id),
-    supabase
-      .from("user_profile")
-      .select("organization_id, farm_id, role")
-      .eq("user_id", data.user.id)
-      .maybeSingle(),
-  ])
+  // Determine post-login redirect from authoritative workspace membership.
+  const { data: memberships } = await supabase.from("farm_user").select("farm_id").eq("user_id", data.user.id)
 
   const membershipFarmIds = (memberships ?? [])
     .map((row) => (typeof row.farm_id === "string" && row.farm_id.trim() ? row.farm_id : null))
     .filter((v): v is string => Boolean(v))
-  const firstMembership = (memberships ?? []).find(
-    (row) => typeof row.farm_id === "string" && row.farm_id.trim().length > 0,
-  ) ?? null
 
   const hasWorkspace = membershipFarmIds.length > 0
   const redirectTo =

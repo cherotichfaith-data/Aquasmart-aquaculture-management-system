@@ -61,7 +61,7 @@ export async function completeAccountSetupAction(input: z.infer<typeof accountSe
 
   const { data: membership, error: membershipError } = await admin
     .from("farm_user")
-    .select("farm_id, role, farm ( organization_id )")
+    .select("farm_id, role")
     .eq("user_id", setupUser.id)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -72,9 +72,6 @@ export async function completeAccountSetupAction(input: z.infer<typeof accountSe
   }
 
   const selectedRole = normalizeRole(membership?.role ?? null) ?? metadataRole
-  const membershipOrganizationId = Array.isArray(membership?.farm)
-    ? membership?.farm[0]?.organization_id ?? null
-    : membership?.farm?.organization_id ?? null
 
   const nextUserMetadata = {
     ...metadata,
@@ -98,9 +95,6 @@ export async function completeAccountSetupAction(input: z.infer<typeof accountSe
       user_id: setupUser.id,
       email: setupUser.email ?? null,
       full_name: payload.fullName,
-      ...(selectedRole ? { role: selectedRole } : {}),
-      ...(membership?.farm_id ? { farm_id: membership.farm_id } : {}),
-      ...(membershipOrganizationId ? { organization_id: membershipOrganizationId } : {}),
     },
     { onConflict: "user_id" },
   )

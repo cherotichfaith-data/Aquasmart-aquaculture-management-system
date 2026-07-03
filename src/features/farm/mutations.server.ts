@@ -252,9 +252,6 @@ export async function createFarmWorkspaceAction(input: FarmWorkspaceInput): Prom
       user_id: user.id,
       full_name: fallbackOwner || null,
       email: user.email ?? null,
-      role,
-      organization_id: organizationId,
-      farm_id: farm.id,
     },
     { onConflict: "user_id" },
   )

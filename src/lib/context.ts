@@ -36,12 +36,6 @@ type MembershipRow = {
   role: string | null
 }
 
-type ProfileWorkspaceRow = {
-  farm_id: string | null
-  organization_id: string | null
-  role: string | null
-}
-
 type MembershipQueryRow = {
   farm_id: string | null
   role: string | null
@@ -160,25 +154,16 @@ async function loadWorkspaceMembershipRows(params: {
   accessToken: string
 }) {
   const supabase = createAccessTokenClient(params.accessToken)
-  const [{ data: memberships, error: membershipError }, { data: profile, error: profileError }] = await Promise.all([
-    supabase.from("farm_user").select("farm_id, role").eq("user_id", params.userId),
-    supabase
-      .from("user_profile")
-      .select("farm_id, organization_id, role")
-      .eq("user_id", params.userId)
-      .maybeSingle(),
-  ])
+  const { data: memberships, error: membershipError } = await supabase
+    .from("farm_user")
+    .select("farm_id, role")
+    .eq("user_id", params.userId)
 
   if (membershipError) {
     throw new Error(membershipError.message)
   }
 
-  if (profileError) {
-    throw new Error(profileError.message)
-  }
-
   const baseRows = (memberships ?? []) as MembershipQueryRow[]
-  const profileRow = (profile ?? null) as ProfileWorkspaceRow | null
   const membershipFarmIds = Array.from(
     new Set(
       baseRows
@@ -205,45 +190,6 @@ async function loadWorkspaceMembershipRows(params: {
     ),
     role: row.role ?? null,
   }))
-  const profileFarmId = normalizeContextValue(profileRow?.farm_id)
-  const organizationIdFromMembershipFarm =
-    rows.find((row) => normalizeContextValue(row.farm_id) === profileFarmId)?.organization_id ?? null
-  const farmIds = profileFarmId && !organizationIdFromMembershipFarm ? [profileFarmId] : []
-  const { data: farmRows, error: farmError } =
-    farmIds.length > 0
-      ? await supabase.from("farm").select("id, organization_id").in("id", farmIds)
-      : { data: [], error: null }
-
-  if (farmError) {
-    throw new Error(farmError.message)
-  }
-
-  const farmOrganizationMap = new Map(
-    ((farmRows ?? []) as FarmOrganizationRow[]).map((row) => [row.id, normalizeContextValue(row.organization_id)]),
-  )
-  const profileOrganizationId =
-    normalizeContextValue(profileRow?.organization_id) ??
-    organizationIdFromMembershipFarm ??
-    (profileFarmId ? (farmOrganizationMap.get(profileFarmId) ?? null) : null)
-
-  if (
-    profileRow &&
-    (profileOrganizationId || profileFarmId)
-  ) {
-    const alreadyIncluded = rows.some(
-      (row) =>
-        normalizeContextValue(row.organization_id) === profileOrganizationId &&
-        normalizeContextValue(row.farm_id) === profileFarmId,
-    )
-
-    if (!alreadyIncluded) {
-      rows.push({
-        farm_id: profileFarmId,
-        organization_id: profileOrganizationId,
-        role: profileRow.role,
-      })
-    }
-  }
 
   return {
     supabase,
