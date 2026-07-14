@@ -9,7 +9,7 @@ import {
   toQuerySuccess,
   toQueryError,
 } from "@/lib/api/_utils"
-import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
+import { isSbAuthMissing, isSbMissingFunction, isSbPermissionDenied } from "@/lib/supabase/log"
 import { toRpcDate, toRpcSystemIds } from "@/lib/rpc-params"
 import type { Database } from "@/lib/types/database"
 import type { ProductionSummaryRpcRow } from "@/features/production/types"
@@ -135,7 +135,7 @@ async function listGrowthTrendRows(
 
   const { data, error } = await query
   if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return []
+    if (params.signal?.aborted || isQuietError(error) || isSbMissingFunction(error, "api_growth_trend")) return []
     throw error
   }
 
