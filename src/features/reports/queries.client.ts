@@ -62,6 +62,7 @@ type FeedingRecordJoinedRow = {
   feed_type_id: number | null
   feeding_amount: number | null
   feeding_response: FeedingRecordRow["feeding_response"] | null
+  notes: string | null
   system_id: number | null
   feed_type: {
     id: number | null
@@ -214,6 +215,7 @@ export async function getFeedingRecords(params?: {
         feed_type_id,
         feeding_amount,
         feeding_response,
+        notes,
         system_id,
         feed_type:feed_type (
           id,
@@ -247,6 +249,7 @@ export async function getFeedingRecords(params?: {
         feed_type_id: row.feed_type_id,
         feeding_amount: row.feeding_amount,
         feeding_response: row.feeding_response,
+        notes: row.notes,
         system_id: row.system_id,
         feed_type: projectFeedType(
           row.feed_type
@@ -517,7 +520,7 @@ export async function getPerformanceSummary(params?: {
 
   const byCycle = new Map<string, ProductionSummaryRpcRow>()
   rowsResult.data.forEach((row) => {
-    const cycleKey = `${row.cycle_id ?? "no-cycle"}-${row.system_id ?? "no-system"}`
+    const cycleKey = `${row.cycle_id ?? `no-cycle-${row.system_id ?? "no-system"}`}`
     const current = byCycle.get(cycleKey)
     if (!current || String(row.date ?? "") > String(current.date ?? "")) {
       byCycle.set(cycleKey, row)
@@ -723,6 +726,8 @@ export async function getMortalityData(params?: {
 
 export async function getTransferData(params?: {
   farmId?: string | null
+  systemId?: number
+  systemIds?: number[]
   batchId?: number
   dateFrom?: string
   dateTo?: string
@@ -736,7 +741,12 @@ export async function getTransferData(params?: {
   const { supabase } = clientResult
 
   try {
-    const scopedSystemIds = await resolveScopedSystemIds(supabase, { farmId: params.farmId, signal: params.signal })
+    const scopedSystemIds = await resolveScopedSystemIds(supabase, {
+      farmId: params.farmId,
+      systemId: params.systemId,
+      systemIds: params.systemIds,
+      signal: params.signal,
+    })
     if (!scopedSystemIds || scopedSystemIds.length === 0) return empty<FishTransferRow>()
 
     let query = supabase

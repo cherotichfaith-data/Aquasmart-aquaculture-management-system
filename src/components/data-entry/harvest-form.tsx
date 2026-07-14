@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog } from "@/components/app-ui/dialog"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { useProductionSummary } from "@/features/production/hooks"
+import { useHarvests } from "@/features/reports/hooks"
 import {
     Form,
     FormControl,
@@ -34,6 +35,7 @@ import {
     reportDataEntrySubmitError,
     requireActiveFarmId,
 } from "./form-utils"
+import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
@@ -188,8 +190,48 @@ export function HarvestForm({
         [resolvedSystemId, systems],
     )
     const selectedCageLabel = resolvedSystemId ? formatCageLabel(selectedSystem) : "this system"
+    const latestEntryQuery = useHarvests({
+        systemId: resolvedSystemId ?? undefined,
+        limit: 1,
+        enabled: Boolean(resolvedSystemId),
+    })
+    const duplicateQuery = useHarvests({
+        systemId: resolvedSystemId ?? undefined,
+        dateFrom: selectedDate || undefined,
+        dateTo: selectedDate || undefined,
+        limit: 20,
+        enabled: Boolean(resolvedSystemId) && Boolean(selectedDate),
+    })
+    const pendingEntries = usePendingLatestEntries("harvest", resolvedSystemId)
+    const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+        key: `harvest-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
+        date: row.date ?? "",
+        createdAt: row.created_at ?? null,
+        summary: `${row.total_weight_harvest ?? 0} kg harvested`,
+        details: [
+            { label: "Count", value: String(row.number_of_fish_harvest ?? 0) },
+            { label: "Type", value: row.type_of_harvest ?? "Not recorded" },
+        ],
+    }))
+    const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+        key: `harvest-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
+        date: row.date ?? "",
+        createdAt: row.created_at ?? null,
+        summary: `${row.total_weight_harvest ?? 0} kg harvested`,
+        details: [
+            { label: "Count", value: String(row.number_of_fish_harvest ?? 0) },
+            { label: "Type", value: row.type_of_harvest ?? "Not recorded" },
+        ],
+    }))
+    const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+    const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
     async function submitHarvest(values: z.infer<typeof formSchema>) {
+        if (duplicateEntry) {
+            form.setError("date", { message: `A harvest entry already exists for ${values.date}.` })
+            return
+        }
+
         const resolvedFarmId = requireActiveFarmId(farmId)
         const systemId = parseRequiredNumericId(values.system_id, "System")
         const batchId = parseOptionalNumericId(values.batch_id)
@@ -252,6 +294,7 @@ export function HarvestForm({
                     <div className="data-entry-status">
                         <OfflineSaveBadge result={mutation.data} />
                     </div>
+                    <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="harvest" />
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                             <div className="data-entry-secondary-grid">
@@ -387,7 +430,7 @@ export function HarvestForm({
                                 </div>
                             ) : null}
 
-                            <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
+                            <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
                                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Record Harvest
                             </Button>

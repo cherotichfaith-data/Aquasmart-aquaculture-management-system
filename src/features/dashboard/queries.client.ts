@@ -13,10 +13,6 @@ import type { DashboardPageInitialData, DashboardSystemRow } from "./types"
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
 type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 type DashboardReadClient = ReturnType<typeof createClient> | ReturnType<typeof createAccessTokenClient>
-type ProductionCycleBatchRow = Pick<
-  Database["public"]["Tables"]["production_cycle"]["Row"],
-  "batch_id" | "cycle_end" | "cycle_start" | "system_id"
->
 type BatchActivityRow = {
   batch_id: number
   date: string
@@ -26,31 +22,12 @@ type BatchActivityRow = {
 const isQuietError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
 
-const dateFitsCycle = (asOfDate: string | null, cycle: ProductionCycleBatchRow) => {
-  if (!asOfDate) return false
-  if (cycle.cycle_start > asOfDate) return false
-  if (cycle.cycle_end && cycle.cycle_end < asOfDate) return false
-  return true
-}
-
 function attachBatchNamesToDashboardRows<T extends { system_id: number; as_of_date: string | null; batch_name?: string | null }>(
   rows: T[],
-  cycles: ProductionCycleBatchRow[],
   activities: BatchActivityRow[],
   batchLabelById: Map<number, string>,
 ): T[] {
   if (!rows.length || !batchLabelById.size) return rows
-
-  const cyclesBySystemId = new Map<number, ProductionCycleBatchRow[]>()
-  cycles.forEach((cycle) => {
-    const current = cyclesBySystemId.get(cycle.system_id) ?? []
-    current.push(cycle)
-    cyclesBySystemId.set(cycle.system_id, current)
-  })
-
-  cyclesBySystemId.forEach((systemCycles) => {
-    systemCycles.sort((left, right) => right.cycle_start.localeCompare(left.cycle_start))
-  })
 
   const activitiesBySystemId = new Map<number, BatchActivityRow[]>()
   activities.forEach((activity) => {
@@ -64,14 +41,8 @@ function attachBatchNamesToDashboardRows<T extends { system_id: number; as_of_da
   })
 
   return rows.map((row) => {
-    const systemCycles = cyclesBySystemId.get(row.system_id) ?? []
-    const match = systemCycles.find((cycle) => dateFitsCycle(row.as_of_date, cycle))
-    const directBatchId = match?.batch_id ?? null
-    const fallbackBatchId =
-      directBatchId == null
-        ? (activitiesBySystemId.get(row.system_id) ?? []).find((activity) => row.as_of_date && activity.date <= row.as_of_date)?.batch_id ?? null
-        : null
-    const batchId = directBatchId ?? fallbackBatchId
+    const batchId = (activitiesBySystemId.get(row.system_id) ?? [])
+      .find((activity) => row.as_of_date && activity.date <= row.as_of_date)?.batch_id ?? null
     if (batchId == null) return row
 
     const batchName = batchLabelById.get(batchId) ?? `Batch ${batchId}`
@@ -129,27 +100,6 @@ async function listDashboardBatchActivityRows(
   })
 
   return [...baseActivities, ...transferActivities]
-}
-
-async function listDashboardCycleRows(
-  supabase: DashboardReadClient,
-  params: {
-    systemIds: number[]
-    minDate: string
-    maxDate: string
-  },
-): Promise<ProductionCycleBatchRow[]> {
-  let query = supabase
-    .from("production_cycle")
-    .select("system_id, batch_id, cycle_start, cycle_end")
-    .in("system_id", params.systemIds)
-    .lte("cycle_start", params.maxDate)
-    .or(`cycle_end.is.null,cycle_end.gte.${params.minDate}`)
-
-  const { data, error } = await query
-  if (error && isQuietError(error)) return []
-  if (error) throw error
-  return (data ?? []) as ProductionCycleBatchRow[]
 }
 
 export async function getDashboardKpiOverview(params?: {
@@ -258,15 +208,13 @@ export async function getDashboardSystems(params?: {
     return toQuerySuccess<DashboardSystemRow>(rows)
   }
 
-  const minDate = asOfDates.reduce((current, value) => (value < current ? value : current))
   const maxDate = asOfDates.reduce((current, value) => (value > current ? value : current))
 
-  const [batchOptionsResult, cycleRows, activityRows] = await Promise.all([
+  const [batchOptionsResult, activityRows] = await Promise.all([
     supabase.rpc("api_fingerling_batch_options_rpc", {
       p_farm_id: params.farmId,
       p_active_only: false,
     }),
-    listDashboardCycleRows(supabase, { systemIds, minDate, maxDate }),
     listDashboardBatchActivityRows(supabase, { systemIds, maxDate }),
   ])
 
@@ -277,5 +225,5 @@ export async function getDashboardSystems(params?: {
     ]),
   )
 
-  return toQuerySuccess<DashboardSystemRow>(attachBatchNamesToDashboardRows(rows, cycleRows, activityRows, batchLabelById))
+  return toQuerySuccess<DashboardSystemRow>(attachBatchNamesToDashboardRows(rows, activityRows, batchLabelById))
 }

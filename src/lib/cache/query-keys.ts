@@ -422,6 +422,8 @@ export const queryKeys = {
     },
     transfer(params?: {
       farmId?: string | null
+      systemId?: number
+      systemIds?: number[]
       batchId?: number
       dateFrom?: string
       dateTo?: string
@@ -431,6 +433,8 @@ export const queryKeys = {
         "reports",
         "transfer",
         farmToken(params?.farmId),
+        numberToken(params?.systemId),
+        params?.systemIds?.join(",") ?? "all-systems",
         numberToken(params?.batchId),
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),

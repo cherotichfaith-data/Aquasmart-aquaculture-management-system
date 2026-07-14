@@ -17,6 +17,7 @@ import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import type { Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
+import { useTransferData } from "@/features/reports/hooks"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { TRANSFER_TYPE_LABELS, UI_TRANSFER_TYPES } from "@/lib/transfer-types"
@@ -28,6 +29,7 @@ import {
   requireActiveFarmId,
   toIsoDate,
 } from "./form-utils"
+import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const EXTERNAL_DESTINATION = "__external__"
@@ -92,12 +94,61 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   const originSystemId = form.watch("origin_system_id")
   const targetSystemId = form.watch("target_system_id")
   const selectedBatchId = form.watch("batch_id")
+  const selectedDate = form.watch("date")
   const transferType = form.watch("transfer_type")
   const externalTargetName = form.watch("external_target_name")
   const isExternalOut = transferType === "external_out"
+  const resolvedOriginSystemId = Number(originSystemId)
+  const hasValidOriginSystemId = Number.isFinite(resolvedOriginSystemId) && resolvedOriginSystemId > 0
+  const latestEntryQuery = useTransferData({
+    systemId: hasValidOriginSystemId ? resolvedOriginSystemId : undefined,
+    limit: 1,
+    enabled: hasValidOriginSystemId,
+  })
+  const duplicateQuery = useTransferData({
+    systemId: hasValidOriginSystemId ? resolvedOriginSystemId : undefined,
+    dateFrom: selectedDate || undefined,
+    dateTo: selectedDate || undefined,
+    limit: 20,
+    enabled: hasValidOriginSystemId && Boolean(selectedDate),
+  })
+  const pendingEntries = usePendingLatestEntries("transfer", hasValidOriginSystemId ? resolvedOriginSystemId : null)
+  const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `transfer-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.number_of_fish_transfer ?? 0} fish transferred`,
+    details: [
+      {
+        label: "Destination",
+        value: row.external_target_name?.trim() || (row.target_system_id != null ? `Cage ${row.target_system_id}` : "Not recorded"),
+      },
+      { label: "Weight", value: row.total_weight_transfer != null ? `${row.total_weight_transfer} kg` : "Not recorded" },
+    ],
+  }))
+  const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `transfer-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.number_of_fish_transfer ?? 0} fish transferred`,
+    details: [
+      {
+        label: "Destination",
+        value: row.external_target_name?.trim() || (row.target_system_id != null ? `Cage ${row.target_system_id}` : "Not recorded"),
+      },
+      { label: "Weight", value: row.total_weight_transfer != null ? `${row.total_weight_transfer} kg` : "Not recorded" },
+    ],
+  }))
+  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      if (duplicateEntry) {
+        form.setError("date", { message: `A transfer entry already exists for ${values.date}.` })
+        return
+      }
+
       const resolvedFarmId = requireActiveFarmId(farmId)
       const isExternalTransfer = values.transfer_type === "external_out"
       if (!isExternalTransfer && values.origin_system_id === values.target_system_id) {
@@ -153,6 +204,8 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
+
+      <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="transfer" />
 
         {isExternalOut ? (
           <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
@@ -385,7 +438,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
             )}
           />
 
-          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
+          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
             {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Record Transfer
           </Button>

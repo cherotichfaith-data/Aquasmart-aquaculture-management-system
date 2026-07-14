@@ -38,6 +38,7 @@ import {
   requireActiveFarmId,
   toIsoDate,
 } from "./form-utils"
+import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
@@ -137,6 +138,19 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
     limit: 10,
     enabled: hasValidSystemId,
   })
+  const duplicateQuery = useSamplingData({
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
+    dateFrom: selectedDate || undefined,
+    dateTo: selectedDate || undefined,
+    limit: 20,
+    enabled: hasValidSystemId && Boolean(selectedDate),
+  })
+  const latestEntryQuery = useSamplingData({
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
+    limit: 1,
+    enabled: hasValidSystemId,
+  })
+  const pendingEntries = usePendingLatestEntries("sampling", hasValidSystemId ? selectedSystemId : null)
 
   const samplingHistory = useMemo(() => {
     const rows = samplingHistoryQuery.data?.status === "success" ? samplingHistoryQuery.data.data : []
@@ -155,9 +169,36 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
   )
   const daysSinceLastSample = diffDateDays(previousSample?.date, selectedDate)
   const isEarlierThanMonthlyCadence = daysSinceLastSample != null && daysSinceLastSample < 25
+  const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `sampling-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.number_of_fish_sampling ?? 0} fish sampled`,
+    details: [
+      { label: "Total Weight", value: row.total_weight_sampling != null ? `${row.total_weight_sampling} kg` : "Not recorded" },
+      { label: "ABW", value: row.abw != null ? `${row.abw.toFixed(2)} g` : "Not recorded" },
+    ],
+  }))
+  const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `sampling-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.number_of_fish_sampling ?? 0} fish sampled`,
+    details: [
+      { label: "Total Weight", value: row.total_weight_sampling != null ? `${row.total_weight_sampling} kg` : "Not recorded" },
+      { label: "ABW", value: row.abw != null ? `${row.abw.toFixed(2)} g` : "Not recorded" },
+    ],
+  }))
+  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      if (duplicateEntry) {
+        form.setError("date", { message: `A sampling entry already exists for ${values.date}.` })
+        return
+      }
+
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
       const batchId = parseOptionalNumericId(values.batch_id)
@@ -200,6 +241,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
+          <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="sampling" />
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="data-entry-secondary-grid">
@@ -354,7 +396,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 )}
               />
 
-              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
+              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Record Sampling
               </Button>
