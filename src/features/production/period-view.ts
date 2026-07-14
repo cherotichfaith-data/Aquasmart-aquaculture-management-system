@@ -4,6 +4,7 @@ import type { ProductionSummaryRpcRow } from "./types"
 export type ProductionPeriodViewRow = {
   date: string
   systemName: string | null
+  periodStartFish: number | null
   numberOfFish: number | null
   abwG: number | null
   biomassKg: number | null
@@ -15,6 +16,7 @@ export type ProductionPeriodViewRow = {
   cumulativeGrowthKg: number | null
   harvestKg: number | null
   mortalityFish: number | null
+  mortalityRatePct: number | null
   transferInFish: number | null
   transferOutFish: number | null
   harvestFish: number | null
@@ -36,6 +38,7 @@ export type ProductionPeriodViewResponse = {
 
 type ConsolidatedAccumulator = {
   date: string
+  periodStartFish: number
   numberOfFish: number
   biomassKg: number
   feedPeriodKg: number
@@ -89,14 +92,17 @@ function mapProductionSummaryRow(
     systemId != null ? enrichment.volumeBySystemId?.get(systemId) ?? null : enrichment.totalScopedVolumeM3 ?? null
   const growth = enrichment.growthBySystemDate?.get(key)
   const numberOfFish = asFiniteNumber(row.number_of_fish_inventory)
+  const periodStartFish = asFiniteNumber(row.fish_count_period_start)
   const biomassKg = asFiniteNumber(row.total_biomass)
   const feedPeriodKg = asFiniteNumber(row.total_feed_amount_period)
   const feedAggKg = asFiniteNumber(row.total_feed_amount_aggregated)
   const transferInFish = getOptionalNumber(row, "number_of_fish_transfer_in")
+  const mortalityFish = asFiniteNumber(row.mortality_count_period)
 
   return {
     date: row.date,
     systemName: row.system_name ?? (systemId != null ? `System ${systemId}` : null),
+    periodStartFish,
     numberOfFish,
     abwG: asFiniteNumber(row.average_body_weight),
     biomassKg,
@@ -107,7 +113,8 @@ function mapProductionSummaryRow(
     growthKg: asFiniteNumber(row.biomass_increase_period),
     cumulativeGrowthKg: asFiniteNumber(row.biomass_increase_aggregated),
     harvestKg: asFiniteNumber(row.total_weight_harvested),
-    mortalityFish: asFiniteNumber(row.mortality_count_period),
+    mortalityFish,
+    mortalityRatePct: periodStartFish ? divideOrNull((mortalityFish ?? 0) * 100, periodStartFish) : null,
     transferInFish,
     transferOutFish: asFiniteNumber(row.number_of_fish_transfer_out),
     harvestFish: asFiniteNumber(row.number_of_fish_harvested),
@@ -137,6 +144,7 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
       byDate.get(row.date) ??
       {
         date: row.date,
+        periodStartFish: 0,
         numberOfFish: 0,
         biomassKg: 0,
         feedPeriodKg: 0,
@@ -162,6 +170,7 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
     const biomassWeight = row.total_biomass ?? 0
     const transferInFish = getOptionalNumber(row, "number_of_fish_transfer_in") ?? 0
     const survivalWeight = row.fish_count_period_start ?? 0
+    current.periodStartFish += row.fish_count_period_start ?? 0
     current.numberOfFish += row.number_of_fish_inventory ?? 0
     current.biomassKg += row.total_biomass ?? 0
     current.feedPeriodKg += row.total_feed_amount_period ?? 0
@@ -189,6 +198,7 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
   return sortByDateAsc(Array.from(byDate.values()), (row) => row.date).map((row) => ({
     date: row.date,
     systemName: "All Systems",
+    periodStartFish: row.periodStartFish,
     numberOfFish: row.numberOfFish,
     abwG: divideOrNull(row.biomassKg * 1000, row.numberOfFish),
     biomassKg: row.biomassKg,
@@ -206,6 +216,7 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
     cumulativeGrowthKg: row.cumulativeGrowthKg,
     harvestKg: row.harvestKg,
     mortalityFish: row.mortalityFish,
+    mortalityRatePct: divideOrNull(row.mortalityFish * 100, row.periodStartFish),
     transferInFish: row.transferInFish,
     transferOutFish: row.transferOutFish,
     harvestFish: row.harvestFish,

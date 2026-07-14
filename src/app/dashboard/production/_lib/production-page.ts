@@ -17,7 +17,7 @@ export type ProductionEfcrChartRow = {
 
 export function buildProductionMetricRows(
   rows: ProductionPeriodViewRow[],
-  metric: Exclude<ProductionMetric, "efcr">,
+  metric: ProductionMetric,
 ): ProductionChartRow[] {
   return sortByDateAsc(
     rows.map((row) => ({
@@ -31,33 +31,21 @@ export function buildProductionMetricRows(
   }))
 }
 
-export function buildProductionEfcrRows(rows: ProductionPeriodViewRow[]): ProductionEfcrChartRow[] {
-  return sortByDateAsc(
-    rows.map((row) => ({
-      date: row.date,
-      periodEfcr: row.periodEfcr,
-      aggregatedEfcr: row.aggregatedEfcr,
-    })),
-    (row) => row.date,
-  ).map((row) => ({
-    ...row,
-    label: formatCompactDate(row.date),
-  }))
-}
-
-function getSingleMetricValue(row: ProductionPeriodViewRow, metric: Exclude<ProductionMetric, "efcr">) {
+function getSingleMetricValue(row: ProductionPeriodViewRow, metric: ProductionMetric) {
   switch (metric) {
+    case "efcr_periodic":
+      return row.periodEfcr
+    case "efcr_aggregated":
+      return row.aggregatedEfcr
     case "abw":
       return row.abwG
-    case "biomass":
-      return row.biomassKg
+    case "biomass_increase":
+      return row.growthKg
     case "mortality":
-      return row.mortalityFish
-    case "feeding_rate":
+      return row.mortalityRatePct
+    case "feeding":
       return row.feedingRate
-    case "biomass_density":
+    case "density":
       return row.biomassDensity
-    case "sgr":
-      return row.sgr
   }
 }
