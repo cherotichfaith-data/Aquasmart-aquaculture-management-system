@@ -11,6 +11,7 @@ import {
   type OptionsRpcName,
 } from "@/lib/api/_utils"
 import type { SystemOption } from "@/lib/system-options"
+import { formatSystemOptionLabel } from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 type SystemListItem = SystemOption
@@ -103,7 +104,7 @@ export async function getSystemOptions(params?: {
     growth_stage: row.growth_stage,
     id: row.id,
     is_active: row.is_active,
-    label: row.label,
+    label: formatSystemOptionLabel({ id: row.id, name: row.name ?? null, unit: row.unit ?? null }),
     name: row.name ?? null,
     type: row.type,
     unit: row.unit ?? null,
