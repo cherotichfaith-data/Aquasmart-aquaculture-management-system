@@ -107,7 +107,7 @@ function selectLatestRowsPerCycle(rows: ProductionSummaryRow[]) {
   const byCycle = new Map<string, ProductionSummaryRow>()
 
   rows.forEach((row) => {
-    const cycleKey = `${row.cycle_id ?? "no-cycle"}-${row.system_id ?? "no-system"}`
+    const cycleKey = `${row.cycle_id ?? `no-cycle-${row.system_id ?? "no-system"}`}`
     const current = byCycle.get(cycleKey)
     if (!current || String(row.date ?? "") > String(current.date ?? "")) {
       byCycle.set(cycleKey, row)

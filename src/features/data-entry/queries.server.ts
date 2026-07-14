@@ -31,6 +31,33 @@ async function safePrefetch<T>(tag: string, fallback: T, loader: () => Promise<T
   }
 }
 
+async function safePrefetchWithTimeout<T>(
+  tag: string,
+  fallback: T,
+  loader: () => Promise<T>,
+  timeoutMs: number,
+) {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+
+  try {
+    const loaderPromise = loader().catch((error) => {
+      logSbError(tag, error)
+      return fallback
+    })
+
+    const timeoutPromise = new Promise<T>((resolve) => {
+      timeoutHandle = setTimeout(() => {
+        logSbError(`${tag}:timeout`, new Error(`Timed out after ${timeoutMs}ms`))
+        resolve(fallback)
+      }, timeoutMs)
+    })
+
+    return await Promise.race([loaderPromise, timeoutPromise])
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle)
+  }
+}
+
 export async function getDataEntryPrefetch({
   farmId,
   userId,
@@ -55,8 +82,11 @@ export async function getDataEntryPrefetch({
         safePrefetch("data-entry:prefetch:systems", toQuerySuccess([]), () => getSystems(supabase, farmId)),
         safePrefetch("data-entry:prefetch:batches", toQuerySuccess([]), () => getBatches(supabase, farmId)),
         safePrefetch("data-entry:prefetch:feedTypes", toQuerySuccess([]), () => getFeedTypes(supabase, farmId)),
-        safePrefetch("data-entry:prefetch:recentEntries", emptyRecentEntries(), () =>
-          listRecentEntries(supabase, farmId),
+        safePrefetchWithTimeout(
+          "data-entry:prefetch:recentEntries",
+          emptyRecentEntries(),
+          () => listRecentEntries(supabase, farmId),
+          3000,
         ),
       ])
 

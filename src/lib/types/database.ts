@@ -642,11 +642,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "feeding_record_cycle_id_fkey"
-            columns: ["cycle_id"]
+            foreignKeyName: "feeding_record_cycle_batch_fkey"
+            columns: ["cycle_id", "batch_id"]
             isOneToOne: false
             referencedRelation: "production_cycle"
-            referencedColumns: ["cycle_id"]
+            referencedColumns: ["cycle_id", "batch_id"]
           },
           {
             foreignKeyName: "feeding_record_feed_id_fkey"
@@ -821,11 +821,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fish_harvest_cycle_id_fkey"
-            columns: ["cycle_id"]
+            foreignKeyName: "fish_harvest_cycle_batch_fkey"
+            columns: ["cycle_id", "batch_id"]
             isOneToOne: false
             referencedRelation: "production_cycle"
-            referencedColumns: ["cycle_id"]
+            referencedColumns: ["cycle_id", "batch_id"]
           },
           {
             foreignKeyName: "fish_harvest_system_id_fkey"
@@ -897,11 +897,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fish_mortality_cycle_id_fkey"
-            columns: ["cycle_id"]
+            foreignKeyName: "fish_mortality_cycle_batch_fkey"
+            columns: ["cycle_id", "batch_id"]
             isOneToOne: false
             referencedRelation: "production_cycle"
-            referencedColumns: ["cycle_id"]
+            referencedColumns: ["cycle_id", "batch_id"]
           },
           {
             foreignKeyName: "fish_mortality_farm_id_fkey"
@@ -974,11 +974,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fish_sampling_weight_cycle_id_fkey"
-            columns: ["cycle_id"]
+            foreignKeyName: "fish_sampling_weight_cycle_batch_fkey"
+            columns: ["cycle_id", "batch_id"]
             isOneToOne: false
             referencedRelation: "production_cycle"
-            referencedColumns: ["cycle_id"]
+            referencedColumns: ["cycle_id", "batch_id"]
           },
           {
             foreignKeyName: "fish_weight_sampling_system_id_fkey"
@@ -1047,11 +1047,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fish_stocking_cycle_id_fkey"
-            columns: ["cycle_id"]
+            foreignKeyName: "fish_stocking_cycle_batch_fkey"
+            columns: ["cycle_id", "batch_id"]
             isOneToOne: false
             referencedRelation: "production_cycle"
-            referencedColumns: ["cycle_id"]
+            referencedColumns: ["cycle_id", "batch_id"]
           },
           {
             foreignKeyName: "stocking_system_id_fkey"
@@ -1129,11 +1129,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fish_transfer_cycle_id_fkey"
-            columns: ["cycle_id"]
+            foreignKeyName: "fish_transfer_cycle_batch_fkey"
+            columns: ["cycle_id", "batch_id"]
             isOneToOne: false
             referencedRelation: "production_cycle"
-            referencedColumns: ["cycle_id"]
+            referencedColumns: ["cycle_id", "batch_id"]
           },
           {
             foreignKeyName: "transfer_origin_system_id_fkey"

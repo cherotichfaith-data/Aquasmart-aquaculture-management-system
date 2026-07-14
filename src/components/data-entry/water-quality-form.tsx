@@ -21,11 +21,12 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/lib/hooks/app/use-toast"
 import { useSystemOptions } from "@/lib/hooks/use-options"
-import { useRecordWaterQuality } from "@/features/water-quality/hooks"
+import { useRecordWaterQuality, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoPanel, InfoStat } from "./form-support"
 import { parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
+import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
 import { SelectedSystemInfo } from "./selection-info"
 
 const optionalNumber = z.preprocess(
@@ -102,12 +103,29 @@ export function WaterQualityForm({
 
   const selectedSystemValue = form.watch("system_id")
   const selectedSystemId = Number(selectedSystemValue)
+  const selectedDate = form.watch("date")
   const doValue = form.watch("dissolved_oxygen")
   const selectedTime = form.watch("time")
   const selectedDepth = form.watch("water_depth")
   const selectedSystem =
     selectableSystems.find((system) => String(system.id) === selectedSystemValue) ?? null
   const isLakeReference = selectedSystem?.label?.toLowerCase().includes("lake reference") ?? false
+  const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
+  const latestEntryQuery = useWaterQualityMeasurements({
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
+    limit: 1,
+    requireSystem: true,
+    enabled: hasValidSystemId,
+  })
+  const duplicateQuery = useWaterQualityMeasurements({
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
+    dateFrom: selectedDate || undefined,
+    dateTo: selectedDate || undefined,
+    limit: 20,
+    requireSystem: true,
+    enabled: hasValidSystemId && Boolean(selectedDate),
+  })
+  const pendingEntries = usePendingLatestEntries("water_quality", hasValidSystemId ? selectedSystemId : null)
 
   useEffect(() => {
     let active = true
@@ -148,8 +166,36 @@ export function WaterQualityForm({
     }
   }, [doValue, supabase])
 
+  const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `water-quality-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.parameter_name ?? "Parameter"}: ${row.parameter_value ?? ""}`,
+    details: [
+      { label: "Time", value: row.time ?? "Not recorded" },
+      { label: "Depth", value: row.water_depth != null ? `${row.water_depth} m` : "Not recorded" },
+    ],
+  }))
+  const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `water-quality-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.parameter_name ?? "Parameter"}: ${row.parameter_value ?? ""}`,
+    details: [
+      { label: "Time", value: row.time ?? "Not recorded" },
+      { label: "Depth", value: row.water_depth != null ? `${row.water_depth} m` : "Not recorded" },
+    ],
+  }))
+  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      if (duplicateEntry) {
+        form.setError("date", { message: `A water quality entry already exists for ${values.date}.` })
+        return
+      }
+
       if (isLakeReference && !values.location_reference?.trim()) {
         form.setError("location_reference", {
           message: "Location / reference is required for LAKE measurements",
@@ -224,6 +270,7 @@ export function WaterQualityForm({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
+            <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="water quality" />
             {selectedTime < "12:00" ? (
               <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
                 Morning measurement logged. Remember to return for the PM measurement as well.
@@ -401,7 +448,7 @@ export function WaterQualityForm({
                 />
               </div>
 
-              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
+              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Record Water Quality
               </Button>

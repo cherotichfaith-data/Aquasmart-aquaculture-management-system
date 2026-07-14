@@ -17,24 +17,22 @@ import {
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useRecordFeeding } from "@/features/feed/hooks"
-import { useFeedingRecords } from "@/features/reports/hooks"
+import { useFeedingRecords, useSamplingData } from "@/features/reports/hooks"
 import type { Database } from "@/lib/types/database"
 import { FEEDING_RESPONSE_LEVELS, type FeedingResponseLevel } from "@/lib/feeding-response"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useDashboardSystems } from "@/lib/hooks/use-dashboard-systems"
-import { useLatestWaterQualityStatus, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
-import { diffDateDays } from "@/lib/time-series"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import {
   InfoPanel,
   InfoStat,
   findUnitForSystem,
-  formatRelativeDays,
   getSystemUnits,
   getSystemsForUnit,
 } from "./form-support"
 import { parseOptionalNumericId, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId, toIsoDate } from "./form-utils"
+import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
@@ -96,10 +94,29 @@ interface FeedingFormProps {
   defaultBatchId?: number | null
 }
 
-const shiftDate = (dateString: string, days: number) => {
-  const next = new Date(`${dateString}T00:00:00`)
-  next.setDate(next.getDate() + days)
-  return toIsoDate(next)
+function toFeedingEntrySummary(row: {
+  id?: number | null
+  created_at?: string | null
+  date?: string | null
+  feeding_amount?: number | null
+  feeding_response?: number | null
+  notes?: string | null
+  feed_type?: { feed_line?: string | null } | null
+}, keyPrefix: string): LatestEntrySummary {
+  const amount = row.feeding_amount ?? 0
+  return {
+    key: `${keyPrefix}-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${amount.toFixed(2)} kg feed`,
+    details:
+      amount === 0
+        ? [{ label: "Reason", value: row.notes?.trim() || "No reason recorded" }]
+        : [
+            { label: "Feed Type", value: row.feed_type?.feed_line || "Not recorded" },
+            { label: "Response", value: row.feeding_response != null ? `Level ${row.feeding_response}` : "Not recorded" },
+          ],
+  }
 }
 
 export function FeedingForm({
@@ -139,12 +156,9 @@ export function FeedingForm({
   const selectedBatchId =
     selectedBatchValue && selectedBatchValue !== OPTIONAL_SELECT_VALUE ? Number(selectedBatchValue) : null
   const selectedDate = form.watch("date")
-  const selectedFeedId = Number(form.watch("feed_id"))
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
-  const previousDate = selectedDate ? shiftDate(selectedDate, -1) : undefined
   const feedOptions = feeds
-  const selectedFeed = feedOptions.find((feed) => feed.id === selectedFeedId) ?? null
 
   useEffect(() => {
     if (!defaultSystemValue) return
@@ -190,57 +204,43 @@ export function FeedingForm({
     limit: 20,
     enabled: Boolean(selectedDate) && hasValidSystemId,
   })
-  const yesterdayFeedQuery = useFeedingRecords({
+  const latestEntryQuery = useFeedingRecords({
     systemId: hasValidSystemId ? selectedSystemId : undefined,
-    dateFrom: previousDate,
-    dateTo: previousDate,
-    limit: 20,
-    enabled: Boolean(previousDate) && hasValidSystemId,
-  })
-  const systemStatusQuery = useDashboardSystems({
-    farmId,
-    systemId: hasValidSystemId ? selectedSystemId : undefined,
-    dateFrom: selectedDate || undefined,
-    dateTo: selectedDate || undefined,
-    enabled: Boolean(farmId) && Boolean(selectedDate) && hasValidSystemId,
-  })
-  const latestWaterStatusQuery = useLatestWaterQualityStatus(
-    hasValidSystemId ? selectedSystemId : undefined,
-    { farmId },
-  )
-  const doQuery = useWaterQualityMeasurements({
-    systemId: hasValidSystemId ? selectedSystemId : undefined,
-    parameterName: "dissolved_oxygen",
-    limit: 10,
-    requireSystem: true,
+    limit: 1,
     enabled: hasValidSystemId,
   })
+  const latestSamplingQuery = useSamplingData({
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
+    limit: 1,
+    enabled: hasValidSystemId,
+  })
+  const latestBiomassQuery = useDashboardSystems({
+    farmId,
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
+    enabled: Boolean(farmId) && hasValidSystemId,
+  })
+  const pendingEntries = usePendingLatestEntries("feeding", hasValidSystemId ? selectedSystemId : null)
 
   const existingDailyRecords = duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []
-  const yesterdayRecords = yesterdayFeedQuery.data?.status === "success" ? yesterdayFeedQuery.data.data : []
-  const latestSystemStatus = systemStatusQuery.data?.status === "success" ? systemStatusQuery.data.data[0] ?? null : null
-  const latestDoReading = useMemo(() => {
-    const rows = doQuery.data?.status === "success" ? doQuery.data.data : []
-    return rows
-      .slice()
-      .sort((a, b) => `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`))[0] ?? null
-  }, [doQuery.data])
-  const latestWaterStatus =
-    latestWaterStatusQuery.data?.status === "success" ? latestWaterStatusQuery.data.data[0] ?? null : null
-  const doValue = latestDoReading?.parameter_value ?? null
-  const yesterdayFeedAmount = yesterdayRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
-  const latestDoAge = diffDateDays(latestDoReading?.date, selectedDate)
-  const doTone =
-    doValue == null
-      ? "default"
-      : doValue < 4
-        ? "critical"
-        : doValue < 5
-          ? "warning"
-          : "success"
+  const latestServerRecords = latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []
+  const latestSampling = latestSamplingQuery.data?.status === "success" ? latestSamplingQuery.data.data[0] ?? null : null
+  const latestBiomassStatus =
+    latestBiomassQuery.data?.status === "success" ? latestBiomassQuery.data.data[0] ?? null : null
+  const latestAbw = latestSampling?.abw ?? latestBiomassStatus?.abw ?? null
+  const latestBiomass = latestBiomassStatus?.biomass_end ?? null
+
+  const latestServerEntries = latestServerRecords.map((row) => toFeedingEntrySummary(row, "feeding"))
+  const duplicateServerEntries = existingDailyRecords.map((row) => toFeedingEntrySummary(row, "feeding-duplicate"))
+  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      if (duplicateEntry) {
+        form.setError("date", { message: `A feeding entry already exists for ${values.date}.` })
+        return
+      }
+
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
       const feedTypeId = parseOptionalNumericId(values.feed_id)
@@ -292,11 +292,7 @@ export function FeedingForm({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
-          {existingDailyRecords.length > 0 ? (
-            <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
-              Feeding is already recorded for {selectedSystem ? formatCageLabel(selectedSystem) : "this cage"} on {selectedDate}. Confirm this is an additional feed event before saving.
-            </div>
-          ) : null}
+          <LatestEntryGuard latestEntry={null} duplicateEntry={duplicateEntry} itemLabel="feeding" />
           {submissionSummary ? (
             <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
               {submissionSummary}
@@ -517,7 +513,7 @@ export function FeedingForm({
                 ) : null}
               </div>
 
-              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
+              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
                 {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Record Feeding
               </Button>
@@ -526,40 +522,20 @@ export function FeedingForm({
         </div>
 
         <div className="space-y-4">
-          <InfoPanel title="Cage Feed Context">
-            <InfoStat
-              label="Latest DO"
-              tone={doTone}
-              value={
-                doValue != null
-                  ? `${doValue.toFixed(2)} mg/L${latestDoAge != null ? ` · ${formatRelativeDays(latestDoAge)}` : ""}`
-                  : "No DO reading"
-              }
-            />
-            <InfoStat
-              label="Yesterday's Feed"
-              value={previousDate ? `${yesterdayFeedAmount.toFixed(2)} kg on ${previousDate}` : "No prior day"}
-            />
+          <InfoPanel title="Latest feeding entry for this cage">
+            <InfoStat label="Date" value={latestEntry?.date || "No feeding entry recorded"} />
+            <InfoStat label="Entry" value={latestEntry?.summary || "No feeding entry recorded"} />
+            {latestEntry?.details.map((detail) => (
+              <InfoStat key={`${latestEntry.key}-${detail.label}`} label={detail.label} value={detail.value} />
+            ))}
             <InfoStat
               label="ABW / Biomass"
               value={
-                latestSystemStatus?.abw != null && latestSystemStatus?.biomass_end != null
-                  ? `${latestSystemStatus.abw.toFixed(2)} g · ${latestSystemStatus.biomass_end.toFixed(2)} kg`
+                latestAbw != null || latestBiomass != null
+                  ? `${latestAbw != null ? `${latestAbw.toFixed(2)} g` : "ABW not recorded"} · ${latestBiomass != null ? `${latestBiomass.toFixed(2)} kg` : "Biomass not recorded"}`
                   : "No recent sampling snapshot"
               }
             />
-            <InfoStat
-              label="Active DO Alert"
-              tone={latestWaterStatus?.do_exceeded ? "critical" : "default"}
-              value={
-                latestWaterStatus?.do_exceeded
-                  ? `DO threshold exceeded${latestWaterStatus.low_do_threshold != null ? ` (< ${latestWaterStatus.low_do_threshold} mg/L)` : ""}`
-                  : "No active DO warning"
-              }
-            />
-            {selectedFeed?.feed_pellet_size ? (
-              <InfoStat label="Pellet Guide" value={selectedFeed.feed_pellet_size} />
-            ) : null}
           </InfoPanel>
         </div>
       </div>

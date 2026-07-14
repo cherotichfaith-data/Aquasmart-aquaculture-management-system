@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Constants, type Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useRecordStocking } from "@/lib/hooks/use-stocking"
+import { useStockingData } from "@/features/reports/hooks"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { BatchQuickCreate } from "./batch-quick-create"
@@ -34,6 +35,7 @@ import {
   requireActiveFarmId,
   toIsoDate,
 } from "./form-utils"
+import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
@@ -102,10 +104,24 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   const selectedUnit = form.watch("unit")
   const selectedSystemId = form.watch("system_id")
   const selectedBatchId = form.watch("batch_id")
+  const selectedDate = form.watch("stocking_date")
   const selectedSystemIdNumber = Number(selectedSystemId)
   const selectedSystemIdForBatch =
     Number.isFinite(selectedSystemIdNumber) && selectedSystemIdNumber > 0 ? selectedSystemIdNumber : null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
+  const latestEntryQuery = useStockingData({
+    systemId: selectedSystemIdForBatch ?? undefined,
+    limit: 1,
+    enabled: Boolean(selectedSystemIdForBatch),
+  })
+  const duplicateQuery = useStockingData({
+    systemId: selectedSystemIdForBatch ?? undefined,
+    dateFrom: selectedDate || undefined,
+    dateTo: selectedDate || undefined,
+    limit: 20,
+    enabled: Boolean(selectedSystemIdForBatch) && Boolean(selectedDate),
+  })
+  const pendingEntries = usePendingLatestEntries("stocking", selectedSystemIdForBatch)
 
   function handleBatchCreated(batch: FingerlingBatchRow) {
     const systemId = selectedSystemIdForBatch
@@ -154,8 +170,36 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
     }
   }, [form, selectedUnit, systemsForUnit])
 
+  const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `stocking-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.number_of_fish_stocking ?? 0} fish stocked`,
+    details: [
+      { label: "Weight", value: row.total_weight_stocking != null ? `${row.total_weight_stocking} kg` : "Not recorded" },
+      { label: "Type", value: row.type_of_stocking ?? "Not recorded" },
+    ],
+  }))
+  const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `stocking-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.number_of_fish_stocking ?? 0} fish stocked`,
+    details: [
+      { label: "Weight", value: row.total_weight_stocking != null ? `${row.total_weight_stocking} kg` : "Not recorded" },
+      { label: "Type", value: row.type_of_stocking ?? "Not recorded" },
+    ],
+  }))
+  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      if (duplicateEntry) {
+        form.setError("stocking_date", { message: `A stocking entry already exists for ${values.stocking_date}.` })
+        return
+      }
+
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
       const batchId = parseRequiredNumericId(values.batch_id, "Batch")
@@ -278,6 +322,8 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       {showBatchCreate ? (
         <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} onCreated={handleBatchCreated} />
       ) : null}
+
+      <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="stocking" />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -454,7 +500,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
             )}
           />
 
-          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
+          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
             {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Record Stocking
           </Button>

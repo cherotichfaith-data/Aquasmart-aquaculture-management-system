@@ -13,10 +13,6 @@ type SystemVolumeRow = Pick<
 >
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type BatchOptionRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
-type ProductionCycleBatchRow = Pick<
-  Database["public"]["Tables"]["production_cycle"]["Row"],
-  "batch_id" | "cycle_end" | "cycle_start" | "system_id"
->
 type BatchActivityRow = {
   batch_id: number
   date: string
@@ -33,31 +29,12 @@ type FarmMember = {
   full_name?: string | null
 }
 
-const dateFitsCycle = (asOfDate: string | null, cycle: ProductionCycleBatchRow) => {
-  if (!asOfDate) return false
-  if (cycle.cycle_start > asOfDate) return false
-  if (cycle.cycle_end && cycle.cycle_end < asOfDate) return false
-  return true
-}
-
 function attachBatchNamesToDashboardRows<T extends { system_id: number; as_of_date: string | null; batch_name?: string | null }>(
   rows: T[],
-  cycles: ProductionCycleBatchRow[],
   activities: BatchActivityRow[],
   batchLabelById: Map<number, string>,
 ): T[] {
   if (!rows.length || !batchLabelById.size) return rows
-
-  const cyclesBySystemId = new Map<number, ProductionCycleBatchRow[]>()
-  cycles.forEach((cycle) => {
-    const current = cyclesBySystemId.get(cycle.system_id) ?? []
-    current.push(cycle)
-    cyclesBySystemId.set(cycle.system_id, current)
-  })
-
-  cyclesBySystemId.forEach((systemCycles) => {
-    systemCycles.sort((left, right) => right.cycle_start.localeCompare(left.cycle_start))
-  })
 
   const activitiesBySystemId = new Map<number, BatchActivityRow[]>()
   activities.forEach((activity) => {
@@ -71,14 +48,8 @@ function attachBatchNamesToDashboardRows<T extends { system_id: number; as_of_da
   })
 
   return rows.map((row) => {
-    const systemCycles = cyclesBySystemId.get(row.system_id) ?? []
-    const match = systemCycles.find((cycle) => dateFitsCycle(row.as_of_date, cycle))
-    const directBatchId = match?.batch_id ?? null
-    const fallbackBatchId =
-      directBatchId == null
-        ? (activitiesBySystemId.get(row.system_id) ?? []).find((activity) => row.as_of_date && activity.date <= row.as_of_date)?.batch_id ?? null
-        : null
-    const batchId = directBatchId ?? fallbackBatchId
+    const batchId = (activitiesBySystemId.get(row.system_id) ?? [])
+      .find((activity) => row.as_of_date && activity.date <= row.as_of_date)?.batch_id ?? null
     if (batchId == null) return row
 
     const batchName = batchLabelById.get(batchId) ?? `Batch ${batchId}`
@@ -296,29 +267,20 @@ export async function listDashboardSystemsRows(
   const asOfDates = rows.map((row) => row.as_of_date).filter((value): value is string => typeof value === "string" && value.length > 0)
   if (!rows.length || !systemIds.length || !asOfDates.length) return rows
 
-  const minDate = asOfDates.reduce((current, value) => (value < current ? value : current))
   const maxDate = asOfDates.reduce((current, value) => (value > current ? value : current))
 
-  const [batchOptions, activityRows, cycleRowsResponse] = await Promise.all([
+  const [batchOptions, activityRows] = await Promise.all([
     supabase.rpc("api_fingerling_batch_options_rpc", {
       p_farm_id: params.farmId,
       p_active_only: false,
     }),
     listDashboardBatchActivityRows(supabase, { systemIds, maxDate }),
-    supabase
-      .from("production_cycle")
-      .select("system_id, batch_id, cycle_start, cycle_end")
-      .in("system_id", systemIds)
-      .lte("cycle_start", maxDate)
-      .or(`cycle_end.is.null,cycle_end.gte.${minDate}`),
   ])
 
   const batchLabelById = new Map(
     ((batchOptions.data ?? []) as BatchOptionRow[]).map((row) => [row.id, row.label || `Batch ${row.id}`]),
   )
-  const cycleRows = (cycleRowsResponse.data ?? []) as ProductionCycleBatchRow[]
-
-  return attachBatchNamesToDashboardRows(rows, cycleRows, activityRows, batchLabelById)
+  return attachBatchNamesToDashboardRows(rows, activityRows, batchLabelById)
 }
 
 export async function listFarmMembers(

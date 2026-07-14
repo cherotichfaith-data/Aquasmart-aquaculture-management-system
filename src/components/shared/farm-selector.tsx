@@ -71,7 +71,6 @@ export default function FarmSelector({
     () => (selectedSystemId == null ? null : allSystems.find((system) => system.id === selectedSystemId) ?? null),
     [allSystems, selectedSystemId],
   )
-  const systemsById = useMemo(() => new Map(allSystems.map((system) => [system.id, system])), [allSystems])
   const selectedBatchSystemIds = useMemo(() => {
     if (selectedBatch === "all" || batchSystemsQuery.data?.status !== "success") return null
     return new Set(batchSystemsQuery.data.data.map((row) => row.system_id))
@@ -90,15 +89,9 @@ export default function FarmSelector({
   }, [allSystems, selectedBatchSystemIds, selectedStage])
   const systemCount = systems.length
   const resolvedLayout = layout ?? (variant === "compact" ? "row" : "grid")
-  const filteredBatches = useMemo(() => {
-    return batches.filter((batch) => {
-      const batchSystemId = typeof batch.system_id === "number" ? batch.system_id : null
-      const batchSystem = batchSystemId == null ? null : systemsById.get(batchSystemId)
-      if (selectedSystemId != null && batchSystemId !== selectedSystemId) return false
-      if (selectedStage !== "all" && batchSystem?.growth_stage !== selectedStage) return false
-      return true
-    })
-  }, [batches, selectedStage, selectedSystemId, systemsById])
+  // A batch can be split across or moved through several systems during one
+  // production cycle. Do not hide it based on the cycle's starting system.
+  const filteredBatches = batches
   const stages = useMemo(() => {
     const stageSet = new Set<Enums<"system_growth_stage">>()
     const stageSystems =

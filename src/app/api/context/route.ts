@@ -11,17 +11,37 @@ const selectWorkspaceSchema = z.object({
   farmId: z.string().uuid(),
 })
 
+async function retryOnNetworkError<T>(loader: () => Promise<T>, attempts = 2, delayMs = 250): Promise<T> {
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await loader()
+    } catch (error) {
+      lastError = error
+      if (!isSbNetworkError(error) || attempt >= attempts) {
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+
+  throw lastError
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { user, accessToken } = await requireUserContext(request.nextUrl.pathname)
 
     const cookies = getWorkspaceCookieValues(request.cookies)
-    const context = await loadWorkspaceContextForUser({
-      userId: user.id,
-      accessToken,
-      cookieOrganizationId: cookies.organizationId,
-      cookieFarmId: cookies.farmId,
-    })
+    const context = await retryOnNetworkError(() =>
+      loadWorkspaceContextForUser({
+        userId: user.id,
+        accessToken,
+        cookieOrganizationId: cookies.organizationId,
+        cookieFarmId: cookies.farmId,
+      }),
+    )
 
     return NextResponse.json(context, {
       headers: {
@@ -53,11 +73,13 @@ export async function POST(request: NextRequest) {
       { data: membership, error: membershipError },
       { data: farm, error: farmError },
       { data: organization, error: organizationError },
-    ] = await Promise.all([
-      supabase.from("farm_user").select("role").eq("user_id", user.id).eq("farm_id", payload.farmId).maybeSingle(),
-      supabase.from("farm").select("id, organization_id").eq("id", payload.farmId).maybeSingle(),
-      supabase.from("organization").select("id, owner_id").eq("id", payload.orgId).maybeSingle(),
-    ])
+    ] = await retryOnNetworkError(() =>
+      Promise.all([
+        supabase.from("farm_user").select("role").eq("user_id", user.id).eq("farm_id", payload.farmId).maybeSingle(),
+        supabase.from("farm").select("id, organization_id").eq("id", payload.farmId).maybeSingle(),
+        supabase.from("organization").select("id, owner_id").eq("id", payload.orgId).maybeSingle(),
+      ]),
+    )
 
     if (membershipError || farmError || organizationError) {
       throw membershipError ?? farmError ?? organizationError

@@ -366,6 +366,8 @@ export function usePerformanceRecords(params?: {
 }
 
 export function useTransferData(params?: {
+  systemId?: number
+  systemIds?: number[]
   batchId?: number
   dateFrom?: string
   dateTo?: string
