@@ -25,13 +25,17 @@ function hasDuplicatedUnitPrefix(unit: string, name: string) {
   return name.toLowerCase().startsWith(unit.toLowerCase())
 }
 
+function buildCompactSystemLabel(unit: string, name: string) {
+  return `${unit}${name}`
+}
+
 export function formatSystemOptionLabel(system: Pick<SystemOptionSource, "id" | "name" | "unit">): string {
   const unit = system.unit?.trim()
   const name = system.name?.trim()
 
   if (unit && name) {
     if (hasDuplicatedUnitPrefix(unit, name)) return name
-    return `${unit} - ${name}`
+    return buildCompactSystemLabel(unit, name)
   }
   if (name) return name
   if (unit) return unit
@@ -41,17 +45,17 @@ export function formatSystemOptionLabel(system: Pick<SystemOptionSource, "id" | 
 export function formatCageLabel(
   system: { id: number; label?: string | null; name?: string | null; unit?: string | null } | null | undefined,
 ): string {
-  const label = system?.label?.trim()
-  if (label) return label
-
   const name = system?.name?.trim()
   const unit = system?.unit?.trim()
   if (unit && name) {
     if (hasDuplicatedUnitPrefix(unit, name)) return name
-    return `${unit} - ${name}`
+    return buildCompactSystemLabel(unit, name)
   }
   if (name) return name
   if (unit) return unit
+
+  const label = system?.label?.trim()
+  if (label) return label
 
   return "Missing cage name"
 }
@@ -72,7 +76,7 @@ function normalizeSystemFilterText(value: string | null | undefined) {
 export function getSystemFilterUrlValue(
   system: { id: number; label?: string | null; name?: string | null; unit?: string | null } | null | undefined,
 ) {
-  return system?.name?.trim() || system?.unit?.trim() || formatCageLabel(system)
+  return formatCageLabel(system)
 }
 
 export function resolveSystemIdFromFilterValue(
@@ -93,7 +97,7 @@ export function resolveSystemIdFromFilterValue(
 
   const normalizedValue = normalizeSystemFilterText(rawValue)
   const match = systems.find((system) => {
-    const candidates = [system.label, system.name, system.unit]
+    const candidates = [formatCageLabel(system as { id: number; label?: string | null; name?: string | null; unit?: string | null }), system.label, system.name, system.unit]
       .map((candidate) => normalizeSystemFilterText(candidate))
       .filter(Boolean)
     return candidates.includes(normalizedValue)

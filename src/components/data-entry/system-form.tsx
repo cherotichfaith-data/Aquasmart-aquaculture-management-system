@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react"
 import {
     Form,
     FormControl,
+    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -19,6 +20,7 @@ import { toast } from "@/lib/hooks/app/use-toast"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useCreateSystem } from "@/lib/hooks/use-system"
 import { GROWTH_STAGE_VALUES, formatGrowthStage } from "@/lib/stage-filter"
+import { formatSystemOptionLabel } from "@/lib/system-options"
 import { FORM_SYSTEM_TYPES, FORM_SYSTEM_TYPE_OPTIONS } from "@/lib/system-types"
 import type { Database } from "@/lib/types/database"
 
@@ -54,6 +56,13 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
             volume: 0,
             depth: 0,
         },
+    })
+    const unitValue = form.watch("unit")
+    const nameValue = form.watch("name")
+    const cageNamePreview = formatSystemOptionLabel({
+        id: 0,
+        unit: unitValue,
+        name: nameValue,
     })
 
     function onSubmit(values: z.infer<typeof formSchema>) {
@@ -124,10 +133,11 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                             name="unit"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Cage Unit</FormLabel>
+                                    <FormLabel>Cage Number / Prefix</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="e.g. Unit A" {...field} />
+                                        <Input placeholder="e.g. 3" {...field} />
                                     </FormControl>
+                                    <FormDescription>This appears first in the cage name, for example `3` in `3E`.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -139,14 +149,20 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                         name="name"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Cage/System</FormLabel>
+                                <FormLabel>Cage Letter / Suffix</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="e.g. Cage 101" {...field} />
+                                    <Input placeholder="e.g. E" {...field} />
                                 </FormControl>
+                                <FormDescription>This appears after the number, for example `E` in `3E`.</FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
+
+                    <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+                        <span className="text-muted-foreground">Displayed cage name: </span>
+                        <span className="font-medium text-foreground">{cageNamePreview}</span>
+                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
