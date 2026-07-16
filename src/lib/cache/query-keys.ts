@@ -477,6 +477,7 @@ export const queryKeys = {
       dateTo?: string | null
       parameterName?: string | null
       limit?: number | null
+      latestFirst?: boolean | null
     }) {
       return [
         "wq",
@@ -487,6 +488,7 @@ export const queryKeys = {
         params?.dateTo ?? null,
         params?.parameterName ?? null,
         params?.limit ?? null,
+        params?.latestFirst ?? false,
       ] as const
     },
     dailyRating(params?: {

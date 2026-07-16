@@ -27,12 +27,26 @@ const toCreatedAt = (createdAtLocal: number) => new Date(createdAtLocal).toISOSt
 const toEntryTimestamp = (entry: LatestEntrySummary) =>
   new Date(entry.createdAt ?? `${entry.date}T00:00:00`).getTime()
 
+const toEntryDateValue = (entry: LatestEntrySummary) => entry.date || ""
+
 export function sortLatestEntries(entries: LatestEntrySummary[]) {
   return [...entries].sort((left, right) => toEntryTimestamp(right) - toEntryTimestamp(left))
 }
 
 export function pickLatestEntry(entries: LatestEntrySummary[]) {
   return sortLatestEntries(entries)[0] ?? null
+}
+
+export function sortLatestEntriesByRecordDate(entries: LatestEntrySummary[]) {
+  return [...entries].sort((left, right) => {
+    const dateCompare = toEntryDateValue(right).localeCompare(toEntryDateValue(left))
+    if (dateCompare !== 0) return dateCompare
+    return toEntryTimestamp(right) - toEntryTimestamp(left)
+  })
+}
+
+export function pickLatestEntryByRecordDate(entries: LatestEntrySummary[]) {
+  return sortLatestEntriesByRecordDate(entries)[0] ?? null
 }
 
 export function pickSameDayEntry(entries: LatestEntrySummary[], date?: string | null) {

@@ -234,7 +234,9 @@ export async function getFeedingRecords(params?: {
     if (params.limit) query = query.limit(params.limit)
     if (params.signal) query = query.abortSignal(params.signal)
 
-    const { data, error } = await query.order("date", { ascending: false })
+    const { data, error } = await query
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
     if (error) {
       if (params.signal?.aborted || isQuietError(error)) return empty<FeedingRecordWithType>()
       return toQueryError("getFeedingRecords", error)
@@ -303,7 +305,9 @@ export async function getFeedingActivityRecords(params?: {
     if (params.limit) query = query.limit(params.limit)
     if (params.signal) query = query.abortSignal(params.signal)
 
-    const { data, error } = await query.order("date", { ascending: false })
+    const { data, error } = await query
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
     if (error) {
       if (params.signal?.aborted || isQuietError(error)) return empty<FeedingActivityRow>()
       return toQueryError("getFeedingActivityRecords", error)
@@ -632,7 +636,9 @@ async function getScopedTableRows<T extends FishHarvestRow | FishStockingRow | F
     if (params.limit) query = query.limit(params.limit)
     if (params.signal) query = query.abortSignal(params.signal)
 
-    const { data, error } = await query.order("date", { ascending: false })
+    const { data, error } = await query
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
     if (error) {
       if (params.signal?.aborted || isQuietError(error)) return empty<T>()
       return toQueryError(tag, error)
@@ -711,7 +717,9 @@ export async function getMortalityData(params?: {
     if (params.limit) query = query.limit(params.limit)
     if (params.signal) query = query.abortSignal(params.signal)
 
-    const { data, error } = await query.order("date", { ascending: false })
+    const { data, error } = await query
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
     if (error) {
       if (params.signal?.aborted || isQuietError(error)) return empty<FishMortalityRow>()
       return toQueryError("getMortalityData", error)
@@ -759,7 +767,9 @@ export async function getTransferData(params?: {
     if (params.limit) query = query.limit(params.limit)
     if (params.signal) query = query.abortSignal(params.signal)
 
-    const { data, error } = await query.order("date", { ascending: false })
+    const { data, error } = await query
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
     if (error) {
       if (params.signal?.aborted || isQuietError(error)) return empty<FishTransferRow>()
       return toQueryError("getTransferData", error)
@@ -862,7 +872,11 @@ async function getRecentRows<T>(
   }
 
   if (params.signal) query = query.abortSignal(params.signal)
-  const { data, error } = await query.order(orderColumn, { ascending: false }).limit(limit)
+  const orderedQuery =
+    orderColumn === "created_at"
+      ? query.order(orderColumn, { ascending: false })
+      : query.order(orderColumn, { ascending: false }).order("created_at", { ascending: false })
+  const { data, error } = await orderedQuery.limit(limit)
   if (error) {
     if (params.signal?.aborted || isQuietError(error)) return []
     throw error

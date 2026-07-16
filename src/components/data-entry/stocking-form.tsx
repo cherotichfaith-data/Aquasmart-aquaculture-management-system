@@ -35,7 +35,13 @@ import {
   requireActiveFarmId,
   toIsoDate,
 } from "./form-utils"
-import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
+import {
+  LatestEntryGuard,
+  pickLatestEntryByRecordDate,
+  pickSameDayEntry,
+  usePendingLatestEntries,
+  type LatestEntrySummary,
+} from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
@@ -190,7 +196,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       { label: "Type", value: row.type_of_stocking ?? "Not recorded" },
     ],
   }))
-  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
   const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {

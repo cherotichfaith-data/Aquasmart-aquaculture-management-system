@@ -197,12 +197,20 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
   )
 }
 
-function mergeRecentEntries<T extends { created_at: string | null; status?: "pending" }>(serverRows: T[], pendingRows: T[]) {
+function mergeRecentEntriesByPrimaryDate<T extends { created_at: string | null; status?: "pending" }>(
+  serverRows: T[],
+  pendingRows: T[],
+  getPrimaryDate: (row: T) => string | null | undefined,
+) {
   const hasLivePendingRows = serverRows.some((row) => row.status === "pending")
   const combined = hasLivePendingRows ? serverRows : [...pendingRows, ...serverRows]
 
   return [...combined]
-    .sort((left, right) => new Date(right.created_at ?? 0).getTime() - new Date(left.created_at ?? 0).getTime())
+    .sort((left, right) => {
+      const dateCompare = String(getPrimaryDate(right) ?? "").localeCompare(String(getPrimaryDate(left) ?? ""))
+      if (dateCompare !== 0) return dateCompare
+      return new Date(right.created_at ?? 0).getTime() - new Date(left.created_at ?? 0).getTime()
+    })
     .slice(0, 5)
 }
 
@@ -275,7 +283,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
   let pendingCount = 0
 
   if (type === "mortality") {
-    const rows = mergeRecentEntries(data, pendingEntries as MortalityRow[])
+    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as MortalityRow[], (row) => row.date)
     pendingCount = (pendingEntries as MortalityRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -289,7 +297,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "feeding") {
-    const rows = mergeRecentEntries(data, pendingEntries as FeedingRow[])
+    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as FeedingRow[], (row) => row.date)
     pendingCount = (pendingEntries as FeedingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -304,7 +312,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "sampling") {
-    const rows = mergeRecentEntries(data, pendingEntries as SamplingRow[])
+    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as SamplingRow[], (row) => row.date)
     pendingCount = (pendingEntries as SamplingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -319,7 +327,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "transfer") {
-    const rows = mergeRecentEntries(data, pendingEntries as TransferRow[])
+    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as TransferRow[], (row) => row.date)
     pendingCount = (pendingEntries as TransferRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -334,7 +342,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "harvest") {
-    const rows = mergeRecentEntries(data, pendingEntries as HarvestRow[])
+    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as HarvestRow[], (row) => row.date)
     pendingCount = (pendingEntries as HarvestRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -349,7 +357,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "water_quality") {
-    const rows = mergeRecentEntries(data, pendingEntries as WaterQualityRow[])
+    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as WaterQualityRow[], (row) => row.date)
     pendingCount = (pendingEntries as WaterQualityRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -365,7 +373,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
     }))
   } else if (type === "feed_inventory") {
     const feedInventoryPendingEntries = pendingEntries as unknown as FeedInventoryRow[]
-    const rows = mergeRecentEntries(data, feedInventoryPendingEntries)
+    const rows = mergeRecentEntriesByPrimaryDate(data, feedInventoryPendingEntries, (row) => row.inventory_date)
     pendingCount = feedInventoryPendingEntries.length
     cards = rows.map((row, index) => {
       return {
@@ -382,7 +390,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       }
     })
   } else if (type === "stocking") {
-    const rows = mergeRecentEntries(data, pendingEntries as StockingRow[])
+    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as StockingRow[], (row) => row.date)
     pendingCount = (pendingEntries as StockingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),

@@ -22,7 +22,13 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
+import {
+  LatestEntryGuard,
+  pickLatestEntryByRecordDate,
+  pickSameDayEntry,
+  usePendingLatestEntries,
+  type LatestEntrySummary,
+} from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 import { parseOptionalNumericId, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 
@@ -126,7 +132,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       },
     ],
   }))
-  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
   const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {

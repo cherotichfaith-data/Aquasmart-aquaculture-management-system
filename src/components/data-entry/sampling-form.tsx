@@ -38,7 +38,13 @@ import {
   requireActiveFarmId,
   toIsoDate,
 } from "./form-utils"
-import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
+import {
+  LatestEntryGuard,
+  pickLatestEntryByRecordDate,
+  pickSameDayEntry,
+  usePendingLatestEntries,
+  type LatestEntrySummary,
+} from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
@@ -189,7 +195,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
       { label: "ABW", value: row.abw != null ? `${row.abw.toFixed(2)} g` : "Not recorded" },
     ],
   }))
-  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
   const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {

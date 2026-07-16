@@ -26,7 +26,13 @@ import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoPanel, InfoStat } from "./form-support"
 import { parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
-import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
+import {
+  LatestEntryGuard,
+  pickLatestEntryByRecordDate,
+  pickSameDayEntry,
+  usePendingLatestEntries,
+  type LatestEntrySummary,
+} from "./latest-entry-guard"
 import { SelectedSystemInfo } from "./selection-info"
 
 const optionalNumber = z.preprocess(
@@ -114,6 +120,7 @@ export function WaterQualityForm({
   const latestEntryQuery = useWaterQualityMeasurements({
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     limit: 1,
+    latestFirst: true,
     requireSystem: true,
     enabled: hasValidSystemId,
   })
@@ -186,7 +193,7 @@ export function WaterQualityForm({
       { label: "Depth", value: row.water_depth != null ? `${row.water_depth} m` : "Not recorded" },
     ],
   }))
-  const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
   const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {

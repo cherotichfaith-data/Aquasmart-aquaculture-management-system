@@ -72,6 +72,7 @@ export async function getWaterQualityMeasurements(params: {
   dateTo?: string
   parameterName?: Enums<"water_quality_parameters"> | string
   limit?: number
+  latestFirst?: boolean
   signal?: AbortSignal
 }): Promise<QueryResult<MeasurementRow>> {
   const clientResult = await getClientOrError("getWaterQualityMeasurements", { requireSession: true })
@@ -81,8 +82,8 @@ export async function getWaterQualityMeasurements(params: {
   let q = queryOptionsView(supabase, "api_water_quality_measurements")
     .select("*")
     .eq("farm_id", params.farmId)
-    .order("date", { ascending: true })
-    .order("time", { ascending: true })
+    .order("date", { ascending: !params.latestFirst })
+    .order("time", { ascending: !params.latestFirst })
 
   if (params.systemId) q = q.eq("system_id", params.systemId)
   if (params.dateFrom) q = q.gte("date", params.dateFrom)
