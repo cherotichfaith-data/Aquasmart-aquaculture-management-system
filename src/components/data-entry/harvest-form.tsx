@@ -35,7 +35,13 @@ import {
     reportDataEntrySubmitError,
     requireActiveFarmId,
 } from "./form-utils"
-import { LatestEntryGuard, pickLatestEntry, pickSameDayEntry, usePendingLatestEntries, type LatestEntrySummary } from "./latest-entry-guard"
+import {
+    LatestEntryGuard,
+    pickLatestEntryByRecordDate,
+    pickSameDayEntry,
+    usePendingLatestEntries,
+    type LatestEntrySummary,
+} from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
@@ -223,7 +229,7 @@ export function HarvestForm({
             { label: "Type", value: row.type_of_harvest ?? "Not recorded" },
         ],
     }))
-    const latestEntry = pickLatestEntry([...latestServerEntries, ...pendingEntries])
+    const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
     const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
     async function submitHarvest(values: z.infer<typeof formSchema>) {

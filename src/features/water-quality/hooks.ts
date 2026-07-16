@@ -69,6 +69,7 @@ export function useWaterQualityMeasurements(params: {
   parameterName?: string
   parameter?: string
   limit?: number
+  latestFirst?: boolean
   requireSystem?: boolean
   enabled?: boolean
   farmId?: string | null
@@ -88,6 +89,7 @@ export function useWaterQualityMeasurements(params: {
         dateTo: params.dateTo,
         parameterName: params.parameterName ?? params.parameter,
         limit: params.limit,
+        latestFirst: params.latestFirst ?? false,
       }),
       enabled,
       queryFn: ({ signal }) =>
@@ -98,6 +100,7 @@ export function useWaterQualityMeasurements(params: {
           dateTo: params.dateTo,
           parameterName: params.parameterName ?? params.parameter,
           limit: params.limit,
+          latestFirst: params.latestFirst,
           signal,
         }),
       staleTime: 60_000,

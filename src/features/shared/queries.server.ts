@@ -254,7 +254,9 @@ export async function listFeedingRecords(
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
 
-  const rows = await runRead<FeedingRecordJoinedRow>(query.order("date", { ascending: false }))
+  const rows = await runRead<FeedingRecordJoinedRow>(
+    query.order("date", { ascending: false }).order("created_at", { ascending: false }),
+  )
 
   return rows.map((row) => ({
     id: row.id,
@@ -308,7 +310,7 @@ export async function listHarvests(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runRead<FishHarvestRow>(query.order("date", { ascending: false }))
+  return runRead<FishHarvestRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
 }
 
 export async function listStockings(
@@ -338,7 +340,7 @@ export async function listStockings(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runRead<FishStockingRow>(query.order("date", { ascending: false }))
+  return runRead<FishStockingRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
 }
 
 export async function listSamplingData(
@@ -368,7 +370,7 @@ export async function listSamplingData(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runRead<FishSamplingWeightRow>(query.order("date", { ascending: false }))
+  return runRead<FishSamplingWeightRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
 }
 
 export async function listMortalityData(
@@ -394,7 +396,7 @@ export async function listMortalityData(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runRead<FishMortalityRow>(query.order("date", { ascending: false }))
+  return runRead<FishMortalityRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
 }
 
 export async function listTransferData(
@@ -418,7 +420,7 @@ export async function listTransferData(
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
-  return runRead<FishTransferRow>(query.order("date", { ascending: false }))
+  return runRead<FishTransferRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
 }
 
 export async function listRecentActivities(
@@ -510,7 +512,11 @@ async function getRecentRows<T>(
       break
   }
 
-  const { data, error } = await query.order(orderColumn, { ascending: false }).limit(limit)
+  const orderedQuery =
+    orderColumn === "created_at"
+      ? query.order(orderColumn, { ascending: false })
+      : query.order(orderColumn, { ascending: false }).order("created_at", { ascending: false })
+  const { data, error } = await orderedQuery.limit(limit)
   if (error) {
     if (isQuietReadError(error)) return []
     throw error
