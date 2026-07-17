@@ -475,6 +475,7 @@ export const queryKeys = {
       systemId?: number | null
       dateFrom?: string | null
       dateTo?: string | null
+      waterDepth?: number | null
       parameterName?: string | null
       limit?: number | null
       latestFirst?: boolean | null
@@ -486,6 +487,7 @@ export const queryKeys = {
         params?.systemId ?? null,
         params?.dateFrom ?? null,
         params?.dateTo ?? null,
+        params?.waterDepth ?? null,
         params?.parameterName ?? null,
         params?.limit ?? null,
         params?.latestFirst ?? false,

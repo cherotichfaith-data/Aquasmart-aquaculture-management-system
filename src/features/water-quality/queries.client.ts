@@ -70,6 +70,7 @@ export async function getWaterQualityMeasurements(params: {
   systemId?: number
   dateFrom?: string
   dateTo?: string
+  waterDepth?: number
   parameterName?: Enums<"water_quality_parameters"> | string
   limit?: number
   latestFirst?: boolean
@@ -88,6 +89,9 @@ export async function getWaterQualityMeasurements(params: {
   if (params.systemId) q = q.eq("system_id", params.systemId)
   if (params.dateFrom) q = q.gte("date", params.dateFrom)
   if (params.dateTo) q = q.lte("date", params.dateTo)
+  if (typeof params.waterDepth === "number" && Number.isFinite(params.waterDepth)) {
+    q = q.eq("water_depth", params.waterDepth)
+  }
   if (params.parameterName) q = q.eq("parameter_name", params.parameterName as Enums<"water_quality_parameters">)
   if (params.limit) q = q.limit(params.limit)
   if (params.signal) q = q.abortSignal(params.signal)

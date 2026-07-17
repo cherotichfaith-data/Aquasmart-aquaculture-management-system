@@ -11,6 +11,8 @@ export type LatestEntrySummary = {
   pending?: boolean
   summary: string
   details: Array<{ label: string; value: string }>
+  metadata?: Record<string, string | number | null | undefined>
+  duplicateMessage?: string
 }
 
 export type LatestEntryGuardKind =
@@ -52,6 +54,26 @@ export function pickLatestEntryByRecordDate(entries: LatestEntrySummary[]) {
 export function pickSameDayEntry(entries: LatestEntrySummary[], date?: string | null) {
   if (!date) return null
   return sortLatestEntries(entries.filter((entry) => entry.date === date))[0] ?? null
+}
+
+export function pickSameDayEntryByMetadata(
+  entries: LatestEntrySummary[],
+  params: {
+    date?: string | null
+    metadataKey: string
+    metadataValue?: string | number | null
+  },
+) {
+  if (!params.date || params.metadataValue == null) return null
+  return (
+    sortLatestEntries(
+      entries.filter(
+        (entry) =>
+          entry.date === params.date &&
+          entry.metadata?.[params.metadataKey] === params.metadataValue,
+      ),
+    )[0] ?? null
+  )
 }
 
 export function usePendingLatestEntries(kind: LatestEntryGuardKind, systemId?: number | null) {
@@ -164,6 +186,10 @@ export function usePendingLatestEntries(kind: LatestEntryGuardKind, systemId?: n
               { label: "Time", value: row.time },
               { label: "Depth", value: `${row.waterDepth} m` },
             ],
+            metadata: {
+              waterDepth: row.waterDepth,
+            },
+            duplicateMessage: `A water quality entry already exists for this cage on ${row.date} at ${row.waterDepth} m depth.`,
           }))
         }
       }
@@ -186,7 +212,7 @@ export function LatestEntryGuard({
     <div className="space-y-3">
       {duplicateEntry ? (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm text-destructive">
-          A {itemLabel} entry already exists for this cage on {duplicateEntry.date}.
+          {duplicateEntry.duplicateMessage ?? `A ${itemLabel} entry already exists for this cage on ${duplicateEntry.date}.`}
         </div>
       ) : null}
 
