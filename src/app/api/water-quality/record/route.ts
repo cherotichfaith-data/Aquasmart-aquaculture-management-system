@@ -39,7 +39,10 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("water_quality_measurement")
-    .upsert(normalized, { onConflict: "local_id" })
+    // Water-quality writes are operator-initiated inserts. Using DO NOTHING for
+    // local_id conflicts preserves idempotency for offline sync without
+    // requiring UPDATE RLS privileges on this table.
+    .upsert(normalized, { onConflict: "local_id", ignoreDuplicates: true })
     .select()
 
   if (error || !data) {
