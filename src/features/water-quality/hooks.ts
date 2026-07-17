@@ -66,6 +66,7 @@ export function useWaterQualityMeasurements(params: {
   systemId?: number
   dateFrom?: string
   dateTo?: string
+  waterDepth?: number
   parameterName?: string
   parameter?: string
   limit?: number
@@ -87,6 +88,7 @@ export function useWaterQualityMeasurements(params: {
         systemId: params.systemId,
         dateFrom: params.dateFrom,
         dateTo: params.dateTo,
+        waterDepth: params.waterDepth,
         parameterName: params.parameterName ?? params.parameter,
         limit: params.limit,
         latestFirst: params.latestFirst ?? false,
@@ -98,6 +100,7 @@ export function useWaterQualityMeasurements(params: {
           systemId: params.systemId,
           dateFrom: params.dateFrom,
           dateTo: params.dateTo,
+          waterDepth: params.waterDepth,
           parameterName: params.parameterName ?? params.parameter,
           limit: params.limit,
           latestFirst: params.latestFirst,

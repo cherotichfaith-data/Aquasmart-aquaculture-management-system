@@ -29,7 +29,7 @@ import { parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
 import {
   LatestEntryGuard,
   pickLatestEntryByRecordDate,
-  pickSameDayEntry,
+  pickSameDayEntryByMetadata,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
@@ -113,6 +113,10 @@ export function WaterQualityForm({
   const doValue = form.watch("dissolved_oxygen")
   const selectedTime = form.watch("time")
   const selectedDepth = form.watch("water_depth")
+  const selectedDepthValue =
+    typeof selectedDepth === "number" && Number.isFinite(selectedDepth)
+      ? selectedDepth
+      : Number(selectedDepth)
   const selectedSystem =
     selectableSystems.find((system) => String(system.id) === selectedSystemValue) ?? null
   const isLakeReference = selectedSystem?.label?.toLowerCase().includes("lake reference") ?? false
@@ -128,9 +132,17 @@ export function WaterQualityForm({
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
-    limit: 20,
+    waterDepth:
+      Number.isFinite(selectedDepthValue) && selectedDepthValue >= 0
+        ? selectedDepthValue
+        : undefined,
+    limit: 100,
     requireSystem: true,
-    enabled: hasValidSystemId && Boolean(selectedDate),
+    enabled:
+      hasValidSystemId &&
+      Boolean(selectedDate) &&
+      Number.isFinite(selectedDepthValue) &&
+      selectedDepthValue >= 0,
   })
   const pendingEntries = usePendingLatestEntries("water_quality", hasValidSystemId ? selectedSystemId : null)
 
@@ -182,6 +194,9 @@ export function WaterQualityForm({
       { label: "Time", value: row.time ?? "Not recorded" },
       { label: "Depth", value: row.water_depth != null ? `${row.water_depth} m` : "Not recorded" },
     ],
+    metadata: {
+      waterDepth: row.water_depth ?? null,
+    },
   }))
   const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
     key: `water-quality-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
@@ -192,14 +207,33 @@ export function WaterQualityForm({
       { label: "Time", value: row.time ?? "Not recorded" },
       { label: "Depth", value: row.water_depth != null ? `${row.water_depth} m` : "Not recorded" },
     ],
+    metadata: {
+      waterDepth: row.water_depth ?? null,
+    },
+    duplicateMessage:
+      row.water_depth != null
+        ? `A water quality entry already exists for this cage on ${row.date} at ${row.water_depth} m depth.`
+        : `A water quality entry already exists for this cage on ${row.date}.`,
   }))
   const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
-  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
+  const duplicateEntry = pickSameDayEntryByMetadata(
+    [...duplicateServerEntries, ...pendingEntries],
+    {
+      date: selectedDate,
+      metadataKey: "waterDepth",
+      metadataValue:
+        Number.isFinite(selectedDepthValue) && selectedDepthValue >= 0
+          ? selectedDepthValue
+          : null,
+    },
+  )
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       if (duplicateEntry) {
-        form.setError("date", { message: `A water quality entry already exists for ${values.date}.` })
+        form.setError("water_depth", {
+          message: `A water quality entry already exists for ${values.date} at ${values.water_depth} m depth.`,
+        })
         return
       }
 
