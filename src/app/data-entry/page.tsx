@@ -73,7 +73,11 @@ export default async function DataEntryPage({
   return (
     <Suspense fallback={null}>
       <QueryHydration state={dehydrate(queryClient)}>
-        <DataEntryPageClient initialFarmId={farmId} initialFarmName={farmName} />
+        <DataEntryPageClient
+          key={currentPath}
+          initialFarmId={farmId}
+          initialFarmName={farmName}
+        />
       </QueryHydration>
     </Suspense>
   )
