@@ -49,7 +49,7 @@ export default function DataEntryPageClient({
   const systemsQuery = useSystemOptions({ farmId, activeOnly: true })
   const batchesQuery = useBatchOptions({ farmId })
   const feedsQuery = useFeedTypeOptions({ farmId })
-  const recentEntriesQuery = useRecentEntries()
+  const recentEntriesQuery = useRecentEntries({ farmId })
   const searchParams = useSearchParams()
   const typeParam = searchParams.get("type")
   const systemParam = searchParams.get("system")
