@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Button from "@mui/material/Button"
 import { createClient } from "@/lib/supabase/client"
@@ -47,9 +47,6 @@ const NotificationsContext = createContext<NotificationsContextValue | undefined
 
 const MAX_NOTIFICATIONS = 50
 
-const formatPercent = (value: number, decimals = 2) =>
-  formatNumberValue(value * 100, { decimals, minimumDecimals: decimals, fallback: "0" })
-
 const isAbortLikeError = (err: unknown): boolean => {
   if (!err) return false
   const e = err as { name?: string; message?: string }
@@ -82,9 +79,42 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const { profile, session, user } = useAuth()
   const { toast } = useToast()
   const userId = user?.id ?? null
-  const [notifications, setNotifications] = useState<AlertNotification[]>([])
   const seenIds = useRef<Set<string>>(new Set())
   const storageKey = farmId ? `aqua_alert_history_${farmId}` : "aqua_alert_history"
+  const currentStorageToken = useMemo(() => Symbol(storageKey), [storageKey])
+  const readStoredNotifications = useCallback(() => {
+    if (typeof window === "undefined") return [] as AlertNotification[]
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) return []
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed
+        .filter((item): item is AlertNotification => Boolean(item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string"))
+        .slice(0, MAX_NOTIFICATIONS)
+    } catch {
+      return []
+    }
+  }, [storageKey])
+  const [notificationsDraft, setNotificationsDraft] = useState(() => ({
+    sourceToken: currentStorageToken,
+    value: readStoredNotifications(),
+  }))
+  const notifications =
+    notificationsDraft.sourceToken === currentStorageToken
+      ? notificationsDraft.value
+      : readStoredNotifications()
+  const setNotifications = useCallback((value: SetStateAction<AlertNotification[]>) => {
+    setNotificationsDraft((current) => {
+      const previousValue =
+        current.sourceToken === currentStorageToken ? current.value : readStoredNotifications()
+      const nextValue = typeof value === "function" ? value(previousValue) : value
+      return {
+        sourceToken: currentStorageToken,
+        value: nextValue,
+      }
+    })
+  }, [currentStorageToken, readStoredNotifications])
 
   const notificationsEnabled = profile?.notifications_enabled ?? true
   const systemsQuery = useQuery({
@@ -139,7 +169,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     },
   })
 
-  const thresholds = thresholdsQuery.data ?? []
+  const thresholds = useMemo(() => thresholdsQuery.data ?? [], [thresholdsQuery.data])
   const systemMap = useMemo(() => {
     const map: Record<number, string> = {}
     ;(systemsQuery.data ?? []).forEach((row) => {
@@ -171,23 +201,23 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         })
       }
     },
-    [notificationsEnabled, router, toast],
+    [notificationsEnabled, router, setNotifications, toast],
   )
 
   const markAllRead = useCallback(() => {
     setNotifications((prev) => prev.map((item) => ({ ...item, read: true })))
-  }, [])
+  }, [setNotifications])
 
   const markRead = useCallback((id: string) => {
     setNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item)),
     )
-  }, [])
+  }, [setNotifications])
 
   const clearAll = useCallback(() => {
     setNotifications([])
     seenIds.current.clear()
-  }, [])
+  }, [setNotifications])
 
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications])
 
@@ -216,25 +246,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [addNotification, farmId, session, systemsLoaded, systemsQuery.data])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const raw = window.localStorage.getItem(storageKey)
-      if (!raw) {
-        setNotifications([])
-        seenIds.current.clear()
-        return
-      }
-      const parsed = JSON.parse(raw) as AlertNotification[]
-      if (!Array.isArray(parsed)) return
-      const normalized = parsed
-        .filter((item) => item && typeof item.id === "string")
-        .slice(0, MAX_NOTIFICATIONS)
-      setNotifications(normalized)
-      seenIds.current = new Set(normalized.map((item) => item.id))
-    } catch {
-      // Ignore malformed local history.
-    }
-  }, [storageKey])
+    seenIds.current = new Set(notifications.map((item) => item.id))
+  }, [notifications])
 
   useEffect(() => {
     if (typeof window === "undefined") return

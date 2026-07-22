@@ -1,4 +1,17 @@
-import { offlineDB, MAX_SYNC_RETRIES, type OfflineTableName } from "@/lib/offline/db"
+import type { Table } from "dexie"
+import {
+  offlineDB,
+  MAX_SYNC_RETRIES,
+  type OfflineBaseRecord,
+  type OfflineFeedingRecord,
+  type OfflineHarvestRecord,
+  type OfflineMortalityRecord,
+  type OfflineSamplingRecord,
+  type OfflineStockingRecord,
+  type OfflineTableName,
+  type OfflineTransferRecord,
+  type OfflineWaterQualityRecord,
+} from "@/lib/offline/db"
 
 /**
  * Exponential backoff delay (ms) for the given retry count.
@@ -22,9 +35,34 @@ type PushRecordResult = {
   errorMessage?: string
 }
 
-type SyncConfig = {
+type OfflineRecordByTable = {
+  feeding: OfflineFeedingRecord
+  mortality: OfflineMortalityRecord
+  sampling: OfflineSamplingRecord
+  waterQuality: OfflineWaterQualityRecord
+  harvest: OfflineHarvestRecord
+  transfer: OfflineTransferRecord
+  stocking: OfflineStockingRecord
+}
+
+type SyncConfig<RecordType> = {
   apiPath: string
-  buildBody: (record: any) => unknown
+  buildBody: (record: RecordType) => unknown
+}
+
+/**
+ * Updates the shared sync-bookkeeping fields (syncStatus/retryCount/retryAfter/serverId)
+ * on a table whose record type is generic over `OfflineTableName`. Dexie's `UpdateSpec<T>`
+ * can't be checked against a generic indexed-access type (`OfflineRecordByTable[Key]`), even
+ * though every concrete record type extends `OfflineBaseRecord` and therefore has these
+ * fields — so this narrows the table handle to its common base type for the update call only.
+ */
+function updateSyncFields<Key extends OfflineTableName>(
+  table: Table<OfflineRecordByTable[Key], string>,
+  localId: string,
+  changes: Partial<OfflineBaseRecord>,
+) {
+  return (table as unknown as Table<OfflineBaseRecord, string>).update(localId, changes)
 }
 
 export const syncTargets = {
@@ -37,7 +75,7 @@ export const syncTargets = {
   stocking: "/api/stocking/record",
 } satisfies Record<OfflineTableName, string>
 
-const syncConfigs: Record<OfflineTableName, SyncConfig> = {
+const syncConfigs: { [Key in OfflineTableName]: SyncConfig<OfflineRecordByTable[Key]> } = {
   feeding: {
     apiPath: syncTargets.feeding,
     buildBody: (record) => ({
@@ -167,7 +205,10 @@ function extractResponseError(responseBody: unknown, fallback: string): string {
   return fallback
 }
 
-export async function pushRecordDirect(tableName: OfflineTableName, record: any): Promise<PushRecordResult> {
+export async function pushRecordDirect<Key extends OfflineTableName>(
+  tableName: Key,
+  record: OfflineRecordByTable[Key],
+): Promise<PushRecordResult> {
   const config = syncConfigs[tableName]
   const response = await fetch(config.apiPath, {
     method: "POST",
@@ -192,8 +233,11 @@ export async function pushRecordDirect(tableName: OfflineTableName, record: any)
   }
 }
 
-export async function pushPendingRecordById(tableName: OfflineTableName, localId: string): Promise<PushRecordResult> {
-  const table = offlineDB.table<any, string>(tableName)
+export async function pushPendingRecordById<Key extends OfflineTableName>(
+  tableName: Key,
+  localId: string,
+): Promise<PushRecordResult> {
+  const table = offlineDB.table<OfflineRecordByTable[Key], string>(tableName)
   const record = await table.get(localId)
   if (!record || record.syncStatus !== "pending") {
     return { status: "missing" }
@@ -217,7 +261,7 @@ export async function pushPendingRecordById(tableName: OfflineTableName, localId
     const body = await response.json().catch(() => null)
 
     if (response.ok) {
-      await table.update(localId, {
+      await updateSyncFields(table, localId, {
         syncStatus: "synced",
         serverId: extractServerId(body),
         retryCount: 0,
@@ -227,20 +271,20 @@ export async function pushPendingRecordById(tableName: OfflineTableName, localId
     }
 
     if (response.status === 409) {
-      await table.update(localId, { syncStatus: "synced", retryCount: 0, retryAfter: undefined })
+      await updateSyncFields(table, localId, { syncStatus: "synced", retryCount: 0, retryAfter: undefined })
       return { status: "conflict", response: body }
     }
 
     // Server error: apply exponential backoff and mark as failed after MAX_SYNC_RETRIES
     const nextRetryCount = (record.retryCount ?? 0) + 1
     if (nextRetryCount >= MAX_SYNC_RETRIES) {
-      await table.update(localId, {
+      await updateSyncFields(table, localId, {
         syncStatus: "failed",
         retryCount: nextRetryCount,
         retryAfter: undefined,
       })
     } else {
-      await table.update(localId, {
+      await updateSyncFields(table, localId, {
         retryCount: nextRetryCount,
         retryAfter: now + backoffDelayMs(nextRetryCount),
       })
@@ -249,7 +293,7 @@ export async function pushPendingRecordById(tableName: OfflineTableName, localId
   } catch {
     // Network error: apply backoff but don't increment retryCount as it might be offline
     const nextRetryCount = (record.retryCount ?? 0) + 1
-    await table.update(localId, {
+    await updateSyncFields(table, localId, {
       retryCount: nextRetryCount,
       retryAfter: now + backoffDelayMs(nextRetryCount),
     })
@@ -257,8 +301,8 @@ export async function pushPendingRecordById(tableName: OfflineTableName, localId
   }
 }
 
-async function pushTable(tableName: OfflineTableName): Promise<SyncResult> {
-  const table = offlineDB.table<any, string>(tableName)
+async function pushTable<Key extends OfflineTableName>(tableName: Key): Promise<SyncResult> {
+  const table = offlineDB.table<OfflineRecordByTable[Key], string>(tableName)
   // Only attempt records that are still 'pending' (not 'failed', 'synced', or 'conflict')
   const pendingRecords = await table.where("syncStatus").equals("pending").toArray()
 

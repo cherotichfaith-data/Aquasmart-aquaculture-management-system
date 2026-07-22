@@ -1,8 +1,6 @@
 import type { Database } from "@/lib/types/database"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
-import { toRpcDate, toRpcSystemIds } from "@/lib/rpc-params"
-import type { DashboardSystemRow } from "@/features/dashboard/types"
 
 export type ServerClient = ReturnType<typeof createAccessTokenClient>
 
@@ -13,99 +11,15 @@ type SystemVolumeRow = Pick<
 >
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type BatchOptionRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
-type BatchActivityRow = {
-  batch_id: number
-  date: string
-  system_id: number
-}
 type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
-type DashboardTimePeriodRow = Database["public"]["Tables"]["dashboard_time_period"]["Row"]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
+type DashboardSystemRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
 type FarmMember = {
   user_id: string
   role: string
   created_at: string
   full_name?: string | null
-}
-
-function attachBatchNamesToDashboardRows<T extends { system_id: number; as_of_date: string | null; batch_name?: string | null }>(
-  rows: T[],
-  activities: BatchActivityRow[],
-  batchLabelById: Map<number, string>,
-): T[] {
-  if (!rows.length || !batchLabelById.size) return rows
-
-  const activitiesBySystemId = new Map<number, BatchActivityRow[]>()
-  activities.forEach((activity) => {
-    const current = activitiesBySystemId.get(activity.system_id) ?? []
-    current.push(activity)
-    activitiesBySystemId.set(activity.system_id, current)
-  })
-
-  activitiesBySystemId.forEach((systemActivities) => {
-    systemActivities.sort((left, right) => right.date.localeCompare(left.date))
-  })
-
-  return rows.map((row) => {
-    const batchId = (activitiesBySystemId.get(row.system_id) ?? [])
-      .find((activity) => row.as_of_date && activity.date <= row.as_of_date)?.batch_id ?? null
-    if (batchId == null) return row
-
-    const batchName = batchLabelById.get(batchId) ?? `Batch ${batchId}`
-    return {
-      ...row,
-      batch_name: batchName,
-    }
-  })
-}
-
-async function listDashboardBatchActivityRows(
-  supabase: ServerClient,
-  params: {
-    systemIds: number[]
-    maxDate: string
-  },
-): Promise<BatchActivityRow[]> {
-  const [feedingResult, samplingResult, mortalityResult, harvestResult, stockingResult, transferResult] = await Promise.all([
-    supabase.from("feeding_record").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
-    supabase.from("fish_sampling_weight").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
-    supabase.from("fish_mortality").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
-    supabase.from("fish_harvest").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
-    supabase.from("fish_stocking").select("system_id, batch_id, date").in("system_id", params.systemIds).lte("date", params.maxDate),
-    supabase
-      .from("fish_transfer")
-      .select("origin_system_id, target_system_id, batch_id, date")
-      .or(`origin_system_id.in.(${params.systemIds.join(",")}),target_system_id.in.(${params.systemIds.join(",")})`)
-      .lte("date", params.maxDate),
-  ])
-
-  const results = [feedingResult, samplingResult, mortalityResult, harvestResult, stockingResult, transferResult]
-  for (const result of results) {
-    if (result.error) return []
-  }
-
-  const baseActivities = [feedingResult.data, samplingResult.data, mortalityResult.data, harvestResult.data, stockingResult.data]
-    .flatMap((rows) => rows ?? [])
-    .flatMap((row) =>
-      typeof row.system_id === "number" && typeof row.batch_id === "number" && typeof row.date === "string"
-        ? [{ system_id: row.system_id, batch_id: row.batch_id, date: row.date }]
-        : [],
-    )
-
-  const transferActivities = (transferResult.data ?? []).flatMap((row) => {
-    if (typeof row.batch_id !== "number" || typeof row.date !== "string") return []
-    const activities: BatchActivityRow[] = []
-    if (typeof row.origin_system_id === "number") {
-      activities.push({ system_id: row.origin_system_id, batch_id: row.batch_id, date: row.date })
-    }
-    if (typeof row.target_system_id === "number") {
-      activities.push({ system_id: row.target_system_id, batch_id: row.batch_id, date: row.date })
-    }
-    return activities
-  })
-
-  return [...baseActivities, ...transferActivities]
 }
 
 export async function listProductionSummaryRows(
@@ -187,22 +101,6 @@ export async function listFeedTypeOptionRows(
   return (data ?? []) as FeedTypeOptionRow[]
 }
 
-export async function listDashboardTimePeriodRows(
-  supabase: ServerClient,
-): Promise<Array<{ time_period: Database["public"]["Enums"]["time_period"] | "all history"; days_since_start: number | null }>> {
-  const { data, error } = await supabase
-    .from("dashboard_time_period")
-    .select("time_period, days_since_start")
-    .order("days_since_start", { ascending: true })
-
-  if (error) return []
-
-  return [
-    ...((data ?? []) as DashboardTimePeriodRow[]),
-    { time_period: "all history", days_since_start: null },
-  ]
-}
-
 export async function listAlertThresholdRows(
   supabase: ServerClient,
   farmId: string,
@@ -241,46 +139,21 @@ export async function listDashboardSystemsRows(
   supabase: ServerClient,
   params: {
     farmId: string
-    stage?: Database["public"]["Enums"]["system_growth_stage"] | null
-    systemId?: number | null
-    systemIds?: number[] | null
-    dateFrom?: string | null
-    dateTo?: string | null
+    systemIds?: number[]
+    stage?: Database["public"]["Enums"]["system_growth_stage"]
+    dateFrom?: string
+    dateTo?: string
   },
 ): Promise<DashboardSystemRow[]> {
   const { data, error } = await supabase.rpc("api_dashboard_systems", {
     p_farm_id: params.farmId,
     p_stage: params.stage ?? undefined,
-    p_system_ids: toRpcSystemIds(params.systemIds ?? params.systemId),
-    p_start_date: toRpcDate(params.dateFrom),
-    p_end_date: toRpcDate(params.dateTo),
-  } as Database["public"]["Functions"]["api_dashboard_systems"]["Args"] & {
-    p_system_ids: number[] | null
-    p_start_date: string | null
-    p_end_date: string | null
+    p_system_ids: params.systemIds?.length ? params.systemIds : undefined,
+    p_start_date: params.dateFrom ?? undefined,
+    p_end_date: params.dateTo ?? undefined,
   })
   if (error) return []
-  const rows = ((data ?? []) as DashboardSystemRow[]).slice()
-  const systemIds = Array.from(
-    new Set(rows.map((row) => row.system_id).filter((id): id is number => typeof id === "number" && Number.isFinite(id))),
-  )
-  const asOfDates = rows.map((row) => row.as_of_date).filter((value): value is string => typeof value === "string" && value.length > 0)
-  if (!rows.length || !systemIds.length || !asOfDates.length) return rows
-
-  const maxDate = asOfDates.reduce((current, value) => (value > current ? value : current))
-
-  const [batchOptions, activityRows] = await Promise.all([
-    supabase.rpc("api_fingerling_batch_options_rpc", {
-      p_farm_id: params.farmId,
-      p_active_only: false,
-    }),
-    listDashboardBatchActivityRows(supabase, { systemIds, maxDate }),
-  ])
-
-  const batchLabelById = new Map(
-    ((batchOptions.data ?? []) as BatchOptionRow[]).map((row) => [row.id, row.label || `Batch ${row.id}`]),
-  )
-  return attachBatchNamesToDashboardRows(rows, activityRows, batchLabelById)
+  return (data ?? []) as DashboardSystemRow[]
 }
 
 export async function listFarmMembers(

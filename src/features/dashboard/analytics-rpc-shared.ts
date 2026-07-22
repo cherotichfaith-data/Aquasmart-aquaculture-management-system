@@ -1,5 +1,5 @@
 import { Constants, type Database, type Enums } from "@/lib/types/database"
-import type { DashboardPageInitialData, KPIOverviewMetric, RecommendedAction } from "./types"
+import type { KPIOverviewMetric, KpiOverviewData, RecommendedAction } from "./types"
 
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
 
@@ -87,7 +87,7 @@ export function buildKpiOverviewFromRpc(params: {
   consolidatedRows: DashboardConsolidatedRow[]
   dateFrom: string
   dateTo: string
-}): DashboardPageInitialData["kpiOverview"] {
+}): KpiOverviewData {
   if (!params.scopedSystemIds.length) {
     return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }
   }
@@ -208,7 +208,9 @@ export function buildKpiOverviewFromRpc(params: {
       label: "Water Quality",
       value: waterQuality,
       decimals: 1,
-      trend: null,
+      trend: consolidated.water_quality_rating_numeric_delta ?? null,
+      trendFormat: "delta",
+      trendDecimals: 1,
       invertTrend: false,
       tone: waterQualityDisplay?.tone ?? "neutral",
       badge: waterQualityDisplay?.badge ?? "Monitoring",

@@ -1,6 +1,6 @@
 import { runServerReadThrough } from "@/lib/cache/server"
 import { cacheTags } from "@/lib/cache/tags"
-import { toQuerySuccess } from "@/lib/api/_utils"
+import { toQuerySuccess } from "@/lib/supabase/query-transport"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { getScopedSystemOptions } from "@/features/shared/scoped-analytics.server"
 import { listBatchOptionRows, listFeedTypeOptionRows } from "@/features/shared/query-seed.server"

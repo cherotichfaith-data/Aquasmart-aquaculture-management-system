@@ -2,12 +2,11 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState, type MouseEvent } from "react"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Collapse from "@mui/material/Collapse"
-import Divider from "@mui/material/Divider"
 import Drawer from "@mui/material/Drawer"
 import IconButton from "@mui/material/IconButton"
 import List from "@mui/material/List"
@@ -20,7 +19,6 @@ import Paper from "@mui/material/Paper"
 import Skeleton from "@mui/material/Skeleton"
 import Tooltip from "@mui/material/Tooltip"
 import Typography from "@mui/material/Typography"
-import { alpha } from "@mui/material/styles"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
@@ -223,7 +221,6 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
   const pathname = usePathname()
   const appPathname = stripDashboardPath(pathname)
   const searchParams = useSearchParams()
-  const router = useRouter()
   const { signOut } = useAuth()
   const { farm, farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const farmRoleQuery = useActiveFarmRole(farmId)
@@ -238,6 +235,19 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
   const waterQualityActive = appPathname === "/water-quality"
   const tabParam = searchParams.get("tab")
   const activeWaterQualityKey = !tabParam || tabParam === "overview" ? "overview" : tabParam
+  // Navigation should carry the user's working context between sections.
+  // Without this, opening Production from another section removes `system`
+  // and Production falls back to the lowest database ID (Cage 2B here).
+  const withCurrentContext = (href: string) => {
+    const [basePath, query = ""] = href.split("?", 2)
+    const nextParams = new URLSearchParams(query)
+    for (const key of ["farmId", "system", "cage", "period", "batch", "stage"]) {
+      const value = searchParams.get(key)
+      if (value != null && !nextParams.has(key)) nextParams.set(key, value)
+    }
+    const nextQuery = nextParams.toString()
+    return nextQuery ? `${basePath}?${nextQuery}` : basePath
+  }
 
   useEffect(() => {
     if (waterQualityActive) setWaterQualityOpen(true)
@@ -263,7 +273,7 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
         <MenuItem
           key={link.href}
           component={Link}
-          href={link.href}
+          href={withCurrentContext(link.href)}
           selected={isActive}
           onClick={closeAfterNavigate}
           dense={dense}
@@ -414,7 +424,7 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
                       >
                         <Box
                           component={Link}
-                          href={item.href}
+                          href={withCurrentContext(item.href)}
                           onClick={closeAfterNavigate}
                           sx={{
                             display: "flex",
@@ -456,7 +466,7 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
                             <ListItemButton
                               key={link.href}
                               component={Link}
-                              href={link.href}
+                              href={withCurrentContext(link.href)}
                               selected={link.activeKey === activeWaterQualityKey}
                               onClick={closeAfterNavigate}
                               sx={{
@@ -477,6 +487,7 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
                 }
 
                 const resolvedHref = resolveItemHref(farmRole, item.href)
+                const contextualHref = withCurrentContext(resolvedHref)
                 const resolvedLabel = resolveItemLabel(farmRole, item.href, item.name)
                 const itemBasePath = stripDashboardPath(item.href)
                 const resolvedBasePath = stripDashboardPath(resolvedHref.split("?")[0] ?? resolvedHref)
@@ -495,7 +506,7 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
                   >
                     <ListItemButton
                       component={Link}
-                      href={resolvedHref}
+                      href={contextualHref}
                       selected={isActive}
                       onClick={closeAfterNavigate}
                       sx={{

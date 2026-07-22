@@ -13,8 +13,8 @@ import { getSessionIdentity } from "@/lib/supabase/session";
 import { mergeUserContext } from "@/lib/user-context";
 
 type UserRole = AquaSmartRole;
-type AuthProfile = Record<string, any> | null;
-type AuthSettings = Record<string, any> | null;
+type AuthProfile = Record<string, unknown> | null;
+type AuthSettings = Record<string, unknown> | null;
 
 interface AuthContextType {
     user: User | null;
@@ -320,7 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => subscription.unsubscribe();
-    }, [applyUserContext, clearInvalidSession, resolvePreferredSession, supabase]);
+    }, [applyUserContext, clearInvalidSession, resolvePreferredSession, resolveServerBackedSession, supabase]);
 
     useEffect(() => {
         const handler = () => {

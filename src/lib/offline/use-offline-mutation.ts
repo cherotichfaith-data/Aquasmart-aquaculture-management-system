@@ -52,7 +52,16 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
         const responses: unknown[] = []
 
         for (const record of records) {
-          const result = await pushRecordDirect(options.tableName, record)
+          // `options.tableName` is widened to `OfflineTableName` here (it isn't tied to a
+          // single literal at this generic boundary), so `pushRecordDirect`'s parameter type
+          // resolves to the full union of offline record shapes. Every concrete caller of
+          // `useOfflineMutation` supplies a `TRecord` that matches its own `tableName` literal,
+          // so this cast reflects a real invariant the generic signature can't express, not a
+          // way to bypass it.
+          const result = await pushRecordDirect(
+            options.tableName,
+            record as unknown as Parameters<typeof pushRecordDirect>[1],
+          )
 
           if (result.status === "pushed" || result.status === "conflict") {
             if (result.response !== undefined) {

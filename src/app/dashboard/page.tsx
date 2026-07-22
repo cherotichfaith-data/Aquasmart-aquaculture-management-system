@@ -8,14 +8,14 @@ import { QueryHydration } from "@/components/providers/query-hydration"
 import { WORKSPACE_SELECT_PATH, resolveAppEntryPath, sanitizeNextPath } from "@/lib/app-entry"
 import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
 import { cleanScopedFilterState, parseSelectedNumericId } from "@/features/shared/scoped-analytics.server"
-import { listBatchOptionRows, listDashboardTimePeriodRows } from "@/features/shared/query-seed.server"
+import { listBatchOptionRows } from "@/features/shared/query-seed.server"
 import { loadWorkspaceContextForUser } from "@/lib/server/workspace"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { queryKeys } from "@/lib/cache/query-keys"
 import { createQueryClient } from "@/lib/react-query/query-client"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { ACTIVE_FARM_COOKIE, ACTIVE_ORGANIZATION_COOKIE, normalizeContextValue } from "@/lib/context"
-import { toQuerySuccess } from "@/lib/api/_utils"
+import { toQuerySuccess } from "@/lib/supabase/query-transport"
 
 export const metadata: Metadata = {
   title: "Dashboard | AquaSmart",
@@ -84,10 +84,7 @@ export default async function DashboardPage({
     initialData.systemOptions.status === "success"
       ? cleanScopedFilterState(initialFilters, initialData.systemOptions.data)
       : initialFilters
-  const [batchOptions, timePeriodOptions] = await Promise.all([
-    listBatchOptionRows(analyticsSupabase, { farmId }),
-    listDashboardTimePeriodRows(analyticsSupabase),
-  ])
+  const batchOptions = await listBatchOptionRows(analyticsSupabase, { farmId })
   const { data: farmRow } = await analyticsSupabase.from("farm").select("name").eq("id", farmId).maybeSingle()
   const initialFarmName = farmRow?.name ?? null
   const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
@@ -120,6 +117,9 @@ export default async function DashboardPage({
       queryKeys.timePeriodBounds({
         farmId,
         timePeriod: effectiveFilters.timePeriod,
+        custom: effectiveFilters.customTimeRange
+          ? `custom_${effectiveFilters.customTimeRange.start}_${effectiveFilters.customTimeRange.end}`
+          : null,
         systemId: undefined,
         batchId,
         scope: "dashboard",
@@ -147,7 +147,6 @@ export default async function DashboardPage({
     ),
   )
   queryClient.setQueryData(queryKeys.options.batches({ farmId }), toQuerySuccess(batchOptions))
-  queryClient.setQueryData(queryKeys.options.timePeriods(), toQuerySuccess(timePeriodOptions))
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)
   queryClient.setQueryData(queryKeys.farmUserRole(farmId, contextUser.id), workspaceContext.role)
 

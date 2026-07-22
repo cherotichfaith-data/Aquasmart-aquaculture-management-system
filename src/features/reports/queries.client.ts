@@ -9,9 +9,9 @@ import {
   queryOptionsRpc,
   toQueryError,
   toQuerySuccess,
-} from "@/lib/api/_utils"
+} from "@/lib/supabase/query-transport"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import { toRpcDate, toRpcSystemIds } from "@/lib/rpc-params"
+import { toRpcDate } from "@/lib/rpc-params"
 import { getProductionSummary } from "@/features/production/queries.client"
 import type { ProductionSummaryRpcRow } from "@/features/production/types"
 import type {
@@ -19,7 +19,6 @@ import type {
   FeedingBreakdownRow,
   FeedingRecordWithType,
   FeedGrowthTrendRow,
-  FeedRunningStockRow,
   FeedingSummaryRow,
   PerformanceSummaryRow,
   PerformanceRecordRow,
@@ -78,13 +77,20 @@ type FeedingActivityRow = Pick<
   FeedingRecordRow,
   "id" | "created_at" | "date" | "batch_id" | "feeding_amount" | "feeding_response" | "system_id"
 >
+type RecentRowsQuery = {
+  eq(column: string, value: string): RecentRowsQuery
+  in(column: string, values: number[]): RecentRowsQuery
+  or(filter: string): RecentRowsQuery
+  abortSignal(signal: AbortSignal): RecentRowsQuery
+  order(column: string, options: { ascending: boolean }): RecentRowsQuery
+  limit(count: number): PromiseLike<{ data: unknown[] | null; error: unknown }>
+}
 
 export type {
   ChangeLogRow,
   FeedingBreakdownRow,
   FeedingRecordWithType,
   FeedGrowthTrendRow,
-  FeedRunningStockRow,
   FeedingSummaryRow,
   PerformanceRecordRow,
   PerformanceSummaryRow,
@@ -439,30 +445,6 @@ export async function getFeedingBreakdown(params?: {
   )
 }
 
-export async function getRunningStock(params: {
-  farmId?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedRunningStockRow>> {
-  if (!params.farmId) return empty<FeedRunningStockRow>()
-
-  const clientResult = await getReportsClient("getRunningStock")
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryKpiRpc(supabase, "api_running_stock", {
-    p_farm_id: params.farmId,
-  })
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<FeedRunningStockRow>()
-    return toQueryError("getRunningStock", error)
-  }
-
-  return toQuerySuccess<FeedRunningStockRow>((data ?? []) as FeedRunningStockRow[])
-}
-
 export async function getGrowthTrend(params: {
   farmId?: string | null
   systemId?: number
@@ -482,27 +464,40 @@ export async function getGrowthTrend(params: {
     const systemIds = await resolveScopedSystemIds(supabase, params)
     if (!systemIds || systemIds.length === 0) return empty<FeedGrowthTrendRow>()
 
-    let query = queryKpiRpc(supabase, "api_growth_trend", {
-      p_farm_id: params.farmId,
-      p_system_ids: toRpcSystemIds(systemIds),
-      p_start_date: toRpcDate(params.dateFrom),
-      p_end_date: toRpcDate(params.dateTo),
-      p_days: params.dateFrom || params.dateTo ? undefined : params.days,
-    })
-    if (params.signal) query = query.abortSignal(params.signal)
-
-    const { data, error } = await query
-    if (error) {
-      if (params.signal?.aborted || isQuietError(error)) return empty<FeedGrowthTrendRow>()
-      return toQueryError("getGrowthTrend", error)
-    }
-
-    const rows = ((data ?? []) as FeedGrowthTrendRow[]).map((row) => ({
-      ...row,
-      system_id:
-        typeof row.system_id === "number" ? row.system_id : systemIds.length === 1 ? systemIds[0] : row.system_id,
-    }))
-    return toQuerySuccess<FeedGrowthTrendRow>(rows)
+    const startDate = toRpcDate(params.dateFrom)
+    const endDate = toRpcDate(params.dateTo)
+    const rowsBySystem = await Promise.all(
+      systemIds.map(async (systemId): Promise<FeedGrowthTrendRow[]> => {
+        let query = queryKpiRpc(supabase, "api_production_summary", {
+          p_farm_id: params.farmId!,
+          p_system_id: systemId,
+          p_start_date: startDate ?? undefined,
+          p_end_date: endDate ?? undefined,
+        })
+        if (params.signal) query = query.abortSignal(params.signal)
+        const { data, error } = await query
+        if (error) {
+          if (params.signal?.aborted || isQuietError(error)) return []
+          throw error
+        }
+        const summaryRows = (data ?? []) as ProductionSummaryRpcRow[]
+        return summaryRows.map((row) => ({
+          system_id: row.system_id ?? systemId,
+          sample_date: row.date,
+          abw_g: row.average_body_weight,
+          adg_g_day: row.agr,
+          sgr_pct_day: row.sgr,
+          days_interval: row.days_in_period,
+          weight_gain_g: row.biomass_increase_period,
+          age_days: null,
+          expected_abw_g: row.target_weight_g,
+          growth_deviation_pct: null,
+        }))
+      }),
+    )
+    return toQuerySuccess<FeedGrowthTrendRow>(
+      rowsBySystem.flat().sort((left, right) => left.sample_date.localeCompare(right.sample_date)),
+    )
   } catch (error) {
     if (params.signal?.aborted || isQuietError(error)) return empty<FeedGrowthTrendRow>()
     return toQueryError("getGrowthTrend", error)
@@ -851,7 +846,7 @@ async function getRecentRows<T>(
   },
 ): Promise<T[]> {
   const limit = params.limit ?? 5
-  let query: any = supabase.from(table).select("*")
+  let query = supabase.from(table).select("*") as unknown as RecentRowsQuery
 
   switch (table) {
     case "fish_mortality":

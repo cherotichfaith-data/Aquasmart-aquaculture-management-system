@@ -11,7 +11,8 @@
     "dev:turbo": "next dev --turbo",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "node -e \"process.env.ESLINT_USE_FLAT_CONFIG='false';const cmd=process.platform==='win32'?'npx.cmd':'npx';require('child_process').spawnSync(cmd,['next','lint'],{stdio:'inherit'});\""
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -26,6 +27,8 @@
     "@supabase/supabase-js": "^2.45.0",
     "@tanstack/react-query": "^5.90.20",
     "@tanstack/react-query-devtools": "^5.91.3",
+    "@tanstack/react-table": "^8.21.3",
+    "@tremor/react": "^3.16.2",
     "autoprefixer": "^10.4.20",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
@@ -40,6 +43,7 @@
     "react-chartjs-2": "^5.3.1",
     "react-dom": "18.3.1",
     "react-hook-form": "^7.60.0",
+    "recharts": "^2.12.6",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "^0.18.5",

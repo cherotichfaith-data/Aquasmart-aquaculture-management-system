@@ -12,13 +12,14 @@ import type {
   DashboardPageInitialFilters,
 } from "./types"
 import type { RecommendedActionRow } from "@/lib/types/insights"
-import { isMissingObjectError, toQuerySuccess } from "@/lib/api/_utils"
+import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
-import { resolveTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { parseCustomPeriodUrlValue, resolveTimePeriod } from "@/lib/time-period"
 import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics-rpc-shared"
 import { listDashboardSystemsRows, listWaterQualityMeasurementRows } from "@/features/shared/query-seed.server"
 import { toRpcDate, toRpcSystemId, toRpcSystemIds } from "@/lib/rpc-params"
+
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
 const DEFAULT_TIME_PERIOD: DashboardPageInitialFilters["timePeriod"] = "month"
@@ -68,6 +69,7 @@ export function parseDashboardPageFilters(
     selectedSystem,
     selectedStage,
     timePeriod,
+    customTimeRange: parseCustomPeriodUrlValue(timePeriodRaw),
   }
 }
 
@@ -77,6 +79,7 @@ async function getTimeBounds(
   timePeriod: DashboardPageInitialFilters["timePeriod"],
   systemId?: number,
   batchId?: number,
+  customTimeRange?: DashboardPageInitialFilters["customTimeRange"],
 ): Promise<TimeBounds> {
   return withNetworkFallback(
     "dashboard:getTimeBounds",
@@ -92,7 +95,7 @@ async function getTimeBounds(
       isTruncated: false,
       stalenessDays: null,
     },
-    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", systemId, batchId),
+    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", systemId, batchId, customTimeRange),
   )
 }
 
@@ -199,9 +202,10 @@ function buildEmptyDashboardPageInitialData(): DashboardPageInitialData {
 async function loadDashboardPageInitialData(
   supabase: ServerClient,
   params: {
-  farmId: string | null
-  filters: DashboardPageInitialFilters
-}): Promise<DashboardPageInitialData> {
+    farmId: string | null
+    filters: DashboardPageInitialFilters
+  },
+): Promise<DashboardPageInitialData> {
   const empty = buildEmptyDashboardPageInitialData()
   if (!params.farmId) return empty
   const farmId = params.farmId
@@ -217,7 +221,14 @@ async function loadDashboardPageInitialData(
     params.filters.selectedBatch !== "all" && Number.isFinite(Number(params.filters.selectedBatch))
       ? Number(params.filters.selectedBatch)
       : undefined
-  const bounds = await getTimeBounds(supabase, farmId, params.filters.timePeriod, selectedSystemId, batchId)
+  const bounds = await getTimeBounds(
+    supabase,
+    farmId,
+    params.filters.timePeriod,
+    selectedSystemId,
+    batchId,
+    params.filters.customTimeRange,
+  )
   if (!bounds.start || !bounds.end) {
     return {
       ...empty,
@@ -254,7 +265,7 @@ async function loadDashboardPageInitialData(
     .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
   const batchScopedIds =
     params.filters.selectedBatch !== "all"
-      ? new Set(batchSystems.map((row) => row.system_id))
+      ? new Set((await getBatchSystemIds(supabase, batchId)).filter((id) => dashboardSystemIds.includes(id)))
       : null
   const stageBatchScopedIds = batchScopedIds
     ? dashboardSystemIds.filter((id) => batchScopedIds.has(id))
@@ -321,9 +332,9 @@ async function loadDashboardPageInitialData(
       farmId,
       dateFrom: startDate,
       dateTo: endDate,
-    selectedStage: params.filters.selectedStage,
-    selectedBatch: params.filters.selectedBatch,
-    selectedSystem: effectiveSelectedSystem,
+      selectedStage: params.filters.selectedStage,
+      selectedBatch: params.filters.selectedBatch,
+      selectedSystem: effectiveSelectedSystem,
       scopedSystemIds: activeScopedSystemIds,
       systemsTableRowsCount: systemsTableRows.length,
     })

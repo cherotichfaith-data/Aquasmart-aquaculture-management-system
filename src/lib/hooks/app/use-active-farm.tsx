@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type SetStateAction } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useFarmOptions } from "@/lib/hooks/use-options"
@@ -21,6 +21,11 @@ type ActiveFarm = {
   owner?: string | null
   email?: string | null
   phone?: string | null
+}
+
+type ActiveFarmDraft = {
+  sourceToken: symbol
+  value: string | null
 }
 
 const getStorageKey = (userId: string) => `aquasmart:${userId}:activeFarmId`
@@ -51,10 +56,70 @@ const clearStoredActiveFarmId = (userId?: string | null) => {
 
 export function useActiveFarm(params?: { initialFarmId?: string | null; initialFarmName?: string | null }) {
   const { user, session, isLoading } = useAuth()
-  const [activeFarmId, setActiveFarmId] = useState<string | null>(normalizeFarmId(params?.initialFarmId))
   const supabase = useMemo(() => createClient(), [])
 
   const farmsQuery = useFarmOptions({ enabled: Boolean(session) })
+  const availableFarms = useMemo(
+    () => ((farmsQuery.data?.status === "success" ? farmsQuery.data.data : []) as FarmOption[]),
+    [farmsQuery.data],
+  )
+  const initialFarmId = normalizeFarmId(params?.initialFarmId)
+  const derivedActiveFarmId = useMemo(() => {
+    if (isLoading) {
+      return initialFarmId
+    }
+
+    if (!session || availableFarms.length === 0) {
+      return null
+    }
+
+    let urlFarmId: string | null = null
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      urlFarmId = normalizeFarmId(params.get("farmId"))
+    }
+
+    let storedFarmId: string | null = null
+    if (user?.id && typeof window !== "undefined") {
+      storedFarmId = normalizeFarmId(window.localStorage.getItem(getStorageKey(user.id)))
+    }
+
+    const cookieFarmId = normalizeFarmId(readBrowserCookie(ACTIVE_FARM_COOKIE))
+    const farmIds = availableFarms.map((row) => row.id)
+
+    return (
+      (urlFarmId && farmIds.includes(urlFarmId) ? urlFarmId : null) ??
+      (storedFarmId && farmIds.includes(storedFarmId) ? storedFarmId : null) ??
+      (cookieFarmId && farmIds.includes(cookieFarmId) ? cookieFarmId : null) ??
+      farmIds[0] ??
+      null
+    )
+  }, [availableFarms, initialFarmId, isLoading, session, user?.id])
+  const sourceSignature = [
+    user?.id ?? "",
+    session ? "session" : "anon",
+    isLoading ? "loading" : "ready",
+    initialFarmId ?? "",
+    availableFarms.map((farm) => farm.id).join(","),
+    derivedActiveFarmId ?? "",
+  ].join("|")
+  const currentSourceToken = useMemo(() => Symbol(sourceSignature), [sourceSignature])
+  const [draft, setDraft] = useState<ActiveFarmDraft>(() => ({
+    sourceToken: currentSourceToken,
+    value: derivedActiveFarmId,
+  }))
+  const activeFarmId = draft.sourceToken === currentSourceToken ? draft.value : derivedActiveFarmId
+  const setActiveFarmId = useCallback((value: SetStateAction<string | null>) => {
+    setDraft((current) => {
+      const previousValue = current.sourceToken === currentSourceToken ? current.value : derivedActiveFarmId
+      const nextValue = typeof value === "function" ? value(previousValue) : value
+      return {
+        sourceToken: currentSourceToken,
+        value: nextValue,
+      }
+    })
+  }, [currentSourceToken, derivedActiveFarmId])
+
   const farmDetailsQuery = useQuery({
     queryKey: queryKeys.appConfig([`farm-details:${activeFarmId ?? "none"}`], user?.id),
     enabled: Boolean(session) && Boolean(activeFarmId),
@@ -72,11 +137,6 @@ export function useActiveFarm(params?: { initialFarmId?: string | null; initialF
   })
 
   useEffect(() => {
-    if (params?.initialFarmId === undefined) return
-    setActiveFarmId(normalizeFarmId(params.initialFarmId))
-  }, [params?.initialFarmId, user?.id])
-
-  useEffect(() => {
     if (isLoading) {
       return
     }
@@ -84,49 +144,20 @@ export function useActiveFarm(params?: { initialFarmId?: string | null; initialF
     if (!session) {
       clearStoredActiveFarmId(user?.id)
       clearBrowserWorkspaceContext()
-      setActiveFarmId(null)
       return
     }
 
-    const farms = (farmsQuery.data?.status === "success" ? farmsQuery.data.data : []) as FarmOption[]
-    if (!farms.length) {
+    if (!availableFarms.length || !activeFarmId) {
       clearStoredActiveFarmId(user?.id)
       clearBrowserWorkspaceContext()
-      setActiveFarmId(null)
       return
     }
 
-    let urlFarmId: string | null = null
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search)
-      urlFarmId = normalizeFarmId(params.get("farmId"))
-    }
-
-    let storedFarmId: string | null = null
     if (user?.id && typeof window !== "undefined") {
-      storedFarmId = normalizeFarmId(window.localStorage.getItem(getStorageKey(user.id)))
+      window.localStorage.setItem(getStorageKey(user.id), activeFarmId)
+      setBrowserWorkspaceContext({ farmId: activeFarmId })
     }
-
-    const cookieFarmId = normalizeFarmId(readBrowserCookie(ACTIVE_FARM_COOKIE))
-
-    const farmIds = farms.map((row) => row.id)
-    const resolvedFarmId =
-      (urlFarmId && farmIds.includes(urlFarmId) ? urlFarmId : null) ??
-      (storedFarmId && farmIds.includes(storedFarmId) ? storedFarmId : null) ??
-      (cookieFarmId && farmIds.includes(cookieFarmId) ? cookieFarmId : null) ??
-      farmIds[0] ??
-      null
-
-    if (resolvedFarmId && user?.id && typeof window !== "undefined") {
-      window.localStorage.setItem(getStorageKey(user.id), resolvedFarmId)
-      setBrowserWorkspaceContext({ farmId: resolvedFarmId })
-    } else {
-      clearStoredActiveFarmId(user?.id)
-      clearBrowserWorkspaceContext()
-    }
-
-    setActiveFarmId(resolvedFarmId)
-  }, [farmsQuery.data, isLoading, session, user?.id])
+  }, [activeFarmId, availableFarms.length, isLoading, session, user?.id])
 
   useEffect(() => {
     const handleFarmUpdated = (event: Event) => {
@@ -150,12 +181,11 @@ export function useActiveFarm(params?: { initialFarmId?: string | null; initialF
         window.removeEventListener("farm-memberships-updated", handleMembershipUpdated)
       }
     }
-  }, [farmDetailsQuery, farmsQuery])
+  }, [farmDetailsQuery, farmsQuery, setActiveFarmId])
 
   const farm = useMemo<ActiveFarm | null>(() => {
-    const farms = (farmsQuery.data?.status === "success" ? farmsQuery.data.data : []) as FarmOption[]
     if (!activeFarmId) return null
-    const match = farms.find((row) => row.id === activeFarmId)
+    const match = availableFarms.find((row) => row.id === activeFarmId)
     const details = farmDetailsQuery.data
     const initialFarmName = params?.initialFarmName?.trim() || null
     if (!match && !details && !initialFarmName) return null
@@ -167,7 +197,7 @@ export function useActiveFarm(params?: { initialFarmId?: string | null; initialF
       email: null,
       phone: null,
     }
-  }, [activeFarmId, farmDetailsQuery.data, farmsQuery.data, params?.initialFarmName])
+  }, [activeFarmId, availableFarms, farmDetailsQuery.data, params?.initialFarmName])
 
   return {
     farm,

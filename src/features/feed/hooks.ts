@@ -82,6 +82,7 @@ export function useRecordFeeding() {
       }
 
       const previous = addOptimisticRecentEntry(queryClient, {
+        farmId,
         key: "feeding",
         entry: optimistic,
       })

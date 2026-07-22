@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/types/database"
-import { toRpcDate, toRpcSystemId, toRpcSystemIds } from "@/lib/rpc-params"
-import { isInvalidBigintUuidError, isMissingObjectError, toQuerySuccess } from "@/lib/api/_utils"
+import { toRpcDate } from "@/lib/rpc-params"
+import { isInvalidBigintUuidError, isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 type SharedSupabaseClient = SupabaseClient<Database>
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
+type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 type GrowthTrendRow = {
   system_id: number
   sample_date: string
@@ -17,11 +18,6 @@ type GrowthTrendRow = {
   age_days?: number | null
   expected_abw_g?: number | null
   growth_deviation_pct?: number | null
-}
-type RunningStockRow = {
-  date: string | null
-  system_id: number | null
-  qty: number | null
 }
 type RecentActivityFeedRow = Database["public"]["Functions"]["api_recent_activity_feed"]["Returns"][number]
 type FishMortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
@@ -80,6 +76,13 @@ type FeedingRecordJoinedRow = {
     feed_category: string | null
     feed_pellet_size: string | null
   } | null
+}
+type RecentRowsQuery = {
+  eq(column: string, value: string): RecentRowsQuery
+  in(column: string, values: number[]): RecentRowsQuery
+  or(filter: string): RecentRowsQuery
+  order(column: string, options: { ascending: boolean }): RecentRowsQuery
+  limit(count: number): PromiseLike<{ data: unknown[] | null; error: unknown }>
 }
 
 const isQuietReadError = (error: unknown) =>
@@ -154,24 +157,6 @@ async function resolveScopedSystemIds(
   return requestedIds.filter((id) => farmSystemIdSet.has(id))
 }
 
-export async function listRunningStock(
-  supabase: SharedSupabaseClient,
-  params: { farmId?: string | null },
-): Promise<RunningStockRow[]> {
-  if (!params.farmId) return []
-
-  const { data, error } = await supabase.rpc("api_running_stock" as never, {
-    p_farm_id: params.farmId,
-  } as never)
-
-  if (error) {
-    if (isQuietReadError(error)) return []
-    throw error
-  }
-
-  return (data ?? []) as RunningStockRow[]
-}
-
 export async function listGrowthTrend(
   supabase: SharedSupabaseClient,
   params: {
@@ -190,22 +175,32 @@ export async function listGrowthTrend(
 
   const startDate = toRpcDate(params.dateFrom)
   const endDate = toRpcDate(params.dateTo)
-  const query = supabase.rpc("api_growth_trend" as never, {
-    p_farm_id: params.farmId,
-    p_system_ids: toRpcSystemIds(systemIds),
-    p_start_date: startDate,
-    p_end_date: endDate,
-    p_days: startDate || endDate ? undefined : params.days,
-  } as never)
+  const rowsBySystem = await Promise.all(
+    systemIds.map(async (systemId) => {
+      const rows = await runRead<ProductionSummaryRow>(
+        supabase.rpc("api_production_summary", {
+          p_farm_id: params.farmId!,
+          p_system_id: systemId,
+          p_start_date: startDate ?? undefined,
+          p_end_date: endDate ?? undefined,
+        }),
+      )
+      return rows.map<GrowthTrendRow>((row) => ({
+        system_id: row.system_id ?? systemId,
+        sample_date: row.date,
+        abw_g: row.average_body_weight,
+        adg_g_day: row.agr,
+        sgr_pct_day: row.sgr,
+        days_interval: row.days_in_period,
+        weight_gain_g: row.biomass_increase_period,
+        age_days: null,
+        expected_abw_g: row.target_weight_g,
+        growth_deviation_pct: null,
+      }))
+    }),
+  )
 
-  const rows = await runRead<GrowthTrendRow>(query)
-  if (systemIds.length !== 1) return rows
-
-  const [onlySystemId] = systemIds
-  return rows.map((row) => ({
-    ...row,
-    system_id: typeof row.system_id === "number" ? row.system_id : onlySystemId,
-  }))
+  return rowsBySystem.flat().sort((left, right) => left.sample_date.localeCompare(right.sample_date))
 }
 
 export async function listFeedingRecords(
@@ -491,7 +486,7 @@ async function getRecentRows<T>(
 
   if (!farmId) return []
 
-  let query: any = supabase.from(table).select("*")
+  let query = supabase.from(table).select("*") as unknown as RecentRowsQuery
   switch (table) {
     case "fish_mortality":
       query = query.eq("farm_id", farmId)

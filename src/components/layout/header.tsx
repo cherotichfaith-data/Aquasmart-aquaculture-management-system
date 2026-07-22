@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useState, type MouseEvent } from "react"
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import Avatar from "@mui/material/Avatar"
 import Badge from "@mui/material/Badge"
 import Box from "@mui/material/Box"
@@ -47,14 +47,19 @@ import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
 import { useTimePeriodBounds } from "@/lib/hooks/app/use-time-period-bounds"
 import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
-import { useBatchOptions, useDashboardTimePeriodOptions, useSystemOptions } from "@/lib/hooks/use-options"
-import { formatStableDateTime } from "@/lib/deterministic-format"
+import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
+import { formatStableDateTime } from "@/lib/analytics-format"
 import { formatGrowthStage, normalizeStageFilter } from "@/lib/stage-filter"
 import {
+  formatCustomRangeLabel,
+  getAvailableTimePeriods,
   formatResolvedTimeWindow,
+  parseCustomPeriodUrlValue,
   resolveTimePeriod,
+  toCustomPeriodUrlValue,
   toTimePeriodUrlValue,
   type AnalyticsTimeScope,
+  type CustomTimeRange,
 } from "@/lib/time-period"
 
 type PageMeta = {
@@ -68,6 +73,8 @@ type PageTimeConfig = {
   useSystemBounds: boolean
   showBatchFilter: boolean
   showStageFilter: boolean
+  /** Production owns its System select in-page (design guide); hide the header's. */
+  showSystemFilter?: boolean
 }
 
 const getPageTimeConfig = (pathname: string): PageTimeConfig => {
@@ -76,7 +83,7 @@ const getPageTimeConfig = (pathname: string): PageTimeConfig => {
   }
   if (pathname.startsWith("/sampling") || pathname.startsWith("/production") || pathname.startsWith("/reports")) {
     if (pathname.startsWith("/production")) {
-      return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: false, showStageFilter: false }
+      return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: false, showStageFilter: false, showSystemFilter: false }
     }
     return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
   }
@@ -194,7 +201,7 @@ export default function Header({
   const pathname = usePathname()
   const appPathname = stripDashboardPath(pathname)
   const searchParams = useSearchParams()
-  const { farm, farmId } = useActiveFarm({ initialFarmId, initialFarmName })
+  const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const activeFarmRoleQuery = useActiveFarmRole(farmId)
   const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
   const [signingOut, setSigningOut] = useState(false)
@@ -222,9 +229,22 @@ export default function Header({
   const systemsQuery = useSystemOptions(
     farmId ? { farmId, activeOnly: appPathname.startsWith("/feed") ? false : true } : undefined,
   )
-  const timePeriodsQuery = useDashboardTimePeriodOptions()
-  const allSystemsForChips = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
-  const allBatchesForChips = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
+  const allSystemsForChips = useMemo(
+    () => (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
+    [systemsQuery.data],
+  )
+  const allBatchesForChips = useMemo(
+    () => (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []),
+    [batchesQuery.data],
+  )
+  const rawPeriodParam = searchParams.get("period")
+
+  // Custom date range (aquasmart-main / v2 design): same URL param as
+  // presets, encoded as `custom_YYYY-MM-DD_YYYY-MM-DD`.
+  const customTimeRange = useMemo(
+    () => parseCustomPeriodUrlValue(rawPeriodParam),
+    [rawPeriodParam],
+  )
 
   const sharedFilterInitialValues = useMemo<Partial<SharedFiltersState> | undefined>(() => {
     const hasFilterParams = ["cage", "system", "batch", "stage", "period"].some((key) => searchParams.get(key) != null)
@@ -236,9 +256,9 @@ export default function Header({
       selectedBatch: searchParams.get("batch") ?? "all",
       selectedSystem: selectedSystemId != null ? String(selectedSystemId) : cageParam ?? "all",
       selectedStage: normalizeStageFilter(searchParams.get("stage")),
-      timePeriod: resolveTimePeriod(searchParams.get("period"), defaultPeriod),
+      timePeriod: resolveTimePeriod(rawPeriodParam, defaultPeriod),
     }
-  }, [allSystemsForChips, defaultPeriod, searchParams])
+  }, [allSystemsForChips, defaultPeriod, rawPeriodParam, searchParams])
 
   const {
     selectedBatch,
@@ -257,9 +277,17 @@ export default function Header({
               getSystemFilterUrlValue(
                 allSystemsForChips.find((item) => String(item.id) === sharedFilterInitialValues.selectedSystem),
               ) ?? sharedFilterInitialValues.selectedSystem,
-            timePeriod: toTimePeriodUrlValue(sharedFilterInitialValues.timePeriod ?? defaultPeriod),
+            // Preserve the custom range token in the URL instead of
+            // rewriting it to the fallback preset.
+            timePeriod: customTimeRange
+              ? toCustomPeriodUrlValue(customTimeRange)
+              : toTimePeriodUrlValue(sharedFilterInitialValues.timePeriod ?? defaultPeriod),
           }
-        : { timePeriod: toTimePeriodUrlValue(sharedFilterInitialValues?.timePeriod ?? defaultPeriod) },
+        : {
+            timePeriod: customTimeRange
+              ? toCustomPeriodUrlValue(customTimeRange)
+              : toTimePeriodUrlValue(sharedFilterInitialValues?.timePeriod ?? defaultPeriod),
+          },
   })
 
   const systemParam = selectedSystem !== "all" ? `&system=${selectedSystem}` : ""
@@ -275,14 +303,18 @@ export default function Header({
   const timeWindowBoundsQuery = useTimePeriodBounds({
     farmId,
     timePeriod,
+    customRange: customTimeRange,
     systemId: pageTimeConfig.useSystemBounds ? selectedSystemId : undefined,
     batchId: selectedBatchId,
     scope: pageTimeConfig.scope,
     enabled: showToolbar,
   })
   const timeWindowSummary = useMemo(
-    () => formatResolvedTimeWindow(timePeriod, timeWindowBoundsQuery.start, timeWindowBoundsQuery.end),
-    [timePeriod, timeWindowBoundsQuery.end, timeWindowBoundsQuery.start],
+    () =>
+      customTimeRange
+        ? `${formatCustomRangeLabel(customTimeRange)} (Custom)`
+        : formatResolvedTimeWindow(timePeriod, timeWindowBoundsQuery.start, timeWindowBoundsQuery.end),
+    [customTimeRange, timePeriod, timeWindowBoundsQuery.end, timeWindowBoundsQuery.start],
   )
 
   const selectedBatchAgeDays = useMemo(() => {
@@ -298,11 +330,8 @@ export default function Header({
   }, [allBatchesForChips, selectedBatch])
 
   const timePeriodOptions = useMemo(() => {
-    if (timePeriodsQuery.data?.status !== "success") return undefined
-    return timePeriodsQuery.data.data
-      .filter((row) => selectedBatchAgeDays == null || row.days_since_start == null || row.days_since_start <= selectedBatchAgeDays)
-      .map((row) => row.time_period)
-  }, [selectedBatchAgeDays, timePeriodsQuery.data])
+    return getAvailableTimePeriods(selectedBatchAgeDays)
+  }, [selectedBatchAgeDays])
 
   const activeSystemLabel = useMemo(() => {
     if (selectedSystem === "all") return null
@@ -338,7 +367,7 @@ export default function Header({
     [],
   )
 
-  const replaceFilterParams = (next: {
+  const replaceFilterParams = useCallback((next: {
     selectedBatch?: string
     selectedSystem?: string
     selectedStage?: SharedFiltersState["selectedStage"]
@@ -368,7 +397,14 @@ export default function Header({
     if (nextStage !== "all") params.set("stage", nextStage)
     else params.delete("stage")
 
-    params.set("period", toTimePeriodUrlValue(nextPeriod))
+    // Keep an active custom range unless this change explicitly picks a preset.
+    if (next.timePeriod == null && customTimeRange) {
+      const customValue = toCustomPeriodUrlValue(customTimeRange)
+      params.set("period", customValue)
+    } else {
+      const nextPeriodValue = toTimePeriodUrlValue(nextPeriod)
+      params.set("period", nextPeriodValue)
+    }
 
     if (isWaterQualityPage) {
       if (nextParameter !== DEFAULT_WQ_PARAMETER) params.set("parameter", nextParameter)
@@ -378,44 +414,70 @@ export default function Header({
     const nextQuery = params.toString()
     if (nextQuery === searchParams.toString()) return
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
-  }
+  }, [
+    allSystemsForChips,
+    customTimeRange,
+    isWaterQualityPage,
+    pathname,
+    router,
+    searchParams,
+    selectedBatch,
+    selectedParameter,
+    selectedStage,
+    selectedSystem,
+    timePeriod,
+  ])
 
-  const handleBatchChange = (value: string) => {
+  const handleBatchChange = useCallback((value: string) => {
     setSelectedBatch(value)
     replaceFilterParams({ selectedBatch: value })
-  }
+  }, [replaceFilterParams, setSelectedBatch])
 
-  const handleSystemChange = (value: string) => {
+  const handleSystemChange = useCallback((value: string) => {
     setSelectedSystem(value)
     replaceFilterParams({ selectedSystem: value })
-  }
+  }, [replaceFilterParams, setSelectedSystem])
 
-  const handleStageChange = (value: SharedFiltersState["selectedStage"]) => {
+  const handleStageChange = useCallback((value: SharedFiltersState["selectedStage"]) => {
     setSelectedStage(value)
     replaceFilterParams({ selectedStage: value })
-  }
+  }, [replaceFilterParams, setSelectedStage])
 
-  const handleTimePeriodChange = (value: TimePeriod) => {
+  const handleTimePeriodChange = useCallback((value: TimePeriod) => {
     setTimePeriod(value)
     replaceFilterParams({ timePeriod: value })
-  }
+  }, [replaceFilterParams, setTimePeriod])
+
+  // Custom range (aquasmart-main / v2 design): writes the whole range into
+  // the same `period` URL param as `custom_from_to`.
+  const handleCustomRangeChange = useCallback(
+    (range: CustomTimeRange) => {
+      const params = new URLSearchParams(searchParams.toString())
+      const customValue = toCustomPeriodUrlValue(range)
+      params.set("period", customValue)
+      const nextQuery = params.toString()
+      if (nextQuery === searchParams.toString()) return
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+    },
+    [pathname, router, searchParams],
+  )
 
   useEffect(() => {
     if (!timePeriodOptions?.length || timePeriodOptions.includes(timePeriod)) return
     const nextPeriod = timePeriodOptions.includes("all history") ? "all history" : timePeriodOptions[0]
     if (!nextPeriod) return
     handleTimePeriodChange(nextPeriod)
-  }, [timePeriod, timePeriodOptions])
+  }, [handleTimePeriodChange, timePeriod, timePeriodOptions])
 
   useEffect(() => {
     if (pageTimeConfig.showBatchFilter || selectedBatch === "all") return
     handleBatchChange("all")
-  }, [pageTimeConfig.showBatchFilter, selectedBatch])
+  }, [handleBatchChange, pageTimeConfig.showBatchFilter, selectedBatch])
 
   useEffect(() => {
     if (pageTimeConfig.showStageFilter || selectedStage === "all") return
     handleStageChange("all")
-  }, [pageTimeConfig.showStageFilter, selectedStage])
+  }, [handleStageChange, pageTimeConfig.showStageFilter, selectedStage])
 
   const handleWaterQualityParameterChange = (value: string) => {
     if (!isWqParameter(value)) return
@@ -624,6 +686,8 @@ export default function Header({
                     <TimePeriodSelector
                       selectedPeriod={timePeriod}
                       onPeriodChange={handleTimePeriodChange}
+                      customRange={customTimeRange}
+                      onCustomRangeChange={handleCustomRangeChange}
                       variant="compact"
                       periods={timePeriodOptions}
                     />
@@ -639,6 +703,7 @@ export default function Header({
                       onStageChange={handleStageChange}
                       showBatch={pageTimeConfig.showBatchFilter}
                       showStage={pageTimeConfig.showStageFilter}
+                      showSystem={pageTimeConfig.showSystemFilter !== false}
                       showCounts={false}
                       variant="compact"
                       layout="row"
@@ -911,6 +976,7 @@ export default function Header({
             onStageChange={handleStageChange}
             showBatch={pageTimeConfig.showBatchFilter}
             showStage={pageTimeConfig.showStageFilter}
+            showSystem={pageTimeConfig.showSystemFilter !== false}
             showCounts={false}
             variant="compact"
             layout="grid"

@@ -2,7 +2,8 @@ import { Constants, type Database, type Enums } from "@/lib/types/database"
 import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 
 export type BaseTimePeriod = Enums<"time_period">
-export type TimePeriod = BaseTimePeriod | "all history"
+export type DateType = BaseTimePeriod | "all history"
+export type TimePeriod = DateType
 export type AnalyticsTimeScope =
   | "dashboard"
   | "inventory"
@@ -13,9 +14,11 @@ export type AnalyticsTimeScope =
 
 export const BASE_TIME_PERIODS = Constants.public.Enums.time_period
 
-export const TIME_PERIODS: TimePeriod[] = [...BASE_TIME_PERIODS, "all history"]
+export const DATE_TYPES: DateType[] = [...BASE_TIME_PERIODS, "all history"]
+export const TIME_PERIODS: TimePeriod[] = DATE_TYPES
 
-export const DEFAULT_TIME_PERIOD: TimePeriod = "month"
+export const DEFAULT_DATE_TYPE: DateType = "month"
+export const DEFAULT_TIME_PERIOD: TimePeriod = DEFAULT_DATE_TYPE
 
 export type TimeBounds = {
   start: string | null
@@ -30,18 +33,19 @@ export type TimeBounds = {
   isTruncated?: boolean | null
 }
 
-export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
-  day: "Last day",
-  week: "Last 7 days",
-  "2 weeks": "Last 14 days",
-  month: "Last 30 days",
-  quarter: "Last 90 days",
-  "6 months": "Last 180 days",
-  year: "Last 365 days",
+export const DATE_TYPE_LABELS: Record<DateType, string> = {
+  day: "Day",
+  week: "Week",
+  "2 weeks": "2 Weeks",
+  month: "Month",
+  quarter: "Quarter",
+  "6 months": "6 Months",
+  year: "Year",
   "all history": "All History",
 }
+export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = DATE_TYPE_LABELS
 
-export const TIME_PERIOD_URL_VALUES: Record<TimePeriod, string> = {
+export const DATE_TYPE_URL_VALUES: Record<DateType, string> = {
   day: "day",
   week: "week",
   "2 weeks": "2-weeks",
@@ -51,31 +55,63 @@ export const TIME_PERIOD_URL_VALUES: Record<TimePeriod, string> = {
   year: "year",
   "all history": "all-history",
 }
+export const TIME_PERIOD_URL_VALUES: Record<TimePeriod, string> = DATE_TYPE_URL_VALUES
 
-const TIME_PERIODS_BY_URL_VALUE = new Map(
-  Object.entries(TIME_PERIOD_URL_VALUES).map(([period, urlValue]) => [urlValue, period as TimePeriod]),
+const DATE_TYPES_BY_URL_VALUE = new Map(
+  Object.entries(DATE_TYPE_URL_VALUES).map(([dateType, urlValue]) => [urlValue, dateType as DateType]),
 )
 
-export function toTimePeriodUrlValue(value: TimePeriod) {
-  return TIME_PERIOD_URL_VALUES[value] ?? value
+export function toDateTypeUrlValue(value: DateType) {
+  return DATE_TYPE_URL_VALUES[value] ?? value
 }
+export const toTimePeriodUrlValue = toDateTypeUrlValue
 
-export function parseTimePeriodUrlValue(value: unknown): TimePeriod | null {
+export function parseDateTypeUrlValue(value: unknown): DateType | null {
   if (typeof value !== "string") return null
   const normalized = value.trim().toLowerCase()
-  return TIME_PERIODS_BY_URL_VALUE.get(normalized) ?? (isTimePeriod(normalized) ? normalized : null)
+  if (normalized === "6months") return "6 months"
+  return DATE_TYPES_BY_URL_VALUE.get(normalized) ?? (isDateType(normalized) ? normalized : null)
 }
+export const parseTimePeriodUrlValue = parseDateTypeUrlValue
 
-export const isTimePeriod = (value: unknown): value is TimePeriod =>
-  typeof value === "string" && TIME_PERIODS.includes(value as TimePeriod)
+export const isDateType = (value: unknown): value is DateType =>
+  typeof value === "string" && DATE_TYPES.includes(value as DateType)
+export const isTimePeriod = isDateType
 
 export const isBaseTimePeriod = (value: unknown): value is BaseTimePeriod =>
-  value !== "all history" && isTimePeriod(value)
+  value !== "all history" && isDateType(value)
 
-export const resolveTimePeriod = (value: unknown, fallback: TimePeriod = DEFAULT_TIME_PERIOD): TimePeriod =>
-  parseTimePeriodUrlValue(value) ?? fallback
+export const resolveDateType = (value: unknown, fallback: DateType = DEFAULT_DATE_TYPE): DateType =>
+  parseDateTypeUrlValue(value) ?? fallback
+export const resolveTimePeriod = resolveDateType
 
-const TIME_PERIOD_DAY_COUNTS: Record<BaseTimePeriod, number> = {
+/**
+ * Custom date range (aquasmart-main / v2 design): encoded in the same URL
+ * param as presets, as `custom_YYYY-MM-DD_YYYY-MM-DD`. These are explicit
+ * user-chosen dates — no window derivation happens client-side.
+ */
+export type CustomTimeRange = { start: string; end: string }
+
+const CUSTOM_PERIOD_RE = /^custom_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/
+
+export function parseCustomPeriodUrlValue(value: unknown): CustomTimeRange | null {
+  if (typeof value !== "string") return null
+  const match = value.trim().match(CUSTOM_PERIOD_RE)
+  if (!match) return null
+  const [, start, end] = match
+  if (!parseDateOnly(start) || !parseDateOnly(end)) return null
+  return start <= end ? { start, end } : { start: end, end: start }
+}
+
+export function toCustomPeriodUrlValue(range: CustomTimeRange): string {
+  return `custom_${range.start}_${range.end}`
+}
+
+export function formatCustomRangeLabel(range: CustomTimeRange): string {
+  return formatResolvedDateRange(range.start, range.end) ?? `${range.start} - ${range.end}`
+}
+
+const DATE_TYPE_DAY_COUNTS: Record<BaseTimePeriod, number> = {
   day: 1,
   week: 7,
   "2 weeks": 14,
@@ -85,10 +121,23 @@ const TIME_PERIOD_DAY_COUNTS: Record<BaseTimePeriod, number> = {
   year: 365,
 }
 
-export function getTimePeriodDays(value: TimePeriod): number | null {
+export function getDateTypeDays(value: DateType): number | null {
   if (value === "all history") return null
-  return TIME_PERIOD_DAY_COUNTS[value]
+  return DATE_TYPE_DAY_COUNTS[value]
 }
+export const getTimePeriodDays = getDateTypeDays
+
+export function getAvailableDateTypes(maxDaysSinceStart?: number | null): DateType[] {
+  if (maxDaysSinceStart == null || !Number.isFinite(maxDaysSinceStart) || maxDaysSinceStart <= 0) {
+    return DATE_TYPES
+  }
+
+  return DATE_TYPES.filter((dateType) => {
+    const days = getDateTypeDays(dateType)
+    return days == null || days <= maxDaysSinceStart
+  })
+}
+export const getAvailableTimePeriods = getAvailableDateTypes
 
 function parseDateOnly(value: string | null | undefined) {
   if (!value) return null
@@ -117,11 +166,11 @@ export function formatResolvedDateRange(start: string | null | undefined, end: s
 }
 
 export function formatResolvedTimeWindow(
-  timePeriod: TimePeriod,
+  timePeriod: DateType,
   start: string | null | undefined,
   end: string | null | undefined,
 ) {
-  const label = TIME_PERIOD_LABELS[timePeriod]
+  const label = DATE_TYPE_LABELS[timePeriod]
   const range = formatResolvedDateRange(start, end)
   return range ? `${range} (${label})` : label
 }
@@ -158,11 +207,32 @@ function mapTimeBoundsRow(row: TimePeriodBoundsRpcRow | null | undefined): TimeB
   }
 }
 
+export function customRangeToBounds(range: CustomTimeRange): TimeBounds {
+  const start = parseDateOnly(range.start)
+  const end = parseDateOnly(range.end)
+  const days =
+    start && end ? Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1 : null
+  return {
+    start: range.start,
+    end: range.end,
+    anchorScope: "custom",
+    latestAvailableDate: null,
+    availableFromDate: null,
+    requestedDays: days,
+    availableDays: days,
+    resolvedDays: days,
+    stalenessDays: null,
+    isTruncated: false,
+  }
+}
+
 export async function fetchTimePeriodBounds(
   supabase: unknown,
   params: {
     farmId: string
-    timePeriod: TimePeriod
+    timePeriod: DateType
+    /** Explicit custom range wins over the preset — no RPC round-trip needed. */
+    customRange?: CustomTimeRange | null
     scope?: AnalyticsTimeScope
     anchorDate?: string | null
     systemId?: number | null
@@ -170,6 +240,10 @@ export async function fetchTimePeriodBounds(
     signal?: AbortSignal
   },
 ): Promise<TimeBounds> {
+  if (params.customRange) {
+    return customRangeToBounds(params.customRange)
+  }
+
   const client = supabase as TimePeriodBoundsRpcClient
   let query = client.rpc("api_time_period_bounds_scoped", {
     p_farm_id: params.farmId,

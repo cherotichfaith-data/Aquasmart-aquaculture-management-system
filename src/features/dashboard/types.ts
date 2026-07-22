@@ -1,6 +1,6 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import type { TimeBounds, TimePeriod } from "@/lib/time-period"
+import type { CustomTimeRange, TimeBounds, TimePeriod } from "@/lib/time-period"
 import type { SystemOption } from "@/lib/system-options"
 
 export type DashboardStageFilter = "all" | Enums<"system_growth_stage">
@@ -40,6 +40,11 @@ export type KPIOverviewMetric = {
   badge?: string
 }
 
+export type KpiOverviewData = {
+  metrics: KPIOverviewMetric[]
+  dateBounds: { start: string | null; end: string | null }
+}
+
 export type RecommendedAction = {
   title: string
   description: string
@@ -51,6 +56,21 @@ export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboa
   batch_name?: string | null
 }
 export type DashboardSystemRow = DashboardSystemRpcRow
+
+export type BatchSummaryRow = {
+  batch_id: number
+  batch_name: string
+  current_system_ids: number[]
+  current_system_names: string[]
+  cycle_day: number | null
+  fish_end: number | null
+  abw: number | null
+  biomass_end: number | null
+  efcr: number | null
+  mortality_rate: number | null
+  target_weight_g: number | null
+  target_weight_progress_pct: number | null
+}
 
 export type SystemsOverviewRow = {
   system_id: number
@@ -81,16 +101,14 @@ export type DashboardPageInitialFilters = {
   selectedSystem: string
   selectedStage: DashboardStageFilter
   timePeriod: DashboardTimePeriod
+  customTimeRange: CustomTimeRange | null
 }
 
 export type DashboardPageInitialData = {
   bounds: TimeBounds
   systemOptions: QueryResult<DashboardSystemOption>
   batchSystems: QueryResult<{ system_id: number }>
-  kpiOverview: {
-    metrics: KPIOverviewMetric[]
-    dateBounds: { start: string | null; end: string | null }
-  }
+  kpiOverview: KpiOverviewData
   systemsTable: SystemsTableData
   waterQualityMeasurements: QueryResult<DashboardWaterQualityMeasurement>
   recommendedActions: RecommendedAction[]

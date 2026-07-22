@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type SetStateAction } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
@@ -26,12 +26,52 @@ export default function DashboardLayout({
   initialFarmId?: string | null
   initialFarmName?: string | null
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [commandOpen, setCommandOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const routeKey = `${pathname}?${searchParams.toString()}`
+  const isDesktopViewport = typeof window !== "undefined" ? window.innerWidth >= 768 : true
+  const defaultCollapsedPreference = (() => {
+    if (typeof window === "undefined") return false
+    const stored = window.localStorage.getItem("dashboard:sidebar-collapsed")
+    if (stored === "true") return true
+    if (stored === "false") return false
+    return window.innerWidth < 1280
+  })()
+  const [isDesktop, setIsDesktop] = useState(isDesktopViewport)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(defaultCollapsedPreference)
+  const routeToken = useMemo(() => Symbol(routeKey), [routeKey])
+  const [mobileSidebarDraft, setMobileSidebarDraft] = useState(() => ({
+    sourceToken: routeToken,
+    value: false,
+  }))
+  const [commandDraft, setCommandDraft] = useState(() => ({
+    sourceToken: routeToken,
+    value: false,
+  }))
+  const setMobileSidebarOpen = useCallback((value: SetStateAction<boolean>) => {
+    setMobileSidebarDraft((current) => {
+      const previousValue = current.sourceToken === routeToken ? current.value : false
+      const nextValue = typeof value === "function" ? value(previousValue) : value
+      return {
+        sourceToken: routeToken,
+        value: nextValue,
+      }
+    })
+  }, [routeToken])
+  const setCommandOpen = useCallback((value: SetStateAction<boolean>) => {
+    setCommandDraft((current) => {
+      const previousValue = current.sourceToken === routeToken ? current.value : false
+      const nextValue = typeof value === "function" ? value(previousValue) : value
+      return {
+        sourceToken: routeToken,
+        value: nextValue,
+      }
+    })
+  }, [routeToken])
+  const commandOpen = commandDraft.sourceToken === routeToken ? commandDraft.value : false
+  const mobileSidebarOpen = mobileSidebarDraft.sourceToken === routeToken ? mobileSidebarDraft.value : false
+  const sidebarOpen = isDesktop ? true : mobileSidebarOpen
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const farmRoleQuery = useActiveFarmRole(farmId)
   const farmRole = (farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
@@ -39,22 +79,9 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (typeof window === "undefined") return
-
-    const storedCollapsed = window.localStorage.getItem("dashboard:sidebar-collapsed")
-
     const applyResponsiveSidebarState = () => {
-      const isDesktop = window.innerWidth >= 768
-      setSidebarOpen(isDesktop)
-
-      if (storedCollapsed == null) {
-        setSidebarCollapsed(window.innerWidth < 1280)
-      }
+      setIsDesktop(window.innerWidth >= 768)
     }
-
-    if (storedCollapsed === "true") setSidebarCollapsed(true)
-    if (storedCollapsed === "false") setSidebarCollapsed(false)
-
-    applyResponsiveSidebarState()
     window.addEventListener("resize", applyResponsiveSidebarState)
     return () => window.removeEventListener("resize", applyResponsiveSidebarState)
   }, [])
@@ -99,12 +126,7 @@ export default function DashboardLayout({
 
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [allowDataEntry, router])
-
-  useEffect(() => {
-    setCommandOpen(false)
-    setSidebarOpen((prev) => (typeof window !== "undefined" && window.innerWidth >= 768 ? prev : false))
-  }, [pathname, searchParams])
+  }, [allowDataEntry, router, setCommandOpen])
 
   const desktopOffset = sidebarCollapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH
 
@@ -115,7 +137,11 @@ export default function DashboardLayout({
         initialFarmName={initialFarmName}
         open={sidebarOpen}
         collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarOpen((prev) => !prev)}
+        onToggle={() => {
+          if (!isDesktop) {
+            setMobileSidebarOpen((prev) => !prev)
+          }
+        }}
         onCollapseToggle={() =>
           setSidebarCollapsed((prev) => {
             const next = !prev
@@ -147,7 +173,11 @@ export default function DashboardLayout({
             <Header
               initialFarmId={initialFarmId}
               initialFarmName={initialFarmName}
-              onMenuClick={() => setSidebarOpen((prev) => !prev)}
+              onMenuClick={() => {
+                if (!isDesktop) {
+                  setMobileSidebarOpen((prev) => !prev)
+                }
+              }}
               showToolbar={showHeaderToolbar}
             />
             <SyncStatusBar />

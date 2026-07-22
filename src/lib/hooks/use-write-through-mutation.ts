@@ -1,6 +1,7 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useToast } from "@/lib/hooks/app/use-toast"
 import { hasPendingSyncMeta } from "@/lib/offline/result"
 import {
@@ -26,6 +27,7 @@ type WriteThroughMutationConfig<TPayload, TResult> = {
 
 export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughMutationConfig<TPayload, TResult>) {
   const queryClient = useQueryClient()
+  const { farmId } = useActiveFarm()
   const { toast } = useToast()
 
   return useMutation({
@@ -45,6 +47,7 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
       }
 
       const previous = addOptimisticRecentEntry(queryClient, {
+        farmId,
         key: config.recentEntryKey,
         entry: optimistic,
       })

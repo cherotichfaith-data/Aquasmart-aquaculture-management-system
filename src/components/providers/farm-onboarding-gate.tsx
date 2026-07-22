@@ -36,6 +36,7 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
   const membershipError = farmsResult?.status === "error" ? String(farmsResult.error ?? "") : ""
   const farms = farmsResult?.status === "success" ? farmsResult.data : []
   const hasFarmMembership = farms.length > 0
+  const refetchFarms = farmsQuery.refetch
   const checkingMembership =
     Boolean(user) &&
     (farmsQuery.isLoading || farmsQuery.isFetching || membershipStatus !== "success")
@@ -46,22 +47,22 @@ export function FarmOnboardingGate({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const handleMembershipSync = () => {
-      void farmsQuery.refetch()
+      void refetchFarms()
     }
 
     if (typeof window !== "undefined") {
       window.addEventListener("farm-memberships-updated", handleMembershipSync)
       return () => window.removeEventListener("farm-memberships-updated", handleMembershipSync)
     }
-  }, [farmsQuery.refetch])
+  }, [refetchFarms])
 
   useEffect(() => {
     if (!user || !session) return
     if (membershipStatus !== "error") return
     if (!/no active session/i.test(membershipError)) return
 
-    void farmsQuery.refetch()
-  }, [farmsQuery.refetch, membershipError, membershipStatus, session, user])
+    void refetchFarms()
+  }, [membershipError, membershipStatus, refetchFarms, session, user])
 
   useEffect(() => {
     if (isLoading) return

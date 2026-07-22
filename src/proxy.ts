@@ -13,6 +13,12 @@ import {
   sanitizeNextPath,
 } from "@/lib/app-entry"
 import {
+  parseCustomPeriodUrlValue,
+  parseTimePeriodUrlValue,
+  toCustomPeriodUrlValue,
+  toTimePeriodUrlValue,
+} from "@/lib/time-period"
+import {
   ACTIVE_FARM_COOKIE,
   ACTIVE_ORGANIZATION_COOKIE,
   clearWorkspaceContextCookies,
@@ -129,6 +135,28 @@ function buildAuthCallbackRedirect(request: NextRequest) {
   return NextResponse.redirect(redirectUrl)
 }
 
+function buildLegacyPeriodRedirect(request: NextRequest) {
+  const legacyDate = request.nextUrl.searchParams.get("date")
+  if (!legacyDate) return null
+
+  const redirectUrl = request.nextUrl.clone()
+  const normalizedCustomRange = parseCustomPeriodUrlValue(legacyDate)
+  const normalizedPeriod = parseTimePeriodUrlValue(legacyDate)
+
+  if (!redirectUrl.searchParams.has("period")) {
+    if (normalizedCustomRange) {
+      redirectUrl.searchParams.set("period", toCustomPeriodUrlValue(normalizedCustomRange))
+    } else if (normalizedPeriod) {
+      redirectUrl.searchParams.set("period", toTimePeriodUrlValue(normalizedPeriod))
+    }
+  }
+
+  redirectUrl.searchParams.delete("date")
+
+  if (redirectUrl.toString() === request.nextUrl.toString()) return null
+  return NextResponse.redirect(redirectUrl)
+}
+
 async function resolveFarmMembership(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
@@ -185,6 +213,11 @@ async function resolveEntryPathForActiveFarm(params: {
 }
 
 export async function proxy(request: NextRequest) {
+  const legacyPeriodRedirect = buildLegacyPeriodRedirect(request)
+  if (legacyPeriodRedirect) {
+    return legacyPeriodRedirect
+  }
+
   const standaloneFeaturePath = mapDashboardPathToStandalone(request.nextUrl.pathname)
   if (standaloneFeaturePath) {
     const redirectUrl = request.nextUrl.clone()

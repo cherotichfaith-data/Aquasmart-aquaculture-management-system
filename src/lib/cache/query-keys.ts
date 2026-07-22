@@ -14,9 +14,6 @@ export const queryKeys = {
     batches(params?: { farmId?: string | null; activeOnly?: boolean }) {
       return ["options", "batches", farmToken(params?.farmId), params?.activeOnly ?? true] as const
     },
-    timePeriods() {
-      return ["options", "time-periods"] as const
-    },
     feeds(
       farmId?: string | null,
       userId?: string | null,
@@ -243,9 +240,6 @@ export const queryKeys = {
     },
   },
   reports: {
-    runningStock(farmId?: string | null) {
-      return ["reports", "running-stock", farmToken(farmId)] as const
-    },
     feedingRecords(params?: {
       farmId?: string | null
       systemId?: number
@@ -515,6 +509,29 @@ export const queryKeys = {
     },
   },
   dashboard: {
+    /** Single-call dashboard payload (api_dashboard RPC). */
+    payload(params: {
+      farmId?: string | null
+      timePeriod?: string
+      /** `custom_YYYY-MM-DD_YYYY-MM-DD` url token when a custom range is active. */
+      custom?: string | null
+      systemId?: number | null
+      batchId?: number | null
+      stage?: string | null
+      /** Batches-view toggle: must vary the key so switching views refetches with `batches` populated. */
+      includeBatches?: boolean
+    }) {
+      return [
+        "dashboard",
+        "payload",
+        farmToken(params.farmId),
+        params.custom ?? params.timePeriod ?? "month",
+        numberToken(params.systemId),
+        numberToken(params.batchId),
+        params.stage ?? "all",
+        params.includeBatches ?? false,
+      ] as const
+    },
     systems(params?: {
       farmId?: string | null
       stage?: string | null
@@ -684,6 +701,8 @@ export const queryKeys = {
   timePeriodBounds(params: {
     farmId?: string | null
     timePeriod: string
+    /** `custom_YYYY-MM-DD_YYYY-MM-DD` url token when a custom range is active. */
+    custom?: string | null
     systemId?: number | null
     batchId?: number | null
     scope?: string | null
@@ -691,7 +710,7 @@ export const queryKeys = {
     return [
       "time-period-bounds",
       farmToken(params.farmId),
-      params.timePeriod,
+      params.custom ?? params.timePeriod,
       numberToken(params.systemId),
       numberToken(params.batchId),
       params.scope ?? "dashboard",

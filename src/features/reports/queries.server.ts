@@ -1,4 +1,4 @@
-import { toQuerySuccess } from "@/lib/api/_utils"
+import { toQuerySuccess } from "@/lib/supabase/query-transport"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import {

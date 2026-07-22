@@ -5,17 +5,17 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataErrorState, EmptyState } from "@/components/shared/data-states"
-import { FeedManagementDashboard } from "./_components/feed-management-dashboard"
+import { FeedManagementDashboard } from "@/features/feed/components/feed-management-dashboard"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { useFeedDashboardKpis, useFeedEfcrTrend, useFeedPlanVsActual, useFeedVsBiomassGain, useFeedingAlerts, useFeedingRateVsTarget, useFeedingResponseDistribution, useSystemFeedStatus } from "@/features/feed-management/hooks"
+import { useFeedDashboardKpis, useFeedEfcrTrend, useFeedPlanVsActual, useFeedVsBiomassGain, useFeedingAlerts, useFeedingRateVsTarget, useFeedingResponseDistribution, useSystemFeedStatus } from "@/features/feed/analytics-hooks"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, toTimePeriodUrlValue } from "@/lib/time-period"
-import type { FeedDashboardFilters } from "@/features/feed-management/types"
+import type { FeedDashboardFilters } from "@/features/feed/types"
 
 export default function FeedPageClient({
   initialFarmId,
@@ -37,7 +37,10 @@ export default function FeedPageClient({
   const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")
   const filterSystemsQuery = useSystemOptions({ farmId: currentFarmId, activeOnly: false })
-  const filterSystemOptions = filterSystemsQuery.data?.status === "success" ? filterSystemsQuery.data.data : []
+  const filterSystemOptions = useMemo(
+    () => (filterSystemsQuery.data?.status === "success" ? filterSystemsQuery.data.data : []),
+    [filterSystemsQuery.data],
+  )
   const selectedSystemUrlValue = useMemo(() => {
     const systemId = resolveSystemIdFromFilterValue(systemParam, filterSystemOptions)
     if (systemId == null) return systemParam ?? undefined

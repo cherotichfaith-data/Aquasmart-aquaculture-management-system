@@ -59,12 +59,14 @@ export const FEEDING_RESPONSE_LEVELS = [
   actionGuideline: string
 }>
 
-export const FEEDING_RESPONSE_LEVEL_COLORS: Record<FeedingResponseLabel, string> = {
-  "No Response": "#dc2626",
-  "Low Appetite": "#f97316",
-  "Ideal Appetite": "#22c55e",
-  "Good Appetite": "#16a34a",
-  "Aggressive Appetite": "#2563eb",
+// CSS custom-property names (resolved at render time via readCssVar), not
+// literal colors — kept token-driven per the app's chart color convention.
+export const FEEDING_RESPONSE_LEVEL_COLOR_VARS: Record<FeedingResponseLabel, string> = {
+  "No Response": "--feeding-response-none",
+  "Low Appetite": "--feeding-response-low",
+  "Ideal Appetite": "--feeding-response-ideal",
+  "Good Appetite": "--feeding-response-good",
+  "Aggressive Appetite": "--feeding-response-aggressive",
 }
 
 const LEGACY_RESPONSE_TO_LEVEL: Record<string, FeedingResponseLevel> = {
@@ -103,17 +105,4 @@ export function formatFeedingResponseLevel(value: unknown, fallback = "Response 
   const level = parseFeedingResponseLevel(value)
   if (level == null) return fallback
   return `Level ${level} - ${FEEDING_RESPONSE_LEVELS[level - 1].label}`
-}
-
-export function isLowFeedingResponse(value: unknown) {
-  const level = parseFeedingResponseLevel(value)
-  return level != null && level <= 2
-}
-
-export function isNoFeedingResponse(value: unknown) {
-  return parseFeedingResponseLevel(value) === 1
-}
-
-export function isAggressiveFeedingResponse(value: unknown) {
-  return parseFeedingResponseLevel(value) === 5
 }

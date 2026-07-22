@@ -12,7 +12,7 @@ type StockingType = Database["public"]["Enums"]["type_of_stocking"]
 type HarvestType = Database["public"]["Enums"]["type_of_harvest"]
 type TransferType = Database["public"]["Enums"]["transfer_type"]
 
-type OfflineBaseRecord = {
+export type OfflineBaseRecord = {
   localId: string
   syncStatus: SyncStatus
   serverId?: number

@@ -10,7 +10,7 @@ import {
   queryOptionsView,
   toQueryError,
   toQuerySuccess,
-} from "@/lib/api/_utils"
+} from "@/lib/supabase/query-transport"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
 

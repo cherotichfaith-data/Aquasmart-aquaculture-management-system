@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useMemo, useState, type SetStateAction } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Building2, CheckCircle2, UserRound } from "lucide-react"
@@ -28,6 +28,13 @@ type MembershipState = {
   source: "active" | "invite" | "none"
 }
 
+type OnboardingDraftState = {
+  sourceToken: symbol
+  fullName: string
+  role: Exclude<AquaSmartRole, null>
+  membership: MembershipState
+}
+
 export default function OnboardingPageClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -40,17 +47,69 @@ export default function OnboardingPageClient() {
   const onboardingState = queryClient.getQueryData<OnboardingPageInitialData>(
     queryKeys.onboarding.state(user?.id ?? null, linkedFarmId),
   )
-
-  const [fullName, setFullName] = useState(() => onboardingState?.fullName ?? "")
-  const [role, setRole] = useState<Exclude<AquaSmartRole, null>>(() => {
+  const initialFullName = onboardingState?.fullName ?? ""
+  const initialRole = (() => {
     const seededRole = normalizeRole(onboardingState?.membership.role)
     return seededRole && seededRole !== "admin" ? seededRole : "system_operator"
-  })
-  const [membership, setMembership] = useState<MembershipState>(() => ({
+  })()
+  const initialMembership: MembershipState = {
     farmId: onboardingState?.membership.farmId ?? linkedFarmId,
     role: normalizeRole(onboardingState?.membership.role),
     source: onboardingState?.membership.source ?? "none",
+  }
+  const sourceSignature = [
+    user?.id ?? "",
+    linkedFarmId ?? "",
+    initialFullName,
+    initialMembership.farmId ?? "",
+    initialMembership.role ?? "",
+    initialMembership.source,
+    initialRole,
+  ].join("|")
+  const currentSourceToken = useMemo(() => Symbol(sourceSignature), [sourceSignature])
+  const [draft, setDraft] = useState<OnboardingDraftState>(() => ({
+    sourceToken: currentSourceToken,
+    fullName: initialFullName,
+    role: initialRole,
+    membership: initialMembership,
   }))
+  const resolvedDraft = draft.sourceToken === currentSourceToken
+    ? draft
+    : {
+        sourceToken: currentSourceToken,
+        fullName: initialFullName,
+        role: initialRole,
+        membership: initialMembership,
+      }
+  const updateDraft = <Key extends "fullName" | "role" | "membership">(
+    key: Key,
+    value: SetStateAction<OnboardingDraftState[Key]>,
+  ) => {
+    setDraft((current) => {
+      const base = current.sourceToken === currentSourceToken
+        ? current
+        : {
+            sourceToken: currentSourceToken,
+            fullName: initialFullName,
+            role: initialRole,
+            membership: initialMembership,
+          }
+      const previousValue = base[key]
+      const nextValue =
+        typeof value === "function"
+          ? (value as (previous: OnboardingDraftState[Key]) => OnboardingDraftState[Key])(previousValue)
+          : value
+
+      return {
+        ...base,
+        sourceToken: currentSourceToken,
+        [key]: nextValue,
+      }
+    })
+  }
+  const fullName = resolvedDraft.fullName
+  const role = resolvedDraft.role
+  const membership = resolvedDraft.membership
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null)
@@ -59,24 +118,6 @@ export default function OnboardingPageClient() {
   const canChooseRole = !assignedRole
   const nextPath = sanitizeNextPath(searchParams.get("next"), resolveAppEntryPath(effectiveRole))
   const createWorkspaceHref = `${ONBOARDING_CREATE_WORKSPACE_PATH}?next=${encodeURIComponent(nextPath)}`
-
-  useEffect(() => {
-    if (!onboardingState) {
-      return
-    }
-
-    setFullName((current) => current || onboardingState.fullName)
-    setMembership({
-      farmId: onboardingState.membership.farmId,
-      role: normalizeRole(onboardingState.membership.role),
-      source: onboardingState.membership.source,
-    })
-
-    const normalizedMembershipRole = normalizeRole(onboardingState.membership.role)
-    if (normalizedMembershipRole && normalizedMembershipRole !== "admin") {
-      setRole(normalizedMembershipRole)
-    }
-  }, [onboardingState])
 
   const displayEmail = user?.email?.trim() || onboardingState?.displayEmail || ""
   const effectiveNoticeMessage = noticeMessage ?? onboardingState?.notice ?? null
@@ -164,7 +205,7 @@ export default function OnboardingPageClient() {
               <input
                 type="text"
                 value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
+                onChange={(event) => updateDraft("fullName", event.target.value)}
                 placeholder="Enter your full name"
                 className={inputCls}
                 autoComplete="name"
@@ -175,7 +216,7 @@ export default function OnboardingPageClient() {
               <span className="text-sm font-medium text-foreground">Role</span>
               <select
                 value={effectiveRole}
-                onChange={(event) => setRole(event.target.value as Exclude<AquaSmartRole, null>)}
+                onChange={(event) => updateDraft("role", event.target.value as Exclude<AquaSmartRole, null>)}
                 disabled={!canChooseRole}
                 className={inputCls}
               >

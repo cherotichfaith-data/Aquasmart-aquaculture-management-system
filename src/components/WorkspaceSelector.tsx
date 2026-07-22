@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { LogOut } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -111,13 +111,7 @@ export default function WorkspaceSelector({
     }
   }, [initialOrganizations, nextPath, router])
 
-  useEffect(() => {
-    if (selectedOrganizationId || isLoading || organizations.length === 0) return
-    void handleOrganizationSelect(organizations[0].id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, organizations, selectedOrganizationId])
-
-  const handleOrganizationSelect = async (organizationId: string) => {
+  const handleOrganizationSelect = useCallback(async (organizationId: string) => {
     if (farmRequestOrganizationIdRef.current === organizationId) {
       return
     }
@@ -138,7 +132,12 @@ export default function WorkspaceSelector({
     } finally {
       setIsLoadingFarms(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (selectedOrganizationId || isLoading || organizations.length === 0) return
+    void handleOrganizationSelect(organizations[0].id)
+  }, [handleOrganizationSelect, isLoading, organizations, selectedOrganizationId])
 
   const handleFarmOpen = async (farm: FarmSummary) => {
     const organizationId = farm.organizationId ?? selectedOrganizationId
