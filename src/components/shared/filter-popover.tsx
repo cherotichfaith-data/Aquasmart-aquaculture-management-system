@@ -1,6 +1,6 @@
 "use client"
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react"
+import { useDeferredValue, useMemo, useState } from "react"
 import type { SxProps, Theme } from "@mui/material/styles"
 import Box from "@mui/material/Box"
 import ButtonBase from "@mui/material/ButtonBase"
@@ -52,6 +52,10 @@ export function FilterPopover({
   const selectedOption = useMemo(() => options.find((option) => option.value === value) ?? null, [options, value])
   const showSearch = searchable || options.length > 8
   const open = Boolean(anchorEl)
+  const closePopover = () => {
+    setAnchorEl(null)
+    setQuery("")
+  }
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = normalize(deferredQuery)
@@ -64,11 +68,6 @@ export function FilterPopover({
       return haystack.includes(normalizedQuery)
     })
   }, [deferredQuery, options])
-
-  useEffect(() => {
-    if (open) return
-    setQuery("")
-  }, [open])
 
   return (
     <>
@@ -143,7 +142,7 @@ export function FilterPopover({
       <Popover
         open={open}
         anchorEl={anchorEl}
-        onClose={() => setAnchorEl(null)}
+        onClose={closePopover}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         slotProps={{
@@ -214,7 +213,7 @@ export function FilterPopover({
                     key={option.value}
                     onClick={() => {
                       onChange(option.value)
-                      setAnchorEl(null)
+                      closePopover()
                     }}
                     sx={{
                       display: "flex",

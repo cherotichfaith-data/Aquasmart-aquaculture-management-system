@@ -5,7 +5,6 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { queryKeys } from "@/lib/cache/query-keys"
 import type { Enums } from "@/lib/types/database"
-import type { FeedGrowthTrendRow } from "./types"
 import {
   getFeedingActivityRecords,
   getBatchSystemIds,
@@ -19,7 +18,6 @@ import {
   getPerformanceSummary,
   getRecentActivities,
   getRecentEntries,
-  getRunningStock,
   getSamplingData,
   getStockings,
   getTransferData,
@@ -43,23 +41,6 @@ function reportsQueryOptions<TResult>(params: {
     refetchOnWindowFocus: params.refetchOnWindowFocus,
     refetchOnMount: params.refetchOnMount,
   })
-}
-
-export function useRunningStock(params?: {
-  farmId?: string | null
-  enabled?: boolean
-}) {
-  const { session } = useAuth()
-  const { farmId } = useActiveFarm()
-  const resolvedFarmId = params?.farmId ?? farmId
-  return useQuery(
-    reportsQueryOptions({
-      queryKey: queryKeys.reports.runningStock(resolvedFarmId),
-      queryFn: ({ signal }) => getRunningStock({ farmId: resolvedFarmId, signal }),
-      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
-      staleTime: 60_000,
-    }),
-  )
 }
 
 export function useFeedingRecords(params?: {

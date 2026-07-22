@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { fetchTimePeriodBounds } from "@/lib/time-period"
 import type { Database, Enums } from "@/lib/types/database"
-import type { TimePeriod } from "@/lib/time-period"
+import type { CustomTimeRange, TimePeriod } from "@/lib/time-period"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>
@@ -34,10 +34,12 @@ export async function getScopedTimeBounds(
   scope: Parameters<typeof fetchTimePeriodBounds>[1]["scope"],
   systemId?: number,
   batchId?: number,
+  customRange?: CustomTimeRange | null,
 ) {
   return fetchTimePeriodBounds(supabase as never, {
     farmId,
     timePeriod,
+    customRange,
     scope,
     systemId,
     batchId,

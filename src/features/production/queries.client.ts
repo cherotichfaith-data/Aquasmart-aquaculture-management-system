@@ -8,9 +8,9 @@ import {
   queryKpiRpc,
   toQuerySuccess,
   toQueryError,
-} from "@/lib/api/_utils"
-import { isSbAuthMissing, isSbMissingFunction, isSbPermissionDenied } from "@/lib/supabase/log"
-import { toRpcDate, toRpcSystemIds } from "@/lib/rpc-params"
+} from "@/lib/supabase/query-transport"
+import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
+import { toRpcDate } from "@/lib/rpc-params"
 import type { Database } from "@/lib/types/database"
 import type { ProductionSummaryRpcRow } from "@/features/production/types"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
@@ -125,25 +125,33 @@ async function listGrowthTrendRows(
     signal?: AbortSignal
   },
 ): Promise<GrowthTrendRow[]> {
-  let query = queryKpiRpc(supabase, "api_growth_trend", {
-    p_farm_id: params.farmId,
-    p_system_ids: toRpcSystemIds(params.systemIds),
-    p_start_date: toRpcDate(params.dateFrom),
-    p_end_date: toRpcDate(params.dateTo),
-  })
-  if (params.signal) query = query.abortSignal(params.signal)
+  const startDate = toRpcDate(params.dateFrom)
+  const endDate = toRpcDate(params.dateTo)
+  const rowsBySystem = await Promise.all(
+    params.systemIds.map(async (systemId): Promise<GrowthTrendRow[]> => {
+      let query = queryKpiRpc(supabase, "api_production_summary", {
+        p_farm_id: params.farmId,
+        p_system_id: systemId,
+        p_start_date: startDate ?? undefined,
+        p_end_date: endDate ?? undefined,
+      })
+      if (params.signal) query = query.abortSignal(params.signal)
+      const { data, error } = await query
+      if (error) {
+        if (params.signal?.aborted || isQuietError(error)) return []
+        throw error
+      }
+      const summaryRows = (data ?? []) as ProductionSummaryRpcRow[]
+      return summaryRows.map((row) => ({
+        system_id: row.system_id ?? systemId,
+        sample_date: row.date,
+        adg_g_day: row.agr,
+        sgr_pct_day: row.sgr,
+      }))
+    }),
+  )
 
-  const { data, error } = await query
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error) || isSbMissingFunction(error, "api_growth_trend")) return []
-    throw error
-  }
-
-  return ((data ?? []) as GrowthTrendRow[]).map((row) => ({
-    ...row,
-    system_id:
-      typeof row.system_id === "number" ? row.system_id : params.systemIds.length === 1 ? params.systemIds[0] : row.system_id,
-  }))
+  return rowsBySystem.flat().sort((left, right) => left.sample_date.localeCompare(right.sample_date))
 }
 
 async function listFeedingRecordRows(

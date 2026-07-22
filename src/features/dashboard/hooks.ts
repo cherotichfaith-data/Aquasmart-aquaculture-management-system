@@ -10,7 +10,7 @@ import { getDashboardKpiOverview } from "@/features/dashboard/queries.client"
 import { mergeRecommendedActionRows } from "@/features/dashboard/analytics-rpc-shared"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { getDashboardSystems } from "@/features/dashboard/queries.client"
-import { getRecommendedActions } from "@/lib/api/analytics"
+import { getRecommendedActions } from "@/features/shared/analytics.client"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 const hasSystemId = (row: unknown): row is { system_id: number } =>

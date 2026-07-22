@@ -137,7 +137,6 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
     if (!row.date) return
     const systemId = row.system_id ?? null
     const key = buildSystemDateKey(systemId, row.date)
-    const volumeM3 = systemId != null ? enrichment.volumeBySystemId?.get(systemId) ?? 0 : 0
     const growth = enrichment.growthBySystemDate?.get(key)
     const feedType = enrichment.feedTypeBySystemDate?.get(key)
     const current =

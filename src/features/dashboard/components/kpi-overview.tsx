@@ -5,10 +5,7 @@ import Grid from "@mui/material/Grid"
 import Box from "@mui/material/Box"
 import Skeleton from "@mui/material/Skeleton"
 import type { Enums } from "@/lib/types/database"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { useKpiOverview } from "@/features/dashboard/hooks"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
-import { getErrorMessage } from "@/lib/utils/query-result"
 import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import { toDashboardPath } from "@/lib/app-entry"
 import type { KPIOverviewMetric } from "../types"
@@ -25,42 +22,30 @@ const kpiProductionFilterMap: Record<string, string | null> = {
 }
 
 interface KPIOverviewProps {
+  metrics: KPIOverviewMetric[]
+  isLoading: boolean
+  isFetching: boolean
+  isError?: boolean
+  errorMessage?: string | null
+  onRetry?: () => void
   stage: "all" | Enums<"system_growth_stage">
   timePeriod?: TimePeriod
   batch?: string
   system?: string
-  scopedSystemIds?: number[] | null
-  dateFrom?: string
-  dateTo?: string
-  farmId?: string | null
 }
 
 export default function KPIOverview({
+  metrics,
+  isLoading,
+  isFetching,
+  isError = false,
+  errorMessage,
+  onRetry,
   stage,
   timePeriod = "month",
   batch = "all",
   system = "all",
-  scopedSystemIds,
-  dateFrom,
-  dateTo,
-  farmId: initialFarmId,
 }: KPIOverviewProps) {
-  const { farmId: activeFarmId } = useActiveFarm()
-  const farmId = initialFarmId ?? activeFarmId
-  const metricsQuery = useKpiOverview({
-    farmId,
-    stage,
-    timePeriod,
-    batch,
-    system,
-    scopedSystemIds,
-    dateFrom: dateFrom ?? null,
-    dateTo: dateTo ?? null,
-  })
-
-  const metrics: KPIOverviewMetric[] = metricsQuery.data?.metrics ?? []
-  const errorMessage = getErrorMessage(metricsQuery.error)
-  const waitingForBounds = !dateFrom || !dateTo
   const buildProductionHref = (metricKey: string) => {
     const params = new URLSearchParams()
     if (system !== "all") params.set("system", system)
@@ -74,17 +59,17 @@ export default function KPIOverview({
     return `${toDashboardPath("/production")}?${params.toString()}`
   }
 
-  if (metricsQuery.isError) {
+  if (isError) {
     return (
       <DataErrorState
         title="Unable to load KPI overview"
         description={errorMessage ?? "Please retry or check your connection."}
-        onRetry={() => metricsQuery.refetch()}
+        onRetry={onRetry}
       />
     )
   }
 
-  if (waitingForBounds || metricsQuery.isLoading) {
+  if (isLoading) {
     return (
       <Grid container spacing={2}>
         {Array(4).fill(0).map((_, i) => (
@@ -100,7 +85,7 @@ export default function KPIOverview({
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span />
-        <DataFetchingBadge isFetching={metricsQuery.isFetching} isLoading={metricsQuery.isLoading} />
+        <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
       </Box>
       {!metrics.length ? (
         <EmptyState

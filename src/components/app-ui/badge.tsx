@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils"
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline"
 
 const badgeVariants = ({
-  variant = "default",
   className,
 }: {
   variant?: BadgeVariant | null

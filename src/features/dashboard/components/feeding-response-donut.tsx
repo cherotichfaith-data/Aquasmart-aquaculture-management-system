@@ -1,14 +1,14 @@
 "use client"
 
 import { useMemo } from "react"
-import type { ChartData, ChartOptions } from "chart.js"
+import type { ChartData, ChartOptions, TooltipItem } from "chart.js"
 import { Doughnut } from "@/components/charts/chartjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { DataFetchingBadge } from "@/components/shared/data-states"
 import { useFeedingRecords } from "@/features/reports/hooks"
 import { formatNumberValue } from "@/lib/analytics-format"
-import { FEEDING_RESPONSE_LEVEL_COLORS, parseFeedingResponseLevel } from "@/lib/feeding-response"
-import { getChartPalette } from "@/components/charts/chartjs-theme"
+import { FEEDING_RESPONSE_LEVEL_COLOR_VARS, parseFeedingResponseLevel } from "@/lib/feeding-response"
+import { getChartPalette, readCssVar } from "@/components/charts/chartjs-theme"
 
 const RESPONSE_LABELS = ["No Response", "Low Appetite", "Ideal Appetite", "Good Appetite", "Aggressive Appetite"] as const
 
@@ -46,7 +46,10 @@ export default function FeedingResponseDonut({
     limit: 5000,
     enabled,
   })
-  const records = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
+  const records = useMemo(
+    () => (feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []),
+    [feedingRecordsQuery.data],
+  )
   const palette = getChartPalette()
 
   const rows = useMemo(() => {
@@ -67,13 +70,13 @@ export default function FeedingResponseDonut({
       datasets: [
         {
           data: rows.map((row) => row.value),
-          backgroundColor: rows.map((row) => FEEDING_RESPONSE_LEVEL_COLORS[row.name]),
+          backgroundColor: rows.map((row) => readCssVar(FEEDING_RESPONSE_LEVEL_COLOR_VARS[row.name], palette.muted)),
           borderWidth: 0,
           hoverOffset: 4,
         },
       ],
     }),
-    [rows],
+    [palette.muted, rows],
   )
 
   const options = useMemo<ChartOptions<"doughnut">>(
@@ -106,7 +109,7 @@ export default function FeedingResponseDonut({
           usePointStyle: true,
           callbacks: {
             title: () => "",
-            label: (context: any) =>
+            label: (context: TooltipItem<"doughnut">) =>
               `${context.label}: ${formatNumberValue(Number(context.parsed), { decimals: 0 })} sessions`,
           },
         },

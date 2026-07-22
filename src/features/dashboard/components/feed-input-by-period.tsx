@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import type { ChartData, ChartOptions } from "chart.js"
+import type { ChartData, ChartOptions, TooltipItem } from "chart.js"
 import { Bar } from "@/components/charts/chartjs"
 import { buildCartesianOptions, getChartPalette } from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
@@ -41,7 +41,10 @@ export default function FeedInputByPeriod({
     limit: 5000,
     enabled,
   })
-  const records = feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []
+  const records = useMemo(
+    () => (feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []),
+    [feedingRecordsQuery.data],
+  )
   const granularity = useMemo(() => getBucketGranularity(timePeriod), [timePeriod])
   const granularityLabel = useMemo(() => formatGranularityLabel(granularity), [granularity])
   const palette = getChartPalette()
@@ -90,7 +93,7 @@ export default function FeedInputByPeriod({
         xTickFormatter: (_value, index) => rows[index]?.label ?? "",
         tooltip: {
           callbacks: {
-            label: (context: any) =>
+            label: (context: TooltipItem<"bar">) =>
               `Feed: ${formatNumberValue(Number(context.parsed.y), { decimals: 1, fallback: "N/A" })} kg`,
           },
         },

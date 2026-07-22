@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import FeedPageClient from "./page.client"
 import { resolveInitialFarmId } from "@/features/farm/queries.server"
-import { parseFeedDashboardFilters } from "@/features/feed-management/queries.server"
+import { parseFeedDashboardFilters } from "@/features/feed/queries.server"
 import { requireUserContext } from "@/lib/supabase/require-user"
 
 type SearchParams = Record<string, string | string[] | undefined>

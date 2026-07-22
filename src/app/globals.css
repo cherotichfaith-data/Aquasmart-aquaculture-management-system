@@ -45,10 +45,19 @@ next-router-prefetch {
   --chart-3: #a5a5a5;
   --chart-4: #ffc000;
   --chart-5: #c00000;
+  --production-chart-primary: #258ef2;
+  --production-chart-compare: #20b7ae;
   --chart-grid: rgba(95, 111, 122, 0.22);
   --chart-tooltip-bg: rgba(38, 46, 56, 0.96);
   --chart-tooltip-border: rgba(216, 222, 230, 0.34);
   --chart-tooltip-foreground: #f8fbff;
+  /* Feeding-response scale (Level 1-5): bad -> ideal -> too aggressive,
+     derived from the existing semantic status colors rather than one-off hex. */
+  --feeding-response-none: var(--color-destructive);
+  --feeding-response-low: var(--color-warning);
+  --feeding-response-ideal: var(--color-success);
+  --feeding-response-good: color-mix(in srgb, var(--color-success) 55%, var(--color-info) 45%);
+  --feeding-response-aggressive: var(--color-info);
   --popover: var(--color-surface);
   --primary: var(--color-primary);
   --sidebar: var(--color-secondary);
@@ -175,7 +184,51 @@ next-router-prefetch {
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Tremor theme tokens (aquasmart-main parity): production charts use
+     @tremor/react's AreaChart, which reads these `tremor-*` utility names
+     internally. Mapped onto Tailwind's built-in palette, same as
+     aquasmart-main's tailwind.config.ts. */
+  --color-tremor-brand-faint: var(--color-blue-50);
+  --color-tremor-brand-muted: var(--color-blue-200);
+  --color-tremor-brand-subtle: var(--color-blue-400);
+  --color-tremor-brand: var(--color-blue-500);
+  --color-tremor-brand-emphasis: var(--color-blue-700);
+  --color-tremor-brand-inverted: #ffffff;
+  --color-tremor-background-muted: var(--color-gray-50);
+  --color-tremor-background-subtle: var(--color-gray-100);
+  --color-tremor-background: #ffffff;
+  --color-tremor-background-emphasis: var(--color-gray-700);
+  --color-tremor-border: var(--color-slate-200);
+  --color-tremor-ring: var(--color-gray-200);
+  --color-tremor-content-subtle: var(--color-gray-400);
+  --color-tremor-content: var(--color-gray-500);
+  --color-tremor-content-emphasis: var(--color-gray-700);
+  --color-tremor-content-strong: var(--color-gray-900);
+  --color-tremor-content-inverted: #ffffff;
+  --radius-tremor-small: 0.375rem;
+  --radius-tremor-default: 0.5rem;
+  --radius-tremor-full: 9999px;
+  --text-tremor-label: 0.75rem;
+  --text-tremor-label--line-height: 1rem;
+  --text-tremor-default: 0.875rem;
+  --text-tremor-default--line-height: 1.25rem;
+  --text-tremor-title: 1.125rem;
+  --text-tremor-title--line-height: 1.75rem;
+  --text-tremor-metric: 1.875rem;
+  --text-tremor-metric--line-height: 2.25rem;
+  --shadow-tremor-input: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-tremor-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-tremor-dropdown: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
+
+/* Tremor scans its own compiled classnames for static utility usage
+   (rounded-tremor-*, shadow-tremor-*, text-tremor-*), and builds color
+   utilities (bg-emerald-500, text-blue-700, ...) from a runtime color->class
+   lookup that Tailwind's static analyzer can't see. Force-generate both. */
+@source "../../node_modules/@tremor/react/dist/**/*.{js,mjs,cjs}";
+@source inline("{bg,text,border,ring,stroke,fill}-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("hover:{bg,text,border}-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
 
 @layer base {
   * {
@@ -251,6 +304,37 @@ next-router-prefetch {
   }
 }
 @layer components {
+  .production-select .MuiOutlinedInput-root {
+    min-height: 56px;
+    border-radius: 12px;
+  }
+
+  .production-period-select .MuiOutlinedInput-root {
+    min-height: 50px;
+    border-radius: 12px;
+  }
+
+  .production-records-card [data-slot="card-header"] {
+    padding: 1.5rem 1.5rem 0.25rem;
+  }
+
+  .production-records-card [data-slot="card-content"] {
+    padding: 0.5rem 1.5rem 1.5rem;
+  }
+
+  .production-records-table {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .production-records-table tbody tr {
+    height: 58px;
+  }
+
+  .production-records-table tbody tr:nth-child(even) {
+    background: color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
   .page-shell {
     @apply space-y-5 md:space-y-6;
   }

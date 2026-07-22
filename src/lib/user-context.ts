@@ -1,8 +1,3 @@
-import type { Tables } from "@/lib/types/database"
-
-export type UserProfileRow = Tables<"user_profile">
-export type UserSettingsRow = Tables<"user_settings">
-
 export function mergeUserContext<TProfile extends Record<string, unknown>, TSettings extends Record<string, unknown>>(params: {
   profile?: TProfile | null
   settings?: TSettings | null

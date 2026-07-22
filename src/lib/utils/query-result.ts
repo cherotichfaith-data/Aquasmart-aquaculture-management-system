@@ -1,4 +1,4 @@
-import { getErrorMessage as getApiErrorMessage } from "@/lib/api/_utils"
+import { getErrorMessage as getApiErrorMessage } from "@/lib/supabase/query-transport"
 import type { QueryResult } from "@/lib/supabase-client"
 
 export function getQueryResultError(result?: QueryResult<unknown> | null): string | null {

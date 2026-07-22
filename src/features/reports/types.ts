@@ -13,11 +13,6 @@ type GrowthTrendRow = {
   expected_abw_g?: number | null
   growth_deviation_pct?: number | null
 }
-type RunningStockRow = {
-  date: string | null
-  system_id: number | null
-  qty: number | null
-}
 type FeedingRecordRow = Tables<"feeding_record">
 
 export type ChangeLogRow = {
@@ -32,7 +27,6 @@ export type ChangeLogRow = {
 
 export type FeedingRecordWithType = FeedingRecordRow & { feed_type: FeedTypeRow | null }
 export type FeedGrowthTrendRow = GrowthTrendRow
-export type FeedRunningStockRow = RunningStockRow
 
 export type FeedingSummaryRow = {
   total_kg_fed: number

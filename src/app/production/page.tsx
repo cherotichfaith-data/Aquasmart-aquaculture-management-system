@@ -19,8 +19,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     initialData.systems.status === "success"
       ? cleanScopedFilterState(initialFilters, initialData.systems.data)
       : initialFilters
-  const selectedSystemId = parseSelectedNumericId(effectiveFilters.selectedSystem)
   const batchId = parseSelectedNumericId(effectiveFilters.selectedBatch)
+  // The page renders one system at a time; the server resolves the same
+  // system the client will (URL `?system=` or lowest-id fallback) so the
+  // hydrated cache keys line up.
+  const seedSystemId = initialData.systemId ?? undefined
   const queryClient = createQueryClient()
 
   if (initialData.bounds.start && initialData.bounds.end) {
@@ -28,7 +31,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
       queryKeys.timePeriodBounds({
         farmId,
         timePeriod: effectiveFilters.timePeriod,
-        systemId: selectedSystemId,
+        custom: effectiveFilters.customTimeRange
+          ? `custom_${effectiveFilters.customTimeRange.start}_${effectiveFilters.customTimeRange.end}`
+          : null,
+        systemId: seedSystemId,
         batchId,
         scope: "production",
       }),
@@ -36,7 +42,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     )
   }
   queryClient.setQueryData(
-    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: false }),
+    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: true }),
     initialData.systems,
   )
   queryClient.setQueryData(queryKeys.reports.batchSystemIds({ farmId, batchId }), initialData.batchSystems)
@@ -44,8 +50,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     queryClient.setQueryData(
       queryKeys.production.summary({
         farmId,
-        systemId: selectedSystemId,
-        stage: effectiveFilters.selectedStage === "all" ? undefined : effectiveFilters.selectedStage,
+        systemId: seedSystemId,
         dateFrom: initialData.bounds.start,
         dateTo: initialData.bounds.end,
         limit: 2500,

@@ -1,0 +1,518 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm, useWatch } from "react-hook-form"
+import * as z from "zod"
+import { Button } from "@/components/app-ui/button"
+import { Loader2 } from "lucide-react"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
+import { Constants, type Database } from "@/lib/types/database"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
+import { useRecordStocking } from "@/lib/hooks/use-stocking"
+import { useStockingData } from "@/features/reports/hooks"
+import { logSbError } from "@/lib/supabase/log"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { BatchQuickCreate } from "./batch-quick-create"
+import { DependencyBlocker } from "./dependency-blocker"
+import {
+  findUnitForSystem,
+  getSystemUnits,
+  getSystemsForUnit,
+} from "./form-support"
+import {
+  parseRequiredNumericId,
+  reportDataEntrySubmitError,
+  requireActiveFarmId,
+  toIsoDate,
+} from "./form-utils"
+import {
+  LatestEntryGuard,
+  pickLatestEntryByRecordDate,
+  pickSameDayEntry,
+  usePendingLatestEntries,
+  type LatestEntrySummary,
+} from "./latest-entry-guard"
+import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+
+type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
+type StockingInsertWithNotes = Omit<StockingInsert, "abw" | "cycle_id"> & {
+  abw?: never
+  cycle_id?: StockingInsert["cycle_id"]
+  farm_id?: string | null
+  notes?: string | null
+}
+type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number] & {
+  supplier_name?: string | null
+}
+type FingerlingBatchRow = Database["public"]["Tables"]["fingerling_batch"]["Row"] & {
+  supplier_name?: string | null
+}
+
+const formSchema = z.object({
+  unit: z.string().min(1, "Cage unit is required"),
+  system_id: z.string().min(1, "Cage number is required"),
+  batch_id: z.string().min(1, "Batch is required"),
+  stocking_date: z.string().min(1, "Date is required"),
+  number_of_fish: z.coerce.number().int("Quantity must be a whole number").min(1, "Quantity must be positive"),
+  total_weight_kg: z.coerce.number().min(0.01, "Weight must be positive"),
+  notes: z.string().max(500, "Notes must be 500 characters or fewer").optional(),
+  type_of_stocking: z.enum(Constants.public.Enums.type_of_stocking),
+})
+
+interface StockingFormProps {
+  farmId: string | null
+  systems: SystemOption[]
+  batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+  defaultSystemId?: number | null
+  defaultBatchId?: number | null
+}
+
+export function StockingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: StockingFormProps) {
+  const mutation = useRecordStocking()
+  const [showBatchCreate, setShowBatchCreate] = useState(false)
+  const [createdBatches, setCreatedBatches] = useState<BatchOption[]>([])
+
+  const units = useMemo(() => getSystemUnits(systems), [systems])
+  const defaultUnit = findUnitForSystem(systems, defaultSystemId)
+  const batchOptions = useMemo(() => {
+    const existingIds = new Set(batches.map((batch) => batch.id))
+    return [
+      ...createdBatches.filter((batch) => !existingIds.has(batch.id)),
+      ...batches,
+    ]
+  }, [batches, createdBatches])
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      stocking_date: toIsoDate(new Date()),
+      unit: defaultUnit,
+      number_of_fish: 0,
+      total_weight_kg: 0,
+      notes: "",
+      system_id: defaultSystemId ? String(defaultSystemId) : "",
+      batch_id: defaultBatchId ? String(defaultBatchId) : "",
+      type_of_stocking: "empty",
+    },
+  })
+  const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
+
+  const selectedUnit = useWatch({ control: form.control, name: "unit" })
+  const selectedSystemId = useWatch({ control: form.control, name: "system_id" })
+  const selectedBatchId = useWatch({ control: form.control, name: "batch_id" })
+  const selectedDate = useWatch({ control: form.control, name: "stocking_date" })
+  const selectedSystemIdNumber = Number(selectedSystemId)
+  const selectedSystemIdForBatch =
+    Number.isFinite(selectedSystemIdNumber) && selectedSystemIdNumber > 0 ? selectedSystemIdNumber : null
+  const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
+  const latestEntryQuery = useStockingData({
+    systemId: selectedSystemIdForBatch ?? undefined,
+    limit: 1,
+    enabled: Boolean(selectedSystemIdForBatch),
+  })
+  const duplicateQuery = useStockingData({
+    systemId: selectedSystemIdForBatch ?? undefined,
+    dateFrom: selectedDate || undefined,
+    dateTo: selectedDate || undefined,
+    limit: 20,
+    enabled: Boolean(selectedSystemIdForBatch) && Boolean(selectedDate),
+  })
+  const pendingEntries = usePendingLatestEntries("stocking", selectedSystemIdForBatch)
+
+  function handleBatchCreated(batch: FingerlingBatchRow) {
+    const systemId = selectedSystemIdForBatch
+    if (!systemId) return
+
+    const option: BatchOption = {
+      id: batch.id,
+      farm_id: batch.farm_id ?? farmId ?? "",
+      system_id: systemId,
+      supplier_id: batch.supplier_id,
+      date_of_delivery: batch.date_of_delivery,
+      number_of_fish: batch.number_of_fish ?? 0,
+      abw: batch.abw ?? 0,
+      label: batch.name,
+      supplier_name: batch.supplier_name ?? null,
+    }
+
+    setCreatedBatches((current) => [option, ...current.filter((item) => item.id !== option.id)])
+    form.setValue("batch_id", String(option.id), { shouldValidate: true })
+    setShowBatchCreate(false)
+  }
+
+  useEffect(() => {
+    if (!defaultSystemValue) return
+    const resolvedUnit = findUnitForSystem(systems, defaultSystemId)
+    if (!resolvedUnit) return
+
+    const currentSystem = form.getValues("system_id")
+    if (currentSystem && currentSystem !== defaultSystemValue) return
+
+    if (form.getValues("unit") !== resolvedUnit) {
+      form.setValue("unit", resolvedUnit, { shouldValidate: true })
+    }
+    if (currentSystem !== defaultSystemValue) {
+      form.setValue("system_id", defaultSystemValue, { shouldValidate: true })
+    }
+  }, [defaultSystemId, defaultSystemValue, form, systems])
+
+  useEffect(() => {
+    if (!selectedUnit) return
+    const currentValue = form.getValues("system_id")
+    if (!currentValue) return
+    const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
+    if (!existsInUnit) {
+      form.setValue("system_id", "", { shouldValidate: true })
+    }
+  }, [form, selectedUnit, systemsForUnit])
+
+  const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `stocking-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.number_of_fish_stocking ?? 0} fish stocked`,
+    details: [
+      { label: "Weight", value: row.total_weight_stocking != null ? `${row.total_weight_stocking} kg` : "Not recorded" },
+      { label: "Type", value: row.type_of_stocking ?? "Not recorded" },
+    ],
+  }))
+  const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `stocking-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.number_of_fish_stocking ?? 0} fish stocked`,
+    details: [
+      { label: "Weight", value: row.total_weight_stocking != null ? `${row.total_weight_stocking} kg` : "Not recorded" },
+      { label: "Type", value: row.type_of_stocking ?? "Not recorded" },
+    ],
+  }))
+  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
+  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      if (duplicateEntry) {
+        form.setError("stocking_date", { message: `A stocking entry already exists for ${values.stocking_date}.` })
+        return
+      }
+
+      const resolvedFarmId = requireActiveFarmId(farmId)
+      const systemId = parseRequiredNumericId(values.system_id, "Cage number")
+      const batchId = parseRequiredNumericId(values.batch_id, "Batch")
+
+      const payload: StockingInsertWithNotes = {
+        farm_id: resolvedFarmId,
+        system_id: systemId,
+        batch_id: batchId,
+        date: values.stocking_date,
+        number_of_fish_stocking: values.number_of_fish,
+        total_weight_stocking: values.total_weight_kg,
+        notes: values.notes?.trim() ? values.notes.trim() : null,
+        type_of_stocking: values.type_of_stocking,
+      }
+
+      await mutation.mutateAsync(payload)
+
+      form.reset({
+        stocking_date: toIsoDate(new Date()),
+        unit: values.unit,
+        number_of_fish: 0,
+        total_weight_kg: 0,
+        notes: "",
+        system_id: values.system_id,
+        batch_id: values.batch_id,
+        type_of_stocking: values.type_of_stocking,
+      })
+    } catch (error) {
+      logSbError("dataEntry:stocking:submit", error)
+      reportDataEntrySubmitError(error, "Failed to record stocking.")
+    }
+  }
+
+  if (batchOptions.length === 0) {
+    return (
+      <DependencyBlocker
+        title="No batches found."
+        description="Select the cage for the new batch, then create a batch to continue stocking."
+        actionLabel={showBatchCreate ? "Hide batch form" : "Create batch"}
+        onAction={() => setShowBatchCreate((current) => !current)}
+      >
+        <Form {...form}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="unit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cage Unit</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {units.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="system_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cage Number</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {systemsForUnit.map((system) => (
+                        <SelectItem key={system.id} value={String(system.id)}>
+                          {formatCageLabel(system)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+        {showBatchCreate ? (
+          <div className="mt-4">
+            <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} onCreated={handleBatchCreated} />
+          </div>
+        ) : null}
+      </DependencyBlocker>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="data-entry-form-intro">
+        <h2 className="text-xl font-semibold tracking-tight">Record Stocking</h2>
+      </div>
+
+      <div className="data-entry-status">
+        <OfflineSaveBadge result={mutation.data} />
+      </div>
+
+      <div className="flex justify-end">
+        <Button type="button" variant="outline" onClick={() => setShowBatchCreate((current) => !current)}>
+          {showBatchCreate ? "Hide batch form" : "Add New Batch"}
+        </Button>
+      </div>
+
+      {showBatchCreate ? (
+        <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} onCreated={handleBatchCreated} />
+      ) : null}
+
+      <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="stocking" />
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="stocking_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="unit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cage Unit</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {units.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="system_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cage Number</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {systemsForUnit.map((system) => (
+                        <SelectItem key={system.id} value={String(system.id)}>
+                          {formatCageLabel(system)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <div>
+                <div className="text-sm font-semibold text-foreground">Batch Number</div>
+              </div>
+              <div className="mt-3">
+                <FormField
+                  control={form.control}
+                  name="batch_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select batch number" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {batchOptions.map((batch) => (
+                            <SelectItem key={batch.id} value={String(batch.id)}>
+                              {batch.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="data-entry-secondary-grid">
+            <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
+            <SelectedBatchSupplierInfo batches={batchOptions} batchId={selectedBatchId} />
+          </div>
+
+          <div className="data-entry-secondary-grid">
+            <FormField
+              control={form.control}
+              name="number_of_fish"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Number of Fish</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="1" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="total_weight_kg"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Total Weight (kg)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <FormField
+            control={form.control}
+            name="type_of_stocking"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Stocking Type</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="empty">Empty cage</SelectItem>
+                    <SelectItem value="already_stocked">Already stocked</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Comments</FormLabel>
+                <FormControl>
+                  <textarea
+                    {...field}
+                    rows={3}
+                    className="data-entry-textarea"
+                    placeholder="Source condition, acclimation detail, or any exception."
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+            {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Record Stocking
+          </Button>
+        </form>
+      </Form>
+    </div>
+  )
+}
+

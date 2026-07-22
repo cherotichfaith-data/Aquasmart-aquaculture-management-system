@@ -22,6 +22,7 @@ interface FarmSelectorProps {
   onStageChange: (stage: StageFilter) => void
   showBatch?: boolean
   showStage?: boolean
+  showSystem?: boolean
   showCounts?: boolean
   variant?: "default" | "compact"
   layout?: "grid" | "row"
@@ -40,6 +41,7 @@ export default function FarmSelector({
   onStageChange,
   showBatch = true,
   showStage = true,
+  showSystem = true,
   showCounts = true,
   variant = "default",
   layout,
@@ -275,6 +277,7 @@ export default function FarmSelector({
         />
       ) : null}
 
+      {showSystem ? (
       <FilterPopover
         label={systemLabel}
         value={selectedSystem}
@@ -300,6 +303,7 @@ export default function FarmSelector({
             : { width: { xs: "min(24rem, calc(100vw - 24px))", sm: 384 } }
         }
       />
+      ) : null}
     </Box>
   )
 }

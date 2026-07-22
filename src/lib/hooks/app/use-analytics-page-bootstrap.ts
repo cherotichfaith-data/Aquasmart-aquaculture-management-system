@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { DEFAULT_TIME_PERIOD, type AnalyticsTimeScope, type TimeBounds } from "@/lib/time-period"
+import { DEFAULT_TIME_PERIOD, parseCustomPeriodUrlValue, type AnalyticsTimeScope } from "@/lib/time-period"
 import {
   useSharedFilters,
   type SharedFiltersState,
@@ -29,6 +29,41 @@ const normalizeFarmId = (value?: string | null) => {
   return trimmed
 }
 
+const mergeSharedFilterOverrides = (
+  initialFilters?: SharedFilterOverrides,
+  filterOverrides?: SharedFilterOverrides,
+) => {
+  const merged: SharedFilterOverrides = {}
+
+  if (initialFilters?.selectedBatch !== undefined) {
+    merged.selectedBatch = initialFilters.selectedBatch
+  }
+  if (initialFilters?.selectedSystem !== undefined) {
+    merged.selectedSystem = initialFilters.selectedSystem
+  }
+  if (initialFilters?.selectedStage !== undefined) {
+    merged.selectedStage = initialFilters.selectedStage
+  }
+  if (initialFilters?.timePeriod !== undefined) {
+    merged.timePeriod = initialFilters.timePeriod
+  }
+
+  if (filterOverrides?.selectedBatch !== undefined) {
+    merged.selectedBatch = filterOverrides.selectedBatch
+  }
+  if (filterOverrides?.selectedSystem !== undefined) {
+    merged.selectedSystem = filterOverrides.selectedSystem
+  }
+  if (filterOverrides?.selectedStage !== undefined) {
+    merged.selectedStage = filterOverrides.selectedStage
+  }
+  if (filterOverrides?.timePeriod !== undefined) {
+    merged.timePeriod = filterOverrides.timePeriod
+  }
+
+  return hasSharedFilterOverrides(merged) ? merged : undefined
+}
+
 export function useAnalyticsPageBootstrap(params: {
   initialFarmId?: string | null
   initialFarmName?: string | null
@@ -41,50 +76,14 @@ export function useAnalyticsPageBootstrap(params: {
   filterUrlValues?: Partial<Record<keyof SharedFiltersState, string>>
   filterUrlKeys?: Partial<Record<keyof SharedFiltersState, string>>
 } = {}) {
+  const searchParams = useSearchParams()
   const initialFarmId = normalizeFarmId(params.initialFarmId)
   const activeFarm = useActiveFarm({ initialFarmId, initialFarmName: params.initialFarmName })
   const farmId = activeFarm.farmId ?? initialFarmId ?? null
+  const rawPeriodParam = searchParams.get("period")
+  const customRange = parseCustomPeriodUrlValue(rawPeriodParam)
 
-  const sharedFilterInitialValues = useMemo(() => {
-    const merged: SharedFilterOverrides = {}
-
-    if (params.initialFilters?.selectedBatch !== undefined) {
-      merged.selectedBatch = params.initialFilters.selectedBatch
-    }
-    if (params.initialFilters?.selectedSystem !== undefined) {
-      merged.selectedSystem = params.initialFilters.selectedSystem
-    }
-    if (params.initialFilters?.selectedStage !== undefined) {
-      merged.selectedStage = params.initialFilters.selectedStage
-    }
-    if (params.initialFilters?.timePeriod !== undefined) {
-      merged.timePeriod = params.initialFilters.timePeriod
-    }
-
-    if (params.filterOverrides?.selectedBatch !== undefined) {
-      merged.selectedBatch = params.filterOverrides.selectedBatch
-    }
-    if (params.filterOverrides?.selectedSystem !== undefined) {
-      merged.selectedSystem = params.filterOverrides.selectedSystem
-    }
-    if (params.filterOverrides?.selectedStage !== undefined) {
-      merged.selectedStage = params.filterOverrides.selectedStage
-    }
-    if (params.filterOverrides?.timePeriod !== undefined) {
-      merged.timePeriod = params.filterOverrides.timePeriod
-    }
-
-    return hasSharedFilterOverrides(merged) ? merged : undefined
-  }, [
-    params.filterOverrides?.selectedBatch,
-    params.filterOverrides?.selectedStage,
-    params.filterOverrides?.selectedSystem,
-    params.filterOverrides?.timePeriod,
-    params.initialFilters?.selectedBatch,
-    params.initialFilters?.selectedStage,
-    params.initialFilters?.selectedSystem,
-    params.initialFilters?.timePeriod,
-  ])
+  const sharedFilterInitialValues = mergeSharedFilterOverrides(params.initialFilters, params.filterOverrides)
 
   const sharedFilters = useSharedFilters(params.defaultTimePeriod ?? DEFAULT_TIME_PERIOD, sharedFilterInitialValues, {
     urlValues: params.filterUrlValues,
@@ -102,6 +101,7 @@ export function useAnalyticsPageBootstrap(params: {
   const boundsQuery = useTimePeriodBounds({
     farmId,
     timePeriod: sharedFilters.timePeriod,
+    customRange,
     systemId: boundsSystemId,
     batchId: selectedBatchId,
     scope: params.boundsScope ?? "dashboard",

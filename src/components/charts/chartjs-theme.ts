@@ -173,12 +173,12 @@ type ChartPalette = {
 const FALLBACK_PALETTE: ChartPalette = {
   text: lightTheme.palette.text.primary,
   muted: lightTheme.palette.text.secondary,
-  grid: "rgba(94, 122, 134, 0.18)",
+  grid: "var(--chart-grid)",
   border: lightTheme.palette.divider,
   card: lightTheme.palette.background.paper,
-  tooltipBackground: "rgba(15, 76, 129, 0.96)",
-  tooltipBorder: "rgba(215, 231, 236, 0.24)",
-  tooltipForeground: "#f8fbff",
+  tooltipBackground: "var(--chart-tooltip-bg)",
+  tooltipBorder: "var(--chart-tooltip-border)",
+  tooltipForeground: "var(--chart-tooltip-foreground)",
   primary: lightTheme.palette.primary.main,
   chart1: lightTheme.palette.primary.main,
   chart2: lightTheme.palette.secondary.main,
@@ -192,6 +192,14 @@ function readVar(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   return value || fallback
+}
+
+/** Resolve a `--css-var` name to its computed color at render time. Canvas
+ * (Chart.js) can't consume `var(...)` references directly like DOM/CSS can,
+ * so any chart color sourced from a CSS custom property must go through
+ * this instead of being passed as a raw `var(--x)` string. */
+export function readCssVar(name: string, fallback = "") {
+  return readVar(name, fallback)
 }
 
 export function getChartPalette(): ChartPalette {
@@ -255,7 +263,7 @@ export function createVerticalGradient(color: string, topOpacity = 0.1, bottomOp
 export function chartLegendOptions(
   palette: ChartPalette,
   display = true,
-): any {
+): Record<string, unknown> {
   return {
     display,
     position: "top",
@@ -271,13 +279,13 @@ export function chartLegendOptions(
         weight: 500,
       },
     },
-  } as any
+  }
 }
 
 export function chartTooltipOptions(
   palette: ChartPalette,
-  overrides?: any,
-): any {
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
   return {
     backgroundColor: palette.tooltipBackground,
     borderColor: palette.tooltipBorder,
@@ -297,7 +305,7 @@ export function chartTooltipOptions(
       size: 13,
     },
     ...overrides,
-  } as any
+  }
 }
 
 function baseTickOptions(
@@ -349,6 +357,9 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
   xMin,
   xMax,
   xMaxTicksLimit,
+  xTicks = true,
+  yTicks = true,
+  yRightTicks = true,
   min,
   max,
   rightMin,
@@ -364,7 +375,7 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
   xTickFormatter?: (value: number | string, index: number, ticks: Tick[]) => string
   yTickFormatter?: (value: number | string, index: number, ticks: Tick[]) => string
   yRightTickFormatter?: (value: number | string, index: number, ticks: Tick[]) => string
-  tooltip?: any
+  tooltip?: Record<string, unknown>
   xGrid?: boolean
   yGrid?: boolean
   xStacked?: boolean
@@ -376,13 +387,16 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
   xMin?: number
   xMax?: number
   xMaxTicksLimit?: number
+  xTicks?: boolean
+  yTicks?: boolean
+  yRightTicks?: boolean
   min?: number
   max?: number
   rightMin?: number
   rightMax?: number
   lockYBounds?: boolean
   lockRightYBounds?: boolean
-  extraScales?: Record<string, any>
+  extraScales?: Record<string, unknown>
 }): ChartOptions<TType> {
   const horizontal = indexAxis === "x"
   const xGridColor = withAlpha(palette.grid, xGrid ? 0.12 : 0)
@@ -432,10 +446,12 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
           drawTicks: false,
           lineWidth: 1,
         },
-        ticks: {
-          ...baseTickOptions(palette, xTickFormatter, { preferTickLabel: true, horizontal }),
-          ...(xMaxTicksLimit != null ? { maxTicksLimit: xMaxTicksLimit } : {}),
-        },
+        ticks: xTicks
+          ? {
+              ...baseTickOptions(palette, xTickFormatter, { preferTickLabel: true, horizontal }),
+              ...(xMaxTicksLimit != null ? { maxTicksLimit: xMaxTicksLimit } : {}),
+            }
+          : { display: false },
         title: xTitle
           ? {
               display: true,
@@ -462,7 +478,7 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
           drawTicks: false,
           lineWidth: (context: ScriptableScaleContext) => (context.tick?.value === 0 ? 1.25 : 1),
         },
-        ticks: baseTickOptions(palette, yTickFormatter, { preferTickLabel: false, horizontal: false }),
+        ticks: yTicks ? baseTickOptions(palette, yTickFormatter, { preferTickLabel: false, horizontal: false }) : { display: false },
         title: yTitle
           ? {
               display: true,
@@ -489,7 +505,9 @@ export function buildCartesianOptions<TType extends "line" | "bar" | "scatter">(
                 drawTicks: false,
                 color: withAlpha(palette.grid, 0.12),
               },
-              ticks: baseTickOptions(palette, yRightTickFormatter, { preferTickLabel: false, horizontal: false }),
+              ticks: yRightTicks
+                ? baseTickOptions(palette, yRightTickFormatter, { preferTickLabel: false, horizontal: false })
+                : { display: false },
               title: yRightTitle
                 ? {
                     display: true,

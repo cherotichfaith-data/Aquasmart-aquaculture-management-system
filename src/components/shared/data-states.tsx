@@ -50,7 +50,10 @@ export function DataErrorState({
       <Typography variant="body2" sx={{ fontWeight: 700 }}>
         {title}
       </Typography>
-      <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: "#991b1b" }}>
+      <Typography
+        variant="caption"
+        sx={{ display: "block", mt: 0.75, color: "color-mix(in srgb, var(--color-destructive) 70%, black)" }}
+      >
         {description}
       </Typography>
       {onRetry ? (

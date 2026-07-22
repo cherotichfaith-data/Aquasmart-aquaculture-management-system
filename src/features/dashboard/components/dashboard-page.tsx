@@ -3,7 +3,6 @@
 import { useEffect, useMemo, type ReactNode } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Box from "@mui/material/Box"
-import Grid from "@mui/material/Grid"
 import Typography from "@mui/material/Typography"
 
 import type { DashboardPageInitialFilters } from "@/features/dashboard/types"
@@ -13,13 +12,12 @@ import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { resolveTimePeriod, toTimePeriodUrlValue } from "@/lib/time-period"
+import { getErrorMessage } from "@/lib/utils/query-result"
 
 import KPIOverview from "./kpi-overview"
 import SystemsTable from "./systems-table"
-import RecommendedActions from "./recommended-actions"
-import FeedInputByPeriod from "./feed-input-by-period"
-import FeedingResponseDonut from "./feeding-response-donut"
 import { parseDashboardStageParam } from "./dashboard-page-utils"
+import { useKpiOverview, useSystemsTable } from "@/features/dashboard/hooks"
 
 function SectionLabel({
   title,
@@ -66,11 +64,14 @@ export default function DashboardPage({
   const systemParam = searchParams.get("cage") ?? searchParams.get("system")
   const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")
-  const systemsQuery = useSystemOptions({
+  const systemOptionsQuery = useSystemOptions({
     farmId: currentFarmId,
     activeOnly: true,
   })
-  const systemOptions = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
+  const systemOptions = useMemo(
+    () => (systemOptionsQuery.data?.status === "success" ? systemOptionsQuery.data.data : []),
+    [systemOptionsQuery.data],
+  )
   const selectedSystemUrlValue = useMemo(() => {
     const systemId = resolveSystemIdFromFilterValue(systemParam, systemOptions)
     if (systemId == null) return systemParam ?? undefined
@@ -122,14 +123,15 @@ export default function DashboardPage({
   const numericSelectedSystemId =
     selectedSystem !== "all" && Number.isFinite(Number(selectedSystem)) ? Number(selectedSystem) : null
   const resolvedSelectedSystemScopeId = selectedSystemId ?? numericSelectedSystemId
-  const resolvedScopedSystemIdList =
-    resolvedSelectedSystemScopeId != null
-      ? [resolvedSelectedSystemScopeId]
-      : scopedSystemIdList
+  const resolvedScopedSystemIdList = useMemo(
+    () =>
+      resolvedSelectedSystemScopeId != null
+        ? [resolvedSelectedSystemScopeId]
+        : scopedSystemIdList,
+    [resolvedSelectedSystemScopeId, scopedSystemIdList],
+  )
   const shouldApplySystemIdScope = hasScopeFilters
   const appliedScopedSystemIds = shouldApplySystemIdScope ? resolvedScopedSystemIdList : null
-  const activeProductionSystemIds = resolvedScopedSystemIdList.length > 0 ? resolvedScopedSystemIdList : null
-
   useEffect(() => {
     if (selectedSystem === "all" || selectedSystemId != null) return
     const params = new URLSearchParams(searchParams.toString())
@@ -176,6 +178,29 @@ export default function DashboardPage({
     shouldApplySystemIdScope,
   ])
 
+  const kpiQuery = useKpiOverview({
+    farmId,
+    stage: selectedStage,
+    timePeriod,
+    batch: selectedBatch,
+    system: selectedSystem,
+    scopedSystemIds: appliedScopedSystemIds,
+    dateFrom: dateFrom ?? null,
+    dateTo: dateTo ?? null,
+  })
+
+  const systemsQuery = useSystemsTable({
+    farmId,
+    stage: selectedStage,
+    batch: selectedBatch,
+    system: selectedSystem,
+    timePeriod,
+    dateFrom: dateFrom ?? null,
+    dateTo: dateTo ?? null,
+    includeIncomplete: true,
+    scopedSystemIds: appliedScopedSystemIds,
+  })
+
   if (!farmId) return <Box sx={{ minHeight: "60vh" }} />
 
   return (
@@ -183,67 +208,34 @@ export default function DashboardPage({
       <section>
         <SectionLabel title="Core Performance Overview" />
         <KPIOverview
-          farmId={farmId}
+          metrics={kpiQuery.data?.metrics ?? []}
+          isLoading={!dateFrom || !dateTo || kpiQuery.isLoading}
+          isFetching={kpiQuery.isFetching}
+          isError={kpiQuery.isError}
+          errorMessage={getErrorMessage(kpiQuery.error)}
+          onRetry={() => kpiQuery.refetch()}
           stage={selectedStage}
           timePeriod={timePeriod}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
           batch={selectedBatch}
           system={selectedSystem}
-          scopedSystemIds={appliedScopedSystemIds}
         />
       </section>
-
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, lg: 7 }}>
-          <FeedInputByPeriod
-            farmId={farmId}
-            batch={selectedBatch}
-            timePeriod={timePeriod}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            scopedSystemIds={activeProductionSystemIds}
-            mode="daily"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 5 }}>
-          <FeedingResponseDonut
-            farmId={farmId}
-            batch={selectedBatch}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            scopedSystemIds={activeProductionSystemIds}
-          />
-        </Grid>
-      </Grid>
 
       <section>
         <SectionLabel title="Production" />
         <SystemsTable
-          farmId={farmId}
+          rows={systemsQuery.data?.rows ?? []}
+          isLoading={!dateFrom || !dateTo || systemsQuery.isLoading}
+          isFetching={systemsQuery.isFetching}
+          isError={systemsQuery.isError}
+          errorMessage={getErrorMessage(systemsQuery.error)}
+          emptyReason={systemsQuery.data?.meta.reason ?? null}
+          updatedAt={systemsQuery.dataUpdatedAt}
+          onRetry={() => systemsQuery.refetch()}
           stage={selectedStage}
           batch={selectedBatch}
-          system={selectedSystem}
           timePeriod={timePeriod}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          scopedSystemIds={appliedScopedSystemIds}
-          showHeader={false}
-        />
-      </section>
-
-      <section className="space-y-0">
-        <SectionLabel title="Recommended Actions" />
-        <RecommendedActions
           farmId={farmId}
-          stage={selectedStage}
-          batch={selectedBatch}
-          system={selectedSystem}
-          timePeriod={timePeriod}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          scopedSystemIds={appliedScopedSystemIds}
-          maxItems={5}
           showHeader={false}
         />
       </section>

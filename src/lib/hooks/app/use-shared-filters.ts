@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState, type SetStateAction } from "react"
 import { DEFAULT_TIME_PERIOD, type TimePeriod } from "@/lib/time-period"
 import { normalizeStageFilter, type StageFilter } from "@/lib/stage-filter"
 
@@ -13,6 +13,33 @@ export type SharedFiltersState = {
   timePeriod: TimePeriod
 }
 
+type SharedFiltersDraft = {
+  sourceToken: symbol
+  values: SharedFiltersState
+}
+
+const buildSharedFiltersState = (
+  defaultTimePeriod: TimePeriod,
+  initialValues?: Partial<SharedFiltersState>,
+): SharedFiltersState => ({
+  selectedBatch: initialValues?.selectedBatch ?? "all",
+  selectedSystem: initialValues?.selectedSystem ?? "all",
+  selectedStage: normalizeStageFilter(initialValues?.selectedStage),
+  timePeriod: initialValues?.timePeriod ?? defaultTimePeriod,
+})
+
+const serializeSharedFiltersSource = (
+  values: SharedFiltersState,
+  resetKey?: string | null,
+) =>
+  [
+    resetKey ?? "",
+    values.selectedBatch,
+    values.selectedSystem,
+    values.selectedStage,
+    values.timePeriod,
+  ].join("|")
+
 export function useSharedFilters(
   defaultTimePeriod: TimePeriod = DEFAULT_TIME_PERIOD,
   initialValues?: Partial<SharedFiltersState>,
@@ -23,21 +50,36 @@ export function useSharedFilters(
     urlKeys?: Partial<Record<keyof SharedFiltersState, string>>
   },
 ) {
-  const initialBatch = initialValues?.selectedBatch ?? "all"
-  const initialSystem = initialValues?.selectedSystem ?? "all"
-  const initialStage = normalizeStageFilter(initialValues?.selectedStage)
-  const initialPeriod = initialValues?.timePeriod ?? defaultTimePeriod
-  const [selectedBatch, setSelectedBatch] = useState<string>(initialBatch)
-  const [selectedSystem, setSelectedSystem] = useState<string>(initialSystem)
-  const [selectedStage, setSelectedStage] = useState<StageFilter>(initialStage)
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialPeriod)
+  const initialState = buildSharedFiltersState(defaultTimePeriod, initialValues)
+  const sourceSignature = serializeSharedFiltersSource(initialState, options?.resetKey)
+  const currentSourceToken = useMemo(() => Symbol(sourceSignature), [sourceSignature])
+  const [draft, setDraft] = useState<SharedFiltersDraft>(() => ({
+    sourceToken: currentSourceToken,
+    values: initialState,
+  }))
+  const resolvedValues = draft.sourceToken === currentSourceToken ? draft.values : initialState
 
-  useEffect(() => {
-    setSelectedBatch(initialBatch)
-    setSelectedSystem(initialSystem)
-    setSelectedStage(initialStage)
-    setTimePeriod(initialPeriod)
-  }, [initialBatch, initialPeriod, initialStage, initialSystem, options?.resetKey])
+  const updateField = <Key extends keyof SharedFiltersState>(
+    key: Key,
+    value: SetStateAction<SharedFiltersState[Key]>,
+  ) => {
+    setDraft((current) => {
+      const baseValues = current.sourceToken === currentSourceToken ? current.values : initialState
+      const previousValue = baseValues[key]
+      const nextValue =
+        typeof value === "function"
+          ? (value as (previous: SharedFiltersState[Key]) => SharedFiltersState[Key])(previousValue)
+          : value
+
+      return {
+        sourceToken: currentSourceToken,
+        values: {
+          ...baseValues,
+          [key]: nextValue,
+        },
+      }
+    })
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -67,10 +109,10 @@ export function useSharedFilters(
       }
     }
 
-    syncParam("selectedBatch", initialBatch)
-    syncParam("selectedSystem", initialSystem)
-    syncParam("selectedStage", initialStage)
-    syncParam("timePeriod", initialPeriod)
+    syncParam("selectedBatch", initialState.selectedBatch)
+    syncParam("selectedSystem", initialState.selectedSystem)
+    syncParam("selectedStage", initialState.selectedStage)
+    syncParam("timePeriod", initialState.timePeriod)
 
     if (changed) {
       const nextQuery = params.toString()
@@ -78,24 +120,24 @@ export function useSharedFilters(
     }
   }, [
     defaultTimePeriod,
-    initialBatch,
-    initialPeriod,
-    initialStage,
-    initialSystem,
+    initialState.selectedBatch,
+    initialState.selectedStage,
+    initialState.selectedSystem,
+    initialState.timePeriod,
     options?.resetKey,
     options?.urlKeys,
     options?.urlValues,
   ])
 
   return {
-    selectedBatch,
-    setSelectedBatch,
-    selectedSystem,
-    setSelectedSystem,
-    selectedStage,
-    setSelectedStage,
-    timePeriod,
-    setTimePeriod,
+    selectedBatch: resolvedValues.selectedBatch,
+    setSelectedBatch: (value: SetStateAction<string>) => updateField("selectedBatch", value),
+    selectedSystem: resolvedValues.selectedSystem,
+    setSelectedSystem: (value: SetStateAction<string>) => updateField("selectedSystem", value),
+    selectedStage: resolvedValues.selectedStage,
+    setSelectedStage: (value: SetStateAction<StageFilter>) => updateField("selectedStage", value),
+    timePeriod: resolvedValues.timePeriod,
+    setTimePeriod: (value: SetStateAction<TimePeriod>) => updateField("timePeriod", value),
   }
 }
 

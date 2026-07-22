@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
 import Alert from "@mui/material/Alert"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
@@ -11,11 +11,11 @@ import { useSyncStore } from "@/lib/offline/sync-store"
 
 export function SyncStatusBar() {
   const { isSyncing, pendingCount, lastSyncedAt, syncError, manualSync } = useSyncStore()
-  const [hasMounted, setHasMounted] = useState(false)
-
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
+  const hasMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
 
   if (!hasMounted) {
     return null

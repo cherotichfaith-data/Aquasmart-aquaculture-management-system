@@ -1,6 +1,6 @@
 "use client"
 
-import { type FormEvent, useEffect, useMemo, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useState, type SetStateAction } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { OnboardingShell } from "@/components/onboarding/onboarding-shell"
 import { useAuth } from "@/components/providers/auth-provider"
@@ -28,7 +28,6 @@ export default function WorkspaceSetupForm() {
   const searchParams = useSearchParams()
   const { user, refreshProfile } = useAuth()
   const nextPath = sanitizeNextPath(searchParams.get("next"), "/dashboard")
-  const [organizationName, setOrganizationName] = useState("")
   const [farmName, setFarmName] = useState("")
   const [location, setLocation] = useState("")
   const [isLoading, setIsLoading] = useState(true)
@@ -43,10 +42,26 @@ export default function WorkspaceSetupForm() {
         ?.trim() ?? "AquaSmart Organization"
     )
   }, [user?.email, user?.user_metadata])
-
-  useEffect(() => {
-    setOrganizationName((current) => (current.trim().length > 0 ? current : fallbackOrganizationName))
-  }, [fallbackOrganizationName])
+  const organizationSourceToken = useMemo(() => Symbol(fallbackOrganizationName), [fallbackOrganizationName])
+  const [organizationDraft, setOrganizationDraft] = useState(() => ({
+    sourceToken: organizationSourceToken,
+    value: fallbackOrganizationName,
+  }))
+  const organizationName =
+    organizationDraft.sourceToken === organizationSourceToken
+      ? organizationDraft.value
+      : fallbackOrganizationName
+  const setOrganizationName = (value: SetStateAction<string>) => {
+    setOrganizationDraft((current) => {
+      const previousValue =
+        current.sourceToken === organizationSourceToken ? current.value : fallbackOrganizationName
+      const nextValue = typeof value === "function" ? value(previousValue) : value
+      return {
+        sourceToken: organizationSourceToken,
+        value: nextValue,
+      }
+    })
+  }
 
   useEffect(() => {
     let active = true
@@ -58,7 +73,6 @@ export default function WorkspaceSetupForm() {
           router.replace(`${WORKSPACE_SELECT_PATH}?next=${encodeURIComponent(nextPath)}`)
           return
         }
-        setOrganizationName((current) => (current.trim().length > 0 ? current : fallbackOrganizationName))
       })
       .catch((error) => {
         if (!active) return
@@ -76,7 +90,7 @@ export default function WorkspaceSetupForm() {
     return () => {
       active = false
     }
-  }, [fallbackOrganizationName, nextPath, router])
+  }, [nextPath, router])
 
   const continueToWorkspace = (nextOrganizationId: string, nextFarmId: string) => {
     if (typeof window !== "undefined" && user?.id) {

@@ -4,16 +4,14 @@ import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/cache/query-keys"
 import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
-import type { SystemOption } from "@/lib/system-options"
 import {
   getBatchOptions,
-  getDashboardTimePeriodOptions,
   getFarmOptions,
   getFeedTypeOptions,
   getFingerlingSupplierOptions,
   getAppConfig,
   getSystemOptions,
-} from "@/features/options/queries.client"
+} from "@/features/shared/options.client"
 
 export function useSystemOptions(params?: {
   farmId?: string | null
@@ -43,16 +41,6 @@ export function useBatchOptions(params?: {
     enabled,
     staleTime: 0,
     refetchOnMount: "always",
-  })
-}
-
-export function useDashboardTimePeriodOptions(params?: { enabled?: boolean }) {
-  const { session, user } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.options.timePeriods(),
-    queryFn: ({ signal }) => getDashboardTimePeriodOptions({ signal }),
-    enabled: (Boolean(session) || Boolean(user)) && (params?.enabled ?? true),
-    staleTime: 5 * 60_000,
   })
 }
 

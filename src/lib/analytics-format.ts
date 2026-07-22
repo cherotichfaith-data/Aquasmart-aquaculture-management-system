@@ -4,6 +4,9 @@ type NumberFormatOptions = {
   fallback?: string
 }
 
+const STABLE_LOCALE = "en-US"
+const STABLE_TIME_ZONE = "UTC"
+
 const parseDateInput = (value: string | number, dateOnly: boolean) => {
   const raw = String(value)
   const parsed =
@@ -46,6 +49,17 @@ export const formatDateTimeValue = (value: string | null | undefined, fallback =
   }).format(parsed)
 }
 
+export const formatStableDateTime = (value: string | number | Date, options?: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat(STABLE_LOCALE, {
+    timeZone: STABLE_TIME_ZONE,
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    ...options,
+  }).format(new Date(value))
+
 export const formatNumberValue = (
   value: number | null | undefined,
   options: NumberFormatOptions = {},
@@ -68,7 +82,7 @@ export const formatUnitValue = (
   return base === fallback ? fallback : `${base} ${unit}`
 }
 
-export const scaleFractionToPercent = (value: number | null | undefined) =>
+const scaleFractionToPercent = (value: number | null | undefined) =>
   value == null || Number.isNaN(value) || !Number.isFinite(value) ? null : value * 100
 
 export const formatPercentRateValue = (
