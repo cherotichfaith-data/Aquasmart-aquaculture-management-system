@@ -1,40 +1,19 @@
 "use server"
 
-import type { User } from "@supabase/supabase-js"
 import { z } from "zod"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createAccessTokenClient } from "@/lib/supabase/server"
 import { logSbError } from "@/lib/supabase/log"
 import { normalizeRole } from "@/lib/app-entry"
-import { getSessionIdentity } from "@/lib/supabase/session"
 
 const accountSetupSchema = z.object({
   fullName: z.string().trim().min(2, "Full name is required."),
-  accessToken: z.string().min(20).optional(),
 })
 
 export async function completeAccountSetupAction(input: z.infer<typeof accountSetupSchema>) {
   const payload = accountSetupSchema.parse(input)
   const admin = createAdminClient()
-  const tokenIdentity = payload.accessToken ? getSessionIdentity(payload.accessToken) : null
-
-  let user: Pick<User, "id" | "email" | "user_metadata" | "app_metadata"> | null = tokenIdentity
-    ? {
-        id: tokenIdentity.userId,
-        email: tokenIdentity.email ?? undefined,
-        user_metadata: tokenIdentity.userMetadata,
-        app_metadata: tokenIdentity.appMetadata,
-      }
-    : null
-  let authenticatedSupabase = payload.accessToken ? createAccessTokenClient(payload.accessToken) : null
-
-  if (!user) {
-    const actionUser = await requireMutationActionUser("auth:setPasswordProfile")
-    user = actionUser.user
-    authenticatedSupabase = actionUser.supabase
-  }
-  const setupUser = user
+  const { supabase: authenticatedSupabase, user: setupUser } = await requireMutationActionUser("auth:setPasswordProfile")
 
   try {
     const { error: claimError } = authenticatedSupabase
@@ -42,9 +21,11 @@ export async function completeAccountSetupAction(input: z.infer<typeof accountSe
       : { error: null }
     if (claimError) {
       logSbError("auth:setPasswordProfile:claimInvitations", claimError)
+      throw new Error("Unable to finalize the user's farm access.")
     }
   } catch (error) {
     logSbError("auth:setPasswordProfile:claimInvitations", error)
+    throw new Error("Unable to finalize the user's farm access.")
   }
 
   const { data: authUserData, error: authUserError } = await admin.auth.admin.getUserById(setupUser.id)

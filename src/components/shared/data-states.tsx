@@ -1,11 +1,9 @@
 "use client"
 
 import type React from "react"
-import Alert from "@mui/material/Alert"
-import Box from "@mui/material/Box"
-import Button from "@mui/material/Button"
-import Typography from "@mui/material/Typography"
 import { AlertTriangle, Inbox } from "lucide-react"
+import { Button } from "@/components/app-ui/button"
+import { cn } from "@/lib/utils"
 
 export function DataFetchingBadge({
   isFetching,
@@ -34,41 +32,21 @@ export function DataErrorState({
   onRetry?: () => void
 }) {
   return (
-    <Alert
-      severity="error"
-      icon={<AlertTriangle size={16} />}
-      sx={{
-        alignItems: "flex-start",
-        borderRadius: 3,
-        border: "1px solid color-mix(in srgb, var(--color-destructive) 35%, transparent)",
-        bgcolor: "color-mix(in srgb, var(--color-destructive) 6%, transparent)",
-        "& .MuiAlert-message": {
-          width: "100%",
-        },
-      }}
+    <div
+      role="alert"
+      className="flex items-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--color-destructive)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_6%,transparent)] px-3.5 py-3"
     >
-      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-        {title}
-      </Typography>
-      <Typography
-        variant="caption"
-        sx={{ display: "block", mt: 0.75, color: "color-mix(in srgb, var(--color-destructive) 70%, black)" }}
-      >
-        {description}
-      </Typography>
-      {onRetry ? (
-        <Button
-          type="button"
-          variant="outlined"
-          size="small"
-          color="error"
-          onClick={onRetry}
-          sx={{ mt: 1.5, borderRadius: 2 }}
-        >
-          Try Again
-        </Button>
-      ) : null}
-    </Alert>
+      <AlertTriangle size={16} className="mt-0.5 shrink-0 text-destructive" />
+      <div className="w-full min-w-0">
+        <p className="text-sm font-bold text-foreground">{title}</p>
+        <p className="mt-0.75 text-xs text-[color-mix(in_srgb,var(--color-destructive)_70%,black)]">{description}</p>
+        {onRetry ? (
+          <Button type="button" variant="outline" size="sm" onClick={onRetry} className="mt-1.5 rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10">
+            Try Again
+          </Button>
+        ) : null}
+      </div>
+    </div>
   )
 }
 
@@ -77,45 +55,27 @@ export function EmptyState({
   description,
   icon: Icon = Inbox,
   action,
+  className,
 }: {
   title: string
   description?: string
   icon?: React.ComponentType<{ className?: string }>
   action?: React.ReactNode
+  className?: string
 }) {
   return (
-    <Box
-      sx={{
-        borderRadius: 3,
-          border: "1px dashed var(--color-border)",
-          bgcolor: "color-mix(in srgb, var(--color-foreground) 3%, transparent)",
-        p: 3,
-        textAlign: "center",
-      }}
+    <div
+      className={cn(
+        "rounded-xl border border-dashed border-border bg-[color-mix(in_srgb,var(--color-foreground)_3%,transparent)] p-6 text-center",
+        className,
+      )}
     >
-      <Box
-        sx={{
-          mx: "auto",
-          display: "flex",
-          width: 48,
-          height: 48,
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 2.5,
-          bgcolor: "action.hover",
-        }}
-      >
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[1.25rem] bg-accent">
         <Icon className="h-5 w-5 text-muted-foreground" />
-      </Box>
-      <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 700 }}>
-        {title}
-      </Typography>
-      {description ? (
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-          {description}
-        </Typography>
-      ) : null}
-      {action ? <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>{action}</Box> : null}
-    </Box>
+      </div>
+      <p className="mt-3 text-sm font-bold text-foreground">{title}</p>
+      {description ? <p className="mt-1 block text-xs text-muted-foreground">{description}</p> : null}
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+    </div>
   )
 }

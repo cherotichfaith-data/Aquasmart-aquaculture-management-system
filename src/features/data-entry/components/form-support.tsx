@@ -1,6 +1,8 @@
 "use client"
 
-import type { ReactNode } from "react"
+import type { ReactNode, Ref } from "react"
+import { Minus, Plus } from "lucide-react"
+import { Input } from "@/components/app-ui/input"
 import type { SystemOption } from "@/lib/system-options"
 import { cn } from "@/lib/utils"
 
@@ -75,4 +77,80 @@ export function formatRelativeDays(days: number | null | undefined, empty = "No 
   if (days <= 0) return "Today"
   if (days === 1) return "1 day ago"
   return `${days} days ago`
+}
+
+type StepperField = {
+  value: unknown
+  onChange: (value: number) => void
+  onBlur: () => void
+  name: string
+  ref: Ref<HTMLInputElement>
+}
+
+/**
+ * Whole-number count input with +/- stepper buttons for one-handed use in the
+ * field (fish counts, bag counts). Buttons are 44px touch targets. Falls back
+ * to plain typing/paste in the input for large counts.
+ */
+export function NumberStepperInput({
+  field,
+  min = 0,
+  step = 1,
+  className,
+  placeholder,
+  disabled,
+}: {
+  field: StepperField
+  min?: number
+  step?: number
+  className?: string
+  placeholder?: string
+  disabled?: boolean
+}) {
+  const numericValue = typeof field.value === "number" ? field.value : Number(field.value)
+  const safeValue = Number.isFinite(numericValue) ? numericValue : 0
+
+  const adjust = (delta: number) => {
+    const next = Math.max(min, safeValue + delta)
+    field.onChange(next)
+  }
+
+  return (
+    <div className={cn("flex items-stretch gap-1.5", className)}>
+      <button
+        type="button"
+        aria-label="Decrease"
+        disabled={disabled || safeValue <= min}
+        onClick={() => adjust(-step)}
+        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Minus className="h-4 w-4" />
+      </button>
+      <Input
+        type="number"
+        step={step}
+        inputMode="numeric"
+        placeholder={placeholder}
+        disabled={disabled}
+        name={field.name}
+        ref={field.ref}
+        value={(field.value as number | string | undefined) ?? ""}
+        onChange={(event) => {
+          const raw = event.target.value
+          field.onChange(raw === "" ? 0 : Number(raw))
+        }}
+        onBlur={field.onBlur}
+        className="min-h-11 text-center"
+      />
+      <button
+        type="button"
+        aria-label="Increase"
+        disabled={disabled}
+        onClick={() => adjust(step)}
+        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+    </div>
+  )
 }

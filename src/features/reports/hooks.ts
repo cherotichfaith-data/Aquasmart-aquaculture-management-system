@@ -17,7 +17,6 @@ import {
   getPerformanceRecords,
   getPerformanceSummary,
   getRecentActivities,
-  getRecentEntries,
   getSamplingData,
   getStockings,
   getTransferData,
@@ -386,23 +385,6 @@ export function useMortalityData(params?: {
       queryFn: ({ signal }) => getMortalityData({ ...params, farmId: resolvedFarmId, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
-    }),
-  )
-}
-
-export function useRecentEntries(params?: {
-  farmId?: string | null
-}) {
-  const { session, user } = useAuth()
-  const { farmId } = useActiveFarm()
-  const resolvedFarmId = params?.farmId ?? farmId
-  return useQuery(
-    reportsQueryOptions({
-      queryKey: queryKeys.reports.recentEntries(resolvedFarmId),
-      queryFn: ({ signal }) => getRecentEntries(resolvedFarmId, signal),
-      enabled: (Boolean(session) || Boolean(user)) && Boolean(resolvedFarmId),
-      staleTime: 5 * 60_000,
-      refetchOnMount: DISABLE_AUTO_REFETCH_IN_DEV ? false : undefined,
     }),
   )
 }

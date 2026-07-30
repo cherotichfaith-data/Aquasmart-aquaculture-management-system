@@ -112,20 +112,20 @@ function KPICardContent({
     trendDirection === "down" ? ArrowDownRight : trendDirection === "up" ? ArrowUpRight : Minus
 
   return (
-    <div className="panel-surface w-full cursor-pointer rounded-2xl px-4 py-3 text-left transition-shadow hover:shadow-[0_28px_54px_-38px_rgba(15,23,32,0.52)]">
+    <div className="panel-surface w-full cursor-pointer rounded-2xl px-3.5 py-2.5 text-left transition-shadow hover:shadow-[0_28px_54px_-38px_rgba(15,23,32,0.52)]">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-          <p className="mt-2 text-[20px] font-semibold leading-tight text-foreground">{formattedValue}</p>
+          <p className="mt-1.5 text-[20px] font-semibold leading-tight text-foreground">{formattedValue}</p>
           {trendText && (
-            <p className={`mt-2 inline-flex items-center gap-1 text-[11px] ${toneStyles[status]}`}>
+            <p className={`mt-1.5 inline-flex items-center gap-1 text-[11px] ${toneStyles[status]}`}>
               <TrendIcon className="h-3 w-3" />
               <span>{trendText}</span>
             </p>
           )}
         </div>
         {hasTrend && (
-          <div className="rounded-md bg-muted/40 p-1.5">
+          <div className="rounded-md bg-muted/40 p-1">
             <Sparkline trend={trend} invertTrend={invertTrend} neutral={neutral} />
           </div>
         )}

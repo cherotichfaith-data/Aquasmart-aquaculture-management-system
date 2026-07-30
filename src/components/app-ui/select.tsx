@@ -7,14 +7,11 @@ import {
   isValidElement,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useState,
 } from "react"
 import type * as React from "react"
-import MuiSelect from "@mui/material/Select"
-import MenuItem from "@mui/material/MenuItem"
-import type { SelectChangeEvent } from "@mui/material/Select"
-import OutlinedInput from "@mui/material/OutlinedInput"
 import { ChevronDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -31,6 +28,7 @@ type SelectContextValue = {
   disabled?: boolean
   contentChildren: React.ReactNode
   setContentChildren: (children: React.ReactNode) => void
+  triggerId: string
 }
 
 const SelectContext = createContext<SelectContextValue | null>(null)
@@ -97,6 +95,7 @@ function Select({
   const [internalValue, setInternalValue] = useState(defaultValue ?? "")
   const [contentChildren, setContentChildren] = useState<React.ReactNode>(null)
   const resolvedValue = value ?? internalValue
+  const triggerId = useId()
 
   return (
     <SelectContext.Provider
@@ -111,6 +110,7 @@ function Select({
         disabled,
         contentChildren,
         setContentChildren,
+        triggerId,
       }}
     >
       {children}
@@ -142,66 +142,40 @@ function SelectTrigger({
   const { value, onValueChange, disabled: rootDisabled, contentChildren } = useSelectContext()
   const items = useMemo(() => flattenSelectItems(contentChildren), [contentChildren])
   const placeholder = findSelectValuePlaceholder(children)
-  const selectedItem = items.find((item) => item.value === value)
-
-  const handleChange = (event: SelectChangeEvent<string>) => {
-    onValueChange?.(event.target.value)
-  }
+  const { triggerId } = useSelectContext()
 
   return (
-    <MuiSelect
+    <div
       data-slot="select-trigger"
-      value={value ?? ""}
-      onChange={handleChange}
-      displayEmpty
-      fullWidth
-      size={size === "sm" ? "small" : "medium"}
-      disabled={rootDisabled || disabled}
       className={cn(
-        "w-fit",
+        "relative w-fit",
         className,
       )}
-      input={
-        <OutlinedInput
-          id={id}
-          aria-describedby={ariaDescribedBy}
-          aria-invalid={ariaInvalid}
-        />
-      }
-      IconComponent={ChevronDown}
-      renderValue={(selected) => {
-        const selectedValue = String(selected ?? "")
-        if (!selectedValue) {
-          return <span className="text-muted-foreground">{placeholder ?? ""}</span>
-        }
-        return selectedItem?.label ?? selectedValue
-      }}
-      sx={{
-        minWidth: 0,
-        "& .MuiOutlinedInput-root": {
-          minHeight: size === "sm" ? 32 : 36,
-          borderRadius: 1,
-          bgcolor: "background.paper",
-        },
-        "& .MuiSelect-select": {
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-        },
-        "& .MuiSelect-icon": {
-          right: 10,
-          width: 16,
-          height: 16,
-          opacity: 0.6,
-        },
-      }}
     >
-      {items.map((item) => (
-        <MenuItem key={item.value} value={item.value} disabled={item.disabled}>
-          {item.label}
-        </MenuItem>
-      ))}
-    </MuiSelect>
+      <select
+        id={id ?? triggerId}
+        data-slot="select-input"
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        value={value ?? ""}
+        onChange={(event) => onValueChange?.(event.target.value)}
+        disabled={rootDisabled || disabled}
+        className={cn(
+          "h-10 w-full appearance-none rounded-md border border-input bg-background px-3 pr-9 text-sm text-foreground ring-offset-background outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          size === "sm" && "h-8 text-xs",
+        )}
+      >
+        <option value="" disabled hidden>
+          {placeholder ?? ""}
+        </option>
+        {items.map((item) => (
+          <option key={item.value} value={item.value} disabled={item.disabled}>
+            {typeof item.label === "string" ? item.label : String(item.value)}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    </div>
   )
 }
 

@@ -57,6 +57,14 @@ export type DashboardSystemRpcRow = Database["public"]["Functions"]["api_dashboa
 }
 export type DashboardSystemRow = DashboardSystemRpcRow
 
+export type DashboardBatchRow = {
+  batch_id: number
+  batch_name: string
+  cycle_day: number | null
+  date_of_delivery: string | null
+  system_ids: number[]
+}
+
 export type BatchSummaryRow = {
   batch_id: number
   batch_name: string

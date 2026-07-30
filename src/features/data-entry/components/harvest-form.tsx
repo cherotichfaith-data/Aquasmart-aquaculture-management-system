@@ -5,11 +5,11 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
 import { Loader2 } from "lucide-react"
-import Box from "@mui/material/Box"
 import { Button } from "@/components/app-ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { Dialog } from "@/components/app-ui/dialog"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { NumberStepperInput } from "./form-support"
 import { useProductionSummary } from "@/features/production/hooks"
 import { useHarvests } from "@/features/reports/hooks"
 import {
@@ -176,6 +176,7 @@ export function HarvestForm({
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
+        mode: "onBlur",
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
             number_of_fish: 0,
@@ -302,7 +303,7 @@ export function HarvestForm({
                     </div>
                     <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="harvest" />
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
                             <div className="data-entry-secondary-grid">
                                 <FormField
                                     control={form.control}
@@ -312,7 +313,7 @@ export function HarvestForm({
                                             <FormLabel>System</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value || undefined}>
                                                 <FormControl>
-                                                    <SelectTrigger>
+                                                    <SelectTrigger className="max-w-xs">
                                                         <SelectValue placeholder="Select system" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -335,7 +336,7 @@ export function HarvestForm({
                                         <FormItem>
                                             <FormLabel>Date</FormLabel>
                                             <FormControl>
-                                                <Input type="date" {...field} />
+                                                <Input type="date" className="max-w-xs" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -356,7 +357,7 @@ export function HarvestForm({
                                         <FormItem>
                                             <FormLabel>Harvested Fish Count</FormLabel>
                                             <FormControl>
-                                                <Input type="number" {...field} />
+                                                <NumberStepperInput field={field} className="max-w-xs" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -369,7 +370,7 @@ export function HarvestForm({
                                         <FormItem>
                                             <FormLabel>Total Harvested Weight (kg)</FormLabel>
                                             <FormControl>
-                                                <Input type="number" step="0.01" {...field} />
+                                                <Input type="number" step="0.01" className="max-w-xs" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -386,7 +387,7 @@ export function HarvestForm({
                                             <FormLabel>Harvest Type</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value}>
                                                 <FormControl>
-                                                    <SelectTrigger>
+                                                    <SelectTrigger className="max-w-xs">
                                                         <SelectValue placeholder="Select type" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -407,7 +408,7 @@ export function HarvestForm({
                                             <FormLabel>Batch (auto-resolved if blank)</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value || "none"}>
                                                 <FormControl>
-                                                    <SelectTrigger>
+                                                    <SelectTrigger className="max-w-xs">
                                                         <SelectValue placeholder="Select batch" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -436,10 +437,12 @@ export function HarvestForm({
                                 </div>
                             ) : null}
 
-                            <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
-                                {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Record Harvest
-                            </Button>
+                            <div className="flex justify-end pt-1">
+                                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+                                    {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Record Harvest
+                                </Button>
+                            </div>
                         </form>
                     </Form>
                 </div>
@@ -462,8 +465,8 @@ export function HarvestForm({
                 description={`This will close the production cycle for ${selectedCageLabel}. All subsequent events will start a new cycle. Continue?`}
                 maxWidth="sm"
             >
-                <Box className="max-w-md">
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, pt: 1 }}>
+                <div className="max-w-md">
+                    <div className="flex justify-end gap-2 pt-2">
                         <Button
                             type="button"
                             variant="outline"
@@ -479,10 +482,9 @@ export function HarvestForm({
                             {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Continue
                         </Button>
-                    </Box>
-                </Box>
+                    </div>
+                </div>
             </Dialog>
         </>
     )
 }
-

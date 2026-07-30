@@ -1,14 +1,9 @@
 "use client"
 
-import { useDeferredValue, useMemo, useState } from "react"
-import type { SxProps, Theme } from "@mui/material/styles"
-import Box from "@mui/material/Box"
-import ButtonBase from "@mui/material/ButtonBase"
-import InputAdornment from "@mui/material/InputAdornment"
-import OutlinedInput from "@mui/material/OutlinedInput"
-import Popover from "@mui/material/Popover"
-import Typography from "@mui/material/Typography"
+import { useCallback, useDeferredValue, useMemo, useState } from "react"
 import { Check, ChevronDown, Search } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { AnchoredPopover } from "@/components/app-ui/popover"
 
 export type FilterPopoverOption = {
   value: string
@@ -18,7 +13,7 @@ export type FilterPopoverOption = {
 }
 
 type FilterPopoverProps = {
-  label: string
+  label?: string
   value: string
   options: FilterPopoverOption[]
   placeholder: string
@@ -27,8 +22,8 @@ type FilterPopoverProps = {
   emptyMessage?: string
   disabled?: boolean
   searchable?: boolean
-  triggerSx?: SxProps<Theme>
-  contentSx?: SxProps<Theme>
+  className?: string
+  contentClassName?: string
 }
 
 const normalize = (value: string) => value.trim().toLowerCase()
@@ -43,17 +38,23 @@ export function FilterPopover({
   emptyMessage = "No matching options found.",
   disabled = false,
   searchable = false,
-  triggerSx,
-  contentSx,
+  className,
+  contentClassName,
 }: FilterPopoverProps) {
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  const resolvedLabel = typeof label === "string" ? label.trim() : ""
+  const showLabel = resolvedLabel.length > 0
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
+  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
   const selectedOption = useMemo(() => options.find((option) => option.value === value) ?? null, [options, value])
   const showSearch = searchable || options.length > 8
-  const open = Boolean(anchorEl)
+  const triggerRef = useCallback((node: HTMLButtonElement | null) => {
+    setAnchorEl(node)
+  }, [])
+
   const closePopover = () => {
-    setAnchorEl(null)
+    setOpen(false)
     setQuery("")
   }
 
@@ -71,207 +72,95 @@ export function FilterPopover({
 
   return (
     <>
-      <ButtonBase
+      <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
-        aria-label={label}
-        onClick={(event) => setAnchorEl(event.currentTarget)}
-        sx={{
-          display: "flex",
-          minHeight: 40,
-          width: "100%",
-          minWidth: 0,
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 1.5,
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-          borderRadius: 1.5,
-          bgcolor: "background.paper",
-          px: 1.5,
-          py: 1,
-          textAlign: "left",
-          transition: (theme) =>
-            theme.transitions.create(["border-color", "background-color"], {
-              duration: theme.transitions.duration.shorter,
-            }),
-          "&:hover": {
-            borderColor: "primary.main",
-            bgcolor: "background.paper",
-          },
-          "&:focus-visible": {
-            outline: "none",
-            borderColor: "primary.main",
-            bgcolor: "background.paper",
-          },
-          "&.Mui-disabled": {
-            opacity: 0.6,
-          },
-          ...(Array.isArray(triggerSx) ? {} : triggerSx),
-        }}
+        aria-label={resolvedLabel || placeholder}
+        onClick={() => setOpen(true)}
+        className={cn(
+          "flex min-h-10 w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary focus-visible:border-primary focus-visible:outline-none disabled:opacity-60",
+          className,
+        )}
       >
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography
-            variant="overline"
-            sx={{
-              display: "block",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              color: "text.secondary",
-              lineHeight: 1.1,
-            }}
-          >
-            {label}
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              mt: 0.35,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              fontWeight: 600,
-              color: "text.primary",
-            }}
-          >
+        <span className="min-w-0 flex-1">
+          {showLabel ? (
+            <span className="block truncate text-[11px] uppercase leading-tight tracking-[0.08em] text-muted-foreground">
+              {resolvedLabel}
+            </span>
+          ) : null}
+          <span className={cn("block truncate text-sm font-semibold text-foreground", showLabel && "mt-0.5")}>
             {selectedOption?.label ?? placeholder}
-          </Typography>
-        </Box>
-        <ChevronDown size={16} />
-      </ButtonBase>
-      <Popover
+          </span>
+        </span>
+        <ChevronDown size={16} className="shrink-0 text-muted-foreground" />
+      </button>
+      <AnchoredPopover
         open={open}
         anchorEl={anchorEl}
         onClose={closePopover}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-        slotProps={{
-          paper: {
-            sx: {
-              mt: 1.25,
-              width: "min(24rem, calc(100vw - 24px))",
-              borderRadius: 2,
-              border: (theme) => `1px solid ${theme.palette.divider}`,
-              bgcolor: "background.paper",
-              p: 1,
-              boxShadow: "none",
-              ...(Array.isArray(contentSx) ? {} : contentSx),
-            },
-          },
-        }}
+        align="start"
+        className={cn("w-[min(24rem,calc(100vw-24px))] p-2", contentClassName)}
       >
-        <Box sx={{ display: "grid", gap: 1 }}>
+        <div className="grid gap-2">
           {showSearch ? (
-            <OutlinedInput
-              autoFocus
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={searchPlaceholder}
-              fullWidth
-              size="small"
-              startAdornment={
-                <InputAdornment position="start">
-                  <Search size={16} />
-                </InputAdornment>
-              }
-              sx={{
-                bgcolor: "background.paper",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "divider",
-                },
-                "&.Mui-focused": {
-                  bgcolor: "background.paper",
-                },
-                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "primary.main",
-                },
-              }}
-            />
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 focus-within:border-primary">
+              <Search size={16} className="shrink-0 text-muted-foreground" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
           ) : null}
 
-          <Box sx={{ display: "grid", gap: 0.75, maxHeight: 320, overflowY: "auto", pr: 0.25 }}>
+          <div className="grid max-h-80 gap-1.5 overflow-y-auto pr-0.5">
             {filteredOptions.length === 0 ? (
-              <Box
-                sx={{
-                  border: (theme) => `1px dashed ${theme.palette.divider}`,
-                  borderRadius: 2,
-                  bgcolor: "color-mix(in srgb, var(--color-foreground) 3%, transparent)",
-                  px: 2,
-                  py: 3,
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  {emptyMessage}
-                </Typography>
-              </Box>
+              <div className="rounded-lg border border-dashed border-border bg-[color-mix(in_srgb,var(--color-foreground)_3%,transparent)] px-4 py-6">
+                <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+              </div>
             ) : (
               filteredOptions.map((option) => {
                 const isSelected = option.value === value
 
                 return (
-                  <ButtonBase
+                  <button
                     key={option.value}
+                    type="button"
                     onClick={() => {
                       onChange(option.value)
                       closePopover()
                     }}
-                    sx={{
-                      display: "flex",
-                      width: "100%",
-                      alignItems: "center",
-                      gap: 1.25,
-                      border: isSelected
-                        ? "1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)"
-                        : "1px solid transparent",
-                      borderRadius: 1.5,
-                      bgcolor: isSelected
-                        ? "color-mix(in srgb, var(--color-primary) 8%, transparent)"
-                        : "var(--color-surface)",
-                      px: 1.5,
-                      py: 1.25,
-                      textAlign: "left",
-                      justifyContent: "flex-start",
-                      "&:hover": {
-                        borderColor: "divider",
-                        bgcolor: "background.default",
-                      },
-                    }}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:border-border hover:bg-background",
+                      isSelected
+                        ? "border-[color-mix(in_srgb,var(--color-primary)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)]"
+                        : "border-transparent bg-card",
+                    )}
                   >
-                    <Box
-                      sx={{
-                        display: "flex",
-                        width: 20,
-                        height: 20,
-                        flexShrink: 0,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        border: isSelected
-                          ? "1px solid var(--color-primary)"
-                          : "1px solid color-mix(in srgb, var(--color-border) 90%, transparent)",
-                        borderRadius: "50%",
-                        bgcolor: isSelected ? "primary.main" : "background.paper",
-                        color: isSelected ? "primary.contrastText" : "transparent",
-                      }}
+                    <span
+                      className={cn(
+                        "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                        isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-transparent",
+                      )}
                     >
                       <Check size={13} />
-                    </Box>
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                        {option.label}
-                      </Typography>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-foreground">{option.label}</span>
                       {option.description ? (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
-                          {option.description}
-                        </Typography>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{option.description}</span>
                       ) : null}
-                    </Box>
-                  </ButtonBase>
+                    </span>
+                  </button>
                 )
               })
             )}
-          </Box>
-        </Box>
-      </Popover>
+          </div>
+        </div>
+      </AnchoredPopover>
     </>
   )
 }

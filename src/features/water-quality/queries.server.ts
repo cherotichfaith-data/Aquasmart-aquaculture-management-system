@@ -70,7 +70,7 @@ export function parseWaterQualityPageFilters(
   const selectedBatchRaw = searchParams?.batch
   const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
-  const timePeriodRaw = searchParams?.period
+  const timePeriodRaw = searchParams?.date
   const activeTabRaw = searchParams?.tab
   const selectedParameterRaw = searchParams?.parameter
 

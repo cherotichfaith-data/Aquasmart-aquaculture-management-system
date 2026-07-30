@@ -135,23 +135,28 @@ function buildAuthCallbackRedirect(request: NextRequest) {
   return NextResponse.redirect(redirectUrl)
 }
 
-function buildLegacyPeriodRedirect(request: NextRequest) {
-  const legacyDate = request.nextUrl.searchParams.get("date")
-  if (!legacyDate) return null
+/**
+ * Canonical time-period URL param is `date` (aligned with the aquasmart-main URL/UI
+ * contract). `period` is the pre-alignment key — redirect any link still using it to
+ * the `date` form so old bookmarks/shared links keep working.
+ */
+function buildLegacyTimePeriodRedirect(request: NextRequest) {
+  const legacyPeriod = request.nextUrl.searchParams.get("period")
+  if (!legacyPeriod) return null
 
   const redirectUrl = request.nextUrl.clone()
-  const normalizedCustomRange = parseCustomPeriodUrlValue(legacyDate)
-  const normalizedPeriod = parseTimePeriodUrlValue(legacyDate)
+  const normalizedCustomRange = parseCustomPeriodUrlValue(legacyPeriod)
+  const normalizedPeriod = parseTimePeriodUrlValue(legacyPeriod)
 
-  if (!redirectUrl.searchParams.has("period")) {
+  if (!redirectUrl.searchParams.has("date")) {
     if (normalizedCustomRange) {
-      redirectUrl.searchParams.set("period", toCustomPeriodUrlValue(normalizedCustomRange))
+      redirectUrl.searchParams.set("date", toCustomPeriodUrlValue(normalizedCustomRange))
     } else if (normalizedPeriod) {
-      redirectUrl.searchParams.set("period", toTimePeriodUrlValue(normalizedPeriod))
+      redirectUrl.searchParams.set("date", toTimePeriodUrlValue(normalizedPeriod))
     }
   }
 
-  redirectUrl.searchParams.delete("date")
+  redirectUrl.searchParams.delete("period")
 
   if (redirectUrl.toString() === request.nextUrl.toString()) return null
   return NextResponse.redirect(redirectUrl)
@@ -213,9 +218,9 @@ async function resolveEntryPathForActiveFarm(params: {
 }
 
 export async function proxy(request: NextRequest) {
-  const legacyPeriodRedirect = buildLegacyPeriodRedirect(request)
-  if (legacyPeriodRedirect) {
-    return legacyPeriodRedirect
+  const legacyTimePeriodRedirect = buildLegacyTimePeriodRedirect(request)
+  if (legacyTimePeriodRedirect) {
+    return legacyTimePeriodRedirect
   }
 
   const standaloneFeaturePath = mapDashboardPathToStandalone(request.nextUrl.pathname)

@@ -198,14 +198,6 @@ export default function LandingPage() {
                   <Button
                     className="w-full rounded-full px-8 text-base sm:w-auto"
                     size="lg"
-                    sx={{
-                      backgroundColor: "var(--color-primary)",
-                      color: "var(--color-on-primary)",
-                      "&:hover": {
-                        backgroundColor: "var(--color-primary-hover)",
-                        color: "var(--color-on-primary)",
-                      },
-                    }}
                     onClick={() => router.push("/auth?mode=signup")}
                   >
                     Get started
@@ -215,16 +207,6 @@ export default function LandingPage() {
                     variant="outline"
                     size="lg"
                     className="w-full rounded-full border-white/35 bg-transparent px-8 text-base text-white hover:bg-white/10 hover:text-white sm:w-auto"
-                    sx={{
-                      borderColor: "color-mix(in srgb, var(--color-primary) 72%, transparent)",
-                      color: "var(--color-on-primary)",
-                      backgroundColor: "color-mix(in srgb, var(--color-primary) 16%, transparent)",
-                      "&:hover": {
-                        borderColor: "var(--color-primary)",
-                        backgroundColor: "color-mix(in srgb, var(--color-primary) 30%, transparent)",
-                        color: "var(--color-on-primary)",
-                      },
-                    }}
                     onClick={() => router.push("/auth")}
                   >
                     Sign in

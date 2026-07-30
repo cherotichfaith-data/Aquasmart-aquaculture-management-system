@@ -109,12 +109,9 @@ export default function SetPasswordPageClient() {
       return
     }
 
-    const { data: sessionData } = await supabase.auth.getSession()
-
     try {
       await completeAccountSetupAction({
         fullName: trimmedName,
-        accessToken: sessionData.session?.access_token,
       })
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to save the user's profile.")

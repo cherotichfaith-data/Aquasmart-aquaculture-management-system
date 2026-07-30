@@ -32,7 +32,7 @@ export default function FeedPageClient({
   const { isLoading: authLoading } = useAuth()
   const activeFarm = useActiveFarm({ initialFarmId, initialFarmName })
   const currentFarmId = activeFarm.farmId ?? initialFarmId ?? null
-  const periodParam = searchParams.get("period")
+  const periodParam = searchParams.get("date")
   const systemParam = searchParams.get("cage") ?? searchParams.get("system")
   const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")

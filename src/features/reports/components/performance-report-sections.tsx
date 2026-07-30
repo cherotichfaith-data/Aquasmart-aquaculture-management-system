@@ -24,7 +24,7 @@ import {
 } from "./report-shared"
 
 type LatestBySystemRow = {
-  system_name: string
+  system_name: string | null
   total_biomass: number | null
 }
 

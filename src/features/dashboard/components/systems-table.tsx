@@ -78,7 +78,7 @@ export default function SystemsTable({
     if (farmId) params.set("farmId", farmId)
     if (batch && batch !== "all") params.set("batch", batch)
     if (stage && stage !== "all") params.set("stage", stage)
-    if (timePeriod) params.set("period", toTimePeriodUrlValue(timePeriod))
+    if (timePeriod) params.set("date", toTimePeriodUrlValue(timePeriod))
 
     router.push(`/production?${params.toString()}`)
   }
@@ -101,7 +101,7 @@ export default function SystemsTable({
     .join(" · ")
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="production-records-card rounded-2xl">
       {showHeader ? (
         <CardHeader className="pb-1">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -135,8 +135,9 @@ export default function SystemsTable({
                 onRowClick={(row) => openProductionPage(row.system_id)}
                 emptyMessage={emptyMessage}
                 initialSorting={[{ id: "system", desc: false }]}
-                shellClassName="max-h-[520px]"
+                shellClassName="production-records-table dashboard-production-table max-h-[520px]"
                 tableClassName="min-w-[960px] table-fixed"
+                headerVariant="plain"
               />
             </div>
           </>
@@ -170,9 +171,7 @@ function MobileSystemCards({
   return (
     <div className="grid gap-3 md:hidden">
       {systems.map((row) => {
-        const cageLabel = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
-        const title = row.batch_name ?? cageLabel
-        const subtitle = row.batch_name ? cageLabel : null
+        const title = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
 
         return (
           <button
@@ -183,7 +182,6 @@ function MobileSystemCards({
           >
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-5 text-foreground">{title}</p>
-              {subtitle ? <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{subtitle}</p> : null}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <MobileMetric label="Fish" value={formatNumberValue(row.fish_end)} />

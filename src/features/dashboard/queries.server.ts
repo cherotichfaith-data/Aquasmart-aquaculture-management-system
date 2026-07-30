@@ -57,7 +57,7 @@ export function parseDashboardPageFilters(
   const selectedBatchRaw = searchParams?.batch
   const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
-  const timePeriodRaw = searchParams?.period
+  const timePeriodRaw = searchParams?.date
 
   const selectedBatch = typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all"
   const selectedSystem = typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all"

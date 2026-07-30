@@ -3,10 +3,9 @@
 import type { Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
+  fetchRpc,
   getClientOrError,
   isAbortLikeError,
-  queryKpiRpc,
-  queryOptionsRpc,
   toQueryError,
   toQuerySuccess,
 } from "@/lib/supabase/query-transport"
@@ -34,16 +33,6 @@ type SystemRow = Tables<"system">
 type WaterQualityMeasurementRow = Tables<"water_quality_measurement">
 type FishTransferRow = Tables<"fish_transfer">
 type FishStockingRow = Tables<"fish_stocking">
-type RecentRowsTable =
-  | "fish_mortality"
-  | "feeding_record"
-  | "fish_sampling_weight"
-  | "fish_transfer"
-  | "fish_harvest"
-  | "water_quality_measurement"
-  | "feed_inventory"
-  | "fish_stocking"
-  | "system"
 type FeedTypeProjection = {
   feed_type_id: number | null
   feed_label: string | null
@@ -77,6 +66,16 @@ type FeedingActivityRow = Pick<
   FeedingRecordRow,
   "id" | "created_at" | "date" | "batch_id" | "feeding_amount" | "feeding_response" | "system_id"
 >
+type RecentRowsTable =
+  | "fish_mortality"
+  | "feeding_record"
+  | "fish_sampling_weight"
+  | "fish_transfer"
+  | "fish_harvest"
+  | "water_quality_measurement"
+  | "feed_inventory"
+  | "fish_stocking"
+  | "system"
 type RecentRowsQuery = {
   eq(column: string, value: string): RecentRowsQuery
   in(column: string, values: number[]): RecentRowsQuery
@@ -468,20 +467,23 @@ export async function getGrowthTrend(params: {
     const endDate = toRpcDate(params.dateTo)
     const rowsBySystem = await Promise.all(
       systemIds.map(async (systemId): Promise<FeedGrowthTrendRow[]> => {
-        let query = queryKpiRpc(supabase, "api_production_summary", {
-          p_farm_id: params.farmId!,
-          p_system_id: systemId,
-          p_start_date: startDate ?? undefined,
-          p_end_date: endDate ?? undefined,
-        })
-        if (params.signal) query = query.abortSignal(params.signal)
-        const { data, error } = await query
-        if (error) {
-          if (params.signal?.aborted || isQuietError(error)) return []
-          throw error
+        const result = await fetchRpc<ProductionSummaryRpcRow>(
+          "getGrowthTrend",
+          "api_production_summary",
+          {
+            p_farm_id: params.farmId!,
+            p_system_id: systemId,
+            p_start_date: startDate ?? undefined,
+            p_end_date: endDate ?? undefined,
+          },
+          params.signal,
+        )
+        // fetchRpc already collapses abort/permission/auth-missing errors to
+        // an empty success result, so a leftover "error" status is genuine.
+        if (result.status === "error") {
+          throw new Error(result.error)
         }
-        const summaryRows = (data ?? []) as ProductionSummaryRpcRow[]
-        return summaryRows.map((row) => ({
+        return result.data.map((row) => ({
           system_id: row.system_id ?? systemId,
           sample_date: row.date,
           abw_g: row.average_body_weight,
@@ -788,27 +790,31 @@ export async function getRecentActivities(params?: {
 }): Promise<QueryResult<ChangeLogRow>> {
   if (!params?.farmId) return empty<ChangeLogRow>()
 
-  const clientResult = await getReportsClient("getRecentActivities")
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
+  const result = await fetchRpc<{
+    id: string | number
+    table_name: string | null
+    activity_date: string | null
+    system_id?: number | null
+    batch_id?: number | null
+  }>(
+    "getRecentActivities",
+    "api_recent_activity_feed",
+    {
+      p_farm_id: params.farmId,
+      p_limit: params.limit ?? 50,
+      p_date_from: toRpcDate(params.dateFrom),
+      p_date_to: toRpcDate(params.dateTo),
+      p_table: params.tableName && params.tableName !== "all" ? params.tableName : undefined,
+    },
+    params.signal,
+  )
 
-  let query = supabase.rpc("api_recent_activity_feed", {
-    p_farm_id: params.farmId,
-    p_limit: params.limit ?? 50,
-    p_date_from: toRpcDate(params.dateFrom),
-    p_date_to: toRpcDate(params.dateTo),
-    p_table: params.tableName && params.tableName !== "all" ? params.tableName : undefined,
-  } as never)
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<ChangeLogRow>()
-    return toQuerySuccess<ChangeLogRow>([])
-  }
+  // This endpoint has always degraded to an empty list on any error (rather
+  // than surfacing one), so preserve that even for a genuine failure.
+  if (result.status === "error") return toQuerySuccess<ChangeLogRow>([])
 
   return toQuerySuccess<ChangeLogRow>(
-    ((data ?? []) as Array<{ id: string | number; table_name: string | null; activity_date: string | null; system_id?: number | null; batch_id?: number | null }>).map(
+    result.data.map(
       (row) => ({
         id: row.id,
         table_name: row.table_name,
@@ -880,76 +886,20 @@ async function getRecentRows<T>(
   return (data ?? []) as T[]
 }
 
-export async function getRecentEntries(farmId?: string | null, signal?: AbortSignal) {
-  if (!farmId) return emptyRecentEntries()
-
-  const clientResult = await getReportsClient("getRecentEntries")
-  if ("error" in clientResult) return emptyRecentEntries()
-  const { supabase } = clientResult
-
-  try {
-    const farmSystemIds = await getFarmSystemIds(supabase, farmId, signal)
-    const [
-      mortality,
-      feeding,
-      sampling,
-      transfer,
-      harvest,
-      waterQuality,
-      feedInventory,
-      stocking,
-      systems,
-    ] = await Promise.all([
-      getRecentRows<FishMortalityRow>(supabase, "fish_mortality", "date", { farmId, farmSystemIds, signal }),
-      getRecentRows<FeedingRecordRow>(supabase, "feeding_record", "date", { farmId, farmSystemIds, signal }),
-      getRecentRows<FishSamplingWeightRow>(supabase, "fish_sampling_weight", "date", { farmId, farmSystemIds, signal }),
-      getRecentRows<FishTransferRow>(supabase, "fish_transfer", "date", { farmId, farmSystemIds, signal }),
-      getRecentRows<FishHarvestRow>(supabase, "fish_harvest", "date", { farmId, farmSystemIds, signal }),
-      getRecentRows<WaterQualityMeasurementRow>(supabase, "water_quality_measurement", "date", {
-        farmId,
-        farmSystemIds,
-        signal,
-      }),
-      getRecentRows<FeedInventoryRow>(supabase, "feed_inventory", "inventory_date", { farmId, farmSystemIds, signal }),
-      getRecentRows<FishStockingRow>(supabase, "fish_stocking", "date", { farmId, farmSystemIds, signal }),
-      getRecentRows<SystemRow>(supabase, "system", "created_at", { farmId, farmSystemIds, signal }),
-    ])
-
-    return {
-      mortality: toQuerySuccess(mortality),
-      feeding: toQuerySuccess(feeding),
-      sampling: toQuerySuccess(sampling),
-      transfer: toQuerySuccess(transfer),
-      harvest: toQuerySuccess(harvest),
-      water_quality: toQuerySuccess(waterQuality),
-      feed_inventory: toQuerySuccess(feedInventory),
-      stocking: toQuerySuccess(stocking),
-      systems: toQuerySuccess(systems),
-    }
-  } catch {
-    return emptyRecentEntries()
-  }
-}
-
 export async function getBatchSystemIds(params: {
   batchId: number
   signal?: AbortSignal
 }): Promise<QueryResult<{ system_id: number }>> {
-  const clientResult = await getReportsClient("getBatchSystemIds")
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryOptionsRpc(supabase, "api_batch_system_ids", { p_batch_id: params.batchId })
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<{ system_id: number }>()
-    return toQueryError("getBatchSystemIds", error)
-  }
+  const result = await fetchRpc<{ system_id: number | null }>(
+    "getBatchSystemIds",
+    "api_batch_system_ids",
+    { p_batch_id: params.batchId },
+    params.signal,
+  )
+  if (result.status === "error") return result
 
   return toQuerySuccess<{ system_id: number }>(
-    ((data ?? []) as Array<{ system_id: number | null }>).flatMap((row) =>
+    result.data.flatMap((row) =>
       typeof row.system_id === "number" && Number.isFinite(row.system_id) ? [{ system_id: row.system_id }] : [],
     ),
   )

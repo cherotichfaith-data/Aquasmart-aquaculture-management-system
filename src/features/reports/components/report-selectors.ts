@@ -1,8 +1,8 @@
 import type { Database } from "@/lib/types/database"
-import type { ProductionTrendRow } from "@/features/dashboard/types"
+import type { ProductionSummaryRpcRow } from "@/features/production/types"
 import { sortByDateAsc } from "@/lib/utils"
 
-type ProductionSummaryRow = ProductionTrendRow
+type ProductionSummaryRow = ProductionSummaryRpcRow
 type MeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 type ThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 

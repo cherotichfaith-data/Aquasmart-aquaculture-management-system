@@ -43,6 +43,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    mode: "onBlur",
     defaultValues: {
       inventory_date: new Date().toISOString().split("T")[0],
       inventory_time: "16:00",
@@ -118,7 +119,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
         <div className="space-y-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
               <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
@@ -127,7 +128,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                     <FormItem>
                       <FormLabel>Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -141,7 +142,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                     <FormItem>
                       <FormLabel>Time</FormLabel>
                       <FormControl>
-                        <Input type="time" {...field} />
+                        <Input type="time" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -158,7 +159,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                       <FormLabel>Feed Type</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger className="w-full sm:flex-1">
+                          <SelectTrigger className="max-w-xs">
                             <SelectValue placeholder="Select feed" />
                           </SelectTrigger>
                         </FormControl>
@@ -175,7 +176,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                 )}
               />
 
-              <div className="data-entry-compact-grid md:grid-cols-3">
+              <div className="data-entry-compact-grid sm:grid-cols-2 lg:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="bag_weight_kg"
@@ -183,7 +184,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                     <FormItem>
                       <FormLabel>Bag Weight (kg)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} />
+                        <Input type="number" step="0.01" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -197,7 +198,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                     <FormItem>
                       <FormLabel>Amount of Bags</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} />
+                        <Input type="number" step="0.01" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -211,7 +212,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                     <FormItem>
                       <FormLabel>Open Feed (g)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="1" {...field} />
+                        <Input type="number" step="1" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -236,10 +237,12 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending}>
-                {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Record Feed Inventory
-              </Button>
+              <div className="flex justify-end pt-1">
+                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending}>
+                  {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Record Feed Inventory
+                </Button>
+              </div>
             </form>
           </Form>
         </div>

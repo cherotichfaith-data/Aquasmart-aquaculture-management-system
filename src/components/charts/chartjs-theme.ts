@@ -1,7 +1,6 @@
 "use client"
 
 import type { ChartOptions, ScriptableContext, ScriptableScaleContext, Tick } from "chart.js"
-import { lightTheme } from "@/theme"
 
 export function formatCompactTick(value: number | string) {
   const numeric = Number(value)
@@ -171,21 +170,21 @@ type ChartPalette = {
 }
 
 const FALLBACK_PALETTE: ChartPalette = {
-  text: lightTheme.palette.text.primary,
-  muted: lightTheme.palette.text.secondary,
+  text: "#16313d",
+  muted: "#5f6f7a",
   grid: "var(--chart-grid)",
-  border: lightTheme.palette.divider,
-  card: lightTheme.palette.background.paper,
+  border: "#d8dee6",
+  card: "#ffffff",
   tooltipBackground: "var(--chart-tooltip-bg)",
   tooltipBorder: "var(--chart-tooltip-border)",
   tooltipForeground: "var(--chart-tooltip-foreground)",
-  primary: lightTheme.palette.primary.main,
-  chart1: lightTheme.palette.primary.main,
-  chart2: lightTheme.palette.secondary.main,
-  chart3: lightTheme.palette.info.main,
-  chart4: lightTheme.palette.warning.main,
-  chart5: lightTheme.palette.error.main,
-  destructive: lightTheme.palette.error.main,
+  primary: "#0f4c81",
+  chart1: "#4472c4",
+  chart2: "#ed7d31",
+  chart3: "#3b6ea8",
+  chart4: "#ffc000",
+  chart5: "#c00000",
+  destructive: "#ef4444",
 }
 
 function readVar(name: string, fallback: string) {

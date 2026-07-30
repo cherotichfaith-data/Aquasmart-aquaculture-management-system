@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState, type SetStateAction } from "react"
-import { DEFAULT_TIME_PERIOD, type TimePeriod } from "@/lib/time-period"
-import { normalizeStageFilter, type StageFilter } from "@/lib/stage-filter"
+import { useEffect, useRef, useState } from "react"
+import { DEFAULT_TIME_PERIOD, isTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { GROWTH_STAGE_VALUES, normalizeStageFilter, type StageFilter } from "@/lib/stage-filter"
 
 export type { TimePeriod } from "@/lib/time-period"
 
@@ -13,32 +13,25 @@ export type SharedFiltersState = {
   timePeriod: TimePeriod
 }
 
-type SharedFiltersDraft = {
-  sourceToken: symbol
-  values: SharedFiltersState
-}
+const STORAGE_KEY = "aquasmart:shared-filters:v1"
+const EVENT_NAME = "aquasmart:shared-filters"
 
-const buildSharedFiltersState = (
+const hasMeaningfulInitialValues = (
+  initialValues: Partial<SharedFiltersState> | undefined,
   defaultTimePeriod: TimePeriod,
-  initialValues?: Partial<SharedFiltersState>,
-): SharedFiltersState => ({
-  selectedBatch: initialValues?.selectedBatch ?? "all",
-  selectedSystem: initialValues?.selectedSystem ?? "all",
-  selectedStage: normalizeStageFilter(initialValues?.selectedStage),
-  timePeriod: initialValues?.timePeriod ?? defaultTimePeriod,
-})
-
-const serializeSharedFiltersSource = (
-  values: SharedFiltersState,
-  resetKey?: string | null,
 ) =>
-  [
-    resetKey ?? "",
-    values.selectedBatch,
-    values.selectedSystem,
-    values.selectedStage,
-    values.timePeriod,
-  ].join("|")
+  Boolean(
+    initialValues &&
+      ((initialValues.selectedBatch !== undefined && initialValues.selectedBatch !== "all") ||
+        (initialValues.selectedSystem !== undefined && initialValues.selectedSystem !== "all") ||
+        (initialValues.selectedStage !== undefined && initialValues.selectedStage !== "all") ||
+        (initialValues.timePeriod !== undefined && initialValues.timePeriod !== defaultTimePeriod)),
+  )
+
+const isStage = (value: unknown): value is StageFilter => {
+  if (typeof value !== "string") return false
+  return value === "all" || GROWTH_STAGE_VALUES.includes(value as (typeof GROWTH_STAGE_VALUES)[number])
+}
 
 export function useSharedFilters(
   defaultTimePeriod: TimePeriod = DEFAULT_TIME_PERIOD,
@@ -50,94 +43,131 @@ export function useSharedFilters(
     urlKeys?: Partial<Record<keyof SharedFiltersState, string>>
   },
 ) {
-  const initialState = buildSharedFiltersState(defaultTimePeriod, initialValues)
-  const sourceSignature = serializeSharedFiltersSource(initialState, options?.resetKey)
-  const currentSourceToken = useMemo(() => Symbol(sourceSignature), [sourceSignature])
-  const [draft, setDraft] = useState<SharedFiltersDraft>(() => ({
-    sourceToken: currentSourceToken,
-    values: initialState,
-  }))
-  const resolvedValues = draft.sourceToken === currentSourceToken ? draft.values : initialState
+  void options
 
-  const updateField = <Key extends keyof SharedFiltersState>(
-    key: Key,
-    value: SetStateAction<SharedFiltersState[Key]>,
-  ) => {
-    setDraft((current) => {
-      const baseValues = current.sourceToken === currentSourceToken ? current.values : initialState
-      const previousValue = baseValues[key]
-      const nextValue =
-        typeof value === "function"
-          ? (value as (previous: SharedFiltersState[Key]) => SharedFiltersState[Key])(previousValue)
-          : value
-
-      return {
-        sourceToken: currentSourceToken,
-        values: {
-          ...baseValues,
-          [key]: nextValue,
-        },
-      }
-    })
-  }
+  const initialStage = normalizeStageFilter(initialValues?.selectedStage)
+  const hasInitialValues = hasMeaningfulInitialValues(
+    initialValues
+      ? {
+          ...initialValues,
+          selectedStage: initialStage,
+        }
+      : undefined,
+    defaultTimePeriod,
+  )
+  const initialBatch = initialValues?.selectedBatch ?? "all"
+  const initialSystem = initialValues?.selectedSystem ?? "all"
+  const initialPeriod = initialValues?.timePeriod ?? defaultTimePeriod
+  const initialDefaultPeriod = useRef(defaultTimePeriod)
+  const instanceId = useRef(`shared-filters-${Math.random().toString(36).slice(2)}`)
+  const suppressEmit = useRef(false)
+  const [selectedBatch, setSelectedBatch] = useState<string>(initialBatch)
+  const [selectedSystem, setSelectedSystem] = useState<string>(initialSystem)
+  const [selectedStage, setSelectedStage] = useState<StageFilter>(initialStage)
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(initialPeriod)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const params = new URLSearchParams(window.location.search)
-    let changed = false
-
-    const syncParam = (key: keyof SharedFiltersState, value: string) => {
-      const defaultUrlKey = key === "timePeriod" ? "period" : key.replace("selected", "").toLowerCase()
-      const urlKey = options?.urlKeys?.[key] ?? defaultUrlKey
-      const current = params.get(urlKey)
-      const isDefault = value === "all" || (key === "timePeriod" && value === defaultTimePeriod)
-      const nextUrlValue = options?.urlValues?.[key] ?? value
-
-      if (current == null && isDefault) return
-      if (current === nextUrlValue) return
-
-      changed = true
-      if (isDefault) {
-        params.delete(urlKey)
-        if (key === "selectedSystem" && urlKey === "cage") params.delete("system")
-        if (key === "selectedSystem" && urlKey === "system") params.delete("cage")
-      } else {
-        params.set(urlKey, nextUrlValue)
-        if (key === "selectedSystem" && urlKey === "cage") params.delete("system")
-        if (key === "selectedSystem" && urlKey === "system") params.delete("cage")
+    const fallbackPeriod = initialDefaultPeriod.current
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY)
+      if (raw && !hasInitialValues) {
+        const parsed = JSON.parse(raw) as Partial<SharedFiltersState>
+        setSelectedBatch(typeof parsed.selectedBatch === "string" ? parsed.selectedBatch : "all")
+        setSelectedSystem(typeof parsed.selectedSystem === "string" ? parsed.selectedSystem : "all")
+        setSelectedStage(isStage(parsed.selectedStage) ? parsed.selectedStage : "all")
+        setTimePeriod(isTimePeriod(parsed.timePeriod) ? parsed.timePeriod : fallbackPeriod)
+      } else if (!hasInitialValues) {
+        setTimePeriod(fallbackPeriod)
       }
+    } catch {
+      if (!hasInitialValues) {
+        setTimePeriod(fallbackPeriod)
+      }
+    } finally {
+      if (!hasInitialValues && typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search)
+        const paramSystem = params.get("cage") ?? params.get("system")
+        const paramBatch = params.get("batch")
+        const paramStage = params.get("stage")
+        const paramPeriod = params.get("date")
+
+        if (paramSystem) setSelectedSystem(paramSystem)
+        if (paramBatch) setSelectedBatch(paramBatch)
+        if (isStage(paramStage)) setSelectedStage(paramStage)
+        if (isTimePeriod(paramPeriod)) setTimePeriod(paramPeriod)
+      }
+      setHydrated(true)
+    }
+  }, [hasInitialValues])
+
+  useEffect(() => {
+    if (!hasInitialValues) return
+
+    suppressEmit.current = true
+    setSelectedBatch(initialBatch)
+    setSelectedSystem(initialSystem)
+    setSelectedStage(initialStage)
+    setTimePeriod(initialPeriod)
+    setHydrated(true)
+  }, [hasInitialValues, initialBatch, initialPeriod, initialStage, initialSystem, options?.resetKey])
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return
+
+    const payload: SharedFiltersState = {
+      selectedBatch,
+      selectedSystem,
+      selectedStage,
+      timePeriod,
     }
 
-    syncParam("selectedBatch", initialState.selectedBatch)
-    syncParam("selectedSystem", initialState.selectedSystem)
-    syncParam("selectedStage", initialState.selectedStage)
-    syncParam("timePeriod", initialState.timePeriod)
-
-    if (changed) {
-      const nextQuery = params.toString()
-      window.history.replaceState(null, "", nextQuery ? `${window.location.pathname}?${nextQuery}` : window.location.pathname)
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+    if (suppressEmit.current) {
+      suppressEmit.current = false
+      return
     }
-  }, [
-    defaultTimePeriod,
-    initialState.selectedBatch,
-    initialState.selectedStage,
-    initialState.selectedSystem,
-    initialState.timePeriod,
-    options?.resetKey,
-    options?.urlKeys,
-    options?.urlValues,
-  ])
+
+    window.dispatchEvent(
+      new CustomEvent(EVENT_NAME, {
+        detail: {
+          sourceId: instanceId.current,
+          state: payload,
+        },
+      }),
+    )
+  }, [hydrated, selectedBatch, selectedStage, selectedSystem, timePeriod])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ sourceId: string; state: SharedFiltersState }>).detail
+      if (!detail || detail.sourceId === instanceId.current) return
+
+      const next = detail.state
+      suppressEmit.current = true
+      setSelectedBatch(next.selectedBatch)
+      setSelectedSystem(next.selectedSystem)
+      setSelectedStage(next.selectedStage)
+      setTimePeriod(next.timePeriod)
+      setHydrated(true)
+    }
+
+    window.addEventListener(EVENT_NAME, handler as EventListener)
+    return () => window.removeEventListener(EVENT_NAME, handler as EventListener)
+  }, [])
 
   return {
-    selectedBatch: resolvedValues.selectedBatch,
-    setSelectedBatch: (value: SetStateAction<string>) => updateField("selectedBatch", value),
-    selectedSystem: resolvedValues.selectedSystem,
-    setSelectedSystem: (value: SetStateAction<string>) => updateField("selectedSystem", value),
-    selectedStage: resolvedValues.selectedStage,
-    setSelectedStage: (value: SetStateAction<StageFilter>) => updateField("selectedStage", value),
-    timePeriod: resolvedValues.timePeriod,
-    setTimePeriod: (value: SetStateAction<TimePeriod>) => updateField("timePeriod", value),
+    selectedBatch,
+    setSelectedBatch,
+    selectedSystem,
+    setSelectedSystem,
+    selectedStage,
+    setSelectedStage,
+    timePeriod,
+    setTimePeriod,
   }
 }
-

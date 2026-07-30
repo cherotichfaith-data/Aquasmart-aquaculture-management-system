@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
@@ -26,6 +26,7 @@ import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import {
   InfoPanel,
   InfoStat,
+  NumberStepperInput,
   findUnitForSystem,
   formatRelativeDays,
   getSystemUnits,
@@ -83,14 +84,14 @@ const projectAbwFromHistory = (
 
 export function SamplingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: SamplingFormProps) {
   const mutation = useRecordSampling()
-
-
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const units = useMemo(() => getSystemUnits(systems), [systems])
   const defaultUnit = findUnitForSystem(systems, defaultSystemId)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    mode: "onBlur",
     defaultValues: {
       date: toIsoDate(new Date()),
       unit: defaultUnit,
@@ -248,7 +249,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
         <div className="space-y-6">
           <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="sampling" />
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
               <div className="data-entry-secondary-grid">
                 <FormField
                   control={form.control}
@@ -257,7 +258,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                     <FormItem>
                       <FormLabel>Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -272,7 +273,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                       <FormLabel>Cage Unit</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="max-w-xs">
                             <SelectValue placeholder="Select unit" />
                           </SelectTrigger>
                         </FormControl>
@@ -297,7 +298,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                       <FormLabel>Cage Number</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="max-w-xs">
                             <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                           </SelectTrigger>
                         </FormControl>
@@ -314,36 +315,54 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="batch_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Batch (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select batch" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">No batch</SelectItem>
-                          {batches.map((batch) => (
-                            <SelectItem key={batch.id} value={String(batch.id)}>
-                              {batch.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
               <div className="data-entry-secondary-grid">
                 <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
                 <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchIdValue} />
+              </div>
+
+              <div className="rounded-lg border border-border/80 bg-muted/10 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Batch is optional and hidden by default to keep sampling entry fast.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setShowAdvanced((current) => !current)}>
+                    {showAdvanced ? "Hide" : "Show"}
+                  </Button>
+                </div>
+                {showAdvanced ? (
+                  <div className="mt-4">
+                    <FormField
+                      control={form.control}
+                      name="batch_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Batch (Optional)</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="max-w-xs">
+                                <SelectValue placeholder="Select batch" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No batch</SelectItem>
+                              {batches.map((batch) => (
+                                <SelectItem key={batch.id} value={String(batch.id)}>
+                                  {batch.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <div className="data-entry-secondary-grid">
@@ -354,7 +373,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                     <FormItem>
                       <FormLabel>Number of Fish Sampled</FormLabel>
                       <FormControl>
-                        <Input type="number" step="1" {...field} />
+                        <NumberStepperInput field={field} className="max-w-xs" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -368,7 +387,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                     <FormItem>
                       <FormLabel>Total Weight (kg)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} />
+                        <Input type="number" step="0.01" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -401,10 +420,12 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 )}
               />
 
-              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
-                {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Record Sampling
-              </Button>
+              <div className="flex justify-end pt-1">
+                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+                  {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Record Sampling
+                </Button>
+              </div>
             </form>
           </Form>
         </div>

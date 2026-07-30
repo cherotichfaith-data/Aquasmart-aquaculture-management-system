@@ -3,9 +3,9 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
+  fetchRpc,
   getClientOrError,
   isAbortLikeError,
-  queryOptionsRpc,
   resolveClientReadQuery,
   toQuerySuccess,
   type OptionsRpcName,
@@ -16,7 +16,6 @@ import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 
 type SystemListItem = SystemOption
 type BatchListItem = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
-type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type FarmOptionRow = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
 type FingerlingSupplierTableRow = Pick<
   Database["public"]["Tables"]["fingerling_supplier"]["Row"],
@@ -30,9 +29,6 @@ type OptionsRpcRow<Name extends OptionsRpcName> = Database["public"]["Functions"
 type OptionsRpcArgs<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Args"]
 
 const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
-
-const isQuietOptionsError = (err: unknown): boolean =>
-  isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
 
 const isQuietTableError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
@@ -54,19 +50,7 @@ async function rpcOrEmpty<Name extends OptionsRpcName>(
   args?: OptionsRpcArgs<Name>,
   signal?: AbortSignal,
 ): Promise<QueryResult<OptionsRpcRow<Name>>> {
-  const clientResult = await getClientOrError(tag, { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let q = args === undefined ? queryOptionsRpc(supabase, name) : queryOptionsRpc(supabase, name, args)
-  if (signal) q = q.abortSignal(signal)
-
-  return resolveClientReadQuery<OptionsRpcRow<Name>>({
-    tag,
-    query: q as PromiseLike<{ data: OptionsRpcRow<Name>[] | null; error: unknown }>,
-    signal,
-    quietWhen: isQuietOptionsError,
-  })
+  return fetchRpc<OptionsRpcRow<Name>>(tag, name, args as Record<string, unknown> | undefined, signal)
 }
 
 export async function getSystemOptions(params?: {
@@ -76,24 +60,18 @@ export async function getSystemOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<SystemListItem>> {
   if (!params?.farmId) return empty<SystemListItem>()
-  const clientResult = await getClientOrError("getSystemOptions", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryOptionsRpc(supabase, "api_system_options_rpc", {
-    p_farm_id: params.farmId,
-    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
-    p_active_only: params.activeOnly ?? true,
-  })
-  if (params.signal) query = query.abortSignal(params.signal)
 
   type SystemOptionsRpcRow = OptionsRpcRow<"api_system_options_rpc">
-  const result = await resolveClientReadQuery<SystemOptionsRpcRow>({
-    tag: "getSystemOptions",
-    query: query as PromiseLike<{ data: SystemOptionsRpcRow[] | null; error: unknown }>,
-    signal: params.signal,
-    quietWhen: isQuietOptionsError,
-  })
+  const result = await fetchRpc<SystemOptionsRpcRow>(
+    "getSystemOptions",
+    "api_system_options_rpc",
+    {
+      p_farm_id: params.farmId,
+      p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+      p_active_only: params.activeOnly ?? true,
+    },
+    params.signal,
+  )
   if (result.status !== "success") return result
 
   const rows: SystemListItem[] = result.data.map((row) => ({
@@ -126,25 +104,6 @@ export async function getBatchOptions(params?: {
   )
   if (res.status !== "success") return res
   return toQuerySuccess<BatchListItem>(res.data)
-}
-
-export async function getFeedTypeOptions(params?: {
-  farmId?: string | null
-  limit?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedTypeOptionRow>> {
-  if (!params?.farmId) return empty<FeedTypeOptionRow>()
-
-  const res = await rpcOrEmpty(
-    "getFeedTypeOptions",
-    "api_feed_type_options_rpc",
-    { p_farm_id: params.farmId },
-    params.signal,
-  )
-  if (res.status !== "success") return res
-
-  const rows = res.data
-  return toQuerySuccess<FeedTypeOptionRow>(params?.limit ? rows.slice(0, params.limit) : rows)
 }
 
 export async function getFingerlingSupplierOptions(params?: {

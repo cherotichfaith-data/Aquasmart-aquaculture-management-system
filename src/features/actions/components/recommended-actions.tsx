@@ -4,7 +4,7 @@ import { useMemo } from "react"
 import Link from "next/link"
 import { AlertTriangle, ArrowRight, ChevronRight, Info, SlidersHorizontal } from "lucide-react"
 import type { Enums } from "@/lib/types/database"
-import { useRecommendedActions } from "@/features/dashboard/hooks"
+import { useRecommendedActions } from "@/features/actions/hooks"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { DataErrorState, DataFetchingBadge, DataUpdatedAt, EmptyState } from "@/components/shared/data-states"
 import { getErrorMessage } from "@/lib/utils/query-result"
@@ -54,7 +54,7 @@ export default function RecommendedActions({
     if (batch && batch !== "all") params.set("batch", batch)
     if (system && system !== "all") params.set("system", system)
     if (stage && stage !== "all") params.set("stage", stage)
-    if (timePeriod) params.set("period", toTimePeriodUrlValue(timePeriod))
+    if (timePeriod) params.set("date", toTimePeriodUrlValue(timePeriod))
     const query = params.toString()
     return `${toDashboardPath("/actions")}${query ? `?${query}` : ""}`
   }, [batch, stage, system, timePeriod])

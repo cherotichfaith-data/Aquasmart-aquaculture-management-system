@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Select,
@@ -10,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/app-ui/select"
-import { PRODUCTION_METRIC_OPTIONS, parseProductionMetric } from "@/features/production/components/metrics"
+import { PRODUCTION_METRIC_OPTIONS, parseProductionCompareMetric, parseProductionMetric } from "@/features/production/components/metrics"
 import { cn } from "@/lib/utils"
 
 export default function ProductionMetricFilter({ className }: { className?: string }) {
@@ -19,17 +18,16 @@ export default function ProductionMetricFilter({ className }: { className?: stri
   const searchParams = useSearchParams()
   const selected = parseProductionMetric(searchParams.get("filter"))
 
-  const createQueryString = useCallback(
-    (name: string, value: string) => {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set(name, value)
-      return params.toString()
-    },
-    [searchParams],
-  )
-
   const handleSelectChange = (value: string) => {
-    const nextQuery = createQueryString("filter", value)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("filter", value)
+    // If the newly selected primary metric matches the active compare metric,
+    // the comparison is no longer meaningful — clear it (mirrors the design's onKpi behavior).
+    const nextMetric = parseProductionMetric(value)
+    const activeCompare = parseProductionCompareMetric(searchParams.get("compare"), selected)
+    if (activeCompare === nextMetric) params.delete("compare")
+
+    const nextQuery = params.toString()
     const currentQuery = searchParams.toString()
     if (nextQuery === currentQuery) return
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
@@ -44,7 +42,7 @@ export default function ProductionMetricFilter({ className }: { className?: stri
         id="production-metric-filter"
         className={cn("w-full max-w-[260px]", className)}
       >
-        <SelectValue placeholder="eFCR periodic" />
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>

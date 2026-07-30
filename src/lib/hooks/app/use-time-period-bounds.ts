@@ -1,11 +1,9 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { useMemo } from "react"
 import { queryKeys } from "@/lib/cache/query-keys"
-import { createClient } from "@/lib/supabase/client"
 import {
-  fetchTimePeriodBounds,
+  fetchTimePeriodBoundsClient,
   toCustomPeriodUrlValue,
   type AnalyticsTimeScope,
   type CustomTimeRange,
@@ -22,7 +20,6 @@ export function useTimePeriodBounds(params: {
   scope?: AnalyticsTimeScope
   enabled?: boolean
 }) {
-  const supabase = useMemo(() => createClient(), [])
   const enabled = Boolean(params.farmId) && (params.enabled ?? true)
   const query = useQuery({
     queryKey: queryKeys.timePeriodBounds({
@@ -32,7 +29,7 @@ export function useTimePeriodBounds(params: {
     queryFn: ({ signal }) =>
       !params.farmId
         ? Promise.resolve<TimeBounds>({ start: null, end: null })
-        : fetchTimePeriodBounds(supabase as never, {
+        : fetchTimePeriodBoundsClient({
             farmId: params.farmId,
             timePeriod: params.timePeriod,
             customRange: params.customRange,

@@ -1,10 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Box from "@mui/material/Box"
-import MuiTab from "@mui/material/Tab"
-import MuiTabs from "@mui/material/Tabs"
-import type { TabsProps as MuiTabsProps } from "@mui/material/Tabs"
 import { cn } from "@/lib/utils"
 
 type TabsContextValue = {
@@ -54,43 +50,24 @@ function Tabs({
 
   return (
     <TabsContext.Provider value={{ value, onValueChange: handleValueChange, idBase: generatedId }}>
-      <Box data-slot="tabs" className={cn("flex flex-col gap-2", className)} {...props}>
+      <div data-slot="tabs" className={cn("flex flex-col gap-2", className)} {...props}>
         {children}
-      </Box>
+      </div>
     </TabsContext.Provider>
   )
 }
 
-type TabsListProps = Omit<MuiTabsProps, "value" | "onChange" | "children"> & {
+type TabsListProps = React.ComponentPropsWithoutRef<"div"> & {
   children?: React.ReactNode
 }
 
 const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
   ({ className, ...props }, ref) => {
-    const { value, onValueChange } = useTabsContext()
     return (
-      <MuiTabs
+      <div
         ref={ref}
-        value={value}
-        onChange={(_event, nextValue) => onValueChange?.(String(nextValue))}
-        variant="scrollable"
-        scrollButtons="auto"
         data-slot="tabs-list"
-        className={cn(className)}
-        sx={{
-          minHeight: 44,
-          width: "fit-content",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-          borderRadius: 1,
-          bgcolor: "background.paper",
-          px: 0.5,
-          "& .MuiTabs-indicator": {
-            display: "none",
-          },
-          "& .MuiTabs-flexContainer": {
-            gap: 0.5,
-          },
-        }}
+        className={cn("inline-flex w-fit items-center gap-1 rounded-md border bg-background p-1", className)}
         {...props}
       />
     )
@@ -108,41 +85,33 @@ type TabsTriggerProps = {
 }
 
 function TabsTrigger({ className, value, disabled, onClick, children, ...props }: TabsTriggerProps) {
-  const { value: selectedValue, idBase } = useTabsContext()
+  const { value: selectedValue, idBase, onValueChange } = useTabsContext()
   const active = selectedValue === value
 
   return (
-    <MuiTab
+    <button
+      type="button"
       data-slot="tabs-trigger"
       aria-controls={`${idBase}-panel-${value}`}
       id={`${idBase}-tab-${value}`}
+      aria-selected={active}
+      role="tab"
       disabled={disabled}
-      value={value}
-      disableRipple
-      label={children}
       onClick={(event) => {
         onClick?.(event)
+        if (!event.defaultPrevented) {
+          onValueChange?.(value)
+        }
       }}
-      className={cn(className)}
-      sx={{
-        minHeight: 40,
-        borderRadius: 1,
-        border: (theme) => `1px solid ${active ? theme.palette.divider : "transparent"}`,
-        bgcolor: active ? "background.default" : "transparent",
-        color: active ? "text.primary" : "text.secondary",
-        textTransform: "none",
-        fontSize: "0.875rem",
-        fontWeight: active ? 600 : 500,
-        px: 1.5,
-        py: 1,
-        minWidth: 0,
-        "&.Mui-focusVisible": {
-          outline: "2px solid var(--color-ring)",
-          outlineOffset: 2,
-        },
-      }}
+      className={cn(
+        "inline-flex min-h-10 min-w-0 items-center justify-center rounded-md border border-transparent px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        active ? "border-border bg-card text-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+        className,
+      )}
       {...props}
-    />
+    >
+      {children}
+    </button>
   )
 }
 
@@ -161,7 +130,7 @@ const TabsContent = React.forwardRef<
   }
 
   return (
-    <Box
+    <div
       ref={ref}
       role="tabpanel"
       hidden={!active}
@@ -172,7 +141,7 @@ const TabsContent = React.forwardRef<
       {...props}
     >
       {children}
-    </Box>
+    </div>
   )
 })
 

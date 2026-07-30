@@ -80,7 +80,7 @@ export function useAnalyticsPageBootstrap(params: {
   const initialFarmId = normalizeFarmId(params.initialFarmId)
   const activeFarm = useActiveFarm({ initialFarmId, initialFarmName: params.initialFarmName })
   const farmId = activeFarm.farmId ?? initialFarmId ?? null
-  const rawPeriodParam = searchParams.get("period")
+  const rawPeriodParam = searchParams.get("date")
   const customRange = parseCustomPeriodUrlValue(rawPeriodParam)
 
   const sharedFilterInitialValues = mergeSharedFilterOverrides(params.initialFilters, params.filterOverrides)

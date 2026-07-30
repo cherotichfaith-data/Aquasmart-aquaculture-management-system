@@ -5,12 +5,9 @@ import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataEntryInterface } from "@/features/data-entry/components/data-entry-interface"
 import { SystemForm } from "@/features/data-entry/components/system-form"
-import { useRecentEntries } from "@/features/reports/hooks"
-import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
-import { useBatchOptions, useFeedTypeOptions, useSystemOptions } from "@/lib/hooks/use-options"
-import { DataErrorState } from "@/components/shared/data-states"
-import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
+import type { getDataEntryPrefetch } from "@/features/data-entry/queries.server"
+import type { Database } from "@/lib/types/database"
+import type { SystemOption } from "@/lib/system-options"
 
 const dataEntryTabs = [
   "feeding",
@@ -39,17 +36,20 @@ function parsePositiveId(value: string | null) {
 export default function DataEntryPageClient({
   initialFarmId,
   initialFarmName,
+  initialFarmRole,
+  initialSystems,
+  initialBatches,
+  initialFeeds,
+  initialRecentEntries,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
+  initialFarmRole?: Database["public"]["Tables"]["farm_user"]["Row"]["role"] | null
+  initialSystems: SystemOption[]
+  initialBatches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+  initialFeeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
+  initialRecentEntries: Awaited<ReturnType<typeof getDataEntryPrefetch>>["recentEntries"]
 }) {
-  const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
-  const activeFarmRoleQuery = useActiveFarmRole(farmId)
-
-  const systemsQuery = useSystemOptions({ farmId, activeOnly: true })
-  const batchesQuery = useBatchOptions({ farmId })
-  const feedsQuery = useFeedTypeOptions({ farmId })
-  const recentEntriesQuery = useRecentEntries({ farmId })
   const searchParams = useSearchParams()
   const typeParam = searchParams.get("type")
   const systemParam = searchParams.get("system")
@@ -58,42 +58,10 @@ export default function DataEntryPageClient({
   const tab = useMemo(() => resolveDataEntryTab(typeParam), [typeParam])
   const requestedSystemId = useMemo(() => parsePositiveId(systemParam), [systemParam])
   const requestedBatchId = useMemo(() => parsePositiveId(batchParam), [batchParam])
-
-  const systemsLoading = systemsQuery.isLoading
-  const loading =
-    activeFarmRoleQuery.isLoading || batchesQuery.isLoading || feedsQuery.isLoading || recentEntriesQuery.isLoading
-
-  const entryErrors = useMemo(() => {
-    const data = recentEntriesQuery.data
-    if (!data) return []
-    return [
-      getQueryResultError(data.mortality),
-      getQueryResultError(data.feeding),
-      getQueryResultError(data.sampling),
-      getQueryResultError(data.transfer),
-      getQueryResultError(data.harvest),
-      getQueryResultError(data.water_quality),
-      getQueryResultError(data.feed_inventory),
-      getQueryResultError(data.stocking),
-      getQueryResultError(data.systems),
-    ].filter(Boolean) as string[]
-  }, [recentEntriesQuery.data])
-  const systemsErrorMessages = [
-    getErrorMessage(systemsQuery.error),
-    getQueryResultError(systemsQuery.data),
-  ].filter(Boolean) as string[]
-  const errorMessages = [
-    getErrorMessage(activeFarmRoleQuery.error),
-    getErrorMessage(batchesQuery.error),
-    getQueryResultError(batchesQuery.data),
-    getErrorMessage(feedsQuery.error),
-    getQueryResultError(feedsQuery.data),
-    getErrorMessage(recentEntriesQuery.error),
-    ...entryErrors,
-  ].filter(Boolean) as string[]
-  const systems = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
-  const batches = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
-  const feeds = feedsQuery.data?.status === "success" ? feedsQuery.data.data : []
+  const farmId = initialFarmId ?? null
+  const systems = initialSystems
+  const batches = initialBatches
+  const feeds = initialFeeds
   const defaultSystemId = requestedSystemId && systems.some((system) => system.id === requestedSystemId)
     ? requestedSystemId
     : null
@@ -104,48 +72,30 @@ export default function DataEntryPageClient({
 
   const recentEntries = useMemo(
     () => ({
-      mortality:
-        recentEntriesQuery.data?.mortality?.status === "success" ? recentEntriesQuery.data.mortality.data : [],
-      feeding:
-        recentEntriesQuery.data?.feeding?.status === "success" ? recentEntriesQuery.data.feeding.data : [],
-      sampling:
-        recentEntriesQuery.data?.sampling?.status === "success" ? recentEntriesQuery.data.sampling.data : [],
-      transfer:
-        recentEntriesQuery.data?.transfer?.status === "success" ? recentEntriesQuery.data.transfer.data : [],
-      harvest:
-        recentEntriesQuery.data?.harvest?.status === "success" ? recentEntriesQuery.data.harvest.data : [],
+      mortality: initialRecentEntries.mortality.status === "success" ? initialRecentEntries.mortality.data : [],
+      feeding: initialRecentEntries.feeding.status === "success" ? initialRecentEntries.feeding.data : [],
+      sampling: initialRecentEntries.sampling.status === "success" ? initialRecentEntries.sampling.data : [],
+      transfer: initialRecentEntries.transfer.status === "success" ? initialRecentEntries.transfer.data : [],
+      harvest: initialRecentEntries.harvest.status === "success" ? initialRecentEntries.harvest.data : [],
       water_quality:
-        recentEntriesQuery.data?.water_quality?.status === "success"
-          ? recentEntriesQuery.data.water_quality.data
-          : [],
+        initialRecentEntries.water_quality.status === "success" ? initialRecentEntries.water_quality.data : [],
       feed_inventory:
-        recentEntriesQuery.data?.feed_inventory?.status === "success"
-          ? recentEntriesQuery.data.feed_inventory.data
-          : [],
-      stocking:
-        recentEntriesQuery.data?.stocking?.status === "success" ? recentEntriesQuery.data.stocking.data : [],
-      systems:
-        recentEntriesQuery.data?.systems?.status === "success" ? recentEntriesQuery.data.systems.data : [],
+        initialRecentEntries.feed_inventory.status === "success" ? initialRecentEntries.feed_inventory.data : [],
+      stocking: initialRecentEntries.stocking.status === "success" ? initialRecentEntries.stocking.data : [],
+      systems: initialRecentEntries.systems.status === "success" ? initialRecentEntries.systems.data : [],
     }),
-    [
-      recentEntriesQuery.data,
-    ],
+    [initialRecentEntries],
   )
 
   return (
-    <DashboardLayout hideHeader initialFarmId={initialFarmId} initialFarmName={initialFarmName}>
+    <DashboardLayout
+      hideHeader
+      initialFarmId={initialFarmId}
+      initialFarmName={initialFarmName}
+      headerDataOverrides={{ role: initialFarmRole ?? null }}
+    >
       <div className="data-entry-page-shell container mx-auto py-0 sm:py-0">
-        {systemsErrorMessages.length > 0 ? (
-          <DataErrorState
-            title="Unable to load systems"
-            description={systemsErrorMessages[0]}
-            onRetry={() => {
-              systemsQuery.refetch()
-            }}
-          />
-        ) : systemsLoading ? (
-          <div className="min-h-[300px] rounded-lg border border-border/80 bg-muted/40 animate-pulse shadow-sm" />
-        ) : !hasSystems ? (
+        {!hasSystems ? (
           <div className="space-y-6">
             <div className="rounded-lg border border-dashed border-border/80 bg-muted/30 p-6 shadow-sm">
               <h2 className="text-xl font-semibold tracking-tight">Set up your first system</h2>
@@ -157,23 +107,10 @@ export default function DataEntryPageClient({
               <SystemForm />
             </div>
           </div>
-        ) : errorMessages.length > 0 ? (
-          <DataErrorState
-            title="Unable to load data-entry options"
-            description={errorMessages[0]}
-            onRetry={() => {
-              systemsQuery.refetch()
-              batchesQuery.refetch()
-              feedsQuery.refetch()
-              recentEntriesQuery.refetch()
-            }}
-          />
-        ) : loading ? (
-          <div className="min-h-[300px] rounded-lg border border-border/80 bg-muted/40 animate-pulse shadow-sm" />
         ) : (
           <DataEntryInterface
             farmId={farmId}
-            farmRole={activeFarmRoleQuery.data}
+            farmRole={initialFarmRole}
             systems={systems}
             feeds={feeds}
             batches={batches}

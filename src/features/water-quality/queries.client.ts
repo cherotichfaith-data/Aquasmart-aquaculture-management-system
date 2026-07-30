@@ -4,9 +4,9 @@ import type { Database, Enums, Tables } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { WaterQualityLatestStatusRow } from "@/features/water-quality/types"
 import {
+  fetchRpc,
   getClientOrError,
   isAbortLikeError,
-  queryKpiRpc,
   queryOptionsView,
   toQueryError,
   toQuerySuccess,
@@ -46,23 +46,18 @@ export async function getLatestWaterQualityStatus(params: {
   systemId?: number
   signal?: AbortSignal
 }): Promise<QueryResult<WaterQualityLatestStatusRow>> {
-  const clientResult = await getClientOrError("getLatestWaterQualityStatus", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
+  const result = await fetchRpc<LatestStatusRpcRow>(
+    "getLatestWaterQualityStatus",
+    "api_latest_water_quality_status",
+    {
+      p_farm_id: params.farmId,
+      p_system_id: toRpcSystemId(params.systemId),
+    },
+    params.signal,
+  )
+  if (result.status === "error") return result
 
-  let q = queryKpiRpc(supabase, "api_latest_water_quality_status", {
-    p_farm_id: params.farmId,
-    p_system_id: toRpcSystemId(params.systemId),
-  })
-  if (params.signal) q = q.abortSignal(params.signal)
-
-  const { data, error } = await q
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<WaterQualityLatestStatusRow>()
-    return toQueryError("getLatestWaterQualityStatus", error)
-  }
-
-  return toQuerySuccess<WaterQualityLatestStatusRow>(((data ?? []) as LatestStatusRpcRow[]).map(normalizeLatestStatusRow))
+  return toQuerySuccess<WaterQualityLatestStatusRow>(result.data.map(normalizeLatestStatusRow))
 }
 
 export async function getWaterQualityMeasurements(params: {
@@ -162,25 +157,17 @@ export async function getWaterQualityTrend(params: {
   dateTo?: string
   signal?: AbortSignal
 }): Promise<QueryResult<WaterQualityTrendRow>> {
-  const clientResult = await getClientOrError("getWaterQualityTrend", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let q = queryKpiRpc(supabase, "api_water_quality_trend", {
-    p_farm_id: params.farmId,
-    p_system_id: toRpcSystemId(params.systemId),
-    p_start_date: toRpcDate(params.dateFrom),
-    p_end_date: toRpcDate(params.dateTo),
-  })
-  if (params.signal) q = q.abortSignal(params.signal)
-
-  const { data, error } = await q
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<WaterQualityTrendRow>()
-    return toQueryError("getWaterQualityTrend", error)
-  }
-
-  return toQuerySuccess<WaterQualityTrendRow>((data ?? []) as WaterQualityTrendRow[])
+  return fetchRpc<WaterQualityTrendRow>(
+    "getWaterQualityTrend",
+    "api_water_quality_trend",
+    {
+      p_farm_id: params.farmId,
+      p_system_id: toRpcSystemId(params.systemId),
+      p_start_date: toRpcDate(params.dateFrom),
+      p_end_date: toRpcDate(params.dateTo),
+    },
+    params.signal,
+  )
 }
 
 export async function getWaterQualityIndex(params: {
@@ -190,25 +177,17 @@ export async function getWaterQualityIndex(params: {
   dateTo?: string
   signal?: AbortSignal
 }): Promise<QueryResult<WaterQualityIndexRow>> {
-  const clientResult = await getClientOrError("getWaterQualityIndex", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let q = queryKpiRpc(supabase, "api_water_quality_index", {
-    p_farm_id: params.farmId,
-    p_system_id: toRpcSystemId(params.systemId),
-    p_start_date: toRpcDate(params.dateFrom),
-    p_end_date: toRpcDate(params.dateTo),
-  })
-  if (params.signal) q = q.abortSignal(params.signal)
-
-  const { data, error } = await q
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<WaterQualityIndexRow>()
-    return toQueryError("getWaterQualityIndex", error)
-  }
-
-  return toQuerySuccess<WaterQualityIndexRow>((data ?? []) as WaterQualityIndexRow[])
+  return fetchRpc<WaterQualityIndexRow>(
+    "getWaterQualityIndex",
+    "api_water_quality_index",
+    {
+      p_farm_id: params.farmId,
+      p_system_id: toRpcSystemId(params.systemId),
+      p_start_date: toRpcDate(params.dateFrom),
+      p_end_date: toRpcDate(params.dateTo),
+    },
+    params.signal,
+  )
 }
 
 export async function getWaterQualityRatings(params: {

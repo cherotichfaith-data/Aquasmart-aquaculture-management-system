@@ -97,6 +97,36 @@ export type Database = {
           },
         ]
       }
+      api_rate_limit_counter: {
+        Row: {
+          created_at: string
+          last_request_ip: unknown
+          request_count: number
+          scope: string
+          updated_at: string
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          last_request_ip?: unknown
+          request_count?: number
+          scope: string
+          updated_at?: string
+          user_id: string
+          window_start: string
+        }
+        Update: {
+          created_at?: string
+          last_request_ip?: unknown
+          request_count?: number
+          scope?: string
+          updated_at?: string
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       app_config: {
         Row: {
           key: string
@@ -1178,69 +1208,6 @@ export type Database = {
         }
         Relationships: []
       }
-      normalization_review: {
-        Row: {
-          created_at: string
-          farm_id: string
-          id: string
-          issue_detail: string
-          issue_type: string
-          raw_upload_id: string | null
-          resolution: string | null
-          resolved: boolean
-          resolved_at: string | null
-          resolved_by: string | null
-          row_data: Json
-          table_name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          farm_id: string
-          id?: string
-          issue_detail: string
-          issue_type: string
-          raw_upload_id?: string | null
-          resolution?: string | null
-          resolved?: boolean
-          resolved_at?: string | null
-          resolved_by?: string | null
-          row_data: Json
-          table_name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          farm_id?: string
-          id?: string
-          issue_detail?: string
-          issue_type?: string
-          raw_upload_id?: string | null
-          resolution?: string | null
-          resolved?: boolean
-          resolved_at?: string | null
-          resolved_by?: string | null
-          row_data?: Json
-          table_name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "normalization_review_farm_id_fkey"
-            columns: ["farm_id"]
-            isOneToOne: false
-            referencedRelation: "farm"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "normalization_review_raw_upload_id_fkey"
-            columns: ["raw_upload_id"]
-            isOneToOne: false
-            referencedRelation: "raw_uploads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       organization: {
         Row: {
           created_at: string
@@ -1325,68 +1292,6 @@ export type Database = {
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "system"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      raw_uploads: {
-        Row: {
-          farm_id: string
-          file_name: string
-          file_type: string | null
-          id: string
-          parse_warnings: Json | null
-          rejection_reason: string | null
-          review_notes: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          row_count: number | null
-          status: string
-          storage_path: string
-          updated_at: string
-          uploaded_at: string
-          uploaded_by: string
-        }
-        Insert: {
-          farm_id: string
-          file_name: string
-          file_type?: string | null
-          id?: string
-          parse_warnings?: Json | null
-          rejection_reason?: string | null
-          review_notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          row_count?: number | null
-          status?: string
-          storage_path: string
-          updated_at?: string
-          uploaded_at?: string
-          uploaded_by: string
-        }
-        Update: {
-          farm_id?: string
-          file_name?: string
-          file_type?: string | null
-          id?: string
-          parse_warnings?: Json | null
-          rejection_reason?: string | null
-          review_notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          row_count?: number | null
-          status?: string
-          storage_path?: string
-          updated_at?: string
-          uploaded_at?: string
-          uploaded_by?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "raw_uploads_farm_id_fkey"
-            columns: ["farm_id"]
-            isOneToOne: false
-            referencedRelation: "farm"
             referencedColumns: ["id"]
           },
         ]
@@ -1812,6 +1717,61 @@ export type Database = {
           system_id: number
         }[]
       }
+      api_dashboard_batches: {
+        Args: {
+          p_batch_ids?: number[]
+          p_end_date?: string
+          p_farm_id: string
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
+          p_start_date?: string
+        }
+        Returns: {
+          abw: number
+          abw_arrow: string
+          abw_latest_date: string
+          agr: number
+          agr_arrow: string
+          as_of_date: string
+          batch_id: number
+          batch_name: string
+          biomass_density: number
+          biomass_density_arrow: string
+          biomass_density_latest_date: string
+          biomass_end: number
+          cycle_day: number
+          efcr: number
+          efcr_arrow: string
+          efcr_latest_date: string
+          feed_total: number
+          feeding_rate: number
+          feeding_rate_arrow: string
+          feeding_rate_latest_date: string
+          fish_end: number
+          growth_stage: Database["public"]["Enums"]["system_growth_stage"]
+          input_end_date: string
+          input_start_date: string
+          is_complete: boolean
+          missing_days_count: number
+          mortality_rate: number
+          mortality_rate_arrow: string
+          mortality_rate_latest_date: string
+          sample_age_days: number
+          sampling_end_date: string
+          sgr: number
+          sgr_arrow: string
+          system_count: number
+          system_ids: number[]
+          target_weight_g: number
+          target_weight_progress_pct: number
+          water_quality_arrow: string
+          water_quality_latest_date: string
+          water_quality_rating_average: string
+          water_quality_rating_numeric_average: number
+          worst_parameter: string
+          worst_parameter_unit: string
+          worst_parameter_value: number
+        }[]
+      }
       api_dashboard_consolidated: {
         Args: {
           p_end_date?: string
@@ -2205,6 +2165,32 @@ export type Database = {
           unit: string
         }[]
       }
+      api_system_daily_trend: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+          p_system_ids?: number[]
+        }
+        Returns: {
+          abw_last_sampling: number
+          biomass_density: number
+          biomass_last_sampling: number
+          date: string
+          feeding_amount_today: number
+          feeding_rate: number
+          fish_density: number
+          fish_died_today: number
+          fish_harvested_today: number
+          fish_stocked_today: number
+          fish_transferred_in_today: number
+          fish_transferred_out_today: number
+          mortality_rate: number
+          number_of_fish: number
+          system_id: number
+          system_volume: number
+        }[]
+      }
       api_system_feed_status: {
         Args: {
           p_end_date?: string
@@ -2345,6 +2331,21 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      enforce_api_rate_limit: {
+        Args: {
+          p_ip_address?: unknown
+          p_limit: number
+          p_scope: string
+          p_user_id: string
+          p_window_seconds: number
+        }
+        Returns: {
+          allowed: boolean
+          current_count: number
+          remaining: number
+          reset_at: string
+        }[]
       }
       feed_inventory_snapshot_kg:
         | {
@@ -2497,11 +2498,7 @@ export type Database = {
         | "starvation"
         | "temperature"
         | "other"
-      system_growth_stage:
-        | "fingerling"
-        | "juvenile"
-        | "sub_adult"
-        | "broodstock"
+      system_growth_stage: "nursing" | "grow_out"
       system_type:
         | "cage"
         | "compartment"
@@ -2722,12 +2719,7 @@ export const Constants = {
         "temperature",
         "other",
       ],
-      system_growth_stage: [
-        "fingerling",
-        "juvenile",
-        "sub_adult",
-        "broodstock",
-      ],
+      system_growth_stage: ["nursing", "grow_out"],
       system_type: [
         "cage",
         "compartment",

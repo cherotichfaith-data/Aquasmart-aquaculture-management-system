@@ -20,13 +20,15 @@ import { toast } from "@/lib/hooks/app/use-toast"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useCreateSystem } from "@/lib/hooks/use-system"
 import { GROWTH_STAGE_VALUES, formatGrowthStage } from "@/lib/stage-filter"
-import { formatSystemOptionLabel } from "@/lib/system-options"
+import { buildPersistedSystemName, formatSystemOptionLabel } from "@/lib/system-options"
 import { FORM_SYSTEM_TYPES, FORM_SYSTEM_TYPE_OPTIONS } from "@/lib/system-types"
 import type { Database } from "@/lib/types/database"
 
 type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
     unit?: string | null
 }
+type SystemFormValues = z.infer<typeof formSchema>
+const DEFAULT_GROWTH_STAGE = GROWTH_STAGE_VALUES[0]
 
 const getTodayDateValue = () => new Date().toISOString().slice(0, 10)
 
@@ -45,14 +47,15 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
     const farmId = initialFarmId ?? activeFarmId
     const createSystem = useCreateSystem()
 
-    const form = useForm<z.infer<typeof formSchema>>({
+    const form = useForm<SystemFormValues>({
         resolver: zodResolver(formSchema),
+        mode: "onBlur",
         defaultValues: {
             commissioned_at: getTodayDateValue(),
             unit: "",
             name: "",
             type: "rectangular_cage",
-            growth_stage: "fingerling",
+            growth_stage: DEFAULT_GROWTH_STAGE,
             volume: 0,
             depth: 0,
         },
@@ -65,7 +68,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
         name: nameValue,
     })
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
+    function onSubmit(values: SystemFormValues) {
         if (!farmId) {
             toast({
                 variant: "destructive",
@@ -80,7 +83,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
         const payload: SystemInsertWithUnit = {
             commissioned_at: values.commissioned_at,
             unit: values.unit,
-            name: values.name,
+            name: buildPersistedSystemName(values.unit, values.name),
             type: values.type,
             growth_stage: values.growth_stage,
             ...(values.volume !== undefined ? { volume: values.volume } : {}),
@@ -97,7 +100,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                     unit: "",
                     name: "",
                     type: "rectangular_cage",
-                    growth_stage: "fingerling",
+                    growth_stage: DEFAULT_GROWTH_STAGE,
                     volume: 0,
                     depth: 0,
                 })
@@ -112,17 +115,20 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                 <p className="text-sm text-muted-foreground">Register a new cage, pond, or tank.</p>
             </div>
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3.5 max-w-2xl">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <FormField
                             control={form.control}
                             name="commissioned_at"
                             render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="flex h-full flex-col">
                                     <FormLabel>Date</FormLabel>
                                     <FormControl>
-                                        <Input type="date" {...field} />
+                                        <Input type="date" className="max-w-xs" {...field} />
                                     </FormControl>
+                                    <FormDescription className="min-h-[2rem]">
+                                        Commissioning date for this system.
+                                    </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -132,12 +138,14 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                             control={form.control}
                             name="unit"
                             render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Cage Number / Prefix</FormLabel>
+                                <FormItem className="flex h-full flex-col">
+                                    <FormLabel>Cage Unit</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="e.g. 3" {...field} />
+                                        <Input placeholder="e.g. A" className="max-w-xs" {...field} />
                                     </FormControl>
-                                    <FormDescription>This appears first in the cage name, for example `3` in `3E`.</FormDescription>
+                                    <FormDescription className="min-h-[2rem]">
+                                        This appears first in the cage name, for example `A` in `A.3`.
+                                    </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -149,11 +157,11 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                         name="name"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Cage Letter / Suffix</FormLabel>
+                                <FormLabel>Cage Number</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="e.g. E" {...field} />
+                                    <Input placeholder="e.g. 3" className="max-w-xs" {...field} />
                                 </FormControl>
-                                <FormDescription>This appears after the number, for example `E` in `3E`.</FormDescription>
+                                <FormDescription>This appears after the unit, for example `3` in `A.3`.</FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -164,7 +172,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                         <span className="font-medium text-foreground">{cageNamePreview}</span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <FormField
                             control={form.control}
                             name="type"
@@ -173,7 +181,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                                     <FormLabel>Type</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="max-w-xs">
                                                 <SelectValue placeholder="Select type" />
                                             </SelectTrigger>
                                         </FormControl>
@@ -198,7 +206,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                                     <FormLabel>Growth Stage</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="max-w-xs">
                                                 <SelectValue placeholder="Select stage" />
                                             </SelectTrigger>
                                         </FormControl>
@@ -216,7 +224,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <FormField
                             control={form.control}
                             name="depth"
@@ -224,7 +232,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                                 <FormItem>
                                     <FormLabel>Depth (m)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.1" {...field} />
+                                        <Input type="number" step="0.1" className="max-w-xs" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -237,7 +245,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                                 <FormItem>
                                     <FormLabel>Volume (m3)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.1" {...field} />
+                                        <Input type="number" step="0.1" className="max-w-xs" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -245,10 +253,16 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                         />
                     </div>
 
-                    <Button type="submit" className="data-entry-action" disabled={createSystem.isPending || (!farmId && activeFarmLoading)}>
-                        {createSystem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Record System
-                    </Button>
+                    <div className="flex justify-end pt-1">
+                        <Button
+                            type="submit"
+                            className="min-h-11 rounded-lg px-5"
+                            disabled={createSystem.isPending || (!farmId && activeFarmLoading)}
+                        >
+                            {createSystem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Record System
+                        </Button>
+                    </div>
                 </form>
             </Form>
         </div>

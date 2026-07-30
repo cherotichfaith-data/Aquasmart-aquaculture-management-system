@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
@@ -22,6 +23,7 @@ import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { TRANSFER_TYPE_LABELS, UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { NumberStepperInput } from "./form-support"
 import {
   parseOptionalNumericId,
   parseRequiredNumericId,
@@ -81,9 +83,11 @@ interface TransferFormProps {
 
 export function TransferForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: TransferFormProps) {
   const mutation = useRecordTransfer()
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    mode: "onBlur",
     defaultValues: {
       date: toIsoDate(new Date()),
       number_of_fish: 0,
@@ -220,7 +224,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
         ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
           <FormField
             control={form.control}
             name="date"
@@ -228,7 +232,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
               <FormItem className="max-w-sm">
                 <FormLabel>Date</FormLabel>
                 <FormControl>
-                  <Input type="date" {...field} />
+                  <Input type="date" className="max-w-xs" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -249,7 +253,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                     value={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder="Select origin" />
                       </SelectTrigger>
                     </FormControl>
@@ -274,7 +278,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                   <FormItem>
                     <FormLabel>Destination Location</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g. KIMBWELA Pond 3" />
+                      <Input {...field} className="max-w-sm" placeholder="e.g. KIMBWELA Pond 3" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -297,7 +301,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="max-w-xs">
                           <SelectValue placeholder="Select destination" />
                         </SelectTrigger>
                       </FormControl>
@@ -337,7 +341,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                     value={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder="Select transfer type" />
                       </SelectTrigger>
                     </FormControl>
@@ -345,32 +349,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                       {UI_TRANSFER_TYPES.map((transferType) => (
                         <SelectItem key={transferType} value={transferType}>
                           {TRANSFER_TYPE_LABELS[transferType]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="batch_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Batch (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select batch" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">No batch</SelectItem>
-                      {batches.map((batch) => (
-                        <SelectItem key={batch.id} value={String(batch.id)}>
-                          {batch.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -395,6 +373,49 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
 
           <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
 
+          <div className="rounded-lg border border-border/80 bg-muted/10 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
+                <p className="text-xs text-muted-foreground">
+                  Batch is optional and hidden by default to keep transfer entry fast.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setShowAdvanced((current) => !current)}>
+                {showAdvanced ? "Hide" : "Show"}
+              </Button>
+            </div>
+            {showAdvanced ? (
+              <div className="mt-4">
+                <FormField
+                  control={form.control}
+                  name="batch_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Batch (Optional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="max-w-xs">
+                            <SelectValue placeholder="Select batch" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No batch</SelectItem>
+                          {batches.map((batch) => (
+                            <SelectItem key={batch.id} value={String(batch.id)}>
+                              {batch.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : null}
+          </div>
+
           <div className="data-entry-secondary-grid">
             <FormField
               control={form.control}
@@ -403,7 +424,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Number of Fish</FormLabel>
                   <FormControl>
-                    <Input type="number" step="1" {...field} />
+                    <NumberStepperInput field={field} className="max-w-xs" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -417,7 +438,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Total Weight (kg)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} />
+                    <Input type="number" step="0.01" className="max-w-xs" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -444,10 +465,12 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
             )}
           />
 
-          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
-            {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Record Transfer
-          </Button>
+          <div className="flex justify-end pt-1">
+            <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Transfer
+            </Button>
+          </div>
         </form>
       </Form>
     </div>

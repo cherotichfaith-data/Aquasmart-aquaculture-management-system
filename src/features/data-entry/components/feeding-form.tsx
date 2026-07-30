@@ -145,6 +145,7 @@ export function FeedingForm({
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    mode: "onBlur",
     defaultValues: {
       date: toIsoDate(new Date()),
       unit: defaultUnit,
@@ -296,7 +297,7 @@ export function FeedingForm({
         ) : null}
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
             <div className="data-entry-secondary-grid">
               <FormField
                 control={form.control}
@@ -305,7 +306,7 @@ export function FeedingForm({
                   <FormItem>
                     <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                        <Input type="date" className="max-w-xs" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -326,7 +327,7 @@ export function FeedingForm({
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="max-w-xs">
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -351,7 +352,7 @@ export function FeedingForm({
                     <FormLabel>Cage Number</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="max-w-xs">
                           <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
@@ -376,7 +377,7 @@ export function FeedingForm({
                     <FormLabel>Feed Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="max-w-xs">
                           <SelectValue placeholder="Select feed" />
                         </SelectTrigger>
                       </FormControl>
@@ -408,7 +409,7 @@ export function FeedingForm({
                   <FormItem>
                     <FormLabel>Amount (kg)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                        <Input type="number" step="0.01" className="max-w-xs" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -424,7 +425,7 @@ export function FeedingForm({
                   <FormLabel>Feeding Response</FormLabel>
                   <Select onValueChange={field.onChange} value={String(field.value)}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder="Select response" />
                       </SelectTrigger>
                     </FormControl>
@@ -469,7 +470,7 @@ export function FeedingForm({
                     Batch is optional and hidden by default to keep the common feeding flow fast.
                   </p>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowAdvanced((current) => !current)}>
+                <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setShowAdvanced((current) => !current)}>
                   {showAdvanced ? "Hide" : "Show"}
                 </Button>
               </div>
@@ -483,7 +484,7 @@ export function FeedingForm({
                         <FormLabel>Batch (Optional)</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="max-w-xs">
                               <SelectValue placeholder="Select batch" />
                             </SelectTrigger>
                           </FormControl>
@@ -504,14 +505,16 @@ export function FeedingForm({
               ) : null}
             </div>
 
-            <Button
-              type="submit"
-              className="data-entry-action"
-              disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}
-            >
-              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Record Feeding
-            </Button>
+            <div className="flex justify-end pt-1">
+              <Button
+                type="submit"
+                className="min-h-11 rounded-lg px-5"
+                disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}
+              >
+                {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Record Feeding
+              </Button>
+            </div>
           </form>
         </Form>
       </div>

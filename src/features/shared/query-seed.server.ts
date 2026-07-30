@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/types/database"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
+import type { DashboardBatchRow } from "@/features/dashboard/types"
 
 export type ServerClient = ReturnType<typeof createAccessTokenClient>
 
@@ -15,6 +16,8 @@ type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 type DashboardSystemRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
+type BatchOptionRowForDashboard = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
+type SystemOptionRowForDashboard = Database["public"]["Functions"]["api_system_options_rpc"]["Returns"][number]
 type FarmMember = {
   user_id: string
   role: string
@@ -154,6 +157,65 @@ export async function listDashboardSystemsRows(
   })
   if (error) return []
   return (data ?? []) as DashboardSystemRow[]
+}
+
+export async function listDashboardBatchRows(
+  supabase: ServerClient,
+  params: {
+    farmId: string
+    batchIds?: number[]
+    stage?: Database["public"]["Enums"]["system_growth_stage"]
+    dateFrom?: string
+    dateTo?: string
+  },
+): Promise<DashboardBatchRow[]> {
+  const [{ data: batchData, error: batchError }, { data: systemData, error: systemError }] = await Promise.all([
+    supabase.rpc("api_fingerling_batch_options_rpc", {
+      p_farm_id: params.farmId,
+      p_active_only: false,
+    }),
+    params.stage
+      ? supabase.rpc("api_system_options_rpc", {
+          p_farm_id: params.farmId,
+          p_stage: params.stage,
+          p_active_only: true,
+        })
+      : Promise.resolve({ data: null, error: null }),
+  ])
+
+  if (batchError || systemError) return []
+
+  const allowedSystemIds =
+    params.stage != null
+      ? new Set(
+          ((systemData ?? []) as SystemOptionRowForDashboard[])
+            .map((row) => row.id)
+            .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
+        )
+      : null
+
+  const byBatchId = new Map<number, DashboardBatchRow>()
+  ;((batchData ?? []) as BatchOptionRowForDashboard[]).forEach((row) => {
+    if (!Number.isFinite(row.id) || !Number.isFinite(row.system_id)) return
+    if (allowedSystemIds && !allowedSystemIds.has(row.system_id)) return
+    if (params.batchIds?.length && !params.batchIds.includes(row.id)) return
+
+    const existing = byBatchId.get(row.id)
+    if (existing) {
+      if (!existing.system_ids.includes(row.system_id)) existing.system_ids.push(row.system_id)
+      return
+    }
+
+    byBatchId.set(row.id, {
+      batch_id: row.id,
+      batch_name: row.label || `Batch ${row.id}`,
+      cycle_day: null,
+      date_of_delivery: row.date_of_delivery ?? null,
+      system_ids: [row.system_id],
+    })
+  })
+
+  return [...byBatchId.values()].sort((left, right) => left.batch_name.localeCompare(right.batch_name))
 }
 
 export async function listFarmMembers(

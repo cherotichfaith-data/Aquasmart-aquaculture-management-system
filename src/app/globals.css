@@ -45,8 +45,12 @@ next-router-prefetch {
   --chart-3: #a5a5a5;
   --chart-4: #ffc000;
   --chart-5: #c00000;
+  /* Production chart trend-line palette: bright blue + green, deliberately
+     distinct from the generic Office chart-1..5 swatches below. Green is a
+     touch deeper than --color-success (#22c55e) so the compare line doesn't
+     read as identical to the stocking event marker. */
   --production-chart-primary: #258ef2;
-  --production-chart-compare: #20b7ae;
+  --production-chart-compare: #16a34a;
   --chart-grid: rgba(95, 111, 122, 0.22);
   --chart-tooltip-bg: rgba(38, 46, 56, 0.96);
   --chart-tooltip-border: rgba(216, 222, 230, 0.34);
@@ -304,13 +308,13 @@ next-router-prefetch {
   }
 }
 @layer components {
-  .production-select .MuiOutlinedInput-root {
-    min-height: 56px;
+  .production-select [data-slot="select-input"] {
+    min-height: 40px;
     border-radius: 12px;
   }
 
-  .production-period-select .MuiOutlinedInput-root {
-    min-height: 50px;
+  .production-period-select [data-slot="select-input"] {
+    min-height: 40px;
     border-radius: 12px;
   }
 
@@ -333,6 +337,13 @@ next-router-prefetch {
 
   .production-records-table tbody tr:nth-child(even) {
     background: color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+  /* Dashboard's compact production summary table: shaded header bar,
+     scoped to the dashboard only so the production page's own table
+     (which shares .production-records-table) keeps its plain header. */
+  .dashboard-production-table thead [data-slot="table-row"] {
+    background: var(--color-accent);
   }
 
   .page-shell {
@@ -510,7 +521,7 @@ next-router-prefetch {
   }
 
   .data-entry-tab {
-    @apply inline-flex min-h-10 shrink-0 items-center rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors;
+    @apply inline-flex min-h-11 shrink-0 items-center rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors;
   }
 
   .data-entry-tab-active {
@@ -599,28 +610,28 @@ next-router-prefetch {
     @apply text-[12px] font-semibold leading-5 tracking-[0.02em] text-foreground/80;
   }
 
-  .data-entry-canvas form [data-slot="input"] .MuiOutlinedInput-root,
-  .data-entry-canvas form [data-slot="select-trigger"] .MuiOutlinedInput-root,
+  .data-entry-canvas form [data-slot="input"],
+  .data-entry-canvas form [data-slot="select-input"],
   .data-entry-canvas form textarea {
     border-radius: 10px;
     background: color-mix(in srgb, var(--card) 92%, var(--background) 8%);
     box-shadow: none;
   }
 
-  .data-entry-canvas form [data-slot="input"] .MuiOutlinedInput-notchedOutline,
-  .data-entry-canvas form [data-slot="select-trigger"] .MuiOutlinedInput-notchedOutline,
+  .data-entry-canvas form [data-slot="input"],
+  .data-entry-canvas form [data-slot="select-input"],
   .data-entry-canvas form textarea {
     border-color: color-mix(in srgb, var(--border) 84%, transparent);
   }
 
-  .data-entry-canvas form [data-slot="input"] .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline,
-  .data-entry-canvas form [data-slot="select-trigger"] .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline,
+  .data-entry-canvas form [data-slot="input"]:hover,
+  .data-entry-canvas form [data-slot="select-input"]:hover,
   .data-entry-canvas form textarea:hover {
     border-color: color-mix(in srgb, var(--border) 62%, var(--foreground) 38%);
   }
 
-  .data-entry-canvas form [data-slot="input"] .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
-  .data-entry-canvas form [data-slot="select-trigger"] .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
+  .data-entry-canvas form [data-slot="input"]:focus-visible,
+  .data-entry-canvas form [data-slot="select-input"]:focus-visible,
   .data-entry-canvas form textarea:focus-visible {
     border-color: color-mix(in srgb, var(--primary) 72%, white 28%);
     border-width: 1px;

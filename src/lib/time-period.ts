@@ -1,5 +1,6 @@
 import { Constants, type Database, type Enums } from "@/lib/types/database"
 import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
+import { fetchRpc } from "@/lib/supabase/query-transport"
 
 export type BaseTimePeriod = Enums<"time_period">
 export type DateType = BaseTimePeriod | "all history"
@@ -45,21 +46,32 @@ export const DATE_TYPE_LABELS: Record<DateType, string> = {
 }
 export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = DATE_TYPE_LABELS
 
+// URL slug === the internal DateType value itself (space-separated, e.g. "2 weeks"),
+// matching aquasmart-main's convention. URLSearchParams encodes/decodes the spaces
+// automatically, so no separate slug table is needed for the current form.
 export const DATE_TYPE_URL_VALUES: Record<DateType, string> = {
   day: "day",
   week: "week",
-  "2 weeks": "2-weeks",
+  "2 weeks": "2 weeks",
   month: "month",
   quarter: "quarter",
-  "6 months": "6-months",
+  "6 months": "6 months",
   year: "year",
-  "all history": "all-history",
+  "all history": "all history",
 }
 export const TIME_PERIOD_URL_VALUES: Record<TimePeriod, string> = DATE_TYPE_URL_VALUES
 
 const DATE_TYPES_BY_URL_VALUE = new Map(
   Object.entries(DATE_TYPE_URL_VALUES).map(([dateType, urlValue]) => [urlValue, dateType as DateType]),
 )
+
+// Pre-alignment hyphenated slugs (e.g. "2-weeks", "all-history") — accepted so links
+// shared before this change still resolve correctly.
+const LEGACY_URL_VALUES: Record<string, DateType> = {
+  "2-weeks": "2 weeks",
+  "6-months": "6 months",
+  "all-history": "all history",
+}
 
 export function toDateTypeUrlValue(value: DateType) {
   return DATE_TYPE_URL_VALUES[value] ?? value
@@ -70,7 +82,11 @@ export function parseDateTypeUrlValue(value: unknown): DateType | null {
   if (typeof value !== "string") return null
   const normalized = value.trim().toLowerCase()
   if (normalized === "6months") return "6 months"
-  return DATE_TYPES_BY_URL_VALUE.get(normalized) ?? (isDateType(normalized) ? normalized : null)
+  if (normalized === "2weeks") return "2 weeks"
+  if (normalized === "allhistory") return "all history"
+  return (
+    DATE_TYPES_BY_URL_VALUE.get(normalized) ?? LEGACY_URL_VALUES[normalized] ?? (isDateType(normalized) ? normalized : null)
+  )
 }
 export const parseTimePeriodUrlValue = parseDateTypeUrlValue
 
@@ -262,4 +278,45 @@ export async function fetchTimePeriodBounds(
   if (error) return { start: null, end: null }
 
   return mapTimeBoundsRow(data?.[0])
+}
+
+/**
+ * Client-side counterpart to fetchTimePeriodBounds(). Goes through the
+ * authenticated /api/rpc proxy (src/lib/supabase/query-transport.ts) instead
+ * of calling supabase.rpc(...) directly with a browser client -- this is the
+ * one chosen client-read transport, so no feature (dashboard, production,
+ * reports, feed, water-quality, or anything else that needs time bounds)
+ * calls the RPC straight from the browser.
+ */
+export async function fetchTimePeriodBoundsClient(params: {
+  farmId: string
+  timePeriod: DateType
+  customRange?: CustomTimeRange | null
+  scope?: AnalyticsTimeScope
+  anchorDate?: string | null
+  systemId?: number | null
+  batchId?: number | null
+  signal?: AbortSignal
+}): Promise<TimeBounds> {
+  if (params.customRange) {
+    return customRangeToBounds(params.customRange)
+  }
+
+  const result = await fetchRpc<TimePeriodBoundsRpcRow>(
+    "fetchTimePeriodBoundsClient",
+    "api_time_period_bounds_scoped",
+    {
+      p_farm_id: params.farmId,
+      p_time_period: params.timePeriod,
+      p_scope: params.scope ?? "dashboard",
+      p_anchor_date: toRpcDate(params.anchorDate),
+      p_system_id: toRpcSystemId(params.systemId),
+      p_batch_id: params.batchId ?? undefined,
+    },
+    params.signal,
+  )
+
+  if (params.signal?.aborted || result.status === "error") return { start: null, end: null }
+
+  return mapTimeBoundsRow(result.data[0])
 }

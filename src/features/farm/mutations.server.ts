@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { cacheTags } from "@/lib/cache/tags"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
+import { buildPersistedSystemName } from "@/lib/system-options"
 import { revalidateWriteTags } from "@/lib/server/write-through"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
@@ -299,7 +300,7 @@ export async function createSystemAction(
     .from("system")
     .insert({
       farm_id: parsedPayload.farm_id,
-      name: parsedPayload.name,
+      name: buildPersistedSystemName(parsedPayload.unit, parsedPayload.name),
       type: parsedPayload.type,
       growth_stage: parsedPayload.growth_stage,
       commissioned_at: parsedPayload.commissioned_at ?? null,

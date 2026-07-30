@@ -7,7 +7,6 @@ import { useAuth } from "@/components/providers/auth-provider"
 import {
   getBatchOptions,
   getFarmOptions,
-  getFeedTypeOptions,
   getFingerlingSupplierOptions,
   getAppConfig,
   getSystemOptions,
@@ -41,23 +40,6 @@ export function useBatchOptions(params?: {
     enabled,
     staleTime: 0,
     refetchOnMount: "always",
-  })
-}
-
-export function useFeedTypeOptions(params?: {
-  farmId?: string | null
-  enabled?: boolean
-}) {
-  const { session, user } = useAuth()
-  const enabled =
-    (Boolean(session) || Boolean(user)) &&
-    Boolean(params?.farmId) &&
-    (params?.enabled ?? true)
-  return useQuery({
-    queryKey: queryKeys.options.feeds(params?.farmId, user?.id),
-    queryFn: ({ signal }) => getFeedTypeOptions({ ...params, signal }),
-    enabled,
-    staleTime: 5 * 60_000,
   })
 }
 

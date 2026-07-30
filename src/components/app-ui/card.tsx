@@ -1,109 +1,46 @@
 import * as React from "react"
-import MuiCard from "@mui/material/Card"
-import Box from "@mui/material/Box"
-import Typography from "@mui/material/Typography"
 import { cn } from "@/lib/utils"
 
 const Card = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return (
-    <MuiCard
-      ref={ref}
-      data-slot="card"
-      variant="outlined"
-      className={cn(className)}
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 1.5,
-        py: 1.5,
-        color: "text.primary",
-        boxShadow: "none",
-      }}
-      {...props}
-    />
-  )
+  return <div ref={ref} data-slot="card" className={cn("rounded-xl border bg-card text-card-foreground shadow-none", className)} {...props} />
 })
 
 Card.displayName = "Card"
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return (
-    <Box
-      ref={ref}
-      data-slot="card-header"
-      className={cn(className)}
-      sx={{
-        display: "grid",
-        gridTemplateRows: "auto auto",
-        alignItems: "start",
-        gap: 0.5,
-        px: 2,
-      }}
-      {...props}
-    />
-  )
+  return <div ref={ref} data-slot="card-header" className={cn("grid items-start gap-1 px-4 py-4", className)} {...props} />
 })
 
 CardHeader.displayName = "CardHeader"
 
 const CardTitle = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return (
-    <Typography
-      ref={ref}
-      component="div"
-      variant="h6"
-      data-slot="card-title"
-      className={cn(className)}
-      sx={{ fontSize: "1.02rem", lineHeight: 1.2, fontWeight: 600, letterSpacing: "-0.02em" }}
-      {...props}
-    />
-  )
+  return <div ref={ref} data-slot="card-title" className={cn("text-[1.02rem] font-semibold leading-tight tracking-[-0.02em]", className)} {...props} />
 })
 
 CardTitle.displayName = "CardTitle"
 
 const CardDescription = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
   ({ className, ...props }, ref) => {
-    return (
-      <Typography
-        ref={ref}
-        component="div"
-        variant="body2"
-        data-slot="card-description"
-        className={cn(className)}
-        sx={{ color: "text.secondary", fontSize: "0.8125rem", lineHeight: 1.6 }}
-        {...props}
-      />
-    )
+    return <div ref={ref} data-slot="card-description" className={cn("text-[0.8125rem] leading-6 text-muted-foreground", className)} {...props} />
   },
 )
 
 CardDescription.displayName = "CardDescription"
 
 const CardAction = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return (
-    <Box
-      ref={ref}
-      data-slot="card-action"
-      className={cn(className)}
-      sx={{ gridColumnStart: 2, gridRow: "1 / span 2", alignSelf: "start", justifySelf: "end" }}
-      {...props}
-    />
-  )
+  return <div ref={ref} data-slot="card-action" className={cn("justify-self-end self-start", className)} {...props} />
 })
 
 CardAction.displayName = "CardAction"
 
 const CardContent = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return <Box ref={ref} data-slot="card-content" className={cn(className)} sx={{ px: 2 }} {...props} />
+  return <div ref={ref} data-slot="card-content" className={cn("px-4 pb-4", className)} {...props} />
 })
 
 CardContent.displayName = "CardContent"
 
 const CardFooter = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return (
-    <Box ref={ref} data-slot="card-footer" className={cn(className)} sx={{ display: "flex", alignItems: "center", px: 2 }} {...props} />
-  )
+  return <div ref={ref} data-slot="card-footer" className={cn("flex items-center px-4 pb-4", className)} {...props} />
 })
 
 CardFooter.displayName = "CardFooter"

@@ -39,6 +39,7 @@ type DataTableProps<TRow> = {
   /** Extra classes on the scroll shell, e.g. "max-h-[480px]". */
   shellClassName?: string
   tableClassName?: string
+  headerVariant?: "default" | "plain"
 }
 
 // Design-guide header: 12px/600 muted labels on a transparent row with a
@@ -54,6 +55,7 @@ export function DataTable<TRow>({
   initialSorting,
   shellClassName = "",
   tableClassName = "",
+  headerVariant = "default",
 }: DataTableProps<TRow>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
@@ -78,6 +80,7 @@ export function DataTable<TRow>({
   }
 
   const flatColumns = table.getAllLeafColumns()
+  const usePlainHeader = headerVariant === "plain"
 
   return (
     <div className={`soft-table-shell ${shellClassName}`}>
@@ -106,7 +109,12 @@ export function DataTable<TRow>({
 
                 return (
                   <TableHead key={header.id} className={headerCellClass}>
-                    {header.column.getCanSort() ? (
+                    {usePlainHeader ? (
+                      <span className={`inline-flex w-full items-center gap-0.5 text-xs font-semibold text-muted-foreground ${align}`}>
+                        <span>{label}</span>
+                        {meta?.unit ? <span className="font-medium opacity-70">({meta.unit})</span> : null}
+                      </span>
+                    ) : header.column.getCanSort() ? (
                       <button
                         type="button"
                         onClick={header.column.getToggleSortingHandler()}

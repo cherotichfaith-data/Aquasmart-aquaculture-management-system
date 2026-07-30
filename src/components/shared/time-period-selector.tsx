@@ -4,6 +4,7 @@ import { useState } from "react"
 import { FilterPopover } from "@/components/shared/filter-popover"
 import { Button } from "@/components/app-ui/button"
 import { Dialog } from "@/components/app-ui/dialog"
+import { cn } from "@/lib/utils"
 import {
   TIME_PERIOD_LABELS,
   TIME_PERIODS,
@@ -19,6 +20,7 @@ const CUSTOM_OPTION_VALUE = "__custom__"
 interface TimePeriodSelectorProps {
   selectedPeriod: TimePeriod
   onPeriodChange: (period: TimePeriod) => void
+  label?: string | null
   /** aquasmart-main / v2-design custom range: enabled when the handler is provided. */
   customRange?: CustomTimeRange | null
   onCustomRangeChange?: (range: CustomTimeRange) => void
@@ -31,6 +33,7 @@ interface TimePeriodSelectorProps {
 export default function TimePeriodSelector({
   selectedPeriod,
   onPeriodChange,
+  label = null,
   customRange,
   onCustomRangeChange,
   variant = "default",
@@ -78,20 +81,15 @@ export default function TimePeriodSelector({
   return (
     <>
       <FilterPopover
-        label="Date type"
+        label={label ?? undefined}
         value={customRange ? CUSTOM_OPTION_VALUE : selectedPeriod}
         options={options}
         placeholder="Select date type"
         onChange={handleChange}
         disabled={disabled}
         searchable={false}
-        triggerSx={{
-          minWidth: {
-            xs: "100%",
-            sm: variant === "compact" ? 190 : 170,
-          },
-        }}
-        contentSx={{ width: { xs: "min(24rem, calc(100vw - 24px))", sm: 352 } }}
+        className={cn("w-full", variant === "compact" ? "sm:min-w-0" : "sm:min-w-[170px]")}
+        contentClassName="sm:w-[352px]"
       />
 
       {allowCustom ? (

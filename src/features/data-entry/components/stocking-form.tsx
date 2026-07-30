@@ -25,6 +25,7 @@ import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { BatchQuickCreate } from "./batch-quick-create"
 import { DependencyBlocker } from "./dependency-blocker"
 import {
+  NumberStepperInput,
   findUnitForSystem,
   getSystemUnits,
   getSystemsForUnit,
@@ -94,6 +95,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    mode: "onBlur",
     defaultValues: {
       stocking_date: toIsoDate(new Date()),
       unit: defaultUnit,
@@ -257,7 +259,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                   <FormLabel>Cage Unit</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder="Select unit" />
                       </SelectTrigger>
                     </FormControl>
@@ -282,7 +284,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                   <FormLabel>Cage Number</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                       </SelectTrigger>
                     </FormControl>
@@ -332,7 +334,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="stocking" />
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormField
               control={form.control}
@@ -341,7 +343,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Date</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input type="date" className="max-w-xs" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -356,7 +358,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                   <FormLabel>Cage Unit</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder="Select unit" />
                       </SelectTrigger>
                     </FormControl>
@@ -381,7 +383,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                   <FormLabel>Cage Number</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                       </SelectTrigger>
                     </FormControl>
@@ -410,7 +412,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                     <FormItem>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="max-w-xs">
                             <SelectValue placeholder="Select batch number" />
                           </SelectTrigger>
                         </FormControl>
@@ -443,7 +445,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Number of Fish</FormLabel>
                   <FormControl>
-                    <Input type="number" step="1" {...field} />
+                    <NumberStepperInput field={field} className="max-w-xs" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -457,7 +459,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Total Weight (kg)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} />
+                    <Input type="number" step="0.01" className="max-w-xs" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -473,7 +475,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormLabel>Stocking Type</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className="max-w-xs">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                   </FormControl>
@@ -506,10 +508,12 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
             )}
           />
 
-          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
-            {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Record Stocking
-          </Button>
+          <div className="flex justify-end pt-1">
+            <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Stocking
+            </Button>
+          </div>
         </form>
       </Form>
     </div>
