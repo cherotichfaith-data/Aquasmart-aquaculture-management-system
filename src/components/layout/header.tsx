@@ -1,23 +1,6 @@
 "use client"
-
-import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
-import Avatar from "@mui/material/Avatar"
-import Badge from "@mui/material/Badge"
-import Box from "@mui/material/Box"
-import Button from "@mui/material/Button"
-import Chip from "@mui/material/Chip"
-import Divider from "@mui/material/Divider"
-import Drawer from "@mui/material/Drawer"
-import IconButton from "@mui/material/IconButton"
-import ListItemIcon from "@mui/material/ListItemIcon"
-import ListItemText from "@mui/material/ListItemText"
-import Menu from "@mui/material/Menu"
-import MenuItem from "@mui/material/MenuItem"
-import Paper from "@mui/material/Paper"
-import Tooltip from "@mui/material/Tooltip"
-import Typography from "@mui/material/Typography"
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent } from "react"
 import {
   Bell,
   Droplets,
@@ -31,6 +14,14 @@ import {
 } from "lucide-react"
 import { useNotifications } from "@/components/notifications/notifications-provider"
 import { useAuth } from "@/components/providers/auth-provider"
+import { getHeaderPageMeta, getHeaderPageTimeConfig } from "@/components/layout/header-config"
+import { Avatar } from "@/components/app-ui/avatar"
+import { Button } from "@/components/app-ui/button"
+import { Menu, MenuItem } from "@/components/app-ui/menu"
+import { Separator } from "@/components/app-ui/separator"
+import { Sheet } from "@/components/app-ui/sheet"
+import { Tooltip } from "@/components/app-ui/tooltip"
+import { cn } from "@/lib/utils"
 import FarmSelector from "@/components/shared/farm-selector"
 import { FilterPopover } from "@/components/shared/filter-popover"
 import { createSystemLabelResolver, getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
@@ -58,103 +49,23 @@ import {
   resolveTimePeriod,
   toCustomPeriodUrlValue,
   toTimePeriodUrlValue,
-  type AnalyticsTimeScope,
   type CustomTimeRange,
+  type TimeBounds,
 } from "@/lib/time-period"
+import type { SystemOption } from "@/lib/system-options"
+import type { Database } from "@/lib/types/database"
 
-type PageMeta = {
-  title: string
-  description?: string
-}
+type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 
-type PageTimeConfig = {
-  defaultPeriod: TimePeriod
-  scope: AnalyticsTimeScope
-  useSystemBounds: boolean
-  showBatchFilter: boolean
-  showStageFilter: boolean
-  /** Production owns its System select in-page (design guide); hide the header's. */
-  showSystemFilter?: boolean
-}
+const normalizeBatchDisplayLabel = (label: string | null | undefined) => {
+  const trimmed = label?.trim() ?? ""
+  if (!trimmed) return ""
 
-const getPageTimeConfig = (pathname: string): PageTimeConfig => {
-  if (pathname.startsWith("/feed")) {
-    return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
-  }
-  if (pathname.startsWith("/sampling") || pathname.startsWith("/production") || pathname.startsWith("/reports")) {
-    if (pathname.startsWith("/production")) {
-      return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: false, showStageFilter: false, showSystemFilter: false }
-    }
-    return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
-  }
-  if (pathname.startsWith("/water-quality")) {
-    return { defaultPeriod: "month", scope: "water_quality", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
-  }
-  if (pathname.startsWith("/actions")) {
-    return { defaultPeriod: "month", scope: "dashboard", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
-  }
-  return { defaultPeriod: "month", scope: "dashboard", useSystemBounds: false, showBatchFilter: true, showStageFilter: true }
-}
-
-const getPageMeta = (pathname: string, tab: string | null): PageMeta | null => {
-  if (pathname === "/") {
-    return {
-      title: "Farm Performance Dashboard",
-      description: "Live production, feed, water-quality, and activity signals across the farm.",
-    }
-  }
-  if (pathname.startsWith("/sampling")) {
-    return {
-      title: "Growth Dashboard",
-      description: "Growth sampling trends, biomass progress, and harvest-readiness indicators.",
-    }
-  }
-  if (pathname.startsWith("/feed")) {
-    return {
-      title: "Feed Management Dashboard",
-      description: "Model-guided feed planning, actual feed execution, feeding response, and feed-risk alerts.",
-    }
-  }
-  if (pathname.startsWith("/water-quality")) {
-    const tabDescriptions: Record<string, string> = {
-      overview: "Farm-wide quality status, alerts, and system health at a glance.",
-      parameter: "Parameter trends with feeding and mortality overlays for deeper analysis.",
-      environment: "Environmental indicators and system-level water quality exposure.",
-      depth: "Stratification and depth-profile analysis across the water column.",
-      alerts: "Current risk conditions, emerging issues, and threshold-based alerts.",
-      sensors: "Sensor coverage, freshness, and operational status by system.",
-    }
-
-    return {
-      title: "Water Quality Dashboard",
-      description: tabDescriptions[tab ?? "overview"] ?? tabDescriptions.overview,
-    }
-  }
-  if (pathname.startsWith("/production")) {
-    return {
-      title: "Production",
-      description: "System-level production trends with snapshot-safe reporting across the selected period.",
-    }
-  }
-  if (pathname.startsWith("/reports")) {
-    return {
-      title: "Reports",
-      description: "Exports, compliance, and period summaries without inferring fake production dates.",
-    }
-  }
-  if (pathname.startsWith("/actions")) {
-    return {
-      title: "Recommended Actions",
-      description: "Operational priorities generated from recent farm signals.",
-    }
-  }
-  if (pathname.startsWith("/settings")) {
-    return {
-      title: "Settings",
-      description: "Manage farm configuration, alert thresholds, and workspace preferences.",
-    }
-  }
-  return null
+  return trimmed
+    .replace(/\s*\(\s*split\s+[^)]+\)$/i, "")
+    .replace(/\s*[-/|]\s*split\s+.+$/i, "")
+    .replace(/\s+split\s+.+$/i, "")
+    .trim()
 }
 
 function FilterChip({
@@ -165,34 +76,36 @@ function FilterChip({
   onDelete: () => void
 }) {
   return (
-    <Chip
-      size="small"
-      label={label}
-      onDelete={onDelete}
-      deleteIcon={<X size={12} />}
-      sx={{
-        borderRadius: 999,
-        bgcolor: "color-mix(in srgb, var(--color-primary) 10%, transparent)",
-        color: "primary.main",
-        "& .MuiChip-deleteIcon": {
-          color: "inherit",
-          "&:hover": {
-            color: "inherit",
-          },
-        },
-      }}
-    />
+    <span className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] px-2.5 py-1 text-xs font-medium text-primary">
+      {label}
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`Remove ${label} filter`}
+        className="inline-flex size-4 items-center justify-center rounded-full text-current hover:opacity-70"
+      >
+        <X size={12} />
+      </button>
+    </span>
   )
 }
 
 export default function Header({
   initialFarmId,
   initialFarmName,
+  roleOverride,
+  systemOptionsOverride,
+  batchOptionsOverride,
+  timeBoundsOverride,
   onMenuClick,
   showToolbar = true,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
+  roleOverride?: string | null
+  systemOptionsOverride?: SystemOption[]
+  batchOptionsOverride?: BatchOption[]
+  timeBoundsOverride?: TimeBounds
   onMenuClick: () => void
   showToolbar?: boolean
 }) {
@@ -202,7 +115,7 @@ export default function Header({
   const appPathname = stripDashboardPath(pathname)
   const searchParams = useSearchParams()
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
-  const activeFarmRoleQuery = useActiveFarmRole(farmId)
+  const activeFarmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
   const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
   const [signingOut, setSigningOut] = useState(false)
   const [isCondensed, setIsCondensed] = useState(false)
@@ -211,9 +124,9 @@ export default function Header({
   const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null)
   const [addDataAnchor, setAddDataAnchor] = useState<HTMLElement | null>(null)
 
-  const pageMeta = getPageMeta(appPathname, searchParams.get("tab"))
-  const pageTimeConfig = useMemo(() => getPageTimeConfig(appPathname), [appPathname])
-  const resolvedRole = (activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
+  const pageMeta = getHeaderPageMeta(appPathname, searchParams.get("tab"))
+  const pageTimeConfig = useMemo(() => getHeaderPageTimeConfig(appPathname), [appPathname])
+  const resolvedRole = (roleOverride ?? activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const resolvedUser = user ?? null
   const resolvedUnreadCount = unreadCount ?? 0
   const canAccessSettings = resolvedRole === "admin" || resolvedRole === "farm_manager"
@@ -225,29 +138,37 @@ export default function Header({
     isWaterQualityPage && isWqParameter(searchParams.get("parameter"))
       ? (searchParams.get("parameter") as WqParameter)
       : DEFAULT_WQ_PARAMETER
-  const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
+  const batchesQuery = useBatchOptions(
+    farmId && !batchOptionsOverride
+      ? { farmId }
+      : undefined,
+  )
   const systemsQuery = useSystemOptions(
-    farmId ? { farmId, activeOnly: appPathname.startsWith("/feed") ? false : true } : undefined,
+    farmId
+      ? {
+          farmId,
+          activeOnly: appPathname.startsWith("/feed") ? false : true,
+          enabled: !systemOptionsOverride,
+        }
+      : undefined,
   )
   const allSystemsForChips = useMemo(
-    () => (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
-    [systemsQuery.data],
+    () => systemOptionsOverride ?? (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
+    [systemOptionsOverride, systemsQuery.data],
   )
   const allBatchesForChips = useMemo(
-    () => (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []),
-    [batchesQuery.data],
+    () => batchOptionsOverride ?? (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []),
+    [batchOptionsOverride, batchesQuery.data],
   )
-  const rawPeriodParam = searchParams.get("period")
+  const rawPeriodParam = searchParams.get("date")
 
-  // Custom date range (aquasmart-main / v2 design): same URL param as
-  // presets, encoded as `custom_YYYY-MM-DD_YYYY-MM-DD`.
   const customTimeRange = useMemo(
     () => parseCustomPeriodUrlValue(rawPeriodParam),
     [rawPeriodParam],
   )
 
   const sharedFilterInitialValues = useMemo<Partial<SharedFiltersState> | undefined>(() => {
-    const hasFilterParams = ["cage", "system", "batch", "stage", "period"].some((key) => searchParams.get(key) != null)
+    const hasFilterParams = ["cage", "system", "batch", "stage", "date"].some((key) => searchParams.get(key) != null)
     if (!hasFilterParams) return undefined
     const cageParam = searchParams.get("cage") ?? searchParams.get("system")
     const selectedSystemId = resolveSystemIdFromFilterValue(cageParam, allSystemsForChips)
@@ -277,8 +198,6 @@ export default function Header({
               getSystemFilterUrlValue(
                 allSystemsForChips.find((item) => String(item.id) === sharedFilterInitialValues.selectedSystem),
               ) ?? sharedFilterInitialValues.selectedSystem,
-            // Preserve the custom range token in the URL instead of
-            // rewriting it to the fallback preset.
             timePeriod: customTimeRange
               ? toCustomPeriodUrlValue(customTimeRange)
               : toTimePeriodUrlValue(sharedFilterInitialValues.timePeriod ?? defaultPeriod),
@@ -307,19 +226,22 @@ export default function Header({
     systemId: pageTimeConfig.useSystemBounds ? selectedSystemId : undefined,
     batchId: selectedBatchId,
     scope: pageTimeConfig.scope,
-    enabled: showToolbar,
+    enabled: showToolbar && !timeBoundsOverride,
   })
+  const resolvedTimeBounds = timeBoundsOverride ?? timeWindowBoundsQuery.data
   const timeWindowSummary = useMemo(
     () =>
       customTimeRange
         ? `${formatCustomRangeLabel(customTimeRange)} (Custom)`
-        : formatResolvedTimeWindow(timePeriod, timeWindowBoundsQuery.start, timeWindowBoundsQuery.end),
-    [customTimeRange, timePeriod, timeWindowBoundsQuery.end, timeWindowBoundsQuery.start],
+        : formatResolvedTimeWindow(timePeriod, resolvedTimeBounds.start, resolvedTimeBounds.end),
+    [customTimeRange, resolvedTimeBounds.end, resolvedTimeBounds.start, timePeriod],
   )
 
   const selectedBatchAgeDays = useMemo(() => {
     if (selectedBatch === "all") return null
-    const deliveryDate = allBatchesForChips.find((item) => String(item.id) === selectedBatch)?.date_of_delivery
+    const match = allBatchesForChips.find((item) => String(item.id) === selectedBatch)
+    if (!match) return null
+    const deliveryDate = match.date_of_delivery
     if (!deliveryDate) return null
     const [year, month, day] = deliveryDate.split("-").map(Number)
     if (!year || !month || !day) return null
@@ -342,7 +264,8 @@ export default function Header({
     if (!pageTimeConfig.showBatchFilter) return null
     if (selectedBatch === "all") return null
     const batch = allBatchesForChips.find((item) => String(item.id) === selectedBatch)
-    return batch?.label ?? null
+    const label = batch?.label ?? null
+    return normalizeBatchDisplayLabel(label) || label || null
   }, [allBatchesForChips, pageTimeConfig.showBatchFilter, selectedBatch])
 
   const activeStageLabel = useMemo(() => {
@@ -385,8 +308,7 @@ export default function Header({
       const system = allSystemsForChips.find((item) => String(item.id) === nextSystem)
       params.set("system", getSystemFilterUrlValue(system) || nextSystem)
       params.delete("cage")
-    }
-    else {
+    } else {
       params.delete("cage")
       params.delete("system")
     }
@@ -397,13 +319,12 @@ export default function Header({
     if (nextStage !== "all") params.set("stage", nextStage)
     else params.delete("stage")
 
-    // Keep an active custom range unless this change explicitly picks a preset.
     if (next.timePeriod == null && customTimeRange) {
       const customValue = toCustomPeriodUrlValue(customTimeRange)
-      params.set("period", customValue)
+      params.set("date", customValue)
     } else {
       const nextPeriodValue = toTimePeriodUrlValue(nextPeriod)
-      params.set("period", nextPeriodValue)
+      params.set("date", nextPeriodValue)
     }
 
     if (isWaterQualityPage) {
@@ -448,13 +369,11 @@ export default function Header({
     replaceFilterParams({ timePeriod: value })
   }, [replaceFilterParams, setTimePeriod])
 
-  // Custom range (aquasmart-main / v2 design): writes the whole range into
-  // the same `period` URL param as `custom_from_to`.
   const handleCustomRangeChange = useCallback(
     (range: CustomTimeRange) => {
       const params = new URLSearchParams(searchParams.toString())
       const customValue = toCustomPeriodUrlValue(range)
-      params.set("period", customValue)
+      params.set("date", customValue)
       const nextQuery = params.toString()
       if (nextQuery === searchParams.toString()) return
       router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
@@ -502,7 +421,20 @@ export default function Header({
       .join(" ")
   }
 
+  // Auth state resolves client-side only (see AuthProvider), so the very first
+  // client render can already have `user` populated while the server render
+  // never does. Gate the initial-dependent render behind a mounted flag so
+  // both the server HTML and the client's first hydration pass agree (both
+  // render nothing), avoiding a hydration mismatch on the avatar text node.
+  const hasMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
+
   const userInitial = useMemo(() => {
+    if (!hasMounted) return ""
+
     const nameCandidate = [
       resolvedUser?.user_metadata?.first_name,
       resolvedUser?.user_metadata?.full_name,
@@ -512,7 +444,7 @@ export default function Header({
 
     const firstToken = nameCandidate?.trim().split(/[\s@._-]+/).find(Boolean) ?? ""
     return firstToken.charAt(0).toUpperCase() || ""
-  }, [resolvedUser?.email, resolvedUser?.user_metadata])
+  }, [hasMounted, resolvedUser?.email, resolvedUser?.user_metadata])
 
   const displayName = useMemo(() => {
     return (
@@ -556,143 +488,93 @@ export default function Header({
   }
 
   const clearAllFilters = () => {
-    handleSystemChange("all")
-    handleBatchChange("all")
-    handleStageChange("all")
-    if (isWaterQualityPage) {
-      handleWaterQualityParameterChange(DEFAULT_WQ_PARAMETER)
-    }
+    // Update local state directly and issue a single combined URL replace.
+    // Calling handleSystemChange/handleBatchChange/handleStageChange back to
+    // back here would fire three separate replaceFilterParams() calls in the
+    // same tick, each closing over the *same* stale selectedSystem/selectedBatch/
+    // selectedStage values (React hasn't re-rendered between them yet) — the
+    // last router.replace() wins and silently reintroduces the filters the
+    // earlier calls thought they'd just cleared, leaving the dashboard's data
+    // stuck on the pre-clear filter set even though the dropdowns show "All".
+    setSelectedSystem("all")
+    setSelectedBatch("all")
+    setSelectedStage("all")
+    replaceFilterParams({
+      selectedSystem: "all",
+      selectedBatch: "all",
+      selectedStage: "all",
+      ...(isWaterQualityPage ? { selectedParameter: DEFAULT_WQ_PARAMETER } : {}),
+    })
   }
 
   return (
-    <Box component="header" sx={{ position: "relative", px: { xs: 0.75, sm: 1.5, md: 2 }, pt: { xs: 0.5, md: 0.75 } }}>
-      <Paper
-        elevation={0}
-        sx={{
-          borderRadius: 1,
-          px: { xs: 1, sm: 1.5, md: 2 },
-          py: isCondensed ? 1 : 1.25,
-          backgroundColor: "background.paper",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-          boxShadow: "none",
-          transition: (theme) =>
-            theme.transitions.create(["padding"], {
-              duration: theme.transitions.duration.standard,
-            }),
-        }}
+    <header className="relative px-3 pt-1.5 sm:px-6 sm:pt-2 md:px-8 md:pt-3 lg:px-12">
+      <div
+        className={cn(
+          "mx-auto max-w-[1640px] px-4 transition-[padding] duration-300 md:px-8",
+          isCondensed ? "py-2" : "py-2.5",
+        )}
       >
-        <Box sx={{ display: "grid", gap: showToolbar ? 1.25 : 0 }}>
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "space-between", flexWrap: "nowrap" }}>
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center", minWidth: 0, flex: 1 }}>
-              <IconButton
+        <div className={cn("grid", showToolbar ? "gap-3" : "gap-0")}>
+          <div className="flex flex-nowrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <button
+                type="button"
                 onClick={onMenuClick}
                 aria-label="Open navigation"
-                sx={{
-                  display: { md: "none" },
-                  minWidth: 44,
-                  minHeight: 44,
-                  borderRadius: 999,
-                  bgcolor: "transparent",
-                  color: "text.secondary",
-                }}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent md:hidden"
               >
                 <MenuIcon size={20} />
-              </IconButton>
+              </button>
               {pageMeta ? (
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography
-                    variant="h4"
-                    sx={{
-                      fontSize: isCondensed ? { xs: "1.15rem", sm: "1.35rem" } : { xs: "1.35rem", sm: "1.8rem" },
-                      fontWeight: 700,
-                      lineHeight: 1.15,
-                      overflowWrap: "anywhere",
-                    }}
+                <div className="min-w-0">
+                  <h1
+                    className={cn(
+                      "overflow-wrap-anywhere font-bold leading-[1.15] text-foreground",
+                      isCondensed ? "text-[1.15rem] sm:text-[1.35rem]" : "text-[1.35rem] sm:text-[1.8rem]",
+                    )}
                   >
                     {pageMeta.title}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mt: 0.35, fontWeight: 500 }}
-                  >
-                    {timeWindowSummary}
-                  </Typography>
-                </Box>
+                  </h1>
+                  <p className="mt-1 block text-xs font-medium text-muted-foreground">{timeWindowSummary}</p>
+                </div>
               ) : null}
-            </Box>
-            <Box
-              sx={{
-                display: "flex",
-                gap: 0.5,
-                alignItems: "center",
-                flexWrap: "wrap",
-                justifyContent: "flex-end",
-                borderRadius: 999,
-                bgcolor: "transparent",
-              }}
-            >
-              <Tooltip title="Notifications">
-                <IconButton
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-1.5 rounded-full">
+              <Tooltip content="Notifications">
+                <button
+                  type="button"
                   onClick={openMenu((value) => {
                     if (value) markAllRead()
                     setNotificationsAnchor(value)
                   })}
-                  sx={{
-                    minWidth: 44,
-                    minHeight: 44,
-                    borderRadius: 999,
-                    color: "text.secondary",
-                    bgcolor: "transparent",
-                  }}
+                  className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
-                  <Badge badgeContent={resolvedUnreadCount > 9 ? "9+" : resolvedUnreadCount} color="error" invisible={resolvedUnreadCount === 0}>
-                    <Bell size={18} />
-                  </Badge>
-                </IconButton>
+                  <Bell size={18} />
+                  {resolvedUnreadCount > 0 ? (
+                    <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground">
+                      {resolvedUnreadCount > 9 ? "9+" : resolvedUnreadCount}
+                    </span>
+                  ) : null}
+                </button>
               </Tooltip>
-              <Tooltip title="Account">
-                <IconButton
+              <Tooltip content="Account">
+                <button
+                  type="button"
                   onClick={openMenu(setUserMenuAnchor)}
-                  sx={{
-                    p: 0.25,
-                    minWidth: 44,
-                    minHeight: 44,
-                    borderRadius: 999,
-                    bgcolor: "transparent",
-                  }}
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-0.5 hover:bg-accent"
                 >
-                  <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 700 }}>
-                    {userInitial}
-                  </Avatar>
-                </IconButton>
+                  <Avatar className="size-[34px]">{userInitial}</Avatar>
+                </button>
               </Tooltip>
-            </Box>
-          </Box>
+            </div>
+          </div>
 
           {showToolbar ? (
-            <Box sx={{ display: "grid", gap: 1 }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: { xs: "column", md: "row" },
-                  gap: 1,
-                  alignItems: { xs: "stretch", md: "center" },
-                  justifyContent: "space-between",
-                }}
-              >
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", minWidth: 0, flex: 1 }}>
-                  <Box sx={{ minWidth: { xs: "100%", sm: 210, md: 210 }, flexShrink: 0 }}>
-                    <TimePeriodSelector
-                      selectedPeriod={timePeriod}
-                      onPeriodChange={handleTimePeriodChange}
-                      customRange={customTimeRange}
-                      onCustomRangeChange={handleCustomRangeChange}
-                      variant="compact"
-                      periods={timePeriodOptions}
-                    />
-                  </Box>
-                  <Box sx={{ display: { xs: "none", md: "block" }, minWidth: 0, flex: 1 }}>
+            <div className="grid gap-2">
+              <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+                  <div className="hidden min-w-0 flex-1 md:block">
                     <FarmSelector
                       initialFarmId={initialFarmId}
                       selectedBatch={selectedBatch}
@@ -708,57 +590,56 @@ export default function Header({
                       variant="compact"
                       layout="row"
                     />
-                  </Box>
+                  </div>
                   {isWaterQualityPage ? (
-                    <Box sx={{ display: { xs: "none", md: "block" }, minWidth: 170 }}>
+                    <div className="hidden min-w-[170px] md:block">
                       <FilterPopover
-                        label="Parameter"
+                        label={undefined}
                         value={selectedParameter}
                         options={waterQualityParameterOptions}
                         placeholder="Select parameter"
                         onChange={handleWaterQualityParameterChange}
-                        triggerSx={{ width: 170 }}
+                        className="w-[170px]"
                       />
-                    </Box>
+                    </div>
                   ) : null}
-                  <Box sx={{ display: { xs: "flex", md: "none" }, flex: 1 }}>
+                  <div className="flex flex-1 md:hidden">
                     <Button
                       variant="text"
-                      fullWidth
                       onClick={() => setMobileFiltersOpen(true)}
-                      sx={{
-                        minHeight: 40,
-                        borderRadius: 1.5,
-                        bgcolor: "var(--accent)",
-                        color: "var(--foreground)",
-                      }}
+                      className="min-h-10 w-full rounded-lg bg-accent text-foreground"
                     >
                       Filters
                     </Button>
-                  </Box>
-                </Box>
-                {showAddData ? (
-                  <Box sx={{ width: { xs: "100%", sm: "auto" }, ml: { md: "auto" } }}>
+                  </div>
+                </div>
+                <div className="flex w-full flex-col gap-2 md:ml-auto md:w-auto md:flex-row md:items-center md:justify-end">
+                  <div className="w-full shrink-0 md:w-[170px]">
+                    <TimePeriodSelector
+                      selectedPeriod={timePeriod}
+                      onPeriodChange={handleTimePeriodChange}
+                      label={undefined}
+                      customRange={customTimeRange}
+                      onCustomRangeChange={handleCustomRangeChange}
+                      variant="compact"
+                      periods={timePeriodOptions}
+                    />
+                  </div>
+                  {showAddData ? (
                     <Button
                       variant="contained"
                       onClick={openMenu(setAddDataAnchor)}
-                      startIcon={<PlusCircle size={18} />}
-                      fullWidth
-                      sx={{
-                        minHeight: 40,
-                        borderRadius: 1.5,
-                        px: 2,
-                        fontWeight: 700,
-                      }}
+                      className="h-10 w-full justify-center rounded-lg px-4 font-bold md:w-auto md:min-w-[140px]"
                     >
+                      <PlusCircle size={18} />
                       Add Data
                     </Button>
-                  </Box>
-                ) : null}
-              </Box>
+                  ) : null}
+                </div>
+              </div>
 
               {hasActiveFilters ? (
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+                <div className="flex flex-wrap items-center gap-2">
                   {activeSystemLabel ? <FilterChip label={`Cage: ${activeSystemLabel}`} onDelete={() => handleSystemChange("all")} /> : null}
                   {activeBatchLabel ? <FilterChip label={`Batch: ${activeBatchLabel}`} onDelete={() => handleBatchChange("all")} /> : null}
                   {activeStageLabel ? <FilterChip label={`Stage: ${activeStageLabel}`} onDelete={() => handleStageChange("all")} /> : null}
@@ -768,105 +649,65 @@ export default function Header({
                       onDelete={() => handleWaterQualityParameterChange(DEFAULT_WQ_PARAMETER)}
                     />
                   ) : null}
-                  <Button variant="text" size="small" onClick={clearAllFilters} sx={{ minWidth: 0, px: 0.5 }}>
+                  <Button variant="text" size="sm" onClick={clearAllFilters} className="min-w-0 px-1">
                     Clear all
                   </Button>
-                </Box>
+                </div>
               ) : null}
-            </Box>
+            </div>
           ) : null}
-        </Box>
-      </Paper>
+        </div>
+      </div>
 
-      <Menu
-        anchorEl={notificationsAnchor}
-        open={Boolean(notificationsAnchor)}
-        onClose={() => setNotificationsAnchor(null)}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        slotProps={{ paper: { sx: { width: { xs: "calc(100vw - 24px)", sm: 340 }, maxWidth: 340, mt: 1 } } }}
-      >
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            Notifications
-          </Typography>
-        </Box>
-        <Divider />
-        <Box sx={{ maxHeight: 320, overflowY: "auto", py: 1 }}>
+      <Menu anchorEl={notificationsAnchor} open={Boolean(notificationsAnchor)} onClose={() => setNotificationsAnchor(null)} className="mt-1 w-[calc(100vw-24px)] sm:w-[340px]">
+        <div className="px-4 py-3">
+          <p className="text-sm font-bold">Notifications</p>
+        </div>
+        <Separator />
+        <div className="max-h-80 overflow-y-auto py-1">
           {notifications.length === 0 ? (
-            <Box sx={{ px: 2, py: 3 }}>
-              <Typography variant="body2" color="text.secondary" align="center">
-                No New Notifications
-              </Typography>
-            </Box>
+            <div className="px-4 py-6">
+              <p className="text-center text-sm text-muted-foreground">No New Notifications</p>
+            </div>
           ) : (
             notifications.map((note) => (
-              <MenuItem
+              <button
                 key={note.id}
+                type="button"
                 onClick={() => markRead(note.id)}
-                sx={{
-                  alignItems: "flex-start",
-                  whiteSpace: "normal",
-                  mx: 1,
-                  my: 0.25,
-                  borderRadius: 2,
-                  border: note.read
-                    ? "1px solid color-mix(in srgb, var(--color-border) 50%, transparent)"
-                    : "1px solid color-mix(in srgb, var(--color-primary) 35%, transparent)",
-                  bgcolor: note.read ? "transparent" : "color-mix(in srgb, var(--color-primary) 5%, transparent)",
-                }}
+                className={cn(
+                  "mx-1 my-0.5 block w-[calc(100%-0.5rem)] rounded-lg border px-3 py-2.5 text-left transition-colors",
+                  note.read
+                    ? "border-[color-mix(in_srgb,var(--color-border)_50%,transparent)]"
+                    : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_5%,transparent)]",
+                )}
               >
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {note.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-                    {note.description}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                    {formatStableDateTime(note.createdAt)}
-                  </Typography>
-                </Box>
-              </MenuItem>
+                <p className="text-sm font-bold">{note.title}</p>
+                <p className="mt-1 block text-xs text-muted-foreground">{note.description}</p>
+                <p className="mt-2 block text-xs text-muted-foreground">{formatStableDateTime(note.createdAt)}</p>
+              </button>
             ))
           )}
-        </Box>
-        <Divider />
-        <MenuItem onClick={clearAll} sx={{ justifyContent: "center", fontWeight: 700 }}>
+        </div>
+        <Separator />
+        <MenuItem onClick={clearAll} className="mx-1 justify-center font-bold">
           Clear notifications
         </MenuItem>
       </Menu>
 
-      <Menu
-        anchorEl={userMenuAnchor}
-        open={Boolean(userMenuAnchor)}
-        onClose={() => setUserMenuAnchor(null)}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        slotProps={{ paper: { sx: { width: 240, mt: 1 } } }}
-      >
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>
-            {displayName}
-          </Typography>
+      <Menu anchorEl={userMenuAnchor} open={Boolean(userMenuAnchor)} onClose={() => setUserMenuAnchor(null)} className="mt-1 w-60">
+        <div className="px-4 py-3">
+          <p className="text-sm font-bold">{displayName}</p>
           {resolvedUser?.email && displayName !== resolvedUser.email ? (
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-              {resolvedUser.email}
-            </Typography>
+            <p className="mt-1 block text-xs text-muted-foreground">{resolvedUser.email}</p>
           ) : null}
-          {resolvedRole ? (
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
-              {formatRole(resolvedRole)}
-            </Typography>
-          ) : null}
-        </Box>
-        <Divider />
+          {resolvedRole ? <p className="mt-0.5 block text-xs text-muted-foreground">{formatRole(resolvedRole)}</p> : null}
+        </div>
+        <Separator />
         {canAccessSettings ? (
-          <MenuItem component={Link} href={toDashboardPath("/settings")} onClick={() => setUserMenuAnchor(null)}>
-            <ListItemIcon>
-              <Settings size={16} />
-            </ListItemIcon>
-            <ListItemText>Settings</ListItemText>
+          <MenuItem href={toDashboardPath("/settings")} onClick={() => setUserMenuAnchor(null)}>
+            <Settings size={16} />
+            Settings
           </MenuItem>
         ) : null}
         <MenuItem
@@ -875,39 +716,26 @@ export default function Header({
             await handleSignOut()
           }}
           disabled={signingOut}
-          sx={{ color: "error.main" }}
+          destructive
         >
-          <ListItemIcon sx={{ color: "inherit" }}>
-            <LogOut size={16} />
-          </ListItemIcon>
-          <ListItemText>{signingOut ? "Logging out..." : "Log out"}</ListItemText>
+          <LogOut size={16} />
+          {signingOut ? "Logging out..." : "Log out"}
         </MenuItem>
       </Menu>
 
-      <Menu
-        anchorEl={addDataAnchor}
-        open={Boolean(addDataAnchor)}
-        onClose={() => setAddDataAnchor(null)}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        slotProps={{ paper: { sx: { width: 240, mt: 1 } } }}
-      >
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            Quick Entry
-          </Typography>
-        </Box>
-        <Divider />
+      <Menu anchorEl={addDataAnchor} open={Boolean(addDataAnchor)} onClose={() => setAddDataAnchor(null)} className="mt-1 w-60">
+        <div className="px-4 py-3">
+          <p className="text-sm font-bold">Quick Entry</p>
+        </div>
+        <Separator />
         <MenuItem
           onClick={() => {
             setAddDataAnchor(null)
             router.push(`${DATA_ENTRY_PATH}?type=feeding${systemParam}${batchParam}`)
           }}
         >
-          <ListItemIcon>
-            <Fish size={16} />
-          </ListItemIcon>
-          <ListItemText>Record Feeding</ListItemText>
+          <Fish size={16} />
+          Record Feeding
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -915,10 +743,8 @@ export default function Header({
             router.push(`${DATA_ENTRY_PATH}?type=sampling${systemParam}${batchParam}`)
           }}
         >
-          <ListItemIcon>
-            <FlaskConical size={16} />
-          </ListItemIcon>
-          <ListItemText>Record Sampling</ListItemText>
+          <FlaskConical size={16} />
+          Record Sampling
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -926,46 +752,27 @@ export default function Header({
             router.push(`${DATA_ENTRY_PATH}?type=water_quality${systemParam}`)
           }}
         >
-          <ListItemIcon>
-            <Droplets size={16} />
-          </ListItemIcon>
-          <ListItemText>Record Water Quality</ListItemText>
+          <Droplets size={16} />
+          Record Water Quality
         </MenuItem>
-        <Divider />
+        <Separator />
         <MenuItem
           onClick={() => {
             setAddDataAnchor(null)
             router.push(DATA_ENTRY_PATH)
           }}
         >
-          <ListItemText>View All Entry Types</ListItemText>
+          View All Entry Types
         </MenuItem>
       </Menu>
 
-      <Drawer
-        anchor="bottom"
-        open={mobileFiltersOpen}
-        onClose={() => setMobileFiltersOpen(false)}
-        sx={{
-          "& .MuiDrawer-paper": {
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            px: 0,
-            pb: 2,
-            maxHeight: "85vh",
-          },
-        }}
-      >
-        <Box sx={{ px: 2, py: 2 }}>
-          <Typography variant="h6" sx={{ fontSize: "1rem", fontWeight: 700 }}>
-            Filters
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            Refine the current view.
-          </Typography>
-        </Box>
-        <Divider />
-        <Box sx={{ display: "grid", gap: 1.5, px: 2, py: 2, overflowY: "auto" }}>
+      <Sheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} side="bottom">
+        <div className="px-4 py-4">
+          <h2 className="text-base font-bold">Filters</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">Refine the current view.</p>
+        </div>
+        <Separator />
+        <div className="grid gap-3 overflow-y-auto px-4 py-4">
           <FarmSelector
             initialFarmId={initialFarmId}
             selectedBatch={selectedBatch}
@@ -983,16 +790,16 @@ export default function Header({
           />
           {isWaterQualityPage ? (
             <FilterPopover
-              label="Parameter"
+              label={undefined}
               value={selectedParameter}
               options={waterQualityParameterOptions}
               placeholder="Select parameter"
               onChange={handleWaterQualityParameterChange}
-              triggerSx={{ width: "100%" }}
+              className="w-full"
             />
           ) : null}
-        </Box>
-      </Drawer>
-    </Box>
+        </div>
+      </Sheet>
+    </header>
   )
 }

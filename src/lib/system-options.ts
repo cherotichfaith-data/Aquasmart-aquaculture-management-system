@@ -29,6 +29,17 @@ function buildCompactSystemLabel(unit: string, name: string) {
   return `${unit}${name}`
 }
 
+export function buildPersistedSystemName(unit: string | null | undefined, name: string | null | undefined): string {
+  const trimmedUnit = unit?.trim()
+  const trimmedName = name?.trim()
+
+  if (trimmedUnit && trimmedName) {
+    if (hasDuplicatedUnitPrefix(trimmedUnit, trimmedName)) return trimmedName
+    return `${trimmedUnit}.${trimmedName}`
+  }
+  return trimmedName || trimmedUnit || ""
+}
+
 export function formatSystemOptionLabel(system: Pick<SystemOptionSource, "id" | "name" | "unit">): string {
   const unit = system.unit?.trim()
   const name = system.name?.trim()

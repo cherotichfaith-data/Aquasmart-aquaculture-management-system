@@ -3,11 +3,11 @@
 import { useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import RecommendedActions from "@/features/dashboard/components/recommended-actions"
+import RecommendedActions from "@/features/actions/components/recommended-actions"
 import { SectionHeading } from "@/components/shared/section-heading"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
-import { parseDashboardStageParam } from "@/features/dashboard/components/dashboard-page-utils"
+import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveTimePeriod } from "@/lib/time-period"
 
 export default function ActionsPage({
@@ -23,8 +23,8 @@ export default function ActionsPage({
     () => ({
       selectedBatch: searchParams.get("batch") ?? "all",
       selectedSystem: systemParam ?? "all",
-      selectedStage: parseDashboardStageParam(searchParams.get("stage")),
-      timePeriod: resolveTimePeriod(searchParams.get("period"), "month"),
+      selectedStage: normalizeStageFilter(searchParams.get("stage")),
+      timePeriod: resolveTimePeriod(searchParams.get("date"), "month"),
     }),
     [searchParams, systemParam],
   )

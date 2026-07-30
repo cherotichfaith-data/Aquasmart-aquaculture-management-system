@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { cacheTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { requireRateLimitedSessionRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { GROWTH_STAGE_VALUES } from "@/lib/stage-filter"
@@ -33,7 +33,7 @@ function isDuplicateSystemNameError(error: unknown) {
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const auth = await requireRateLimitedSessionRouteUser(supabase, request, "system:record", apiRateLimits.mutation)
+  const auth = await requireRateLimitedRouteUser(supabase, request, "system:record", apiRateLimits.mutation)
   if ("response" in auth) return auth.response
 
   let payload: z.infer<typeof systemSchema>

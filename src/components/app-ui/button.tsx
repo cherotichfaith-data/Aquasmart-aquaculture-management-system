@@ -1,7 +1,4 @@
-import MuiButton from "@mui/material/Button"
-import type { ButtonProps as MuiButtonProps } from "@mui/material/Button"
-import IconButton from "@mui/material/IconButton"
-import type { IconButtonProps } from "@mui/material/IconButton"
+import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
@@ -28,48 +25,35 @@ type ButtonSize =
   | "large"
 
 const buttonVariants = ({
+  variant = "default",
   size = "default",
   className,
 }: {
+  variant?: ButtonVariant | null
   size?: ButtonSize | null
   className?: string
 }) =>
   cn(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none",
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    (variant === "default" || variant === "contained") && "bg-primary text-primary-foreground hover:bg-primary/90",
+    variant === "destructive" && "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+    variant === "secondary" && "bg-secondary text-secondary-foreground hover:bg-secondary/90",
+    (variant === "outline" || variant === "outlined") && "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+    (variant === "ghost" || variant === "text") && "text-foreground hover:bg-accent hover:text-accent-foreground",
+    variant === "link" && "h-auto px-0 py-0 text-primary underline-offset-4 hover:underline",
+    (size === "default" || size === "medium") && "h-10 px-4 py-2",
+    (size === "sm" || size === "small") && "h-9 px-3",
+    (size === "lg" || size === "large") && "h-11 px-8",
     size === "icon" && "size-9",
     size === "icon-sm" && "size-8",
     size === "icon-lg" && "size-10",
     className,
   )
 
-type ButtonProps = Omit<MuiButtonProps, "variant" | "size" | "color"> & {
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant
   size?: ButtonSize
   asChild?: boolean
-}
-
-function resolveButtonVariant(variant: ButtonVariant | undefined): MuiButtonProps["variant"] {
-  if (variant === "outline" || variant === "outlined") return "outlined"
-  if (variant === "ghost" || variant === "link" || variant === "text") return "text"
-  return "contained"
-}
-
-function resolveButtonColor(variant: ButtonVariant | undefined): MuiButtonProps["color"] {
-  if (variant === "destructive") return "error"
-  if (variant === "secondary") return "secondary"
-  return "primary"
-}
-
-function resolveButtonSize(size: ButtonSize | undefined): MuiButtonProps["size"] {
-  if (size === "sm" || size === "small") return "small"
-  if (size === "lg" || size === "large") return "large"
-  return "medium"
-}
-
-function resolveIconButtonSize(size: ButtonSize | undefined): IconButtonProps["size"] {
-  if (size === "icon-sm" || size === "sm" || size === "small") return "small"
-  if (size === "icon-lg" || size === "lg" || size === "large") return "large"
-  return "medium"
 }
 
 function Button({
@@ -82,7 +66,7 @@ function Button({
   ...props
 }: ButtonProps) {
   const normalizedDisabled = disabled === true
-  const normalizedClassName = cn(buttonVariants({ size, className }), "cursor-pointer")
+  const normalizedClassName = cn(buttonVariants({ variant, size, className }), "cursor-pointer")
 
   if (asChild) {
     return (
@@ -92,69 +76,16 @@ function Button({
     )
   }
 
-  const isIconOnly = size === "icon" || size === "icon-sm" || size === "icon-lg"
-
-  if (isIconOnly) {
-    const iconProps = props as Omit<IconButtonProps, "color" | "size">
-    return (
-      <IconButton
-        data-slot="button"
-        color={resolveButtonColor(variant)}
-        size={resolveIconButtonSize(size)}
-        disabled={normalizedDisabled}
-        className={normalizedClassName}
-        sx={{
-          borderRadius: 1,
-          color: variant === "ghost" ? "text.primary" : undefined,
-          bgcolor: variant === "secondary" ? "secondary.main" : undefined,
-          ...(variant === "outline" || variant === "outlined"
-            ? {
-                border: (theme) => `1px solid ${theme.palette.divider}`,
-              }
-            : null),
-          ...iconProps.sx,
-        }}
-        {...iconProps}
-      >
-        {children}
-      </IconButton>
-    )
-  }
-
   return (
-    <MuiButton
+    <button
       data-slot="button"
-      color={resolveButtonColor(variant)}
-      variant={resolveButtonVariant(variant)}
-      size={resolveButtonSize(size)}
+      type={props.type ?? "button"}
       disabled={normalizedDisabled}
       className={normalizedClassName}
-      sx={{
-        borderRadius: 1,
-        textTransform: "none",
-        boxShadow: "none",
-        ...(variant === "link"
-          ? {
-              p: 0,
-              minWidth: 0,
-              textDecoration: "underline",
-              textUnderlineOffset: "4px",
-            }
-          : null),
-        ...(variant === "ghost"
-          ? {
-              color: "text.primary",
-              "&:hover": {
-                bgcolor: "action.hover",
-              },
-            }
-          : null),
-        ...props.sx,
-      }}
       {...props}
     >
       {children}
-    </MuiButton>
+    </button>
   )
 }
 

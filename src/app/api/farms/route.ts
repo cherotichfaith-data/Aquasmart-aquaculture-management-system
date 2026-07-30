@@ -1,9 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod"
+import { requireApiUser } from "@/lib/server/auth"
 import { loadWorkspaceFarmsForUser } from "@/lib/server/workspace"
-import { createClient } from "@/lib/supabase/server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
-import { getSessionIdentity } from "@/lib/supabase/session"
 
 const farmsQuerySchema = z.object({
   orgId: z.string().uuid(),
@@ -16,18 +15,11 @@ async function loadFarmsForOrganization(orgId: string) {
     return NextResponse.json({ error: "Organization is required." }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const auth = await requireApiUser("api:farms")
+  if ("response" in auth) return auth.response
 
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-    const session = sessionData.session
-    const identity = getSessionIdentity(session?.access_token)
-
-    if (sessionError || !identity) {
-      return NextResponse.json({ error: "Session unavailable." }, { status: 401 })
-    }
-
-    const farms = await loadWorkspaceFarmsForUser(identity.userId, parseResult.data.orgId, session?.access_token)
+    const farms = await loadWorkspaceFarmsForUser(auth.user.id, parseResult.data.orgId, auth.accessToken)
 
     return NextResponse.json(farms, {
       headers: {

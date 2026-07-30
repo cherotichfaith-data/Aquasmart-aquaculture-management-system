@@ -1,12 +1,6 @@
 import type { Database } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
-import {
-  getClientOrError,
-  isAbortLikeError,
-  queryKpiRpc,
-  toQueryError,
-  toQuerySuccess,
-} from "@/lib/supabase/query-transport"
+import { fetchRpc, toQuerySuccess } from "@/lib/supabase/query-transport"
 
 type FeedDashboardKpisRow = Database["public"]["Functions"]["api_feed_dashboard_kpis"]["Returns"][number]
 type FeedPlanVsActualRow = Database["public"]["Functions"]["api_feed_plan_vs_actual"]["Returns"][number]
@@ -17,8 +11,6 @@ type FeedingResponseDistributionRow =
   Database["public"]["Functions"]["api_feeding_response_distribution"]["Returns"][number]
 type FeedVsBiomassGainRow = Database["public"]["Functions"]["api_feed_vs_biomass_gain"]["Returns"][number]
 type FeedingAlertRow = Database["public"]["Functions"]["api_feeding_alerts"]["Returns"][number]
-
-const isQuietError = (err: unknown): boolean => isAbortLikeError(err)
 
 const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
 
@@ -59,20 +51,7 @@ async function queryFeedRpc<Row>(
 ): Promise<QueryResult<Row>> {
   if (!params?.farmId) return empty<Row>()
 
-  const clientResult = await getClientOrError(`feed-management:${rpcName}`, { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = queryKpiRpc(supabase, rpcName, buildScopedArgs(params))
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (isQuietError(error)) return empty<Row>()
-    return toQueryError<Row>(`feed-management:${rpcName}`, error)
-  }
-
-  return toQuerySuccess<Row>((data ?? []) as Row[])
+  return fetchRpc<Row>(`feed-management:${rpcName}`, rpcName, buildScopedArgs(params), params.signal)
 }
 
 export async function getFeedDashboardKpis(params?: {

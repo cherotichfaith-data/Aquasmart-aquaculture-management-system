@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server"
+import { requireApiUser } from "@/lib/server/auth"
 import { loadWorkspaceOrganizationsForUser } from "@/lib/server/workspace"
-import { createClient } from "@/lib/supabase/server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
-import { getSessionIdentity } from "@/lib/supabase/session"
 
 export async function GET() {
-  const supabase = await createClient()
+  const auth = await requireApiUser("api:organizations")
+  if ("response" in auth) return auth.response
 
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-    const session = sessionData.session
-    const identity = getSessionIdentity(session?.access_token)
-
-    if (sessionError || !identity) {
-      return NextResponse.json({ error: "Session unavailable." }, { status: 401 })
-    }
-
-    const organizations = await loadWorkspaceOrganizationsForUser(identity.userId, session?.access_token)
+    const organizations = await loadWorkspaceOrganizationsForUser(auth.user.id, auth.accessToken)
 
     return NextResponse.json(
       { organizations },

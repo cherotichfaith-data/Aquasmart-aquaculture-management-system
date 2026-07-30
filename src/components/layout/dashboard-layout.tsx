@@ -3,15 +3,26 @@
 import type React from "react"
 import { useCallback, useEffect, useMemo, useState, type SetStateAction } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import Box from "@mui/material/Box"
-import Button from "@mui/material/Button"
+import { Button } from "@/components/app-ui/button"
 import { Dialog } from "@/components/app-ui/dialog"
+import { cn } from "@/lib/utils"
 import { SyncStatusBar } from "@/components/offline/sync-status-bar"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { canAccessDataEntry, DATA_ENTRY_PATH, toDashboardPath } from "@/lib/app-entry"
 import Header from "./header"
 import Sidebar, { DASHBOARD_SIDEBAR_COLLAPSED_WIDTH, DASHBOARD_SIDEBAR_WIDTH } from "./sidebar"
+import type { TimeBounds } from "@/lib/time-period"
+import type { SystemOption } from "@/lib/system-options"
+import type { Database } from "@/lib/types/database"
+
+type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
+type HeaderDataOverrides = {
+  role?: string | null
+  systemOptions?: SystemOption[]
+  batchOptions?: BatchOption[]
+  timeBounds?: TimeBounds
+}
 
 export default function DashboardLayout({
   children,
@@ -19,12 +30,14 @@ export default function DashboardLayout({
   showHeaderToolbar = true,
   initialFarmId,
   initialFarmName,
+  headerDataOverrides,
 }: {
   children: React.ReactNode
   hideHeader?: boolean
   showHeaderToolbar?: boolean
   initialFarmId?: string | null
   initialFarmName?: string | null
+  headerDataOverrides?: HeaderDataOverrides
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -71,10 +84,9 @@ export default function DashboardLayout({
   }, [routeToken])
   const commandOpen = commandDraft.sourceToken === routeToken ? commandDraft.value : false
   const mobileSidebarOpen = mobileSidebarDraft.sourceToken === routeToken ? mobileSidebarDraft.value : false
-  const sidebarOpen = isDesktop ? true : mobileSidebarOpen
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
-  const farmRoleQuery = useActiveFarmRole(farmId)
-  const farmRole = (farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
+  const farmRoleQuery = useActiveFarmRole(headerDataOverrides?.role ? null : farmId)
+  const farmRole = (headerDataOverrides?.role ?? farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const allowDataEntry = canAccessDataEntry(farmRole)
 
   useEffect(() => {
@@ -131,11 +143,12 @@ export default function DashboardLayout({
   const desktopOffset = sidebarCollapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+    <div className="min-h-screen bg-background">
       <Sidebar
         initialFarmId={initialFarmId}
         initialFarmName={initialFarmName}
-        open={sidebarOpen}
+        roleOverride={headerDataOverrides?.role ?? null}
+        open={mobileSidebarOpen}
         collapsed={sidebarCollapsed}
         onToggle={() => {
           if (!isDesktop) {
@@ -152,19 +165,10 @@ export default function DashboardLayout({
           })
         }
       />
-      <Box
-        sx={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          overflowX: "hidden",
-          ml: { md: `${desktopOffset}px` },
-          transition: (theme) =>
-            theme.transitions.create("margin-left", {
-              duration: theme.transitions.duration.standard,
-            }),
-        }}
+      <div
         id="app-scroll-root"
+        className="flex min-h-screen flex-col overflow-x-hidden transition-[margin-left] duration-300 md:ml-[var(--dashboard-offset)]"
+        style={{ "--dashboard-offset": `${desktopOffset}px` } as React.CSSProperties}
       >
         {hideHeader ? (
           <SyncStatusBar />
@@ -173,6 +177,10 @@ export default function DashboardLayout({
             <Header
               initialFarmId={initialFarmId}
               initialFarmName={initialFarmName}
+              roleOverride={headerDataOverrides?.role ?? null}
+              systemOptionsOverride={headerDataOverrides?.systemOptions}
+              batchOptionsOverride={headerDataOverrides?.batchOptions}
+              timeBoundsOverride={headerDataOverrides?.timeBounds}
               onMenuClick={() => {
                 if (!isDesktop) {
                   setMobileSidebarOpen((prev) => !prev)
@@ -183,28 +191,24 @@ export default function DashboardLayout({
             <SyncStatusBar />
           </>
         )}
-        <Box
-          component="main"
-          sx={{
-            flex: 1,
-            overflowX: "hidden",
-            px: { xs: 0.75, sm: 1.5, md: 2, lg: 3 },
-            pb: { xs: "calc(1.5rem + env(safe-area-inset-bottom))", md: 4 },
-            pt: hideHeader ? { xs: 0.5, md: 0.75 } : showHeaderToolbar ? { xs: 0.5, md: 0.75 } : 0,
-          }}
+        <main
+          className={cn(
+            "flex-1 overflow-x-hidden px-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 md:px-8 md:pb-16 lg:px-12",
+            hideHeader ? "pt-2 md:pt-3" : showHeaderToolbar ? "pt-2 md:pt-3" : "pt-0",
+          )}
         >
-          <Box sx={{ mx: "auto", width: "100%", maxWidth: 1640 }}>{children}</Box>
-        </Box>
-      </Box>
+          <div className="mx-auto w-full max-w-[1640px]">{children}</div>
+        </main>
+      </div>
       <Dialog
         open={commandOpen}
         onClose={() => setCommandOpen(false)}
         title="Quick Actions"
         description="Jump straight to common tasks."
       >
-        <Box sx={{ display: "grid", gap: 1 }}>
+        <div className="grid gap-2">
           <Button
-            variant="outlined"
+            variant="outline"
             onClick={() => {
               setCommandOpen(false)
               router.push(toDashboardPath("/"))
@@ -215,7 +219,7 @@ export default function DashboardLayout({
           {allowDataEntry ? (
             <>
               <Button
-                variant="outlined"
+                variant="outline"
                 onClick={() => {
                   setCommandOpen(false)
                   router.push(DATA_ENTRY_PATH)
@@ -224,7 +228,7 @@ export default function DashboardLayout({
                 New Data Entry
               </Button>
               <Button
-                variant="outlined"
+                variant="outline"
                 onClick={() => {
                   setCommandOpen(false)
                   router.push(`${DATA_ENTRY_PATH}?type=feeding`)
@@ -233,7 +237,7 @@ export default function DashboardLayout({
                 Record Feeding
               </Button>
               <Button
-                variant="outlined"
+                variant="outline"
                 onClick={() => {
                   setCommandOpen(false)
                   router.push(`${DATA_ENTRY_PATH}?type=sampling`)
@@ -244,7 +248,7 @@ export default function DashboardLayout({
             </>
           ) : null}
           <Button
-            variant="outlined"
+            variant="outline"
             onClick={() => {
               setCommandOpen(false)
               router.push(toDashboardPath("/water-quality"))
@@ -252,8 +256,8 @@ export default function DashboardLayout({
           >
             Water Quality Dashboard
           </Button>
-        </Box>
+        </div>
       </Dialog>
-    </Box>
+    </div>
   )
 }

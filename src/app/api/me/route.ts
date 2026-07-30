@@ -5,9 +5,8 @@ import {
   clearWorkspaceContextCookies,
   normalizeContextValue,
 } from "@/lib/context"
-import { createClient } from "@/lib/supabase/server"
-import { isSbInvalidRefreshToken, isSbNetworkError, logSbError } from "@/lib/supabase/log"
-import { getSessionIdentity, isSessionTokenExpired } from "@/lib/supabase/session"
+import { resolveServerUser } from "@/lib/server/auth"
+import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 
 function clearSupabaseAuthCookies(response: NextResponse, cookieStore: Awaited<ReturnType<typeof cookies>>) {
   cookieStore
@@ -25,35 +24,28 @@ function clearSupabaseAuthCookies(response: NextResponse, cookieStore: Awaited<R
 }
 
 export async function GET() {
-  const supabase = await createClient()
+  const result = await resolveServerUser("api:me")
+
+  if (!result.ok) {
+    if (result.reason === "network") {
+      return NextResponse.json({ error: "Authentication service unavailable." }, { status: 503 })
+    }
+    const cookieStore = await cookies()
+    const response = NextResponse.json({ error: "Session unavailable." }, { status: 401 })
+    clearWorkspaceContextCookies(response)
+    clearSupabaseAuthCookies(response, cookieStore)
+    return response
+  }
+
+  const { user, accessToken, supabase } = result
 
   try {
-    let { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-    let accessToken = sessionData.session?.access_token ?? null
-
-    if (accessToken && isSessionTokenExpired(accessToken)) {
-      const refreshed = await supabase.auth.refreshSession()
-      sessionData = refreshed.data
-      sessionError = refreshed.error
-      accessToken = refreshed.data.session?.access_token ?? null
-    }
-
-    const identity = getSessionIdentity(accessToken)
-
-    if (sessionError || !accessToken || !identity) {
-      const cookieStore = await cookies()
-      const response = NextResponse.json({ error: "Session unavailable." }, { status: 401 })
-      clearWorkspaceContextCookies(response)
-      clearSupabaseAuthCookies(response, cookieStore)
-      return response
-    }
-
     const cookieStore = await cookies()
     const activeFarmId = normalizeContextValue(cookieStore.get(ACTIVE_FARM_COOKIE)?.value)
     const { data: membershipRows } = await supabase
       .from("farm_user")
       .select("farm_id, role, created_at")
-      .eq("user_id", identity.userId)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: true })
 
     const memberships = (membershipRows ?? [])
@@ -74,14 +66,14 @@ export async function GET() {
         activeFarmId: resolvedFarmId,
         memberships,
         user: {
-          id: identity.userId,
-          email: identity.email ?? undefined,
+          id: user.id,
+          email: user.email ?? undefined,
           user_metadata: {
-            ...(identity.userMetadata ?? {}),
+            ...(user.user_metadata ?? {}),
             farm_role: farmRole,
-            farm_id: resolvedFarmId ?? identity.userMetadata?.farm_id,
+            farm_id: resolvedFarmId ?? user.user_metadata?.farm_id,
           },
-          app_metadata: identity.appMetadata,
+          app_metadata: user.app_metadata,
           farm_role: farmRole,
         },
       },
@@ -92,14 +84,6 @@ export async function GET() {
       },
     )
   } catch (error) {
-    if (isSbInvalidRefreshToken(error)) {
-      const cookieStore = await cookies()
-      const response = NextResponse.json({ error: "Session unavailable." }, { status: 401 })
-      clearWorkspaceContextCookies(response)
-      clearSupabaseAuthCookies(response, cookieStore)
-      return response
-    }
-
     if (!isSbNetworkError(error)) {
       logSbError("api:me", error)
     }

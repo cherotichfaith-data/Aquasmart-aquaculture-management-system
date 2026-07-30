@@ -88,14 +88,11 @@ export function buildKpiOverviewFromRpc(params: {
   dateFrom: string
   dateTo: string
 }): KpiOverviewData {
-  if (!params.scopedSystemIds.length) {
-    return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }
-  }
-
-  const scopedSet = new Set(params.scopedSystemIds)
-  const consolidatedRows = params.consolidatedRows.filter(
-    (row) => row.system_id == null || scopedSet.has(row.system_id),
-  )
+  const scopedSet = params.scopedSystemIds.length > 0 ? new Set(params.scopedSystemIds) : null
+  const consolidatedRows =
+    scopedSet
+      ? params.consolidatedRows.filter((row) => row.system_id == null || scopedSet.has(row.system_id))
+      : params.consolidatedRows
 
   if (!consolidatedRows.length) {
     return { metrics: [], dateBounds: { start: params.dateFrom, end: params.dateTo } }

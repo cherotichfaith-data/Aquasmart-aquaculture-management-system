@@ -25,8 +25,10 @@ export type KpiRpcName =
   | "api_feeding_rate_vs_target"
   | "api_feeding_response_distribution"
   | "api_production_summary"
+  | "api_recent_activity_feed"
   | "api_recommended_actions"
   | "api_system_feed_status"
+  | "api_time_period_bounds_scoped"
   | "api_latest_water_quality_status"
   | "api_water_quality_trend"
   | "api_water_quality_index"
@@ -39,7 +41,6 @@ export type OptionsRpcName =
   | "api_farm_options_rpc"
   | "api_system_options_rpc"
   | "api_fingerling_batch_options_rpc"
-  | "api_feed_type_options_rpc"
 
 /**
  * PostgREST views still used in code.
@@ -216,4 +217,47 @@ export async function resolveClientReadQuery<Row>(params: {
   }
 
   return toQueryError<Row>(params.tag, error)
+}
+
+/**
+ * Client-read transport for RPCs, going through the authenticated /api/rpc
+ * proxy instead of calling supabase.rpc(...) directly from the browser.
+ */
+export async function fetchRpc<Row>(
+  tag: string,
+  name: KpiRpcName | OptionsRpcName,
+  args?: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<QueryResult<Row>> {
+  try {
+    const response = await fetch("/api/rpc", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, args: args ?? {} }),
+      signal,
+    })
+    const body = (await response.json().catch(() => ({}))) as QueryResult<Row> | { error?: string }
+
+    if (!response.ok) {
+      const errorMessage =
+        typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
+          ? body.error
+          : "Request failed."
+      const error = new Error(errorMessage)
+      if (signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
+        return toQuerySuccess<Row>([])
+      }
+      return toQueryError<Row>(tag, error)
+    }
+
+    const result = body as QueryResult<Row>
+    return result?.status ? result : toQuerySuccess<Row>([])
+  } catch (error) {
+    if (signal?.aborted || isAbortLikeError(error) || isSbPermissionDenied(error) || isSbAuthMissing(error)) {
+      return toQuerySuccess<Row>([])
+    }
+    return toQueryError<Row>(tag, error)
+  }
 }

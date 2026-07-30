@@ -11,13 +11,13 @@ export function formatGrowthStage(value: StageFilter | string | null | undefined
     case "juvenile":
       return "Juvenile"
     case "sub_adult":
-      return "Sub-adult"
+      return "Sub Adult"
     case "broodstock":
       return "Broodstock"
     case "all":
       return "All Stages"
     default:
-      return "Unspecified"
+      return value ? String(value).replaceAll("_", " ") : "Unspecified"
   }
 }
 

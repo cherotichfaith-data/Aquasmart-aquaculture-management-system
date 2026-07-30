@@ -3,26 +3,18 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useState, type MouseEvent } from "react"
-import Box from "@mui/material/Box"
-import Button from "@mui/material/Button"
-import Collapse from "@mui/material/Collapse"
-import Drawer from "@mui/material/Drawer"
-import IconButton from "@mui/material/IconButton"
-import List from "@mui/material/List"
-import ListItemButton from "@mui/material/ListItemButton"
-import ListItemIcon from "@mui/material/ListItemIcon"
-import ListItemText from "@mui/material/ListItemText"
-import Menu from "@mui/material/Menu"
-import MenuItem from "@mui/material/MenuItem"
-import Paper from "@mui/material/Paper"
-import Skeleton from "@mui/material/Skeleton"
-import Tooltip from "@mui/material/Tooltip"
-import Typography from "@mui/material/Typography"
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
+import { Button } from "@/components/app-ui/button"
+import { Collapsible } from "@/components/app-ui/collapsible"
+import { Menu, MenuItem } from "@/components/app-ui/menu"
+import { Sheet } from "@/components/app-ui/sheet"
+import { Skeleton } from "@/components/app-ui/skeleton"
+import { Tooltip } from "@/components/app-ui/tooltip"
+import { cn } from "@/lib/utils"
 import {
   Activity,
   BarChart3,
@@ -150,6 +142,7 @@ type SidebarContentProps = {
   mobile: boolean
   initialFarmId?: string | null
   initialFarmName?: string | null
+  roleOverride?: string | null
 }
 
 function LogoBlock({
@@ -164,17 +157,8 @@ function LogoBlock({
   onCollapseToggle: () => void
 }) {
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        minHeight: 72,
-        px: collapsed && !mobile ? 1.5 : 2.5,
-        py: 1.5,
-      }}
-    >
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+    <div className={cn("flex min-h-[72px] items-center justify-between py-3", collapsed && !mobile ? "px-3" : "px-5")}>
+      <div className="min-w-0 flex-1">
         <Link
           href={toDashboardPath("/")}
           className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90"
@@ -182,54 +166,57 @@ function LogoBlock({
         >
           <Image src="/use this.png" alt="AquaSmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
           {!collapsed || mobile ? (
-            <Typography variant="h6" sx={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--color-sidebar-foreground)" }}>
-              AquaSmart
-            </Typography>
+            <span className="text-[1.1rem] font-bold text-[color:var(--color-sidebar-foreground)]">AquaSmart</span>
           ) : null}
         </Link>
-      </Box>
+      </div>
       {mobile ? (
-        <IconButton
+        <button
+          type="button"
           onClick={onClose}
           aria-label="Close navigation"
-          sx={{
-            color: "var(--color-sidebar-foreground)",
-            bgcolor: "transparent",
-          }}
+          className="inline-flex size-9 items-center justify-center rounded-full text-[color:var(--color-sidebar-foreground)] transition-colors hover:bg-white/10"
         >
           <X size={18} />
-        </IconButton>
+        </button>
       ) : (
-        <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-          <IconButton
+        <Tooltip content={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+          <button
+            type="button"
             onClick={onCollapseToggle}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            sx={{
-              color: "var(--color-sidebar-foreground)",
-              bgcolor: "transparent",
-            }}
+            className="inline-flex size-9 items-center justify-center rounded-full text-[color:var(--color-sidebar-foreground)] transition-colors hover:bg-white/10"
           >
             <MenuIcon size={18} />
-          </IconButton>
+          </button>
         </Tooltip>
       )}
-    </Box>
+    </div>
   )
 }
 
-function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialFarmId, initialFarmName }: SidebarContentProps) {
+function SidebarContent({
+  collapsed,
+  onClose,
+  onCollapseToggle,
+  mobile,
+  initialFarmId,
+  initialFarmName,
+  roleOverride,
+}: SidebarContentProps) {
   const pathname = usePathname()
   const appPathname = stripDashboardPath(pathname)
   const searchParams = useSearchParams()
   const { signOut } = useAuth()
   const { farm, farmId } = useActiveFarm({ initialFarmId, initialFarmName })
-  const farmRoleQuery = useActiveFarmRole(farmId)
-  const farmRole = farmRoleQuery.data ?? null
-  const isRoleLoading = farmRoleQuery.isLoading
+  const farmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
+  const farmRole = roleOverride ?? farmRoleQuery.data ?? null
+  const isRoleLoading = roleOverride == null && farmRoleQuery.isLoading
   const navigationSections = useMemo(() => getVisibleSections(farmRole), [farmRole])
   const [signingOut, setSigningOut] = useState(false)
   const [waterQualityOpen, setWaterQualityOpen] = useState(appPathname.startsWith("/water-quality"))
   const [waterQualityMenuAnchor, setWaterQualityMenuAnchor] = useState<HTMLElement | null>(null)
+  const flyoutTriggerRef = useRef<HTMLButtonElement>(null)
 
   const farmName = farm?.name ?? initialFarmName ?? null
   const waterQualityActive = appPathname === "/water-quality"
@@ -241,7 +228,7 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
   const withCurrentContext = (href: string) => {
     const [basePath, query = ""] = href.split("?", 2)
     const nextParams = new URLSearchParams(query)
-    for (const key of ["farmId", "system", "cage", "period", "batch", "stage"]) {
+    for (const key of ["farmId", "system", "cage", "date", "batch", "stage"]) {
       const value = searchParams.get(key)
       if (value != null && !nextParams.has(key)) nextParams.set(key, value)
     }
@@ -272,18 +259,10 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
       return (
         <MenuItem
           key={link.href}
-          component={Link}
           href={withCurrentContext(link.href)}
           selected={isActive}
           onClick={closeAfterNavigate}
           dense={dense}
-          sx={{
-            borderRadius: 2,
-            mx: 1,
-            my: 0.25,
-            fontSize: dense ? "0.75rem" : "0.8125rem",
-            whiteSpace: "normal",
-          }}
         >
           {link.label}
         </MenuItem>
@@ -291,263 +270,177 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
     })
 
   return (
-    <Paper
-      square
-      elevation={0}
-      sx={{
-        display: "flex",
-        height: "100%",
-        width: "100%",
-        flexDirection: "column",
-        borderRadius: 0,
-        borderRight: "1px solid var(--color-sidebar-border)",
+    <div
+      className="flex h-full w-full flex-col overflow-y-auto overflow-x-hidden border-r [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{
+        borderColor: "var(--color-sidebar-border)",
         backgroundColor: "var(--color-sidebar)",
-        backgroundImage: "none",
-        boxShadow: "none",
         color: "var(--color-sidebar-foreground)",
-        overflowY: "auto",
-        overflowX: "hidden",
-        scrollbarWidth: "none",
-        msOverflowStyle: "none",
-        "&::-webkit-scrollbar": {
-          display: "none",
-        },
       }}
     >
       <LogoBlock collapsed={collapsed} mobile={mobile} onClose={onClose} onCollapseToggle={onCollapseToggle} />
       {farmId && farmName && (!collapsed || mobile) ? (
-        <>
-          <Box sx={{ px: 2, py: 1.5 }}>
-            <Box
-              title={farmName}
-              sx={{
-                display: "flex",
-                gap: 1,
-                alignItems: "center",
-                border: "1px solid var(--color-sidebar-border)",
-                borderRadius: 2.5,
-                px: 1.5,
-                py: 1.25,
-                bgcolor: "color-mix(in srgb, var(--color-sidebar-accent) 82%, white 18%)",
-              }}
-            >
-              <Box
-                aria-hidden
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  bgcolor: "primary.main",
-                  flexShrink: 0,
-                }}
-              />
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Farm:
-              </Typography>
-              <Typography variant="body2" sx={{ minWidth: 0 }} noWrap>
-                {farmName}
-              </Typography>
-            </Box>
-          </Box>
-        </>
+        <div className="px-4 py-3">
+          <div
+            title={farmName}
+            className="flex items-center gap-2 rounded-xl border px-3 py-2.5"
+            style={{
+              borderColor: "var(--color-sidebar-border)",
+              backgroundColor: "color-mix(in srgb, var(--color-sidebar-accent) 82%, white 18%)",
+            }}
+          >
+            <span aria-hidden className="size-2 shrink-0 rounded-full bg-primary" />
+            <span className="text-sm font-semibold">Farm:</span>
+            <span className="min-w-0 truncate text-sm">{farmName}</span>
+          </div>
+        </div>
       ) : null}
-      <Box sx={{ flex: 1, px: 1.25, py: 1.5 }}>
+      <div className="flex-1 px-2.5 py-3">
         {isRoleLoading ? (
-          <Box sx={{ display: "grid", gap: 0.5, px: 0.5 }}>
+          <div className="grid gap-1.5 px-1">
             {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} variant="rounded" height={44} sx={{ borderRadius: 2.5 }} />
+              <Skeleton key={i} className="h-11 rounded-[1.25rem]" />
             ))}
-          </Box>
-        ) : navigationSections.map((section) => (
-          <Box key={section.title} sx={{ mb: 2.5 }}>
-            {!collapsed || mobile ? (
-              <Typography
-                variant="overline"
-                sx={{
-                  display: "block",
-                  px: 1.5,
-                  pb: 0.5,
-                  color: "var(--color-sidebar-accent-foreground)",
-                  opacity: 0.8,
-                }}
-              >
-                {section.title}
-              </Typography>
-            ) : null}
-            <List disablePadding sx={{ display: "grid", gap: 0.5 }}>
-              {section.items.map((item) => {
-                if (item.href === toDashboardPath("/water-quality")) {
-                  const Icon = item.icon
+          </div>
+        ) : (
+          navigationSections.map((section) => (
+            <div key={section.title} className="mb-5">
+              {!collapsed || mobile ? (
+                <span className="block px-2.5 pb-1 font-mono text-[11px] uppercase tracking-[0.08em] opacity-80" style={{ color: "var(--color-sidebar-accent-foreground)" }}>
+                  {section.title}
+                </span>
+              ) : null}
+              <div className="grid gap-1">
+                {section.items.map((item) => {
+                  if (item.href === toDashboardPath("/water-quality")) {
+                    const Icon = item.icon
 
-                  if (collapsed && !mobile) {
-                    return (
-                      <Box key={item.href}>
-                        <Tooltip title="Water Quality" placement="right">
-                          <ListItemButton
-                            onClick={(event: MouseEvent<HTMLElement>) => setWaterQualityMenuAnchor(event.currentTarget)}
-                            selected={waterQualityActive}
-                            sx={{
-                              minHeight: 48,
-                              justifyContent: "center",
-                              borderRadius: 2.5,
-                              px: 1.5,
-                            }}
-                          >
-                            <ListItemIcon sx={{ minWidth: 0, color: "inherit" }}>
+                    if (collapsed && !mobile) {
+                      return (
+                        <div key={item.href}>
+                          <Tooltip content="Water Quality" side="right" wrapperClassName="flex w-full [&>*]:w-full">
+                            <button
+                              ref={flyoutTriggerRef}
+                              type="button"
+                              onClick={(event: MouseEvent<HTMLElement>) => setWaterQualityMenuAnchor(event.currentTarget)}
+                              className={cn(
+                                "flex min-h-12 w-full items-center justify-center rounded-2xl px-3 transition-colors hover:bg-white/10",
+                                waterQualityActive && "bg-white/15",
+                              )}
+                            >
                               <Icon size={18} />
-                            </ListItemIcon>
-                          </ListItemButton>
-                        </Tooltip>
-                        <Menu
-                          anchorEl={waterQualityMenuAnchor}
-                          open={Boolean(waterQualityMenuAnchor)}
-                          onClose={() => setWaterQualityMenuAnchor(null)}
-                          anchorOrigin={{ vertical: "center", horizontal: "right" }}
-                          transformOrigin={{ vertical: "center", horizontal: "left" }}
-                          slotProps={{ list: { dense: true } }}
+                            </button>
+                          </Tooltip>
+                          <Menu
+                            anchorEl={waterQualityMenuAnchor}
+                            open={Boolean(waterQualityMenuAnchor)}
+                            onClose={() => setWaterQualityMenuAnchor(null)}
+                            side="right"
+                            align="center"
+                            dense
+                          >
+                            {renderWaterQualityMenuItems(true)}
+                          </Menu>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div key={item.href}>
+                        <div
+                          className={cn(
+                            "flex min-h-12 items-center rounded-2xl px-1.5 transition-colors",
+                            waterQualityActive && "bg-white/15",
+                          )}
                         >
-                          {renderWaterQualityMenuItems(true)}
-                        </Menu>
-                      </Box>
+                          <Link
+                            href={withCurrentContext(item.href)}
+                            onClick={closeAfterNavigate}
+                            className="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-current no-underline"
+                          >
+                            <Icon size={18} />
+                            <span className="truncate text-sm font-semibold">{item.name}</span>
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              setWaterQualityOpen((prev) => !prev)
+                            }}
+                            aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
+                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-current hover:bg-white/10"
+                          >
+                            <ChevronDown size={16} className={cn("transition-transform duration-200", waterQualityOpen && "rotate-180")} />
+                          </button>
+                        </div>
+                        <Collapsible open={waterQualityOpen}>
+                          <div className="ml-4 mt-1 grid gap-0.5">
+                            {waterQualityLinks.map((link) => (
+                              <Link
+                                key={link.href}
+                                href={withCurrentContext(link.href)}
+                                onClick={closeAfterNavigate}
+                                className={cn(
+                                  "flex min-h-[38px] items-center rounded-xl px-3 text-[12px] font-semibold text-current no-underline transition-colors hover:bg-white/10",
+                                  link.activeKey === activeWaterQualityKey && "bg-white/15",
+                                )}
+                              >
+                                {link.label}
+                              </Link>
+                            ))}
+                          </div>
+                        </Collapsible>
+                      </div>
                     )
                   }
 
-                  return (
-                    <Box key={item.href}>
-                      <ListItemButton
-                        selected={waterQualityActive}
-                        sx={{
-                          minHeight: 48,
-                          borderRadius: 2.5,
-                          px: 1.5,
-                        }}
-                      >
-                        <Box
-                          component={Link}
-                          href={withCurrentContext(item.href)}
-                          onClick={closeAfterNavigate}
-                          sx={{
-                            display: "flex",
-                            minWidth: 0,
-                            flex: 1,
-                            alignItems: "center",
-                            gap: 1.5,
-                            color: "inherit",
-                            textDecoration: "none",
-                          }}
-                        >
-                          <Icon size={18} />
-                          <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                            {item.name}
-                          </Typography>
-                        </Box>
-                        <IconButton
-                          size="small"
-                          onClick={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                            setWaterQualityOpen((prev) => !prev)
-                          }}
-                          aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
-                          sx={{ color: "inherit" }}
-                        >
-                          <ChevronDown
-                            size={16}
-                            style={{
-                              transform: waterQualityOpen ? "rotate(180deg)" : "rotate(0deg)",
-                              transition: "transform 0.2s ease",
-                            }}
-                          />
-                        </IconButton>
-                      </ListItemButton>
-                      <Collapse in={waterQualityOpen} timeout="auto" unmountOnExit>
-                        <List disablePadding sx={{ mt: 0.5, ml: 2, display: "grid", gap: 0.25 }}>
-                          {waterQualityLinks.map((link) => (
-                            <ListItemButton
-                              key={link.href}
-                              component={Link}
-                              href={withCurrentContext(link.href)}
-                              selected={link.activeKey === activeWaterQualityKey}
-                              onClick={closeAfterNavigate}
-                              sx={{
-                                minHeight: 38,
-                                borderRadius: 2,
-                                px: 1.5,
-                              }}
-                            >
-                              <ListItemText
-                                primary={<Typography variant="caption" sx={{ fontWeight: 600 }}>{link.label}</Typography>}
-                              />
-                            </ListItemButton>
-                          ))}
-                        </List>
-                      </Collapse>
-                    </Box>
-                  )
-                }
+                  const resolvedHref = resolveItemHref(farmRole, item.href)
+                  const contextualHref = withCurrentContext(resolvedHref)
+                  const resolvedLabel = resolveItemLabel(farmRole, item.href, item.name)
+                  const itemBasePath = stripDashboardPath(item.href)
+                  const resolvedBasePath = stripDashboardPath(resolvedHref.split("?")[0] ?? resolvedHref)
+                  const isActive =
+                    appPathname === itemBasePath ||
+                    appPathname === resolvedBasePath ||
+                    (itemBasePath !== "/" && appPathname.startsWith(`${itemBasePath}/`))
+                  const Icon = item.icon
 
-                const resolvedHref = resolveItemHref(farmRole, item.href)
-                const contextualHref = withCurrentContext(resolvedHref)
-                const resolvedLabel = resolveItemLabel(farmRole, item.href, item.name)
-                const itemBasePath = stripDashboardPath(item.href)
-                const resolvedBasePath = stripDashboardPath(resolvedHref.split("?")[0] ?? resolvedHref)
-                const isActive =
-                  appPathname === itemBasePath ||
-                  appPathname === resolvedBasePath ||
-                  (itemBasePath !== "/" && appPathname.startsWith(`${itemBasePath}/`))
-                const Icon = item.icon
-
-                return (
-                  <Tooltip
-                    key={item.href}
-                    title={collapsed && !mobile ? resolvedLabel : ""}
-                    placement="right"
-                    disableHoverListener={!collapsed || mobile}
-                  >
-                    <ListItemButton
-                      component={Link}
+                  const link = (
+                    <Link
                       href={contextualHref}
-                      selected={isActive}
                       onClick={closeAfterNavigate}
-                      sx={{
-                        minHeight: 48,
-                        justifyContent: collapsed && !mobile ? "center" : "flex-start",
-                        borderRadius: 2.5,
-                        px: collapsed && !mobile ? 1.5 : 1.75,
-                      }}
+                      className={cn(
+                        "flex min-h-12 items-center gap-3 rounded-2xl text-current no-underline transition-colors hover:bg-white/10",
+                        collapsed && !mobile ? "justify-center px-3" : "px-3.5",
+                        isActive && "bg-white/15",
+                      )}
                     >
-                      <ListItemIcon
-                        sx={{
-                          minWidth: collapsed && !mobile ? 0 : 34,
-                          color: "inherit",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Icon size={18} />
-                      </ListItemIcon>
-                      {!collapsed || mobile ? (
-                        <ListItemText
-                          primary={
-                            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                              {resolvedLabel}
-                            </Typography>
-                          }
-                        />
-                      ) : null}
-                    </ListItemButton>
-                  </Tooltip>
-                )
-              })}
-            </List>
-          </Box>
-        ))}
-      </Box>
-      <Box sx={{ p: 1.5 }}>
+                      <Icon size={18} />
+                      {!collapsed || mobile ? <span className="truncate text-sm font-semibold">{resolvedLabel}</span> : null}
+                    </Link>
+                  )
+
+                  return (
+                    <Tooltip
+                      key={item.href}
+                      content={collapsed && !mobile ? resolvedLabel : undefined}
+                      side="right"
+                      disabled={!collapsed || mobile}
+                      wrapperClassName="flex w-full [&>*]:w-full"
+                    >
+                      {link}
+                    </Tooltip>
+                  )
+                })}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="p-3">
         <Button
-          fullWidth
-          color="inherit"
-          variant="text"
-          startIcon={<LogOut size={16} />}
+          variant="ghost"
           disabled={signingOut}
           onClick={async () => {
             if (signingOut) return
@@ -558,23 +451,23 @@ function SidebarContent({ collapsed, onClose, onCollapseToggle, mobile, initialF
               setSigningOut(false)
             }
           }}
-          sx={{
-            justifyContent: collapsed && !mobile ? "center" : "flex-start",
-            minHeight: 48,
-            borderRadius: 2.5,
-            px: collapsed && !mobile ? 1.5 : 1.75,
-          }}
+          className={cn(
+            "min-h-12 w-full gap-3 rounded-2xl text-current hover:bg-white/10",
+            collapsed && !mobile ? "justify-center px-3" : "justify-start px-3.5",
+          )}
         >
+          <LogOut size={16} />
           {!collapsed || mobile ? (signingOut ? "Logging out..." : "Log out") : null}
         </Button>
-      </Box>
-    </Paper>
+      </div>
+    </div>
   )
 }
 
 export default function Sidebar({
   initialFarmId,
   initialFarmName,
+  roleOverride,
   open,
   collapsed,
   onToggle,
@@ -582,6 +475,7 @@ export default function Sidebar({
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
+  roleOverride?: string | null
   open: boolean
   collapsed: boolean
   onToggle: () => void
@@ -589,52 +483,37 @@ export default function Sidebar({
 }) {
   return (
     <>
-      <Drawer
+      <Sheet
         open={open}
         onClose={onToggle}
-        variant="temporary"
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          display: { xs: "block", md: "none" },
-          "& .MuiDrawer-paper": {
-            width: `min(${DASHBOARD_SIDEBAR_WIDTH}px, calc(100vw - 48px))`,
-            boxSizing: "border-box",
-          },
-        }}
+        side="left"
+        containerClassName="md:hidden"
+        className="w-[min(248px,calc(100vw-48px))]"
       >
         <SidebarContent
           initialFarmId={initialFarmId}
           initialFarmName={initialFarmName}
+          roleOverride={roleOverride}
           collapsed={false}
           onClose={onToggle}
           onCollapseToggle={onCollapseToggle}
           mobile
         />
-      </Drawer>
-      <Box
-        sx={{
-          display: { xs: "none", md: "block" },
-          position: "fixed",
-          top: 0,
-          left: 0,
-          zIndex: (theme) => theme.zIndex.drawer,
-          width: collapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH,
-          height: "100vh",
-          transition: (theme) =>
-            theme.transitions.create("width", {
-              duration: theme.transitions.duration.standard,
-            }),
-        }}
+      </Sheet>
+      <div
+        className="fixed left-0 top-0 z-40 hidden h-screen transition-[width] duration-300 md:block"
+        style={{ width: collapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH }}
       >
         <SidebarContent
           initialFarmId={initialFarmId}
           initialFarmName={initialFarmName}
+          roleOverride={roleOverride}
           collapsed={collapsed}
           onClose={onToggle}
           onCollapseToggle={onCollapseToggle}
           mobile={false}
         />
-      </Box>
+      </div>
     </>
   )
 }

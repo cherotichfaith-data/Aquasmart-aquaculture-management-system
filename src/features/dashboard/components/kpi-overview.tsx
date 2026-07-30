@@ -1,9 +1,6 @@
 "use client"
 
 import KPICard from "./kpi-card"
-import Grid from "@mui/material/Grid"
-import Box from "@mui/material/Box"
-import Skeleton from "@mui/material/Skeleton"
 import type { Enums } from "@/lib/types/database"
 import { DataErrorState, DataFetchingBadge, EmptyState } from "@/components/shared/data-states"
 import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
@@ -11,12 +8,12 @@ import { toDashboardPath } from "@/lib/app-entry"
 import type { KPIOverviewMetric } from "../types"
 
 const kpiProductionFilterMap: Record<string, string | null> = {
-  efcr: "efcr_periodic",
+  efcr: "efcr",
   mortality: "mortality",
   abw: "abw",
   sgr: "sgr",
   agr: null,
-  biomass: null,
+  biomass: "biomass",
   biomass_density: "density",
   feeding: "feeding",
 }
@@ -51,7 +48,7 @@ export default function KPIOverview({
     if (system !== "all") params.set("system", system)
     if (stage !== "all") params.set("stage", stage)
     if (batch !== "all") params.set("batch", batch)
-    params.set("period", toTimePeriodUrlValue(timePeriod))
+    params.set("date", toTimePeriodUrlValue(timePeriod))
 
     const mappedFilter = kpiProductionFilterMap[metricKey]
     if (mappedFilter) params.set("filter", mappedFilter)
@@ -71,33 +68,31 @@ export default function KPIOverview({
 
   if (isLoading) {
     return (
-      <Grid container spacing={2}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {Array(4).fill(0).map((_, i) => (
-          <Grid key={i} size={{ xs: 12, sm: 6, lg: 3 }}>
-            <Skeleton variant="rounded" height={112} sx={{ borderRadius: 2 }} />
-          </Grid>
+          <div key={i} className="h-28 animate-pulse rounded-2xl bg-muted/50" />
         ))}
-      </Grid>
+      </div>
     )
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
         <span />
         <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
-      </Box>
+      </div>
       {!metrics.length ? (
         <EmptyState
           title="No KPI data available"
           description="Try a different period or confirm data entry is up to date."
         />
       ) : null}
-      <Grid container spacing={2}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {metrics.map((metric) => {
           const href = buildProductionHref(metric.key)
           return (
-            <Grid key={metric.key} size={{ xs: 12, sm: 6, lg: 3 }}>
+            <div key={metric.key}>
               <KPICard
                 title={metric.label}
                 average={metric.value}
@@ -110,10 +105,10 @@ export default function KPIOverview({
                 invertTrend={metric.invertTrend}
                 href={href}
               />
-            </Grid>
+            </div>
           )
         })}
-      </Grid>
-    </Box>
+      </div>
+    </div>
   )
 }

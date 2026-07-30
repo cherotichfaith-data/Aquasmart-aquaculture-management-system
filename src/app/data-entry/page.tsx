@@ -1,14 +1,10 @@
 import { Suspense } from "react"
-import { dehydrate } from "@tanstack/react-query"
 import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import DataEntryPageClient from "./page.client"
-import { QueryHydration } from "@/components/providers/query-hydration"
 import { getDataEntryPrefetch } from "@/features/data-entry/queries.server"
 import { resolveInitialFarmId } from "@/features/farm/queries.server"
 import { WORKSPACE_SELECT_PATH, canAccessDataEntry } from "@/lib/app-entry"
-import { queryKeys } from "@/lib/cache/query-keys"
-import { createQueryClient } from "@/lib/react-query/query-client"
 import { logSbError } from "@/lib/supabase/log"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { createAccessTokenClient } from "@/lib/supabase/server"
@@ -62,23 +58,19 @@ export default async function DataEntryPage({
   }
 
   const prefetch = await getDataEntryPrefetch({ farmId, userId: user.id, accessToken })
-  const queryClient = createQueryClient()
-
-  queryClient.setQueryData(queryKeys.farmUserRole(farmId, user.id), role)
-  queryClient.setQueryData(queryKeys.options.systems({ farmId }), prefetch.systems)
-  queryClient.setQueryData(queryKeys.options.batches({ farmId }), prefetch.batches)
-  queryClient.setQueryData(queryKeys.options.feeds(farmId, user.id), prefetch.feedTypes)
-  queryClient.setQueryData(queryKeys.reports.recentEntries(farmId), prefetch.recentEntries)
 
   return (
     <Suspense fallback={null}>
-      <QueryHydration state={dehydrate(queryClient)}>
-        <DataEntryPageClient
-          key={currentPath}
-          initialFarmId={farmId}
-          initialFarmName={farmName}
-        />
-      </QueryHydration>
+      <DataEntryPageClient
+        key={currentPath}
+        initialFarmId={farmId}
+        initialFarmName={farmName}
+        initialFarmRole={role}
+        initialSystems={prefetch.systems.data ?? []}
+        initialBatches={prefetch.batches.data ?? []}
+        initialFeeds={prefetch.feedTypes.data ?? []}
+        initialRecentEntries={prefetch.recentEntries}
+      />
     </Suspense>
   )
 }

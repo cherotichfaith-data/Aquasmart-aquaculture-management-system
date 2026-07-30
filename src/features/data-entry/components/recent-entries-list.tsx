@@ -5,6 +5,7 @@ import { format } from "date-fns"
 import { Clock3, Loader2 } from "lucide-react"
 import { Badge } from "@/components/app-ui/badge"
 import { offlineDB } from "@/lib/offline/db"
+import { formatGrowthStage } from "@/lib/stage-filter"
 import { createSystemLabelResolver, type SystemOption } from "@/lib/system-options"
 import type { Tables } from "@/lib/types/database"
 
@@ -414,7 +415,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       details: [
         { label: "Unit", value: row.unit ?? "-" },
         { label: "Type", value: row.type },
-        { label: "Stage", value: row.growth_stage },
+        { label: "Stage", value: formatGrowthStage(row.growth_stage) },
       ],
     }))
   }

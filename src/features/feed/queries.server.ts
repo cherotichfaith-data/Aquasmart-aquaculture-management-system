@@ -10,7 +10,7 @@ export function parseFeedDashboardFilters(
   const selectedBatchRaw = searchParams?.batch
   const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
-  const timePeriodRaw = searchParams?.period
+  const timePeriodRaw = searchParams?.date
 
   return {
     selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",

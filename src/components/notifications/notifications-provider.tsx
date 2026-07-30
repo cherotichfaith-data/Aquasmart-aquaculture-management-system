@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import Button from "@mui/material/Button"
+import { Button } from "@/components/app-ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
@@ -194,7 +194,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           description: notification.description,
           variant: notification.severity === "critical" ? "destructive" : "default",
           action: notification.href ? (
-            <Button size="small" color="inherit" onClick={() => router.push(notification.href!)}>
+            <Button size="sm" variant="ghost" className="text-inherit hover:bg-white/15" onClick={() => router.push(notification.href!)}>
               {notification.actionLabel ?? "View"}
             </Button>
           ) : undefined,

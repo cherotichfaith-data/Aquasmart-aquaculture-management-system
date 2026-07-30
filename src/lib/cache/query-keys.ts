@@ -14,17 +14,6 @@ export const queryKeys = {
     batches(params?: { farmId?: string | null; activeOnly?: boolean }) {
       return ["options", "batches", farmToken(params?.farmId), params?.activeOnly ?? true] as const
     },
-    feeds(
-      farmId?: string | null,
-      userId?: string | null,
-    ) {
-      return [
-        "options",
-        "feeds",
-        farmToken(farmId),
-        userId ?? "anon",
-      ] as const
-    },
     feedSuppliers(userId?: string | null) {
       return ["options", "feed-suppliers", userId ?? "anon"] as const
     },
@@ -532,28 +521,45 @@ export const queryKeys = {
         params.includeBatches ?? false,
       ] as const
     },
-    systems(params?: {
-      farmId?: string | null
-      stage?: string | null
-      systemId?: number | null
-      systemIds?: number[] | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "dashboard",
-        "systems",
-        farmToken(params?.farmId),
-        params?.stage ?? "all",
-        numberToken(params?.systemId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
-    systemsOverview(farmId?: string | null) {
-      return ["systems-overview", farmToken(farmId)] as const
-    },
+      systems(params?: {
+        farmId?: string | null
+        stage?: string | null
+        systemId?: number | null
+        systemIds?: number[] | null
+        dateFrom?: string | null
+        dateTo?: string | null
+      }) {
+        return [
+          "dashboard",
+          "systems",
+          farmToken(params?.farmId),
+          params?.stage ?? "all",
+          numberToken(params?.systemId),
+          params?.systemIds?.join(",") ?? "all-systems",
+          stringToken(params?.dateFrom),
+          stringToken(params?.dateTo),
+        ] as const
+      },
+      batches(params?: {
+        farmId?: string | null
+        stage?: string | null
+        batchIds?: number[] | null
+        dateFrom?: string | null
+        dateTo?: string | null
+      }) {
+        return [
+          "dashboard",
+          "batches",
+          farmToken(params?.farmId),
+          params?.stage ?? "all",
+          params?.batchIds?.join(",") ?? "all-batches",
+          stringToken(params?.dateFrom),
+          stringToken(params?.dateTo),
+        ] as const
+      },
+      systemsOverview(farmId?: string | null) {
+        return ["systems-overview", farmToken(farmId)] as const
+      },
     systemsTable(params: {
       farmId?: string | null
       stage: string

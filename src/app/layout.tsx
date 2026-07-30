@@ -1,7 +1,7 @@
 import type React from "react"
 import { Suspense } from "react"
 import type { Metadata } from "next"
-import { AuthProvider, ThemeProvider, MuiProvider } from "@/components/providers"
+import { AuthProvider } from "@/components/providers"
 import { SyncProvider } from "@/components/offline/sync-provider"
 import { FarmOnboardingGate } from "@/components/providers/farm-onboarding-gate"
 import { ToastProvider } from "@/components/shared/toast-provider"
@@ -67,23 +67,19 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className={`font-sans antialiased`}>
-        <ThemeProvider>
-          <MuiProvider>
-          <ReactQueryProvider>
-            <AuthProvider>
-              <SyncProvider>
-                <ToastProvider>
-                  <NotificationsProvider>
-                    <Suspense fallback={<div className="min-h-screen bg-background" />}>
-                      <FarmOnboardingGate>{children}</FarmOnboardingGate>
-                    </Suspense>
-                  </NotificationsProvider>
-                </ToastProvider>
-              </SyncProvider>
-            </AuthProvider>
-          </ReactQueryProvider>
-          </MuiProvider>
-        </ThemeProvider>
+        <ReactQueryProvider>
+          <AuthProvider>
+            <SyncProvider>
+              <ToastProvider>
+                <NotificationsProvider>
+                  <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                    <FarmOnboardingGate>{children}</FarmOnboardingGate>
+                  </Suspense>
+                </NotificationsProvider>
+              </ToastProvider>
+            </SyncProvider>
+          </AuthProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   )

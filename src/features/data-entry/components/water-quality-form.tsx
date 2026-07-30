@@ -19,13 +19,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { createClient } from "@/lib/supabase/client"
-import { useToast } from "@/lib/hooks/app/use-toast"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useRecordWaterQuality, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoPanel, InfoStat } from "./form-support"
-import { parseRequiredNumericId, requireActiveFarmId } from "./form-utils"
+import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 import {
   LatestEntryGuard,
   pickLatestEntryByRecordDate,
@@ -75,7 +74,6 @@ export function WaterQualityForm({
   defaultSystemId?: number | null
 }) {
   const mutation = useRecordWaterQuality()
-  const { toast } = useToast()
   const supabase = useMemo(() => createClient(), [])
   const [doClassification, setDoClassification] = useState<Database["public"]["Enums"]["water_quality_rating"] | null>(null)
 
@@ -92,6 +90,7 @@ export function WaterQualityForm({
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    mode: "onBlur",
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
       system_id: defaultSystemId ? String(defaultSystemId) : "",
@@ -290,11 +289,7 @@ export function WaterQualityForm({
       })
     } catch (error) {
       logSbError("dataEntry:waterQuality:submit", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to record water quality data.",
-      })
+      reportDataEntrySubmitError(error, "Failed to record water quality data.")
     }
   }
 
@@ -319,7 +314,7 @@ export function WaterQualityForm({
             ) : null}
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-3xl space-y-3.5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -328,7 +323,7 @@ export function WaterQualityForm({
                     <FormItem>
                       <FormLabel>Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -342,7 +337,7 @@ export function WaterQualityForm({
                     <FormItem>
                       <FormLabel>Time</FormLabel>
                       <FormControl>
-                        <Input type="time" step="900" {...field} />
+                        <Input type="time" step="900" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -357,7 +352,7 @@ export function WaterQualityForm({
                       <FormLabel>System / Cage</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="max-w-xs">
                             <SelectValue placeholder="Select system" />
                           </SelectTrigger>
                         </FormControl>
@@ -382,6 +377,7 @@ export function WaterQualityForm({
                       <FormLabel>{isLakeReference ? "Location / Reference" : "Location / Reference (Optional)"}</FormLabel>
                       <FormControl>
                         <Input
+                          className="max-w-sm"
                           {...field}
                           placeholder={isLakeReference ? "e.g. lake edge, 20m from cage line" : "Optional reference note"}
                         />
@@ -408,7 +404,7 @@ export function WaterQualityForm({
 
               <SelectedSystemInfo systems={selectableSystems} systemId={selectedSystemId} />
 
-              <div className="data-entry-compact-grid sm:grid-cols-2 lg:grid-cols-4">
+              <div className="data-entry-compact-grid sm:grid-cols-2 xl:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="temperature"
@@ -489,10 +485,12 @@ export function WaterQualityForm({
                 />
               </div>
 
-              <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
-                {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Record Water Quality
-              </Button>
+              <div className="flex justify-end pt-1">
+                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+                  {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Record Water Quality
+                </Button>
+              </div>
             </form>
           </Form>
         </div>

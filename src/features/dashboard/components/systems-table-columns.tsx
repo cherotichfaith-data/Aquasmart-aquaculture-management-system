@@ -5,7 +5,6 @@ import type { DashboardSystemRow } from "@/features/dashboard/types"
 import type { ProductionMetric } from "@/features/production/components/metrics"
 import { formatNumberValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
-import { formatGrowthStage } from "@/lib/stage-filter"
 import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import {
   MetricCell,
@@ -16,14 +15,6 @@ import {
   isFiniteNumber,
 } from "@/features/dashboard/lib/table-cells"
 
-/**
- * Dashboard systems table — design-guide column set: System | eFCR | ABW |
- * Feeding rate | Daily mortality rate | Density | Water quality.
- * Every metric cell drills into the production page with that metric
- * pre-selected. Warning values render in the destructive tone.
- */
-
-/** Deterministic per-system identity dot color from the chart palette vars. */
 const identityDotColor = (systemId: number) => `var(--chart-${(Math.abs(systemId) % 5) + 1})`
 
 export function buildDashboardSystemColumns(params: {
@@ -36,14 +27,14 @@ export function buildDashboardSystemColumns(params: {
     const query = new URLSearchParams()
     query.set("system", String(systemId))
     if (filter) query.set("filter", filter)
-    if (timePeriod) query.set("period", toTimePeriodUrlValue(timePeriod))
+    if (timePeriod) query.set("date", toTimePeriodUrlValue(timePeriod))
     return `/production?${query.toString()}`
   }
 
   const waterQualityHref = (systemId: number) => {
     const query = new URLSearchParams()
     query.set("system", String(systemId))
-    if (timePeriod) query.set("period", toTimePeriodUrlValue(timePeriod))
+    if (timePeriod) query.set("date", toTimePeriodUrlValue(timePeriod))
     return `/water-quality?${query.toString()}`
   }
 
@@ -54,14 +45,13 @@ export function buildDashboardSystemColumns(params: {
     {
       id: "system",
       header: "System",
-      accessorFn: (row) => (row.system_name ?? "").toLowerCase(),
+      accessorFn: (row) => formatCageLabel({ id: row.system_id, label: row.system_name, unit: null }).toLowerCase(),
       sortDescFirst: false,
-      meta: { width: "190px" },
+      meta: { width: "220px" },
       cell: ({ row }) => {
         const data = row.original
-        const cageLabel = formatCageLabel({ id: data.system_id, label: data.system_name, unit: null })
-        const stageLabel = data.growth_stage ? formatGrowthStage(data.growth_stage) : null
-        const subtitle = [stageLabel, data.batch_name].filter(Boolean).join(" · ")
+        const title = formatCageLabel({ id: data.system_id, label: data.system_name, unit: null })
+
         return (
           <span className="flex items-center gap-2.5">
             <span
@@ -70,10 +60,7 @@ export function buildDashboardSystemColumns(params: {
               style={{ backgroundColor: identityDotColor(data.system_id) }}
             />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold leading-5 text-foreground">{cageLabel}</span>
-              {subtitle ? (
-                <span className="block truncate text-xs leading-4 text-muted-foreground">{subtitle}</span>
-              ) : null}
+              <span className="block truncate text-sm font-semibold leading-5 text-foreground">{title}</span>
             </span>
           </span>
         )
@@ -97,7 +84,7 @@ export function buildDashboardSystemColumns(params: {
           data.efcr > farmMedianEfcr * 3
         return (
           <MetricCell
-            href={productionHref(data.system_id, "efcr_periodic")}
+            href={productionHref(data.system_id, "efcr")}
             value={<span className={isOutlier ? "text-destructive" : undefined}>{value}</span>}
             arrow={data.efcr_arrow}
             invertArrow
@@ -177,7 +164,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.biomass_density ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "120px", unit: "kg/m³" },
+      meta: { width: "120px", unit: "kg/m3" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.biomass_density, 1)

@@ -2,13 +2,10 @@
 
 import { useMemo } from "react"
 import type { ChartData, ChartOptions, TooltipItem } from "chart.js"
-import Alert from "@mui/material/Alert"
-import Box from "@mui/material/Box"
-import Chip from "@mui/material/Chip"
-import Grid from "@mui/material/Grid"
-import Typography from "@mui/material/Typography"
 import { AlertTriangle, Info } from "lucide-react"
+import { Badge } from "@/components/app-ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
+import { cn } from "@/lib/utils"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/app-ui/table"
 import { Doughnut, Line, Scatter } from "@/components/charts/chartjs"
 import {
@@ -79,19 +76,11 @@ function KpiCard({
   return (
     <div className="panel-surface h-full rounded-2xl px-4 py-3">
       <div className="flex h-full flex-col justify-center gap-2">
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          {label}
-        </Typography>
+        <span className="text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground">{label}</span>
         <div className="flex items-end justify-between gap-3">
           <div className="flex items-end gap-1.5">
-            <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: "-0.04em" }}>
-              {value}
-            </Typography>
-            {suffix ? (
-              <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
-                {suffix}
-              </Typography>
-            ) : null}
+            <span className="text-2xl font-bold tracking-[-0.04em]">{value}</span>
+            {suffix ? <span className="pb-0.5 text-sm text-muted-foreground">{suffix}</span> : null}
           </div>
           {accent ? <div>{accent}</div> : null}
         </div>
@@ -119,17 +108,7 @@ function FeedKpiOverview({
       : null
 
   return (
-    <Box
-      sx={{
-        display: "grid",
-        gap: 2,
-        gridTemplateColumns: {
-          xs: "1fr",
-          sm: "repeat(2, minmax(0, 1fr))",
-          xl: "repeat(5, minmax(0, 1fr))",
-        },
-      }}
-    >
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <div>
         <KpiCard label="Feed Used Today" value={feedUsedToday} suffix="kg" />
       </div>
@@ -148,7 +127,7 @@ function FeedKpiOverview({
           value={formatNumberValue(flaggedSystems, { decimals: 0 })}
           accent={
             overfeedingSystems != null && underfeedingSystems != null ? (
-              <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "right" }}>
+              <p className="text-right text-sm text-muted-foreground">
                 <span style={{ color: "var(--color-warning)" }}>
                   {formatNumberValue(overfeedingSystems, { decimals: 0 })} Over
                 </span>
@@ -156,20 +135,20 @@ function FeedKpiOverview({
                 <span style={{ color: "var(--color-destructive)" }}>
                   {formatNumberValue(underfeedingSystems, { decimals: 0 })} Under
                 </span>
-              </Typography>
+              </p>
             ) : null
           }
         />
       </div>
       {!row && !isLoading ? (
-        <div style={{ gridColumn: "1 / -1" }}>
+        <div className="col-span-full">
           <EmptyState
             title="No feed dashboard records"
             description="The selected scope does not yet have feed dashboard records."
           />
         </div>
       ) : null}
-    </Box>
+    </div>
   )
 }
 
@@ -281,16 +260,12 @@ function SystemFeedStatusTable({
                     <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{formatDateOnly(row.date)}</p>
                   </div>
                   {row.status ? (
-                    <Chip
-                      size="small"
-                      label={row.status}
-                      sx={{
-                        bgcolor: tone.bg,
-                        color: tone.fg,
-                        fontWeight: 700,
-                        borderRadius: 1.5,
-                      }}
-                    />
+                    <Badge
+                      className="border-transparent font-bold"
+                      style={{ backgroundColor: tone.bg, color: tone.fg }}
+                    >
+                      {row.status}
+                    </Badge>
                   ) : null}
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -350,16 +325,12 @@ function SystemFeedStatusTable({
                     <TableCell align="right" className="font-medium text-foreground">{formatNumberValue(numeric(row.efcr_period), { decimals: 2 })}</TableCell>
                     <TableCell align="right">
                       {row.status ? (
-                        <Chip
-                          size="small"
-                          label={row.status}
-                          sx={{
-                            bgcolor: tone.bg,
-                            color: tone.fg,
-                            fontWeight: 700,
-                            borderRadius: 1.5,
-                          }}
-                        />
+                        <Badge
+                          className="border-transparent font-bold"
+                          style={{ backgroundColor: tone.bg, color: tone.fg }}
+                        >
+                          {row.status}
+                        </Badge>
                       ) : null}
                     </TableCell>
                   </TableRow>
@@ -684,34 +655,36 @@ function FeedAlertsPanel({
       {isLoading ? (
         <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">Loading feed alerts...</div>
       ) : rows.length === 0 ? (
-        <Alert
-          icon={<Info size={16} />}
-          severity="success"
-          sx={{
-            borderRadius: 3,
-            bgcolor: "color-mix(in srgb, var(--color-success) 8%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--color-success) 20%, transparent)",
-          }}
-        >
-          No current feed-management alerts in this scope.
-        </Alert>
+        <div className="flex items-start gap-2.5 rounded-2xl border border-[color-mix(in_srgb,var(--color-success)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-success)_8%,transparent)] px-4 py-3 text-sm">
+          <Info size={16} className="mt-0.5 shrink-0" />
+          <span>No current feed-management alerts in this scope.</span>
+        </div>
       ) : (
         <div className="space-y-3">
-          {rows.map((row) => (
-            <Alert
-              key={`${row.system_id}:${row.alert}:${row.date}`}
-              icon={<AlertTriangle size={16} />}
-              severity={row.severity === "critical" ? "error" : "warning"}
-              sx={{ borderRadius: 3 }}
-            >
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                {row.system_name}: {row.alert}
-              </Typography>
-              <Typography variant="caption" sx={{ display: "block", mt: 0.5 }}>
-                {row.recommendation} - {formatDateOnly(row.date)}
-              </Typography>
-            </Alert>
-          ))}
+          {rows.map((row) => {
+            const critical = row.severity === "critical"
+            return (
+              <div
+                key={`${row.system_id}:${row.alert}:${row.date}`}
+                className={cn(
+                  "flex items-start gap-2.5 rounded-2xl border px-4 py-3",
+                  critical
+                    ? "border-[color-mix(in_srgb,var(--color-destructive)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)]"
+                    : "border-[color-mix(in_srgb,var(--color-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_8%,transparent)]",
+                )}
+              >
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold">
+                    {row.system_name}: {row.alert}
+                  </p>
+                  <p className="mt-1 block text-xs">
+                    {row.recommendation} - {formatDateOnly(row.date)}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </SectionCard>
@@ -737,33 +710,23 @@ export function FeedManagementDashboard(props: {
   alertsLoading?: boolean
 }) {
   return (
-    <Box sx={{ p: { xs: 1.5, md: 2 }, display: "flex", flexDirection: "column", gap: 2 }}>
+    <div className="flex flex-col gap-4 p-3 md:p-4">
       <FeedKpiOverview row={props.kpiRow} isLoading={props.kpiLoading} />
 
       <FeedPlanVsActualChart rows={props.planRows} isLoading={props.planLoading} />
 
       <SystemFeedStatusTable rows={props.statusRows} isLoading={props.statusLoading} />
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <EfcrTrendChart rows={props.efcrRows} isLoading={props.efcrLoading} />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <FeedingRateVsTargetChart rows={props.rateRows} isLoading={props.rateLoading} />
-        </Grid>
-      </Grid>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <EfcrTrendChart rows={props.efcrRows} isLoading={props.efcrLoading} />
+        <FeedingRateVsTargetChart rows={props.rateRows} isLoading={props.rateLoading} />
+      </div>
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <FeedingResponseCard rows={props.responseRows} isLoading={props.responseLoading} />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <FeedVsBiomassGainChart rows={props.scatterRows} isLoading={props.scatterLoading} />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <FeedAlertsPanel rows={props.alertRows} isLoading={props.alertsLoading} />
-        </Grid>
-      </Grid>
-    </Box>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <FeedingResponseCard rows={props.responseRows} isLoading={props.responseLoading} />
+        <FeedVsBiomassGainChart rows={props.scatterRows} isLoading={props.scatterLoading} />
+        <FeedAlertsPanel rows={props.alertRows} isLoading={props.alertsLoading} />
+      </div>
+    </div>
   )
 }

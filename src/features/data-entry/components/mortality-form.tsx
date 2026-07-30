@@ -22,6 +22,7 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { NumberStepperInput } from "./form-support"
 import {
   LatestEntryGuard,
   pickLatestEntryByRecordDate,
@@ -75,6 +76,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    mode: "onBlur",
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
       number_of_fish: 0,
@@ -190,7 +192,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
         ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
           <div className="data-entry-secondary-grid">
             <FormField
               control={form.control}
@@ -199,7 +201,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 <FormItem>
                   <FormLabel>Date</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input type="date" className="max-w-xs" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -214,7 +216,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                   <FormLabel>Cage Number</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder="Select cage" />
                       </SelectTrigger>
                     </FormControl>
@@ -239,7 +241,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                   <FormLabel>Batch (Optional)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="max-w-xs">
                         <SelectValue placeholder="Select batch" />
                       </SelectTrigger>
                     </FormControl>
@@ -264,7 +266,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 <FormItem>
                   <FormLabel>Number of Dead Fish</FormLabel>
                   <FormControl>
-                    <Input type="number" step="1" {...field} />
+                    <NumberStepperInput field={field} className="max-w-xs" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -285,7 +287,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 <FormLabel>Cause</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className="max-w-xs">
                       <SelectValue placeholder="Select cause" />
                     </SelectTrigger>
                   </FormControl>
@@ -309,7 +311,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
               <FormItem>
                 <FormLabel>Total Dead Weight (kg){mortalityCount >= 100 ? " *" : ""}</FormLabel>
                 <FormControl>
-                  <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
+                  <Input type="number" step="0.01" className="max-w-xs" {...field} value={field.value ?? ""} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -335,10 +337,12 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
             )}
           />
 
-          <Button type="submit" className="data-entry-action" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
-            {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Record Mortality
-          </Button>
+          <div className="flex justify-end pt-1">
+            <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Mortality
+            </Button>
+          </div>
         </form>
       </Form>
     </div>

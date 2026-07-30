@@ -2,7 +2,7 @@
 
 import { useCallback } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Plus, X } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/app-ui/button"
 import {
   Select,
@@ -16,6 +16,8 @@ import {
   PRODUCTION_METRIC_OPTIONS,
   type ProductionMetric,
 } from "@/features/production/components/metrics"
+
+const NO_COMPARE_VALUE = "__none__"
 
 /**
  * "+ Compare KPI" control (design guide): inactive → dashed ghost button;
@@ -52,7 +54,7 @@ export default function ProductionCompareFilter({
       <Button
         type="button"
         variant="outline"
-        className="h-10 border-dashed bg-transparent px-4 text-sm font-semibold text-primary hover:border-primary hover:bg-card"
+        className="h-10 w-[180px] rounded-xl border-dashed bg-transparent px-4 text-sm font-semibold text-primary hover:border-primary hover:bg-card md:w-[190px]"
         onClick={() => pushCompare(options[0]?.value ?? null)}
       >
         <Plus className="mr-1 h-4 w-4" />
@@ -62,37 +64,27 @@ export default function ProductionCompareFilter({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-semibold text-muted-foreground">Compare to</span>
-      <div className="flex items-center gap-2">
-        <Select value={compareMetric} onValueChange={(value) => pushCompare(value)}>
-          {/* MUI Select is fullWidth; the wrapper fixes its width. */}
-          <div className="w-[190px] shrink-0 md:w-[200px]">
-            <SelectTrigger id="production-compare-filter" className="production-select">
-              <SelectValue />
-            </SelectTrigger>
-          </div>
-          <SelectContent>
-            <SelectGroup>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label="Clear comparison"
-          className="h-10 w-10 text-muted-foreground hover:border-destructive hover:text-destructive"
-          onClick={() => pushCompare(null)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+    <div className="w-[180px] shrink-0 md:w-[190px]">
+      <Select
+        value={compareMetric}
+        onValueChange={(value) => pushCompare(value === NO_COMPARE_VALUE ? null : value)}
+      >
+        <div className="w-[180px] shrink-0 md:w-[190px]">
+          <SelectTrigger id="production-compare-filter" className="production-select">
+            <SelectValue />
+          </SelectTrigger>
+        </div>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem value={NO_COMPARE_VALUE}>No comparison</SelectItem>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
     </div>
   )
 }

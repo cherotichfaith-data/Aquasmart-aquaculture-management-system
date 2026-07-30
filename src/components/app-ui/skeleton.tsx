@@ -1,19 +1,21 @@
 import * as React from "react"
-import MuiSkeleton from "@mui/material/Skeleton"
 import { cn } from "@/lib/utils"
 
 const Skeleton = React.forwardRef<
-  HTMLSpanElement,
+  HTMLDivElement,
   React.ComponentPropsWithoutRef<"div"> & {
     animation?: "pulse" | "wave" | false
   }
 >(({ className, animation = "pulse", ...props }, ref) => {
   return (
-    <MuiSkeleton
+    <div
       ref={ref}
       data-slot="skeleton"
-      animation={animation === "pulse" ? "wave" : animation}
-      className={cn("rounded-md", className)}
+      className={cn(
+        "rounded-md bg-muted/60",
+        animation !== false && "animate-pulse",
+        className,
+      )}
       {...props}
     />
   )

@@ -1,13 +1,20 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
-import Alert from "@mui/material/Alert"
-import Box from "@mui/material/Box"
-import Button from "@mui/material/Button"
-import Typography from "@mui/material/Typography"
 import { formatDistanceToNow } from "date-fns"
 import { AlertTriangle, CheckCircle2, Loader2, WifiOff } from "lucide-react"
+import { Button } from "@/components/app-ui/button"
 import { useSyncStore } from "@/lib/offline/sync-store"
+import { cn } from "@/lib/utils"
+
+const barClassName = "flex items-center border-b px-4 py-2"
+
+const severityClassName = {
+  error: "border-destructive/30 bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-destructive",
+  info: "border-info/30 bg-[color-mix(in_srgb,var(--color-info)_8%,transparent)] text-info",
+  warning: "border-warning/30 bg-[color-mix(in_srgb,var(--color-warning)_8%,transparent)] text-[color:var(--warning-foreground)]",
+  success: "border-success/30 bg-[color-mix(in_srgb,var(--color-success)_8%,transparent)] text-[color:var(--success-foreground)]",
+} as const
 
 export function SyncStatusBar() {
   const { isSyncing, pendingCount, lastSyncedAt, syncError, manualSync } = useSyncStore()
@@ -23,74 +30,60 @@ export function SyncStatusBar() {
 
   const canSyncNow = Boolean(manualSync) && !isSyncing && pendingCount > 0
   const syncButton = canSyncNow ? (
-    <Button size="small" variant="outlined" onClick={() => void manualSync?.()} sx={{ minHeight: 28, borderRadius: 999, px: 1.5, fontSize: "0.6875rem" }}>
+    <Button size="sm" variant="outline" onClick={() => void manualSync?.()} className="min-h-7 rounded-full px-3 text-[11px]">
       Sync now
     </Button>
   ) : null
 
-  const barSx = {
-    borderRadius: 0,
-    borderTop: 0,
-    borderLeft: 0,
-    borderRight: 0,
-    px: 2,
-    py: 1,
-    alignItems: "center",
-    "& .MuiAlert-message": {
-      width: "100%",
-    },
-  } as const
-
   if (syncError) {
     return (
-      <Alert severity="error" icon={<AlertTriangle size={14} />} sx={barSx}>
-        <Box sx={{ display: "flex", gap: 1, flexDirection: { xs: "column", sm: "row" }, alignItems: { sm: "center" }, justifyContent: "space-between" }}>
-          <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
-            {syncError}
-          </Typography>
+      <div className={cn(barClassName, severityClassName.error)}>
+        <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={14} className="shrink-0" />
+            <span className="text-xs">{syncError}</span>
+          </div>
           {syncButton}
-        </Box>
-      </Alert>
+        </div>
+      </div>
     )
   }
 
   if (isSyncing) {
     return (
-      <Alert severity="info" icon={<Loader2 size={14} className="animate-spin" />} sx={barSx}>
-        <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
-          Syncing to server...
-        </Typography>
-      </Alert>
+      <div className={cn(barClassName, severityClassName.info)}>
+        <div className="flex items-center gap-2">
+          <Loader2 size={14} className="shrink-0 animate-spin" />
+          <span className="text-xs">Syncing to server...</span>
+        </div>
+      </div>
     )
   }
 
   if (pendingCount > 0) {
     return (
-      <Alert severity="warning" icon={<WifiOff size={14} />} sx={barSx}>
-        <Box sx={{ display: "flex", gap: 1, flexDirection: { xs: "column", sm: "row" }, alignItems: { sm: "center" }, justifyContent: "space-between" }}>
-          <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
-            {pendingCount} record{pendingCount > 1 ? "s" : ""} pending upload and saved locally.
-          </Typography>
+      <div className={cn(barClassName, severityClassName.warning)}>
+        <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <WifiOff size={14} className="shrink-0" />
+            <span className="text-xs">
+              {pendingCount} record{pendingCount > 1 ? "s" : ""} pending upload and saved locally.
+            </span>
+          </div>
           {syncButton}
-        </Box>
-      </Alert>
+        </div>
+      </div>
     )
   }
 
   if (lastSyncedAt) {
     return (
-      <Alert
-        severity="success"
-        icon={<CheckCircle2 size={14} />}
-        sx={{
-          ...barSx,
-          bgcolor: "color-mix(in srgb, var(--color-success) 8%, transparent)",
-        }}
-      >
-        <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
-          All synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}
-        </Typography>
-      </Alert>
+      <div className={cn(barClassName, severityClassName.success)}>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 size={14} className="shrink-0" />
+          <span className="text-xs">All synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
+        </div>
+      </div>
     )
   }
 

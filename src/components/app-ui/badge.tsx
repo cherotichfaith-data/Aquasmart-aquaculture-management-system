@@ -1,20 +1,26 @@
 import * as React from "react"
-import Chip from "@mui/material/Chip"
-import { alpha } from "@mui/material/styles"
 import { Slot } from "@radix-ui/react-slot"
 
 import { cn } from "@/lib/utils"
 
-type BadgeVariant = "default" | "secondary" | "destructive" | "outline"
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "positive" | "neutral" | "negative"
 
 const badgeVariants = ({
+  variant = "default",
   className,
 }: {
   variant?: BadgeVariant | null
   className?: string
 }) =>
   cn(
-    "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none transition-[color,box-shadow] overflow-hidden",
+    "inline-flex min-h-6 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] [&>svg]:size-3 [&>svg]:pointer-events-none",
+    variant === "default" && "border-transparent bg-primary text-primary-foreground",
+    variant === "secondary" && "border-transparent bg-secondary text-secondary-foreground",
+    variant === "destructive" && "border-transparent bg-destructive text-destructive-foreground",
+    variant === "outline" && "border-border bg-background text-foreground",
+    variant === "positive" && "border-transparent bg-emerald-100 text-emerald-700",
+    variant === "neutral" && "border-transparent bg-slate-100 text-slate-700",
+    variant === "negative" && "border-transparent bg-red-100 text-red-700",
     className,
   )
 
@@ -32,31 +38,10 @@ function Badge({
   }
 
   return (
-    <Chip
+    <span
       data-slot="badge"
-      size="small"
-      label={props.children}
       className={badgeVariants({ variant, className })}
-      sx={{
-        height: 24,
-        borderRadius: 1,
-        borderColor: variant === "outline" ? "divider" : "transparent",
-        bgcolor: variant === "default" ? "primary.main" : variant === "secondary" ? "secondary.main" : variant === "destructive" ? "error.main" : "transparent",
-        color: variant === "default" ? "primary.contrastText" : variant === "secondary" ? "secondary.contrastText" : variant === "destructive" ? "error.contrastText" : "text.primary",
-        "& .MuiChip-label": {
-          px: 1,
-          fontSize: "0.75rem",
-          fontWeight: 600,
-          lineHeight: 1.2,
-        },
-        ...(variant === "outline" && {
-          "&:hover": {
-            bgcolor: (theme) => alpha(theme.palette.action.hover, 0.9),
-            color: "text.primary",
-          },
-        }),
-      }}
-      {...Object.fromEntries(Object.entries(props).filter(([key]) => key !== "children"))}
+      {...props}
     />
   )
 }

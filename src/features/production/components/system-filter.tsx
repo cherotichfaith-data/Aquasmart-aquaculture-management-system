@@ -37,10 +37,10 @@ export default function ProductionSystemFilter({
     .sort((left, right) => formatCageLabel(left).localeCompare(formatCageLabel(right), undefined, { numeric: true }))
 
   return (
-    <div className="w-[200px] shrink-0 md:w-[210px]">
-      <Select value={selectedSystemId != null ? String(selectedSystemId) : ""} onValueChange={handleSelectChange}>
+    <div className="w-[180px] shrink-0 md:w-[190px]">
+      <Select value={selectedSystemId != null ? String(selectedSystemId) : undefined} onValueChange={handleSelectChange}>
         <SelectTrigger id="production-system-filter" className="production-select">
-          <SelectValue placeholder="Select system" />
+          <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>

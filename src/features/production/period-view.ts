@@ -101,7 +101,7 @@ function mapProductionSummaryRow(
 
   return {
     date: row.date,
-    systemName: row.system_name ?? (systemId != null ? `System ${systemId}` : null),
+    systemName: row.system_name ?? null,
     periodStartFish,
     numberOfFish,
     abwG: asFiniteNumber(row.average_body_weight),
@@ -196,7 +196,7 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
 
   return sortByDateAsc(Array.from(byDate.values()), (row) => row.date).map((row) => ({
     date: row.date,
-    systemName: "All Systems",
+    systemName: null,
     periodStartFish: row.periodStartFish,
     numberOfFish: row.numberOfFish,
     abwG: divideOrNull(row.biomassKg * 1000, row.numberOfFish),
