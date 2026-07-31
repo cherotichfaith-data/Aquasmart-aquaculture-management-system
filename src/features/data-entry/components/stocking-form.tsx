@@ -25,7 +25,7 @@ import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { BatchQuickCreate } from "./batch-quick-create"
 import { DependencyBlocker } from "./dependency-blocker"
 import {
-  NumberStepperInput,
+  FishCountInput,
   findUnitForSystem,
   getSystemUnits,
   getSystemsForUnit,
@@ -312,11 +312,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   }
 
   return (
-    <div className="space-y-6">
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Stocking</h2>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
@@ -400,7 +396,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
               )}
             />
 
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div className="data-entry-panel-highlight">
               <div>
                 <div className="text-sm font-semibold text-foreground">Batch Number</div>
               </div>
@@ -445,7 +441,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Number of Fish</FormLabel>
                   <FormControl>
-                    <NumberStepperInput field={field} className="max-w-xs" />
+                    <FishCountInput field={field} className="max-w-xs" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

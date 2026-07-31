@@ -1,11 +1,9 @@
-import type { Database, Enums, Tables } from "@/lib/types/database"
+import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import type { TimeBounds, TimePeriod } from "@/lib/time-period"
 import type { WqParameter } from "@/features/water-quality/wq-utils"
 import type { SystemOption } from "@/lib/system-options"
 
-export type WaterQualityRow = Tables<"water_quality_measurement">
-export type WaterQualityInsert = Database["public"]["Tables"]["water_quality_measurement"]["Insert"]
 export type WaterQualityParameter = Database["public"]["Enums"]["water_quality_parameters"]
 export type WaterQualityPageTab =
   | "alerts"

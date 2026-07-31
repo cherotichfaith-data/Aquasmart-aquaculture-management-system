@@ -239,7 +239,7 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
       </Button>
 
       {showSupplierEditor ? (
-        <div className="grid gap-4 rounded-md border border-border/80 p-4 md:grid-cols-2">
+        <div className="grid gap-4 rounded-lg border border-border/80 p-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="fingerling-supplier-name">Supplier Name</Label>
             <Input id="fingerling-supplier-name" value={supplierName} onChange={(event) => setSupplierName(event.target.value)} />

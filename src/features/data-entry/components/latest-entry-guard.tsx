@@ -35,10 +35,6 @@ export function sortLatestEntries(entries: LatestEntrySummary[]) {
   return [...entries].sort((left, right) => toEntryTimestamp(right) - toEntryTimestamp(left))
 }
 
-export function pickLatestEntry(entries: LatestEntrySummary[]) {
-  return sortLatestEntries(entries)[0] ?? null
-}
-
 export function sortLatestEntriesByRecordDate(entries: LatestEntrySummary[]) {
   return [...entries].sort((left, right) => {
     const dateCompare = toEntryDateValue(right).localeCompare(toEntryDateValue(left))
@@ -54,6 +50,17 @@ export function pickLatestEntryByRecordDate(entries: LatestEntrySummary[]) {
 export function pickSameDayEntry(entries: LatestEntrySummary[], date?: string | null) {
   if (!date) return null
   return sortLatestEntries(entries.filter((entry) => entry.date === date))[0] ?? null
+}
+
+/**
+ * Duplicate key for feeding entries: a cage/system can have multiple feeding entries the same
+ * day as long as each uses a different feed type -- only same cage + date + feed type collides.
+ * This is a frontend-only check (no DB-level constraint); kept in one place so the client-side
+ * check (feeding-form.tsx, for both server rows and locally-pending offline rows below) stays
+ * consistent.
+ */
+export function composeFeedingDuplicateKey(feedTypeId: number | null | undefined) {
+  return feedTypeId != null ? String(feedTypeId) : "none"
 }
 
 export function pickSameDayEntryByMetadata(
@@ -76,7 +83,11 @@ export function pickSameDayEntryByMetadata(
   )
 }
 
-export function usePendingLatestEntries(kind: LatestEntryGuardKind, systemId?: number | null) {
+export function usePendingLatestEntries(
+  kind: LatestEntryGuardKind,
+  systemId?: number | null,
+  feedTypes?: Array<{ id: number; label: string }>,
+) {
   return (
     useLiveQuery(async () => {
       if (!systemId || !Number.isFinite(systemId) || systemId <= 0) return [] as LatestEntrySummary[]
@@ -84,6 +95,10 @@ export function usePendingLatestEntries(kind: LatestEntryGuardKind, systemId?: n
       switch (kind) {
         case "feeding": {
           const rows = await offlineDB.feeding.where("systemId").equals(systemId).toArray()
+          const feedTypeLabel = (feedTypeId: number | null | undefined) =>
+            feedTypeId != null
+              ? feedTypes?.find((feedType) => feedType.id === feedTypeId)?.label ?? `Feed type #${feedTypeId}`
+              : "Not selected"
           return rows.map<LatestEntrySummary>((row) => ({
             key: `pending-feeding-${row.localId}`,
             date: row.date,
@@ -94,9 +109,14 @@ export function usePendingLatestEntries(kind: LatestEntryGuardKind, systemId?: n
               row.feedingAmount === 0
                 ? [{ label: "Reason", value: row.notes?.trim() || "No reason recorded" }]
                 : [
-                    { label: "Feed Type", value: row.feedTypeId != null ? String(row.feedTypeId) : "Not selected" },
+                    { label: "Feed Type", value: feedTypeLabel(row.feedTypeId) },
                     { label: "Response", value: row.feedingResponse != null ? `Level ${row.feedingResponse}` : "Not recorded" },
                   ],
+            metadata: { feedingDuplicateKey: composeFeedingDuplicateKey(row.feedTypeId) },
+            duplicateMessage:
+              row.feedTypeId != null
+                ? `A feeding entry with this feed type already exists for this cage on ${row.date}.`
+                : `A feeding entry already exists for this cage on ${row.date}. Select a feed type to log an additional feeding.`,
           }))
         }
         case "mortality": {
@@ -193,7 +213,7 @@ export function usePendingLatestEntries(kind: LatestEntryGuardKind, systemId?: n
           }))
         }
       }
-    }, [kind, systemId]) ?? []
+    }, [kind, systemId, feedTypes]) ?? []
   )
 }
 
@@ -211,13 +231,13 @@ export function LatestEntryGuard({
   return (
     <div className="space-y-3">
       {duplicateEntry ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm text-destructive">
           {duplicateEntry.duplicateMessage ?? `A ${itemLabel} entry already exists for this cage on ${duplicateEntry.date}.`}
         </div>
       ) : null}
 
       {latestEntry ? (
-        <div className="rounded-md border border-border/80 bg-muted/15 px-4 py-4">
+        <div className="data-entry-panel">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-foreground">Latest {itemLabel} entry for this cage</div>
@@ -232,7 +252,7 @@ export function LatestEntryGuard({
           <div className="mt-3 text-sm font-medium text-foreground">{latestEntry.summary}</div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {latestEntry.details.map((detail) => (
-              <div key={`${latestEntry.key}-${detail.label}`} className="rounded-md border border-border/70 bg-background/70 px-3 py-2">
+              <div key={`${latestEntry.key}-${detail.label}`} className="rounded-lg border border-border/70 bg-background/70 px-3 py-2">
                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{detail.label}</div>
                 <div className="text-sm text-foreground">{detail.value}</div>
               </div>

@@ -16,7 +16,14 @@ import { buildOfflinePendingResult } from "@/lib/offline/pending-result"
 import { hasPendingSyncMeta } from "@/lib/offline/result"
 import { useOfflineMutation } from "@/lib/offline/use-offline-mutation"
 import type { Tables } from "@/lib/types/database"
-import { recordFeedInventorySnapshotAction } from "./mutations.server"
+import type { FeedInventorySnapshotInput } from "./mutations.server"
+
+function requireFeedInventoryNumber(value: number | null | undefined, field: string) {
+  if (typeof value !== "number") {
+    throw new Error(`Feed inventory ${field} is required.`)
+  }
+  return value
+}
 
 export function useRecordFeeding() {
   const queryClient = useQueryClient()
@@ -136,11 +143,52 @@ export function useRecordFeeding() {
 }
 
 export function useRecordFeedInventorySnapshot() {
+  const { farmId } = useActiveFarm()
+
+  const offlineMutation = useOfflineMutation<
+    FeedInventorySnapshotInput,
+    {
+      farmId?: string | null
+      inventoryDate: string
+      inventoryTime?: string | null
+      feedTypeId: number
+      bagWeight: number
+      amountOfBags: number
+      openedBags?: number | null
+      comments?: string | null
+    },
+    {
+      data: Tables<"feed_inventory">
+      meta: { farmId: string; date: string; pendingSync?: boolean; localIds?: string[] }
+    }
+  >({
+    tableName: "feedInventory",
+    buildRecords: (payload) => [
+      {
+        farmId: payload.farm_id ?? farmId,
+        inventoryDate: payload.inventory_date,
+        inventoryTime: payload.inventory_time ?? null,
+        feedTypeId: requireFeedInventoryNumber(payload.feed_type_id, "feed type"),
+        bagWeight: requireFeedInventoryNumber(payload.bag_weight, "bag weight"),
+        amountOfBags: requireFeedInventoryNumber(payload.amount_of_bags, "amount of bags"),
+        openedBags: payload.opened_bags ?? null,
+        comments: payload.comments ?? null,
+      },
+    ],
+    buildPendingResult: ({ input, localIds }) =>
+      buildOfflinePendingResult({
+        data: { id: 0 } as Tables<"feed_inventory">,
+        farmId: input.farm_id ?? farmId,
+        date: input.inventory_date,
+        localIds,
+      }),
+  })
+
   return useWriteThroughMutation({
-    mutationFn: recordFeedInventorySnapshotAction,
+    mutationFn: offlineMutation.mutate,
     activityTableName: "feed_inventory",
     recentEntryKey: "feed_inventory",
-    buildOptimisticEntry: (payload) => {
+    buildOptimisticEntry: (payload: FeedInventorySnapshotInput) => {
       return {
         id: `optimistic-${Date.now()}`,
         farm_id: payload.farm_id,

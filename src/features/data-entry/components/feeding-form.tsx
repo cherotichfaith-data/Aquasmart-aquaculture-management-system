@@ -37,8 +37,9 @@ import {
 } from "./form-utils"
 import {
   LatestEntryGuard,
+  composeFeedingDuplicateKey,
   pickLatestEntryByRecordDate,
-  pickSameDayEntry,
+  pickSameDayEntryByMetadata,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
@@ -109,6 +110,7 @@ function toFeedingEntrySummary(row: {
   date?: string | null
   feeding_amount?: number | null
   feeding_response?: number | null
+  feed_type_id?: number | null
   notes?: string | null
   feed_type?: { feed_line?: string | null } | null
 }, keyPrefix: string): LatestEntrySummary {
@@ -125,6 +127,13 @@ function toFeedingEntrySummary(row: {
             { label: "Feed Type", value: row.feed_type?.feed_line || "Not recorded" },
             { label: "Response", value: row.feeding_response != null ? `Level ${row.feeding_response}` : "Not recorded" },
           ],
+    // Duplicate key is feed type only -- a cage can have several feeding entries the same day
+    // as long as each uses a different feed type. This is a frontend-only check.
+    metadata: { feedingDuplicateKey: composeFeedingDuplicateKey(row.feed_type_id) },
+    duplicateMessage:
+      row.feed_type_id != null
+        ? `A feeding entry with this feed type already exists for this cage on ${row.date}.`
+        : `A feeding entry already exists for this cage on ${row.date}. Select a feed type to log an additional feeding.`,
   }
 }
 
@@ -164,6 +173,10 @@ export function FeedingForm({
   const selectedSystemId = Number(selectedSystemValue)
   const selectedBatchValue = useWatch({ control: form.control, name: "batch_id" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
+  const selectedFeedValue = useWatch({ control: form.control, name: "feed_id" })
+  const selectedFeedTypeId =
+    selectedFeedValue && selectedFeedValue !== OPTIONAL_SELECT_VALUE ? Number(selectedFeedValue) : null
+  const selectedFeedingDuplicateKey = composeFeedingDuplicateKey(selectedFeedTypeId)
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
   const feedOptions = feeds
@@ -217,7 +230,7 @@ export function FeedingForm({
     limit: 1,
     enabled: hasValidSystemId,
   })
-  const pendingEntries = usePendingLatestEntries("feeding", hasValidSystemId ? selectedSystemId : null)
+  const pendingEntries = usePendingLatestEntries("feeding", hasValidSystemId ? selectedSystemId : null, feeds)
 
   const existingDailyRecords = duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []
   const latestServerRecords = latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []
@@ -225,12 +238,21 @@ export function FeedingForm({
   const latestServerEntries = latestServerRecords.map((row) => toFeedingEntrySummary(row, "feeding"))
   const duplicateServerEntries = existingDailyRecords.map((row) => toFeedingEntrySummary(row, "feeding-duplicate"))
   const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
-  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
+  // Keyed on feed type, not just date -- a cage can have multiple feeding entries the same day
+  // as long as each uses a different feed type. This is a frontend-only check (no DB constraint):
+  // blocks the submit button and shows a warning instead of relying on a server-side rejection.
+  const duplicateEntry = pickSameDayEntryByMetadata([...duplicateServerEntries, ...pendingEntries], {
+    date: selectedDate,
+    metadataKey: "feedingDuplicateKey",
+    metadataValue: selectedFeedingDuplicateKey,
+  })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       if (duplicateEntry) {
-        form.setError("date", { message: `A feeding entry already exists for ${values.date}.` })
+        form.setError("date", {
+          message: duplicateEntry.duplicateMessage ?? `A feeding entry already exists for ${values.date}.`,
+        })
         return
       }
 
@@ -274,24 +296,20 @@ export function FeedingForm({
 
   return (
     <div>
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
-        <p className="text-sm text-muted-foreground">Fast cage-first feeding entry for daily farm operations.</p>
-      </div>
 
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="feeding" />
         {submissionSummary ? (
-          <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
+          <div className="data-entry-callout-alert border-success/40 bg-success/10 text-sm text-success">
             {submissionSummary}
           </div>
         ) : null}
         {feedOptions.length === 0 ? (
-          <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
+          <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-sm text-warning">
             No feed types are available for this farm yet.
           </div>
         ) : null}
@@ -462,7 +480,7 @@ export function FeedingForm({
               )}
             />
 
-            <div className="rounded-lg border border-border/80 bg-muted/10 p-4">
+            <div className="data-entry-panel">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
@@ -475,7 +493,7 @@ export function FeedingForm({
                 </Button>
               </div>
               {showAdvanced ? (
-                <div className="mt-4">
+                <div className="mt-4 space-y-3">
                   <FormField
                     control={form.control}
                     name="batch_id"

@@ -9,7 +9,7 @@ import { Button } from "@/components/app-ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { Dialog } from "@/components/app-ui/dialog"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { NumberStepperInput } from "./form-support"
+import { FishCountInput } from "./form-support"
 import { useProductionSummary } from "@/features/production/hooks"
 import { useHarvests } from "@/features/reports/hooks"
 import {
@@ -103,7 +103,7 @@ function HarvestCycleSummary({
     const asOfDate = latestCycleRow?.date ?? null
 
     return (
-        <Card className="xl:sticky xl:top-6">
+        <Card className="border-t-2 border-t-primary/25 xl:sticky xl:top-6">
             <CardHeader>
                 <CardTitle>Current Cycle Summary</CardTitle>
                 <CardDescription>
@@ -113,47 +113,47 @@ function HarvestCycleSummary({
             </CardHeader>
             <CardContent className="space-y-4">
                 {!systemId ? (
-                    <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
+                    <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
                         Select a system to load cycle checks before submitting harvest.
                     </div>
                 ) : queryError ? (
-                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive">
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive">
                         Unable to load cycle summary. {queryError}
                     </div>
                 ) : summaryQuery.isLoading ? (
                     <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                         {Array.from({ length: 3 }).map((_, index) => (
-                            <div key={index} className="rounded-md border border-border/80 bg-muted/30 p-3">
+                            <div key={index} className="rounded-lg border border-border/80 bg-muted/30 p-3">
                                 <div className="h-3 w-24 animate-pulse rounded bg-muted" />
                                 <div className="mt-3 h-7 w-20 animate-pulse rounded bg-muted" />
                             </div>
                         ))}
                     </div>
                 ) : !latestCycleRow ? (
-                    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
+                    <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
                         No production-cycle summary is available yet for this system.
                     </div>
                 ) : (
                     <>
                         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                            <div className="rounded-md border border-border/80 bg-muted/20 p-3">
+                            <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Days In Cycle</p>
                                 <p className="mt-2 text-2xl font-semibold">{formatNumberValue(cycleDays)}</p>
                             </div>
-                            <div className="rounded-md border border-border/80 bg-muted/20 p-3">
+                            <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Cumulative eFCR</p>
                                 <p className="mt-2 text-2xl font-semibold">
                                     {formatNumberValue(latestCycleRow.efcr_aggregated, { decimals: 2, fallback: "--" })}
                                 </p>
                             </div>
-                            <div className="rounded-md border border-border/80 bg-muted/20 p-3">
+                            <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Fish Count</p>
                                 <p className="mt-2 text-2xl font-semibold">
                                     {formatNumberValue(latestCycleRow.number_of_fish_inventory)}
                                 </p>
                             </div>
                         </div>
-                        <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+                        <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
                             Use these cycle totals to confirm the entered harvest fish count and weight are consistent before saving.
                         </div>
                     </>
@@ -293,11 +293,8 @@ export function HarvestForm({
 
     return (
         <>
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
                 <div>
-                    <div className="data-entry-form-intro">
-                        <h2 className="text-xl font-semibold tracking-tight">Record Harvest</h2>
-                    </div>
                     <div className="data-entry-status">
                         <OfflineSaveBadge result={mutation.data} />
                     </div>
@@ -357,7 +354,7 @@ export function HarvestForm({
                                         <FormItem>
                                             <FormLabel>Harvested Fish Count</FormLabel>
                                             <FormControl>
-                                                <NumberStepperInput field={field} className="max-w-xs" />
+                                                <FishCountInput field={field} className="max-w-xs" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -428,7 +425,7 @@ export function HarvestForm({
                             </div>
 
                             {harvestType === "final" ? (
-                                <div className="data-entry-callout-alert rounded-md border border-destructive/30 bg-destructive/5 text-sm">
+                                <div className="data-entry-callout-alert border-destructive/30 bg-destructive/5 text-sm">
                                     <p className="font-medium text-foreground">Final harvest will close this cycle.</p>
                                     <p className="mt-1 text-muted-foreground">
                                         This will close the production cycle for {selectedCageLabel}. All subsequent

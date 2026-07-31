@@ -44,7 +44,3 @@ export function toRpcDate(value: unknown): RpcDate {
 
   return DATE_ONLY_RE.exec(trimmed)?.[1] ?? null
 }
-
-export function toRpcDateOrUndefined(value: unknown): string | undefined {
-  return toRpcDate(value) ?? undefined
-}

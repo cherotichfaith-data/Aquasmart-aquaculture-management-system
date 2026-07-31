@@ -1,36 +1,17 @@
 "use server"
 
 import { z } from "zod"
-import { cacheTags, feedInventoryWriteTags } from "@/lib/cache/tags"
+import { feedInventoryWriteTags } from "@/lib/cache/tags"
 import { revalidateWriteTags } from "@/lib/server/write-through"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
-import { UI_FEED_CATEGORIES, UI_FEED_PELLET_SIZES } from "@/lib/feed-type-values"
 import type { Database } from "@/lib/types/database"
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
 type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"]
 
-export type FeedSupplierInput = Insert<"feed_supplier">
-export type FeedTypeInput = Insert<"feed_type">
 export type FeedInventorySnapshotInput = Insert<"feed_inventory"> & { feed_type_label?: string }
-
-const feedSupplierSchema = z.object({
-  company_name: z.string().trim().min(1).max(255),
-  location_country: z.string().trim().min(1).max(255),
-  location_city: z.string().trim().max(255).nullable().optional(),
-})
-
-const feedTypeSchema = z.object({
-  farm_id: z.string().uuid(),
-  feed_line: z.string().trim().max(255).nullable().optional(),
-  feed_category: z.enum(UI_FEED_CATEGORIES),
-  feed_pellet_size: z.enum(UI_FEED_PELLET_SIZES),
-  crude_protein_percentage: z.number().finite().positive(),
-  crude_fat_percentage: z.number().finite().min(0).nullable().optional(),
-  feed_supplier_id: z.number().int().positive(),
-})
 
 const FEED_INVENTORY_ALLOWED_ROLES = new Set(["admin", "farm_manager", "system_operator"])
 
@@ -44,80 +25,6 @@ const feedInventorySchema = z.object({
   opened_bags: z.number().int().min(0).nullable().optional(),
   comments: z.string().trim().max(500).nullable().optional(),
 })
-
-export async function createFeedSupplierAction(payload: FeedSupplierInput): Promise<{ data: Row<"feed_supplier"> }> {
-  const { supabase } = await requireMutationActionUser("feed-supplier:create")
-
-  let parsedPayload: z.infer<typeof feedSupplierSchema>
-  try {
-    parsedPayload = feedSupplierSchema.parse(payload)
-  } catch (error) {
-    throw new Error(
-      error instanceof z.ZodError ? error.issues[0]?.message ?? "Invalid feed supplier payload." : "Invalid request body.",
-    )
-  }
-
-  const { data, error } = await supabase
-    .from("feed_supplier")
-    .insert({
-      company_name: parsedPayload.company_name,
-      location_country: parsedPayload.location_country,
-      location_city: parsedPayload.location_city?.trim() ? parsedPayload.location_city.trim() : null,
-    })
-    .select()
-    .single()
-
-  if (error || !data) {
-    logSbError("feed-supplier:create:insert", error)
-    if (isSbPermissionDenied(error)) {
-      throw new Error("Unable to create feed supplier.")
-    }
-    throw new Error("Unable to create feed supplier.")
-  }
-
-  revalidateWriteTags([cacheTags.feedSuppliers()])
-
-  return { data }
-}
-
-export async function createFeedTypeAction(payload: FeedTypeInput): Promise<{ data: Row<"feed_type"> }> {
-  const { supabase } = await requireMutationActionUser("feed-type:create")
-
-  let parsedPayload: z.infer<typeof feedTypeSchema>
-  try {
-    parsedPayload = feedTypeSchema.parse(payload)
-  } catch (error) {
-    throw new Error(
-      error instanceof z.ZodError ? error.issues[0]?.message ?? "Invalid feed type payload." : "Invalid request body.",
-    )
-  }
-
-  const { data, error } = await supabase
-    .from("feed_type")
-    .insert({
-      feed_line: parsedPayload.feed_line?.trim() ? parsedPayload.feed_line.trim() : null,
-      farm_id: parsedPayload.farm_id,
-      feed_category: parsedPayload.feed_category,
-      feed_pellet_size: parsedPayload.feed_pellet_size,
-      crude_protein_percentage: parsedPayload.crude_protein_percentage,
-      crude_fat_percentage: parsedPayload.crude_fat_percentage ?? null,
-      feed_supplier_id: parsedPayload.feed_supplier_id,
-    })
-    .select()
-    .single()
-
-  if (error || !data) {
-    logSbError("feed-type:create:insert", error)
-    if (isSbPermissionDenied(error)) {
-      throw new Error("Unable to create feed type.")
-    }
-    throw new Error("Unable to create feed type.")
-  }
-
-  revalidateWriteTags([cacheTags.feedTypes(), cacheTags.farm(parsedPayload.farm_id)])
-
-  return { data }
-}
 
 export async function recordFeedInventorySnapshotAction(
   payload: FeedInventorySnapshotInput,

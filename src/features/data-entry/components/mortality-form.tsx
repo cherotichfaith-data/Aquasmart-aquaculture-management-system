@@ -22,7 +22,7 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { NumberStepperInput } from "./form-support"
+import { FishCountInput } from "./form-support"
 import {
   LatestEntryGuard,
   pickLatestEntryByRecordDate,
@@ -174,11 +174,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
   }
 
   return (
-    <div className="space-y-6">
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Mortality</h2>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
@@ -186,7 +182,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="mortality" />
 
         {mortalityCount >= 100 ? (
-        <div className="data-entry-callout-alert rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
+        <div className="data-entry-callout-alert border-destructive/40 bg-destructive/10 text-destructive">
             Mass mortality threshold exceeded. Weigh the dead fish and record the total dead weight, then complete a DO and water-quality check for this cage.
           </div>
         ) : null}
@@ -266,7 +262,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 <FormItem>
                   <FormLabel>Number of Dead Fish</FormLabel>
                   <FormControl>
-                    <NumberStepperInput field={field} className="max-w-xs" />
+                    <FishCountInput field={field} className="max-w-xs" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

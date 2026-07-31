@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
+import { registerBackgroundSync } from "@/lib/offline/background-sync"
 import { offlineDB, type OfflineTableName } from "@/lib/offline/db"
 import { getPendingCount, pushPendingRecordById, pushRecordDirect } from "@/lib/offline/sync"
 import { useSyncStore } from "@/lib/offline/sync-store"
@@ -22,6 +23,15 @@ function isNetworkSaveError(error: unknown) {
   )
 }
 
+/**
+ * Thrown when the initial (online-path) push fails with a 401. Handled like a
+ * network error -- the record still gets queued locally so the entry isn't
+ * lost -- but surfaces a "sign in again" state instead of a generic
+ * "will sync when back online" message, since retrying without a fresh
+ * session will just 401 again.
+ */
+class AuthSyncError extends Error {}
+
 type OfflineMutationOptions<TInput, TRecord extends object, TResult> = {
   tableName: OfflineTableName
   buildRecords: (input: TInput) => TRecord[]
@@ -32,7 +42,7 @@ type OfflineMutationOptions<TInput, TRecord extends object, TResult> = {
 export function useOfflineMutation<TInput, TRecord extends object, TResult>(
   options: OfflineMutationOptions<TInput, TRecord, TResult>,
 ) {
-  const { setPendingCount, setIsSyncing, setLastSyncedAt, setSyncError } = useSyncStore()
+  const { setPendingCount, setIsSyncing, setLastSyncedAt, setSyncError, setNeedsReauth } = useSyncStore()
 
   const mutate = useCallback(
     async (input: TInput): Promise<TResult> => {
@@ -70,10 +80,15 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
             continue
           }
 
+          if (result.status === "auth") {
+            throw new AuthSyncError(result.errorMessage ?? "Your session has expired.")
+          }
+
           throw new Error(result.errorMessage ?? "Unable to save this record.")
         }
 
         setSyncError(null)
+        setNeedsReauth(false)
         setLastSyncedAt(new Date())
         window.dispatchEvent(new CustomEvent("offline-sync-complete"))
 
@@ -84,13 +99,25 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
           return responses[0] as TResult
         }
       } catch (error) {
-        if (!isNetworkSaveError(error)) {
+        const isAuthError = error instanceof AuthSyncError
+        if (!isNetworkSaveError(error) && !isAuthError) {
           throw error
         }
-      }
 
-      await offlineDB.table(options.tableName).bulkAdd(records as Array<SyncTrackedRecord & TRecord>)
-      setPendingCount(await getPendingCount())
+        await offlineDB.table(options.tableName).bulkAdd(records as Array<SyncTrackedRecord & TRecord>)
+        setPendingCount(await getPendingCount())
+        void registerBackgroundSync()
+
+        if (isAuthError) {
+          // Already know we're online (we got an actual 401 response), so
+          // there's no point immediately retrying the push below -- it would
+          // just 401 again. Leave it queued for the background sync loop,
+          // which will pick it up once the user signs back in.
+          setNeedsReauth(true)
+          setSyncError("Saved locally. Sign in again to sync this record.")
+          return options.buildPendingResult({ input, localIds })
+        }
+      }
 
       if (!navigator.onLine) {
         setSyncError("Saved locally. Will sync when back online.")
@@ -104,6 +131,7 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
         const responses: unknown[] = []
         let allSynced = true
         let pushedAny = false
+        let authErrorAny = false
 
         for (const localId of localIds) {
           const result = await pushPendingRecordById(options.tableName, localId)
@@ -123,6 +151,10 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
             continue
           }
 
+          if (result.status === "auth") {
+            authErrorAny = true
+          }
+
           allSynced = false
         }
 
@@ -133,6 +165,7 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
 
         if (allSynced) {
           setSyncError(null)
+          setNeedsReauth(false)
           setPendingCount(await getPendingCount())
           if (options.combineSyncedResponses) {
             return options.combineSyncedResponses({ input, responses, localIds })
@@ -140,6 +173,9 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
           if (responses[0] !== undefined) {
             return responses[0] as TResult
           }
+        } else if (authErrorAny) {
+          setNeedsReauth(true)
+          setSyncError("Saved locally. Sign in again to sync this record.")
         } else {
           setSyncError("Saved locally. Some records will retry syncing automatically.")
         }
@@ -152,7 +188,7 @@ export function useOfflineMutation<TInput, TRecord extends object, TResult>(
 
       return options.buildPendingResult({ input, localIds })
     },
-    [options, setIsSyncing, setLastSyncedAt, setPendingCount, setSyncError],
+    [options, setIsSyncing, setLastSyncedAt, setNeedsReauth, setPendingCount, setSyncError],
   )
 
   return { mutate }

@@ -4,10 +4,12 @@ import {
   MAX_SYNC_RETRIES,
   type OfflineBaseRecord,
   type OfflineFeedingRecord,
+  type OfflineFeedInventoryRecord,
   type OfflineHarvestRecord,
   type OfflineMortalityRecord,
   type OfflineSamplingRecord,
   type OfflineStockingRecord,
+  type OfflineSystemRecord,
   type OfflineTableName,
   type OfflineTransferRecord,
   type OfflineWaterQualityRecord,
@@ -25,9 +27,13 @@ type SyncResult = {
   pushed: number
   errors: number
   conflicts: number
+  /** Records that couldn't sync because the session is no longer valid (401) --
+   * distinct from `errors` because retrying won't help until the user signs in
+   * again, and these records are deliberately never marked 'failed'. */
+  authErrors: number
 }
 
-type PushStatus = "pushed" | "conflict" | "error" | "missing"
+type PushStatus = "pushed" | "conflict" | "error" | "missing" | "auth"
 
 type PushRecordResult = {
   status: PushStatus
@@ -43,6 +49,8 @@ type OfflineRecordByTable = {
   harvest: OfflineHarvestRecord
   transfer: OfflineTransferRecord
   stocking: OfflineStockingRecord
+  feedInventory: OfflineFeedInventoryRecord
+  system: OfflineSystemRecord
 }
 
 type SyncConfig<RecordType> = {
@@ -73,6 +81,8 @@ export const syncTargets = {
   harvest: "/api/harvest/record",
   transfer: "/api/transfer/record",
   stocking: "/api/stocking/record",
+  feedInventory: "/api/feed-inventory/record",
+  system: "/api/system/record",
 } satisfies Record<OfflineTableName, string>
 
 const syncConfigs: { [Key in OfflineTableName]: SyncConfig<OfflineRecordByTable[Key]> } = {
@@ -177,6 +187,35 @@ const syncConfigs: { [Key in OfflineTableName]: SyncConfig<OfflineRecordByTable[
       local_id: record.localId,
     }),
   },
+  // feedInventory and system have no `local_id` column server-side (unlike the tables
+  // above), so retries aren't idempotent the same way -- see the offline-coverage note
+  // in db.ts. Their API routes don't accept a local_id field, so it's omitted here.
+  feedInventory: {
+    apiPath: syncTargets.feedInventory,
+    buildBody: (record) => ({
+      farm_id: record.farmId ?? null,
+      inventory_date: record.inventoryDate,
+      inventory_time: record.inventoryTime ?? null,
+      feed_type_id: record.feedTypeId,
+      bag_weight: record.bagWeight,
+      amount_of_bags: record.amountOfBags,
+      opened_bags: record.openedBags ?? null,
+      comments: record.comments ?? null,
+    }),
+  },
+  system: {
+    apiPath: syncTargets.system,
+    buildBody: (record) => ({
+      farm_id: record.farmId ?? null,
+      commissioned_at: record.commissionedAt ?? null,
+      unit: record.unit ?? null,
+      name: record.name,
+      type: record.type,
+      growth_stage: record.growthStage,
+      volume: record.volume ?? null,
+      depth: record.depth ?? null,
+    }),
+  },
 }
 
 function extractServerId(responseBody: unknown): number | undefined {
@@ -224,6 +263,14 @@ export async function pushRecordDirect<Key extends OfflineTableName>(
 
   if (response.status === 409) {
     return { status: "conflict", response: body }
+  }
+
+  if (response.status === 401) {
+    return {
+      status: "auth",
+      response: body,
+      errorMessage: extractResponseError(body, "Your session has expired. Sign in again to save this record."),
+    }
   }
 
   return {
@@ -275,6 +322,22 @@ export async function pushPendingRecordById<Key extends OfflineTableName>(
       return { status: "conflict", response: body }
     }
 
+    if (response.status === 401) {
+      // Never mark auth failures 'failed' -- the record is fine, the session isn't.
+      // Keep it pending with backoff so it retries automatically once the user
+      // signs back in, instead of getting stuck as an unrecoverable record.
+      const nextRetryCount = (record.retryCount ?? 0) + 1
+      await updateSyncFields(table, localId, {
+        retryCount: nextRetryCount,
+        retryAfter: now + backoffDelayMs(Math.min(nextRetryCount, 3)),
+      })
+      return {
+        status: "auth",
+        response: body,
+        errorMessage: extractResponseError(body, "Your session has expired. Sign in again to sync."),
+      }
+    }
+
     // Server error: apply exponential backoff and mark as failed after MAX_SYNC_RETRIES
     const nextRetryCount = (record.retryCount ?? 0) + 1
     if (nextRetryCount >= MAX_SYNC_RETRIES) {
@@ -309,53 +372,48 @@ async function pushTable<Key extends OfflineTableName>(tableName: Key): Promise<
   let pushed = 0
   let errors = 0
   let conflicts = 0
+  let authErrors = 0
 
   for (const record of pendingRecords) {
     const result = await pushPendingRecordById(tableName, record.localId)
     if (result.status === "pushed") pushed += 1
     else if (result.status === "conflict") conflicts += 1
+    else if (result.status === "auth") authErrors += 1
     else if (result.status === "error") errors += 1
   }
 
-  return { pushed, errors, conflicts }
+  return { pushed, errors, conflicts, authErrors }
 }
 
-export async function runSync(): Promise<SyncResult> {
-  const tableNames: OfflineTableName[] = [
-    "feeding",
-    "mortality",
-    "waterQuality",
-    "sampling",
-    "stocking",
-    "harvest",
-    "transfer",
-  ]
+const ALL_OFFLINE_TABLE_NAMES: OfflineTableName[] = [
+  "feeding",
+  "mortality",
+  "waterQuality",
+  "sampling",
+  "stocking",
+  "harvest",
+  "transfer",
+  "feedInventory",
+  "system",
+]
 
-  const results = await Promise.all(tableNames.map((tableName) => pushTable(tableName)))
+export async function runSync(): Promise<SyncResult> {
+  const results = await Promise.all(ALL_OFFLINE_TABLE_NAMES.map((tableName) => pushTable(tableName)))
 
   return results.reduce<SyncResult>(
     (aggregate, result) => ({
       pushed: aggregate.pushed + result.pushed,
       errors: aggregate.errors + result.errors,
       conflicts: aggregate.conflicts + result.conflicts,
+      authErrors: aggregate.authErrors + result.authErrors,
     }),
-    { pushed: 0, errors: 0, conflicts: 0 },
+    { pushed: 0, errors: 0, conflicts: 0, authErrors: 0 },
   )
 }
 
 export async function getPendingCount(): Promise<number> {
-  const tableNames: OfflineTableName[] = [
-    "feeding",
-    "mortality",
-    "waterQuality",
-    "sampling",
-    "stocking",
-    "harvest",
-    "transfer",
-  ]
-
   const counts = await Promise.all(
-    tableNames.map((tableName) => offlineDB.table(tableName).where("syncStatus").equals("pending").count()),
+    ALL_OFFLINE_TABLE_NAMES.map((tableName) => offlineDB.table(tableName).where("syncStatus").equals("pending").count()),
   )
 
   return counts.reduce((total, count) => total + count, 0)

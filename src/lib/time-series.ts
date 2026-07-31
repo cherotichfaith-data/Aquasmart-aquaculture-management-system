@@ -1,6 +1,3 @@
-import { formatDateOnly } from "@/lib/analytics-format"
-import type { TimePeriod } from "@/lib/time-period"
-
 export type BucketGranularity = "day" | "week" | "month"
 
 const DAY_MS = 86_400_000
@@ -25,24 +22,6 @@ function getWeekStart(date: Date) {
   const delta = day === 0 ? -6 : 1 - day
   normalized.setDate(normalized.getDate() + delta)
   return normalized
-}
-
-export function getBucketGranularity(
-  timePeriod: TimePeriod,
-  dateFrom?: string | null,
-  dateTo?: string | null,
-): BucketGranularity {
-  const resolvedDays = diffDateDays(dateFrom, dateTo)
-  const inclusiveDays = resolvedDays == null ? null : resolvedDays + 1
-
-  if (inclusiveDays != null) {
-    if (inclusiveDays <= 30) return "day"
-    if (inclusiveDays <= 90) return "week"
-    return "month"
-  }
-
-  if (timePeriod === "all history") return "month"
-  return "day"
 }
 
 export function getBucketKey(value: string | null | undefined, granularity: BucketGranularity) {
@@ -72,32 +51,3 @@ function toIsoDate(value: Date) {
   return `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(value.getDate())}`
 }
 
-export function formatBucketLabel(value: string, granularity: BucketGranularity) {
-  if (granularity === "day") {
-    return formatDateOnly(value, value, { month: "short", day: "numeric" })
-  }
-
-  if (granularity === "week") {
-    const start = parseDateOnly(value)
-    if (!start) return value
-    const end = new Date(start.getTime())
-    end.setDate(end.getDate() + 6)
-    return `${formatDateOnly(toIsoDate(start), value, { month: "short", day: "numeric" })} - ${formatDateOnly(
-      toIsoDate(end),
-      value,
-      { month: "short", day: "numeric" },
-    )}`
-  }
-
-  if (granularity === "month") {
-    return formatDateOnly(`${value}-01`, value, { month: "short", year: "2-digit" })
-  }
-
-  return value
-}
-
-export function formatGranularityLabel(value: BucketGranularity) {
-  if (value === "week") return "week"
-  if (value === "month") return "month"
-  return "day"
-}

@@ -12,7 +12,6 @@ import { useOfflineMutation } from "@/lib/offline/use-offline-mutation"
 import type { Tables } from "@/lib/types/database"
 import {
   getAlertThresholds,
-  getDailyWaterQualityRating,
   getLatestWaterQualityStatus,
   getWaterQualityMeasurements,
 } from "./queries.client"
@@ -104,45 +103,6 @@ export function useWaterQualityMeasurements(params: {
           parameterName: params.parameterName ?? params.parameter,
           limit: params.limit,
           latestFirst: params.latestFirst,
-          signal,
-        }),
-      staleTime: 60_000,
-    }),
-  )
-}
-
-export function useDailyWaterQualityRating(params: {
-  systemId?: number
-  dateFrom?: string
-  dateTo?: string
-  requireSystem?: boolean
-  limit?: number
-  enabled?: boolean
-  farmId?: string | null
-}) {
-  const { farmId } = useActiveFarm()
-  const { session } = useAuth()
-  const resolvedFarmId = params.farmId ?? farmId
-  const enabledBase = Boolean(session) && Boolean(resolvedFarmId)
-  const enabledSystem = enabledBase && Boolean(params.systemId)
-  const enabled = Boolean(params.enabled ?? true) && (params.requireSystem ? enabledSystem : enabledBase)
-  return useQuery(
-    waterQualityQueryOptions({
-      queryKey: queryKeys.waterQuality.dailyRating({
-        farmId: resolvedFarmId,
-        systemId: params.systemId,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-        limit: params.limit,
-      }),
-      enabled,
-      queryFn: ({ signal }) =>
-        getDailyWaterQualityRating({
-          farmId: resolvedFarmId!,
-          systemId: params.systemId,
-          dateFrom: params.dateFrom,
-          dateTo: params.dateTo,
-          limit: params.limit,
           signal,
         }),
       staleTime: 60_000,

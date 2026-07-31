@@ -16,37 +16,6 @@ export function getWqiLabel(value: number | null): WaterQualityStatusLabel {
   return { label: "Poor", color: getSemanticColor("bad") }
 }
 
-function scoreDissolvedOxygen(value: number | null, lowDoThreshold: number) {
-  if (value == null) return null
-  if (value >= lowDoThreshold + 2) return 90
-  if (value >= lowDoThreshold) return 60
-  if (value >= lowDoThreshold - 1) return 30
-  return 0
-}
-
-function scoreTemperature(value: number | null, tempMean: number | null, tempStd: number | null) {
-  if (value == null || tempMean == null || tempStd == null) return null
-  const delta = Math.abs(value - tempMean)
-  if (tempStd === 0) return delta === 0 ? 90 : 0
-  if (delta <= tempStd) return 90
-  if (delta <= tempStd * 2) return 60
-  if (delta <= tempStd * 3) return 30
-  return 0
-}
-
-export function calculateWqi(
-  doValue: number | null,
-  tempValue: number | null,
-  lowDoThreshold: number,
-  tempMean: number | null,
-  tempStd: number | null,
-) {
-  const doScore = scoreDissolvedOxygen(doValue, lowDoThreshold)
-  const tempScore = scoreTemperature(tempValue, tempMean, tempStd)
-  if (doScore == null || tempScore == null) return null
-  return (doScore + tempScore) / 2
-}
-
 export function selectThresholdRow(rows: WaterQualityThresholdRow[], systemId?: number | null) {
   if (systemId != null) {
     const systemThreshold = rows.find((row) => row.system_id === systemId)

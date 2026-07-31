@@ -62,10 +62,6 @@ type FeedingRecordJoinedRow = {
   } | null
 }
 
-type FeedingActivityRow = Pick<
-  FeedingRecordRow,
-  "id" | "created_at" | "date" | "batch_id" | "feeding_amount" | "feeding_response" | "system_id"
->
 type RecentRowsTable =
   | "fish_mortality"
   | "feeding_record"
@@ -276,52 +272,6 @@ export async function getFeedingRecords(params?: {
   } catch (error) {
     if (params.signal?.aborted || isQuietError(error)) return empty<FeedingRecordWithType>()
     return toQueryError("getFeedingRecords", error)
-  }
-}
-
-export async function getFeedingActivityRecords(params?: {
-  farmId?: string | null
-  systemId?: number
-  systemIds?: number[]
-  batchId?: number
-  dateFrom?: string
-  dateTo?: string
-  limit?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedingActivityRow>> {
-  if (!params?.farmId) return empty<FeedingActivityRow>()
-
-  const clientResult = await getReportsClient("getFeedingActivityRecords")
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  try {
-    const scopedSystemIds = await resolveScopedSystemIds(supabase, params)
-    if (!scopedSystemIds || scopedSystemIds.length === 0) return empty<FeedingActivityRow>()
-
-    let query = supabase
-      .from("feeding_record")
-      .select("id, created_at, date, batch_id, feeding_amount, feeding_response, system_id")
-
-    query = query.in("system_id", scopedSystemIds)
-    if (params.batchId) query = query.eq("batch_id", params.batchId)
-    if (params.dateFrom) query = query.gte("date", params.dateFrom)
-    if (params.dateTo) query = query.lte("date", params.dateTo)
-    if (params.limit) query = query.limit(params.limit)
-    if (params.signal) query = query.abortSignal(params.signal)
-
-    const { data, error } = await query
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false })
-    if (error) {
-      if (params.signal?.aborted || isQuietError(error)) return empty<FeedingActivityRow>()
-      return toQueryError("getFeedingActivityRecords", error)
-    }
-
-    return toQuerySuccess<FeedingActivityRow>((data ?? []) as FeedingActivityRow[])
-  } catch (error) {
-    if (params.signal?.aborted || isQuietError(error)) return empty<FeedingActivityRow>()
-    return toQueryError("getFeedingActivityRecords", error)
   }
 }
 
@@ -777,55 +727,6 @@ export async function getTransferData(params?: {
     if (params.signal?.aborted || isQuietError(error)) return empty<FishTransferRow>()
     return toQueryError("getTransferData", error)
   }
-}
-
-export async function getRecentActivities(params?: {
-  farmId?: string | null
-  tableName?: string
-  changeType?: Enums<"change_type_enum">
-  dateFrom?: string
-  dateTo?: string
-  limit?: number
-  signal?: AbortSignal
-}): Promise<QueryResult<ChangeLogRow>> {
-  if (!params?.farmId) return empty<ChangeLogRow>()
-
-  const result = await fetchRpc<{
-    id: string | number
-    table_name: string | null
-    activity_date: string | null
-    system_id?: number | null
-    batch_id?: number | null
-  }>(
-    "getRecentActivities",
-    "api_recent_activity_feed",
-    {
-      p_farm_id: params.farmId,
-      p_limit: params.limit ?? 50,
-      p_date_from: toRpcDate(params.dateFrom),
-      p_date_to: toRpcDate(params.dateTo),
-      p_table: params.tableName && params.tableName !== "all" ? params.tableName : undefined,
-    },
-    params.signal,
-  )
-
-  // This endpoint has always degraded to an empty list on any error (rather
-  // than surfacing one), so preserve that even for a genuine failure.
-  if (result.status === "error") return toQuerySuccess<ChangeLogRow>([])
-
-  return toQuerySuccess<ChangeLogRow>(
-    result.data.map(
-      (row) => ({
-        id: row.id,
-        table_name: row.table_name,
-        change_type: "INSERT",
-        column_name: null,
-        change_time: row.activity_date,
-        system_id: row.system_id,
-        batch_id: row.batch_id,
-      }),
-    ),
-  )
 }
 
 const emptyRecentEntries = () => ({

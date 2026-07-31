@@ -1,50 +1,72 @@
 "use client"
 
 import { invalidateAfterWrite } from "@/lib/cache/react-query"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
+import { buildOfflinePendingResult } from "@/lib/offline/pending-result"
+import { useOfflineMutation } from "@/lib/offline/use-offline-mutation"
 import type { Database } from "@/lib/types/database"
 
 type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
   unit?: string | null
 }
-
-async function createSystem(payload: SystemInsertWithUnit) {
-  const response = await fetch("/api/system/record", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(payload),
-  })
-  const body = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    const message =
-      body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
-        ? (body as { error: string }).error
-        : "Failed to create system."
-    throw new Error(message)
-  }
-
-  return body as {
-    data: Database["public"]["Tables"]["system"]["Row"]
-    meta: { farmId: string; systemId: number | null; date: string }
-  }
-}
+type SystemRow = Database["public"]["Tables"]["system"]["Row"]
 
 export function useCreateSystem() {
+  const { farmId } = useActiveFarm()
+
+  const offlineMutation = useOfflineMutation<
+    SystemInsertWithUnit,
+    {
+      farmId?: string | null
+      commissionedAt?: string | null
+      unit?: string | null
+      name: string
+      type: SystemInsertWithUnit["type"]
+      growthStage: SystemInsertWithUnit["growth_stage"]
+      volume?: number | null
+      depth?: number | null
+    },
+    {
+      data: SystemRow
+      meta: { farmId: string; systemId: number | null; date: string; pendingSync?: boolean; localIds?: string[] }
+    }
+  >({
+    tableName: "system",
+    buildRecords: (payload) => [
+      {
+        farmId: payload.farm_id ?? farmId,
+        commissionedAt: payload.commissioned_at ?? null,
+        unit: payload.unit ?? null,
+        name: payload.name,
+        type: payload.type,
+        growthStage: payload.growth_stage,
+        volume: payload.volume ?? null,
+        depth: payload.depth ?? null,
+      },
+    ],
+    buildPendingResult: ({ input, localIds }) =>
+      buildOfflinePendingResult({
+        data: { id: 0 } as SystemRow,
+        farmId: input.farm_id ?? farmId,
+        systemId: null,
+        date: input.commissioned_at ?? new Date().toISOString(),
+        localIds,
+      }),
+  })
+
   return useWriteThroughMutation({
-    mutationFn: createSystem,
+    mutationFn: offlineMutation.mutate,
     activityTableName: "system",
     recentEntryKey: "systems",
-    buildOptimisticEntry: (payload) => {
-      const systemPayload = payload as SystemInsertWithUnit
+    buildOptimisticEntry: (payload: SystemInsertWithUnit) => {
       return {
         id: `optimistic-${Date.now()}`,
-        commissioned_at: systemPayload.commissioned_at ?? null,
-        unit: systemPayload.unit ?? null,
-        name: systemPayload.name ?? null,
-        type: systemPayload.type ?? null,
-        growth_stage: systemPayload.growth_stage ?? null,
+        commissioned_at: payload.commissioned_at ?? null,
+        unit: payload.unit ?? null,
+        name: payload.name ?? null,
+        type: payload.type ?? null,
+        growth_stage: payload.growth_stage ?? null,
         created_at: new Date().toISOString(),
         status: "pending",
       }

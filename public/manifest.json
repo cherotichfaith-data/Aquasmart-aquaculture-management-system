@@ -7,7 +7,35 @@
   "background_color": "#0A7E8C",
   "theme_color": "#0A7E8C",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Log Feeding",
+      "short_name": "Feeding",
+      "description": "Record a feeding event",
+      "url": "/data-entry?type=feeding"
+    },
+    {
+      "name": "Log Mortality",
+      "short_name": "Mortality",
+      "description": "Record a mortality event",
+      "url": "/data-entry?type=mortality"
+    },
+    {
+      "name": "Log Water Quality",
+      "short_name": "Water Quality",
+      "description": "Record a water quality measurement",
+      "url": "/data-entry?type=water_quality"
+    },
+    {
+      "name": "Log Harvest",
+      "short_name": "Harvest",
+      "description": "Record a harvest event",
+      "url": "/data-entry?type=harvest"
+    }
   ]
 }
