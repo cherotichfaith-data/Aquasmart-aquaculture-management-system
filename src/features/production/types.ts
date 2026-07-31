@@ -46,10 +46,3 @@ export type ProductionDailyTrendRow = {
   biomass_density: number | null
 }
 
-export type ProductionSummaryMetricsRow = {
-  period_start_fish: number
-  mortality_fish: number
-  transfer_out_fish: number
-  total_harvested_kg: number
-  total_harvested_fish: number
-}

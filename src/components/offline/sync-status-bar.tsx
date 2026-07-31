@@ -1,8 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import { useSyncExternalStore } from "react"
 import { formatDistanceToNow } from "date-fns"
-import { AlertTriangle, CheckCircle2, Loader2, WifiOff } from "lucide-react"
+import { AlertTriangle, CheckCircle2, LogIn, Loader2, WifiOff } from "lucide-react"
 import { Button } from "@/components/app-ui/button"
 import { useSyncStore } from "@/lib/offline/sync-store"
 import { cn } from "@/lib/utils"
@@ -17,7 +18,7 @@ const severityClassName = {
 } as const
 
 export function SyncStatusBar() {
-  const { isSyncing, pendingCount, lastSyncedAt, syncError, manualSync } = useSyncStore()
+  const { isSyncing, pendingCount, lastSyncedAt, syncError, manualSync, needsReauth } = useSyncStore()
   const hasMounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -34,6 +35,31 @@ export function SyncStatusBar() {
       Sync now
     </Button>
   ) : null
+
+  // Checked ahead of the generic syncError bar -- a "Sync now" button is useless
+  // here since retrying without a fresh session will just 401 again. Signing
+  // back in re-establishes the session, and the existing 60s/online-triggered
+  // sync loop picks the queued records up automatically after that.
+  if (needsReauth) {
+    return (
+      <div className={cn(barClassName, severityClassName.error)}>
+        <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={14} className="shrink-0" />
+            <span className="text-xs">
+              {syncError ?? "Your session expired. Sign in again to sync your saved records."}
+            </span>
+          </div>
+          <Button size="sm" variant="outline" asChild className="min-h-7 rounded-full px-3 text-[11px]">
+            <Link href="/auth">
+              <LogIn size={12} />
+              Sign in
+            </Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (syncError) {
     return (

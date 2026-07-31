@@ -7,7 +7,6 @@ import { revalidateWriteTags } from "@/lib/server/write-through"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { logSbError } from "@/lib/supabase/log"
 import { normalizeRole, type AquaSmartRole } from "@/lib/app-entry"
-import type { TablesInsert } from "@/lib/types/database"
 
 const VALID_ROLES = [
   "admin",
@@ -22,19 +21,7 @@ const onboardingProfileSchema = z.object({
   role: z.enum(VALID_ROLES, { errorMap: () => ({ message: "Invalid role." }) }),
 })
 
-const onboardingBootstrapSchema = z.object({
-  farmName: z.string().trim().min(2, "Farm name is required."),
-  location: z.string().trim().min(2, "Location is required."),
-  owner: z.string().trim().optional().default(""),
-  email: z.string().trim().optional().default(""),
-  phone: z.string().trim().optional().default(""),
-  lowDoThreshold: z.number().finite().min(0).optional().default(5.0),
-  highAmmoniaThreshold: z.number().finite().min(0).optional().default(0.05),
-  highMortalityThreshold: z.number().finite().min(0).optional().default(2.0),
-})
-
 type OnboardingProfileInput = z.infer<typeof onboardingProfileSchema>
-type OnboardingBootstrapInput = z.infer<typeof onboardingBootstrapSchema>
 
 type OnboardingProfileResult = {
   farmId: string | null
@@ -295,108 +282,5 @@ export async function completeOnboardingProfileAction(
     farmId: assignment.farmId,
     role: selectedRole,
     membershipAssigned: true,
-  }
-}
-
-export async function bootstrapOnboardingWorkspaceAction(
-  input: OnboardingBootstrapInput,
-): Promise<{ farmId: string; alreadyProvisioned: boolean }> {
-  const { supabase, user } = await requireMutationActionUser("onboarding:bootstrap")
-
-  const { data: farmOptions, error: farmOptionsError } = await supabase.rpc("api_farm_options_rpc")
-  if (farmOptionsError) {
-    logSbError("onboarding:bootstrap:farmOptions", farmOptionsError)
-    throw new Error("Unable to verify onboarding status.")
-  }
-
-  const existingFarmId = (farmOptions ?? [])[0]?.id ?? null
-  if (existingFarmId) {
-    return { farmId: existingFarmId, alreadyProvisioned: true }
-  }
-
-  let payload: OnboardingBootstrapInput
-  try {
-    payload = onboardingBootstrapSchema.parse(input)
-  } catch (error) {
-    throw new Error(
-      error instanceof z.ZodError
-        ? error.issues[0]?.message ?? "Invalid onboarding payload."
-        : "Invalid request body.",
-    )
-  }
-
-  let admin: ReturnType<typeof createAdminClient>
-  try {
-    admin = createAdminClient()
-  } catch (error) {
-    logSbError("onboarding:bootstrap:createAdminClient", error)
-    throw new Error("Server onboarding is not configured. Set SUPABASE_SERVICE_ROLE_KEY.")
-  }
-
-  const { data: farm, error: farmInsertError } = await admin
-    .from("farm")
-    .insert({
-      name: payload.farmName,
-      location: payload.location,
-    })
-    .select("id")
-    .single()
-
-  if (farmInsertError || !farm?.id) {
-    logSbError("onboarding:bootstrap:createFarm", farmInsertError)
-    throw new Error("Unable to create the farm workspace.")
-  }
-
-  const { error: membershipError } = await admin
-    .from("farm_user")
-    .upsert(
-      {
-        farm_id: farm.id,
-        user_id: user.id,
-        role: "admin",
-      },
-      { onConflict: "farm_id,user_id" },
-    )
-
-  if (membershipError) {
-    logSbError("onboarding:bootstrap:createFarmUser", membershipError)
-    throw new Error("Farm created, but owner membership setup failed.")
-  }
-
-  const { error: thresholdError } = await admin
-    .from("alert_threshold")
-    .insert({
-      scope: "farm",
-      farm_id: farm.id,
-      low_do_threshold: payload.lowDoThreshold,
-      high_ammonia_threshold: payload.highAmmoniaThreshold,
-      high_mortality_threshold: payload.highMortalityThreshold,
-    } as TablesInsert<"alert_threshold">)
-
-  if (thresholdError) {
-    logSbError("onboarding:bootstrap:createThresholds", thresholdError)
-    throw new Error("Farm created, but default thresholds could not be saved.")
-  }
-
-  const nextUserMetadata = {
-    ...(typeof user.user_metadata === "object" && user.user_metadata ? user.user_metadata : {}),
-    role: "admin",
-    farm_name: payload.farmName,
-    location: payload.location,
-    owner: payload.owner,
-  }
-
-  const { error: metadataError } = await admin.auth.admin.updateUserById(user.id, {
-    user_metadata: nextUserMetadata,
-  })
-  if (metadataError) {
-    logSbError("onboarding:bootstrap:updateUserMetadata", metadataError)
-  }
-
-  revalidateWriteTags([cacheTags.farmOptions(user.id), cacheTags.farm(farm.id)])
-
-  return {
-    farmId: farm.id,
-    alreadyProvisioned: false,
   }
 }

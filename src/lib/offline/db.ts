@@ -11,6 +11,8 @@ type WaterQualityParameter = Database["public"]["Enums"]["water_quality_paramete
 type StockingType = Database["public"]["Enums"]["type_of_stocking"]
 type HarvestType = Database["public"]["Enums"]["type_of_harvest"]
 type TransferType = Database["public"]["Enums"]["transfer_type"]
+type SystemType = Database["public"]["Enums"]["system_type"]
+type SystemGrowthStage = Database["public"]["Enums"]["system_growth_stage"]
 
 export type OfflineBaseRecord = {
   localId: string
@@ -102,6 +104,28 @@ export interface OfflineTransferRecord extends OfflineBaseRecord {
   notes?: string | null
 }
 
+export interface OfflineFeedInventoryRecord extends OfflineBaseRecord {
+  farmId?: string | null
+  inventoryDate: string
+  inventoryTime?: string | null
+  feedTypeId: number
+  bagWeight: number
+  amountOfBags: number
+  openedBags?: number | null
+  comments?: string | null
+}
+
+export interface OfflineSystemRecord extends OfflineBaseRecord {
+  farmId?: string | null
+  commissionedAt?: string | null
+  unit?: string | null
+  name: string
+  type: SystemType
+  growthStage: SystemGrowthStage
+  volume?: number | null
+  depth?: number | null
+}
+
 export type OfflineTableName =
   | "feeding"
   | "mortality"
@@ -110,6 +134,26 @@ export type OfflineTableName =
   | "stocking"
   | "harvest"
   | "transfer"
+  | "feedInventory"
+  | "system"
+
+/**
+ * Read-through cache for dropdown/reference data (systems, batches, feed types) so
+ * data-entry forms keep working after days offline, instead of showing whatever the
+ * last server-rendered payload happened to contain. Distinct from the offline write
+ * queue above -- this table is never synced, just refreshed opportunistically whenever
+ * live data comes through. See src/lib/offline/reference-cache.ts.
+ */
+export type ReferenceCacheKind = "systems" | "batches" | "feeds"
+
+export interface ReferenceCacheEntry {
+  /** `${kind}:${farmId}` */
+  key: string
+  kind: ReferenceCacheKind
+  farmId: string
+  data: unknown[]
+  cachedAt: number
+}
 
 export class AquaSmartOfflineDB extends Dexie {
   feeding!: Table<OfflineFeedingRecord, string>
@@ -119,6 +163,9 @@ export class AquaSmartOfflineDB extends Dexie {
   stocking!: Table<OfflineStockingRecord, string>
   harvest!: Table<OfflineHarvestRecord, string>
   transfer!: Table<OfflineTransferRecord, string>
+  feedInventory!: Table<OfflineFeedInventoryRecord, string>
+  system!: Table<OfflineSystemRecord, string>
+  referenceCache!: Table<ReferenceCacheEntry, string>
 
   constructor() {
     super("aquasmart-offline")
@@ -141,6 +188,31 @@ export class AquaSmartOfflineDB extends Dexie {
       stocking: "localId, syncStatus, systemId, createdAtLocal",
       harvest: "localId, syncStatus, systemId, createdAtLocal",
       transfer: "localId, syncStatus, originSystemId, createdAtLocal",
+    })
+    // v3 — add feedInventory and system tables (farm-scoped, no systemId index)
+    this.version(3).stores({
+      feeding: "localId, syncStatus, systemId, createdAtLocal",
+      mortality: "localId, syncStatus, systemId, createdAtLocal",
+      waterQuality: "localId, syncStatus, systemId, createdAtLocal",
+      sampling: "localId, syncStatus, systemId, createdAtLocal",
+      stocking: "localId, syncStatus, systemId, createdAtLocal",
+      harvest: "localId, syncStatus, systemId, createdAtLocal",
+      transfer: "localId, syncStatus, originSystemId, createdAtLocal",
+      feedInventory: "localId, syncStatus, createdAtLocal",
+      system: "localId, syncStatus, createdAtLocal",
+    })
+    // v4 — add referenceCache table for offline dropdown/lookup data
+    this.version(4).stores({
+      feeding: "localId, syncStatus, systemId, createdAtLocal",
+      mortality: "localId, syncStatus, systemId, createdAtLocal",
+      waterQuality: "localId, syncStatus, systemId, createdAtLocal",
+      sampling: "localId, syncStatus, systemId, createdAtLocal",
+      stocking: "localId, syncStatus, systemId, createdAtLocal",
+      harvest: "localId, syncStatus, systemId, createdAtLocal",
+      transfer: "localId, syncStatus, originSystemId, createdAtLocal",
+      feedInventory: "localId, syncStatus, createdAtLocal",
+      system: "localId, syncStatus, createdAtLocal",
+      referenceCache: "key, kind, farmId",
     })
   }
 }

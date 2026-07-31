@@ -9,13 +9,6 @@ import type { ProductionDailyTrendRow } from "@/features/production/types"
 
 export type { ProductionPeriodViewRow } from "@/features/production/period-view"
 
-export type ProductionEfcrChartRow = {
-  date: string
-  label: string
-  periodEfcr: number | null
-  aggregatedEfcr: number | null
-}
-
 export function buildProductionMetricRows(
   rows: ProductionPeriodViewRow[],
   metric: ProductionMetric,

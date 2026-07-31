@@ -59,8 +59,6 @@ export const DATE_TYPE_URL_VALUES: Record<DateType, string> = {
   year: "year",
   "all history": "all history",
 }
-export const TIME_PERIOD_URL_VALUES: Record<TimePeriod, string> = DATE_TYPE_URL_VALUES
-
 const DATE_TYPES_BY_URL_VALUE = new Map(
   Object.entries(DATE_TYPE_URL_VALUES).map(([dateType, urlValue]) => [urlValue, dateType as DateType]),
 )
@@ -93,9 +91,6 @@ export const parseTimePeriodUrlValue = parseDateTypeUrlValue
 export const isDateType = (value: unknown): value is DateType =>
   typeof value === "string" && DATE_TYPES.includes(value as DateType)
 export const isTimePeriod = isDateType
-
-export const isBaseTimePeriod = (value: unknown): value is BaseTimePeriod =>
-  value !== "all history" && isDateType(value)
 
 export const resolveDateType = (value: unknown, fallback: DateType = DEFAULT_DATE_TYPE): DateType =>
   parseDateTypeUrlValue(value) ?? fallback
@@ -141,8 +136,6 @@ export function getDateTypeDays(value: DateType): number | null {
   if (value === "all history") return null
   return DATE_TYPE_DAY_COUNTS[value]
 }
-export const getTimePeriodDays = getDateTypeDays
-
 export function getAvailableDateTypes(maxDaysSinceStart?: number | null): DateType[] {
   if (maxDaysSinceStart == null || !Number.isFinite(maxDaysSinceStart) || maxDaysSinceStart <= 0) {
     return DATE_TYPES

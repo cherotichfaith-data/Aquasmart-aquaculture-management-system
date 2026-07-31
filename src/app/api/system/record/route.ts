@@ -65,7 +65,13 @@ export async function POST(request: Request) {
   if (error || !data) {
     logSbError("system:record:insert", error)
     if (isDuplicateSystemNameError(error)) {
-      return NextResponse.json({ error: `A system named "${payload.name}" already exists in this farm.` }, { status: 409 })
+      // 422, not 409: the offline sync layer (src/lib/offline/sync.ts) treats HTTP 409
+      // specifically as "already synced via local_id retry" and marks the record synced
+      // without surfacing an error. A duplicate-name conflict is a real validation failure,
+      // not an idempotent-retry no-op, so it must use a status the sync layer treats as an
+      // actual error -- otherwise a queued offline system record that collides with an
+      // existing name would silently vanish as if it had been created.
+      return NextResponse.json({ error: `A system named "${payload.name}" already exists in this farm.` }, { status: 422 })
     }
     const status = isSbPermissionDenied(error) ? 403 : 500
     return NextResponse.json({ error: "Unable to create system." }, { status })

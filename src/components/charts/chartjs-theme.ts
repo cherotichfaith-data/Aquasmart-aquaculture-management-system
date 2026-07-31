@@ -2,24 +2,6 @@
 
 import type { ChartOptions, ScriptableContext, ScriptableScaleContext, Tick } from "chart.js"
 
-export function formatCompactTick(value: number | string) {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric)) return String(value)
-  return new Intl.NumberFormat(undefined, {
-    notation: Math.abs(numeric) >= 1000 ? "compact" : "standard",
-    maximumFractionDigits: Math.abs(numeric) >= 1000 ? 1 : 0,
-  }).format(numeric)
-}
-
-export function formatDecimalTick(value: number | string, decimals = 1) {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric)) return String(value)
-  return numeric.toLocaleString(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })
-}
-
 function parseIsoDay(value: string) {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!match) return null
@@ -75,14 +57,6 @@ export function buildDailyDateDomain(values: Array<string | null | undefined>) {
     cursor.setUTCDate(cursor.getUTCDate() + 1)
   }
   return domain
-}
-
-export function buildSparseDateDomain(values: Array<string | null | undefined>) {
-  return values
-    .filter((value): value is string => Boolean(value))
-    .filter((value) => parseIsoDay(value) != null)
-    .sort((left, right) => left.localeCompare(right))
-    .filter((value, index, array) => index === 0 || value !== array[index - 1])
 }
 
 export function getDateAxisMaxTicks(domainLength: number) {

@@ -10,7 +10,6 @@ import {
   getDateAxisMaxTicks,
 } from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
-import { DataFetchingBadge, DataUpdatedAt } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
@@ -41,31 +40,6 @@ type FeedingRecordRow = {
     feed_line?: string | null
     crude_protein_percentage?: number | null
   } | null
-}
-
-export function FeedingStatusRow({
-  latestUpdatedAt,
-  recordsCount,
-  systemCount,
-  isFetching,
-  isLoading,
-}: {
-  latestUpdatedAt: number
-  recordsCount: number
-  systemCount: number
-  isFetching: boolean
-  isLoading: boolean
-}) {
-  return (
-    <div className="filter-bar text-xs">
-      <DataUpdatedAt updatedAt={latestUpdatedAt} />
-      <div className="legend-pills">
-        <div className="legend-pill">{recordsCount} feeding rows</div>
-        <div className="legend-pill">{systemCount} cages in scope</div>
-        <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
-      </div>
-    </div>
-  )
 }
 
 export function FeedingSummaryCards({

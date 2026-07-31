@@ -3,22 +3,13 @@
 import { z } from "zod"
 import { cacheTags } from "@/lib/cache/tags"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
-import { buildPersistedSystemName } from "@/lib/system-options"
 import { revalidateWriteTags } from "@/lib/server/write-through"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
-import { GROWTH_STAGE_VALUES } from "@/lib/stage-filter"
-import { FORM_SYSTEM_TYPES } from "@/lib/system-types"
 import type { Database } from "@/lib/types/database"
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
 type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"]
-
-type MutationMeta = {
-  farmId: string
-  systemId?: number | null
-  date: string
-}
 
 type DbErrorLike = {
   code?: string
@@ -26,21 +17,8 @@ type DbErrorLike = {
   details?: string
 }
 
-export type SystemInput = Insert<"system">
 export type FingerlingSupplierInput = Insert<"fingerling_supplier">
 export type FingerlingBatchInput = Insert<"fingerling_batch">
-
-const systemSchema = z.object({
-  farm_id: z.string().uuid(),
-  commissioned_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  unit: z.string().max(120).nullable().optional(),
-  name: z.string().min(1).max(120),
-  type: z.enum(FORM_SYSTEM_TYPES),
-  growth_stage: z.enum(GROWTH_STAGE_VALUES),
-  volume: z.number().min(0).nullable().optional(),
-  depth: z.number().min(0).nullable().optional(),
-  is_active: z.boolean().optional(),
-})
 
 const fingerlingSupplierSchema = z.object({
   company_name: z.string().trim().min(1).max(255),
@@ -65,17 +43,6 @@ const farmWorkspaceSchema = z.object({
 })
 
 type FarmWorkspaceInput = z.infer<typeof farmWorkspaceSchema>
-
-function isDuplicateSystemNameError(error: unknown) {
-  if (!error || typeof error !== "object") return false
-  const dbError = error as DbErrorLike
-  return (
-    dbError.code === "23505" &&
-    /system_active_name_farm_unique|system_name_farm_unique|farm_id, name|duplicate key/i.test(
-      `${dbError.message ?? ""}\n${dbError.details ?? ""}`,
-    )
-  )
-}
 
 function isDuplicateFingerlingSupplierNameError(error: unknown) {
   if (!error || typeof error !== "object") return false
@@ -280,65 +247,6 @@ export async function createFarmWorkspaceAction(input: FarmWorkspaceInput): Prom
   revalidateWriteTags([cacheTags.farmOptions(user.id), cacheTags.farm(farm.id)])
 
   return { farmId: farm.id, organizationId }
-}
-
-export async function createSystemAction(
-  payload: SystemInput,
-): Promise<{ data: Row<"system">; meta: MutationMeta }> {
-  const { supabase } = await requireMutationActionUser("system:create")
-
-  let parsedPayload: z.infer<typeof systemSchema>
-  try {
-    parsedPayload = systemSchema.parse(payload)
-  } catch (error) {
-    throw new Error(
-      error instanceof z.ZodError ? error.issues[0]?.message ?? "Invalid system payload." : "Invalid request body.",
-    )
-  }
-
-  const { data, error } = await supabase
-    .from("system")
-    .insert({
-      farm_id: parsedPayload.farm_id,
-      name: buildPersistedSystemName(parsedPayload.unit, parsedPayload.name),
-      type: parsedPayload.type,
-      growth_stage: parsedPayload.growth_stage,
-      commissioned_at: parsedPayload.commissioned_at ?? null,
-      unit: parsedPayload.unit?.trim() ? parsedPayload.unit.trim() : null,
-      is_active: parsedPayload.is_active ?? true,
-      cage_status: "available",
-      volume: parsedPayload.volume ?? null,
-      depth: parsedPayload.depth ?? null,
-    })
-    .select()
-    .single()
-
-  if (error || !data) {
-    logSbError("system:create:insert", error)
-    if (isDuplicateSystemNameError(error)) {
-      throw new Error(`A system named "${parsedPayload.name}" already exists in this farm.`)
-    }
-    if (isSbPermissionDenied(error)) {
-      throw new Error("Unable to create system.")
-    }
-    throw new Error("Unable to create system.")
-  }
-
-  revalidateWriteTags([
-    cacheTags.farm(parsedPayload.farm_id),
-    cacheTags.systems(parsedPayload.farm_id),
-    cacheTags.dashboard(parsedPayload.farm_id),
-    cacheTags.reports(parsedPayload.farm_id, "recent-entries"),
-  ])
-
-  return {
-    data,
-    meta: {
-      farmId: parsedPayload.farm_id,
-      systemId: data.id,
-      date: data.created_at,
-    },
-  }
 }
 
 export async function createFingerlingSupplierAction(

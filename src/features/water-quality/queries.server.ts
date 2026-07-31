@@ -1,17 +1,12 @@
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { toQuerySuccess } from "@/lib/supabase/query-transport"
-import {
-  listWaterQualityMeasurementsInputSchema,
-  type ListWaterQualityMeasurementsInput,
-} from "./schemas"
 import type {
   WaterQualityLatestStatusRow,
   WaterQualityMeasurementViewRow,
   WaterQualityPageFilters,
   WaterQualityPageInitialData,
   WaterQualityPageTab,
-  WaterQualityRow,
   WaterQualitySystemOption,
 } from "./types"
 import {
@@ -30,32 +25,6 @@ import {
 } from "@/features/water-quality/wq-utils"
 
 type ServerClient = ReturnType<typeof createAccessTokenClient>
-
-export async function listWaterQualityMeasurements(
-  input: ListWaterQualityMeasurementsInput,
-): Promise<WaterQualityRow[]> {
-  const { accessToken } = await requireUserContext()
-  const parsed = listWaterQualityMeasurementsInputSchema.parse(input)
-  const supabase = createAccessTokenClient(accessToken)
-
-  let query = supabase
-    .from("water_quality_measurement")
-    .select("*")
-    .order("measured_at", { ascending: false })
-    .limit(parsed.limit)
-
-  if (parsed.systemId != null) query = query.eq("system_id", parsed.systemId)
-  if (parsed.dateFrom) query = query.gte("date", parsed.dateFrom)
-  if (parsed.dateTo) query = query.lte("date", parsed.dateTo)
-  if (parsed.parameterName) query = query.eq("parameter_name", parsed.parameterName)
-
-  const { data, error } = await query
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (data ?? []) as WaterQualityRow[]
-}
 
 const DEFAULT_TIME_PERIOD: WaterQualityPageFilters["timePeriod"] = "month"
 const VALID_TABS: WaterQualityPageTab[] = ["alerts", "parameter", "environment", "depth"]

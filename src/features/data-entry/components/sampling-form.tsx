@@ -26,7 +26,7 @@ import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import {
   InfoPanel,
   InfoStat,
-  NumberStepperInput,
+  FishCountInput,
   findUnitForSystem,
   formatRelativeDays,
   getSystemUnits,
@@ -236,17 +236,13 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
 
   return (
     <div>
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Sampling</h2>
-        <p className="text-sm text-muted-foreground">Capture the monthly sampled fish count and total sample weight in kilograms for this batch.</p>
-      </div>
 
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
-        <div className="space-y-6">
+        <div className="space-y-4">
           <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="sampling" />
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
@@ -373,7 +369,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                     <FormItem>
                       <FormLabel>Number of Fish Sampled</FormLabel>
                       <FormControl>
-                        <NumberStepperInput field={field} className="max-w-xs" />
+                        <FishCountInput field={field} className="max-w-xs" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -396,7 +392,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
               </div>
 
               {isEarlierThanMonthlyCadence ? (
-                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
                   Last sampling was {formatRelativeDays(daysSinceLastSample)}. Sampling is normally done monthly because it stresses the fish.
                 </div>
               ) : null}

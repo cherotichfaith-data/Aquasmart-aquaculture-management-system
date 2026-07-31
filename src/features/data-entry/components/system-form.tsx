@@ -16,6 +16,7 @@ import {
 } from "@/components/app-ui/form"
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { toast } from "@/lib/hooks/app/use-toast"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useCreateSystem } from "@/lib/hooks/use-system"
@@ -110,9 +111,8 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
 
     return (
         <div>
-            <div className="data-entry-form-intro">
-                <h2 className="text-xl font-semibold tracking-tight">Add New System</h2>
-                <p className="text-sm text-muted-foreground">Register a new cage, pond, or tank.</p>
+            <div className="data-entry-status">
+                <OfflineSaveBadge result={createSystem.data} />
             </div>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3.5 max-w-2xl">
@@ -167,7 +167,7 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                         )}
                     />
 
-                    <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">
                         <span className="text-muted-foreground">Displayed cage name: </span>
                         <span className="font-medium text-foreground">{cageNamePreview}</span>
                     </div>

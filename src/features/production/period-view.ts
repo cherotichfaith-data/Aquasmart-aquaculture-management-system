@@ -31,11 +31,6 @@ export type ProductionPeriodViewRow = {
   feedType: string | null
 }
 
-export type ProductionPeriodViewResponse = {
-  chartRows: ProductionPeriodViewRow[]
-  tableRows: ProductionPeriodViewRow[]
-}
-
 type ConsolidatedAccumulator = {
   date: string
   periodStartFish: number

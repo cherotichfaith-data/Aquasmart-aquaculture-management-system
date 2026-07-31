@@ -8,6 +8,10 @@ type SyncState = {
   lastSyncedAt: Date | null
   syncError: string | null
   manualSync: (() => Promise<void>) | null
+  /** True when at least one pending record can't sync because the session has
+   * expired (401), rather than a transient network/server issue. Distinct from
+   * `syncError` so the UI can offer a "sign in again" action instead of "retry". */
+  needsReauth: boolean
 }
 
 type SyncStore = SyncState & {
@@ -16,6 +20,7 @@ type SyncStore = SyncState & {
   setLastSyncedAt: (value: Date | null) => void
   setSyncError: (value: string | null) => void
   setManualSync: (value: (() => Promise<void>) | null) => void
+  setNeedsReauth: (value: boolean) => void
 }
 
 const listeners = new Set<() => void>()
@@ -26,6 +31,7 @@ let state: SyncState = {
   lastSyncedAt: null,
   syncError: null,
   manualSync: null,
+  needsReauth: false,
 }
 
 const emitChange = () => {
@@ -60,6 +66,7 @@ const actions = {
   setLastSyncedAt: (lastSyncedAt: Date | null) => setState({ lastSyncedAt }),
   setSyncError: (syncError: string | null) => setState({ syncError }),
   setManualSync: (manualSync: (() => Promise<void>) | null) => setState({ manualSync }),
+  setNeedsReauth: (needsReauth: boolean) => setState({ needsReauth }),
 }
 
 export function useSyncStore(): SyncStore {

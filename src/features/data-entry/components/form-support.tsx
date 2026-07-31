@@ -1,11 +1,18 @@
 "use client"
 
 import type { ReactNode, Ref } from "react"
-import { Minus, Plus } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { Input } from "@/components/app-ui/input"
 import type { SystemOption } from "@/lib/system-options"
 import { cn } from "@/lib/utils"
 
+/**
+ * Sidebar/context panel for data-entry forms (DO classification preview, cycle
+ * summary, etc). Built on the shared Card primitive so every form's side panel
+ * matches -- previously some forms used this component (rounded-lg) while others
+ * (e.g. the harvest cycle summary) used Card directly (rounded-xl), which read as
+ * two different card styles sitting side by side.
+ */
 export function InfoPanel({
   title,
   children,
@@ -16,10 +23,12 @@ export function InfoPanel({
   className?: string
 }) {
   return (
-    <div className={cn("data-entry-context-panel p-4", className)}>
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      <div className="mt-3 space-y-3">{children}</div>
-    </div>
+    <Card className={cn("border-t-2 border-t-primary/25 xl:sticky xl:top-6", className)}>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">{children}</CardContent>
+    </Card>
   )
 }
 
@@ -42,7 +51,7 @@ export function InfoStat({
           : "border-border/60 bg-background/70"
 
   return (
-    <div className={cn("data-entry-note-card rounded-md border px-3 py-2", toneClass)}>
+    <div className={cn("rounded-lg border px-3 py-2", toneClass)}>
       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-medium text-foreground">{value}</div>
     </div>
@@ -79,7 +88,7 @@ export function formatRelativeDays(days: number | null | undefined, empty = "No 
   return `${days} days ago`
 }
 
-type StepperField = {
+type FishCountField = {
   value: unknown
   onChange: (value: number) => void
   onBlur: () => void
@@ -88,11 +97,10 @@ type StepperField = {
 }
 
 /**
- * Whole-number count input with +/- stepper buttons for one-handed use in the
- * field (fish counts, bag counts). Buttons are 44px touch targets. Falls back
- * to plain typing/paste in the input for large counts.
+ * Direct-entry whole-number count input for fish counts (mortality, sampling,
+ * transfer, harvest, stocking). Plain typing only -- no +/- stepper buttons.
  */
-export function NumberStepperInput({
+export function FishCountInput({
   field,
   min = 0,
   step = 1,
@@ -100,57 +108,30 @@ export function NumberStepperInput({
   placeholder,
   disabled,
 }: {
-  field: StepperField
+  field: FishCountField
   min?: number
   step?: number
   className?: string
   placeholder?: string
   disabled?: boolean
 }) {
-  const numericValue = typeof field.value === "number" ? field.value : Number(field.value)
-  const safeValue = Number.isFinite(numericValue) ? numericValue : 0
-
-  const adjust = (delta: number) => {
-    const next = Math.max(min, safeValue + delta)
-    field.onChange(next)
-  }
-
   return (
-    <div className={cn("flex items-stretch gap-1.5", className)}>
-      <button
-        type="button"
-        aria-label="Decrease"
-        disabled={disabled || safeValue <= min}
-        onClick={() => adjust(-step)}
-        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <Minus className="h-4 w-4" />
-      </button>
-      <Input
-        type="number"
-        step={step}
-        inputMode="numeric"
-        placeholder={placeholder}
-        disabled={disabled}
-        name={field.name}
-        ref={field.ref}
-        value={(field.value as number | string | undefined) ?? ""}
-        onChange={(event) => {
-          const raw = event.target.value
-          field.onChange(raw === "" ? 0 : Number(raw))
-        }}
-        onBlur={field.onBlur}
-        className="min-h-11 text-center"
-      />
-      <button
-        type="button"
-        aria-label="Increase"
-        disabled={disabled}
-        onClick={() => adjust(step)}
-        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <Plus className="h-4 w-4" />
-      </button>
-    </div>
+    <Input
+      type="number"
+      min={min}
+      step={step}
+      inputMode="numeric"
+      placeholder={placeholder}
+      disabled={disabled}
+      name={field.name}
+      ref={field.ref}
+      value={(field.value as number | string | undefined) ?? ""}
+      onChange={(event) => {
+        const raw = event.target.value
+        field.onChange(raw === "" ? 0 : Number(raw))
+      }}
+      onBlur={field.onBlur}
+      className={cn("min-h-11", className)}
+    />
   )
 }

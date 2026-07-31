@@ -1,13 +1,17 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import DashboardLayout from "@/components/layout/dashboard-layout"
-import { DataEntryInterface } from "@/features/data-entry/components/data-entry-interface"
+import { DataEntryAppShell } from "@/components/layout/data-entry-app-shell"
+import { DataEntryInterface, DataEntryTabStrip } from "@/features/data-entry/components/data-entry-interface"
 import { SystemForm } from "@/features/data-entry/components/system-form"
 import type { getDataEntryPrefetch } from "@/features/data-entry/queries.server"
+import { loadReferenceData, saveReferenceData } from "@/lib/offline/reference-cache"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
+
+type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
+type FeedOption = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 
 const dataEntryTabs = [
   "feeding",
@@ -59,9 +63,46 @@ export default function DataEntryPageClient({
   const requestedSystemId = useMemo(() => parsePositiveId(systemParam), [systemParam])
   const requestedBatchId = useMemo(() => parsePositiveId(batchParam), [batchParam])
   const farmId = initialFarmId ?? null
-  const systems = initialSystems
-  const batches = initialBatches
-  const feeds = initialFeeds
+
+  // Systems/batches/feeds normally arrive fresh on every server render. When they don't
+  // (a cold load with no network to reach the origin), fall back to whatever was last
+  // cached in IndexedDB for this farm rather than showing empty dropdowns -- see
+  // src/lib/offline/reference-cache.ts.
+  const [cachedReferenceData, setCachedReferenceData] = useState<{
+    systems: SystemOption[]
+    batches: BatchOption[]
+    feeds: FeedOption[]
+  } | null>(null)
+
+  useEffect(() => {
+    if (!farmId) return
+    void saveReferenceData("systems", farmId, initialSystems)
+    void saveReferenceData("batches", farmId, initialBatches)
+    void saveReferenceData("feeds", farmId, initialFeeds)
+  }, [farmId, initialSystems, initialBatches, initialFeeds])
+
+  useEffect(() => {
+    if (!farmId) return
+    let cancelled = false
+    void (async () => {
+      const [systems, batches, feeds] = await Promise.all([
+        loadReferenceData<SystemOption>("systems", farmId),
+        loadReferenceData<BatchOption>("batches", farmId),
+        loadReferenceData<FeedOption>("feeds", farmId),
+      ])
+      if (!cancelled) setCachedReferenceData({ systems, batches, feeds })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [farmId])
+
+  // Each field falls back independently -- a farm can legitimately have systems but zero
+  // batches yet, and that shouldn't be treated the same as "this came back empty because
+  // we're offline."
+  const systems = initialSystems.length > 0 ? initialSystems : cachedReferenceData?.systems ?? initialSystems
+  const batches = initialBatches.length > 0 ? initialBatches : cachedReferenceData?.batches ?? initialBatches
+  const feeds = initialFeeds.length > 0 ? initialFeeds : cachedReferenceData?.feeds ?? initialFeeds
   const defaultSystemId = requestedSystemId && systems.some((system) => system.id === requestedSystemId)
     ? requestedSystemId
     : null
@@ -88,22 +129,31 @@ export default function DataEntryPageClient({
   )
 
   return (
-    <DashboardLayout
-      hideHeader
+    <DataEntryAppShell
       initialFarmId={initialFarmId}
       initialFarmName={initialFarmName}
-      headerDataOverrides={{ role: initialFarmRole ?? null }}
+      farmRole={initialFarmRole}
+      tabs={
+        hasSystems ? (
+          <DataEntryTabStrip
+            farmRole={initialFarmRole}
+            tab={tab}
+            defaultSystemId={defaultSystemId}
+            defaultBatchId={defaultBatchId}
+          />
+        ) : null
+      }
     >
-      <div className="data-entry-page-shell container mx-auto py-0 sm:py-0">
+      <div className="data-entry-page-shell">
         {!hasSystems ? (
-          <div className="space-y-6">
-            <div className="rounded-lg border border-dashed border-border/80 bg-muted/30 p-6 shadow-sm">
-              <h2 className="text-xl font-semibold tracking-tight">Set up your first system</h2>
+          <div className="mx-auto max-w-2xl space-y-4 py-4">
+            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-6 text-center">
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">Set up your first system</h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 Add at least one system before recording farm operations.
               </p>
             </div>
-            <div className="rounded-lg border border-border/80 bg-card p-6 shadow-sm">
+            <div className="rounded-xl border border-border/70 bg-card p-6">
               <SystemForm />
             </div>
           </div>
@@ -121,6 +171,6 @@ export default function DataEntryPageClient({
           />
         )}
       </div>
-    </DashboardLayout>
+    </DataEntryAppShell>
   )
 }

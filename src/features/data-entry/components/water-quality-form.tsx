@@ -295,20 +295,16 @@ export function WaterQualityForm({
 
   return (
     <div>
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Water Quality</h2>
-        <p className="text-sm text-muted-foreground">Multi-parameter entry with a live dissolved oxygen classification preview.</p>
-      </div>
 
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
-        <div className="space-y-6">
+        <div className="space-y-4">
             <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="water quality" />
             {selectedTime < "12:00" ? (
-              <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
+              <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
                 Morning measurement logged. Remember to return for the PM measurement as well.
               </div>
             ) : null}

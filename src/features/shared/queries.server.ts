@@ -19,7 +19,6 @@ type GrowthTrendRow = {
   expected_abw_g?: number | null
   growth_deviation_pct?: number | null
 }
-type RecentActivityFeedRow = Database["public"]["Functions"]["api_recent_activity_feed"]["Returns"][number]
 type FishMortalityRow = Database["public"]["Tables"]["fish_mortality"]["Row"]
 type FeedingRecordRow = Database["public"]["Tables"]["feeding_record"]["Row"]
 type FishSamplingWeightRow = Database["public"]["Tables"]["fish_sampling_weight"]["Row"]
@@ -29,16 +28,6 @@ type WaterQualityMeasurementRow = Database["public"]["Tables"]["water_quality_me
 type FeedInventoryRow = Database["public"]["Tables"]["feed_inventory"]["Row"]
 type FishStockingRow = Database["public"]["Tables"]["fish_stocking"]["Row"]
 type SystemRow = Database["public"]["Tables"]["system"]["Row"]
-type ChangeType = Database["public"]["Enums"]["change_type_enum"]
-type ChangeLogRow = {
-  id: string | number
-  table_name: string | null
-  change_type: ChangeType | null
-  column_name: string | null
-  change_time: string | null
-  system_id?: number | null
-  batch_id?: number | null
-}
 type RecentRowsTable =
   | "fish_mortality"
   | "feeding_record"
@@ -308,36 +297,6 @@ export async function listHarvests(
   return runRead<FishHarvestRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
 }
 
-export async function listStockings(
-  supabase: SharedSupabaseClient,
-  params?: {
-    farmId?: string | null
-    systemId?: number
-    systemIds?: number[]
-    batchId?: number
-    dateFrom?: string
-    dateTo?: string
-    limit?: number
-  },
-): Promise<FishStockingRow[]> {
-  const scopedSystemIds = await resolveScopedSystemIds(supabase, {
-    farmId: params?.farmId,
-    systemId: params?.systemId,
-    systemIds: params?.systemIds,
-  })
-  if (params?.farmId && (!scopedSystemIds || scopedSystemIds.length === 0)) return []
-
-  let query = supabase.from("fish_stocking").select("*")
-  if (scopedSystemIds && scopedSystemIds.length > 0) {
-    query = query.in("system_id", scopedSystemIds)
-  }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  if (params?.limit) query = query.limit(params.limit)
-  return runRead<FishStockingRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
-}
-
 export async function listSamplingData(
   supabase: SharedSupabaseClient,
   params?: {
@@ -392,71 +351,6 @@ export async function listMortalityData(
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
   return runRead<FishMortalityRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
-}
-
-export async function listTransferData(
-  supabase: SharedSupabaseClient,
-  params?: {
-    farmId?: string | null
-    batchId?: number
-    dateFrom?: string
-    dateTo?: string
-    limit?: number
-  },
-): Promise<FishTransferRow[]> {
-  const scopedSystemIds = params?.farmId ? await resolveScopedSystemIds(supabase, { farmId: params.farmId }) : null
-  if (params?.farmId && (!scopedSystemIds || scopedSystemIds.length === 0)) return []
-
-  let query = supabase.from("fish_transfer").select("*")
-  if (scopedSystemIds && scopedSystemIds.length > 0) {
-    query = query.or(`origin_system_id.in.(${scopedSystemIds.join(",")}),target_system_id.in.(${scopedSystemIds.join(",")})`)
-  }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
-  if (params?.dateFrom) query = query.gte("date", params.dateFrom)
-  if (params?.dateTo) query = query.lte("date", params.dateTo)
-  if (params?.limit) query = query.limit(params.limit)
-  return runRead<FishTransferRow>(query.order("date", { ascending: false }).order("created_at", { ascending: false }))
-}
-
-export async function listRecentActivities(
-  supabase: SharedSupabaseClient,
-  params?: {
-    farmId?: string | null
-    tableName?: string
-    dateFrom?: string
-    dateTo?: string
-    limit?: number
-  },
-): Promise<ChangeLogRow[]> {
-  if (!params?.farmId) return []
-
-  const limit = params.limit ?? 50
-  const tableName = params.tableName && params.tableName !== "all" ? params.tableName : null
-  const { data, error } = await supabase.rpc("api_recent_activity_feed", {
-    p_farm_id: params.farmId,
-    p_limit: limit,
-    p_date_from: toRpcDate(params.dateFrom),
-    p_date_to: toRpcDate(params.dateTo),
-    p_table: tableName ?? undefined,
-  } as Database["public"]["Functions"]["api_recent_activity_feed"]["Args"] & {
-    p_date_from: string | null
-    p_date_to: string | null
-  })
-
-  if (error) {
-    if (isQuietReadError(error)) return []
-    throw error
-  }
-
-  return ((data ?? []) as RecentActivityFeedRow[]).map((row) => ({
-    id: row.id,
-    table_name: row.table_name,
-    change_type: "INSERT",
-    column_name: null,
-    change_time: row.activity_date,
-    system_id: row.system_id,
-    batch_id: row.batch_id,
-  }))
 }
 
 export const emptyRecentEntries = () => ({

@@ -23,7 +23,7 @@ import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { TRANSFER_TYPE_LABELS, UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { NumberStepperInput } from "./form-support"
+import { FishCountInput } from "./form-support"
 import {
   parseOptionalNumericId,
   parseRequiredNumericId,
@@ -206,11 +206,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   }
 
   return (
-    <div className="space-y-6">
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Transfer</h2>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
@@ -218,7 +214,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="transfer" />
 
         {isExternalOut ? (
-          <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
+          <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
             Fish will leave this farm system and no receiving cage will be tracked.
           </div>
         ) : null}
@@ -362,7 +358,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SelectedSystemInfo systems={systems} systemId={originSystemId} title="Origin System" />
             {isExternalOut ? (
-              <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
+              <div className="data-entry-note-card px-3 py-2 text-sm">
                 <div className="font-medium">Destination</div>
                 <div className="text-muted-foreground">{externalTargetName?.trim() || "External location"}</div>
               </div>
@@ -373,7 +369,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
 
           <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
 
-          <div className="rounded-lg border border-border/80 bg-muted/10 p-4">
+          <div className="data-entry-panel">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
@@ -424,7 +420,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Number of Fish</FormLabel>
                   <FormControl>
-                    <NumberStepperInput field={field} className="max-w-xs" />
+                    <FishCountInput field={field} className="max-w-xs" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

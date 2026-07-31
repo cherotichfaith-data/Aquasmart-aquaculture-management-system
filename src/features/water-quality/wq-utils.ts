@@ -36,12 +36,6 @@ export const parameterLabels: Record<WqParameter, string> = {
 export const isWqParameter = (value: string | null | undefined): value is WqParameter =>
   typeof value === "string" && value in parameterLabels
 
-export const statusClass = (tone: StatusTone) => {
-  if (tone === "green") return "bg-success/10 text-success"
-  if (tone === "yellow") return "bg-warning/10 text-warning"
-  return "bg-destructive/10 text-destructive"
-}
-
 export const formatTimestamp = (value: string) => {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
