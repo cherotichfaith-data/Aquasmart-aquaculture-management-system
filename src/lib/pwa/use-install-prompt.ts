@@ -51,15 +51,11 @@ function wasRecentlyDismissed() {
  */
 export function useInstallPrompt() {
   const [deferredEvent, setDeferredEvent] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isStandalone, setIsStandalone] = useState(false)
-  const [isIos, setIsIos] = useState(false)
-  const [dismissed, setDismissed] = useState(true)
+  const [isStandalone, setIsStandalone] = useState(() => isStandaloneDisplay())
+  const [isIos] = useState(() => isIosSafari())
+  const [dismissed, setDismissed] = useState(() => wasRecentlyDismissed())
 
   useEffect(() => {
-    setIsStandalone(isStandaloneDisplay())
-    setIsIos(isIosSafari())
-    setDismissed(wasRecentlyDismissed())
-
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault()
       setDeferredEvent(event as BeforeInstallPromptEvent)

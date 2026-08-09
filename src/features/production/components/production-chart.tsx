@@ -170,9 +170,20 @@ export default function ProductionChart({
     })
     .filter((marker): marker is ProductionChartMarker & { x: number } => marker !== null)
     .sort((a, b) => a.x - b.x)
-
-  let lastMarkerLabelEnd = -Infinity
   const markerLabelMinGap = 64
+  const chartMarkersWithLabels = chartMarkers.reduce<{
+    items: Array<(ProductionChartMarker & { x: number }) & { showLabel: boolean }>
+    visibleLabelEnd: number
+  }>(
+    (acc, marker) => {
+      const showLabel = marker.x - acc.visibleLabelEnd >= markerLabelMinGap
+      return {
+        items: [...acc.items, { ...marker, showLabel }],
+        visibleLabelEnd: showLabel ? marker.x + markerLabelMinGap : acc.visibleLabelEnd,
+      }
+    },
+    { items: [], visibleLabelEnd: -Infinity },
+  ).items
 
   if (error) {
     return (
@@ -263,9 +274,7 @@ export default function ProductionChart({
                     ))
                   : null}
 
-                {chartMarkers.map((marker, index) => {
-                  const showLabel = marker.x - lastMarkerLabelEnd >= markerLabelMinGap
-                  if (showLabel) lastMarkerLabelEnd = marker.x + markerLabelMinGap
+                {chartMarkersWithLabels.map((marker, index) => {
                   const color = MARKER_COLORS[marker.type]
                   return (
                     <g key={`${marker.date}-${marker.type}-${index}`}>
@@ -280,7 +289,7 @@ export default function ProductionChart({
                         strokeDasharray="4 4"
                       />
                       <circle cx={marker.x} cy={PLOT_BOTTOM} r="5" fill={color} stroke="var(--card)" strokeWidth="2" />
-                      {showLabel ? (
+                      {marker.showLabel ? (
                         <text x={marker.x} y={MARKER_LABEL_Y} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>
                           {marker.label}
                         </text>

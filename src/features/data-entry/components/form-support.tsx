@@ -115,6 +115,8 @@ export function FishCountInput({
   placeholder?: string
   disabled?: boolean
 }) {
+  const { name, onBlur, onChange, ref: inputRef, value } = field
+
   return (
     <Input
       type="number"
@@ -123,14 +125,14 @@ export function FishCountInput({
       inputMode="numeric"
       placeholder={placeholder}
       disabled={disabled}
-      name={field.name}
-      ref={field.ref}
-      value={(field.value as number | string | undefined) ?? ""}
+      name={name}
+      ref={inputRef}
+      value={(value as number | string | undefined) ?? ""}
       onChange={(event) => {
         const raw = event.target.value
-        field.onChange(raw === "" ? 0 : Number(raw))
+        onChange(raw === "" ? 0 : Number(raw))
       }}
-      onBlur={field.onBlur}
+      onBlur={onBlur}
       className={cn("min-h-11", className)}
     />
   )

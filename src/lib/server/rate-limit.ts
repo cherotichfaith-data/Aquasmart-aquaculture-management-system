@@ -42,11 +42,7 @@ export async function enforceUserRateLimit(params: {
   const forwardedFor = params.request.headers.get("x-forwarded-for")
   const ipAddress = forwardedFor?.split(",")[0]?.trim() || null
 
-  const unsafeRpc = admin.rpc as unknown as (
-    name: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: unknown }>
-  const { data, error } = await unsafeRpc("enforce_api_rate_limit", {
+  const { data, error } = await admin.rpc("enforce_api_rate_limit", {
     p_scope: params.policy.scope,
     p_user_id: params.userId,
     p_limit: params.policy.limit,
