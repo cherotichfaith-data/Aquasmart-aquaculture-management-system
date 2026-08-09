@@ -7,7 +7,6 @@ import {
   getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
-import { listProductionSummaryRows } from "@/features/shared/query-seed.server"
 import type { ProductionDailyTrendRow, ProductionSummaryRpcRow } from "@/features/production/types"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
@@ -454,14 +453,16 @@ async function listProductionSummaryRowsDirectServer(
   ])
 
   if (summaryResult.error || dailyFactsResult.error || cycleResult.error || systemResult.error) {
-    return listProductionSummaryRows(supabase, {
-      farmId: params.farmId,
-      systemId: params.systemIds.length === 1 ? params.systemIds[0] : undefined,
-      stage: params.stage,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-      limit: params.limit,
-    })
+    throw new Error(
+      [
+        summaryResult.error ? `production_summary: ${String((summaryResult.error as { message?: unknown })?.message ?? summaryResult.error)}` : null,
+        dailyFactsResult.error ? `daily_system_facts: ${String((dailyFactsResult.error as { message?: unknown })?.message ?? dailyFactsResult.error)}` : null,
+        cycleResult.error ? `production_cycle: ${String((cycleResult.error as { message?: unknown })?.message ?? cycleResult.error)}` : null,
+        systemResult.error ? `system: ${String((systemResult.error as { message?: unknown })?.message ?? systemResult.error)}` : null,
+      ]
+        .filter(Boolean)
+        .join("; "),
+    )
   }
 
   const stageFilter = params.stage ?? null

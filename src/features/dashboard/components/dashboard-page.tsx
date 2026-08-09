@@ -42,7 +42,7 @@ export default function DashboardPage({
   initialFarmId?: string | null
   initialFilters?: DashboardPageInitialFilters
   initialData: DashboardPageInitialData
-  renderedAt: number
+  renderedAt?: number
 }) {
   const farmId = initialFarmId ?? null
   const selectedStage = initialFilters?.selectedStage ?? "all"

@@ -5,16 +5,14 @@ import type { DashboardPageInitialData, DashboardPageInitialFilters } from "@/fe
 
 export default function DashboardPageClient({
   initialFarmId,
-  initialFarmName,
   initialFilters,
   initialData,
   renderedAt,
 }: {
   initialFarmId?: string | null
-  initialFarmName?: string | null
   initialFilters?: DashboardPageInitialFilters
   initialData: DashboardPageInitialData
-  renderedAt: number
+  renderedAt?: number
 }) {
   return (
     <DashboardPage

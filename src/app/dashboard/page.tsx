@@ -96,10 +96,8 @@ export default async function DashboardPage({
     >
       <DashboardPageClient
         initialFarmId={farmId}
-        initialFarmName={initialFarmName}
         initialFilters={effectiveFilters}
         initialData={initialData}
-        renderedAt={Date.now()}
       />
     </DashboardLayout>
   )
