@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
@@ -9,7 +9,6 @@ import { Button } from "@/components/app-ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { Dialog } from "@/components/app-ui/dialog"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { FishCountInput } from "./form-support"
 import { useProductionSummary } from "@/features/production/hooks"
 import { useHarvests } from "@/features/reports/hooks"
 import {
@@ -30,7 +29,6 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import {
     parseNumericId,
-    parseOptionalNumericId,
     parseRequiredNumericId,
     reportDataEntrySubmitError,
     requireActiveFarmId,
@@ -46,7 +44,6 @@ import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
-    batch_id: z.string().optional(),
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Count must be positive"),
     amount_kg: z.coerce.number().min(0.01, "Weight must be positive"),
@@ -69,6 +66,7 @@ interface HarvestFormProps {
     batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
     defaultSystemId?: number | null
     defaultBatchId?: number | null
+    onSystemChange?: (systemId: number | null) => void
 }
 
 function HarvestCycleSummary({
@@ -103,7 +101,7 @@ function HarvestCycleSummary({
     const asOfDate = latestCycleRow?.date ?? null
 
     return (
-        <Card className="border-t-2 border-t-primary/25 xl:sticky xl:top-6">
+        <Card className="xl:sticky xl:top-6">
             <CardHeader>
                 <CardTitle>Current Cycle Summary</CardTitle>
                 <CardDescription>
@@ -113,47 +111,47 @@ function HarvestCycleSummary({
             </CardHeader>
             <CardContent className="space-y-4">
                 {!systemId ? (
-                    <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
+                    <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
                         Select a system to load cycle checks before submitting harvest.
                     </div>
                 ) : queryError ? (
-                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive">
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive">
                         Unable to load cycle summary. {queryError}
                     </div>
                 ) : summaryQuery.isLoading ? (
                     <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                         {Array.from({ length: 3 }).map((_, index) => (
-                            <div key={index} className="rounded-lg border border-border/80 bg-muted/30 p-3">
+                            <div key={index} className="rounded-md border border-border/80 bg-muted/30 p-3">
                                 <div className="h-3 w-24 animate-pulse rounded bg-muted" />
                                 <div className="mt-3 h-7 w-20 animate-pulse rounded bg-muted" />
                             </div>
                         ))}
                     </div>
                 ) : !latestCycleRow ? (
-                    <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
+                    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
                         No production-cycle summary is available yet for this system.
                     </div>
                 ) : (
                     <>
                         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                            <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+                            <div className="rounded-md border border-border/80 bg-muted/20 p-3">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Days In Cycle</p>
                                 <p className="mt-2 text-2xl font-semibold">{formatNumberValue(cycleDays)}</p>
                             </div>
-                            <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+                            <div className="rounded-md border border-border/80 bg-muted/20 p-3">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Cumulative eFCR</p>
                                 <p className="mt-2 text-2xl font-semibold">
                                     {formatNumberValue(latestCycleRow.efcr_aggregated, { decimals: 2, fallback: "--" })}
                                 </p>
                             </div>
-                            <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
+                            <div className="rounded-md border border-border/80 bg-muted/20 p-3">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Fish Count</p>
                                 <p className="mt-2 text-2xl font-semibold">
                                     {formatNumberValue(latestCycleRow.number_of_fish_inventory)}
                                 </p>
                             </div>
                         </div>
-                        <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+                        <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
                             Use these cycle totals to confirm the entered harvest fish count and weight are consistent before saving.
                         </div>
                     </>
@@ -168,7 +166,7 @@ export function HarvestForm({
     systems,
     batches,
     defaultSystemId = null,
-    defaultBatchId = null,
+    onSystemChange,
 }: HarvestFormProps) {
     const mutation = useRecordHarvest()
     const [confirmOpen, setConfirmOpen] = useState(false)
@@ -183,12 +181,10 @@ export function HarvestForm({
             amount_kg: 0,
             type_of_harvest: "partial",
             system_id: defaultSystemId ? String(defaultSystemId) : "",
-            batch_id: defaultBatchId ? String(defaultBatchId) : "none",
         },
     })
 
     const selectedSystemId = useWatch({ control: form.control, name: "system_id" })
-    const selectedBatchId = useWatch({ control: form.control, name: "batch_id" })
     const selectedDate = useWatch({ control: form.control, name: "date" })
     const harvestType = useWatch({ control: form.control, name: "type_of_harvest" })
     const resolvedSystemId = parseNumericId(selectedSystemId)
@@ -197,12 +193,26 @@ export function HarvestForm({
         [resolvedSystemId, systems],
     )
     const selectedCageLabel = resolvedSystemId ? formatCageLabel(selectedSystem) : "this system"
+
+    useEffect(() => {
+        onSystemChange?.(resolvedSystemId ?? null)
+    }, [onSystemChange, resolvedSystemId])
+
+    // A system can only host one active batch/production cycle at a time, so the
+    // batch is derived from the selected cage instead of asking the user to pick
+    // one manually (see api_fingerling_batch_options_rpc's system_id column).
+    const resolvedBatchId = useMemo(
+        () => batches.find((batch) => batch.system_id === resolvedSystemId)?.id ?? null,
+        [batches, resolvedSystemId],
+    )
     const latestEntryQuery = useHarvests({
+        farmId,
         systemId: resolvedSystemId ?? undefined,
         limit: 1,
         enabled: Boolean(resolvedSystemId),
     })
     const duplicateQuery = useHarvests({
+        farmId,
         systemId: resolvedSystemId ?? undefined,
         dateFrom: selectedDate || undefined,
         dateTo: selectedDate || undefined,
@@ -241,12 +251,11 @@ export function HarvestForm({
 
         const resolvedFarmId = requireActiveFarmId(farmId)
         const systemId = parseRequiredNumericId(values.system_id, "System")
-        const batchId = parseOptionalNumericId(values.batch_id)
 
         await mutation.mutateAsync({
             farm_id: resolvedFarmId,
             system_id: systemId,
-            batch_id: batchId,
+            batch_id: resolvedBatchId,
             date: values.date,
             number_of_fish_harvest: values.number_of_fish,
             total_weight_harvest: values.amount_kg,
@@ -259,7 +268,6 @@ export function HarvestForm({
             amount_kg: 0,
             type_of_harvest: "partial",
             system_id: values.system_id,
-            batch_id: values.batch_id,
         })
     }
 
@@ -293,8 +301,11 @@ export function HarvestForm({
 
     return (
         <>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
                 <div>
+                    <div className="data-entry-form-intro">
+                        <h2 className="text-xl font-semibold tracking-tight">Record Harvest</h2>
+                    </div>
                     <div className="data-entry-status">
                         <OfflineSaveBadge result={mutation.data} />
                     </div>
@@ -343,7 +354,7 @@ export function HarvestForm({
 
                             <div className="data-entry-secondary-grid">
                                 <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-                                <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
+                                <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
                             </div>
 
                             <div className="data-entry-secondary-grid">
@@ -354,7 +365,7 @@ export function HarvestForm({
                                         <FormItem>
                                             <FormLabel>Harvested Fish Count</FormLabel>
                                             <FormControl>
-                                                <FishCountInput field={field} className="max-w-xs" />
+                                                <Input type="number" step="1" className="max-w-xs" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -397,35 +408,10 @@ export function HarvestForm({
                                         </FormItem>
                                     )}
                                 />
-                                <FormField
-                                    control={form.control}
-                                    name="batch_id"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Batch (auto-resolved if blank)</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value || "none"}>
-                                                <FormControl>
-                                                    <SelectTrigger className="max-w-xs">
-                                                        <SelectValue placeholder="Select batch" />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                    <SelectItem value="none">No batch</SelectItem>
-                                                    {batches.map((batch) => (
-                                                        <SelectItem key={batch.id} value={String(batch.id)}>
-                                                            {batch.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
                             </div>
 
                             {harvestType === "final" ? (
-                                <div className="data-entry-callout-alert border-destructive/30 bg-destructive/5 text-sm">
+                                <div className="data-entry-callout-alert rounded-md border border-destructive/30 bg-destructive/5 text-sm">
                                     <p className="font-medium text-foreground">Final harvest will close this cycle.</p>
                                     <p className="mt-1 text-muted-foreground">
                                         This will close the production cycle for {selectedCageLabel}. All subsequent

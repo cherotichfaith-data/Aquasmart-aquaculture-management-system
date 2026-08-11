@@ -23,6 +23,7 @@ export type WaterQualityIndexRow = {
 }
 
 type MeasurementRow = Tables<"api_water_quality_measurements">
+type DailyRatingRow = Tables<"api_daily_water_quality_rating">
 type ThresholdRow = Tables<"api_alert_thresholds">
 
 const isQuietError = (err: unknown): boolean =>
@@ -99,6 +100,38 @@ export async function getWaterQualityMeasurements(params: {
   return toQuerySuccess<MeasurementRow>((data ?? []) as MeasurementRow[])
 }
 
+export async function getDailyWaterQualityRating(params: {
+  farmId: string
+  systemId?: number
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  signal?: AbortSignal
+}): Promise<QueryResult<DailyRatingRow>> {
+  const clientResult = await getClientOrError("getDailyWaterQualityRating", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let q = queryOptionsView(supabase, "api_daily_water_quality_rating")
+    .select("*")
+    .eq("farm_id", params.farmId)
+    .order("rating_date", { ascending: true })
+
+  if (params.systemId) q = q.eq("system_id", params.systemId)
+  if (params.dateFrom) q = q.gte("rating_date", params.dateFrom)
+  if (params.dateTo) q = q.lte("rating_date", params.dateTo)
+  if (params.limit) q = q.limit(params.limit)
+  if (params.signal) q = q.abortSignal(params.signal)
+
+  const { data, error } = await q
+  if (error) {
+    if (params.signal?.aborted || isQuietError(error)) return empty<DailyRatingRow>()
+    return toQueryError("getDailyWaterQualityRating", error)
+  }
+
+  return toQuerySuccess<DailyRatingRow>((data ?? []) as DailyRatingRow[])
+}
+
 export async function getAlertThresholds(params: {
   farmId: string
   signal?: AbortSignal
@@ -157,3 +190,21 @@ export async function getWaterQualityIndex(params: {
   )
 }
 
+export async function getWaterQualityRatings(params: {
+  farmId?: string | null
+  systemId?: number
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  signal?: AbortSignal
+}) {
+  if (!params.farmId) return empty<DailyRatingRow>()
+  return getDailyWaterQualityRating({
+    farmId: params.farmId,
+    systemId: params.systemId,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+    limit: params.limit,
+    signal: params.signal,
+  })
+}

@@ -37,9 +37,8 @@ import {
 } from "./form-utils"
 import {
   LatestEntryGuard,
-  composeFeedingDuplicateKey,
   pickLatestEntryByRecordDate,
-  pickSameDayEntryByMetadata,
+  pickSameDayEntry,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
@@ -61,7 +60,6 @@ const formSchema = z
     feed_id: z.string().optional(),
     amount_kg: z.coerce.number().min(0, "Amount cannot be negative"),
     feeding_response: z.string().optional(),
-    batch_id: z.string().optional(),
     notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
   })
   .superRefine((values, ctx) => {
@@ -102,6 +100,7 @@ interface FeedingFormProps {
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
+  onSystemChange?: (systemId: number | null) => void
 }
 
 function toFeedingEntrySummary(row: {
@@ -110,7 +109,6 @@ function toFeedingEntrySummary(row: {
   date?: string | null
   feeding_amount?: number | null
   feeding_response?: number | null
-  feed_type_id?: number | null
   notes?: string | null
   feed_type?: { feed_line?: string | null } | null
 }, keyPrefix: string): LatestEntrySummary {
@@ -127,13 +125,6 @@ function toFeedingEntrySummary(row: {
             { label: "Feed Type", value: row.feed_type?.feed_line || "Not recorded" },
             { label: "Response", value: row.feeding_response != null ? `Level ${row.feeding_response}` : "Not recorded" },
           ],
-    // Duplicate key is feed type only -- a cage can have several feeding entries the same day
-    // as long as each uses a different feed type. This is a frontend-only check.
-    metadata: { feedingDuplicateKey: composeFeedingDuplicateKey(row.feed_type_id) },
-    duplicateMessage:
-      row.feed_type_id != null
-        ? `A feeding entry with this feed type already exists for this cage on ${row.date}.`
-        : `A feeding entry already exists for this cage on ${row.date}. Select a feed type to log an additional feeding.`,
   }
 }
 
@@ -143,10 +134,9 @@ export function FeedingForm({
   feeds,
   batches,
   defaultSystemId = null,
-  defaultBatchId = null,
+  onSystemChange,
 }: FeedingFormProps) {
   const mutation = useRecordFeeding()
-  const [showAdvanced, setShowAdvanced] = useState(false)
   const [submissionSummary, setSubmissionSummary] = useState<string | null>(null)
 
   const units = useMemo(() => getSystemUnits(systems), [systems])
@@ -162,7 +152,6 @@ export function FeedingForm({
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       feed_id: OPTIONAL_SELECT_VALUE,
       feeding_response: OPTIONAL_SELECT_VALUE,
-      batch_id: defaultBatchId ? String(defaultBatchId) : OPTIONAL_SELECT_VALUE,
       notes: "",
     },
   })
@@ -171,15 +160,17 @@ export function FeedingForm({
   const selectedUnit = useWatch({ control: form.control, name: "unit" })
   const selectedSystemValue = useWatch({ control: form.control, name: "system_id" })
   const selectedSystemId = Number(selectedSystemValue)
-  const selectedBatchValue = useWatch({ control: form.control, name: "batch_id" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
-  const selectedFeedValue = useWatch({ control: form.control, name: "feed_id" })
-  const selectedFeedTypeId =
-    selectedFeedValue && selectedFeedValue !== OPTIONAL_SELECT_VALUE ? Number(selectedFeedValue) : null
-  const selectedFeedingDuplicateKey = composeFeedingDuplicateKey(selectedFeedTypeId)
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
   const feedOptions = feeds
+  // A system can only host one active batch/production cycle at a time, so the
+  // batch is derived from the selected cage instead of asking the user to pick
+  // one manually (see api_fingerling_batch_options_rpc's system_id column).
+  const resolvedBatchId = useMemo(
+    () => batches.find((batch) => batch.system_id === selectedSystemId)?.id ?? null,
+    [batches, selectedSystemId],
+  )
 
   useEffect(() => {
     if (!defaultSystemValue) return
@@ -218,7 +209,12 @@ export function FeedingForm({
 
   const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
 
+  useEffect(() => {
+    onSystemChange?.(hasValidSystemId ? selectedSystemId : null)
+  }, [hasValidSystemId, onSystemChange, selectedSystemId])
+
   const duplicateQuery = useFeedingRecords({
+    farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
@@ -226,6 +222,7 @@ export function FeedingForm({
     enabled: Boolean(selectedDate) && hasValidSystemId,
   })
   const latestEntryQuery = useFeedingRecords({
+    farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     limit: 1,
     enabled: hasValidSystemId,
@@ -238,21 +235,12 @@ export function FeedingForm({
   const latestServerEntries = latestServerRecords.map((row) => toFeedingEntrySummary(row, "feeding"))
   const duplicateServerEntries = existingDailyRecords.map((row) => toFeedingEntrySummary(row, "feeding-duplicate"))
   const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
-  // Keyed on feed type, not just date -- a cage can have multiple feeding entries the same day
-  // as long as each uses a different feed type. This is a frontend-only check (no DB constraint):
-  // blocks the submit button and shows a warning instead of relying on a server-side rejection.
-  const duplicateEntry = pickSameDayEntryByMetadata([...duplicateServerEntries, ...pendingEntries], {
-    date: selectedDate,
-    metadataKey: "feedingDuplicateKey",
-    metadataValue: selectedFeedingDuplicateKey,
-  })
+  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       if (duplicateEntry) {
-        form.setError("date", {
-          message: duplicateEntry.duplicateMessage ?? `A feeding entry already exists for ${values.date}.`,
-        })
+        form.setError("date", { message: `A feeding entry already exists for ${values.date}.` })
         return
       }
 
@@ -260,7 +248,7 @@ export function FeedingForm({
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
       const feedTypeId = parseOptionalNumericId(values.feed_id)
       const feedingResponse = parseOptionalNumericId(values.feeding_response) as FeedingResponseLevel | undefined
-      const batchId = parseOptionalNumericId(values.batch_id)
+      const batchId = resolvedBatchId
       const existingTotal = existingDailyRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
       const dailyTotal = existingTotal + values.amount_kg
       const payload = {
@@ -284,7 +272,6 @@ export function FeedingForm({
         amount_kg: 0,
         system_id: values.system_id,
         feed_id: values.feed_id,
-        batch_id: values.batch_id,
         feeding_response: values.feeding_response,
         notes: "",
       })
@@ -296,20 +283,24 @@ export function FeedingForm({
 
   return (
     <div>
+      <div className="data-entry-form-intro">
+        <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
+        <p className="text-sm text-muted-foreground">Fast cage-first feeding entry for daily farm operations.</p>
+      </div>
 
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="feeding" />
         {submissionSummary ? (
-          <div className="data-entry-callout-alert border-success/40 bg-success/10 text-sm text-success">
+          <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
             {submissionSummary}
           </div>
         ) : null}
         {feedOptions.length === 0 ? (
-          <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-sm text-warning">
+          <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
             No feed types are available for this farm yet.
           </div>
         ) : null}
@@ -416,7 +407,7 @@ export function FeedingForm({
 
             <div className="data-entry-secondary-grid">
               <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-              <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchValue} />
+              <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
             </div>
 
             <div className="data-entry-secondary-grid">
@@ -479,49 +470,6 @@ export function FeedingForm({
                 </FormItem>
               )}
             />
-
-            <div className="data-entry-panel">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Batch is optional and hidden by default to keep the common feeding flow fast.
-                  </p>
-                </div>
-                <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setShowAdvanced((current) => !current)}>
-                  {showAdvanced ? "Hide" : "Show"}
-                </Button>
-              </div>
-              {showAdvanced ? (
-                <div className="mt-4 space-y-3">
-                  <FormField
-                    control={form.control}
-                    name="batch_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Batch (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="max-w-xs">
-                              <SelectValue placeholder="Select batch" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value={OPTIONAL_SELECT_VALUE}>No batch</SelectItem>
-                            {batches.map((batch) => (
-                              <SelectItem key={batch.id} value={String(batch.id)}>
-                                {batch.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              ) : null}
-            </div>
 
             <div className="flex justify-end pt-1">
               <Button

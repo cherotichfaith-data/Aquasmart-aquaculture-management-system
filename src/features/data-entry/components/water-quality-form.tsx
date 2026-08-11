@@ -68,10 +68,12 @@ export function WaterQualityForm({
   farmId,
   systems,
   defaultSystemId = null,
+  onSystemChange,
 }: {
   farmId: string | null
   systems: SystemOption[]
   defaultSystemId?: number | null
+  onSystemChange?: (systemId: number | null) => void
 }) {
   const mutation = useRecordWaterQuality()
   const supabase = useMemo(() => createClient(), [])
@@ -120,7 +122,13 @@ export function WaterQualityForm({
     selectableSystems.find((system) => String(system.id) === selectedSystemValue) ?? null
   const isLakeReference = selectedSystem?.label?.toLowerCase().includes("lake reference") ?? false
   const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
+
+  useEffect(() => {
+    onSystemChange?.(hasValidSystemId ? selectedSystemId : null)
+  }, [hasValidSystemId, onSystemChange, selectedSystemId])
+
   const latestEntryQuery = useWaterQualityMeasurements({
+    farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     limit: 1,
     latestFirst: true,
@@ -128,6 +136,7 @@ export function WaterQualityForm({
     enabled: hasValidSystemId,
   })
   const duplicateQuery = useWaterQualityMeasurements({
+    farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
@@ -295,16 +304,20 @@ export function WaterQualityForm({
 
   return (
     <div>
+      <div className="data-entry-form-intro">
+        <h2 className="text-xl font-semibold tracking-tight">Record Water Quality</h2>
+        <p className="text-sm text-muted-foreground">Multi-parameter entry with a live dissolved oxygen classification preview.</p>
+      </div>
 
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
-        <div className="space-y-4">
+        <div className="space-y-6">
             <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="water quality" />
             {selectedTime < "12:00" ? (
-              <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
+              <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
                 Morning measurement logged. Remember to return for the PM measurement as well.
               </div>
             ) : null}

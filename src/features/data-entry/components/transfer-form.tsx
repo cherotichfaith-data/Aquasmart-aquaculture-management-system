@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
@@ -23,9 +23,7 @@ import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { TRANSFER_TYPE_LABELS, UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { FishCountInput } from "./form-support"
 import {
-  parseOptionalNumericId,
   parseRequiredNumericId,
   reportDataEntrySubmitError,
   requireActiveFarmId,
@@ -47,7 +45,6 @@ const formSchema = z.object({
   target_system_id: z.string().optional(),
   external_target_name: z.string().optional(),
   transfer_type: z.enum(UI_TRANSFER_TYPES),
-  batch_id: z.string().optional(),
   date: z.string().min(1, "Date is required"),
   number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Count must be positive"),
   total_weight_kg: z.coerce.number().min(0.01, "Weight must be positive"),
@@ -79,11 +76,11 @@ interface TransferFormProps {
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
+  onSystemChange?: (systemId: number | null) => void
 }
 
-export function TransferForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: TransferFormProps) {
+export function TransferForm({ farmId, systems, batches, defaultSystemId = null, onSystemChange }: TransferFormProps) {
   const mutation = useRecordTransfer()
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -96,26 +93,38 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       target_system_id: "",
       external_target_name: "",
       transfer_type: "transfer",
-      batch_id: defaultBatchId ? String(defaultBatchId) : "none",
       notes: "",
     },
   })
 
   const originSystemId = useWatch({ control: form.control, name: "origin_system_id" })
   const targetSystemId = useWatch({ control: form.control, name: "target_system_id" })
-  const selectedBatchId = useWatch({ control: form.control, name: "batch_id" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
   const transferType = useWatch({ control: form.control, name: "transfer_type" })
   const externalTargetName = useWatch({ control: form.control, name: "external_target_name" })
   const isExternalOut = transferType === "external_out"
   const resolvedOriginSystemId = Number(originSystemId)
   const hasValidOriginSystemId = Number.isFinite(resolvedOriginSystemId) && resolvedOriginSystemId > 0
+
+  useEffect(() => {
+    onSystemChange?.(hasValidOriginSystemId ? resolvedOriginSystemId : null)
+  }, [hasValidOriginSystemId, onSystemChange, resolvedOriginSystemId])
+
+  // A system can only host one active batch/production cycle at a time, so the
+  // transferred batch is derived from the origin cage instead of asking the
+  // user to pick one manually (see api_fingerling_batch_options_rpc's system_id column).
+  const resolvedBatchId = useMemo(
+    () => batches.find((batch) => batch.system_id === resolvedOriginSystemId)?.id ?? null,
+    [batches, resolvedOriginSystemId],
+  )
   const latestEntryQuery = useTransferData({
+    farmId,
     systemId: hasValidOriginSystemId ? resolvedOriginSystemId : undefined,
     limit: 1,
     enabled: hasValidOriginSystemId,
   })
   const duplicateQuery = useTransferData({
+    farmId,
     systemId: hasValidOriginSystemId ? resolvedOriginSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
@@ -171,7 +180,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
         values.target_system_id && values.target_system_id !== EXTERNAL_DESTINATION
           ? parseRequiredNumericId(values.target_system_id, "Destination cage")
           : null
-      const batchId = parseOptionalNumericId(values.batch_id)
       const resolvedTransferType = isExternalTransfer ? "external_out" : values.transfer_type
 
       await mutation.mutateAsync({
@@ -181,7 +189,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
         external_target_name:
           resolvedTransferType === "external_out" ? values.external_target_name?.trim() ?? null : null,
         transfer_type: resolvedTransferType,
-        batch_id: batchId,
+        batch_id: resolvedBatchId,
         date: values.date,
         number_of_fish_transfer: values.number_of_fish,
         total_weight_transfer: values.total_weight_kg,
@@ -196,7 +204,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
         target_system_id: "",
         external_target_name: "",
         transfer_type: values.transfer_type,
-        batch_id: values.batch_id,
         notes: "",
       })
     } catch (error) {
@@ -206,7 +213,11 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="data-entry-form-intro">
+        <h2 className="text-xl font-semibold tracking-tight">Record Transfer</h2>
+      </div>
+
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
@@ -214,7 +225,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="transfer" />
 
         {isExternalOut ? (
-          <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
+          <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
             Fish will leave this farm system and no receiving cage will be tracked.
           </div>
         ) : null}
@@ -358,7 +369,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SelectedSystemInfo systems={systems} systemId={originSystemId} title="Origin System" />
             {isExternalOut ? (
-              <div className="data-entry-note-card px-3 py-2 text-sm">
+              <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
                 <div className="font-medium">Destination</div>
                 <div className="text-muted-foreground">{externalTargetName?.trim() || "External location"}</div>
               </div>
@@ -367,50 +378,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
             )}
           </div>
 
-          <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
-
-          <div className="data-entry-panel">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
-                <p className="text-xs text-muted-foreground">
-                  Batch is optional and hidden by default to keep transfer entry fast.
-                </p>
-              </div>
-              <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setShowAdvanced((current) => !current)}>
-                {showAdvanced ? "Hide" : "Show"}
-              </Button>
-            </div>
-            {showAdvanced ? (
-              <div className="mt-4">
-                <FormField
-                  control={form.control}
-                  name="batch_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Batch (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="max-w-xs">
-                            <SelectValue placeholder="Select batch" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">No batch</SelectItem>
-                          {batches.map((batch) => (
-                            <SelectItem key={batch.id} value={String(batch.id)}>
-                              {batch.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            ) : null}
-          </div>
+          <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
 
           <div className="data-entry-secondary-grid">
             <FormField
@@ -420,7 +388,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Number of Fish</FormLabel>
                   <FormControl>
-                    <FishCountInput field={field} className="max-w-xs" />
+                    <Input type="number" step="1" className="max-w-xs" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

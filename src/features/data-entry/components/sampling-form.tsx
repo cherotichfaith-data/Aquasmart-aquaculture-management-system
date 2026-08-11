@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
@@ -26,14 +26,12 @@ import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import {
   InfoPanel,
   InfoStat,
-  FishCountInput,
   findUnitForSystem,
   formatRelativeDays,
   getSystemUnits,
   getSystemsForUnit,
 } from "./form-support"
 import {
-  parseOptionalNumericId,
   parseRequiredNumericId,
   reportDataEntrySubmitError,
   requireActiveFarmId,
@@ -51,7 +49,6 @@ import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
 const formSchema = z.object({
   unit: z.string().min(1, "Cage unit is required"),
   system_id: z.string().min(1, "Cage number is required"),
-  batch_id: z.string().optional(),
   date: z.string().min(1, "Date is required"),
   number_of_fish: z.coerce.number().int("Sample count must be a whole number").min(1, "Sample count must be at least 1"),
   total_weight_kg: z.coerce.number().min(0.001, "Weight must be positive"),
@@ -64,6 +61,7 @@ interface SamplingFormProps {
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
+  onSystemChange?: (systemId: number | null) => void
 }
 
 const projectAbwFromHistory = (
@@ -82,9 +80,8 @@ const projectAbwFromHistory = (
   return latestAbw * Math.exp(sgrPerDay * projectionDays)
 }
 
-export function SamplingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: SamplingFormProps) {
+export function SamplingForm({ farmId, systems, batches, defaultSystemId = null, onSystemChange }: SamplingFormProps) {
   const mutation = useRecordSampling()
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const units = useMemo(() => getSystemUnits(systems), [systems])
   const defaultUnit = findUnitForSystem(systems, defaultSystemId)
@@ -98,7 +95,6 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
       number_of_fish: 0,
       total_weight_kg: 0,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
-      batch_id: defaultBatchId ? String(defaultBatchId) : "none",
       notes: "",
     },
   })
@@ -107,9 +103,15 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
   const selectedUnit = useWatch({ control: form.control, name: "unit" })
   const selectedSystemValue = useWatch({ control: form.control, name: "system_id" })
   const selectedSystemId = Number(selectedSystemValue)
-  const selectedBatchIdValue = useWatch({ control: form.control, name: "batch_id" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
+  // A system can only host one active batch/production cycle at a time, so the
+  // batch is derived from the selected cage instead of asking the user to pick
+  // one manually (see api_fingerling_batch_options_rpc's system_id column).
+  const resolvedBatchId = useMemo(
+    () => batches.find((batch) => batch.system_id === selectedSystemId)?.id ?? null,
+    [batches, selectedSystemId],
+  )
 
   useEffect(() => {
     if (!defaultSystemValue) return
@@ -139,12 +141,18 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
 
   const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
 
+  useEffect(() => {
+    onSystemChange?.(hasValidSystemId ? selectedSystemId : null)
+  }, [hasValidSystemId, onSystemChange, selectedSystemId])
+
   const samplingHistoryQuery = useSamplingData({
+    farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     limit: 10,
     enabled: hasValidSystemId,
   })
   const duplicateQuery = useSamplingData({
+    farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
@@ -152,6 +160,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
     enabled: hasValidSystemId && Boolean(selectedDate),
   })
   const latestEntryQuery = useSamplingData({
+    farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
     limit: 1,
     enabled: hasValidSystemId,
@@ -207,12 +216,11 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
 
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
-      const batchId = parseOptionalNumericId(values.batch_id)
 
       await mutation.mutateAsync({
         farm_id: resolvedFarmId,
         system_id: systemId,
-        batch_id: batchId,
+        batch_id: resolvedBatchId,
         date: values.date,
         number_of_fish_sampling: values.number_of_fish,
         total_weight_sampling: values.total_weight_kg,
@@ -225,7 +233,6 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
         number_of_fish: 0,
         total_weight_kg: 0,
         system_id: values.system_id,
-        batch_id: values.batch_id,
         notes: "",
       })
     } catch (error) {
@@ -236,13 +243,17 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
 
   return (
     <div>
+      <div className="data-entry-form-intro">
+        <h2 className="text-xl font-semibold tracking-tight">Record Sampling</h2>
+        <p className="text-sm text-muted-foreground">Capture the monthly sampled fish count and total sample weight in kilograms for this batch.</p>
+      </div>
 
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
-        <div className="space-y-4">
+        <div className="space-y-6">
           <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="sampling" />
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
@@ -315,50 +326,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
 
               <div className="data-entry-secondary-grid">
                 <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-                <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchIdValue} />
-              </div>
-
-              <div className="rounded-lg border border-border/80 bg-muted/10 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Batch is optional and hidden by default to keep sampling entry fast.
-                    </p>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setShowAdvanced((current) => !current)}>
-                    {showAdvanced ? "Hide" : "Show"}
-                  </Button>
-                </div>
-                {showAdvanced ? (
-                  <div className="mt-4">
-                    <FormField
-                      control={form.control}
-                      name="batch_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Batch (Optional)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="max-w-xs">
-                                <SelectValue placeholder="Select batch" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No batch</SelectItem>
-                              {batches.map((batch) => (
-                                <SelectItem key={batch.id} value={String(batch.id)}>
-                                  {batch.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                ) : null}
+                <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
               </div>
 
               <div className="data-entry-secondary-grid">
@@ -369,7 +337,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                     <FormItem>
                       <FormLabel>Number of Fish Sampled</FormLabel>
                       <FormControl>
-                        <FishCountInput field={field} className="max-w-xs" />
+                        <Input type="number" step="1" className="max-w-xs" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -392,7 +360,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
               </div>
 
               {isEarlierThanMonthlyCadence ? (
-                <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Last sampling was {formatRelativeDays(daysSinceLastSample)}. Sampling is normally done monthly because it stresses the fish.
                 </div>
               ) : null}

@@ -142,6 +142,30 @@ export function isInvalidBigintUuidError(err: unknown): boolean {
   return normalized.includes("invalid input syntax for type bigint") && normalized.includes("-")
 }
 
+/**
+ * The browser Supabase client's `auth.getSession()`/`getUser()` calls serialize
+ * through the SDK's cross-tab lock (Web Locks API where available). If that lock
+ * is ever left held -- another tab mid-refresh, a stuck prior call -- this can
+ * hang indefinitely instead of rejecting. Race it against a timeout so a stuck
+ * lock degrades to the `/api/me` server-backed fallback below instead of leaving
+ * every direct-Supabase read (reports, supplier options, etc.) stuck loading forever.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      () => {
+        clearTimeout(timer)
+        resolve(null)
+      },
+    )
+  })
+}
+
 export async function getClientOrError(
   tag: string,
   options?: { requireSession?: boolean },
@@ -150,7 +174,7 @@ export async function getClientOrError(
   const requireSession = options?.requireSession ?? false
 
   if (requireSession) {
-    const sessionUser = await getSessionUser(supabase, `api:${tag}:getSession`)
+    const sessionUser = await withTimeout(getSessionUser(supabase, `api:${tag}:getSession`), 4000)
     if (sessionUser) {
       return { supabase }
     }

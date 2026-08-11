@@ -107,13 +107,17 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
 
   return (
     <div>
+      <div className="data-entry-form-intro">
+        <h2 className="text-xl font-semibold tracking-tight">Feed Inventory</h2>
+        <p className="text-sm text-muted-foreground">Record current feed stock by feed type, including bagged and open-bag quantities.</p>
+      </div>
 
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
               <div className="grid grid-cols-1 gap-4">

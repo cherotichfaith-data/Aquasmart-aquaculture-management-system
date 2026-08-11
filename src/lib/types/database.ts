@@ -2332,6 +2332,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      current_fish_count: { Args: { p_system_id: number }; Returns: number }
       enforce_api_rate_limit: {
         Args: {
           p_ip_address?: unknown
