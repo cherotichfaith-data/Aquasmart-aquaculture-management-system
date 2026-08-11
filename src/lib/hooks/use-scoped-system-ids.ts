@@ -23,6 +23,7 @@ export function useScopedSystemIds(params: Params) {
     stage: params.selectedStage,
     activeOnly: params.activeOnly ?? true,
     enabled: params.enabled,
+    stockedOnly: true,
   })
   const selectedSystemId =
     systemsQuery.data?.status === "success"

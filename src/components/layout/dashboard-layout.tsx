@@ -43,16 +43,14 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const routeKey = `${pathname}?${searchParams.toString()}`
-  const isDesktopViewport = typeof window !== "undefined" ? window.innerWidth >= 768 : true
-  const defaultCollapsedPreference = (() => {
-    if (typeof window === "undefined") return false
-    const stored = window.localStorage.getItem("dashboard:sidebar-collapsed")
-    if (stored === "true") return true
-    if (stored === "false") return false
-    return window.innerWidth < 1280
-  })()
-  const [isDesktop, setIsDesktop] = useState(isDesktopViewport)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(defaultCollapsedPreference)
+  // Viewport width and the collapsed-sidebar preference are only knowable in
+  // the browser (window size, localStorage), so the server always renders the
+  // same "desktop, expanded" defaults below. Reading them here instead would
+  // make the client's first render diverge from that server-rendered HTML and
+  // fail hydration -- the real values are applied client-side in the mount
+  // effect right after, once the DOM is already attached.
+  const [isDesktop, setIsDesktop] = useState(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const routeToken = useMemo(() => Symbol(routeKey), [routeKey])
   const [mobileSidebarDraft, setMobileSidebarDraft] = useState(() => ({
     sourceToken: routeToken,
@@ -90,9 +88,20 @@ export default function DashboardLayout({
   const allowDataEntry = canAccessDataEntry(farmRole)
 
   useEffect(() => {
-    if (typeof window === "undefined") return
     const applyResponsiveSidebarState = () => {
       setIsDesktop(window.innerWidth >= 768)
+    }
+    // Apply once on mount to correct the SSR-safe defaults above now that
+    // window/localStorage are actually available, then keep isDesktop in
+    // sync with the viewport from here on.
+    applyResponsiveSidebarState()
+    const stored = window.localStorage.getItem("dashboard:sidebar-collapsed")
+    if (stored === "true") {
+      setSidebarCollapsed(true)
+    } else if (stored === "false") {
+      setSidebarCollapsed(false)
+    } else {
+      setSidebarCollapsed(window.innerWidth < 1280)
     }
     window.addEventListener("resize", applyResponsiveSidebarState)
     return () => window.removeEventListener("resize", applyResponsiveSidebarState)

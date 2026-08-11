@@ -52,6 +52,10 @@ export default function DashboardPage({
 
   if (!farmId) return <div className="min-h-[60vh]" />
 
+  // Cages that have been fully harvested or emptied out no longer belong in
+  // the operational overview -- they'll come back once they're restocked.
+  const stockedRows = initialData.systemsTable.rows.filter((row) => (row.fish_end ?? 0) > 0)
+
   return (
     <div className="container mx-auto flex flex-col gap-8 p-4 md:p-8">
       <section>
@@ -70,7 +74,7 @@ export default function DashboardPage({
       <section>
         <SectionLabel title="Production" />
         <SystemsTable
-          rows={initialData.systemsTable.rows}
+          rows={stockedRows}
           isLoading={false}
           isFetching={false}
           emptyReason={initialData.systemsTable.meta.reason ?? null}

@@ -149,6 +149,7 @@ export default function Header({
           farmId,
           activeOnly: appPathname.startsWith("/feed") ? false : true,
           enabled: !systemOptionsOverride,
+          stockedOnly: true,
         }
       : undefined,
   )

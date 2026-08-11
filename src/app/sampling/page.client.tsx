@@ -33,7 +33,7 @@ export default function SamplingPage({
   const systemParam = searchParams.get("cage") ?? searchParams.get("system")
   const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")
-  const filterSystemsQuery = useSystemOptions({ farmId: initialFarmId, activeOnly: true })
+  const filterSystemsQuery = useSystemOptions({ farmId: initialFarmId, activeOnly: true, stockedOnly: true })
   const filterSystemOptions = useMemo(
     () => (filterSystemsQuery.data?.status === "success" ? filterSystemsQuery.data.data : []),
     [filterSystemsQuery.data],
