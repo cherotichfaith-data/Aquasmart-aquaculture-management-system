@@ -35,6 +35,10 @@ export function sortLatestEntries(entries: LatestEntrySummary[]) {
   return [...entries].sort((left, right) => toEntryTimestamp(right) - toEntryTimestamp(left))
 }
 
+export function pickLatestEntry(entries: LatestEntrySummary[]) {
+  return sortLatestEntries(entries)[0] ?? null
+}
+
 export function sortLatestEntriesByRecordDate(entries: LatestEntrySummary[]) {
   return [...entries].sort((left, right) => {
     const dateCompare = toEntryDateValue(right).localeCompare(toEntryDateValue(left))
@@ -50,17 +54,6 @@ export function pickLatestEntryByRecordDate(entries: LatestEntrySummary[]) {
 export function pickSameDayEntry(entries: LatestEntrySummary[], date?: string | null) {
   if (!date) return null
   return sortLatestEntries(entries.filter((entry) => entry.date === date))[0] ?? null
-}
-
-/**
- * Duplicate key for feeding entries: a cage/system can have multiple feeding entries the same
- * day as long as each uses a different feed type -- only same cage + date + feed type collides.
- * This is a frontend-only check (no DB-level constraint); kept in one place so the client-side
- * check (feeding-form.tsx, for both server rows and locally-pending offline rows below) stays
- * consistent.
- */
-export function composeFeedingDuplicateKey(feedTypeId: number | null | undefined) {
-  return feedTypeId != null ? String(feedTypeId) : "none"
 }
 
 export function pickSameDayEntryByMetadata(
@@ -86,7 +79,7 @@ export function pickSameDayEntryByMetadata(
 export function usePendingLatestEntries(
   kind: LatestEntryGuardKind,
   systemId?: number | null,
-  feedTypes?: Array<{ id: number; label: string }>,
+  feedTypes?: Array<{ id: number; label?: string | null; feed_line?: string | null }>,
 ) {
   return (
     useLiveQuery(async () => {
@@ -94,11 +87,16 @@ export function usePendingLatestEntries(
 
       switch (kind) {
         case "feeding": {
-          const rows = await offlineDB.feeding.where("systemId").equals(systemId).toArray()
-          const feedTypeLabel = (feedTypeId: number | null | undefined) =>
-            feedTypeId != null
-              ? feedTypes?.find((feedType) => feedType.id === feedTypeId)?.label ?? `Feed type #${feedTypeId}`
-              : "Not selected"
+          const rows = await offlineDB.feeding
+            .where("systemId")
+            .equals(systemId)
+            .and((row) => row.syncStatus === "pending")
+            .toArray()
+          const feedTypeLabel = (feedTypeId: number | null | undefined) => {
+            if (feedTypeId == null) return "Not selected"
+            const feedType = feedTypes?.find((item) => item.id === feedTypeId)
+            return feedType?.label ?? feedType?.feed_line ?? "Not recorded"
+          }
           return rows.map<LatestEntrySummary>((row) => ({
             key: `pending-feeding-${row.localId}`,
             date: row.date,
@@ -112,15 +110,14 @@ export function usePendingLatestEntries(
                     { label: "Feed Type", value: feedTypeLabel(row.feedTypeId) },
                     { label: "Response", value: row.feedingResponse != null ? `Level ${row.feedingResponse}` : "Not recorded" },
                   ],
-            metadata: { feedingDuplicateKey: composeFeedingDuplicateKey(row.feedTypeId) },
-            duplicateMessage:
-              row.feedTypeId != null
-                ? `A feeding entry with this feed type already exists for this cage on ${row.date}.`
-                : `A feeding entry already exists for this cage on ${row.date}. Select a feed type to log an additional feeding.`,
           }))
         }
         case "mortality": {
-          const rows = await offlineDB.mortality.where("systemId").equals(systemId).toArray()
+          const rows = await offlineDB.mortality
+            .where("systemId")
+            .equals(systemId)
+            .and((row) => row.syncStatus === "pending")
+            .toArray()
           return rows.map<LatestEntrySummary>((row) => ({
             key: `pending-mortality-${row.localId}`,
             date: row.date,
@@ -137,7 +134,11 @@ export function usePendingLatestEntries(
           }))
         }
         case "sampling": {
-          const rows = await offlineDB.sampling.where("systemId").equals(systemId).toArray()
+          const rows = await offlineDB.sampling
+            .where("systemId")
+            .equals(systemId)
+            .and((row) => row.syncStatus === "pending")
+            .toArray()
           return rows.map<LatestEntrySummary>((row) => ({
             key: `pending-sampling-${row.localId}`,
             date: row.date,
@@ -150,7 +151,11 @@ export function usePendingLatestEntries(
           }))
         }
         case "stocking": {
-          const rows = await offlineDB.stocking.where("systemId").equals(systemId).toArray()
+          const rows = await offlineDB.stocking
+            .where("systemId")
+            .equals(systemId)
+            .and((row) => row.syncStatus === "pending")
+            .toArray()
           return rows.map<LatestEntrySummary>((row) => ({
             key: `pending-stocking-${row.localId}`,
             date: row.date,
@@ -164,7 +169,11 @@ export function usePendingLatestEntries(
           }))
         }
         case "harvest": {
-          const rows = await offlineDB.harvest.where("systemId").equals(systemId).toArray()
+          const rows = await offlineDB.harvest
+            .where("systemId")
+            .equals(systemId)
+            .and((row) => row.syncStatus === "pending")
+            .toArray()
           return rows.map<LatestEntrySummary>((row) => ({
             key: `pending-harvest-${row.localId}`,
             date: row.date,
@@ -178,7 +187,11 @@ export function usePendingLatestEntries(
           }))
         }
         case "transfer": {
-          const rows = await offlineDB.transfer.where("originSystemId").equals(systemId).toArray()
+          const rows = await offlineDB.transfer
+            .where("originSystemId")
+            .equals(systemId)
+            .and((row) => row.syncStatus === "pending")
+            .toArray()
           return rows.map<LatestEntrySummary>((row) => ({
             key: `pending-transfer-${row.localId}`,
             date: row.date,
@@ -195,7 +208,11 @@ export function usePendingLatestEntries(
           }))
         }
         case "water_quality": {
-          const rows = await offlineDB.waterQuality.where("systemId").equals(systemId).toArray()
+          const rows = await offlineDB.waterQuality
+            .where("systemId")
+            .equals(systemId)
+            .and((row) => row.syncStatus === "pending")
+            .toArray()
           return rows.map<LatestEntrySummary>((row) => ({
             key: `pending-water-quality-${row.localId}`,
             date: row.date,
@@ -213,7 +230,7 @@ export function usePendingLatestEntries(
           }))
         }
       }
-    }, [kind, systemId, feedTypes]) ?? []
+    }, [feedTypes, kind, systemId]) ?? []
   )
 }
 
@@ -231,13 +248,13 @@ export function LatestEntryGuard({
   return (
     <div className="space-y-3">
       {duplicateEntry ? (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm text-destructive">
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm text-destructive">
           {duplicateEntry.duplicateMessage ?? `A ${itemLabel} entry already exists for this cage on ${duplicateEntry.date}.`}
         </div>
       ) : null}
 
       {latestEntry ? (
-        <div className="data-entry-panel">
+        <div className="rounded-md border border-border/80 bg-muted/15 px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-foreground">Latest {itemLabel} entry for this cage</div>
@@ -252,7 +269,7 @@ export function LatestEntryGuard({
           <div className="mt-3 text-sm font-medium text-foreground">{latestEntry.summary}</div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {latestEntry.details.map((detail) => (
-              <div key={`${latestEntry.key}-${detail.label}`} className="rounded-lg border border-border/70 bg-background/70 px-3 py-2">
+              <div key={`${latestEntry.key}-${detail.label}`} className="rounded-md border border-border/70 bg-background/70 px-3 py-2">
                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{detail.label}</div>
                 <div className="text-sm text-foreground">{detail.value}</div>
               </div>

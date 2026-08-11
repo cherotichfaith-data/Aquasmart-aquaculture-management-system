@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
@@ -22,7 +23,6 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { FishCountInput } from "./form-support"
 import {
   LatestEntryGuard,
   pickLatestEntryByRecordDate,
@@ -31,11 +31,10 @@ import {
   type LatestEntrySummary,
 } from "./latest-entry-guard"
 import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
-import { parseOptionalNumericId, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 
 const formSchema = z.object({
   system_id: z.string().min(1, "Cage number is required"),
-  batch_id: z.string().optional(),
   date: z.string().min(1, "Date is required"),
   number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Must be positive"),
   cause: z.enum(MORTALITY_CAUSES, { errorMap: () => ({ message: "Cause is required" }) }),
@@ -57,6 +56,7 @@ interface MortalityFormProps {
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
+  onSystemChange?: (systemId: number | null) => void
 }
 
 const CAUSE_LABELS: Record<MortalityCause, string> = {
@@ -71,7 +71,7 @@ const CAUSE_LABELS: Record<MortalityCause, string> = {
   other: "Other",
 }
 
-export function MortalityForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: MortalityFormProps) {
+export function MortalityForm({ farmId, systems, batches, defaultSystemId = null, onSystemChange }: MortalityFormProps) {
   const mutation = useRecordMortality()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -81,25 +81,34 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       date: new Date().toISOString().split("T")[0],
       number_of_fish: 0,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
-      batch_id: defaultBatchId ? String(defaultBatchId) : "none",
       total_weight_mortality: undefined,
       notes: "",
     },
   })
 
   const selectedSystemId = useWatch({ control: form.control, name: "system_id" })
-  const selectedBatchId = useWatch({ control: form.control, name: "batch_id" })
   const mortalityCount = useWatch({ control: form.control, name: "number_of_fish" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
   const resolvedSystemId = Number(selectedSystemId)
   const hasValidSystemId = Number.isFinite(resolvedSystemId) && resolvedSystemId > 0
 
+  useEffect(() => {
+    onSystemChange?.(hasValidSystemId ? resolvedSystemId : null)
+  }, [hasValidSystemId, onSystemChange, resolvedSystemId])
+
+  // A system can only host one active batch/production cycle at a time, so the
+  // batch is derived from the selected cage instead of asking the user to pick
+  // one manually (see api_fingerling_batch_options_rpc's system_id column).
+  const resolvedBatchId = batches.find((batch) => batch.system_id === resolvedSystemId)?.id ?? null
+
   const latestEntryQuery = useMortalityData({
+    farmId,
     systemId: hasValidSystemId ? resolvedSystemId : undefined,
     limit: 1,
     enabled: hasValidSystemId,
   })
   const duplicateQuery = useMortalityData({
+    farmId,
     systemId: hasValidSystemId ? resolvedSystemId : undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
@@ -146,12 +155,11 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
-      const batchId = parseOptionalNumericId(values.batch_id)
 
       await mutation.mutateAsync({
         farm_id: resolvedFarmId,
         system_id: systemId,
-        batch_id: batchId,
+        batch_id: resolvedBatchId,
         date: values.date,
         number_of_fish_mortality: values.number_of_fish,
         total_weight_mortality: values.total_weight_mortality ?? null,
@@ -163,7 +171,6 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
         date: new Date().toISOString().split("T")[0],
         number_of_fish: 0,
         system_id: values.system_id,
-        batch_id: values.batch_id,
         total_weight_mortality: undefined,
         notes: "",
       })
@@ -174,7 +181,11 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="data-entry-form-intro">
+        <h2 className="text-xl font-semibold tracking-tight">Record Mortality</h2>
+      </div>
+
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
@@ -182,7 +193,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="mortality" />
 
         {mortalityCount >= 100 ? (
-        <div className="data-entry-callout-alert border-destructive/40 bg-destructive/10 text-destructive">
+        <div className="data-entry-callout-alert rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
             Mass mortality threshold exceeded. Weigh the dead fish and record the total dead weight, then complete a DO and water-quality check for this cage.
           </div>
         ) : null}
@@ -231,38 +242,12 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
             <FormField
               control={form.control}
-              name="batch_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Batch (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="max-w-xs">
-                        <SelectValue placeholder="Select batch" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">No batch</SelectItem>
-                      {batches.map((batch) => (
-                        <SelectItem key={batch.id} value={String(batch.id)}>
-                          {batch.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="number_of_fish"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Number of Dead Fish</FormLabel>
                   <FormControl>
-                    <FishCountInput field={field} className="max-w-xs" />
+                    <Input type="number" step="1" className="max-w-xs" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -272,7 +257,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
           <div className="data-entry-secondary-grid">
             <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-            <SelectedBatchSupplierInfo batches={batches} batchId={selectedBatchId} />
+            <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
           </div>
 
           <FormField

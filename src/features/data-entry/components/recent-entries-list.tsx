@@ -50,18 +50,19 @@ type FeedInventoryRow = Pick<
   PendingMeta
 type StockingRow = Pick<Tables<"fish_stocking">, "id" | "date" | "system_id" | "number_of_fish_stocking" | "type_of_stocking" | "created_at"> & PendingMeta
 
-type FeedTypeOption = { id: number; label: string }
+type FeedTypeOption = { id: number; label?: string | null; feed_line?: string | null }
 
-type RecentEntriesListProps =
-  | { type: "mortality"; data: MortalityRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
-  | { type: "feeding"; data: FeedingRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
-  | { type: "sampling"; data: SamplingRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
-  | { type: "transfer"; data: TransferRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
-  | { type: "harvest"; data: HarvestRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
-  | { type: "water_quality"; data: WaterQualityRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
-  | { type: "feed_inventory"; data: FeedInventoryRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
-  | { type: "stocking"; data: StockingRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
-  | { type: "system"; data: SystemEntryRow[]; systems: SystemOption[]; feeds?: FeedTypeOption[] }
+type RecentEntriesListProps = (
+  | { type: "mortality"; data: MortalityRow[] }
+  | { type: "feeding"; data: FeedingRow[] }
+  | { type: "sampling"; data: SamplingRow[] }
+  | { type: "transfer"; data: TransferRow[] }
+  | { type: "harvest"; data: HarvestRow[] }
+  | { type: "water_quality"; data: WaterQualityRow[] }
+  | { type: "feed_inventory"; data: FeedInventoryRow[] }
+  | { type: "stocking"; data: StockingRow[] }
+  | { type: "system"; data: SystemEntryRow[] }
+) & { systems: SystemOption[]; feeds?: FeedTypeOption[] }
 
 type RecentCard = {
   key: string
@@ -230,15 +231,10 @@ function EntriesSection({
 }) {
   return (
     <div className="data-entry-recent-panel">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2.5">
-          <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Clock3 className="h-3.5 w-3.5" />
-          </span>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Recent Entries</h3>
-            <p className="text-xs text-muted-foreground">Latest saved records for this entry type.</p>
-          </div>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Recent Entries</h3>
+          <p className="text-xs text-muted-foreground">Latest saved records for this entry type.</p>
         </div>
         {pendingCount > 0 ? (
           <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
@@ -288,7 +284,8 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
   const formatSystemName = createSystemLabelResolver(systems)
   const formatFeedTypeName = (feedTypeId: number | null | undefined) => {
     if (feedTypeId == null) return "Not selected"
-    return feeds?.find((feed) => feed.id === feedTypeId)?.label ?? `Feed type #${feedTypeId}`
+    const feedType = feeds?.find((item) => item.id === feedTypeId)
+    return feedType?.label ?? feedType?.feed_line ?? "Not recorded"
   }
 
   let cards: RecentCard[] = []

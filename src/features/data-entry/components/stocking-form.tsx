@@ -25,7 +25,6 @@ import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { BatchQuickCreate } from "./batch-quick-create"
 import { DependencyBlocker } from "./dependency-blocker"
 import {
-  FishCountInput,
   findUnitForSystem,
   getSystemUnits,
   getSystemsForUnit,
@@ -76,9 +75,10 @@ interface StockingFormProps {
   batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
+  onSystemChange?: (systemId: number | null) => void
 }
 
-export function StockingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null }: StockingFormProps) {
+export function StockingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null, onSystemChange }: StockingFormProps) {
   const mutation = useRecordStocking()
   const [showBatchCreate, setShowBatchCreate] = useState(false)
   const [createdBatches, setCreatedBatches] = useState<BatchOption[]>([])
@@ -117,12 +117,19 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   const selectedSystemIdForBatch =
     Number.isFinite(selectedSystemIdNumber) && selectedSystemIdNumber > 0 ? selectedSystemIdNumber : null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
+
+  useEffect(() => {
+    onSystemChange?.(selectedSystemIdForBatch)
+  }, [onSystemChange, selectedSystemIdForBatch])
+
   const latestEntryQuery = useStockingData({
+    farmId,
     systemId: selectedSystemIdForBatch ?? undefined,
     limit: 1,
     enabled: Boolean(selectedSystemIdForBatch),
   })
   const duplicateQuery = useStockingData({
+    farmId,
     systemId: selectedSystemIdForBatch ?? undefined,
     dateFrom: selectedDate || undefined,
     dateTo: selectedDate || undefined,
@@ -312,7 +319,11 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="data-entry-form-intro">
+        <h2 className="text-xl font-semibold tracking-tight">Record Stocking</h2>
+      </div>
+
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
@@ -396,7 +407,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
               )}
             />
 
-            <div className="data-entry-panel-highlight">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
               <div>
                 <div className="text-sm font-semibold text-foreground">Batch Number</div>
               </div>
@@ -441,7 +452,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 <FormItem>
                   <FormLabel>Number of Fish</FormLabel>
                   <FormControl>
-                    <FishCountInput field={field} className="max-w-xs" />
+                    <Input type="number" step="1" className="max-w-xs" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

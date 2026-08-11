@@ -6,6 +6,7 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { queryKeys } from "@/lib/cache/query-keys"
 import type { Enums } from "@/lib/types/database"
 import {
+  getFeedingActivityRecords,
   getBatchSystemIds,
   getFeedingBreakdown,
   getFeedingRecords,
@@ -15,6 +16,7 @@ import {
   getMortalityData,
   getPerformanceRecords,
   getPerformanceSummary,
+  getRecentActivities,
   getSamplingData,
   getStockings,
   getTransferData,
@@ -57,6 +59,30 @@ export function useFeedingRecords(params?: {
     ...reportsQueryOptions({
       queryKey: queryKeys.reports.feedingRecords({ ...params, farmId: resolvedFarmId }),
       queryFn: ({ signal }) => getFeedingRecords({ ...params, farmId: resolvedFarmId, signal }),
+      staleTime: 5 * 60_000,
+      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
+    }),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useFeedingActivityRecords(params?: {
+  systemId?: number
+  systemIds?: number[]
+  batchId?: number
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  enabled?: boolean
+  farmId?: string | null
+}) {
+  const { session } = useAuth()
+  const { farmId } = useActiveFarm()
+  const resolvedFarmId = params?.farmId ?? farmId
+  return useQuery({
+    ...reportsQueryOptions({
+      queryKey: queryKeys.reports.feedingActivity({ ...params, farmId: resolvedFarmId }),
+      queryFn: ({ signal }) => getFeedingActivityRecords({ ...params, farmId: resolvedFarmId, signal }),
       staleTime: 5 * 60_000,
       enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
     }),
@@ -135,6 +161,7 @@ export function useFeedingBreakdown(params?: {
 }
 
 export function useSamplingData(params?: {
+  farmId?: string | null
   systemId?: number
   systemIds?: number[]
   batchId?: number
@@ -145,17 +172,19 @@ export function useSamplingData(params?: {
 }) {
   const { session } = useAuth()
   const { farmId } = useActiveFarm()
+  const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
-      queryKey: queryKeys.reports.sampling({ ...params, farmId }),
-      queryFn: ({ signal }) => getSamplingData({ ...params, farmId, signal }),
+      queryKey: queryKeys.reports.sampling({ ...params, farmId: resolvedFarmId }),
+      queryFn: ({ signal }) => getSamplingData({ ...params, farmId: resolvedFarmId, signal }),
       staleTime: 5 * 60_000,
-      enabled: Boolean(session) && Boolean(farmId) && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
     }),
   )
 }
 
 export function useStockingData(params?: {
+  farmId?: string | null
   systemId?: number
   systemIds?: number[]
   batchId?: number
@@ -166,12 +195,13 @@ export function useStockingData(params?: {
 }) {
   const { session } = useAuth()
   const { farmId } = useActiveFarm()
+  const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
-      queryKey: queryKeys.reports.stocking({ ...params, farmId }),
-      queryFn: ({ signal }) => getStockings({ ...params, farmId, signal }),
+      queryKey: queryKeys.reports.stocking({ ...params, farmId: resolvedFarmId }),
+      queryFn: ({ signal }) => getStockings({ ...params, farmId: resolvedFarmId, signal }),
       staleTime: 5 * 60_000,
-      enabled: Boolean(session) && Boolean(farmId) && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
     }),
   )
 }
@@ -320,6 +350,7 @@ export function usePerformanceRecords(params?: {
 }
 
 export function useTransferData(params?: {
+  farmId?: string | null
   systemId?: number
   systemIds?: number[]
   batchId?: number
@@ -330,12 +361,13 @@ export function useTransferData(params?: {
 }) {
   const { session } = useAuth()
   const { farmId } = useActiveFarm()
+  const resolvedFarmId = params?.farmId ?? farmId
   return useQuery(
     reportsQueryOptions({
-      queryKey: queryKeys.reports.transfer({ ...params, farmId }),
-      queryFn: ({ signal }) => getTransferData({ ...params, farmId, signal }),
+      queryKey: queryKeys.reports.transfer({ ...params, farmId: resolvedFarmId }),
+      queryFn: ({ signal }) => getTransferData({ ...params, farmId: resolvedFarmId, signal }),
       staleTime: 5 * 60_000,
-      enabled: Boolean(session) && Boolean(farmId) && (params?.enabled ?? true),
+      enabled: Boolean(session) && Boolean(resolvedFarmId) && (params?.enabled ?? true),
     }),
   )
 }
@@ -386,3 +418,31 @@ export function useBatchSystemIds(params?: {
   )
 }
 
+export function useRecentActivities(params?: {
+  farmId?: string | null
+  tableName?: string
+  changeType?: Enums<"change_type_enum">
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+  enabled?: boolean
+}) {
+  const enabled = params?.enabled ?? true
+  return useQuery({
+    queryKey: queryKeys.activity.recentActivities(params),
+    queryFn: ({ signal }) =>
+      getRecentActivities({
+        farmId: params?.farmId,
+        tableName: params?.tableName,
+        changeType: params?.changeType,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+        limit: params?.limit ?? 5,
+        signal,
+      }),
+    enabled: enabled && Boolean(params?.farmId),
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60_000,
+  })
+}
