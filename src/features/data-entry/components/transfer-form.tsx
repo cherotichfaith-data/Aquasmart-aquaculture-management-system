@@ -222,7 +222,12 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="transfer" />
+      <LatestEntryGuard
+        latestEntry={latestEntry}
+        duplicateEntry={duplicateEntry}
+        itemLabel="transfer"
+        isLoading={latestEntryQuery.isLoading}
+      />
 
         {isExternalOut ? (
           <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">

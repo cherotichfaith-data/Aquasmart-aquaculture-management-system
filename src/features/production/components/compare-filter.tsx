@@ -27,9 +27,12 @@ const NO_COMPARE_VALUE = "__none__"
 export default function ProductionCompareFilter({
   primaryMetric,
   compareMetric,
+  startTransition,
 }: {
   primaryMetric: ProductionMetric
   compareMetric: ProductionMetric | null
+  /** See ProductionMetricFilter's `startTransition` prop for why this exists. */
+  startTransition?: (callback: () => void) => void
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -42,9 +45,10 @@ export default function ProductionCompareFilter({
       else params.delete("compare")
       const nextQuery = params.toString()
       if (nextQuery === searchParams.toString()) return
-      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+      const navigate = () => router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+      startTransition ? startTransition(navigate) : navigate()
     },
-    [pathname, router, searchParams],
+    [pathname, router, searchParams, startTransition],
   )
 
   const options = PRODUCTION_METRIC_OPTIONS.filter((option) => option.value !== primaryMetric)

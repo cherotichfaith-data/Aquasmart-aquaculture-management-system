@@ -338,7 +338,12 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} onCreated={handleBatchCreated} />
       ) : null}
 
-      <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="stocking" />
+      <LatestEntryGuard
+        latestEntry={latestEntry}
+        duplicateEntry={duplicateEntry}
+        itemLabel="stocking"
+        isLoading={latestEntryQuery.isLoading}
+      />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">

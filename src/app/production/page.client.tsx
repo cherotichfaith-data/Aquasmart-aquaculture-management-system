@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/app-ui/button"
@@ -22,6 +22,7 @@ import type { ProductionPageInitialData, ProductionPageFilters } from "@/feature
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { formatCustomRangeLabel, parseCustomPeriodUrlValue, TIME_PERIOD_LABELS, type TimePeriod } from "@/lib/time-period"
 import { downloadCsv } from "@/lib/utils/report-export"
+import { cn } from "@/lib/utils"
 
 const PRODUCTION_DATE_TYPES: TimePeriod[] = [
   "day",
@@ -34,7 +35,14 @@ const PRODUCTION_DATE_TYPES: TimePeriod[] = [
   "all history",
 ]
 
-function ProductionPeriodFilter({ selectedPeriod }: { selectedPeriod: TimePeriod }) {
+function ProductionPeriodFilter({
+  selectedPeriod,
+  startTransition,
+}: {
+  selectedPeriod: TimePeriod
+  /** See ProductionMetricFilter's `startTransition` prop for why this exists. */
+  startTransition?: (callback: () => void) => void
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -43,13 +51,15 @@ function ProductionPeriodFilter({ selectedPeriod }: { selectedPeriod: TimePeriod
   const handleChange = (value: TimePeriod) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set("date", value)
-    router.replace(`${pathname}?${params.toString()}`)
+    const navigate = () => router.replace(`${pathname}?${params.toString()}`)
+    startTransition ? startTransition(navigate) : navigate()
   }
 
   const handleCustomRangeChange = (range: { start: string; end: string }) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set("date", `custom_${range.start}_${range.end}`)
-    router.replace(`${pathname}?${params.toString()}`)
+    const navigate = () => router.replace(`${pathname}?${params.toString()}`)
+    startTransition ? startTransition(navigate) : navigate()
   }
 
   return (
@@ -81,6 +91,13 @@ export default function ProductionPageClient({
   initialData: ProductionPageInitialData
 }) {
   const searchParams = useSearchParams()
+  // Filter changes (period/system/metric/compare) all write to the URL and
+  // re-render this page from the server with fresh initialData -- there's no
+  // client-side query to key a loading state off. Wrapping those navigations
+  // in a transition gives the chart/table something real to show instead of
+  // a hardcoded isLoading={false} that goes stale the moment a filter is
+  // clicked.
+  const [isPending, startTransition] = useTransition()
   const metric = parseProductionMetric(searchParams.get("filter"))
   const compareMetric = parseProductionCompareMetric(searchParams.get("compare"), metric)
   const allSystems = useMemo<SystemOption[]>(
@@ -230,7 +247,7 @@ export default function ProductionPageClient({
             <section className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
               <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Production</h1>
               <div className="flex flex-wrap gap-2">
-                <ProductionPeriodFilter selectedPeriod={initialFilters.timePeriod} />
+                <ProductionPeriodFilter selectedPeriod={initialFilters.timePeriod} startTransition={startTransition} />
                 <Button asChild variant="secondary" className="h-10 px-4">
                   <Link href={addDataHref}>Add data</Link>
                 </Button>
@@ -239,11 +256,19 @@ export default function ProductionPageClient({
             </section>
 
             <div className="flex flex-wrap items-end gap-2">
-              <ProductionSystemFilter systems={systems} selectedSystemId={resolvedSelectedSystemId} />
+              <ProductionSystemFilter
+                systems={systems}
+                selectedSystemId={resolvedSelectedSystemId}
+                startTransition={startTransition}
+              />
               <div className="w-[200px] shrink-0 md:w-[210px]">
-                <ProductionMetricFilter className="production-select" />
+                <ProductionMetricFilter className="production-select" startTransition={startTransition} />
               </div>
-              <ProductionCompareFilter primaryMetric={metric} compareMetric={compareMetric} />
+              <ProductionCompareFilter
+                primaryMetric={metric}
+                compareMetric={compareMetric}
+                startTransition={startTransition}
+              />
             </div>
 
             <ProductionChart
@@ -253,7 +278,7 @@ export default function ProductionPageClient({
               compareRows={compareChartRows}
               markers={markers}
               periodLabel={periodLabel}
-              isLoading={false}
+              isLoading={isPending}
               onRetry={undefined}
             />
 
@@ -261,7 +286,7 @@ export default function ProductionPageClient({
               <CardHeader className="pb-1">
                 <CardTitle>Production records</CardTitle>
               </CardHeader>
-              <CardContent className="pt-2">
+              <CardContent className={cn("pt-2 transition-opacity duration-200", isPending && "opacity-50")}>
                 <DataTable
                   columns={productionTableColumns}
                   data={tableRows}

@@ -293,7 +293,12 @@ export function FeedingForm({
       </div>
 
       <div className="space-y-6">
-        <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="feeding" />
+        <LatestEntryGuard
+          latestEntry={latestEntry}
+          duplicateEntry={duplicateEntry}
+          itemLabel="feeding"
+          isLoading={latestEntryQuery.isLoading}
+        />
         {submissionSummary ? (
           <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
             {submissionSummary}

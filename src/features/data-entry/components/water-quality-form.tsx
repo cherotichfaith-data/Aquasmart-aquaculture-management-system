@@ -315,7 +315,12 @@ export function WaterQualityForm({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
-            <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="water quality" />
+            <LatestEntryGuard
+              latestEntry={latestEntry}
+              duplicateEntry={duplicateEntry}
+              itemLabel="water quality"
+              isLoading={latestEntryQuery.isLoading}
+            />
             {selectedTime < "12:00" ? (
               <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
                 Morning measurement logged. Remember to return for the PM measurement as well.

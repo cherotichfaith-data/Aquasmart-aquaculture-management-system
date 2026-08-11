@@ -768,9 +768,19 @@ export default function Header({
       </Menu>
 
       <Sheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} side="bottom">
-        <div className="px-4 py-4">
-          <h2 className="text-base font-bold">Filters</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">Refine the current view.</p>
+        <div className="flex items-start justify-between gap-3 px-4 py-4">
+          <div>
+            <h2 className="text-base font-bold">Filters</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">Refine the current view.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(false)}
+            aria-label="Close filters"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent"
+          >
+            <X size={18} />
+          </button>
         </div>
         <Separator />
         <div className="grid gap-3 overflow-y-auto px-4 py-4">
