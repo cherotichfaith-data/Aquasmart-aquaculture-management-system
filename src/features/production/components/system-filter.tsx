@@ -18,9 +18,12 @@ import { formatCageLabel } from "@/lib/system-options"
 export default function ProductionSystemFilter({
   systems,
   selectedSystemId,
+  startTransition,
 }: {
   systems: SystemOption[]
   selectedSystemId: number | null
+  /** See ProductionMetricFilter's `startTransition` prop for why this exists. */
+  startTransition?: (callback: () => void) => void
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -30,7 +33,8 @@ export default function ProductionSystemFilter({
     const params = new URLSearchParams(searchParams.toString())
     params.set("system", value)
     params.delete("cage")
-    router.replace(`${pathname}?${params.toString()}`)
+    const navigate = () => router.replace(`${pathname}?${params.toString()}`)
+    startTransition ? startTransition(navigate) : navigate()
   }
 
   const options = [...systems]

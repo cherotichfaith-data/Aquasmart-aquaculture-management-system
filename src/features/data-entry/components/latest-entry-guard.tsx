@@ -2,6 +2,7 @@
 
 import { useLiveQuery } from "dexie-react-hooks"
 import { Badge } from "@/components/app-ui/badge"
+import { Skeleton } from "@/components/app-ui/skeleton"
 import { offlineDB } from "@/lib/offline/db"
 
 export type LatestEntrySummary = {
@@ -238,12 +239,39 @@ export function LatestEntryGuard({
   latestEntry,
   duplicateEntry,
   itemLabel,
+  isLoading = false,
 }: {
   latestEntry: LatestEntrySummary | null
   duplicateEntry: LatestEntrySummary | null
   itemLabel: string
+  /**
+   * Whether the server-backed "latest entry" query is still on its first
+   * fetch. A pending offline entry can already satisfy `latestEntry` before
+   * that resolves, so this only matters -- and only renders a skeleton --
+   * when neither entry is known yet, instead of the panel just being absent
+   * and then popping in once the network call finishes.
+   */
+  isLoading?: boolean
 }) {
-  if (!latestEntry && !duplicateEntry) return null
+  if (!latestEntry && !duplicateEntry) {
+    if (!isLoading) return null
+
+    return (
+      <div className="rounded-md border border-border/80 bg-muted/15 px-4 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </div>
+        <Skeleton className="mt-3 h-4 w-40" />
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Skeleton className="h-12 rounded-md" />
+          <Skeleton className="h-12 rounded-md" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">

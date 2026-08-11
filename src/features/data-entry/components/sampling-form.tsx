@@ -254,7 +254,12 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
-          <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="sampling" />
+          <LatestEntryGuard
+            latestEntry={latestEntry}
+            duplicateEntry={duplicateEntry}
+            itemLabel="sampling"
+            isLoading={latestEntryQuery.isLoading}
+          />
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
               <div className="data-entry-secondary-grid">

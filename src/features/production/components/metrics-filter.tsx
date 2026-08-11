@@ -12,7 +12,19 @@ import {
 import { PRODUCTION_METRIC_OPTIONS, parseProductionCompareMetric, parseProductionMetric } from "@/features/production/components/metrics"
 import { cn } from "@/lib/utils"
 
-export default function ProductionMetricFilter({ className }: { className?: string }) {
+export default function ProductionMetricFilter({
+  className,
+  startTransition,
+}: {
+  className?: string
+  /**
+   * Wraps the URL update in a React transition so the page can show a
+   * pending state (e.g. the chart's loading skeleton) while the server
+   * re-renders with the new filter, instead of the UI just sitting there
+   * with no feedback until the new data streams in.
+   */
+  startTransition?: (callback: () => void) => void
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -30,7 +42,8 @@ export default function ProductionMetricFilter({ className }: { className?: stri
     const nextQuery = params.toString()
     const currentQuery = searchParams.toString()
     if (nextQuery === currentQuery) return
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+    const navigate = () => router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+    startTransition ? startTransition(navigate) : navigate()
   }
 
   return (

@@ -190,7 +190,12 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="mortality" />
+      <LatestEntryGuard
+        latestEntry={latestEntry}
+        duplicateEntry={duplicateEntry}
+        itemLabel="mortality"
+        isLoading={latestEntryQuery.isLoading}
+      />
 
         {mortalityCount >= 100 ? (
         <div className="data-entry-callout-alert rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
