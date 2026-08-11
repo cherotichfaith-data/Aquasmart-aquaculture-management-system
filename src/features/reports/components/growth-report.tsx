@@ -45,6 +45,7 @@ export default function GrowthReport({
     stage: stage ?? "all",
     activeOnly: false,
     enabled: boundsReady,
+    stockedOnly: true,
   })
   const appConfigQuery = useAppConfig({
     keys: ["target_harvest_weight_g"],

@@ -15,6 +15,7 @@ import ProductionCompareFilter from "@/features/production/components/compare-fi
 import ProductionSystemFilter from "@/features/production/components/system-filter"
 import { parseProductionCompareMetric, parseProductionMetric, type ProductionMetric } from "@/features/production/components/metrics"
 import { productionTableColumns } from "@/features/production/components/production-table-columns"
+import { useStockedSystemIds } from "@/lib/hooks/use-stocked-system-ids"
 import { buildProductionDailyMetricRows, buildProductionMetricRows } from "@/features/production/lib/production-page"
 import { buildProductionPeriodViewRows } from "@/features/production/period-view"
 import type { ProductionPageInitialData, ProductionPageFilters } from "@/features/production/queries.server"
@@ -82,9 +83,16 @@ export default function ProductionPageClient({
   const searchParams = useSearchParams()
   const metric = parseProductionMetric(searchParams.get("filter"))
   const compareMetric = parseProductionCompareMetric(searchParams.get("compare"), metric)
-  const systems = useMemo<SystemOption[]>(
+  const allSystems = useMemo<SystemOption[]>(
     () => (initialData.systems.status === "success" ? initialData.systems.data : []),
     [initialData.systems],
+  )
+  // The filter should only offer cages that currently hold fish -- once a
+  // cage is fully harvested or emptied out it drops out until restocked.
+  const { stockedIds: stockedSystemIds } = useStockedSystemIds(initialFarmId)
+  const systems = useMemo(
+    () => allSystems.filter((system) => stockedSystemIds.has(system.id)),
+    [allSystems, stockedSystemIds],
   )
   const resolvedSelectedSystemId = initialData.systemId ?? null
   const summaryRows = useMemo(
@@ -157,9 +165,11 @@ export default function ProductionPageClient({
     [viewRows],
   )
   const selectedSystemLabel = useMemo(() => {
-    const match = systems.find((system) => system.id === resolvedSelectedSystemId)
+    // Look up against the unfiltered list so a system that's since emptied
+    // out still resolves its label correctly when viewed via a direct link.
+    const match = allSystems.find((system) => system.id === resolvedSelectedSystemId)
     return match ? formatCageLabel(match) : null
-  }, [resolvedSelectedSystemId, systems])
+  }, [allSystems, resolvedSelectedSystemId])
   const periodLabel = useMemo(() => {
     if (!initialData.bounds.start || !initialData.bounds.end) return null
     const rangeLabel = initialFilters.customTimeRange
@@ -210,7 +220,7 @@ export default function ProductionPageClient({
       headerDataOverrides={{ role: initialFarmRole ?? null }}
     >
       <main className="container mx-auto flex flex-col gap-8 p-4 md:p-8">
-        {systems.length === 0 ? (
+        {allSystems.length === 0 ? (
           <EmptyState
             title="No systems available"
             description="Please add a system to view production data."

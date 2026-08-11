@@ -75,7 +75,9 @@ export default function FarmSelector({
     selectedBatch !== "all" && Number.isFinite(Number(selectedBatch)) ? Number(selectedBatch) : undefined
 
   const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
-  const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
+  const systemsQuery = useSystemOptions(
+    farmId ? { farmId, activeOnly: true, stockedOnly: !systemOptionsOverride } : undefined,
+  )
   const batchSystemsQuery = useBatchSystemIds({
     batchId,
     farmId,

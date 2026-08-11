@@ -6,6 +6,7 @@ import { Button } from "@/components/app-ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useStockedSystemIds } from "@/lib/hooks/use-stocked-system-ids"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/lib/hooks/app/use-toast"
 import { useRouter } from "next/navigation"
@@ -18,8 +19,10 @@ type AlertThresholdRow = Tables<"alert_threshold">
 type WaterQualityRow = Tables<"water_quality_measurement">
 type MortalityRow = Tables<"fish_mortality">
 type SystemRow = Tables<"system">
+type HarvestRow = Tables<"fish_harvest">
+type TransferRow = Tables<"fish_transfer">
 
-type NotificationKind = "water_quality" | "mortality"
+type NotificationKind = "water_quality" | "mortality" | "cage_empty"
 type NotificationSeverity = "warning" | "critical"
 
 export type AlertNotification = {
@@ -75,11 +78,19 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const supabase = useMemo(() => createClient(), [])
   const queryClient = useQueryClient()
   const router = useRouter()
-  const { farmId } = useActiveFarm()
+  const { farmId: liveFarmId } = useActiveFarm()
   const { profile, session, user } = useAuth()
   const { toast } = useToast()
   const userId = user?.id ?? null
   const seenIds = useRef<Set<string>>(new Set())
+  // useActiveFarm() can briefly report `null` while it's re-deriving (e.g. a
+  // stray loading/auth blip), even once a real farm has already been
+  // resolved. Latching onto the last non-null value keeps the notification
+  // storage key (and everything gated on farmId below) from bouncing back to
+  // the farm-less default and losing sight of already-saved notifications.
+  const lastKnownFarmIdRef = useRef<string | null>(null)
+  if (liveFarmId) lastKnownFarmIdRef.current = liveFarmId
+  const farmId = liveFarmId ?? lastKnownFarmIdRef.current
   const storageKey = farmId ? `aqua_alert_history_${farmId}` : "aqua_alert_history"
   const currentStorageToken = useMemo(() => Symbol(storageKey), [storageKey])
   const readStoredNotifications = useCallback(() => {
@@ -244,6 +255,37 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       })
     })
   }, [addNotification, farmId, session, systemsLoaded, systemsQuery.data])
+
+  // The harvest/transfer realtime listener below only catches a cage going
+  // empty *after* this page is open and subscribed -- it can't see a cage
+  // that was already empty before that (e.g. emptied out yesterday, or
+  // before this feature shipped). This reconciles against the live
+  // "currently stocked" set on every load/refresh so an already-empty cage
+  // still shows up here, using a stable per-system id so it doesn't re-fire
+  // on every render once seen.
+  const { stockedIds: currentlyStockedIds, query: stockedSystemsQuery } = useStockedSystemIds(farmId, {
+    enabled: Boolean(session) && Boolean(farmId),
+  })
+  useEffect(() => {
+    if (!session || !farmId || !systemsLoaded || !stockedSystemsQuery.isSuccess) return
+
+    ;(systemsQuery.data ?? []).forEach((system) => {
+      if (currentlyStockedIds.has(system.id)) return
+
+      addNotification({
+        id: `cage-empty-current-${system.id}`,
+        title: "Cage Now Empty",
+        description: `${buildSystemLabel(systemMap, system.id)} has no fish remaining and is now available for restocking.`,
+        createdAt: new Date().toISOString(),
+        systemId: system.id,
+        kind: "cage_empty",
+        severity: "warning",
+        read: false,
+        href: `${DATA_ENTRY_PATH}?type=stocking&system=${system.id}`,
+        actionLabel: "Restock cage",
+      })
+    })
+  }, [addNotification, currentlyStockedIds, farmId, session, stockedSystemsQuery.isSuccess, systemMap, systemsLoaded, systemsQuery.data])
 
   useEffect(() => {
     seenIds.current = new Set(notifications.map((item) => item.id))
@@ -415,6 +457,87 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       supabase.removeChannel(mortalityChannel)
     }
   }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
+
+  // Fires a "cage now empty" pop notification the moment a harvest or transfer
+  // brings a cage's live fish count to zero, and refreshes the cached
+  // "currently stocked" system lists (dashboard tables, report/production
+  // filters) so the now-empty cage drops out of them right away.
+  useEffect(() => {
+    if (!session || !farmId || !systemsLoaded) return
+
+    const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
+    if (!farmSystemIds.length) return
+
+    const notifyIfEmptied = async (systemId: number, sourceId: string) => {
+      if (!systemMap[systemId]) return
+      const { data: fishCount, error } = await supabase.rpc("current_fish_count", { p_system_id: systemId })
+      if (error) {
+        logSbError("notifications:cageEmpty", error)
+        return
+      }
+      if ((fishCount ?? 0) > 0) return
+
+      const systemLabel = buildSystemLabel(systemMap, systemId)
+      addNotification({
+        id: `cage-empty-${sourceId}`,
+        title: "Cage Now Empty",
+        description: `${systemLabel} has no fish remaining and is now available for restocking.`,
+        createdAt: new Date().toISOString(),
+        systemId,
+        kind: "cage_empty",
+        severity: "warning",
+        read: false,
+        href: `${DATA_ENTRY_PATH}?type=stocking&system=${systemId}`,
+        actionLabel: "Restock cage",
+      })
+
+      void queryClient.invalidateQueries({
+        predicate: ({ queryKey }) =>
+          String(queryKey[0]) === "dashboard" && String(queryKey[1]) === "systems" && String(queryKey[2]) === farmId,
+      })
+    }
+
+    const harvestChannel = supabase
+      .channel(`alerts-cage-empty-harvest-${farmId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "fish_harvest",
+          filter: `system_id=in.(${farmSystemIds.join(",")})`,
+        },
+        (payload) => {
+          const row = payload.new as HarvestRow
+          if (!row?.system_id) return
+          void notifyIfEmptied(row.system_id, `harvest-${row.id}`)
+        },
+      )
+      .subscribe()
+
+    const transferChannel = supabase
+      .channel(`alerts-cage-empty-transfer-${farmId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "fish_transfer",
+          filter: `origin_system_id=in.(${farmSystemIds.join(",")})`,
+        },
+        (payload) => {
+          const row = payload.new as TransferRow
+          if (!row?.origin_system_id) return
+          void notifyIfEmptied(row.origin_system_id, `transfer-${row.id}`)
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(harvestChannel)
+      supabase.removeChannel(transferChannel)
+    }
+  }, [addNotification, farmId, queryClient, session, supabase, systemMap, systemsLoaded, systemsQuery.data])
 
   const value = useMemo(
     () => ({ notifications, unreadCount, markAllRead, markRead, clearAll }),

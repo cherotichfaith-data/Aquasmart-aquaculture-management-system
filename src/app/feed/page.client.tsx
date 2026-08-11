@@ -36,7 +36,7 @@ export default function FeedPageClient({
   const systemParam = searchParams.get("cage") ?? searchParams.get("system")
   const batchParam = searchParams.get("batch")
   const stageParam = searchParams.get("stage")
-  const filterSystemsQuery = useSystemOptions({ farmId: currentFarmId, activeOnly: false })
+  const filterSystemsQuery = useSystemOptions({ farmId: currentFarmId, activeOnly: false, stockedOnly: true })
   const filterSystemOptions = useMemo(
     () => (filterSystemsQuery.data?.status === "success" ? filterSystemsQuery.data.data : []),
     [filterSystemsQuery.data],
