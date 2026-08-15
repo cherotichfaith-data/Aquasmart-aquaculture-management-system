@@ -111,7 +111,7 @@ function getProductionSummaryRowScore(row: ProductionSummaryRpcRow) {
     row.efcr_aggregated,
   ]
 
-  return numericValues.reduce((score, value) => {
+  return numericValues.reduce<number>((score, value) => {
     if (typeof value !== "number" || !Number.isFinite(value)) return score
     if (value === 0) return score + 0.25
     return score + 1
@@ -545,7 +545,7 @@ async function listProductionSummaryRowsDirectServer(
       .map((row) => [`${row.system_id}|${row.inventory_date}`, row]),
   )
 
-  let rows = ((summaryResult.data ?? []) as unknown as AnalyticsProductionSummaryRow[])
+  let rows: ProductionSummaryRpcRow[] = ((summaryResult.data ?? []) as unknown as AnalyticsProductionSummaryRow[])
     .filter((row) => typeof row.system_id === "number" && allowedSystemIds.has(row.system_id))
     .map((row) => {
       const cycle = row.cycle_id != null ? cyclesById.get(row.cycle_id) : null
