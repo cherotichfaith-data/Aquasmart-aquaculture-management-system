@@ -37,20 +37,21 @@ export function useSystemOptions(params?: {
     enabled,
     staleTime: 5 * 60_000,
   })
-  const { stockedIds } = useStockedSystemIds(params?.farmId, {
+  const stockedSystems = useStockedSystemIds(params?.farmId, {
     enabled: enabled && Boolean(params?.stockedOnly),
   })
 
   return useMemo(() => {
     if (!params?.stockedOnly || query.data?.status !== "success") return query
+    if (stockedSystems.query.data?.status !== "success") return query
     return {
       ...query,
       data: {
         ...query.data,
-        data: query.data.data.filter((system) => stockedIds.has(system.id)),
+        data: query.data.data.filter((system) => stockedSystems.stockedIds.has(system.id)),
       },
     }
-  }, [query, params?.stockedOnly, stockedIds])
+  }, [query, params?.stockedOnly, stockedSystems])
 }
 
 export function useBatchOptions(params?: {

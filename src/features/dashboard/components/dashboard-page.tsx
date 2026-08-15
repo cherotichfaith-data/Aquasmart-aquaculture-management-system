@@ -19,7 +19,7 @@ function SectionLabel({
   return (
     <div className="mb-2 flex items-start justify-between">
       <div>
-        <p className="text-[0.9375rem] font-semibold tracking-[-0.01em]">
+        <p className="text-base font-semibold tracking-[-0.01em]">
           {title}
         </p>
         {description ? (

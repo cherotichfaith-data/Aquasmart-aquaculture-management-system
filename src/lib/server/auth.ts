@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
-import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import { isSbAuthMissing, isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import { enforceUserRateLimit, type ApiRateLimitPolicy } from "@/lib/server/rate-limit"
 
 /**
@@ -50,7 +50,7 @@ export async function resolveServerUser(tag: string): Promise<ResolveSuccess | R
     if (userError || !userData.user) {
       if (userError) {
         if (isSbNetworkError(userError)) return { ok: false, reason: "network" }
-        logSbError(`${tag}:getUser`, userError)
+        if (!isSbAuthMissing(userError)) logSbError(`${tag}:getUser`, userError)
       }
       return { ok: false, reason: "unauthenticated" }
     }

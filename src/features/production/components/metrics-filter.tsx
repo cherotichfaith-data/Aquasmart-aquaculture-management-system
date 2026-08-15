@@ -43,7 +43,8 @@ export default function ProductionMetricFilter({
     const currentQuery = searchParams.toString()
     if (nextQuery === currentQuery) return
     const navigate = () => router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
-    startTransition ? startTransition(navigate) : navigate()
+    if (startTransition) startTransition(navigate)
+    else navigate()
   }
 
   return (

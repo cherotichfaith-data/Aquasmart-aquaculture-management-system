@@ -13,20 +13,42 @@ export type PageTimeConfig = {
   showBatchFilter: boolean
   showStageFilter: boolean
   showSystemFilter?: boolean
+  /** Defaults to true. Set false to hide the date/time-period selector (and the
+   * resolved date-range text under the title) for pages that always show the
+   * full picture rather than a filterable rolling window. */
+  showTimePeriod?: boolean
 }
 
 export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
   if (pathname.startsWith("/feed")) {
     return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
   }
-  if (pathname.startsWith("/sampling") || pathname.startsWith("/production") || pathname.startsWith("/reports")) {
+  if (pathname.startsWith("/production") || pathname.startsWith("/reports")) {
     if (pathname.startsWith("/production")) {
       return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: false, showStageFilter: false, showSystemFilter: false }
     }
     return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
   }
-  if (pathname.startsWith("/water-quality")) {
-    return { defaultPeriod: "month", scope: "water_quality", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
+  if (pathname.startsWith("/batches")) {
+    return {
+      defaultPeriod: "all history",
+      scope: "dashboard",
+      useSystemBounds: false,
+      showBatchFilter: true,
+      showStageFilter: true,
+      showSystemFilter: false,
+      showTimePeriod: false,
+    }
+  }
+  if (pathname.startsWith("/systems")) {
+    return {
+      defaultPeriod: "all history",
+      scope: "dashboard",
+      useSystemBounds: false,
+      showBatchFilter: true,
+      showStageFilter: true,
+      showTimePeriod: false,
+    }
   }
   if (pathname.startsWith("/actions")) {
     return { defaultPeriod: "month", scope: "dashboard", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
@@ -35,37 +57,29 @@ export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
 }
 
 export const getHeaderPageMeta = (pathname: string, tab: string | null): PageMeta | null => {
+  void tab
   if (pathname === "/") {
     return {
       title: "Farm Performance Dashboard",
       description: "Live production, feed, water-quality, and activity signals across the farm.",
     }
   }
-  if (pathname.startsWith("/sampling")) {
+  if (pathname.startsWith("/systems")) {
     return {
-      title: "Growth Dashboard",
-      description: "Growth sampling trends, biomass progress, and harvest-readiness indicators.",
+      title: "Cages",
+      description: "Every cage with its current stocking, stage, and latest performance status.",
+    }
+  }
+  if (pathname.startsWith("/batches")) {
+    return {
+      title: "Batches",
+      description: "Batch-level rollups across every cage each batch is currently stocked in.",
     }
   }
   if (pathname.startsWith("/feed")) {
     return {
       title: "Feed Management Dashboard",
       description: "Model-guided feed planning, actual feed execution, feeding response, and feed-risk alerts.",
-    }
-  }
-  if (pathname.startsWith("/water-quality")) {
-    const tabDescriptions: Record<string, string> = {
-      overview: "Farm-wide quality status, alerts, and system health at a glance.",
-      parameter: "Parameter trends with feeding and mortality overlays for deeper analysis.",
-      environment: "Environmental indicators and system-level water quality exposure.",
-      depth: "Stratification and depth-profile analysis across the water column.",
-      alerts: "Current risk conditions, emerging issues, and threshold-based alerts.",
-      sensors: "Sensor coverage, freshness, and operational status by system.",
-    }
-
-    return {
-      title: "Water Quality Dashboard",
-      description: tabDescriptions[tab ?? "overview"] ?? tabDescriptions.overview,
     }
   }
   if (pathname.startsWith("/production")) {

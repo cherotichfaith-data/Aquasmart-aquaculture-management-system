@@ -257,7 +257,7 @@ function SystemFeedStatusTable({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold leading-5 text-foreground">{row.system_name}</p>
-                    <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{formatDateOnly(row.date)}</p>
+                    <p className="mt-1 text-tag leading-4 text-muted-foreground">{formatDateOnly(row.date)}</p>
                   </div>
                   {row.status ? (
                     <Badge
@@ -278,7 +278,7 @@ function SystemFeedStatusTable({
                     ["eFCR", formatNumberValue(numeric(row.efcr_period), { decimals: 2 })],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md bg-muted/45 px-2.5 py-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+                      <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
                       <div className="mt-0.5 font-semibold text-foreground">{value}</div>
                     </div>
                   ))}
@@ -314,7 +314,7 @@ function SystemFeedStatusTable({
                     <TableCell className="align-top">
                       <div className="space-y-1.5">
                         <p className="text-sm font-semibold leading-5 text-foreground">{row.system_name}</p>
-                        <div className="text-[11px] text-muted-foreground">{formatDateOnly(row.date)}</div>
+                        <div className="text-tag text-muted-foreground">{formatDateOnly(row.date)}</div>
                       </div>
                     </TableCell>
                     <TableCell align="right" className="font-medium text-foreground">{formatNumberValue(numeric(row.biomass_kg), { decimals: 1 })}</TableCell>

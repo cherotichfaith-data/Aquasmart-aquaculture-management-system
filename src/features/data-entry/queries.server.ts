@@ -68,7 +68,7 @@ export async function getDataEntryPrefetch({
   accessToken: string
 }) {
   return runServerReadThrough({
-    keyParts: ["data-entry-page", "active-batches-v2", userId, farmId],
+    keyParts: ["data-entry-page", "active-batches-v3", userId, farmId],
     tags: [
       cacheTags.farm(farmId),
       cacheTags.systems(farmId),

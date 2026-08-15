@@ -23,15 +23,8 @@ import { Sheet } from "@/components/app-ui/sheet"
 import { Tooltip } from "@/components/app-ui/tooltip"
 import { cn } from "@/lib/utils"
 import FarmSelector from "@/components/shared/farm-selector"
-import { FilterPopover } from "@/components/shared/filter-popover"
 import { createSystemLabelResolver, getSystemFilterUrlValue, resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import TimePeriodSelector, { type TimePeriod } from "@/components/shared/time-period-selector"
-import {
-  DEFAULT_WQ_PARAMETER,
-  isWqParameter,
-  parameterLabels,
-  type WqParameter,
-} from "@/features/water-quality/wq-utils"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useSharedFilters } from "@/lib/hooks/app/use-shared-filters"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
@@ -132,12 +125,7 @@ export default function Header({
   const canAccessSettings = resolvedRole === "admin" || resolvedRole === "farm_manager"
   const allowDataEntry = canAccessDataEntry(resolvedRole)
   const showAddData = appPathname === "/" && allowDataEntry
-  const isWaterQualityPage = appPathname.startsWith("/water-quality")
   const defaultPeriod: TimePeriod = pageTimeConfig.defaultPeriod
-  const selectedParameter =
-    isWaterQualityPage && isWqParameter(searchParams.get("parameter"))
-      ? (searchParams.get("parameter") as WqParameter)
-      : DEFAULT_WQ_PARAMETER
   const batchesQuery = useBatchOptions(
     farmId && !batchOptionsOverride
       ? { farmId }
@@ -275,35 +263,22 @@ export default function Header({
     return formatGrowthStage(selectedStage)
   }, [pageTimeConfig.showStageFilter, selectedStage])
 
-  const activeParameterLabel = useMemo(() => {
-    if (!isWaterQualityPage) return null
-    if (selectedParameter === DEFAULT_WQ_PARAMETER) return null
-    return parameterLabels[selectedParameter] ?? null
-  }, [isWaterQualityPage, selectedParameter])
-
-  const hasActiveFilters = Boolean(activeSystemLabel || activeBatchLabel || activeStageLabel || activeParameterLabel)
-  const waterQualityParameterOptions = useMemo(
-    () =>
-      Object.entries(parameterLabels).map(([key, label]) => ({
-        value: key,
-        label,
-      })),
-    [],
-  )
+  const activeFilterCount = [activeSystemLabel, activeBatchLabel, activeStageLabel].filter(
+    Boolean,
+  ).length
+  const hasActiveFilters = activeFilterCount > 0
 
   const replaceFilterParams = useCallback((next: {
     selectedBatch?: string
     selectedSystem?: string
     selectedStage?: SharedFiltersState["selectedStage"]
     timePeriod?: TimePeriod
-    selectedParameter?: WqParameter
   }) => {
     const params = new URLSearchParams(searchParams.toString())
     const nextBatch = next.selectedBatch ?? selectedBatch
     const nextSystem = next.selectedSystem ?? selectedSystem
     const nextStage = next.selectedStage ?? selectedStage
     const nextPeriod = next.timePeriod ?? timePeriod
-    const nextParameter = next.selectedParameter ?? selectedParameter
 
     if (nextSystem !== "all") {
       const system = allSystemsForChips.find((item) => String(item.id) === nextSystem)
@@ -328,23 +303,16 @@ export default function Header({
       params.set("date", nextPeriodValue)
     }
 
-    if (isWaterQualityPage) {
-      if (nextParameter !== DEFAULT_WQ_PARAMETER) params.set("parameter", nextParameter)
-      else params.delete("parameter")
-    }
-
     const nextQuery = params.toString()
     if (nextQuery === searchParams.toString()) return
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
   }, [
     allSystemsForChips,
     customTimeRange,
-    isWaterQualityPage,
     pathname,
     router,
     searchParams,
     selectedBatch,
-    selectedParameter,
     selectedStage,
     selectedSystem,
     timePeriod,
@@ -398,11 +366,6 @@ export default function Header({
     if (pageTimeConfig.showStageFilter || selectedStage === "all") return
     handleStageChange("all")
   }, [handleStageChange, pageTimeConfig.showStageFilter, selectedStage])
-
-  const handleWaterQualityParameterChange = (value: string) => {
-    if (!isWqParameter(value)) return
-    replaceFilterParams({ selectedParameter: value as WqParameter })
-  }
 
   const handleSignOut = async () => {
     if (signingOut) return
@@ -500,12 +463,7 @@ export default function Header({
     setSelectedSystem("all")
     setSelectedBatch("all")
     setSelectedStage("all")
-    replaceFilterParams({
-      selectedSystem: "all",
-      selectedBatch: "all",
-      selectedStage: "all",
-      ...(isWaterQualityPage ? { selectedParameter: DEFAULT_WQ_PARAMETER } : {}),
-    })
+    replaceFilterParams({ selectedSystem: "all", selectedBatch: "all", selectedStage: "all" })
   }
 
   return (
@@ -532,7 +490,7 @@ export default function Header({
                   <h1
                     className={cn(
                       "overflow-wrap-anywhere font-bold leading-[1.15] text-foreground",
-                      isCondensed ? "text-[1.15rem] sm:text-[1.35rem]" : "text-[1.35rem] sm:text-[1.8rem]",
+                      isCondensed ? "text-lg sm:text-xl" : "text-xl sm:text-3xl",
                     )}
                   >
                     {pageMeta.title}
@@ -553,7 +511,7 @@ export default function Header({
                 >
                   <Bell size={18} />
                   {resolvedUnreadCount > 0 ? (
-                    <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground">
+                    <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-micro font-bold leading-none text-destructive-foreground">
                       {resolvedUnreadCount > 9 ? "9+" : resolvedUnreadCount}
                     </span>
                   ) : null}
@@ -592,25 +550,18 @@ export default function Header({
                       layout="row"
                     />
                   </div>
-                  {isWaterQualityPage ? (
-                    <div className="hidden min-w-[170px] md:block">
-                      <FilterPopover
-                        label={undefined}
-                        value={selectedParameter}
-                        options={waterQualityParameterOptions}
-                        placeholder="Select parameter"
-                        onChange={handleWaterQualityParameterChange}
-                        className="w-[170px]"
-                      />
-                    </div>
-                  ) : null}
                   <div className="flex flex-1 md:hidden">
                     <Button
-                      variant="text"
+                      variant="ghost"
                       onClick={() => setMobileFiltersOpen(true)}
-                      className="min-h-10 w-full rounded-lg bg-accent text-foreground"
+                      className="min-h-10 w-full gap-2 rounded-lg bg-accent text-foreground"
                     >
                       Filters
+                      {activeFilterCount > 0 ? (
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-tag font-bold leading-none text-primary-foreground">
+                          {activeFilterCount}
+                        </span>
+                      ) : null}
                     </Button>
                   </div>
                 </div>
@@ -628,7 +579,7 @@ export default function Header({
                   </div>
                   {showAddData ? (
                     <Button
-                      variant="contained"
+                      variant="default"
                       onClick={openMenu(setAddDataAnchor)}
                       className="h-10 w-full justify-center rounded-lg px-4 font-bold md:w-auto md:min-w-[140px]"
                     >
@@ -644,13 +595,7 @@ export default function Header({
                   {activeSystemLabel ? <FilterChip label={`Cage: ${activeSystemLabel}`} onDelete={() => handleSystemChange("all")} /> : null}
                   {activeBatchLabel ? <FilterChip label={`Batch: ${activeBatchLabel}`} onDelete={() => handleBatchChange("all")} /> : null}
                   {activeStageLabel ? <FilterChip label={`Stage: ${activeStageLabel}`} onDelete={() => handleStageChange("all")} /> : null}
-                  {activeParameterLabel ? (
-                    <FilterChip
-                      label={`Parameter: ${activeParameterLabel}`}
-                      onDelete={() => handleWaterQualityParameterChange(DEFAULT_WQ_PARAMETER)}
-                    />
-                  ) : null}
-                  <Button variant="text" size="sm" onClick={clearAllFilters} className="min-w-0 px-1">
+                  <Button variant="ghost" size="sm" onClick={clearAllFilters} className="min-w-0 px-1">
                     Clear all
                   </Button>
                 </div>
@@ -799,16 +744,6 @@ export default function Header({
             variant="compact"
             layout="grid"
           />
-          {isWaterQualityPage ? (
-            <FilterPopover
-              label={undefined}
-              value={selectedParameter}
-              options={waterQualityParameterOptions}
-              placeholder="Select parameter"
-              onChange={handleWaterQualityParameterChange}
-              className="w-full"
-            />
-          ) : null}
         </div>
       </Sheet>
     </header>

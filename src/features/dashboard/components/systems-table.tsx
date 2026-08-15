@@ -107,7 +107,7 @@ export default function SystemsTable({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle>Production</CardTitle>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">{subtitle}</p>
+              <p className="mt-0.5 text-dense text-muted-foreground">{subtitle}</p>
             </div>
             <DataFetchingBadge isFetching={isFetching} isLoading={isLoading} />
           </div>
@@ -197,7 +197,7 @@ function MobileSystemCards({
               <MobileMetric label="Biomass" value={formatUnitValue(row.biomass_end, 1, "kg")} />
               <MobileMetric label="Density" value={formatUnitValue(row.biomass_density, 2, "kg/m3")} />
               <div className="col-span-2 rounded-md bg-muted/45 px-2.5 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">WQ / Flags</p>
+                <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">WQ / Flags</p>
                 <WaterQualityFlagsCell row={row} farmMedianEfcr={farmMedianEfcr} size="card" />
               </div>
             </div>
@@ -211,9 +211,9 @@ function MobileSystemCards({
 function MobileMetric({ label, value, subtext }: { label: string; value: string; subtext?: string | null }) {
   return (
     <div className="rounded-md bg-muted/45 px-2.5 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-0.5 font-semibold text-foreground">{value}</p>
-      {subtext ? <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">{subtext}</p> : null}
+      {subtext ? <p className="mt-0.5 text-micro font-medium text-muted-foreground">{subtext}</p> : null}
     </div>
   )
 }

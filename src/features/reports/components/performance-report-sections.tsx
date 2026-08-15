@@ -277,7 +277,7 @@ export function BenchmarkStatusSection({
                 : "bg-warning/10 border-warning/25 text-warning"
 
             return (
-              <div key={item.metric} className="rounded-[1rem] border border-border/60 bg-background p-3">
+              <div key={item.metric} className="rounded-2xl border border-border/60 bg-background p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold">{item.metric}</p>
                   <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${toneClass}`}>

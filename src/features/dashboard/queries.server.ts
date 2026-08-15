@@ -371,3 +371,134 @@ export async function getDashboardPageInitialData(params: {
 }): Promise<DashboardPageInitialData> {
   return loadDashboardPageInitialData(createAccessTokenClient(params.accessToken), params)
 }
+
+/**
+ * Same bounds/systemOptions/batchSystems/systemsTable computation as
+ * loadDashboardPageInitialData above, minus the dashboard-only KPI/water-
+ * quality/recommended-actions fetches -- used by the Systems (Cages) page,
+ * which only needs the table itself and layers its own growth/mortality/
+ * water-quality queries on top separately.
+ */
+export async function loadSystemsTableData(
+  supabase: ServerClient,
+  params: {
+    farmId: string | null
+    filters: DashboardPageInitialFilters
+  },
+): Promise<{
+  bounds: TimeBounds
+  systemOptions: DashboardPageInitialData["systemOptions"]
+  batchSystems: DashboardPageInitialData["batchSystems"]
+  systemsTable: DashboardPageInitialData["systemsTable"]
+}> {
+  const emptyBounds: TimeBounds = {
+    start: null,
+    end: null,
+    anchorScope: null,
+    latestAvailableDate: null,
+    availableFromDate: null,
+    requestedDays: 0,
+    availableDays: 0,
+    resolvedDays: 0,
+    isTruncated: false,
+    stalenessDays: null,
+  }
+  if (!params.farmId) {
+    return {
+      bounds: emptyBounds,
+      systemOptions: toQuerySuccess([]),
+      batchSystems: toQuerySuccess([]),
+      systemsTable: { rows: [], meta: { reason: "Missing time bounds", start: null, end: null } },
+    }
+  }
+  const farmId = params.farmId
+
+  const selectedSystemId = await withNetworkFallback("systems:resolveActiveSystemId", undefined, async () => {
+    if (!params.filters.selectedSystem || params.filters.selectedSystem === "all") return undefined
+    const systems = await getScopedSystemOptions(supabase, farmId, "all")
+    const systemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, systems)
+    return systemId && Number.isFinite(systemId) ? systemId : undefined
+  })
+  const batchId =
+    params.filters.selectedBatch !== "all" && Number.isFinite(Number(params.filters.selectedBatch))
+      ? Number(params.filters.selectedBatch)
+      : undefined
+  const bounds = await getTimeBounds(
+    supabase,
+    farmId,
+    params.filters.timePeriod,
+    selectedSystemId,
+    batchId,
+    params.filters.customTimeRange,
+  )
+  if (!bounds.start || !bounds.end) {
+    return {
+      bounds,
+      systemOptions: toQuerySuccess(
+        await withNetworkFallback("systems:getScopedSystemOptions:missing-bounds", [], () =>
+          getScopedSystemOptions(supabase, farmId, params.filters.selectedStage),
+        ),
+      ),
+      batchSystems: toQuerySuccess(
+        await withNetworkFallback("systems:getScopedBatchSystems:missing-bounds", [], () =>
+          getScopedBatchSystems(
+            supabase,
+            params.filters.selectedBatch !== "all" ? Number(params.filters.selectedBatch) : undefined,
+          ),
+        ),
+      ),
+      systemsTable: { rows: [], meta: { reason: "Missing time bounds", start: bounds.start, end: bounds.end } },
+    }
+  }
+
+  const startDate = bounds.start!
+  const endDate = bounds.end!
+
+  const [systemOptions, batchSystems] = await Promise.all([
+    withNetworkFallback("systems:getScopedSystemOptions", [], () =>
+      getScopedSystemOptions(supabase, farmId, params.filters.selectedStage),
+    ),
+    withNetworkFallback("systems:getScopedBatchSystems", [], () => getScopedBatchSystems(supabase, batchId)),
+  ])
+  const dashboardSystemIds = systemOptions
+    .map((row) => row.id)
+    .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
+  const batchScopedIds =
+    params.filters.selectedBatch !== "all"
+      ? new Set((await getBatchSystemIds(supabase, batchId)).filter((id) => dashboardSystemIds.includes(id)))
+      : null
+  const stageBatchScopedIds = batchScopedIds
+    ? dashboardSystemIds.filter((id) => batchScopedIds.has(id))
+    : dashboardSystemIds
+  const activeScopedSystemIds =
+    selectedSystemId != null
+      ? stageBatchScopedIds.includes(selectedSystemId)
+        ? [selectedSystemId]
+        : []
+      : stageBatchScopedIds
+
+  const systemsTableRows = await withNetworkFallback("systems:listDashboardSystemsRows", [], () =>
+    listDashboardSystemsRows(supabase, {
+      farmId,
+      systemIds: activeScopedSystemIds,
+      stage: params.filters.selectedStage === "all" ? undefined : params.filters.selectedStage,
+      dateFrom: startDate,
+      dateTo: endDate,
+    }),
+  )
+
+  return {
+    bounds,
+    systemOptions: toQuerySuccess(systemOptions),
+    batchSystems: toQuerySuccess(batchSystems),
+    systemsTable: {
+      rows: systemsTableRows,
+      meta: {
+        source: "api_dashboard_systems",
+        start: startDate,
+        end: endDate,
+        reason: activeScopedSystemIds.length === 0 ? "No scoped systems" : undefined,
+      },
+    },
+  }
+}

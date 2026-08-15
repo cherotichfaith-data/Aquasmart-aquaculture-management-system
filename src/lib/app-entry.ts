@@ -32,13 +32,13 @@ export const WORKSPACE_SELECT_PATH = "/onboarding/select-workspace"
 
 const STANDALONE_FEATURE_PREFIXES = [
   "/feed",
-  "/sampling",
-  "/water-quality",
   "/production",
   "/reports",
   "/settings",
   "/actions",
   "/users",
+  "/systems",
+  "/batches",
 ] as const
 
 function matchesStandaloneFeaturePath(pathname: string) {

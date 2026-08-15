@@ -12,6 +12,11 @@ type SyncState = {
    * expired (401), rather than a transient network/server issue. Distinct from
    * `syncError` so the UI can offer a "sign in again" action instead of "retry". */
   needsReauth: boolean
+  /** Browser-reported connectivity (navigator.onLine + online/offline events),
+   * tracked independently of pendingCount -- a crew that's offline with
+   * nothing queued yet still needs to see that they're offline, not just
+   * once they have something pending. */
+  isOffline: boolean
 }
 
 type SyncStore = SyncState & {
@@ -21,6 +26,7 @@ type SyncStore = SyncState & {
   setSyncError: (value: string | null) => void
   setManualSync: (value: (() => Promise<void>) | null) => void
   setNeedsReauth: (value: boolean) => void
+  setIsOffline: (value: boolean) => void
 }
 
 const listeners = new Set<() => void>()
@@ -32,6 +38,7 @@ let state: SyncState = {
   syncError: null,
   manualSync: null,
   needsReauth: false,
+  isOffline: false,
 }
 
 const emitChange = () => {
@@ -67,6 +74,7 @@ const actions = {
   setSyncError: (syncError: string | null) => setState({ syncError }),
   setManualSync: (manualSync: (() => Promise<void>) | null) => setState({ manualSync }),
   setNeedsReauth: (needsReauth: boolean) => setState({ needsReauth }),
+  setIsOffline: (isOffline: boolean) => setState({ isOffline }),
 }
 
 export function useSyncStore(): SyncStore {

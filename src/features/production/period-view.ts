@@ -2,6 +2,7 @@ import { sortByDateAsc } from "@/lib/utils"
 import type { ProductionSummaryRpcRow } from "./types"
 
 export type ProductionPeriodViewRow = {
+  rowId: string
   date: string
   systemName: string | null
   periodStartFish: number | null
@@ -29,6 +30,21 @@ export type ProductionPeriodViewRow = {
   cumulativeMortality: number | null
   survivalRatePct: number | null
   feedType: string | null
+}
+
+function attachUniqueRowIds(rows: ProductionPeriodViewRow[]) {
+  const seen = new Map<string, number>()
+
+  return rows.map((row) => {
+    const occurrence = seen.get(row.rowId) ?? 0
+    seen.set(row.rowId, occurrence + 1)
+    if (occurrence === 0) return row
+
+    return {
+      ...row,
+      rowId: `${row.rowId}|${occurrence + 1}`,
+    }
+  })
 }
 
 type ConsolidatedAccumulator = {
@@ -67,6 +83,20 @@ const getOptionalNumber = (row: ProductionSummaryRpcRow, key: string) => {
   return typeof value === "number" && Number.isFinite(value) ? value : null
 }
 
+function resolveDisplayEfcr(row: ProductionSummaryRpcRow) {
+  const periodicEfcr = asFiniteNumber(row.efcr_period)
+  const aggregatedEfcr = asFiniteNumber(row.efcr_aggregated)
+
+  // The live "current" row is an in-progress period. Its periodic eFCR can
+  // spike unrealistically when biomass increase is still near zero, while the
+  // cumulative eFCR remains the meaningful operational value.
+  if (row.activity === "current") {
+    return aggregatedEfcr ?? periodicEfcr
+  }
+
+  return periodicEfcr
+}
+
 const buildSystemDateKey = (systemId: number | null | undefined, date: string | null | undefined) =>
   `${systemId ?? "system"}|${date ?? ""}`
 
@@ -95,6 +125,7 @@ function mapProductionSummaryRow(
   const mortalityFish = asFiniteNumber(row.mortality_count_period)
 
   return {
+    rowId: `${row.date}|${row.system_id ?? "system"}|${row.cycle_id ?? "cycle"}|${row.activity ?? "activity"}`,
     date: row.date,
     systemName: row.system_name ?? null,
     periodStartFish,
@@ -117,7 +148,7 @@ function mapProductionSummaryRow(
     sgr: growth?.sgrPctDay ?? getOptionalNumber(row, "sgr"),
     feedingRate: asFiniteNumber(row.feeding_rate_on_date),
     biomassDensity: asFiniteNumber(row.biomass_density) ?? (volumeM3 ? divideOrNull(biomassKg ?? 0, volumeM3) : null),
-    periodEfcr: asFiniteNumber(row.efcr_period),
+    periodEfcr: resolveDisplayEfcr(row),
     aggregatedEfcr: asFiniteNumber(row.efcr_aggregated),
     cumulativeMortality: asFiniteNumber(row.cumulative_mortality),
     survivalRatePct: asFiniteNumber(row.survival_rate_pct),
@@ -190,6 +221,7 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
   })
 
   return sortByDateAsc(Array.from(byDate.values()), (row) => row.date).map((row) => ({
+    rowId: row.date,
     date: row.date,
     systemName: null,
     periodStartFish: row.periodStartFish,
@@ -248,5 +280,5 @@ export function buildProductionPeriodViewRows(params: {
     ? consolidateProductionRows(params.productionRows, enrichment)
     : params.productionRows.map((row) => mapProductionSummaryRow(row, enrichment))
 
-  return sortByDateAsc(rows, (row) => row.date)
+  return attachUniqueRowIds(sortByDateAsc(rows, (row) => row.date))
 }

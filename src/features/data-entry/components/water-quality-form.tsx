@@ -306,7 +306,6 @@ export function WaterQualityForm({
     <div>
       <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Water Quality</h2>
-        <p className="text-sm text-muted-foreground">Multi-parameter entry with a live dissolved oxygen classification preview.</p>
       </div>
 
       <div className="data-entry-status">

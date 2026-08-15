@@ -16,13 +16,13 @@ import {
 } from "@/components/app-ui/form"
 import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
-import type { Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useTransferData } from "@/features/reports/hooks"
 import { useRecordTransfer } from "@/lib/hooks/use-transfer"
 import { logSbError } from "@/lib/supabase/log"
 import { TRANSFER_TYPE_LABELS, UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
   parseRequiredNumericId,
   reportDataEntrySubmitError,
@@ -73,7 +73,7 @@ const formSchema = z.object({
 interface TransferFormProps {
   farmId: string | null
   systems: SystemOption[]
-  batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+  batches: BatchOptionItem[]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
   onSystemChange?: (systemId: number | null) => void
@@ -81,6 +81,14 @@ interface TransferFormProps {
 
 export function TransferForm({ farmId, systems, batches, defaultSystemId = null, onSystemChange }: TransferFormProps) {
   const mutation = useRecordTransfer()
+  const resolveSystemLabel = useMemo(
+    () => (systemId: number | null | undefined) => {
+      if (systemId == null) return "Not recorded"
+      const system = systems.find((item) => item.id === systemId) ?? null
+      return system ? formatCageLabel(system) : `Cage ${systemId}`
+    },
+    [systems],
+  )
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -110,11 +118,8 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
     onSystemChange?.(hasValidOriginSystemId ? resolvedOriginSystemId : null)
   }, [hasValidOriginSystemId, onSystemChange, resolvedOriginSystemId])
 
-  // A system can only host one active batch/production cycle at a time, so the
-  // transferred batch is derived from the origin cage instead of asking the
-  // user to pick one manually (see api_fingerling_batch_options_rpc's system_id column).
   const resolvedBatchId = useMemo(
-    () => batches.find((batch) => batch.system_id === resolvedOriginSystemId)?.id ?? null,
+    () => resolveBatchIdForSystem(batches, resolvedOriginSystemId),
     [batches, resolvedOriginSystemId],
   )
   const latestEntryQuery = useTransferData({
@@ -140,7 +145,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
     details: [
       {
         label: "Destination",
-        value: row.external_target_name?.trim() || (row.target_system_id != null ? `Cage ${row.target_system_id}` : "Not recorded"),
+        value: row.external_target_name?.trim() || resolveSystemLabel(row.target_system_id),
       },
       { label: "Weight", value: row.total_weight_transfer != null ? `${row.total_weight_transfer} kg` : "Not recorded" },
     ],
@@ -153,7 +158,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
     details: [
       {
         label: "Destination",
-        value: row.external_target_name?.trim() || (row.target_system_id != null ? `Cage ${row.target_system_id}` : "Not recorded"),
+        value: row.external_target_name?.trim() || resolveSystemLabel(row.target_system_id),
       },
       { label: "Weight", value: row.total_weight_transfer != null ? `${row.total_weight_transfer} kg` : "Not recorded" },
     ],

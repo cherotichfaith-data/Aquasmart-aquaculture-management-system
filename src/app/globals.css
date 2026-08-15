@@ -40,11 +40,16 @@ next-router-prefetch {
   --accent: var(--color-accent);
   --border: var(--color-border);
   --radius: 0.5rem;
-  --chart-1: #4472c4;
-  --chart-2: #ed7d31;
-  --chart-3: #a5a5a5;
-  --chart-4: #ffc000;
-  --chart-5: #c00000;
+  /* Chart palette: derived from the brand + semantic set instead of the
+     stock Office/Excel chart-1..5 defaults, so multi-series charts stay
+     visually tied to the rest of the app. Primary and warning are reused
+     directly; -3/-4/-5 are mixed rather than reused outright so they read
+     as distinct series without duplicating the badge/alert colors exactly. */
+  --chart-1: var(--color-primary);
+  --chart-2: var(--color-warning);
+  --chart-3: #7c8a94;
+  --chart-4: color-mix(in srgb, var(--color-success) 65%, var(--color-primary) 35%);
+  --chart-5: color-mix(in srgb, var(--color-destructive) 55%, white 20%);
   /* Production chart trend-line palette: bright blue + green, deliberately
      distinct from the generic Office chart-1..5 swatches below. Green is a
      touch deeper than --color-success (#22c55e) so the compare line doesn't
@@ -67,14 +72,10 @@ next-router-prefetch {
   --sidebar: var(--color-secondary);
   --font-mono: "IBM Plex Mono", monospace;
   --font-sans: "DM Sans", sans-serif;
-  --font-size-caption: 0.75rem;
-  --font-size-body2: 0.875rem;
-  --font-size-body1: 0.9375rem;
-  --font-size-title: 1rem;
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  /* The type scale itself lives in the @theme block below as --text-micro/
+     -tag/-dense plus Tailwind's own xs/sm/base/lg/xl/2xl/3xl/7xl steps --
+     components should reach for those utilities rather than one-off
+     text-[…] values. */
   --secondary: var(--color-secondary);
   --background: var(--color-background);
   --font-serif: "Lora", serif;
@@ -188,6 +189,28 @@ next-router-prefetch {
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --text-micro: 0.625rem;
+  /* Extends the derived sm/md/lg/xl steps above to cover the panel/card/
+     hero radii that were previously one-off rounded-[…] bracket values
+     scattered across page-hero, kpi-card, soft-panel, dense-table-shell,
+     etc. -2xl/-3xl continue the same +4/+8/+16 progression from --radius;
+     -4xl is pinned to the exact 1.75rem already used consistently by the
+     app's largest hero panels (onboarding, settings) rather than forced
+     onto the doubling pattern. */
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 16px);
+  --radius-4xl: 1.75rem;
+
+  /* Sub-xs type steps: the app's smallest, densest text (table micro-labels,
+     uppercase tags/chips, dense table/card body copy) was previously a
+     spread of one-off values -- 9/10/10.5/11/12/13px all meaning roughly
+     the same three things. These three named steps are the real values
+     already in majority use, now given a name so new text sizes have
+     somewhere below text-xs to go instead of another bespoke bracket.
+     Font-size only (no paired line-height) so existing leading-* utilities
+     keep controlling line-height wherever one is already set. */
+  --text-tag: 0.6875rem;
+  --text-dense: 0.8125rem;
 
   /* Tremor theme tokens (aquasmart-main parity): production charts use
      @tremor/react's AreaChart, which reads these `tremor-*` utility names
@@ -351,7 +374,7 @@ next-router-prefetch {
   }
 
   .page-hero {
-    @apply rounded-[1.5rem] border border-border bg-background p-4 md:p-5 lg:p-6;
+    @apply rounded-3xl border border-border bg-background p-4 md:p-5 lg:p-6;
     box-shadow: none;
   }
 
@@ -361,7 +384,7 @@ next-router-prefetch {
   }
 
   .page-chip {
-    @apply inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
+    @apply inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-tag font-semibold uppercase tracking-[0.16em] text-muted-foreground;
   }
 
   .page-section {
@@ -369,12 +392,12 @@ next-router-prefetch {
   }
 
   .dense-table-shell {
-    @apply w-full max-w-full overflow-auto rounded-[1.1rem] border border-border bg-background;
+    @apply w-full max-w-full overflow-auto rounded-2xl border border-border bg-background;
     box-shadow: none;
   }
 
   .dense-table {
-    @apply w-full min-w-[44rem] text-[13px] leading-6;
+    @apply w-full min-w-[44rem] text-dense leading-6;
   }
 
   .dense-table thead th {
@@ -390,7 +413,7 @@ next-router-prefetch {
   }
 
   .legend-pill {
-    @apply inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-semibold leading-none text-muted-foreground;
+    @apply inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-tag font-semibold leading-none text-muted-foreground;
   }
 
   .legend-pill-swatch {
@@ -398,7 +421,7 @@ next-router-prefetch {
   }
 
   .filter-bar {
-    @apply flex flex-col gap-2.5 rounded-[1rem] border border-border bg-background px-3 py-2.5 shadow-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-between;
+    @apply flex flex-col gap-2.5 rounded-2xl border border-border bg-background px-3 py-2.5 shadow-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-between;
   }
 
   .panel-surface {
@@ -412,17 +435,17 @@ next-router-prefetch {
   }
 
   .soft-panel {
-    @apply rounded-[1.1rem] border border-border bg-background;
+    @apply rounded-2xl border border-border bg-background;
     box-shadow: none;
   }
 
   .soft-panel-subtle {
-    @apply rounded-[0.95rem] border border-border bg-background;
+    @apply rounded-2xl border border-border bg-background;
     box-shadow: none;
   }
 
   .soft-table-shell {
-    @apply overflow-x-auto rounded-[0.95rem] border border-border bg-background;
+    @apply overflow-x-auto rounded-2xl border border-border bg-background;
     box-shadow: none;
   }
 
@@ -436,7 +459,7 @@ next-router-prefetch {
   }
 
   .kpi-card {
-    @apply h-full rounded-[1.15rem] border border-border/80 bg-background shadow-none;
+    @apply h-full rounded-2xl border border-border/80 bg-background shadow-none;
   }
 
   .kpi-card-header {
@@ -444,7 +467,7 @@ next-router-prefetch {
   }
 
   .kpi-card-title {
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+    @apply text-tag font-semibold uppercase tracking-[0.14em] text-muted-foreground;
   }
 
   .kpi-card-content {
@@ -453,6 +476,8 @@ next-router-prefetch {
 
   .kpi-card-value {
     @apply mt-1 text-2xl font-semibold leading-none tracking-tight text-foreground;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 
   .kpi-card-meta {
@@ -465,7 +490,7 @@ next-router-prefetch {
   }
 
   .queue-card {
-    @apply rounded-[1rem] border px-3 py-3 text-left transition-colors;
+    @apply rounded-2xl border px-3 py-3 text-left transition-colors;
   }
 
   .section-heading {
@@ -487,7 +512,7 @@ next-router-prefetch {
 }
 @layer components {
   .page-toolbar {
-    @apply flex flex-col items-stretch gap-2.5 rounded-[1.1rem] border border-border bg-background px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center;
+    @apply flex flex-col items-stretch gap-2.5 rounded-2xl border border-border bg-background px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center;
     box-shadow: none;
   }
 
@@ -495,7 +520,7 @@ next-router-prefetch {
     @apply space-y-0;
   }
 
-  /* Note: outer centering/max-width already comes from DataEntryAppShell's
+  /* Note: outer centering/max-width comes from the surrounding page shell's
      <main> wrapper (mx-auto w-full max-w-[1240px]) -- this class only owns
      horizontal gutters so the two never compete over width. */
   .data-entry-page-shell {
@@ -515,7 +540,7 @@ next-router-prefetch {
   }
 
   .data-entry-required-note {
-    @apply text-[12px] leading-5 text-muted-foreground;
+    @apply text-xs leading-5 text-muted-foreground;
   }
 
   .data-entry-tabs-shell {
@@ -623,7 +648,7 @@ next-router-prefetch {
   }
 
   .data-entry-canvas form [data-slot="form-label"] {
-    @apply text-[12px] font-semibold leading-5 tracking-[0.02em] text-foreground/80;
+    @apply text-xs font-semibold leading-5 tracking-[0.02em] text-foreground/80;
   }
 
   .data-entry-canvas form [data-slot="input"],
@@ -659,7 +684,7 @@ next-router-prefetch {
   }
 
   .data-entry-canvas form [data-slot="form-message"] {
-    @apply text-[12px] leading-5;
+    @apply text-xs leading-5;
   }
 
   .data-entry-canvas form > button:last-child {
@@ -703,11 +728,11 @@ next-router-prefetch {
   }
 
   .data-entry-recent-item-subtitle {
-    @apply mt-0.5 text-[12px] text-muted-foreground;
+    @apply mt-0.5 text-xs text-muted-foreground;
   }
 
   .data-entry-recent-meta {
-    @apply text-[11px] text-muted-foreground;
+    @apply text-tag text-muted-foreground;
   }
 
   .data-entry-recent-grid {
@@ -715,7 +740,7 @@ next-router-prefetch {
   }
 
   .data-entry-recent-detail {
-    @apply flex items-center justify-between gap-3 border-t border-border/55 pt-2 text-[12px];
+    @apply flex items-center justify-between gap-3 border-t border-border/55 pt-2 text-xs;
   }
 
   .data-entry-recent-detail-label {
@@ -736,7 +761,7 @@ next-router-prefetch {
   }
 
   .data-entry-bottom-nav-item {
-    @apply flex min-h-[3.25rem] w-[4.25rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-center text-[10.5px] font-semibold leading-tight no-underline transition-colors;
+    @apply flex min-h-[3.25rem] w-[4.25rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-center text-micro font-semibold leading-tight no-underline transition-colors;
   }
 
   .data-entry-bottom-nav-item-active {

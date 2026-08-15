@@ -256,15 +256,6 @@ export default function DashboardLayout({
               </Button>
             </>
           ) : null}
-          <Button
-            variant="outline"
-            onClick={() => {
-              setCommandOpen(false)
-              router.push(toDashboardPath("/water-quality"))
-            }}
-          >
-            Water Quality Dashboard
-          </Button>
         </div>
       </Dialog>
     </div>

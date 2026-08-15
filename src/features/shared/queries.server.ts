@@ -7,12 +7,19 @@ import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 type SharedSupabaseClient = SupabaseClient<Database>
 type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
-type GrowthTrendRow = {
+export type GrowthTrendRow = {
   system_id: number
   sample_date: string
+  /** api_production_summary's boundary type: 'stocking' | 'sampling' | 'transfer' | 'current'.
+   * Only 'sampling' rows are an actual weighing event -- 'current' in particular is a
+   * carried-forward estimate for "today", not a recorded sample. */
+  activity: string | null
   abw_g: number | null
+  /** Fish inventory as of this row -- used to fish-count-weight ABW/eFCR when combining multiple cages into one batch total. */
+  fish_count: number | null
   adg_g_day: number | null
   sgr_pct_day: number | null
+  efcr_period: number | null
   days_interval: number | null
   weight_gain_g: number | null
   age_days?: number | null
@@ -177,9 +184,12 @@ export async function listGrowthTrend(
       return rows.map<GrowthTrendRow>((row) => ({
         system_id: row.system_id ?? systemId,
         sample_date: row.date,
+        activity: row.activity,
         abw_g: row.average_body_weight,
+        fish_count: row.number_of_fish_inventory,
         adg_g_day: row.agr,
         sgr_pct_day: row.sgr,
+        efcr_period: row.efcr_period,
         days_interval: row.days_in_period,
         weight_gain_g: row.biomass_increase_period,
         age_days: null,

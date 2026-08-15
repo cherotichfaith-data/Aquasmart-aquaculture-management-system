@@ -22,6 +22,7 @@ import { useRecordStocking } from "@/lib/hooks/use-stocking"
 import { useStockingData } from "@/features/reports/hooks"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { type BatchOptionItem } from "@/features/shared/batch-options"
 import { BatchQuickCreate } from "./batch-quick-create"
 import { DependencyBlocker } from "./dependency-blocker"
 import {
@@ -51,7 +52,7 @@ type StockingInsertWithNotes = Omit<StockingInsert, "abw" | "cycle_id"> & {
   farm_id?: string | null
   notes?: string | null
 }
-type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number] & {
+type BatchOption = BatchOptionItem & {
   supplier_name?: string | null
 }
 type FingerlingBatchRow = Database["public"]["Tables"]["fingerling_batch"]["Row"] & {
@@ -72,7 +73,7 @@ const formSchema = z.object({
 interface StockingFormProps {
   farmId: string | null
   systems: SystemOption[]
-  batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+  batches: BatchOptionItem[]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
   onSystemChange?: (systemId: number | null) => void
@@ -145,6 +146,8 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
     const option: BatchOption = {
       id: batch.id,
       farm_id: batch.farm_id ?? farmId ?? "",
+      current_system_id: systemId,
+      current_system_ids: [systemId],
       system_id: systemId,
       supplier_id: batch.supplier_id,
       date_of_delivery: batch.date_of_delivery,

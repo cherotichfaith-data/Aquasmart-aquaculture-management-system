@@ -9,10 +9,13 @@ import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import {
   MetricCell,
   NoData,
+  SeverityValue,
   WaterQualityFlagsCell,
   formatLastDate,
   formatSampleAgeText,
+  isEfcrOutlier,
   isFiniteNumber,
+  isMortalityCritical,
 } from "@/features/dashboard/lib/table-cells"
 
 const identityDotColor = (systemId: number) => `var(--chart-${(Math.abs(systemId) % 5) + 1})`
@@ -33,9 +36,10 @@ export function buildDashboardSystemColumns(params: {
 
   const waterQualityHref = (systemId: number) => {
     const query = new URLSearchParams()
+    query.set("tab", "water-quality")
     query.set("system", String(systemId))
     if (timePeriod) query.set("date", toTimePeriodUrlValue(timePeriod))
-    return `/water-quality?${query.toString()}`
+    return `/reports?${query.toString()}`
   }
 
   const metricValue = (value: number | null | undefined, decimals: number) =>
@@ -77,15 +81,10 @@ export function buildDashboardSystemColumns(params: {
         const data = row.original
         const value = metricValue(data.efcr, 2)
         if (value == null) return <NoData />
-        const isOutlier =
-          isFiniteNumber(data.efcr) &&
-          isFiniteNumber(farmMedianEfcr) &&
-          farmMedianEfcr > 0 &&
-          data.efcr > farmMedianEfcr * 3
         return (
           <MetricCell
             href={productionHref(data.system_id, "efcr")}
-            value={<span className={isOutlier ? "text-destructive" : undefined}>{value}</span>}
+            value={<SeverityValue value={value} active={isEfcrOutlier(data, farmMedianEfcr)} />}
             arrow={data.efcr_arrow}
             invertArrow
             subtext={formatLastDate(data.efcr_latest_date)}
@@ -146,11 +145,10 @@ export function buildDashboardSystemColumns(params: {
         const data = row.original
         const value = metricValue(data.mortality_rate, 2)
         if (value == null) return <NoData />
-        const rising = String(data.mortality_rate_arrow ?? "").toLowerCase() === "up"
         return (
           <MetricCell
             href={productionHref(data.system_id, "mortality")}
-            value={<span className={rising ? "text-destructive" : undefined}>{value}</span>}
+            value={<SeverityValue value={value} active={isMortalityCritical(data)} />}
             arrow={data.mortality_rate_arrow}
             invertArrow
             subtext={formatLastDate(data.mortality_rate_latest_date)}

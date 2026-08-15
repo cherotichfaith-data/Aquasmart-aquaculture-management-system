@@ -14,14 +14,14 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>
 CardHeader.displayName = "CardHeader"
 
 const CardTitle = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return <div ref={ref} data-slot="card-title" className={cn("text-[1.02rem] font-semibold leading-tight tracking-[-0.02em]", className)} {...props} />
+  return <div ref={ref} data-slot="card-title" className={cn("text-base font-semibold leading-tight tracking-[-0.02em]", className)} {...props} />
 })
 
 CardTitle.displayName = "CardTitle"
 
 const CardDescription = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
   ({ className, ...props }, ref) => {
-    return <div ref={ref} data-slot="card-description" className={cn("text-[0.8125rem] leading-6 text-muted-foreground", className)} {...props} />
+    return <div ref={ref} data-slot="card-description" className={cn("text-dense leading-6 text-muted-foreground", className)} {...props} />
   },
 )
 

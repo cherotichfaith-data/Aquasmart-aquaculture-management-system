@@ -70,7 +70,7 @@ export function EmptyState({
         className,
       )}
     >
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[1.25rem] bg-accent">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
       <p className="mt-3 text-sm font-bold text-foreground">{title}</p>

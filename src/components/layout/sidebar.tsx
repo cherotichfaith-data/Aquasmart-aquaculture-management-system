@@ -3,14 +3,12 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
+import { useMemo, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
 import { Button } from "@/components/app-ui/button"
-import { Collapsible } from "@/components/app-ui/collapsible"
-import { Menu, MenuItem } from "@/components/app-ui/menu"
 import { Sheet } from "@/components/app-ui/sheet"
 import { Skeleton } from "@/components/app-ui/skeleton"
 import { Tooltip } from "@/components/app-ui/tooltip"
@@ -18,15 +16,13 @@ import { cn } from "@/lib/utils"
 import {
   Activity,
   BarChart3,
-  ChevronDown,
-  Droplets,
   Fish,
   LayoutDashboard,
   LogOut,
   Menu as MenuIcon,
   PlusCircle,
   Settings,
-  TestTube,
+  Rows3,
   Users,
   X,
 } from "lucide-react"
@@ -39,8 +35,8 @@ const ALL_NAV_SECTIONS = [
     title: "Operate",
     items: [
       { name: "Dashboard", href: toDashboardPath("/"), icon: LayoutDashboard },
-      { name: "Growth", href: toDashboardPath("/sampling"), icon: TestTube },
-      { name: "Water Quality", href: toDashboardPath("/water-quality"), icon: Droplets },
+      { name: "Cages", href: toDashboardPath("/systems"), icon: Rows3 },
+      { name: "Batches", href: toDashboardPath("/batches"), icon: Fish },
     ],
   },
   {
@@ -67,8 +63,8 @@ const ALL_NAV_SECTIONS = [
 const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
   admin: new Set([
     toDashboardPath("/"),
-    toDashboardPath("/sampling"),
-    toDashboardPath("/water-quality"),
+    toDashboardPath("/systems"),
+    toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
     toDashboardPath("/reports"),
@@ -78,8 +74,8 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
   ]),
   farm_manager: new Set([
     toDashboardPath("/"),
-    toDashboardPath("/sampling"),
-    toDashboardPath("/water-quality"),
+    toDashboardPath("/systems"),
+    toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
     toDashboardPath("/reports"),
@@ -88,11 +84,23 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
   ]),
   system_operator: new Set([
     DATA_ENTRY_PATH,
-    toDashboardPath("/sampling"),
-    toDashboardPath("/water-quality"),
+    toDashboardPath("/systems"),
   ]),
-  data_analyst: new Set([toDashboardPath("/"), toDashboardPath("/feed"), toDashboardPath("/production"), toDashboardPath("/reports")]),
-  viewer: new Set([toDashboardPath("/"), toDashboardPath("/feed"), toDashboardPath("/reports")]),
+  data_analyst: new Set([
+    toDashboardPath("/"),
+    toDashboardPath("/systems"),
+    toDashboardPath("/batches"),
+    toDashboardPath("/feed"),
+    toDashboardPath("/production"),
+    toDashboardPath("/reports"),
+  ]),
+  viewer: new Set([
+    toDashboardPath("/"),
+    toDashboardPath("/systems"),
+    toDashboardPath("/batches"),
+    toDashboardPath("/feed"),
+    toDashboardPath("/reports"),
+  ]),
 }
 
 const ROLE_ITEM_LABELS: Record<string, Record<string, string>> = {
@@ -102,19 +110,6 @@ const ROLE_ITEM_LABELS: Record<string, Record<string, string>> = {
 const ROLE_ITEM_HREFS: Record<string, Record<string, string>> = {
   system_operator: { [DATA_ENTRY_PATH]: `${DATA_ENTRY_PATH}?type=feeding` },
 }
-
-const waterQualityLinks = [
-  { href: toDashboardPath("/water-quality"), label: "Overview", activeKey: "overview" },
-  { href: `${toDashboardPath("/water-quality")}?tab=parameter`, label: "Parameter Analysis", activeKey: "parameter" },
-  {
-    href: `${toDashboardPath("/water-quality")}?tab=environment`,
-    label: "Environmental Indicators",
-    activeKey: "environment",
-  },
-  { href: `${toDashboardPath("/water-quality")}?tab=depth`, label: "Stratification Analysis", activeKey: "depth" },
-  { href: `${toDashboardPath("/water-quality")}?tab=alerts`, label: "Alerts", activeKey: "alerts" },
-  { href: `${toDashboardPath("/water-quality")}?tab=sensors`, label: "System Coverage", activeKey: "sensors" },
-] as const
 
 function getVisibleSections(role: string | null | undefined) {
   const allowed = role ? (ROLE_ALLOWED_ROUTES[role] ?? null) : null
@@ -166,7 +161,7 @@ function LogoBlock({
         >
           <Image src="/use this.png" alt="AquaSmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
           {!collapsed || mobile ? (
-            <span className="text-[1.1rem] font-bold text-[color:var(--color-sidebar-foreground)]">AquaSmart</span>
+            <span className="text-lg font-bold text-[color:var(--color-sidebar-foreground)]">AquaSmart</span>
           ) : null}
         </Link>
       </div>
@@ -214,14 +209,8 @@ function SidebarContent({
   const isRoleLoading = roleOverride == null && farmRoleQuery.isLoading
   const navigationSections = useMemo(() => getVisibleSections(farmRole), [farmRole])
   const [signingOut, setSigningOut] = useState(false)
-  const [waterQualityOpen, setWaterQualityOpen] = useState(appPathname.startsWith("/water-quality"))
-  const [waterQualityMenuAnchor, setWaterQualityMenuAnchor] = useState<HTMLElement | null>(null)
-  const flyoutTriggerRef = useRef<HTMLButtonElement>(null)
 
   const farmName = farm?.name ?? initialFarmName ?? null
-  const waterQualityActive = appPathname === "/water-quality"
-  const tabParam = searchParams.get("tab")
-  const activeWaterQualityKey = !tabParam || tabParam === "overview" ? "overview" : tabParam
   // Navigation should carry the user's working context between sections.
   // Without this, opening Production from another section removes `system`
   // and Production falls back to the lowest database ID (Cage 2B here).
@@ -236,38 +225,11 @@ function SidebarContent({
     return nextQuery ? `${basePath}?${nextQuery}` : basePath
   }
 
-  useEffect(() => {
-    if (waterQualityActive) setWaterQualityOpen(true)
-  }, [waterQualityActive])
-
-  useEffect(() => {
-    if (!collapsed) {
-      setWaterQualityMenuAnchor(null)
-    }
-  }, [collapsed])
-
   const closeAfterNavigate = () => {
-    setWaterQualityMenuAnchor(null)
     if (mobile) {
       onClose()
     }
   }
-
-  const renderWaterQualityMenuItems = (dense = false) =>
-    waterQualityLinks.map((link) => {
-      const isActive = link.activeKey === activeWaterQualityKey
-      return (
-        <MenuItem
-          key={link.href}
-          href={withCurrentContext(link.href)}
-          selected={isActive}
-          onClick={closeAfterNavigate}
-          dense={dense}
-        >
-          {link.label}
-        </MenuItem>
-      )
-    })
 
   return (
     <div
@@ -299,102 +261,19 @@ function SidebarContent({
         {isRoleLoading ? (
           <div className="grid gap-1.5 px-1">
             {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-11 rounded-[1.25rem]" />
+              <Skeleton key={i} className="h-11 rounded-2xl" />
             ))}
           </div>
         ) : (
           navigationSections.map((section) => (
             <div key={section.title} className="mb-5">
               {!collapsed || mobile ? (
-                <span className="block px-2.5 pb-1 font-mono text-[11px] uppercase tracking-[0.08em] opacity-80" style={{ color: "var(--color-sidebar-accent-foreground)" }}>
+                <span className="block px-2.5 pb-1 font-mono text-tag uppercase tracking-[0.08em] opacity-80" style={{ color: "var(--color-sidebar-accent-foreground)" }}>
                   {section.title}
                 </span>
               ) : null}
               <div className="grid gap-1">
                 {section.items.map((item) => {
-                  if (item.href === toDashboardPath("/water-quality")) {
-                    const Icon = item.icon
-
-                    if (collapsed && !mobile) {
-                      return (
-                        <div key={item.href}>
-                          <Tooltip content="Water Quality" side="right" wrapperClassName="flex w-full [&>*]:w-full">
-                            <button
-                              ref={flyoutTriggerRef}
-                              type="button"
-                              onClick={(event: MouseEvent<HTMLElement>) => setWaterQualityMenuAnchor(event.currentTarget)}
-                              className={cn(
-                                "flex min-h-12 w-full items-center justify-center rounded-2xl px-3 transition-colors hover:bg-white/10",
-                                waterQualityActive && "bg-white/15",
-                              )}
-                            >
-                              <Icon size={18} />
-                            </button>
-                          </Tooltip>
-                          <Menu
-                            anchorEl={waterQualityMenuAnchor}
-                            open={Boolean(waterQualityMenuAnchor)}
-                            onClose={() => setWaterQualityMenuAnchor(null)}
-                            side="right"
-                            align="center"
-                            dense
-                          >
-                            {renderWaterQualityMenuItems(true)}
-                          </Menu>
-                        </div>
-                      )
-                    }
-
-                    return (
-                      <div key={item.href}>
-                        <div
-                          className={cn(
-                            "flex min-h-12 items-center rounded-2xl px-1.5 transition-colors",
-                            waterQualityActive && "bg-white/15",
-                          )}
-                        >
-                          <Link
-                            href={withCurrentContext(item.href)}
-                            onClick={closeAfterNavigate}
-                            className="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-current no-underline"
-                          >
-                            <Icon size={18} />
-                            <span className="truncate text-sm font-semibold">{item.name}</span>
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              setWaterQualityOpen((prev) => !prev)
-                            }}
-                            aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
-                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-current hover:bg-white/10"
-                          >
-                            <ChevronDown size={16} className={cn("transition-transform duration-200", waterQualityOpen && "rotate-180")} />
-                          </button>
-                        </div>
-                        <Collapsible open={waterQualityOpen}>
-                          <div className="ml-4 mt-1 grid gap-0.5">
-                            {waterQualityLinks.map((link) => (
-                              <Link
-                                key={link.href}
-                                href={withCurrentContext(link.href)}
-                                onClick={closeAfterNavigate}
-                                className={cn(
-                                  "flex min-h-[38px] items-center rounded-xl px-3 text-[12px] font-semibold text-current no-underline transition-colors hover:bg-white/10",
-                                  link.activeKey === activeWaterQualityKey && "bg-white/15",
-                                )}
-                              >
-                                {link.label}
-                              </Link>
-                            ))}
-                          </div>
-                        </Collapsible>
-                      </div>
-                    )
-                  }
-
                   const resolvedHref = resolveItemHref(farmRole, item.href)
                   const contextualHref = withCurrentContext(resolvedHref)
                   const resolvedLabel = resolveItemLabel(farmRole, item.href, item.name)

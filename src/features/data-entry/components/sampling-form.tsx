@@ -18,11 +18,11 @@ import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useRecordSampling } from "@/features/sampling/hooks"
 import { useSamplingData } from "@/features/reports/hooks"
-import type { Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { diffDateDays } from "@/lib/time-series"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
   InfoPanel,
   InfoStat,
@@ -40,7 +40,6 @@ import {
 import {
   LatestEntryGuard,
   pickLatestEntryByRecordDate,
-  pickSameDayEntry,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
@@ -58,7 +57,7 @@ const formSchema = z.object({
 interface SamplingFormProps {
   farmId: string | null
   systems: SystemOption[]
-  batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+  batches: BatchOptionItem[]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
   onSystemChange?: (systemId: number | null) => void
@@ -105,11 +104,8 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
   const selectedSystemId = Number(selectedSystemValue)
   const selectedDate = useWatch({ control: form.control, name: "date" })
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
-  // A system can only host one active batch/production cycle at a time, so the
-  // batch is derived from the selected cage instead of asking the user to pick
-  // one manually (see api_fingerling_batch_options_rpc's system_id column).
   const resolvedBatchId = useMemo(
-    () => batches.find((batch) => batch.system_id === selectedSystemId)?.id ?? null,
+    () => resolveBatchIdForSystem(batches, selectedSystemId),
     [batches, selectedSystemId],
   )
 
@@ -151,14 +147,6 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
     limit: 10,
     enabled: hasValidSystemId,
   })
-  const duplicateQuery = useSamplingData({
-    farmId,
-    systemId: hasValidSystemId ? selectedSystemId : undefined,
-    dateFrom: selectedDate || undefined,
-    dateTo: selectedDate || undefined,
-    limit: 20,
-    enabled: hasValidSystemId && Boolean(selectedDate),
-  })
   const latestEntryQuery = useSamplingData({
     farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
@@ -183,7 +171,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
     selectedDate,
   )
   const daysSinceLastSample = diffDateDays(previousSample?.date, selectedDate)
-  const isEarlierThanMonthlyCadence = daysSinceLastSample != null && daysSinceLastSample < 25
+  const isVeryRecentResample = daysSinceLastSample != null && daysSinceLastSample < 10
   const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
     key: `sampling-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
     date: row.date ?? "",
@@ -194,26 +182,10 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
       { label: "ABW", value: row.abw != null ? `${row.abw.toFixed(2)} g` : "Not recorded" },
     ],
   }))
-  const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
-    key: `sampling-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
-    date: row.date ?? "",
-    createdAt: row.created_at ?? null,
-    summary: `${row.number_of_fish_sampling ?? 0} fish sampled`,
-    details: [
-      { label: "Total Weight", value: row.total_weight_sampling != null ? `${row.total_weight_sampling} kg` : "Not recorded" },
-      { label: "ABW", value: row.abw != null ? `${row.abw.toFixed(2)} g` : "Not recorded" },
-    ],
-  }))
   const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
-  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      if (duplicateEntry) {
-        form.setError("date", { message: `A sampling entry already exists for ${values.date}.` })
-        return
-      }
-
       const resolvedFarmId = requireActiveFarmId(farmId)
       const systemId = parseRequiredNumericId(values.system_id, "Cage number")
 
@@ -245,7 +217,6 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
     <div>
       <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Sampling</h2>
-        <p className="text-sm text-muted-foreground">Capture the monthly sampled fish count and total sample weight in kilograms for this batch.</p>
       </div>
 
       <div className="data-entry-status">
@@ -256,7 +227,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
         <div className="space-y-6">
           <LatestEntryGuard
             latestEntry={latestEntry}
-            duplicateEntry={duplicateEntry}
+            duplicateEntry={null}
             itemLabel="sampling"
             isLoading={latestEntryQuery.isLoading}
           />
@@ -364,9 +335,9 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 />
               </div>
 
-              {isEarlierThanMonthlyCadence ? (
-                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  Last sampling was {formatRelativeDays(daysSinceLastSample)}. Sampling is normally done monthly because it stresses the fish.
+              {isVeryRecentResample ? (
+                <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
+                  Last sampling was {formatRelativeDays(daysSinceLastSample)}. Bi-weekly and monthly schedules are supported, but this entry is close to the previous sample, so confirm the date before saving.
                 </div>
               ) : null}
 
@@ -390,7 +361,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
               />
 
               <div className="flex justify-end pt-1">
-                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending}>
                   {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Record Sampling
                 </Button>

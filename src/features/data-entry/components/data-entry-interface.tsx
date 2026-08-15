@@ -16,6 +16,7 @@ import { RecentEntriesList } from "./recent-entries-list"
 import type { Database, Tables } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { DATA_ENTRY_PATH } from "@/lib/app-entry"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
 
 type DataEntryTabId =
     | "feeding"
@@ -33,7 +34,7 @@ interface DataEntryInterfaceProps {
     farmRole?: Database["public"]["Tables"]["farm_user"]["Row"]["role"] | null
     systems: SystemOption[]
     feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
-    batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+    batches: BatchOptionItem[]
     recentEntries: {
         mortality: Tables<"fish_mortality">[]
         feeding: Tables<"feeding_record">[]

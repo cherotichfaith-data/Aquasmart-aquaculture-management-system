@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/types/database"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
+import { attachResolvedSystemIdsToBatches, type BatchOptionItem } from "@/features/shared/batch-options"
 
 export type ServerClient = ReturnType<typeof createAccessTokenClient>
 
@@ -10,12 +11,11 @@ type SystemVolumeRow = Pick<
   "commissioned_at" | "growth_stage" | "id" | "is_active" | "name" | "volume"
 >
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
-type BatchOptionRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
+type BatchOptionRow = BatchOptionItem
 type FeedTypeOptionRow = Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]
 type AlertThresholdRow = Database["public"]["Views"]["api_alert_thresholds"]["Row"]
 type WaterQualityMeasurementRow = Database["public"]["Views"]["api_water_quality_measurements"]["Row"]
 type DashboardSystemRow = Database["public"]["Functions"]["api_dashboard_systems"]["Returns"][number]
-type BatchOptionRowForDashboard = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 export async function listProductionSummaryRows(
   supabase: ServerClient,
   params: ProductionSummaryParams,
@@ -75,12 +75,43 @@ export async function listBatchOptionRows(
   supabase: ServerClient,
   params: { farmId: string; activeOnly?: boolean },
 ): Promise<BatchOptionRow[]> {
-  const { data, error } = await supabase.rpc("api_fingerling_batch_options_rpc", {
+  const { data: batchRows, error } = await supabase.rpc("api_fingerling_batch_options_rpc", {
     p_farm_id: params.farmId,
     p_active_only: params.activeOnly ?? true,
   })
   if (error) return []
-  return (data ?? []) as BatchOptionRow[]
+  const rows = ((batchRows ?? []) as Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"]).filter(
+    (row) => Number.isFinite(row.id),
+  )
+  if (!rows.length) return []
+
+  const supplierIds = Array.from(
+    new Set(rows.map((row) => row.supplier_id).filter((value): value is number => Number.isFinite(value))),
+  )
+  const { data: suppliers } = supplierIds.length
+    ? await supabase.from("fingerling_supplier").select("id, company_name").in("id", supplierIds)
+    : { data: [] as Array<{ id: number; company_name: string }> }
+  const supplierNames = new Map<number, string>()
+  for (const supplier of suppliers ?? []) {
+    if (Number.isFinite(supplier.id)) supplierNames.set(supplier.id, supplier.company_name ?? "")
+  }
+
+  const batchSystemIds = new Map<number, number[]>()
+  const { data: dashboardBatches } = await supabase.rpc("api_dashboard_batches", {
+    p_farm_id: params.farmId,
+    p_batch_ids: rows.map((row) => row.id),
+    p_stage: undefined,
+    p_start_date: undefined,
+    p_end_date: undefined,
+  })
+  for (const row of (dashboardBatches ?? []) as Array<{ batch_id: number; system_ids: Array<number | string> | null }>) {
+    const systemIds = (row.system_ids ?? [])
+      .map((value) => Number(value))
+      .filter((value): value is number => Number.isFinite(value) && value > 0)
+    batchSystemIds.set(row.batch_id, systemIds)
+  }
+
+  return attachResolvedSystemIdsToBatches(rows, batchSystemIds, supplierNames)
 }
 
 export async function listFeedTypeOptionRows(
@@ -127,6 +158,27 @@ export async function listWaterQualityMeasurementRows(
   const { data, error } = await query.order("date", { ascending: true }).order("time", { ascending: true })
   if (error) return []
   return (data ?? []) as WaterQualityMeasurementRow[]
+}
+
+type WaterQualityTrendRow = Database["public"]["Functions"]["api_water_quality_trend"]["Returns"][number]
+
+export async function listWaterQualityTrendRows(
+  supabase: ServerClient,
+  params: {
+    farmId: string
+    systemId?: number
+    dateFrom?: string
+    dateTo?: string
+  },
+): Promise<WaterQualityTrendRow[]> {
+  const { data, error } = await supabase.rpc("api_water_quality_trend", {
+    p_farm_id: params.farmId,
+    p_system_id: params.systemId ?? undefined,
+    p_start_date: params.dateFrom ?? undefined,
+    p_end_date: params.dateTo ?? undefined,
+  })
+  if (error) return []
+  return (data ?? []) as WaterQualityTrendRow[]
 }
 
 export async function listDashboardSystemsRows(
