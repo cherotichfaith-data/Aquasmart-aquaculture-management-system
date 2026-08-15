@@ -2361,7 +2361,7 @@ export type Database = {
       }
       classify_growth_stage_tanganicae: {
         Args: { p_abw_g: number }
-        Returns: string
+        Returns: Database["public"]["Enums"]["system_growth_stage"]
       }
       classify_water_quality_measurement: {
         Args: {

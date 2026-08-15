@@ -20,7 +20,7 @@ export type BatchOptionItem = BatchOptionRpcRow & {
 
 function toSortedUniqueNumericIds(values: Array<number | null | undefined>) {
   return Array.from(
-    new Set(values.filter((value): value is number => Number.isFinite(value) && value > 0)),
+    new Set(values.filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0)),
   ).sort((a, b) => a - b)
 }
 
@@ -96,11 +96,12 @@ export function buildBatchOptionsFromSources(
     const fallbackIds = toSortedUniqueNumericIds(fallbackSystemsByBatchId.get(batch.id) ?? [])
     const currentSystemIds = toSortedUniqueNumericIds(currentSystemsByBatchId.get(batch.id) ?? fallbackIds)
     const currentSystemId = currentSystemIds.length === 1 ? currentSystemIds[0] : null
+    const resolvedSystemId = currentSystemId ?? currentSystemIds[0] ?? null
 
     return {
       id: batch.id,
       farm_id: batch.farm_id ?? "",
-      system_id: currentSystemId,
+      system_id: resolvedSystemId,
       current_system_id: currentSystemId,
       current_system_ids: currentSystemIds,
       label: batch.name?.trim() ? batch.name : `Batch #${batch.id}`,
@@ -121,10 +122,11 @@ export function attachResolvedSystemIdsToBatches(
   return batches.map<BatchOptionItem>((batch) => {
     const currentSystemIds = toSortedUniqueNumericIds(batchSystemIds.get(batch.id) ?? [batch.system_id])
     const currentSystemId = currentSystemIds.length === 1 ? currentSystemIds[0] : null
+    const resolvedSystemId = currentSystemId ?? currentSystemIds[0] ?? batch.system_id
 
     return {
       ...batch,
-      system_id: currentSystemId,
+      system_id: resolvedSystemId,
       current_system_id: currentSystemId,
       current_system_ids: currentSystemIds,
       supplier_name: supplierNames?.get(batch.supplier_id) ?? null,

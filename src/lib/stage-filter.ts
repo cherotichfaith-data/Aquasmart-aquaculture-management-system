@@ -6,14 +6,10 @@ export const GROWTH_STAGE_VALUES = Constants.public.Enums.system_growth_stage
 
 export function formatGrowthStage(value: StageFilter | string | null | undefined) {
   switch (value) {
-    case "fingerling":
-      return "Fingerling"
-    case "juvenile":
-      return "Juvenile"
-    case "sub_adult":
-      return "Sub Adult"
-    case "broodstock":
-      return "Broodstock"
+    case "nursing":
+      return "Nursing"
+    case "grow_out":
+      return "Grow Out"
     case "all":
       return "All Stages"
     default:
