@@ -52,14 +52,16 @@ function ProductionPeriodFilter({
     const params = new URLSearchParams(searchParams.toString())
     params.set("date", value)
     const navigate = () => router.replace(`${pathname}?${params.toString()}`)
-    startTransition ? startTransition(navigate) : navigate()
+    if (startTransition) startTransition(navigate)
+    else navigate()
   }
 
   const handleCustomRangeChange = (range: { start: string; end: string }) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set("date", `custom_${range.start}_${range.end}`)
     const navigate = () => router.replace(`${pathname}?${params.toString()}`)
-    startTransition ? startTransition(navigate) : navigate()
+    if (startTransition) startTransition(navigate)
+    else navigate()
   }
 
   return (
@@ -290,7 +292,7 @@ export default function ProductionPageClient({
                 <DataTable
                   columns={productionTableColumns}
                   data={tableRows}
-                  rowKey={(row) => `${row.date}|${row.systemName ?? ""}`}
+                  rowKey={(row) => row.rowId}
                   emptyMessage="No production data available for the selected system and date range."
                   initialSorting={[{ id: "date", desc: true }]}
                   shellClassName="production-records-table"

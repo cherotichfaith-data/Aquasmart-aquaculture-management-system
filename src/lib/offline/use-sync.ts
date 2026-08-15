@@ -6,7 +6,7 @@ import { getPendingCount, runSync } from "@/lib/offline/sync"
 import { useSyncStore } from "@/lib/offline/sync-store"
 
 export function useSyncController() {
-  const { setIsSyncing, setPendingCount, setLastSyncedAt, setSyncError, setManualSync, setNeedsReauth } =
+  const { setIsSyncing, setPendingCount, setLastSyncedAt, setSyncError, setManualSync, setNeedsReauth, setIsOffline } =
     useSyncStore()
   const syncingRef = useRef(false)
 
@@ -55,13 +55,24 @@ export function useSyncController() {
   useEffect(() => {
     setManualSync(triggerSync)
     void getPendingCount().then(setPendingCount)
+    // Read connectivity as soon as we're mounted -- navigator.onLine reflects
+    // the current state immediately, so the offline banner doesn't have to
+    // wait for a dropped connection to fire an "offline" event first.
+    setIsOffline(!navigator.onLine)
     void triggerSync()
     // Best-effort: lets the offline queue flush via the service worker even
     // if this tab gets backgrounded/closed before connectivity returns. See
     // background-sync.ts -- no-ops entirely on browsers without support.
     void registerBackgroundSync()
 
-    window.addEventListener("online", triggerSync)
+    const handleOnline = () => {
+      setIsOffline(false)
+      void triggerSync()
+    }
+    const handleOffline = () => setIsOffline(true)
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
 
     const intervalId = window.setInterval(() => {
       void triggerSync()
@@ -69,10 +80,11 @@ export function useSyncController() {
 
     return () => {
       setManualSync(null)
-      window.removeEventListener("online", triggerSync)
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
       window.clearInterval(intervalId)
     }
-  }, [setManualSync, setPendingCount, triggerSync])
+  }, [setIsOffline, setManualSync, setPendingCount, triggerSync])
 
   return { triggerSync }
 }

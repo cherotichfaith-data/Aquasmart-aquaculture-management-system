@@ -18,7 +18,7 @@ const severityClassName = {
 } as const
 
 export function SyncStatusBar() {
-  const { isSyncing, pendingCount, lastSyncedAt, syncError, manualSync, needsReauth } = useSyncStore()
+  const { isSyncing, pendingCount, lastSyncedAt, syncError, manualSync, needsReauth, isOffline } = useSyncStore()
   const hasMounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -31,7 +31,7 @@ export function SyncStatusBar() {
 
   const canSyncNow = Boolean(manualSync) && !isSyncing && pendingCount > 0
   const syncButton = canSyncNow ? (
-    <Button size="sm" variant="outline" onClick={() => void manualSync?.()} className="min-h-7 rounded-full px-3 text-[11px]">
+    <Button size="sm" variant="outline" onClick={() => void manualSync?.()} className="min-h-7 rounded-full px-3 text-tag">
       Sync now
     </Button>
   ) : null
@@ -50,12 +50,32 @@ export function SyncStatusBar() {
               {syncError ?? "Your session expired. Sign in again to sync your saved records."}
             </span>
           </div>
-          <Button size="sm" variant="outline" asChild className="min-h-7 rounded-full px-3 text-[11px]">
+          <Button size="sm" variant="outline" asChild className="min-h-7 rounded-full px-3 text-tag">
             <Link href="/auth">
               <LogIn size={12} />
               Sign in
             </Link>
           </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Checked ahead of the pendingCount/lastSynced states below: while offline,
+  // a "Sync now" button would just fail, and staying silent until something
+  // happens to be queued would leave a crew with no way to tell the app even
+  // noticed the connection dropped. This fires the moment we're offline,
+  // pending records or not.
+  if (isOffline) {
+    return (
+      <div className={cn(barClassName, severityClassName.warning)}>
+        <div className="flex items-center gap-2">
+          <WifiOff size={14} className="shrink-0" />
+          <span className="text-xs">
+            {pendingCount > 0
+              ? `Offline -- ${pendingCount} record${pendingCount > 1 ? "s" : ""} saved locally and will sync when you're back online.`
+              : "Offline -- entries you save now will sync when you're back online."}
+          </span>
         </div>
       </div>
     )

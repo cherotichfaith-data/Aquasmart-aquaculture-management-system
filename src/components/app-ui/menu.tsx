@@ -50,7 +50,7 @@ type MenuItemBaseProps = {
 const menuItemClassName = ({ selected, disabled, destructive, dense, className }: MenuItemBaseProps) =>
   cn(
     "mx-1 flex w-[calc(100%-0.5rem)] cursor-pointer select-none items-center gap-2.5 rounded-md text-left text-sm transition-colors",
-    dense ? "px-2.5 py-1.5 text-[13px]" : "px-3 py-2",
+    dense ? "px-2.5 py-1.5 text-dense" : "px-3 py-2",
     destructive ? "text-destructive hover:bg-destructive/10" : "text-foreground hover:bg-accent hover:text-accent-foreground",
     selected && "bg-accent text-accent-foreground",
     disabled && "pointer-events-none opacity-50",

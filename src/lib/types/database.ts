@@ -1296,6 +1296,61 @@ export type Database = {
           },
         ]
       }
+      production_cycle_system: {
+        Row: {
+          created_at: string
+          cycle_id: number
+          ended_at: string | null
+          id: number
+          is_current: boolean
+          previous_system_id: number | null
+          started_at: string
+          system_id: number
+        }
+        Insert: {
+          created_at?: string
+          cycle_id: number
+          ended_at?: string | null
+          id?: never
+          is_current?: boolean
+          previous_system_id?: number | null
+          started_at: string
+          system_id: number
+        }
+        Update: {
+          created_at?: string
+          cycle_id?: number
+          ended_at?: string | null
+          id?: never
+          is_current?: boolean
+          previous_system_id?: number | null
+          started_at?: string
+          system_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pcs_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "production_cycle"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "pcs_previous_system_id_fkey"
+            columns: ["previous_system_id"]
+            isOneToOne: false
+            referencedRelation: "system"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pcs_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "system"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system: {
         Row: {
           cage_status: Database["public"]["Enums"]["cage_status_enum"] | null

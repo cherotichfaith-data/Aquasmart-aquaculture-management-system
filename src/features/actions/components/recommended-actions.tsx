@@ -85,10 +85,10 @@ export default function RecommendedActions({
 
   if (!boundsReady || loading) {
     return (
-      <div className="rounded-[1.2rem] border border-border/80 bg-card">
+      <div className="rounded-2xl border border-border/80 bg-card">
         {showHeader ? (
           <div className="flex items-center justify-between border-b border-border/80 px-5 py-4">
-            <h2 className="text-[1.15rem] font-semibold text-primary">Recommended Actions</h2>
+            <h2 className="text-lg font-semibold text-primary">Recommended Actions</h2>
             <Link href={actionsHref} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
               <span>View All</span>
               <ArrowRight className="h-4 w-4" />
@@ -105,11 +105,11 @@ export default function RecommendedActions({
   }
 
   return (
-    <div className="rounded-[1.2rem] border border-border/80 bg-card">
+    <div className="rounded-2xl border border-border/80 bg-card">
       {showHeader ? (
         <div className="flex items-center justify-between border-b border-border/80 px-5 py-4">
           <div>
-            <h2 className="text-[1.15rem] font-semibold text-primary">Recommended Actions</h2>
+            <h2 className="text-lg font-semibold text-primary">Recommended Actions</h2>
             <DataUpdatedAt updatedAt={actionsQuery.dataUpdatedAt} />
           </div>
           <div className="flex items-center gap-3">

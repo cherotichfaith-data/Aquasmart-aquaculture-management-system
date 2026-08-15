@@ -361,7 +361,7 @@ function AlertThresholdsSection({
                 className={inputClassName}
               />
             </div>
-            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-1.5 flex items-start gap-1.5 text-tag leading-relaxed text-muted-foreground">
               <Info size={11} className="mt-0.5 shrink-0 opacity-60" />
               {t.hint}
             </p>
@@ -607,7 +607,7 @@ export default function SettingsPage({
           </div>
         ) : null}
         {missingFarmAssignment ? (
-          <div className="rounded-[1.5rem] border border-warning/30 bg-warning/10 p-6">
+          <div className="rounded-3xl border border-warning/30 bg-warning/10 p-6">
             <div className="flex items-start gap-3">
               <AlertCircle className="mt-0.5 text-warning" size={20} />
               <div className="space-y-4">

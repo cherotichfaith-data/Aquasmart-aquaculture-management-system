@@ -6,11 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const REPORT_ACTION_BUTTON_CLASS =
   "min-h-10 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/35"
 export const REPORT_SURFACE_CARD_CLASS =
-  "rounded-[1.35rem] border-border/70 shadow-none hover:-translate-y-0"
+  "rounded-3xl border-border/70 shadow-none hover:-translate-y-0"
 export const REPORT_CHART_SHELL_CLASS =
-  "h-full overflow-hidden rounded-[1rem] border border-border/60 bg-background p-3 md:p-4"
+  "h-full overflow-hidden rounded-2xl border border-border/60 bg-background p-3 md:p-4"
 export const REPORT_TABLE_SHELL_CLASS =
-  "overflow-x-auto rounded-[1rem] border border-border/60 bg-background"
+  "overflow-x-auto rounded-2xl border border-border/60 bg-background"
 
 export function ReportSectionHeader({
   title,
@@ -40,7 +40,7 @@ export function ReportRecordsHiddenState({
   label: string
 }) {
   return (
-    <div className="rounded-[1rem] bg-muted/20 p-4 text-sm text-muted-foreground">
+    <div className="rounded-2xl bg-muted/20 p-4 text-sm text-muted-foreground">
       Detailed records hidden. Click <span className="font-medium text-foreground">View details</span> to show {label}.
     </div>
   )
@@ -72,7 +72,7 @@ export function ReportMetricCard({
   meta?: ReactNode
 }) {
   return (
-    <Card className="kpi-card min-h-[156px] rounded-[1.2rem] overflow-hidden hover:-translate-y-0">
+    <Card className="kpi-card min-h-[156px] rounded-2xl overflow-hidden hover:-translate-y-0">
       <CardHeader className="kpi-card-header pb-1">
         <CardTitle className="kpi-card-title">{title}</CardTitle>
       </CardHeader>

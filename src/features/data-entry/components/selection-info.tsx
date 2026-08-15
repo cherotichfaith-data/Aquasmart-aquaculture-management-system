@@ -1,13 +1,13 @@
 "use client"
 
 import { useMemo } from "react"
-import type { Database } from "@/lib/types/database"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { useFingerlingSupplierOptions } from "@/lib/hooks/use-options"
 import { formatGrowthStage } from "@/lib/stage-filter"
 import { parseNumericId } from "./form-utils"
 
-type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number] & {
+type BatchOption = BatchOptionItem & {
   supplier_name?: string | null
 }
 

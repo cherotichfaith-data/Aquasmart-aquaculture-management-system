@@ -298,7 +298,7 @@ export function LatestEntryGuard({
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {latestEntry.details.map((detail) => (
               <div key={`${latestEntry.key}-${detail.label}`} className="rounded-md border border-border/70 bg-background/70 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{detail.label}</div>
+                <div className="text-tag uppercase tracking-wide text-muted-foreground">{detail.label}</div>
                 <div className="text-sm text-foreground">{detail.value}</div>
               </div>
             ))}

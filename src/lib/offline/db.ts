@@ -142,7 +142,7 @@ export type OfflineTableName =
  * data-entry forms keep working after days offline, instead of showing whatever the
  * last server-rendered payload happened to contain. Distinct from the offline write
  * queue above -- this table is never synced, just refreshed opportunistically whenever
- * live data comes through. See src/lib/offline/reference-cache.ts.
+ * live data comes through.
  */
 export type ReferenceCacheKind = "systems" | "batches" | "feeds"
 

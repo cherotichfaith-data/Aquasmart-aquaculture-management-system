@@ -230,7 +230,7 @@ export default function UsersPageClient({
   return (
     <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName} showHeaderToolbar={false}>
       <div className="mx-auto max-w-6xl space-y-8 px-1 py-6">
-        <div className="rounded-[1.75rem] border border-border/70 bg-card px-6 py-6 shadow-sm sm:px-8">
+        <div className="rounded-4xl border border-border/70 bg-card px-6 py-6 shadow-sm sm:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
@@ -270,7 +270,7 @@ export default function UsersPageClient({
         ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
-          <section className="rounded-[1.5rem] border border-border/70 bg-card p-6 shadow-sm">
+          <section className="rounded-3xl border border-border/70 bg-card p-6 shadow-sm">
             <div className="mb-5 flex items-start gap-3">
               <div className="rounded-2xl bg-primary/10 p-3 text-primary">
                 <UserPlus className="h-5 w-5" />
@@ -328,7 +328,7 @@ export default function UsersPageClient({
             </div>
           </section>
 
-          <section className="rounded-[1.5rem] border border-border/70 bg-card p-6 shadow-sm">
+          <section className="rounded-3xl border border-border/70 bg-card p-6 shadow-sm">
             <div className="mb-5 flex items-start gap-3">
               <div className="rounded-2xl bg-primary/10 p-3 text-primary">
                 <ShieldCheck className="h-5 w-5" />
@@ -360,7 +360,7 @@ export default function UsersPageClient({
           </section>
         </div>
 
-        <section className="rounded-[1.5rem] border border-border/70 bg-card p-6 shadow-sm">
+        <section className="rounded-3xl border border-border/70 bg-card p-6 shadow-sm">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold tracking-tight text-foreground">Current Members</h2>
@@ -459,7 +459,7 @@ export default function UsersPageClient({
           )}
         </section>
 
-        <section className="rounded-[1.5rem] border border-border/70 bg-card p-6 shadow-sm">
+        <section className="rounded-3xl border border-border/70 bg-card p-6 shadow-sm">
           <div className="mb-5">
             <h2 className="text-xl font-semibold tracking-tight text-foreground">Pending Invites</h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">

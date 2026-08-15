@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { DataEntryInterface } from "@/features/data-entry/components/data-entry-interface"
 import { SystemForm } from "@/features/data-entry/components/system-form"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
 import type { getDataEntryPrefetch } from "@/features/data-entry/queries.server"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
@@ -46,7 +47,7 @@ export default function DataEntryPageClient({
   initialFarmName?: string | null
   initialFarmRole?: Database["public"]["Tables"]["farm_user"]["Row"]["role"] | null
   initialSystems: SystemOption[]
-  initialBatches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+  initialBatches: BatchOptionItem[]
   initialFeeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
   initialRecentEntries: Awaited<ReturnType<typeof getDataEntryPrefetch>>["recentEntries"]
 }) {

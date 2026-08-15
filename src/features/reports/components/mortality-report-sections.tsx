@@ -182,7 +182,7 @@ export function MortalityCauseSections({ causeBreakdown }: { causeBreakdown: Arr
           ) : (
             <div className="space-y-2">
               {causeBreakdown.map((row) => (
-                <div key={row.cause} className="flex justify-between rounded-[1rem] border border-border/60 bg-background px-3 py-2 text-sm">
+                <div key={row.cause} className="flex justify-between rounded-2xl border border-border/60 bg-background px-3 py-2 text-sm">
                   <span>{row.label}</span><span className="font-medium">{row.count.toLocaleString()}</span>
                 </div>
               ))}

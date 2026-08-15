@@ -51,7 +51,7 @@ export default function ReportsPage({
     <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName}>
       <div className="page-shell">
         <Tabs value={activeTab} className="w-full">
-          <div className="rounded-[1.35rem] bg-muted/20 p-1.5">
+          <div className="rounded-3xl bg-muted/20 p-1.5">
             <TabsList className="grid w-full grid-cols-1 gap-1 !border-0 bg-transparent p-0 !shadow-none backdrop-blur-0 sm:grid-cols-2 xl:grid-cols-5">
               <TabsTrigger
                 value="performance"

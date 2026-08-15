@@ -221,7 +221,7 @@ export default function ProductionChart({
               </span>
             ) : null}
           </div>
-          {periodLabel ? <span className="text-xs text-muted-foreground md:text-[13px]">{periodLabel}</span> : null}
+          {periodLabel ? <span className="text-xs text-muted-foreground md:text-dense">{periodLabel}</span> : null}
         </div>
       </CardHeader>
       <CardContent className="px-6 pb-6 pt-4">
@@ -356,7 +356,7 @@ export default function ProductionChart({
               </svg>
             </div>
             {hasCompare && compareMeta ? (
-              <div className="flex flex-wrap justify-center gap-6 text-[13px] font-medium text-muted-foreground">
+              <div className="flex flex-wrap justify-center gap-6 text-dense font-medium text-muted-foreground">
                 <span className="inline-flex items-center gap-2">
                   <span className="h-[3px] w-[18px] rounded-full" style={{ background: "var(--production-chart-primary)" }} />
                   {meta.label} (left axis)

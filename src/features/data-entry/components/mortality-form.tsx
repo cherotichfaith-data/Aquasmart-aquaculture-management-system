@@ -18,11 +18,11 @@ import { Input } from "@/components/app-ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { useRecordMortality } from "@/features/data-entry/hooks"
 import { useMortalityData } from "@/features/reports/hooks"
-import type { Database } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { MORTALITY_CAUSES, type MortalityCause } from "@/lib/mortality"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
   LatestEntryGuard,
   pickLatestEntryByRecordDate,
@@ -53,7 +53,7 @@ const formSchema = z.object({
 interface MortalityFormProps {
   farmId: string | null
   systems: SystemOption[]
-  batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+  batches: BatchOptionItem[]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
   onSystemChange?: (systemId: number | null) => void
@@ -96,10 +96,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
     onSystemChange?.(hasValidSystemId ? resolvedSystemId : null)
   }, [hasValidSystemId, onSystemChange, resolvedSystemId])
 
-  // A system can only host one active batch/production cycle at a time, so the
-  // batch is derived from the selected cage instead of asking the user to pick
-  // one manually (see api_fingerling_batch_options_rpc's system_id column).
-  const resolvedBatchId = batches.find((batch) => batch.system_id === resolvedSystemId)?.id ?? null
+  const resolvedBatchId = resolveBatchIdForSystem(batches, resolvedSystemId)
 
   const latestEntryQuery = useMortalityData({
     farmId,

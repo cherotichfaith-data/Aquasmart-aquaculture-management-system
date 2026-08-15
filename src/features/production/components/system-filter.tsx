@@ -34,7 +34,8 @@ export default function ProductionSystemFilter({
     params.set("system", value)
     params.delete("cage")
     const navigate = () => router.replace(`${pathname}?${params.toString()}`)
-    startTransition ? startTransition(navigate) : navigate()
+    if (startTransition) startTransition(navigate)
+    else navigate()
   }
 
   const options = [...systems]

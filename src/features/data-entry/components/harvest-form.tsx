@@ -24,9 +24,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import { useRecordHarvest } from "@/lib/hooks/use-harvest"
 import { logSbError } from "@/lib/supabase/log"
-import { Constants, type Database } from "@/lib/types/database"
+import { Constants } from "@/lib/types/database"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
+import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
     parseNumericId,
     parseRequiredNumericId,
@@ -63,7 +64,7 @@ function countCycleDays(startDate?: string | null, endDate?: string | null) {
 interface HarvestFormProps {
     farmId: string | null
     systems: SystemOption[]
-    batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+    batches: BatchOptionItem[]
     defaultSystemId?: number | null
     defaultBatchId?: number | null
     onSystemChange?: (systemId: number | null) => void
@@ -198,11 +199,8 @@ export function HarvestForm({
         onSystemChange?.(resolvedSystemId ?? null)
     }, [onSystemChange, resolvedSystemId])
 
-    // A system can only host one active batch/production cycle at a time, so the
-    // batch is derived from the selected cage instead of asking the user to pick
-    // one manually (see api_fingerling_batch_options_rpc's system_id column).
     const resolvedBatchId = useMemo(
-        () => batches.find((batch) => batch.system_id === resolvedSystemId)?.id ?? null,
+        () => resolveBatchIdForSystem(batches, resolvedSystemId),
         [batches, resolvedSystemId],
     )
     const latestEntryQuery = useHarvests({

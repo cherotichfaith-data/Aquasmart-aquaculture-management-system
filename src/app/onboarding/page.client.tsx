@@ -179,7 +179,7 @@ export default function OnboardingPageClient() {
       description="Use onboarding as the single place to confirm your profile, accept assigned access, or create a new farm workspace."
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="rounded-[1.75rem] border border-border/70 bg-card/95 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+        <section className="rounded-4xl border border-border/70 bg-card/95 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
           <div className="space-y-2">
             <h2 className="text-xl font-semibold tracking-tight text-foreground">Your account details</h2>
             <p className="text-sm leading-6 text-muted-foreground">
@@ -256,7 +256,7 @@ export default function OnboardingPageClient() {
         </section>
 
         <aside className="space-y-4">
-          <div className="rounded-[1.75rem] border border-border/70 bg-card/92 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
+          <div className="rounded-4xl border border-border/70 bg-card/92 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
             <h3 className="text-base font-semibold text-foreground">Your onboarding state</h3>
             <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
               <div className="flex items-start gap-3">

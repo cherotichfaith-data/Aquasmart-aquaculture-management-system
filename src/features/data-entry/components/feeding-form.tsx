@@ -23,6 +23,7 @@ import { FEEDING_RESPONSE_LEVELS, type FeedingResponseLevel } from "@/lib/feedin
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
   findUnitForSystem,
   getSystemUnits,
@@ -97,7 +98,7 @@ interface FeedingFormProps {
   farmId: string | null
   systems: SystemOption[]
   feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
-  batches: Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number][]
+  batches: BatchOptionItem[]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
   onSystemChange?: (systemId: number | null) => void
@@ -164,11 +165,8 @@ export function FeedingForm({
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
   const feedOptions = feeds
-  // A system can only host one active batch/production cycle at a time, so the
-  // batch is derived from the selected cage instead of asking the user to pick
-  // one manually (see api_fingerling_batch_options_rpc's system_id column).
   const resolvedBatchId = useMemo(
-    () => batches.find((batch) => batch.system_id === selectedSystemId)?.id ?? null,
+    () => resolveBatchIdForSystem(batches, selectedSystemId),
     [batches, selectedSystemId],
   )
 
@@ -285,7 +283,6 @@ export function FeedingForm({
     <div>
       <div className="data-entry-form-intro">
         <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
-        <p className="text-sm text-muted-foreground">Fast cage-first feeding entry for daily farm operations.</p>
       </div>
 
       <div className="data-entry-status">

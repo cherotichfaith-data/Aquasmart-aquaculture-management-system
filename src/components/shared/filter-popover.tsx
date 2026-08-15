@@ -85,7 +85,7 @@ export function FilterPopover({
       >
         <span className="min-w-0 flex-1">
           {showLabel ? (
-            <span className="block truncate text-[11px] uppercase leading-tight tracking-[0.08em] text-muted-foreground">
+            <span className="block truncate text-tag uppercase leading-tight tracking-[0.08em] text-muted-foreground">
               {resolvedLabel}
             </span>
           ) : null}

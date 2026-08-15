@@ -2,27 +2,9 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
-type ButtonVariant =
-  | "default"
-  | "destructive"
-  | "outline"
-  | "secondary"
-  | "ghost"
-  | "link"
-  | "contained"
-  | "outlined"
-  | "text"
+type ButtonVariant = "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
 
-type ButtonSize =
-  | "default"
-  | "sm"
-  | "lg"
-  | "icon"
-  | "icon-sm"
-  | "icon-lg"
-  | "small"
-  | "medium"
-  | "large"
+type ButtonSize = "default" | "sm" | "lg" | "icon" | "icon-sm" | "icon-lg"
 
 const buttonVariants = ({
   variant = "default",
@@ -35,15 +17,15 @@ const buttonVariants = ({
 }) =>
   cn(
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-    (variant === "default" || variant === "contained") && "bg-primary text-primary-foreground hover:bg-primary/90",
+    variant === "default" && "bg-primary text-primary-foreground hover:bg-primary/90",
     variant === "destructive" && "bg-destructive text-destructive-foreground hover:bg-destructive/90",
     variant === "secondary" && "bg-secondary text-secondary-foreground hover:bg-secondary/90",
-    (variant === "outline" || variant === "outlined") && "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
-    (variant === "ghost" || variant === "text") && "text-foreground hover:bg-accent hover:text-accent-foreground",
+    variant === "outline" && "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+    variant === "ghost" && "text-foreground hover:bg-accent hover:text-accent-foreground",
     variant === "link" && "h-auto px-0 py-0 text-primary underline-offset-4 hover:underline",
-    (size === "default" || size === "medium") && "h-10 px-4 py-2",
-    (size === "sm" || size === "small") && "h-9 px-3",
-    (size === "lg" || size === "large") && "h-11 px-8",
+    size === "default" && "h-10 px-4 py-2",
+    size === "sm" && "h-9 px-3",
+    size === "lg" && "h-11 px-8",
     size === "icon" && "size-9",
     size === "icon-sm" && "size-8",
     size === "icon-lg" && "size-10",

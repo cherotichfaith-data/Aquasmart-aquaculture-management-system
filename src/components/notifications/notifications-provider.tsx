@@ -372,8 +372,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 kind: "water_quality",
                 severity: "critical",
                 read: false,
-                href: `${toDashboardPath("/water-quality")}?system=${row.system_id}`,
-                actionLabel: "View water quality",
+                href: `${toDashboardPath("/systems")}?system=${row.system_id}`,
+                actionLabel: "View cage",
               })
             }
           }
@@ -392,8 +392,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 kind: "water_quality",
                 severity: "critical",
                 read: false,
-                href: `${toDashboardPath("/water-quality")}?system=${row.system_id}`,
-                actionLabel: "View water quality",
+                href: `${toDashboardPath("/systems")}?system=${row.system_id}`,
+                actionLabel: "View cage",
               })
             }
           }

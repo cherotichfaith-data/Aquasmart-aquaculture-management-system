@@ -22,8 +22,6 @@ import {
   getTransferData,
 } from "./queries.client"
 
-const DISABLE_AUTO_REFETCH_IN_DEV = process.env.NODE_ENV !== "production"
-
 function reportsQueryOptions<TResult>(params: {
   queryKey: readonly unknown[]
   queryFn: (context: { signal: AbortSignal }) => Promise<TResult>

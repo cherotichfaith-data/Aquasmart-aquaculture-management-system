@@ -78,6 +78,67 @@ type DailySystemFactRow = {
   feeding_rate: number | null
 }
 
+function buildProductionSummaryDayKey(row: Pick<ProductionSummaryRpcRow, "cycle_id" | "date" | "system_id">) {
+  return `${row.date}|${row.system_id ?? "system"}|${row.cycle_id ?? "cycle"}`
+}
+
+function getProductionSummaryRowScore(row: ProductionSummaryRpcRow) {
+  const numericValues = [
+    row.days_in_period,
+    row.fish_count_period_start,
+    row.number_of_fish_inventory,
+    row.average_body_weight,
+    row.total_biomass,
+    row.mortality_count_period,
+    row.total_feed_amount_period,
+    row.number_of_fish_transfer_in,
+    row.number_of_fish_transfer_out,
+    row.number_of_fish_harvested,
+    row.total_weight_harvested,
+    row.biomass_increase_period,
+    row.feeding_rate_on_date,
+    row.efcr_period,
+    row.sgr,
+    row.agr,
+    row.survival_rate_pct,
+    row.total_feed_amount_aggregated,
+    row.cumulative_mortality,
+    row.biomass_increase_aggregated,
+    row.number_of_fish_transfer_in_aggregated,
+    row.number_of_fish_transfer_out_aggregated,
+    row.number_of_fish_harvested_aggregated,
+    row.total_weight_harvested_aggregated,
+    row.efcr_aggregated,
+  ]
+
+  return numericValues.reduce((score, value) => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return score
+    if (value === 0) return score + 0.25
+    return score + 1
+  }, 0)
+}
+
+function dedupeProductionSummaryRows(rows: ProductionSummaryRpcRow[]) {
+  const rowsByDayKey = new Map<string, ProductionSummaryRpcRow>()
+
+  for (const row of rows) {
+    const key = buildProductionSummaryDayKey(row)
+    const existing = rowsByDayKey.get(key)
+    if (!existing) {
+      rowsByDayKey.set(key, row)
+      continue
+    }
+
+    const existingScore = getProductionSummaryRowScore(existing)
+    const nextScore = getProductionSummaryRowScore(row)
+    if (nextScore > existingScore) {
+      rowsByDayKey.set(key, row)
+    }
+  }
+
+  return Array.from(rowsByDayKey.values())
+}
+
 type AnalyticsQueryResult<T> = PromiseLike<{ data: T[] | null; error: unknown }> & {
   order: (
     column: string,
@@ -286,7 +347,6 @@ async function loadProductionPageInitialData(
           dateTo,
         }),
   ])
-
   const enrichment =
     scopedSystemIds.length === 0
       ? { volumeRows: [], growthTrendRows: [], feedingRecords: [] }
@@ -534,6 +594,8 @@ async function listProductionSummaryRowsDirectServer(
         efcr_aggregated: row.efcr_aggregated,
       } satisfies ProductionSummaryRpcRow
     })
+
+  rows = dedupeProductionSummaryRows(rows)
 
   if (params.limit) rows = rows.slice(0, params.limit)
   return rows

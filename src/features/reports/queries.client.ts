@@ -24,13 +24,10 @@ import type {
 } from "./types"
 
 type FeedTypeRow = FeedingRecordWithType["feed_type"] extends infer T ? T : never
-type FeedInventoryRow = Tables<"feed_inventory">
 type FeedingRecordRow = Tables<"feeding_record">
 type FishHarvestRow = Tables<"fish_harvest">
 type FishSamplingWeightRow = Tables<"fish_sampling_weight">
 type FishMortalityRow = Tables<"fish_mortality">
-type SystemRow = Tables<"system">
-type WaterQualityMeasurementRow = Tables<"water_quality_measurement">
 type FishTransferRow = Tables<"fish_transfer">
 type FishStockingRow = Tables<"fish_stocking">
 type FeedTypeProjection = {
@@ -66,25 +63,6 @@ type FeedingActivityRow = Pick<
   FeedingRecordRow,
   "id" | "created_at" | "date" | "batch_id" | "feeding_amount" | "feeding_response" | "system_id"
 >
-type RecentRowsTable =
-  | "fish_mortality"
-  | "feeding_record"
-  | "fish_sampling_weight"
-  | "fish_transfer"
-  | "fish_harvest"
-  | "water_quality_measurement"
-  | "feed_inventory"
-  | "fish_stocking"
-  | "system"
-type RecentRowsQuery = {
-  eq(column: string, value: string): RecentRowsQuery
-  in(column: string, values: number[]): RecentRowsQuery
-  or(filter: string): RecentRowsQuery
-  abortSignal(signal: AbortSignal): RecentRowsQuery
-  order(column: string, options: { ascending: boolean }): RecentRowsQuery
-  limit(count: number): PromiseLike<{ data: unknown[] | null; error: unknown }>
-}
-
 export type {
   ChangeLogRow,
   FeedingBreakdownRow,
@@ -826,64 +804,6 @@ export async function getRecentActivities(params?: {
       }),
     ),
   )
-}
-
-const emptyRecentEntries = () => ({
-  mortality: toQuerySuccess<FishMortalityRow>([]),
-  feeding: toQuerySuccess<FeedingRecordRow>([]),
-  sampling: toQuerySuccess<FishSamplingWeightRow>([]),
-  transfer: toQuerySuccess<FishTransferRow>([]),
-  harvest: toQuerySuccess<FishHarvestRow>([]),
-  water_quality: toQuerySuccess<WaterQualityMeasurementRow>([]),
-  feed_inventory: toQuerySuccess<FeedInventoryRow>([]),
-  stocking: toQuerySuccess<FishStockingRow>([]),
-  systems: toQuerySuccess<SystemRow>([]),
-})
-
-async function getRecentRows<T>(
-  supabase: Exclude<Awaited<ReturnType<typeof getReportsClient>>, { error: QueryResult<never> }>["supabase"],
-  table: RecentRowsTable,
-  orderColumn: string,
-  params: {
-    farmId: string
-    farmSystemIds: number[]
-    signal?: AbortSignal
-    limit?: number
-  },
-): Promise<T[]> {
-  const limit = params.limit ?? 5
-  let query = supabase.from(table).select("*") as unknown as RecentRowsQuery
-
-  switch (table) {
-    case "fish_mortality":
-    case "feed_inventory":
-    case "system":
-      query = query.eq("farm_id", params.farmId)
-      break
-    case "fish_transfer":
-      if (params.farmSystemIds.length === 0) return []
-      query = query.or(
-        `origin_system_id.in.(${params.farmSystemIds.join(",")}),target_system_id.in.(${params.farmSystemIds.join(",")})`,
-      )
-      break
-    default:
-      if (params.farmSystemIds.length === 0) return []
-      query = query.in("system_id", params.farmSystemIds)
-      break
-  }
-
-  if (params.signal) query = query.abortSignal(params.signal)
-  const orderedQuery =
-    orderColumn === "created_at"
-      ? query.order(orderColumn, { ascending: false })
-      : query.order(orderColumn, { ascending: false }).order("created_at", { ascending: false })
-  const { data, error } = await orderedQuery.limit(limit)
-  if (error) {
-    if (params.signal?.aborted || isQuietError(error)) return []
-    throw error
-  }
-
-  return (data ?? []) as T[]
 }
 
 export async function getBatchSystemIds(params: {
