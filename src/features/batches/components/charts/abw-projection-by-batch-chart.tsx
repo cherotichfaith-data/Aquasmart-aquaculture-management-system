@@ -152,7 +152,7 @@ export default function AbwProjectionByBatchChart({
         <CardTitle>ABW Projection — Next Sampling (estimated)</CardTitle>
       </CardHeader>
       <CardContent className="pt-2">
-        <div className="h-[260px]">
+        <div className="h-[220px] sm:h-[260px]">
           <Line
             data={data}
             options={withRotatedDateAxis(

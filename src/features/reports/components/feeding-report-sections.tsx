@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { ChartData, ChartOptions, TooltipItem } from "chart.js"
 import { Bar, Line } from "@/components/charts/chartjs"
 import {
@@ -11,7 +11,10 @@ import {
 } from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { LazyRender } from "@/components/shared/lazy-render"
+import { MetricGrid } from "@/components/shared/metric-grid"
+import { ResponsiveRecordList } from "@/components/shared/responsive-record-list"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import { cn } from "@/lib/utils"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
 import { formatFeedingResponseLevel } from "@/lib/feeding-response"
 import {
@@ -27,6 +30,39 @@ type CageSeries = {
   key: string
   label: string
   color: string
+}
+
+// A per-cage legend grows with farm size -- uncapped, it can wrap several
+// lines inside the chart's fixed-height container and crowd out the plot
+// itself. Cap it, and let the farmer opt back into the full legend.
+const DEFAULT_CAGE_SERIES_LIMIT = 8
+
+function useCappedCageSeries(cageSeries: CageSeries[], limit = DEFAULT_CAGE_SERIES_LIMIT) {
+  const [showAll, setShowAll] = useState(false)
+  const overflowCount = Math.max(cageSeries.length - limit, 0)
+  const visibleSeries = showAll || overflowCount === 0 ? cageSeries : cageSeries.slice(0, limit)
+  return { visibleSeries, overflowCount, showAll, setShowAll }
+}
+
+function CageSeriesOverflowToggle({
+  overflowCount,
+  showAll,
+  onToggle,
+}: {
+  overflowCount: number
+  showAll: boolean
+  onToggle: () => void
+}) {
+  if (overflowCount === 0) return null
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="mt-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground hover:underline"
+    >
+      {showAll ? "Show fewer cages" : `+${overflowCount} more ${overflowCount === 1 ? "cage" : "cages"} — show all`}
+    </button>
+  )
 }
 
 type FeedingRecordRow = {
@@ -86,6 +122,7 @@ export function FeedByCageSection({
   cageSeries: CageSeries[]
 }) {
   const palette = getChartPalette()
+  const { visibleSeries, overflowCount, showAll, setShowAll } = useCappedCageSeries(cageSeries)
   const dateDomain = useMemo(() => buildDailyDateDomain(rows.map((row) => String(row.date ?? ""))), [rows])
   const rowsByDate = useMemo(
     () => new Map(rows.map((row) => [String(row.date ?? ""), row])),
@@ -95,7 +132,7 @@ export function FeedByCageSection({
   const data = useMemo<ChartData<"bar">>(
     () => ({
       labels: dateDomain,
-      datasets: cageSeries.map((series) => ({
+      datasets: visibleSeries.map((series) => ({
         label: series.label,
         data: dateDomain.map((date) => Number(rowsByDate.get(date)?.[series.key] ?? 0)),
         backgroundColor: series.color,
@@ -104,7 +141,7 @@ export function FeedByCageSection({
         stack: "feed",
       })),
     }),
-    [cageSeries, dateDomain, rowsByDate],
+    [visibleSeries, dateDomain, rowsByDate],
   )
   const options = useMemo<ChartOptions<"bar">>(
     () =>
@@ -145,11 +182,14 @@ export function FeedByCageSection({
         ) : rows.length === 0 ? (
           <EmptyChartState label="No feeding rows found for the selected period." />
         ) : (
-          <div className={REPORT_CHART_SHELL_CLASS}>
-            <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <Bar data={data} options={options} />
-            </LazyRender>
-          </div>
+          <>
+            <div className={REPORT_CHART_SHELL_CLASS}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <Bar data={data} options={options} />
+              </LazyRender>
+            </div>
+            <CageSeriesOverflowToggle overflowCount={overflowCount} showAll={showAll} onToggle={() => setShowAll((prev) => !prev)} />
+          </>
         )}
       </CardContent>
     </Card>
@@ -166,6 +206,7 @@ export function EfcrByCageSection({
   cageSeries: CageSeries[]
 }) {
   const palette = getChartPalette()
+  const { visibleSeries, overflowCount, showAll, setShowAll } = useCappedCageSeries(cageSeries)
   const dateDomain = useMemo(() => buildDailyDateDomain(rows.map((row) => String(row.date ?? ""))), [rows])
   const rowsByDate = useMemo(
     () => new Map(rows.map((row) => [String(row.date ?? ""), row])),
@@ -175,7 +216,7 @@ export function EfcrByCageSection({
   const data = useMemo<ChartData<"line">>(
     () => ({
       labels: dateDomain,
-      datasets: cageSeries.map((series) => ({
+      datasets: visibleSeries.map((series) => ({
         label: series.label,
         data: dateDomain.map((date) => {
           const value = rowsByDate.get(date)?.[series.key]
@@ -189,7 +230,7 @@ export function EfcrByCageSection({
         spanGaps: true,
       })),
     }),
-    [cageSeries, dateDomain, rowsByDate],
+    [visibleSeries, dateDomain, rowsByDate],
   )
   const options = useMemo<ChartOptions<"line">>(
     () =>
@@ -228,11 +269,14 @@ export function EfcrByCageSection({
         ) : rows.length === 0 ? (
           <EmptyChartState label="No eFCR rows found for the selected period." />
         ) : (
-          <div className={REPORT_CHART_SHELL_CLASS}>
-            <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
-              <Line data={data} options={options} />
-            </LazyRender>
-          </div>
+          <>
+            <div className={REPORT_CHART_SHELL_CLASS}>
+              <LazyRender className="h-full" fallback={<div className="h-full w-full" />}>
+                <Line data={data} options={options} />
+              </LazyRender>
+            </div>
+            <CageSeriesOverflowToggle overflowCount={overflowCount} showAll={showAll} onToggle={() => setShowAll((prev) => !prev)} />
+          </>
         )}
       </CardContent>
     </Card>
@@ -248,7 +292,28 @@ export function FeedingBreakdownSection({
     <Card className={REPORT_SURFACE_CARD_CLASS}>
       <CardHeader><CardTitle>Per-Cage Feed Breakdown</CardTitle><CardDescription>Total feed, entry count, and weighted protein by cage in the selected period.</CardDescription></CardHeader>
       <CardContent>
-        <div className={REPORT_TABLE_SHELL_CLASS}>
+        <ResponsiveRecordList
+          className="md:hidden"
+          data={rows}
+          rowKey={(row) => row.systemId}
+          emptyMessage="No cage-level feeding rows found"
+          renderCard={(row) => (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold leading-5 text-foreground">{row.systemLabel}</p>
+                <span className="text-xs text-muted-foreground">{row.lastDate ?? "-"}</span>
+              </div>
+              <MetricGrid
+                items={[
+                  { label: "Total Feed (kg)", value: formatNumberValue(row.totalKg, { decimals: 2, minimumDecimals: 2, fallback: "N/A" }) },
+                  { label: "Entries", value: row.entries },
+                  { label: "Avg Protein (%)", value: formatNumberValue(row.avgProtein, { decimals: 2, minimumDecimals: 2, fallback: "N/A" }) },
+                ]}
+              />
+            </>
+          )}
+        />
+        <div className={cn(REPORT_TABLE_SHELL_CLASS, "hidden md:block")}>
           <table className="dense-table">
             <thead><tr className="border-b border-border"><th>Cage</th><th>Total Feed (kg)</th><th>Entries</th><th>Avg Protein (%)</th><th>Last Feed Date</th></tr></thead>
             <tbody>
@@ -351,24 +416,49 @@ export function FeedingRecordsSection({
           />
         </div>
         {showFeedingRecords ? (
-          <div className={REPORT_TABLE_SHELL_CLASS}>
-            <table className="dense-table">
-              <thead><tr className="border-b border-border"><th>Date</th><th>System</th><th>Batch</th><th>Feed Type</th><th>Amount (kg)</th><th>Response</th></tr></thead>
-              <tbody>
-                {tableLoading ? (
-                  <tr><td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">Loading...</td></tr>
-                ) : tableRecords.length > 0 ? (
-                  tableRecords.map((row) => (
-                    <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
-                      <td className="font-medium">{row.date}</td><td>{row.system_id}</td><td>{row.batch_id ?? "-"}</td><td>{row.feed_type?.feed_line}</td><td>{row.feeding_amount}</td><td>{formatFeedingResponseLevel(row.feeding_response)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr><td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">No feeding records found</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <ResponsiveRecordList
+              className="md:hidden"
+              data={tableRecords}
+              rowKey={(row) => row.id}
+              loading={tableLoading}
+              emptyMessage="No feeding records found"
+              renderCard={(row) => (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold leading-5 text-foreground">{row.date}</p>
+                    <span className="text-xs text-muted-foreground">{row.feed_type?.feed_line}</span>
+                  </div>
+                  <MetricGrid
+                    items={[
+                      { label: "System", value: row.system_id ?? "-" },
+                      { label: "Batch", value: row.batch_id ?? "-" },
+                      { label: "Amount (kg)", value: row.feeding_amount ?? "-" },
+                      { label: "Response", value: formatFeedingResponseLevel(row.feeding_response) },
+                    ]}
+                  />
+                </>
+              )}
+            />
+            <div className={cn(REPORT_TABLE_SHELL_CLASS, "hidden md:block")}>
+              <table className="dense-table">
+                <thead><tr className="border-b border-border"><th>Date</th><th>System</th><th>Batch</th><th>Feed Type</th><th>Amount (kg)</th><th>Response</th></tr></thead>
+                <tbody>
+                  {tableLoading ? (
+                    <tr><td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">Loading...</td></tr>
+                  ) : tableRecords.length > 0 ? (
+                    tableRecords.map((row) => (
+                      <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
+                        <td className="font-medium">{row.date}</td><td>{row.system_id}</td><td>{row.batch_id ?? "-"}</td><td>{row.feed_type?.feed_line}</td><td>{row.feeding_amount}</td><td>{formatFeedingResponseLevel(row.feeding_response)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">No feeding records found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <ReportRecordsHiddenState label={`up to ${tableLimitValue} rows`} />
         )}

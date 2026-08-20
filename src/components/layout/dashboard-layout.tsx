@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils"
 import { SyncStatusBar } from "@/components/offline/sync-status-bar"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
-import { canAccessDataEntry, DATA_ENTRY_PATH, toDashboardPath } from "@/lib/app-entry"
+import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
 import Header from "./header"
+import MobileQuickEntry from "./mobile-quick-entry"
 import Sidebar, { DASHBOARD_SIDEBAR_COLLAPSED_WIDTH, DASHBOARD_SIDEBAR_WIDTH } from "./sidebar"
 import type { TimeBounds } from "@/lib/time-period"
 import type { SystemOption } from "@/lib/system-options"
@@ -86,6 +87,10 @@ export default function DashboardLayout({
   const farmRoleQuery = useActiveFarmRole(headerDataOverrides?.role ? null : farmId)
   const farmRole = (headerDataOverrides?.role ?? farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const allowDataEntry = canAccessDataEntry(farmRole)
+  // Data Entry already opens straight into this exact picker -- a floating
+  // trigger on top of it would just duplicate what's already on screen.
+  const isDataEntryRoute = stripDashboardPath(pathname) === DATA_ENTRY_PATH
+  const showMobileQuickEntry = allowDataEntry && !isDataEntryRoute
 
   useEffect(() => {
     const applyResponsiveSidebarState = () => {
@@ -209,6 +214,7 @@ export default function DashboardLayout({
           <div className="mx-auto w-full max-w-[1640px]">{children}</div>
         </main>
       </div>
+      {showMobileQuickEntry ? <MobileQuickEntry /> : null}
       <Dialog
         open={commandOpen}
         onClose={() => setCommandOpen(false)}

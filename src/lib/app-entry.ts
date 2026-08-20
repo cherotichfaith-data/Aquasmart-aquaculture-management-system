@@ -126,6 +126,26 @@ export function canAccessDataEntry(role: AquaSmartRole) {
   )
 }
 
+const CONTEXT_CARRY_KEYS = ["farmId", "system", "cage", "date", "batch", "stage"] as const
+
+/**
+ * Appends the current farm/system/cage/date/batch/stage query params (when
+ * present and not already set on `href`) onto a navigation target. Without
+ * this, jumping to another section -- or into quick data entry -- drops the
+ * user's working context and falls back to defaults (e.g. the lowest
+ * system ID) instead of the cage they were just looking at.
+ */
+export function withCurrentSearchContext(href: string, searchParams: Pick<URLSearchParams, "get">) {
+  const [basePath, query = ""] = href.split("?", 2)
+  const nextParams = new URLSearchParams(query)
+  for (const key of CONTEXT_CARRY_KEYS) {
+    const value = searchParams.get(key)
+    if (value != null && !nextParams.has(key)) nextParams.set(key, value)
+  }
+  const nextQuery = nextParams.toString()
+  return nextQuery ? `${basePath}?${nextQuery}` : basePath
+}
+
 export function isAuthRoute(pathname: string) {
   return (
     pathname === "/forgot-password" ||

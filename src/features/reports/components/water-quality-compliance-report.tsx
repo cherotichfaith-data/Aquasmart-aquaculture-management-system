@@ -6,6 +6,9 @@ import { Input } from "@/components/app-ui/input"
 import { useAlertThresholds, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
+import { MetricGrid } from "@/components/shared/metric-grid"
+import { ResponsiveRecordList } from "@/components/shared/responsive-record-list"
+import { cn } from "@/lib/utils"
 import { formatNumberValue } from "@/lib/analytics-format"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
 import {
@@ -171,7 +174,31 @@ export default function WaterQualityComplianceReport({ farmId, dateRange, system
           }
         />
         <CardContent>
-          <div className={REPORT_TABLE_SHELL_CLASS}>
+          <ResponsiveRecordList
+            className="md:hidden"
+            data={excursionLogRows}
+            rowKey={(row) => row.id}
+            loading={loading}
+            emptyMessage="No excursions found in the selected report window."
+            renderCard={(row) => (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold leading-5 text-foreground">{row.cage}</p>
+                  <span className="text-xs text-muted-foreground">{row.date}</span>
+                </div>
+                <MetricGrid
+                  items={[
+                    { label: "Parameter", value: row.parameter },
+                    { label: "Value", value: typeof row.value === "number" ? formatNumberValue(row.value, { decimals: 2, minimumDecimals: 2 }) : "-" },
+                    { label: "Threshold", value: typeof row.threshold === "number" ? formatNumberValue(row.threshold, { decimals: 2, minimumDecimals: 2 }) : "-" },
+                    { label: "Duration (hours)", value: typeof row.durationHours === "number" ? formatNumberValue(row.durationHours, { decimals: 2, minimumDecimals: 2 }) : "-" },
+                    { label: "Action taken", value: row.actionTaken },
+                  ]}
+                />
+              </>
+            )}
+          />
+          <div className={cn(REPORT_TABLE_SHELL_CLASS, "hidden md:block")}>
             <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/60">

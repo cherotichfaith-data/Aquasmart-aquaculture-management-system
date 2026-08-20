@@ -11,7 +11,10 @@ import {
 } from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { LazyRender } from "@/components/shared/lazy-render"
+import { MetricGrid } from "@/components/shared/metric-grid"
+import { ResponsiveRecordList } from "@/components/shared/responsive-record-list"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import { cn } from "@/lib/utils"
 import { formatChartDate, formatNumberValue, formatPercentRateValue } from "@/lib/analytics-format"
 import {
   REPORT_CHART_SHELL_CLASS,
@@ -389,52 +392,79 @@ export function PerformanceRecordsSection({
       />
       <CardContent>
         {showPerformanceRecords ? (
-          <div className={REPORT_TABLE_SHELL_CLASS}>
-            <table className="w-full min-w-[960px] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/60">
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Cycle</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Survival (%)</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Harvest (kg)</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Harvest (fish)</th>
-                      <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality (fish)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableLoading ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
-                      Loading...
-                    </td>
+          <>
+            <ResponsiveRecordList
+              className="md:hidden"
+              data={tableRows}
+              rowKey={(row) => `${row.system_id}-${row.date}`}
+              loading={tableLoading}
+              emptyMessage="No end-of-period cycle rows were found for the selected report window."
+              renderCard={(row) => (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold leading-5 text-foreground">{row.date}</p>
+                    <span className="text-xs text-muted-foreground">{row.system_name ?? row.system_id}</span>
+                  </div>
+                  <MetricGrid
+                    items={[
+                      { label: "Cycle", value: row.cycle_id ?? "-" },
+                      { label: "eFCR", value: formatNumberValue(row.efcr_aggregated, { decimals: 2, minimumDecimals: 2, fallback: "-" }) },
+                      { label: "Survival (%)", value: formatNumberValue(row.survival_rate_pct, { decimals: 2, minimumDecimals: 2, fallback: "-" }) },
+                      { label: "Harvest (kg)", value: formatNumberValue(row.total_weight_harvested_aggregated, { decimals: 1, minimumDecimals: 1, fallback: "-" }) },
+                      { label: "Harvest (fish)", value: formatNumberValue(row.number_of_fish_harvested, { decimals: 0, fallback: "-" }) },
+                      { label: "Mortality (fish)", value: formatNumberValue(row.mortality_count_period, { decimals: 0, fallback: "-" }) },
+                    ]}
+                  />
+                </>
+              )}
+            />
+            <div className={cn(REPORT_TABLE_SHELL_CLASS, "hidden md:block")}>
+              <table className="w-full min-w-[960px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/60">
+                    <th className="px-4 py-2 text-left font-semibold text-foreground">Date</th>
+                    <th className="px-4 py-2 text-left font-semibold text-foreground">System</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">Cycle</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">eFCR</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">Survival (%)</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">Harvest (kg)</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">Harvest (fish)</th>
+                        <th className="px-4 py-2 text-center font-semibold text-foreground">Mortality (fish)</th>
                   </tr>
-                ) : tableRows.length > 0 ? (
-                  tableRows.map((row) => (
-                    <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
-                      <td className="px-4 py-2 font-medium">{row.date}</td>
-                      <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
-                      <td className="px-4 py-2 text-center">{row.cycle_id ?? "-"}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.efcr_aggregated, { decimals: 2, minimumDecimals: 2, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">
-                        {formatNumberValue(row.survival_rate_pct, { decimals: 2, minimumDecimals: 2, fallback: "-" })}
+                </thead>
+                <tbody>
+                  {tableLoading ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
+                        Loading...
                       </td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.total_weight_harvested_aggregated, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.number_of_fish_harvested, { decimals: 0, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.mortality_count_period, { decimals: 0, fallback: "-" })}</td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
-                      No end-of-period cycle rows were found for the selected report window.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : tableRows.length > 0 ? (
+                    tableRows.map((row) => (
+                      <tr key={`${row.system_id}-${row.date}`} className="border-b border-border/70 hover:bg-muted/35">
+                        <td className="px-4 py-2 font-medium">{row.date}</td>
+                        <td className="px-4 py-2">{row.system_name ?? row.system_id}</td>
+                        <td className="px-4 py-2 text-center">{row.cycle_id ?? "-"}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.efcr_aggregated, { decimals: 2, minimumDecimals: 2, fallback: "-" })}</td>
+                        <td className="px-4 py-2 text-center">
+                          {formatNumberValue(row.survival_rate_pct, { decimals: 2, minimumDecimals: 2, fallback: "-" })}
+                        </td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.total_weight_harvested_aggregated, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.number_of_fish_harvested, { decimals: 0, fallback: "-" })}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.mortality_count_period, { decimals: 0, fallback: "-" })}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
+                        No end-of-period cycle rows were found for the selected report window.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <ReportRecordsHiddenState label={`up to ${tableLimitValue} rows`} />
         )}
