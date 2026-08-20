@@ -4,7 +4,6 @@ import { z } from "zod"
 import { feedInventoryWriteTags } from "@/lib/cache/tags"
 import { revalidateWriteTags } from "@/lib/server/write-through"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import type { Database } from "@/lib/types/database"
 
@@ -56,8 +55,14 @@ export async function recordFeedInventorySnapshotAction(
     throw new Error("You do not have permission to record feed inventory.")
   }
 
-  const admin = createAdminClient()
-  const { data, error } = await admin
+  // "feed_inventory: insert write roles" now checks the same role set as
+  // FEED_INVENTORY_ALLOWED_ROLES above (admin/farm_manager/system_operator
+  // -- see the 20260818090000 migration that fixed the policy's stale
+  // farm_technician reference). The caller's own client is enough; the
+  // membership check above stays for the friendlier error message instead
+  // of a raw RLS-violation error, not because the database needs help
+  // enforcing the rule.
+  const { data, error } = await supabase
     .from("feed_inventory")
     .insert({
       farm_id: parsedPayload.farm_id,
