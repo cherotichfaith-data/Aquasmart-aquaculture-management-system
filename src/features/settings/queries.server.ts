@@ -46,7 +46,7 @@ export async function getSettingsUsersPageInitialData(params: { farmId: string |
       const [members, pendingInvites] =
         params.farmId && farmRole === "admin"
           ? await Promise.all([
-              listFarmMembersForFarm(params.farmId),
+              listFarmMembersForFarm(params.farmId, supabase),
               listPendingFarmInvitationsForFarm(params.farmId, supabase),
             ])
           : [[], []]

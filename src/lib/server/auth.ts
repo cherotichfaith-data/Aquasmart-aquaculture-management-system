@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
-import { isSbAuthMissing, isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import { isSbAuthMissing, isSbInvalidRefreshToken, isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import { isSessionTokenExpired } from "@/lib/supabase/session"
 import { enforceUserRateLimit, type ApiRateLimitPolicy } from "@/lib/server/rate-limit"
 
 /**
@@ -45,6 +46,27 @@ export async function resolveServerUser(tag: string): Promise<ResolveSuccess | R
   const supabase = await createClient()
 
   try {
+    // @supabase/ssr's server client deliberately ships with autoRefreshToken
+    // disabled -- proxy.ts's middleware is meant to be the thing that keeps
+    // the session cookie fresh instead, refreshing it on page navigation.
+    // But the middleware's matcher excludes /api/* (see proxy.ts's `config`),
+    // and this function is the one funnel every API route authenticates
+    // through. A session left open on one page past its access-token TTL,
+    // with no intervening full navigation, never gets refreshed before
+    // landing here -- every subsequent fetch (including the ones every
+    // shared filter depends on) starts failing with no path back to a
+    // working session short of a full sign-out/sign-in, and shows up as
+    // filters and other data quietly going empty rather than an actual
+    // error. Proactively refreshing here, the same way the middleware
+    // already does for pages, closes that gap for API routes too.
+    const { data: initialSessionData } = await supabase.auth.getSession()
+    if (initialSessionData.session?.access_token && isSessionTokenExpired(initialSessionData.session.access_token)) {
+      const { error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError && !isSbInvalidRefreshToken(refreshError) && !isSbNetworkError(refreshError)) {
+        logSbError(`${tag}:refreshSession`, refreshError)
+      }
+    }
+
     const { data: userData, error: userError } = await supabase.auth.getUser()
 
     if (userError || !userData.user) {

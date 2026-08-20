@@ -78,9 +78,20 @@ async function listAuthUsersByIds(userIds: string[]) {
   return usersById
 }
 
-export async function listFarmMembersForFarm(farmId: string): Promise<SettingsFarmMember[]> {
-  const admin = createAdminClient()
-  const { data: membersData, error: membersError } = await admin
+/**
+ * `supabase` is the caller's own client, not the service role -- since the
+ * 20260818100000 migration, "farm_user_select_admin_roster" lets an admin's
+ * own session see every member row on a farm they administer, the same
+ * boundary every caller already enforces before reaching this function
+ * (assertAdminMembership() / farmRole === "admin"). Callers with no user
+ * session at all (the reminder cron in
+ * app/api/planned-activities/reminders/send/route.ts, which needs every
+ * farm's roster regardless of who's logged in) pass createAdminClient()
+ * explicitly instead -- that's a deliberate choice made at the call site,
+ * not a default baked in here.
+ */
+export async function listFarmMembersForFarm(farmId: string, supabase: AppSupabaseClient): Promise<SettingsFarmMember[]> {
+  const { data: membersData, error: membersError } = await supabase
     .from("farm_user")
     .select("user_id, role, created_at")
     .eq("farm_id", farmId)
@@ -91,7 +102,7 @@ export async function listFarmMembersForFarm(farmId: string): Promise<SettingsFa
   const userIds = (membersData ?? []).map((member) => member.user_id)
   const [{ data: profiles, error: profilesError }, authUsersById] = await Promise.all([
     userIds.length > 0
-      ? admin.from("user_profile").select("user_id, full_name").in("user_id", userIds)
+      ? supabase.from("user_profile").select("user_id, full_name").in("user_id", userIds)
       : Promise.resolve({ data: [], error: null }),
     userIds.length > 0
       ? listAuthUsersByIds(userIds)

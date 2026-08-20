@@ -242,19 +242,25 @@ export async function grantFarmAccessAction(
 }
 
 export async function listFarmMembersAction(input: z.infer<typeof memberListSchema>): Promise<SettingsFarmMember[]> {
-  const { user } = await requireMutationActionUser("settings:listMembers")
+  const { user, supabase } = await requireMutationActionUser("settings:listMembers")
   const payload = memberListSchema.parse(input)
   await assertAdminMembership(payload.farmId, user.id)
-  return listFarmMembersForFarm(payload.farmId)
+  return listFarmMembersForFarm(payload.farmId, supabase)
 }
 
 export async function updateFarmMemberRoleAction(input: z.infer<typeof updateRoleSchema>): Promise<SettingsFarmMember[]> {
-  const { user } = await requireMutationActionUser("settings:updateMemberRole")
+  const { user, supabase } = await requireMutationActionUser("settings:updateMemberRole")
   const payload = updateRoleSchema.parse(input)
   await assertAdminMembership(payload.farmId, user.id)
 
-  const admin = createAdminClient()
-  const { error } = await admin
+  // The "farm_user_update" RLS policy already requires the caller to hold
+  // "admin" on this farm_id -- the same rule assertAdminMembership just
+  // checked by hand. Using the caller's own client here means the database
+  // enforces the rule directly instead of trusting the app-layer check
+  // alone; assertAdminMembership stays for the friendlier error message
+  // and because it still gates the admin-client-backed reads elsewhere in
+  // this file (listing members needs every row, not just the caller's own).
+  const { error } = await supabase
     .from("farm_user")
     .update({ role: payload.role })
     .eq("farm_id", payload.farmId)
@@ -265,11 +271,11 @@ export async function updateFarmMemberRoleAction(input: z.infer<typeof updateRol
     throw new Error("Unable to update the member role.")
   }
 
-  return listFarmMembersForFarm(payload.farmId)
+  return listFarmMembersForFarm(payload.farmId, supabase)
 }
 
 export async function removeFarmMemberAction(input: z.infer<typeof removeMemberSchema>): Promise<SettingsFarmMember[]> {
-  const { user } = await requireMutationActionUser("settings:removeMember")
+  const { user, supabase } = await requireMutationActionUser("settings:removeMember")
   const payload = removeMemberSchema.parse(input)
   await assertAdminMembership(payload.farmId, user.id)
 
@@ -277,8 +283,11 @@ export async function removeFarmMemberAction(input: z.infer<typeof removeMemberS
     throw new Error("You cannot remove your own admin access from this page.")
   }
 
-  const admin = createAdminClient()
-  const { error } = await admin
+  // Same reasoning as updateFarmMemberRoleAction above: "farm_user_delete"
+  // already requires admin on this farm, so the caller's own client is
+  // enough -- no need to borrow the service role to do what RLS already
+  // allows the caller to do themselves.
+  const { error } = await supabase
     .from("farm_user")
     .delete()
     .eq("farm_id", payload.farmId)
@@ -289,7 +298,7 @@ export async function removeFarmMemberAction(input: z.infer<typeof removeMemberS
     throw new Error("Unable to remove the member from this farm.")
   }
 
-  return listFarmMembersForFarm(payload.farmId)
+  return listFarmMembersForFarm(payload.farmId, supabase)
 }
 
 export async function listPendingFarmInvitesAction(
