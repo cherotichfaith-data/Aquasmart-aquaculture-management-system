@@ -4,7 +4,9 @@ import type { ReactNode } from "react"
 
 import type { DashboardPageInitialData, DashboardPageInitialFilters } from "@/features/dashboard/types"
 
+import AlertUpdateBanner from "./alert-update-banner"
 import KPIOverview from "./kpi-overview"
+import PlannedActivitiesTimeline from "./planned-activities-timeline"
 import SystemsTable from "./systems-table"
 
 function SectionLabel({
@@ -57,8 +59,9 @@ export default function DashboardPage({
   const stockedRows = initialData.systemsTable.rows.filter((row) => (row.fish_end ?? 0) > 0)
 
   return (
-    <div className="container mx-auto flex flex-col gap-8 p-4 md:p-8">
+    <div className="page-shell">
       <section>
+        <AlertUpdateBanner farmId={farmId} alerts={initialData.recommendedActions} />
         <SectionLabel title="Core Performance Overview" />
         <KPIOverview
           metrics={initialData.kpiOverview.metrics}
@@ -85,6 +88,11 @@ export default function DashboardPage({
           farmId={farmId}
           showHeader={false}
         />
+      </section>
+
+      <section>
+        <SectionLabel title="Activity Planner" />
+        <PlannedActivitiesTimeline farmId={farmId} />
       </section>
     </div>
   )

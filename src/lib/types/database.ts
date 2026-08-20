@@ -37,6 +37,91 @@ export type Database = {
           },
         ]
       }
+      activity_planner: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          farm_id: string
+          id: string
+          notes: string
+          planning_window: string
+          scheduled_date: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          farm_id: string
+          id?: string
+          notes?: string
+          planning_window: string
+          scheduled_date: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          farm_id?: string
+          id?: string
+          notes?: string
+          planning_window?: string
+          scheduled_date?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_planner_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farm"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_planner_reminder_delivery: {
+        Row: {
+          activity_planner_id: string
+          id: number
+          provider_message_id: string | null
+          recipient_email: string
+          reminder_date: string
+          sent_at: string
+        }
+        Insert: {
+          activity_planner_id: string
+          id?: number
+          provider_message_id?: string | null
+          recipient_email: string
+          reminder_date: string
+          sent_at?: string
+        }
+        Update: {
+          activity_planner_id?: string
+          id?: number
+          provider_message_id?: string | null
+          recipient_email?: string
+          reminder_date?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_planner_reminder_delivery_activity_id_fkey"
+            columns: ["activity_planner_id"]
+            isOneToOne: false
+            referencedRelation: "activity_planner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alert_threshold: {
         Row: {
           created_at: string | null
