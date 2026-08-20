@@ -21,6 +21,7 @@ type MortalityRow = Tables<"fish_mortality">
 type SystemRow = Tables<"system">
 type HarvestRow = Tables<"fish_harvest">
 type TransferRow = Tables<"fish_transfer">
+type StockingRow = Tables<"fish_stocking">
 
 type NotificationKind = "water_quality" | "mortality" | "cage_empty"
 type NotificationSeverity = "warning" | "critical"
@@ -288,6 +289,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [addNotification, currentlyStockedIds, farmId, session, stockedSystemsQuery.isSuccess, systemMap, systemsLoaded, systemsQuery.data])
 
   useEffect(() => {
+    setNotifications((prev) =>
+      prev.filter((item) => !(item.kind === "cage_empty" && item.systemId != null && currentlyStockedIds.has(item.systemId))),
+    )
+  }, [currentlyStockedIds, setNotifications])
+
+  useEffect(() => {
     seenIds.current = new Set(notifications.map((item) => item.id))
   }, [notifications])
 
@@ -491,6 +498,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         actionLabel: "Restock cage",
       })
 
+      void queryClient.invalidateQueries({ queryKey: ["stocked-systems", farmId] })
       void queryClient.invalidateQueries({
         predicate: ({ queryKey }) =>
           String(queryKey[0]) === "dashboard" && String(queryKey[1]) === "systems" && String(queryKey[2]) === farmId,
@@ -538,6 +546,44 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       supabase.removeChannel(transferChannel)
     }
   }, [addNotification, farmId, queryClient, session, supabase, systemMap, systemsLoaded, systemsQuery.data])
+
+  useEffect(() => {
+    if (!session || !farmId || !systemsLoaded) return
+
+    const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
+    if (!farmSystemIds.length) return
+
+    const stockingChannel = supabase
+      .channel(`alerts-restocked-${farmId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "fish_stocking",
+          filter: `system_id=in.(${farmSystemIds.join(",")})`,
+        },
+        (payload) => {
+          const row = payload.new as StockingRow
+          if (!row?.system_id) return
+
+          void queryClient.invalidateQueries({ queryKey: ["stocked-systems", farmId] })
+          void queryClient.invalidateQueries({
+            predicate: ({ queryKey }) =>
+              String(queryKey[0]) === "dashboard" && String(queryKey[1]) === "systems" && String(queryKey[2]) === farmId,
+          })
+
+          setNotifications((prev) =>
+            prev.filter((item) => !(item.kind === "cage_empty" && item.systemId === row.system_id)),
+          )
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(stockingChannel)
+    }
+  }, [farmId, queryClient, session, setNotifications, supabase, systemsLoaded, systemsQuery.data])
 
   const value = useMemo(
     () => ({ notifications, unreadCount, markAllRead, markRead, clearAll }),
