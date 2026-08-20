@@ -43,7 +43,7 @@ export function useSystemOptions(params?: {
 
   return useMemo(() => {
     if (!params?.stockedOnly || query.data?.status !== "success") return query
-    if (stockedSystems.query.data?.status !== "success") return query
+    if (!stockedSystems.query.isSuccess) return query
     return {
       ...query,
       data: {
