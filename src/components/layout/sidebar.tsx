@@ -7,7 +7,7 @@ import { useMemo, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
-import { DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
+import { DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath, withCurrentSearchContext } from "@/lib/app-entry"
 import { Button } from "@/components/app-ui/button"
 import { Sheet } from "@/components/app-ui/sheet"
 import { Skeleton } from "@/components/app-ui/skeleton"
@@ -214,16 +214,7 @@ function SidebarContent({
   // Navigation should carry the user's working context between sections.
   // Without this, opening Production from another section removes `system`
   // and Production falls back to the lowest database ID (Cage 2B here).
-  const withCurrentContext = (href: string) => {
-    const [basePath, query = ""] = href.split("?", 2)
-    const nextParams = new URLSearchParams(query)
-    for (const key of ["farmId", "system", "cage", "date", "batch", "stage"]) {
-      const value = searchParams.get(key)
-      if (value != null && !nextParams.has(key)) nextParams.set(key, value)
-    }
-    const nextQuery = nextParams.toString()
-    return nextQuery ? `${basePath}?${nextQuery}` : basePath
-  }
+  const withCurrentContext = (href: string) => withCurrentSearchContext(href, searchParams)
 
   const closeAfterNavigate = () => {
     if (mobile) {

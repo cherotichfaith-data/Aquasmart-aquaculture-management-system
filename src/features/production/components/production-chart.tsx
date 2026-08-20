@@ -1,7 +1,20 @@
 "use client"
 
+import { useMemo, useState } from "react"
+import type { ChartData, ChartOptions, ScriptableContext, TooltipItem } from "chart.js"
+import { Line } from "@/components/charts/chartjs"
+import {
+  buildCartesianOptions,
+  createVerticalGradient,
+  getChartPalette,
+  getDateAxisMaxTicks,
+  readCssVar,
+  withAlpha,
+} from "@/components/charts/chartjs-theme"
+import { chartEventMarkersPlugin, type ChartEventMarker } from "@/components/charts/chart-event-markers-plugin"
 import { Card, CardContent, CardHeader } from "@/components/app-ui/card"
 import { DataErrorState, EmptyState } from "@/components/shared/data-states"
+import { useIsDesktop } from "@/lib/hooks/use-is-desktop"
 import { PRODUCTION_METRICS, type ProductionMetric } from "@/features/production/components/metrics"
 import type { ProductionChartMarker } from "@/features/production/queries.server"
 
@@ -9,13 +22,6 @@ export type ProductionChartRow = {
   date: string
   label: string
   value: number | null
-}
-
-const MARKER_COLORS: Record<ProductionChartMarker["type"], string> = {
-  stocking: "var(--color-success)",
-  transfer: "var(--color-warning)",
-  harvest: "var(--color-destructive)",
-  water_quality: "var(--color-info)",
 }
 
 function formatProductionMetricValue(value: number, metric: ProductionMetric) {
@@ -38,72 +44,15 @@ function formatProductionMetricValue(value: number, metric: ProductionMetric) {
   }
 }
 
-// ---- chart geometry (categorical x-axis, shared across primary + compare series) ----
-const PLOT_LEFT = 64
-const PLOT_RIGHT_SINGLE = 964
-const PLOT_RIGHT_DUAL = 924
-const PLOT_TOP = 20
-const PLOT_BOTTOM = 260
-const MARKER_LABEL_Y = PLOT_BOTTOM + 22
-const DATE_LABEL_Y = PLOT_BOTTOM + 54
-const CHART_HEIGHT = DATE_LABEL_Y + 20
-
-function buildScale(values: number[]) {
-  const lo0 = Math.min(...values)
-  const hi0 = Math.max(...values)
-  const pad = (hi0 - lo0) * 0.15 || Math.abs(hi0) * 0.1 || 1
-  const lo = lo0 - pad
-  const hi = hi0 + pad
-  return {
-    lo,
-    hi,
-    y: (v: number) => PLOT_BOTTOM - ((v - lo) / (hi - lo || 1)) * (PLOT_BOTTOM - PLOT_TOP),
-  }
-}
-
-function xForIndex(index: number, count: number, plotRight: number) {
-  if (count <= 1) return (PLOT_LEFT + plotRight) / 2
-  return PLOT_LEFT + (index * (plotRight - PLOT_LEFT)) / (count - 1)
-}
-
 type ValidRow = { date: string; label: string; value: number }
-
-type ScaledSeries = {
-  points: Array<ValidRow & { x: number; y: number }>
-  linePath: string
-  areaPath: string
-  yTicks: Array<{ y: number; label: string }>
-}
-
-function buildSeries(
-  rows: ValidRow[],
-  metric: ProductionMetric,
-  dateIndex: Map<string, number>,
-  domainSize: number,
-  plotRight: number,
-): ScaledSeries {
-  const scale = buildScale(rows.map((row) => row.value))
-  const points = rows.map((row) => {
-    const index = dateIndex.get(row.date) ?? 0
-    return { ...row, x: xForIndex(index, domainSize, plotRight), y: scale.y(row.value) }
-  })
-  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ")
-  const areaPath = points.length
-    ? `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${PLOT_BOTTOM} L ${points[0].x.toFixed(1)} ${PLOT_BOTTOM} Z`
-    : ""
-  const yTicks = Array.from({ length: 5 }, (_, i) => {
-    const value = scale.hi - ((scale.hi - scale.lo) * i) / 4
-    const y = PLOT_TOP + ((PLOT_BOTTOM - PLOT_TOP) * i) / 4
-    return { y, label: formatProductionMetricValue(value, metric) }
-  })
-  return { points, linePath, areaPath, yTicks }
-}
 
 function toValidRows(rows: ProductionChartRow[]): ValidRow[] {
   return rows.filter(
     (row): row is ValidRow => typeof row.value === "number" && Number.isFinite(row.value),
   )
 }
+
+const CHART_HEIGHT_CLASS = "h-[280px] sm:h-[360px]"
 
 export default function ProductionChart({
   metric,
@@ -129,61 +78,162 @@ export default function ProductionChart({
 }) {
   const meta = PRODUCTION_METRICS[metric]
   const compareMeta = compareMetric ? PRODUCTION_METRICS[compareMetric] : null
-  const primaryRows = toValidRows(rows)
-  const compareValidRows = compareMetric ? toValidRows(compareRows ?? []) : []
+  const primaryRows = useMemo(() => toValidRows(rows), [rows])
+  const compareValidRows = useMemo(() => (compareMetric ? toValidRows(compareRows ?? []) : []), [compareMetric, compareRows])
   const hasCompare = Boolean(compareMetric && compareMeta && compareValidRows.length > 0)
   const singlePoint = primaryRows.length === 1 ? primaryRows[0] : null
 
+  const isDesktop = useIsDesktop()
+  // Overlaying two different scales on one plot reads fine with the room a
+  // desktop screen gives the two axis label columns; on a phone it's the
+  // dual-axis anti-pattern at its most cramped. Default to one metric at a
+  // time below `md`, `both` at `md` and up -- but let a farmer override
+  // either way, on any size, rather than deciding it for them permanently.
+  const [userViewMode, setUserViewMode] = useState<"both" | "primary" | "compare" | null>(null)
+  // Reset a manual override when a different compare metric is picked
+  // elsewhere in the app, so a stale "show compare only" choice doesn't
+  // keep pointing at a metric that's no longer selected. Adjusting state
+  // during render (React's documented pattern) instead of an effect avoids
+  // an extra commit-then-rerender pass for what is otherwise a plain prop.
+  const [trackedCompareMetric, setTrackedCompareMetric] = useState(compareMetric)
+  if (compareMetric !== trackedCompareMetric) {
+    setTrackedCompareMetric(compareMetric)
+    setUserViewMode(null)
+  }
+  const viewMode = userViewMode ?? (isDesktop ? "both" : "primary")
+  const showBoth = viewMode === "both" && hasCompare
+  const showingCompareOnly = viewMode === "compare" && hasCompare
+
+  const displayMetric = showingCompareOnly && compareMetric ? compareMetric : metric
+  const displayMeta = showingCompareOnly && compareMeta ? compareMeta : meta
+
+  const palette = getChartPalette()
+  const primaryColor = readCssVar("--production-chart-primary", "#258ef2")
+  const compareColor = readCssVar("--production-chart-compare", "#16a34a")
+  const displayColor = showingCompareOnly ? compareColor : primaryColor
+  const markerColors: Record<ProductionChartMarker["type"], string> = {
+    stocking: readCssVar("--color-success", "#22c55e"),
+    transfer: readCssVar("--color-warning", "#d18a14"),
+    harvest: readCssVar("--color-destructive", "#ef4444"),
+    water_quality: readCssVar("--color-info", "#3b6ea8"),
+  }
+
   // Shared categorical date domain so the primary and compare lines (which may come
   // from different-granularity sources) line up on the same x position for the same date.
-  const domainDates = Array.from(
-    new Set([...primaryRows.map((row) => row.date), ...compareValidRows.map((row) => row.date)]),
-  ).sort()
-  const dateIndex = new Map(domainDates.map((date, index) => [date, index]))
-  const dateLabels = new Map(
-    [...compareValidRows, ...primaryRows].map((row) => [row.date, row.label]),
+  const domainDates = useMemo(
+    () => Array.from(new Set([...primaryRows.map((row) => row.date), ...compareValidRows.map((row) => row.date)])).sort(),
+    [primaryRows, compareValidRows],
   )
-  const plotRight = hasCompare ? PLOT_RIGHT_DUAL : PLOT_RIGHT_SINGLE
+  const dateLabels = useMemo(
+    () => new Map([...compareValidRows, ...primaryRows].map((row) => [row.date, row.label])),
+    [compareValidRows, primaryRows],
+  )
+  const primaryValueByDate = useMemo(() => new Map(primaryRows.map((row) => [row.date, row.value])), [primaryRows])
+  const compareValueByDate = useMemo(() => new Map(compareValidRows.map((row) => [row.date, row.value])), [compareValidRows])
+  const displayValueByDate = showingCompareOnly ? compareValueByDate : primaryValueByDate
+  const hasTrendData = domainDates.length > 1
 
-  const primarySeries =
-    domainDates.length > 1 ? buildSeries(primaryRows, metric, dateIndex, domainDates.length, plotRight) : null
-  const compareSeries =
-    hasCompare && compareMetric && domainDates.length > 1
-      ? buildSeries(compareValidRows, compareMetric, dateIndex, domainDates.length, plotRight)
-      : null
+  const latestDate = domainDates.length > 0 ? domainDates[domainDates.length - 1] : null
+  const latestDisplayValue = latestDate != null ? (displayValueByDate.get(latestDate) ?? null) : null
+  const latestCompareValue = latestDate != null ? (compareValueByDate.get(latestDate) ?? null) : null
 
-  const xTickCount = Math.min(7, domainDates.length)
-  const xTickIndexes =
-    domainDates.length > 1
-      ? Array.from(new Set(Array.from({ length: xTickCount }, (_, i) => Math.round((i * (domainDates.length - 1)) / (xTickCount - 1 || 1)))))
-      : []
+  // Time-proportional (not index-snapped) so an event on a day with no
+  // production row still lands at its true position along the plot.
+  const eventMarkers = useMemo<ChartEventMarker[]>(() => {
+    if (domainDates.length < 2) return []
+    const domainStartMs = Date.parse(domainDates[0])
+    const domainEndMs = Date.parse(domainDates[domainDates.length - 1])
+    if (!Number.isFinite(domainStartMs) || !Number.isFinite(domainEndMs) || domainEndMs <= domainStartMs) return []
+    return (markers ?? [])
+      .map((marker) => {
+        const ms = Date.parse(marker.date)
+        if (!Number.isFinite(ms)) return null
+        const t = Math.min(1, Math.max(0, (ms - domainStartMs) / (domainEndMs - domainStartMs)))
+        return { t, color: markerColors[marker.type], label: marker.label }
+      })
+      .filter((item): item is ChartEventMarker => item !== null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- markerColors is a fresh object every render (reads CSS vars); its values only change with the theme, not per render.
+  }, [markers, domainDates])
 
-  const domainStartMs = domainDates.length > 0 ? Date.parse(domainDates[0]) : NaN
-  const domainEndMs = domainDates.length > 0 ? Date.parse(domainDates[domainDates.length - 1]) : NaN
-  const chartMarkers = (markers ?? [])
-    .map((marker) => {
-      const ms = Date.parse(marker.date)
-      if (!Number.isFinite(ms) || !Number.isFinite(domainStartMs) || !Number.isFinite(domainEndMs)) return null
-      if (domainEndMs <= domainStartMs) return null
-      const t = Math.min(1, Math.max(0, (ms - domainStartMs) / (domainEndMs - domainStartMs)))
-      return { ...marker, x: PLOT_LEFT + t * (plotRight - PLOT_LEFT) }
+  const data = useMemo<ChartData<"line">>(() => {
+    const mainDataset = {
+      label: displayMeta.label,
+      data: domainDates.map((date) => displayValueByDate.get(date) ?? null),
+      borderColor: displayColor,
+      backgroundColor: createVerticalGradient(displayColor, 0.16, 0.02),
+      fill: true,
+      spanGaps: true,
+      pointRadius: (context: ScriptableContext<"line">) => (context.dataIndex === domainDates.length - 1 ? 4.5 : 0),
+      pointHoverRadius: 5,
+      pointBackgroundColor: displayColor,
+      pointBorderColor: palette.card,
+      pointBorderWidth: 2,
+    }
+    if (!showBoth || !compareMetric || !compareMeta) {
+      return { labels: domainDates, datasets: [mainDataset] }
+    }
+    return {
+      labels: domainDates,
+      datasets: [
+        mainDataset,
+        {
+          label: compareMeta.label,
+          data: domainDates.map((date) => compareValueByDate.get(date) ?? null),
+          borderColor: compareColor,
+          backgroundColor: "transparent",
+          fill: false,
+          spanGaps: true,
+          pointRadius: (context: ScriptableContext<"line">) => (context.dataIndex === domainDates.length - 1 ? 4.5 : 0),
+          pointHoverRadius: 5,
+          pointBackgroundColor: compareColor,
+          pointBorderColor: palette.card,
+          pointBorderWidth: 2,
+          yAxisID: "y1",
+        },
+      ],
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- palette/colors are re-read from CSS each render, not render-dependent values.
+  }, [domainDates, displayValueByDate, displayColor, displayMeta, showBoth, compareMetric, compareMeta, compareValueByDate])
+
+  const xTickLimit = getDateAxisMaxTicks(domainDates.length)
+  const options = useMemo<ChartOptions<"line">>(() => {
+    const base = buildCartesianOptions<"line">({
+      palette,
+      legend: false, // the header pills already act as the legend
+      xTickFormatter: (_value, index) => dateLabels.get(domainDates[index] ?? "") ?? domainDates[index] ?? "",
+      xMaxTicksLimit: xTickLimit,
+      yTickFormatter: (value) => formatProductionMetricValue(Number(value), displayMetric),
+      yRightTickFormatter:
+        showBoth && compareMetric ? (value) => formatProductionMetricValue(Number(value), compareMetric) : undefined,
+      tooltip: {
+        callbacks: {
+          title: (items: TooltipItem<"line">[]) => {
+            const date = domainDates[items[0]?.dataIndex ?? -1]
+            return date ? (dateLabels.get(date) ?? date) : ""
+          },
+          label: (item: TooltipItem<"line">) => {
+            const value = item.parsed.y
+            if (value == null) return ""
+            const isCompareLine = item.dataset.yAxisID === "y1"
+            const lineMetric = isCompareLine && compareMetric ? compareMetric : displayMetric
+            return `${item.dataset.label}: ${formatProductionMetricValue(Number(value), lineMetric)}`
+          },
+        },
+      },
     })
-    .filter((marker): marker is ProductionChartMarker & { x: number } => marker !== null)
-    .sort((a, b) => a.x - b.x)
-  const markerLabelMinGap = 64
-  const chartMarkersWithLabels = chartMarkers.reduce<{
-    items: Array<(ProductionChartMarker & { x: number }) & { showLabel: boolean }>
-    visibleLabelEnd: number
-  }>(
-    (acc, marker) => {
-      const showLabel = marker.x - acc.visibleLabelEnd >= markerLabelMinGap
-      return {
-        items: [...acc.items, { ...marker, showLabel }],
-        visibleLabelEnd: showLabel ? marker.x + markerLabelMinGap : acc.visibleLabelEnd,
-      }
-    },
-    { items: [], visibleLabelEnd: -Infinity },
-  ).items
+    return {
+      ...base,
+      plugins: {
+        ...base.plugins,
+        chartEventMarkers: {
+          markers: eventMarkers,
+          lineColor: withAlpha(palette.border, 0.9),
+          cardColor: palette.card,
+        },
+      },
+    } as ChartOptions<"line">
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- palette/marker colors are re-read from CSS each render, not render-dependent values.
+  }, [dateLabels, domainDates, xTickLimit, displayMetric, showBoth, compareMetric, eventMarkers])
 
   if (error) {
     return (
@@ -201,24 +251,52 @@ export default function ProductionChart({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold"
+              className="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold transition-opacity"
               style={{
                 background: "color-mix(in srgb, var(--production-chart-primary) 12%, transparent)",
                 color: "var(--production-chart-primary)",
+                opacity: showingCompareOnly ? 0.45 : 1,
               }}
             >
               {meta.label}
             </span>
             {hasCompare && compareMeta ? (
               <span
-                className="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold"
+                className="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold transition-opacity"
                 style={{
                   background: "color-mix(in srgb, var(--production-chart-compare) 16%, transparent)",
                   color: "var(--production-chart-compare)",
+                  opacity: viewMode === "primary" ? 0.45 : 1,
                 }}
               >
                 {compareMeta.label}
               </span>
+            ) : null}
+            {hasCompare && !isDesktop ? (
+              <div className="inline-flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setUserViewMode("primary")}
+                  className="rounded-full px-2.5 py-1 transition-colors"
+                  style={{
+                    background: viewMode === "primary" ? "var(--card)" : "transparent",
+                    color: viewMode === "primary" ? "var(--foreground)" : "var(--muted-foreground)",
+                  }}
+                >
+                  {meta.label}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserViewMode("compare")}
+                  className="rounded-full px-2.5 py-1 transition-colors"
+                  style={{
+                    background: viewMode === "compare" ? "var(--card)" : "transparent",
+                    color: viewMode === "compare" ? "var(--foreground)" : "var(--muted-foreground)",
+                  }}
+                >
+                  {compareMeta?.label}
+                </button>
+              </div>
             ) : null}
           </div>
           {periodLabel ? <span className="text-xs text-muted-foreground md:text-dense">{periodLabel}</span> : null}
@@ -226,136 +304,23 @@ export default function ProductionChart({
       </CardHeader>
       <CardContent className="px-6 pb-6 pt-4">
         {isLoading ? (
-          <div className="h-[360px] animate-pulse rounded-lg bg-muted/50" />
-        ) : primarySeries ? (
+          <div className={`${CHART_HEIGHT_CLASS} animate-pulse rounded-lg bg-muted/50`} />
+        ) : hasTrendData ? (
           <div className="flex flex-col gap-3">
-            <div className="w-full rounded-lg border border-border bg-background/35 p-3">
-              <svg
-                viewBox={`0 0 1000 ${CHART_HEIGHT}`}
-                className="h-[360px] w-full"
-                role="img"
-                aria-label={hasCompare && compareMeta ? `${meta.label} vs ${compareMeta.label}` : meta.label}
-              >
-                <defs>
-                  <linearGradient id="production-chart-fill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--production-chart-primary)" stopOpacity="0.18" />
-                    <stop offset="100%" stopColor="var(--production-chart-primary)" stopOpacity="0.02" />
-                  </linearGradient>
-                </defs>
-
-                {primarySeries.yTicks.map((tick) => (
-                  <g key={tick.y}>
-                    <line
-                      x1={PLOT_LEFT}
-                      x2={plotRight}
-                      y1={tick.y}
-                      y2={tick.y}
-                      stroke="var(--chart-grid)"
-                      strokeWidth="1"
-                    />
-                    <text x={PLOT_LEFT - 10} y={tick.y + 4} textAnchor="end" fontSize="12" fill="var(--color-muted-foreground)">
-                      {tick.label}
-                    </text>
-                  </g>
-                ))}
-
-                {compareSeries
-                  ? compareSeries.yTicks.map((tick) => (
-                      <text
-                        key={`cmp-${tick.y}`}
-                        x={plotRight + 10}
-                        y={tick.y + 4}
-                        textAnchor="start"
-                        fontSize="12"
-                        fill="var(--production-chart-compare)"
-                      >
-                        {tick.label}
-                      </text>
-                    ))
-                  : null}
-
-                {chartMarkersWithLabels.map((marker, index) => {
-                  const color = MARKER_COLORS[marker.type]
-                  return (
-                    <g key={`${marker.date}-${marker.type}-${index}`}>
-                      <title>{`${marker.label}${marker.notes ? ` — ${marker.notes}` : ""} · ${marker.date}`}</title>
-                      <line
-                        x1={marker.x}
-                        x2={marker.x}
-                        y1={PLOT_TOP}
-                        y2={PLOT_BOTTOM}
-                        stroke="var(--border)"
-                        strokeWidth="1"
-                        strokeDasharray="4 4"
-                      />
-                      <circle cx={marker.x} cy={PLOT_BOTTOM} r="5" fill={color} stroke="var(--card)" strokeWidth="2" />
-                      {marker.showLabel ? (
-                        <text x={marker.x} y={MARKER_LABEL_Y} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>
-                          {marker.label}
-                        </text>
-                      ) : null}
-                    </g>
-                  )
-                })}
-
-                <path d={primarySeries.areaPath} fill="url(#production-chart-fill)" />
-                <path
-                  d={primarySeries.linePath}
-                  fill="none"
-                  stroke="var(--production-chart-primary)"
-                  strokeWidth="2.5"
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-                {primarySeries.points.length > 0
-                  ? (() => {
-                      const lastPoint = primarySeries.points[primarySeries.points.length - 1]
-                      return (
-                        <g>
-                          <circle cx={lastPoint.x} cy={lastPoint.y} r="4.5" fill="var(--production-chart-primary)" stroke="var(--card)" strokeWidth="2" />
-                          <title>{`${lastPoint.date}: ${formatProductionMetricValue(lastPoint.value, metric)}`}</title>
-                        </g>
-                      )
-                    })()
-                  : null}
-
-                {compareSeries && compareMetric ? (
-                  <g>
-                    <path
-                      d={compareSeries.linePath}
-                      fill="none"
-                      stroke="var(--production-chart-compare)"
-                      strokeWidth="2.5"
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                    />
-                    {compareSeries.points.length > 0
-                      ? (() => {
-                          const lastPoint = compareSeries.points[compareSeries.points.length - 1]
-                          return (
-                            <g>
-                              <circle cx={lastPoint.x} cy={lastPoint.y} r="4.5" fill="var(--production-chart-compare)" stroke="var(--card)" strokeWidth="2" />
-                              <title>{`${lastPoint.date}: ${formatProductionMetricValue(lastPoint.value, compareMetric)}`}</title>
-                            </g>
-                          )
-                        })()
-                      : null}
-                  </g>
-                ) : null}
-
-                {xTickIndexes.map((index) => {
-                  const date = domainDates[index]
-                  if (!date) return null
-                  const x = xForIndex(index, domainDates.length, plotRight)
-                  return (
-                    <text key={`${date}-tick`} x={x} y={DATE_LABEL_Y} textAnchor="middle" fontSize="12" fill="var(--color-muted-foreground)">
-                      {dateLabels.get(date) ?? date}
-                    </text>
-                  )
-                })}
-              </svg>
+            <div className="flex flex-wrap items-baseline gap-3 px-1">
+              <span className="text-2xl font-semibold tracking-tight text-foreground">
+                {latestDisplayValue != null ? formatProductionMetricValue(latestDisplayValue, displayMetric) : "--"}
+              </span>
+              {showBoth && compareMetric ? (
+                <span className="text-sm font-semibold" style={{ color: compareColor }}>
+                  {latestCompareValue != null ? formatProductionMetricValue(latestCompareValue, compareMetric) : "--"}
+                </span>
+              ) : null}
             </div>
-            {hasCompare && compareMeta ? (
+            <div className={`w-full rounded-lg border border-border bg-background/35 p-3 ${CHART_HEIGHT_CLASS}`}>
+              <Line data={data} options={options} plugins={[chartEventMarkersPlugin]} />
+            </div>
+            {showBoth && compareMeta ? (
               <div className="flex flex-wrap justify-center gap-6 text-dense font-medium text-muted-foreground">
                 <span className="inline-flex items-center gap-2">
                   <span className="h-[3px] w-[18px] rounded-full" style={{ background: "var(--production-chart-primary)" }} />
@@ -369,7 +334,7 @@ export default function ProductionChart({
             ) : null}
           </div>
         ) : singlePoint ? (
-          <div className="flex h-[360px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 p-6">
+          <div className={`flex ${CHART_HEIGHT_CLASS} items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 p-6`}>
             <div className="flex max-w-sm flex-col items-center gap-2 text-center">
               <p className="text-sm text-muted-foreground">{singlePoint.date}</p>
               <p className="text-4xl font-semibold tracking-tight text-foreground">

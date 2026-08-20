@@ -12,7 +12,10 @@ import {
 } from "@/components/charts/chartjs-theme"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { LazyRender } from "@/components/shared/lazy-render"
+import { MetricGrid } from "@/components/shared/metric-grid"
+import { ResponsiveRecordList } from "@/components/shared/responsive-record-list"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import { cn } from "@/lib/utils"
 import { formatChartDate, formatNumberValue } from "@/lib/analytics-format"
 import {
   REPORT_CHART_SHELL_CLASS,
@@ -275,42 +278,69 @@ export function GrowthRecordsSection({
       />
       <CardContent>
         {showGrowthRecords ? (
-          <div className={REPORT_TABLE_SHELL_CLASS}>
-            <table className="w-full min-w-[1040px] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/60">
-                  <th className="px-4 py-2 text-left font-semibold text-foreground">Cage</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Sampling date</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">ABW (g)</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">ABW gain (g)</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Days interval</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">SGR (%/day)</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">ADG (g/day)</th>
-                  <th className="px-4 py-2 text-center font-semibold text-foreground">Days to harvest</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">Loading...</td></tr>
-                ) : rows.length > 0 ? (
-                  rows.map((row) => (
-                    <tr key={`${row.system_id}-${row.sample_date}`} className="border-b border-border/70 hover:bg-muted/35">
-                      <td className="px-4 py-2 font-medium">{row.system_name}</td>
-                      <td className="px-4 py-2 text-center">{row.sample_date}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.abw_g, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.weight_gain_g, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.days_interval, { decimals: 0, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.sgr_pct_day, { decimals: 2, minimumDecimals: 2, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.adg_g_day, { decimals: 2, minimumDecimals: 2, fallback: "-" })}</td>
-                      <td className="px-4 py-2 text-center">{formatNumberValue(row.days_to_harvest, { decimals: 0, fallback: "-" })}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr><td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">No growth intervals were found for the selected period.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <ResponsiveRecordList
+              className="md:hidden"
+              data={rows}
+              rowKey={(row) => `${row.system_id}-${row.sample_date}`}
+              loading={loading}
+              emptyMessage="No growth intervals were found for the selected period."
+              renderCard={(row) => (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold leading-5 text-foreground">{row.system_name}</p>
+                    <span className="text-xs text-muted-foreground">{row.sample_date}</span>
+                  </div>
+                  <MetricGrid
+                    items={[
+                      { label: "ABW (g)", value: formatNumberValue(row.abw_g, { decimals: 1, minimumDecimals: 1, fallback: "-" }) },
+                      { label: "ABW gain (g)", value: formatNumberValue(row.weight_gain_g, { decimals: 1, minimumDecimals: 1, fallback: "-" }) },
+                      { label: "Days interval", value: formatNumberValue(row.days_interval, { decimals: 0, fallback: "-" }) },
+                      { label: "SGR (%/day)", value: formatNumberValue(row.sgr_pct_day, { decimals: 2, minimumDecimals: 2, fallback: "-" }) },
+                      { label: "ADG (g/day)", value: formatNumberValue(row.adg_g_day, { decimals: 2, minimumDecimals: 2, fallback: "-" }) },
+                      { label: "Days to harvest", value: formatNumberValue(row.days_to_harvest, { decimals: 0, fallback: "-" }) },
+                    ]}
+                  />
+                </>
+              )}
+            />
+            <div className={cn(REPORT_TABLE_SHELL_CLASS, "hidden md:block")}>
+              <table className="w-full min-w-[1040px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/60">
+                    <th className="px-4 py-2 text-left font-semibold text-foreground">Cage</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">Sampling date</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">ABW (g)</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">ABW gain (g)</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">Days interval</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">SGR (%/day)</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">ADG (g/day)</th>
+                    <th className="px-4 py-2 text-center font-semibold text-foreground">Days to harvest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">Loading...</td></tr>
+                  ) : rows.length > 0 ? (
+                    rows.map((row) => (
+                      <tr key={`${row.system_id}-${row.sample_date}`} className="border-b border-border/70 hover:bg-muted/35">
+                        <td className="px-4 py-2 font-medium">{row.system_name}</td>
+                        <td className="px-4 py-2 text-center">{row.sample_date}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.abw_g, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.weight_gain_g, { decimals: 1, minimumDecimals: 1, fallback: "-" })}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.days_interval, { decimals: 0, fallback: "-" })}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.sgr_pct_day, { decimals: 2, minimumDecimals: 2, fallback: "-" })}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.adg_g_day, { decimals: 2, minimumDecimals: 2, fallback: "-" })}</td>
+                        <td className="px-4 py-2 text-center">{formatNumberValue(row.days_to_harvest, { decimals: 0, fallback: "-" })}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">No growth intervals were found for the selected period.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <ReportRecordsHiddenState label={`${rows.length} rows`} />
         )}

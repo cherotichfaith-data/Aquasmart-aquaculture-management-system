@@ -12,7 +12,10 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { EmptyState } from "@/components/shared/data-states"
 import { LazyRender } from "@/components/shared/lazy-render"
+import { MetricGrid } from "@/components/shared/metric-grid"
+import { ResponsiveRecordList } from "@/components/shared/responsive-record-list"
 import { downloadCsv, printBrandedPdf } from "@/lib/utils/report-export"
+import { cn } from "@/lib/utils"
 import { formatChartDate } from "@/lib/analytics-format"
 import {
   REPORT_CHART_SHELL_CLASS,
@@ -267,24 +270,49 @@ export function MortalityRecordsSection({
       />
       <CardContent>
         {showMortalityRecords ? (
-          <div className={REPORT_TABLE_SHELL_CLASS}>
-            <table className="w-full min-w-[720px] text-sm">
-              <thead><tr className="border-b border-border bg-muted/60"><th className="px-4 py-2 text-left font-semibold text-foreground">Date</th><th className="px-4 py-2 text-left font-semibold text-foreground">System</th><th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th><th className="px-4 py-2 text-left font-semibold text-foreground">Fish Dead</th><th className="px-4 py-2 text-left font-semibold text-foreground">Cause</th><th className="px-4 py-2 text-left font-semibold text-foreground">Notes</th></tr></thead>
-              <tbody>
-                {tableLoading ? (
-                  <tr><td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">Loading...</td></tr>
-                ) : tableRows.length > 0 ? (
-                  tableRows.map((row) => (
-                    <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
-                      <td className="px-4 py-2 font-medium">{row.date}</td><td className="px-4 py-2">{row.system_id}</td><td className="px-4 py-2">{row.batch_id ?? "-"}</td><td className="px-4 py-2">{row.number_of_fish_mortality}</td><td className="px-4 py-2">{causeLabels[row.cause] ?? row.cause}</td><td className="px-4 py-2">{row.notes?.trim() || "-"}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr><td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">No mortality records found</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <ResponsiveRecordList
+              className="md:hidden"
+              data={tableRows}
+              rowKey={(row) => row.id}
+              loading={tableLoading}
+              emptyMessage="No mortality records found"
+              renderCard={(row) => (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold leading-5 text-foreground">{row.date}</p>
+                    <span className="text-xs text-muted-foreground">{causeLabels[row.cause] ?? row.cause}</span>
+                  </div>
+                  <MetricGrid
+                    items={[
+                      { label: "System", value: row.system_id ?? "-" },
+                      { label: "Batch", value: row.batch_id ?? "-" },
+                      { label: "Fish Dead", value: row.number_of_fish_mortality ?? "-" },
+                      { label: "Notes", value: row.notes?.trim() || "-" },
+                    ]}
+                  />
+                </>
+              )}
+            />
+            <div className={cn(REPORT_TABLE_SHELL_CLASS, "hidden md:block")}>
+              <table className="w-full min-w-[720px] text-sm">
+                <thead><tr className="border-b border-border bg-muted/60"><th className="px-4 py-2 text-left font-semibold text-foreground">Date</th><th className="px-4 py-2 text-left font-semibold text-foreground">System</th><th className="px-4 py-2 text-left font-semibold text-foreground">Batch</th><th className="px-4 py-2 text-left font-semibold text-foreground">Fish Dead</th><th className="px-4 py-2 text-left font-semibold text-foreground">Cause</th><th className="px-4 py-2 text-left font-semibold text-foreground">Notes</th></tr></thead>
+                <tbody>
+                  {tableLoading ? (
+                    <tr><td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">Loading...</td></tr>
+                  ) : tableRows.length > 0 ? (
+                    tableRows.map((row) => (
+                      <tr key={row.id} className="border-b border-border/70 hover:bg-muted/35">
+                        <td className="px-4 py-2 font-medium">{row.date}</td><td className="px-4 py-2">{row.system_id}</td><td className="px-4 py-2">{row.batch_id ?? "-"}</td><td className="px-4 py-2">{row.number_of_fish_mortality}</td><td className="px-4 py-2">{causeLabels[row.cause] ?? row.cause}</td><td className="px-4 py-2">{row.notes?.trim() || "-"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">No mortality records found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <ReportRecordsHiddenState label={`up to ${tableLimitValue} rows`} />
         )}

@@ -119,92 +119,51 @@ export default function SystemsTable({
         {isLoading ? (
           <div className="h-[240px] animate-pulse rounded-lg bg-muted/50" />
         ) : (
-          <>
-            <MobileSystemCards
-              systems={rows}
-              farmMedianEfcr={farmMedianEfcr}
-              emptyMessage={emptyMessage}
-              onOpenSystem={openProductionPage}
-            />
-
-            <div className="hidden md:block">
-              <DataTable<DashboardSystemRow>
-                columns={columns}
-                data={rows}
-                rowKey={(row) => row.system_id}
-                onRowClick={(row) => openProductionPage(row.system_id)}
-                emptyMessage={emptyMessage}
-                initialSorting={[{ id: "system", desc: false }]}
-                shellClassName="production-records-table dashboard-production-table max-h-[520px]"
-                tableClassName="min-w-[960px] table-fixed"
-                headerVariant="plain"
-              />
-            </div>
-          </>
+          <DataTable<DashboardSystemRow>
+            columns={columns}
+            data={rows}
+            rowKey={(row) => row.system_id}
+            onRowClick={(row) => openProductionPage(row.system_id)}
+            emptyMessage={emptyMessage}
+            initialSorting={[{ id: "system", desc: false }]}
+            shellClassName="production-records-table dashboard-production-table max-h-[520px]"
+            tableClassName="min-w-[960px] table-fixed"
+            headerVariant="plain"
+            renderMobileCard={(row) => <SystemCardBody row={row} farmMedianEfcr={farmMedianEfcr} />}
+          />
         )}
       </CardContent>
     </Card>
   )
 }
 
-function MobileSystemCards({
-  systems,
-  farmMedianEfcr,
-  emptyMessage,
-  onOpenSystem,
-}: {
-  systems: DashboardSystemRow[]
-  farmMedianEfcr: number | null
-  emptyMessage: string
-  onOpenSystem: (systemId: number) => void
-}) {
-  if (systems.length === 0) {
-    return (
-      <div className="grid gap-3 md:hidden">
-        <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-          {emptyMessage}
-        </div>
-      </div>
-    )
-  }
+function SystemCardBody({ row, farmMedianEfcr }: { row: DashboardSystemRow; farmMedianEfcr: number | null }) {
+  const title = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
 
   return (
-    <div className="grid gap-3 md:hidden">
-      {systems.map((row) => {
-        const title = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
-
-        return (
-          <button
-            key={row.system_id}
-            type="button"
-            onClick={() => onOpenSystem(row.system_id)}
-            className="w-full rounded-lg border border-border/70 bg-background p-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-semibold leading-5 text-foreground">{title}</p>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <MobileMetric label="Fish" value={formatNumberValue(row.fish_end)} />
-              <MobileMetric label="eFCR" value={formatNumberValue(row.efcr, { decimals: 2 })} />
-              <MobileMetric
-                label="ABW"
-                value={formatUnitValue(row.abw, 1, "g")}
-                subtext={formatSampleAgeText(row.sample_age_days)}
-              />
-              <MobileMetric label="SGR" value={formatPercent(row.sgr, 2, "%/day")} />
-              <MobileMetric label="Feed kg" value={formatUnitValue(row.feed_total, 1, "kg")} />
-              <MobileMetric label="Mortality" value={formatPercent(row.mortality_rate, 2)} />
-              <MobileMetric label="Biomass" value={formatUnitValue(row.biomass_end, 1, "kg")} />
-              <MobileMetric label="Density" value={formatUnitValue(row.biomass_density, 2, "kg/m3")} />
-              <div className="col-span-2 rounded-md bg-muted/45 px-2.5 py-2">
-                <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">WQ / Flags</p>
-                <WaterQualityFlagsCell row={row} farmMedianEfcr={farmMedianEfcr} size="card" />
-              </div>
-            </div>
-          </button>
-        )
-      })}
-    </div>
+    <>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold leading-5 text-foreground">{title}</p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <MobileMetric label="Fish" value={formatNumberValue(row.fish_end)} />
+        <MobileMetric label="eFCR" value={formatNumberValue(row.efcr, { decimals: 2 })} />
+        <MobileMetric
+          label="ABW"
+          value={formatUnitValue(row.abw, 1, "g")}
+          subtext={formatSampleAgeText(row.sample_age_days)}
+        />
+        <MobileMetric label="SGR" value={formatPercent(row.sgr, 2, "%/day")} />
+        <MobileMetric label="Feed kg" value={formatUnitValue(row.feed_total, 1, "kg")} />
+        <MobileMetric label="Mortality" value={formatPercent(row.mortality_rate, 2)} />
+        <MobileMetric label="Biomass" value={formatUnitValue(row.biomass_end, 1, "kg")} />
+        <MobileMetric label="Density" value={formatUnitValue(row.biomass_density, 2, "kg/m3")} />
+        <div className="col-span-2 rounded-md bg-muted/45 px-2.5 py-2">
+          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">WQ / Flags</p>
+          <WaterQualityFlagsCell row={row} farmMedianEfcr={farmMedianEfcr} size="card" />
+        </div>
+      </div>
+    </>
   )
 }
 

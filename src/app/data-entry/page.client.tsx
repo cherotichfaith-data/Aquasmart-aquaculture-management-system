@@ -95,7 +95,7 @@ export default function DataEntryPageClient({
       initialFarmName={initialFarmName}
       headerDataOverrides={{ role: initialFarmRole ?? null }}
     >
-      <div className="data-entry-page-shell container mx-auto py-0 sm:py-0">
+      <div className="data-entry-page-shell py-0 sm:py-0">
         {!hasSystems ? (
           <div className="space-y-6">
             <div className="rounded-lg border border-dashed border-border/80 bg-muted/30 p-6 shadow-sm">

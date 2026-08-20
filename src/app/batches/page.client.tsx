@@ -43,7 +43,7 @@ export default function BatchesPageClient({
       initialFarmName={initialFarmName}
       headerDataOverrides={{ role: initialFarmRole ?? null }}
     >
-      <div className="container mx-auto flex flex-col gap-5 p-4 md:p-8">
+      <div className="page-shell">
         <CommandCentreBanner alerts={initialData.alerts} />
 
         <BatchesKpis batches={rows} stockingByBatchId={initialData.stockingByBatchId} />

@@ -124,7 +124,11 @@ export default function Header({
   const resolvedUnreadCount = unreadCount ?? 0
   const canAccessSettings = resolvedRole === "admin" || resolvedRole === "farm_manager"
   const allowDataEntry = canAccessDataEntry(resolvedRole)
-  const showAddData = appPathname === "/" && allowDataEntry
+  // Available from every page the shared header renders on, not just the
+  // dashboard -- logging a reading shouldn't require navigating back first.
+  // Hidden below `md`: MobileQuickEntry (components/layout/mobile-quick-entry)
+  // covers phones with a thumb-reach button instead of this header dropdown.
+  const showAddData = allowDataEntry
   const defaultPeriod: TimePeriod = pageTimeConfig.defaultPeriod
   const batchesQuery = useBatchOptions(
     farmId && !batchOptionsOverride
@@ -581,7 +585,7 @@ export default function Header({
                     <Button
                       variant="default"
                       onClick={openMenu(setAddDataAnchor)}
-                      className="h-10 w-full justify-center rounded-lg px-4 font-bold md:w-auto md:min-w-[140px]"
+                      className="hidden h-10 justify-center rounded-lg px-4 font-bold md:inline-flex md:min-w-[140px]"
                     >
                       <PlusCircle size={18} />
                       Add Data

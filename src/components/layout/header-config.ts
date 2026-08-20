@@ -45,7 +45,7 @@ export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
       defaultPeriod: "all history",
       scope: "dashboard",
       useSystemBounds: false,
-      showBatchFilter: true,
+      showBatchFilter: false,
       showStageFilter: true,
       showTimePeriod: false,
     }

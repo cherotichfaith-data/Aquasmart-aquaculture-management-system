@@ -47,7 +47,7 @@ export default function SystemsPageClient({
       initialFarmName={initialFarmName}
       headerDataOverrides={{ role: initialFarmRole ?? null }}
     >
-      <div className="container mx-auto flex flex-col gap-5 p-4 md:p-8">
+      <div className="page-shell">
         <CommandCentreBanner alerts={initialData.alerts} />
 
         <CommandCentreKpis stockedRows={stockedRows} waterQualityMonthly={initialData.waterQualityMonthly} />

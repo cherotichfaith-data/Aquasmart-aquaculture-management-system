@@ -238,7 +238,7 @@ export default function ProductionPageClient({
       initialFarmName={initialFarmName}
       headerDataOverrides={{ role: initialFarmRole ?? null }}
     >
-      <main className="container mx-auto flex flex-col gap-8 p-4 md:p-8">
+      <div className="page-shell">
         {allSystems.length === 0 ? (
           <EmptyState
             title="No systems available"
@@ -296,13 +296,14 @@ export default function ProductionPageClient({
                   emptyMessage="No production data available for the selected system and date range."
                   initialSorting={[{ id: "date", desc: true }]}
                   shellClassName="production-records-table"
-                  tableClassName="min-w-[860px]"
+                  tableClassName="md:min-w-[860px]"
+                  priorityColumnIds={["date", "system", "biomassKg"]}
                 />
               </CardContent>
             </Card>
           </>
         )}
-      </main>
+      </div>
     </DashboardLayout>
   )
 }

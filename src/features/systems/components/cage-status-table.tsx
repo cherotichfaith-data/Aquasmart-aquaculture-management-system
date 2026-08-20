@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
@@ -176,8 +176,60 @@ export default function CageStatusTable({
           shellClassName="production-records-table max-h-[520px]"
           tableClassName="min-w-[860px] table-fixed"
           headerVariant="plain"
+          renderMobileCard={(row) => (
+            <CageStatusCardBody
+              row={row}
+              cohort={cohortBySystemId[row.system_id] ?? null}
+              mortalityTotal={mortalityBySystemId.get(row.system_id) ?? 0}
+              status={deriveStatus({ row, farmMedianEfcr, hasOpenAlert: alertSystemIds.has(row.system_id) })}
+            />
+          )}
         />
       </CardContent>
     </Card>
+  )
+}
+
+function CageStatusCardBody({
+  row,
+  cohort,
+  mortalityTotal,
+  status,
+}: {
+  row: DashboardSystemRow
+  cohort: string | null
+  mortalityTotal: number
+  status: CageStatus
+}) {
+  const title = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">{title}</p>
+        <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[status]}`}>
+          <span aria-hidden>{STATUS_ICON[status]}</span> {status}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{cohort ?? "No cohort recorded"}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <MobileMetric label="Live Count" value={formatNumberValue(row.fish_end)} />
+        <MobileMetric label="ABW" value={formatUnitValue(row.abw, 1, "g")} />
+        <MobileMetric label="Biomass" value={formatUnitValue(row.biomass_end, 0, "kg")} />
+        <MobileMetric
+          label="Mortality"
+          value={<SeverityValue value={formatNumberValue(mortalityTotal)} active={isMortalityCritical(row)} />}
+        />
+      </div>
+    </>
+  )
+}
+
+function MobileMetric({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md bg-muted/45 px-2.5 py-2">
+      <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 font-semibold text-foreground">{value}</p>
+    </div>
   )
 }

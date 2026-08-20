@@ -11,6 +11,8 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/app-ui/table"
+import { ResponsiveRecordList } from "@/components/shared/responsive-record-list"
+import { cn } from "@/lib/utils"
 
 /**
  * Declarative, generic data table on @tanstack/react-table (aquasmart-main
@@ -40,6 +42,23 @@ type DataTableProps<TRow> = {
   shellClassName?: string
   tableClassName?: string
   headerVariant?: "default" | "plain"
+  /**
+   * Renders each row as a card below the `md` breakpoint instead of a
+   * horizontally-scrolling table row. Use for record-heavy tables read one
+   * row at a time (a single cage, batch, or log entry) rather than compared
+   * side-by-side. DataTable owns the card/button chrome and empty state --
+   * this only returns the content that goes inside it. Ignored together
+   * with `priorityColumnIds` (a table only needs one mobile strategy).
+   */
+  renderMobileCard?: (row: TRow) => ReactNode
+  /**
+   * Column ids to keep visible below `md` when the table should stay
+   * tabular on mobile because the data is genuinely comparison-heavy
+   * (e.g. a production log). Columns not listed collapse away instead of
+   * forcing a full-width horizontal-scroll strip for 1-3 essential values.
+   * Ignored when `renderMobileCard` is set.
+   */
+  priorityColumnIds?: string[]
 }
 
 // Design-guide header: 12px/600 muted labels on a transparent row with a
@@ -56,8 +75,11 @@ export function DataTable<TRow>({
   shellClassName = "",
   tableClassName = "",
   headerVariant = "default",
+  renderMobileCard,
+  priorityColumnIds,
 }: DataTableProps<TRow>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
+  const isPriorityColumn = (id: string) => !priorityColumnIds || priorityColumnIds.includes(id)
 
   // TanStack Table intentionally returns non-memoizable functions; suppress the React Compiler library warning locally.
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -82,7 +104,7 @@ export function DataTable<TRow>({
   const flatColumns = table.getAllLeafColumns()
   const usePlainHeader = headerVariant === "plain"
 
-  return (
+  const table_ = (
     <div className={`soft-table-shell ${shellClassName}`}>
       <Table className={tableClassName}>
         {flatColumns.some((column) => column.columnDef.meta?.width) ? (
@@ -91,6 +113,7 @@ export function DataTable<TRow>({
               <col
                 key={column.id}
                 style={column.columnDef.meta?.width ? { width: column.columnDef.meta.width } : undefined}
+                className={priorityColumnIds && !isPriorityColumn(column.id) ? "hidden md:table-column" : undefined}
               />
             ))}
           </colgroup>
@@ -106,9 +129,10 @@ export function DataTable<TRow>({
                 const label = header.isPlaceholder
                   ? null
                   : flexRender(header.column.columnDef.header, header.getContext())
+                const priorityHidden = priorityColumnIds && !isPriorityColumn(header.column.id)
 
                 return (
-                  <TableHead key={header.id} className={headerCellClass}>
+                  <TableHead key={header.id} className={cn(headerCellClass, priorityHidden && "hidden md:table-cell")}>
                     {usePlainHeader ? (
                       <span className={`inline-flex w-full items-center gap-0.5 text-xs font-semibold text-muted-foreground ${align}`}>
                         <span>{label}</span>
@@ -159,7 +183,11 @@ export function DataTable<TRow>({
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     key={cell.id}
-                    className={`py-2 align-middle ${cell.column.columnDef.meta?.align === "right" ? "text-right" : ""}`}
+                    className={cn(
+                      "py-2 align-middle",
+                      cell.column.columnDef.meta?.align === "right" && "text-right",
+                      priorityColumnIds && !isPriorityColumn(cell.column.id) && "hidden md:table-cell",
+                    )}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
@@ -176,5 +204,21 @@ export function DataTable<TRow>({
         </TableBody>
       </Table>
     </div>
+  )
+
+  if (!renderMobileCard) return table_
+
+  return (
+    <>
+      <ResponsiveRecordList
+        className="md:hidden"
+        data={data}
+        rowKey={rowKey}
+        renderCard={renderMobileCard}
+        onRowClick={onRowClick}
+        emptyMessage={emptyMessage}
+      />
+      <div className="hidden md:block">{table_}</div>
+    </>
   )
 }

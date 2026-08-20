@@ -53,7 +53,7 @@ export default function MortalityByCageChart({
         <CardTitle>Total Mortality by Cage</CardTitle>
       </CardHeader>
       <CardContent className="pt-2">
-        <div className="h-[260px]">
+        <div className="h-[220px] sm:h-[260px]">
           <Bar
             data={data}
             options={buildCartesianOptions({
