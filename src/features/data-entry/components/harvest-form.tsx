@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog } from "@/components/app-ui/dialog"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { useProductionSummary } from "@/features/production/hooks"
-import { useHarvests } from "@/features/reports/hooks"
+import { useHarvests, useMortalityData, useStockingData, useTransferData } from "@/features/reports/hooks"
 import {
     Form,
     FormControl,
@@ -74,11 +74,13 @@ function HarvestCycleSummary({
     farmId,
     system,
     systemId,
+    batchId,
     selectedDate,
 }: {
     farmId: string | null
     system: SystemOption | null
     systemId: number | null
+    batchId: number | null
     selectedDate: string
 }) {
     const summaryQuery = useProductionSummary({
@@ -88,6 +90,34 @@ function HarvestCycleSummary({
         limit: 2500,
         enabled: Boolean(farmId) && Boolean(systemId),
     })
+    const stockingQuery = useStockingData({
+        farmId,
+        systemId: systemId ?? undefined,
+        batchId: batchId ?? undefined,
+        dateTo: selectedDate || undefined,
+        enabled: Boolean(farmId) && Boolean(systemId) && Boolean(selectedDate),
+    })
+    const mortalityQuery = useMortalityData({
+        farmId,
+        systemId: systemId ?? undefined,
+        batchId: batchId ?? undefined,
+        dateTo: selectedDate || undefined,
+        enabled: Boolean(farmId) && Boolean(systemId) && Boolean(selectedDate),
+    })
+    const transferQuery = useTransferData({
+        farmId,
+        systemId: systemId ?? undefined,
+        batchId: batchId ?? undefined,
+        dateTo: selectedDate || undefined,
+        enabled: Boolean(farmId) && Boolean(systemId) && Boolean(selectedDate),
+    })
+    const harvestQuery = useHarvests({
+        farmId,
+        systemId: systemId ?? undefined,
+        batchId: batchId ?? undefined,
+        dateTo: selectedDate || undefined,
+        enabled: Boolean(farmId) && Boolean(systemId) && Boolean(selectedDate),
+    })
 
     const latestCycleRow = summaryQuery.data?.status === "success" ? summaryQuery.data.data[0] ?? null : null
     const cycleRows = useMemo(() => {
@@ -95,11 +125,53 @@ function HarvestCycleSummary({
         if (!latestCycleRow) return []
         return summaryRows.filter((row) => row.cycle_id === latestCycleRow.cycle_id)
     }, [latestCycleRow, summaryQuery.data])
-    const cycleStartDate = cycleRows[cycleRows.length - 1]?.date ?? latestCycleRow?.date ?? null
-    const cycleDays = countCycleDays(cycleStartDate, latestCycleRow?.date ?? null)
-    const queryError = getErrorMessage(summaryQuery.error) ?? getQueryResultError(summaryQuery.data)
+    const liveFishCount = useMemo(() => {
+        if (!systemId) return null
+
+        const stockingRows = stockingQuery.data?.status === "success" ? stockingQuery.data.data : []
+        const mortalityRows = mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : []
+        const transferRows = transferQuery.data?.status === "success" ? transferQuery.data.data : []
+        const harvestRows = harvestQuery.data?.status === "success" ? harvestQuery.data.data : []
+
+        const stocked = stockingRows.reduce((sum, row) => sum + (row.number_of_fish_stocking ?? 0), 0)
+        const dead = mortalityRows.reduce((sum, row) => sum + (row.number_of_fish_mortality ?? 0), 0)
+        const harvested = harvestRows.reduce((sum, row) => sum + (row.number_of_fish_harvest ?? 0), 0)
+        const transferredNet = transferRows.reduce((sum, row) => {
+            const incoming = row.target_system_id === systemId ? (row.number_of_fish_transfer ?? 0) : 0
+            const outgoing = row.origin_system_id === systemId ? (row.number_of_fish_transfer ?? 0) : 0
+            return sum + incoming - outgoing
+        }, 0)
+
+        return stocked + transferredNet - dead - harvested
+    }, [
+        harvestQuery.data,
+        mortalityQuery.data,
+        stockingQuery.data,
+        systemId,
+        transferQuery.data,
+    ])
+    const cycleStartDate =
+        latestCycleRow?.cycle_start ??
+        cycleRows[cycleRows.length - 1]?.cycle_start ??
+        cycleRows[cycleRows.length - 1]?.date ??
+        latestCycleRow?.date ??
+        null
+    const cycleDays = countCycleDays(cycleStartDate, selectedDate || (latestCycleRow?.date ?? null))
+    const queryError =
+        getErrorMessage(summaryQuery.error) ??
+        getQueryResultError(summaryQuery.data) ??
+        getErrorMessage(stockingQuery.error) ??
+        getQueryResultError(stockingQuery.data) ??
+        getErrorMessage(mortalityQuery.error) ??
+        getQueryResultError(mortalityQuery.data) ??
+        getErrorMessage(transferQuery.error) ??
+        getQueryResultError(transferQuery.data) ??
+        getErrorMessage(harvestQuery.error) ??
+        getQueryResultError(harvestQuery.data)
     const summaryLabel = systemId ? formatCageLabel(system) : "Selected system"
     const asOfDate = latestCycleRow?.date ?? null
+    const isLoadingSummary =
+        summaryQuery.isLoading || stockingQuery.isLoading || mortalityQuery.isLoading || transferQuery.isLoading || harvestQuery.isLoading
 
     return (
         <Card className="xl:sticky xl:top-6">
@@ -119,7 +191,7 @@ function HarvestCycleSummary({
                     <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive">
                         Unable to load cycle summary. {queryError}
                     </div>
-                ) : summaryQuery.isLoading ? (
+                ) : isLoadingSummary ? (
                     <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                         {Array.from({ length: 3 }).map((_, index) => (
                             <div key={index} className="rounded-md border border-border/80 bg-muted/30 p-3">
@@ -148,12 +220,14 @@ function HarvestCycleSummary({
                             <div className="rounded-md border border-border/80 bg-muted/20 p-3">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Fish Count</p>
                                 <p className="mt-2 text-2xl font-semibold">
-                                    {formatNumberValue(latestCycleRow.number_of_fish_inventory)}
+                                    {formatNumberValue(liveFishCount)}
                                 </p>
                             </div>
                         </div>
                         <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
-                            Use these cycle totals to confirm the entered harvest fish count and weight are consistent before saving.
+                            {asOfDate && selectedDate && asOfDate !== selectedDate
+                                ? `Cycle days are counted through ${formatDateOnly(selectedDate)}. Inventory and eFCR reflect the latest available summary on ${formatDateOnly(asOfDate)}.`
+                                : "Use these cycle totals to confirm the entered harvest fish count and weight are consistent before saving."}
                         </div>
                     </>
                 )}
@@ -432,6 +506,7 @@ export function HarvestForm({
                     farmId={farmId}
                     system={selectedSystem}
                     systemId={resolvedSystemId}
+                    batchId={resolvedBatchId}
                     selectedDate={selectedDate}
                 />
             </div>
