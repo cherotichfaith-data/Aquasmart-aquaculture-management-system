@@ -3,9 +3,9 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
-  fetchRpc,
   getClientOrError,
   isAbortLikeError,
+  queryOptionsRpc,
   resolveClientReadQuery,
   toQuerySuccess,
   type OptionsRpcName,
@@ -27,7 +27,6 @@ type FingerlingSupplierRow = Omit<FingerlingSupplierTableRow, "location_city"> &
 }
 type AppConfigRow = Database["public"]["Tables"]["app_config"]["Row"]
 type OptionsRpcRow<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Returns"][number]
-type OptionsRpcArgs<Name extends OptionsRpcName> = Database["public"]["Functions"][Name]["Args"]
 
 const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
 
@@ -45,15 +44,6 @@ function normalizeFingerlingSupplierOptions(
   }))
 }
 
-async function rpcOrEmpty<Name extends OptionsRpcName>(
-  tag: string,
-  name: Name,
-  args?: OptionsRpcArgs<Name>,
-  signal?: AbortSignal,
-): Promise<QueryResult<OptionsRpcRow<Name>>> {
-  return fetchRpc<OptionsRpcRow<Name>>(tag, name, args as Record<string, unknown> | undefined, signal)
-}
-
 export async function getSystemOptions(params?: {
   farmId?: string | null
   stage?: Enums<"system_growth_stage"> | "all"
@@ -62,17 +52,27 @@ export async function getSystemOptions(params?: {
 }): Promise<QueryResult<SystemListItem>> {
   if (!params?.farmId) return empty<SystemListItem>()
 
+  // "api_system_options_rpc" is scoped by the same RLS the caller's own
+  // session already carries -- no server hop needed to enforce anything
+  // the database doesn't already enforce for a direct call.
+  const clientResult = await getClientOrError("getSystemOptions", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
   type SystemOptionsRpcRow = OptionsRpcRow<"api_system_options_rpc">
-  const result = await fetchRpc<SystemOptionsRpcRow>(
-    "getSystemOptions",
-    "api_system_options_rpc",
-    {
-      p_farm_id: params.farmId,
-      p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
-      p_active_only: params.activeOnly ?? true,
-    },
-    params.signal,
-  )
+  let query = queryOptionsRpc(supabase, "api_system_options_rpc", {
+    p_farm_id: params.farmId,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+    p_active_only: params.activeOnly ?? true,
+  })
+  if (params.signal) query = query.abortSignal(params.signal)
+
+  const result = await resolveClientReadQuery<SystemOptionsRpcRow>({
+    tag: "getSystemOptions",
+    query,
+    signal: params.signal,
+    quietWhen: isQuietTableError,
+  })
   if (result.status !== "success") return result
 
   const rows: SystemListItem[] = result.data.map((row) => ({
@@ -101,12 +101,22 @@ export async function getBatchOptions(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  const rpcResult = await rpcOrEmpty(
-    "getBatchOptions",
-    "api_fingerling_batch_options_rpc",
-    { p_farm_id: params.farmId, p_active_only: params.activeOnly ?? true },
-    params.signal,
-  )
+  // Same reasoning as getSystemOptions: called directly on the client
+  // already resolved above (the one the supplier/api_dashboard_batches
+  // calls just below already use), instead of a round trip through
+  // /api/rpc for a read RLS already scopes correctly on its own.
+  let batchQuery = queryOptionsRpc(supabase, "api_fingerling_batch_options_rpc", {
+    p_farm_id: params.farmId,
+    p_active_only: params.activeOnly ?? true,
+  })
+  if (params.signal) batchQuery = batchQuery.abortSignal(params.signal)
+
+  const rpcResult = await resolveClientReadQuery<OptionsRpcRow<"api_fingerling_batch_options_rpc">>({
+    tag: "getBatchOptions",
+    query: batchQuery,
+    signal: params.signal,
+    quietWhen: isQuietTableError,
+  })
   if (rpcResult.status !== "success") return rpcResult
   const rows = rpcResult.data.filter((row) => Number.isFinite(row.id))
   if (!rows.length) return toQuerySuccess<BatchListItem>([])
@@ -185,7 +195,19 @@ export async function getFarmOptions(params?: {
   limit?: number
   signal?: AbortSignal
 }): Promise<QueryResult<FarmOptionRow>> {
-  const res = await rpcOrEmpty("getFarmOptions", "api_farm_options_rpc", undefined, params?.signal)
+  const clientResult = await getClientOrError("getFarmOptions", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = queryOptionsRpc(supabase, "api_farm_options_rpc")
+  if (params?.signal) query = query.abortSignal(params.signal)
+
+  const res = await resolveClientReadQuery<FarmOptionRow>({
+    tag: "getFarmOptions",
+    query,
+    signal: params?.signal,
+    quietWhen: isQuietTableError,
+  })
   if (res.status !== "success") return res
 
   const rows = res.data

@@ -384,7 +384,7 @@ export default function UsersPageClient({
                 <thead>
                   <tr className="border-b border-border/50 bg-muted/20 text-left text-xs font-semibold uppercase tracking-wide text-foreground/70">
                     <th className="px-6 py-4">User</th>
-                    <th className="px-6 py-4">Email</th>
+                    <th className="hidden px-6 py-4 md:table-cell">Email</th>
                     <th className="px-6 py-4">Role</th>
                     <th className="px-6 py-4">Actions</th>
                   </tr>
@@ -394,8 +394,9 @@ export default function UsersPageClient({
                     <tr key={member.user_id} className="border-b border-border/40 last:border-0">
                       <td className="px-6 py-5">
                         <p className="font-medium text-foreground">{member.full_name ?? "Unnamed user"}</p>
+                        <p className="mt-0.5 text-xs text-foreground/70 md:hidden">{member.email ?? "No email found"}</p>
                       </td>
-                      <td className="px-6 py-5 text-foreground/80">{member.email ?? "No email found"}</td>
+                      <td className="hidden px-6 py-5 text-foreground/80 md:table-cell">{member.email ?? "No email found"}</td>
                       <td className="px-6 py-5">
                         {editingUserId === member.user_id ? (
                           <select

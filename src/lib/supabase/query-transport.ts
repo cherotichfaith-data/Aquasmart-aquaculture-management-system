@@ -69,17 +69,14 @@ export function queryKpiRpc<Name extends KpiRpcName>(
 }
 
 /**
- * Typed RPC wrapper (Options)
+ * Typed RPC wrapper (Options). Deliberately not declared as two overloads
+ * returning `ReturnType<SupabaseClient["rpc"]>` -- that type doesn't carry
+ * `Name` through, so it collapses to a broad union across every RPC's
+ * return shape in the whole schema instead of the one being called.
+ * Leaving the return type inferred from the two branches below (both real
+ * `.rpc()` calls narrowed by the literal `name: Name`) gives callers the
+ * builder actually typed to this RPC's row shape.
  */
-export function queryOptionsRpc<Name extends OptionsRpcName>(
-  supabase: SupabaseClient,
-  name: Name,
-): ReturnType<SupabaseClient["rpc"]>
-export function queryOptionsRpc<Name extends OptionsRpcName>(
-  supabase: SupabaseClient,
-  name: Name,
-  args: PublicFunctions[Name]["Args"],
-): ReturnType<SupabaseClient["rpc"]>
 export function queryOptionsRpc<Name extends OptionsRpcName>(
   supabase: SupabaseClient,
   name: Name,
