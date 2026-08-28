@@ -10,12 +10,12 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { completeOnboardingProfileAction } from "@/features/onboarding/mutations.server"
 import type { OnboardingPageInitialData } from "@/features/onboarding/queries.server"
 import {
-  AQUASMART_ROLE_OPTIONS,
+  SAMAKI360_ROLE_OPTIONS,
   ONBOARDING_CREATE_WORKSPACE_PATH,
   normalizeRole,
   resolveAppEntryPath,
   sanitizeNextPath,
-  type AquaSmartRole,
+  type Samaki360Role,
 } from "@/lib/app-entry"
 import { queryKeys } from "@/lib/cache/query-keys"
 
@@ -24,14 +24,14 @@ const inputCls =
 
 type MembershipState = {
   farmId: string | null
-  role: AquaSmartRole
+  role: Samaki360Role
   source: "active" | "invite" | "none"
 }
 
 type OnboardingDraftState = {
   sourceToken: symbol
   fullName: string
-  role: Exclude<AquaSmartRole, null>
+  role: Exclude<Samaki360Role, null>
   membership: MembershipState
 }
 
@@ -114,7 +114,7 @@ export default function OnboardingPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null)
   const assignedRole = membership.role
-  const effectiveRole = (assignedRole ?? role) as Exclude<AquaSmartRole, null>
+  const effectiveRole = (assignedRole ?? role) as Exclude<Samaki360Role, null>
   const canChooseRole = !assignedRole
   const nextPath = sanitizeNextPath(searchParams.get("next"), resolveAppEntryPath(effectiveRole))
   const createWorkspaceHref = `${ONBOARDING_CREATE_WORKSPACE_PATH}?next=${encodeURIComponent(nextPath)}`
@@ -134,7 +134,7 @@ export default function OnboardingPageClient() {
     setNoticeMessage(null)
 
     try {
-      const selectedRole = (assignedRole ?? role) as Exclude<AquaSmartRole, null>
+      const selectedRole = (assignedRole ?? role) as Exclude<Samaki360Role, null>
 
       const result = await completeOnboardingProfileAction({
         fullName: trimmedFullName,
@@ -175,7 +175,7 @@ export default function OnboardingPageClient() {
 
   return (
     <OnboardingShell
-      title="Welcome to AquaSmart"
+      title="Welcome"
       description="Use onboarding as the single place to confirm your profile, accept assigned access, or create a new farm workspace."
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -216,12 +216,12 @@ export default function OnboardingPageClient() {
               <span className="text-sm font-medium text-foreground">Role</span>
               <select
                 value={effectiveRole}
-                onChange={(event) => updateDraft("role", event.target.value as Exclude<AquaSmartRole, null>)}
+                onChange={(event) => updateDraft("role", event.target.value as Exclude<Samaki360Role, null>)}
                 disabled={!canChooseRole}
                 className={inputCls}
               >
                 {assignedRole === "admin" ? <option value="admin">Admin</option> : null}
-                {AQUASMART_ROLE_OPTIONS.filter((option) => option.value !== "admin").map((option) => (
+                {SAMAKI360_ROLE_OPTIONS.filter((option) => option.value !== "admin").map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

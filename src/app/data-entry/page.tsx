@@ -10,7 +10,7 @@ import { requireUserContext } from "@/lib/supabase/require-user"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 
 export const metadata: Metadata = {
-  title: "Data Capture - AquaSmart",
+  title: "Data Capture - Samaki360",
   description: "Record daily farm events",
 }
 

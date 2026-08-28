@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import SetPasswordPageClient from "./page.client"
 
 export const metadata: Metadata = {
-  title: "Create Account | AquaSmart",
-  description: "Create your AquaSmart account from an invitation.",
+  title: "Create Account | Samaki360",
+  description: "Create your Samaki360 account from an invitation.",
 }
 
 export default function SetPasswordPage() {

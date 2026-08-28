@@ -48,7 +48,7 @@ export default function ForgotPasswordPageClient() {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_12%,transparent),color-mix(in_srgb,var(--brand-panel-shell-from)_32%,transparent))]" />
       <div className="relative z-10 w-full max-w-md rounded-[24px] border border-[color:color-mix(in_srgb,var(--card)_70%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card)_82%,transparent),color-mix(in_srgb,var(--card)_68%,transparent))] p-6 shadow-[0_24px_70px_color-mix(in_srgb,var(--chart-5)_18%,transparent)] backdrop-blur-[18px]">
         <div className="flex items-center gap-3">
-          <Image src="/use this.png" alt="AquaSmart logo" width={36} height={36} className="h-9 w-9" priority />
+          <Image src="/Bild.png" alt="Samaki360 logo" width={3284} height={528} className="h-auto w-[168px]" priority />
           <div>
             <div className="font-serif text-[1.45rem] font-extrabold tracking-[-0.04em]">
               <span className="text-[var(--secondary)]">Aqua</span>

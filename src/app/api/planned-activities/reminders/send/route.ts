@@ -43,7 +43,7 @@ function isAuthorized(request: Request) {
 }
 
 function buildReminderSubject(scheduledDate: string) {
-  return `AquaSmart reminder: planned activities for ${formatPlannedActivityDateLabel(scheduledDate)}`
+  return `Samaki360 reminder: planned activities for ${formatPlannedActivityDateLabel(scheduledDate)}`
 }
 
 function buildReminderText(activities: PlannedActivity[], scheduledDate: string) {
@@ -65,7 +65,7 @@ function buildReminderHtml(activities: PlannedActivity[], scheduledDate: string)
 
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#12212b;">
-      <h2 style="margin-bottom:8px;">AquaSmart planned activities reminder</h2>
+      <h2 style="margin-bottom:8px;">Samaki360 planned activities reminder</h2>
       <p style="margin-bottom:16px;">These activities are scheduled for <strong>${escapeHtml(formatPlannedActivityDateLabel(scheduledDate))}</strong>.</p>
       <ol style="padding-left:20px;margin:0;">${items}</ol>
     </div>

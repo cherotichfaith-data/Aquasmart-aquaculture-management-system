@@ -159,10 +159,27 @@ function LogoBlock({
           className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90"
           onClick={mobile ? onClose : undefined}
         >
-          <Image src="/use this.png" alt="AquaSmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
-          {!collapsed || mobile ? (
-            <span className="text-lg font-bold text-[color:var(--color-sidebar-foreground)]">AquaSmart</span>
-          ) : null}
+          {collapsed && !mobile ? (
+            <span className="block h-9 w-9 shrink-0 overflow-hidden" aria-label="Samaki360">
+              <Image
+                src="/Bild.png"
+                alt=""
+                width={3284}
+                height={528}
+                className="h-9 w-auto max-w-none -translate-x-[188px]"
+                priority
+              />
+            </span>
+          ) : (
+            <Image
+              src="/Bild.png"
+              alt="Samaki360 logo"
+              width={3284}
+              height={528}
+              className="h-auto w-[158px] shrink-0"
+              priority
+            />
+          )}
         </Link>
       </div>
       {mobile ? (

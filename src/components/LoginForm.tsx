@@ -127,7 +127,7 @@ export default function LoginForm() {
       }
 
       if (isInviteContinuation) {
-        setFormError("This email has a pending AquaSmart invite. Open the latest invite email instead of creating a new account.")
+        setFormError("This email has a pending platform invite. Open the latest invite email instead of creating a new account.")
         setIsSubmitting(false)
         return
       }
@@ -269,23 +269,9 @@ export default function LoginForm() {
         .logo-header {
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 0.75rem;
           margin-bottom: 1.25rem;
-        }
-
-        .logo-text {
-          font-size: 1.6rem;
-          font-weight: 800;
-          letter-spacing: -0.6px;
-          font-family: var(--font-serif);
-        }
-
-        .logo-text-aqua {
-          color: var(--auth-accent);
-        }
-
-        .logo-text-smart {
-          color: var(--auth-accent);
         }
 
         .login-header h1 {
@@ -504,16 +490,19 @@ export default function LoginForm() {
         <section className="login-card">
           <div className="login-header">
             <div className="logo-header">
-              <Image src="/use this.png" alt="AquaSmart fish logo" width={36} height={36} priority />
-              <span className="logo-text">
-                <span className="logo-text-aqua">Aqua</span>
-                <span className="logo-text-smart">Smart</span>
-              </span>
+              <Image
+                src="/Bild.png"
+                alt="Samaki360 logo"
+                width={3284}
+                height={528}
+                className="h-auto w-[180px]"
+                priority
+              />
             </div>
-            <h1>{authMode === "signin" ? "Sign in to your dashboard" : "Create your AquaSmart account"}</h1>
+            <h1>{authMode === "signin" ? "Sign in to your dashboard" : "Create your account"}</h1>
             {isInviteContinuation ? (
               <p>
-                If you arrived from an invite, open the latest AquaSmart invite email. The invite link sets up your
+                If you arrived from an invite, open the latest invite email. The invite link sets up your
                 session before you choose a password.
               </p>
             ) : null}
@@ -660,7 +649,7 @@ export default function LoginForm() {
               <span>Need a fresh invite link? Ask your farm admin to resend the invitation.</span>
             ) : authMode === "signin" ? (
               <>
-                New to AquaSmart?{" "}
+                New here?{" "}
                 <button
                   type="button"
                   className="link-btn"

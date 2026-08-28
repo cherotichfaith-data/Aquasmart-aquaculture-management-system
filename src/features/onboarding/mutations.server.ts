@@ -6,7 +6,7 @@ import { requireMutationActionUser } from "@/lib/server/mutation-actions"
 import { revalidateWriteTags } from "@/lib/server/write-through"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { logSbError } from "@/lib/supabase/log"
-import { normalizeRole, type AquaSmartRole } from "@/lib/app-entry"
+import { normalizeRole, type Samaki360Role } from "@/lib/app-entry"
 
 const VALID_ROLES = [
   "admin",
@@ -25,7 +25,7 @@ type OnboardingProfileInput = z.infer<typeof onboardingProfileSchema>
 
 type OnboardingProfileResult = {
   farmId: string | null
-  role: AquaSmartRole
+  role: Samaki360Role
   membershipAssigned: boolean
   notice?: string
 }
