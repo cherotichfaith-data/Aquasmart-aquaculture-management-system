@@ -4,7 +4,7 @@ import { getMe } from "@/lib/api"
 import { createClient } from "@/lib/supabase/client"
 import { createAccessTokenClient } from "@/lib/supabase/access-token-client"
 import { isSbAuthMissing, isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
-import { getSessionUser } from "@/lib/supabase/session"
+import { getSessionUser, isSessionTokenExpired } from "@/lib/supabase/session"
 
 type SupabaseClient = ReturnType<typeof createClient> | ReturnType<typeof createAccessTokenClient>
 type PublicFunctions = Database["public"]["Functions"]
@@ -165,10 +165,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 
 export async function getClientOrError(
   tag: string,
-  options?: { requireSession?: boolean },
+  options?: { requireSession?: boolean; accessToken?: string | null },
 ): Promise<{ supabase: SupabaseClient } | { error: QueryResult<never> }> {
-  const supabase = createClient()
   const requireSession = options?.requireSession ?? false
+  const suppliedAccessToken = options?.accessToken?.trim() ?? ""
+
+  // AuthProvider restores returning users from the server-side session cookie.
+  // That gives React a valid access token even when the browser Supabase client
+  // has no local session yet. Use that token immediately instead of waiting on
+  // browser auth discovery (which is only guaranteed after a fresh sign-in).
+  if (suppliedAccessToken && !isSessionTokenExpired(suppliedAccessToken)) {
+    return { supabase: createAccessTokenClient(suppliedAccessToken) }
+  }
+
+  const supabase = createClient()
 
   if (requireSession) {
     const sessionUser = await withTimeout(getSessionUser(supabase, `api:${tag}:getSession`), 4000)

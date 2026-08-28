@@ -8,11 +8,25 @@ export const queryKeys = {
       farmId?: string | null
       stage?: string | null
       activeOnly?: boolean
+      userId?: string | null
     }) {
-      return ["options", "systems", farmToken(params?.farmId), params?.stage ?? "all", params?.activeOnly ?? true] as const
+      return [
+        "options",
+        "systems",
+        params?.userId ?? "anon",
+        farmToken(params?.farmId),
+        params?.stage ?? "all",
+        params?.activeOnly ?? true,
+      ] as const
     },
-    batches(params?: { farmId?: string | null; activeOnly?: boolean }) {
-      return ["options", "batches", farmToken(params?.farmId), params?.activeOnly ?? true] as const
+    batches(params?: { farmId?: string | null; activeOnly?: boolean; userId?: string | null }) {
+      return [
+        "options",
+        "batches",
+        params?.userId ?? "anon",
+        farmToken(params?.farmId),
+        params?.activeOnly ?? true,
+      ] as const
     },
     feedSuppliers(userId?: string | null) {
       return ["options", "feed-suppliers", userId ?? "anon"] as const

@@ -45,10 +45,6 @@ import {
   type CustomTimeRange,
   type TimeBounds,
 } from "@/lib/time-period"
-import type { SystemOption } from "@/lib/system-options"
-import type { Database } from "@/lib/types/database"
-
-type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 
 const normalizeBatchDisplayLabel = (label: string | null | undefined) => {
   const trimmed = label?.trim() ?? ""
@@ -87,8 +83,6 @@ export default function Header({
   initialFarmId,
   initialFarmName,
   roleOverride,
-  systemOptionsOverride,
-  batchOptionsOverride,
   timeBoundsOverride,
   onMenuClick,
   showToolbar = true,
@@ -96,8 +90,6 @@ export default function Header({
   initialFarmId?: string | null
   initialFarmName?: string | null
   roleOverride?: string | null
-  systemOptionsOverride?: SystemOption[]
-  batchOptionsOverride?: BatchOption[]
   timeBoundsOverride?: TimeBounds
   onMenuClick: () => void
   showToolbar?: boolean
@@ -130,28 +122,22 @@ export default function Header({
   // covers phones with a thumb-reach button instead of this header dropdown.
   const showAddData = allowDataEntry
   const defaultPeriod: TimePeriod = pageTimeConfig.defaultPeriod
-  const batchesQuery = useBatchOptions(
-    farmId && !batchOptionsOverride
-      ? { farmId }
-      : undefined,
-  )
+  const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
   const systemsQuery = useSystemOptions(
     farmId
       ? {
           farmId,
           activeOnly: appPathname.startsWith("/feed") ? false : true,
-          enabled: !systemOptionsOverride,
-          stockedOnly: true,
         }
       : undefined,
   )
   const allSystemsForChips = useMemo(
-    () => systemOptionsOverride ?? (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
-    [systemOptionsOverride, systemsQuery.data],
+    () => (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
+    [systemsQuery.data],
   )
   const allBatchesForChips = useMemo(
-    () => batchOptionsOverride ?? (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []),
-    [batchOptionsOverride, batchesQuery.data],
+    () => (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []),
+    [batchesQuery.data],
   )
   const rawPeriodParam = searchParams.get("date")
 

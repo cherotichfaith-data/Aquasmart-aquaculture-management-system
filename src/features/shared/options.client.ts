@@ -48,6 +48,7 @@ export async function getSystemOptions(params?: {
   farmId?: string | null
   stage?: Enums<"system_growth_stage"> | "all"
   activeOnly?: boolean
+  accessToken?: string | null
   signal?: AbortSignal
 }): Promise<QueryResult<SystemListItem>> {
   if (!params?.farmId) return empty<SystemListItem>()
@@ -55,7 +56,10 @@ export async function getSystemOptions(params?: {
   // "api_system_options_rpc" is scoped by the same RLS the caller's own
   // session already carries -- no server hop needed to enforce anything
   // the database doesn't already enforce for a direct call.
-  const clientResult = await getClientOrError("getSystemOptions", { requireSession: true })
+  const clientResult = await getClientOrError("getSystemOptions", {
+    requireSession: true,
+    accessToken: params.accessToken,
+  })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
@@ -93,11 +97,15 @@ export async function getSystemOptions(params?: {
 export async function getBatchOptions(params?: {
   farmId?: string | null
   activeOnly?: boolean
+  accessToken?: string | null
   signal?: AbortSignal
 }): Promise<QueryResult<BatchListItem>> {
   if (!params?.farmId) return empty<BatchListItem>()
 
-  const clientResult = await getClientOrError("getBatchOptions", { requireSession: true })
+  const clientResult = await getClientOrError("getBatchOptions", {
+    requireSession: true,
+    accessToken: params.accessToken,
+  })
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
