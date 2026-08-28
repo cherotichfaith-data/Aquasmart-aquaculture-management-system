@@ -21,7 +21,7 @@ export function OnboardingShell({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-white/78">
-              <Image src="/use this.png" alt="AquaSmart logo" width={28} height={28} />
+              <Image src="/Bild.png" alt="Samaki360 logo" width={3284} height={528} className="h-auto w-[142px]" />
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em]">

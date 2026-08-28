@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/app-ui/skeleton"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { queryKeys } from "@/lib/cache/query-keys"
-import { formatRoleLabel, resolveAppEntryPath, type AquaSmartRole } from "@/lib/app-entry"
+import { formatRoleLabel, resolveAppEntryPath, type Samaki360Role } from "@/lib/app-entry"
 import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { getSessionUser } from "@/lib/supabase/session"
@@ -252,7 +252,7 @@ function FarmInformationSection({
   handleChange: (field: string, value: string | number) => void
   displayName: string
   accountEmail: string
-  farmRole: AquaSmartRole
+  farmRole: Samaki360Role
 }) {
   return (
     <div className="soft-panel p-5 sm:p-6">
@@ -413,7 +413,7 @@ export default function SettingsPage({
   initialFarmId?: string | null
   initialFarmName?: string | null
   initialUserId?: string | null
-  initialFarmRole?: AquaSmartRole | null
+  initialFarmRole?: Samaki360Role | null
   initialSettingsLoad?: SettingsLoadData
 }) {
   const initialThresholdRow = initialSettingsLoad?.thresholdRow ?? null
@@ -438,7 +438,7 @@ export default function SettingsPage({
   const { farm, farmId, loading: farmLoading } = useActiveFarm({ initialFarmId, initialFarmName })
   const resolvedFarmId = farmId ?? initialFarmId ?? null
   const farmRoleQuery = useActiveFarmRole(resolvedFarmId)
-  const farmRole = (farmRoleQuery.data ?? initialFarmRole ?? null) as AquaSmartRole
+  const farmRole = (farmRoleQuery.data ?? initialFarmRole ?? null) as Samaki360Role
   const missingFarmAssignment = Boolean(resolvedUserId) && !farmLoading && !resolvedFarmId
   const router = useRouter()
   const canAccessSettings = !farmRole || farmRole === "admin" || farmRole === "farm_manager"
@@ -614,7 +614,7 @@ export default function SettingsPage({
                 <div>
                   <p className="font-medium text-warning">Set up or join a farm first</p>
                   <p className="mt-2 text-sm leading-6 text-warning/90">
-                    AquaSmart settings are only available after you have farm access.
+                    Settings are only available after you have farm access.
                   </p>
                 </div>
                 <a
@@ -654,4 +654,3 @@ export default function SettingsPage({
     </DashboardLayout>
   )
 }
-

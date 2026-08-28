@@ -1,6 +1,6 @@
-# AquaSmart
+# Samaki360
 
-AquaSmart is a Next.js and Supabase aquaculture operations platform for farm teams that need daily production capture, operational dashboards, reporting, and offline-friendly field workflows.
+Samaki360 is a Next.js and Supabase aquaculture operations platform for farm teams that need daily production capture, operational dashboards, reporting, and offline-friendly field workflows.
 
 ## Current App Scope
 

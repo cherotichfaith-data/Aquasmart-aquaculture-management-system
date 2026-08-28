@@ -29,32 +29,32 @@ function resolveMetadataBase() {
 }
 
 export const metadata: Metadata = {
-  title: "AquaSmart - Aquaculture Management Dashboard",
+  title: "Samaki360 - Aquaculture Management Dashboard",
   description: "Real-time monitoring and management system for aquaculture farm operations",
   metadataBase: resolveMetadataBase(),
   openGraph: {
-    title: "AquaSmart - Aquaculture Management Dashboard",
+    title: "Samaki360 - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
     type: "website",
     images: [
       {
-        url: "/use this.png",
-        width: 60,
-        height: 60,
-        alt: "AquaSmart logo",
+        url: "/Bild.png",
+        width: 3284,
+        height: 528,
+        alt: "Samaki360 logo",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AquaSmart - Aquaculture Management Dashboard",
+    title: "Samaki360 - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
-    images: ["/use this.png"],
+    images: ["/Bild.png"],
   },
   manifest: "/manifest.json",
   icons: {
-    icon: "/use this.png",
-    apple: "/use this.png",
+    icon: "/Bild.png",
+    apple: "/Bild.png",
   },
 }
 

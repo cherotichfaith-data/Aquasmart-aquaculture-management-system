@@ -4,9 +4,9 @@ import LandingPage from "@/components/marketing/landing-page"
 import { WORKSPACE_SELECT_PATH } from "@/lib/app-entry"
 
 export const metadata: Metadata = {
-  title: "AquaSmart | Aquaculture Management Software",
+  title: "Samaki360 | Aquaculture Management Software",
   description:
-    "AquaSmart is aquaculture management software for fish farms with KPI dashboards, feed tracking, mortality records, water quality monitoring, inventory control, and reporting.",
+    "Samaki360 is aquaculture management software for fish farms with KPI dashboards, feed tracking, mortality records, water quality monitoring, inventory control, and reporting.",
   keywords: [
     "aquaculture management software",
     "fish farm management",
@@ -21,27 +21,27 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "AquaSmart | Aquaculture Management Software",
+    title: "Samaki360 | Aquaculture Management Software",
     description:
       "Manage aquaculture operations with real-time KPIs, feed control, mortality tracking, and water quality monitoring.",
     url: "/",
-    siteName: "AquaSmart",
+    siteName: "Samaki360",
     type: "website",
     images: [
       {
-        url: "/use this.png",
-        width: 60,
-        height: 60,
-        alt: "AquaSmart logo",
+        url: "/Bild.png",
+        width: 3284,
+        height: 528,
+        alt: "Samaki360 logo",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AquaSmart | Aquaculture Management Software",
+    title: "Samaki360 | Aquaculture Management Software",
     description:
       "Aquaculture management software for KPI monitoring, feed tracking, water quality, inventory, and reporting.",
-    images: ["/use this.png"],
+    images: ["/Bild.png"],
   },
   robots: {
     index: true,

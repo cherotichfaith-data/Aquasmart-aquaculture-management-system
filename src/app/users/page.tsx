@@ -9,7 +9,7 @@ import { createQueryClient } from "@/lib/react-query/query-client"
 import { requireUser, requireUserContext } from "@/lib/supabase/require-user"
 import { normalizeRole, resolveAppEntryPath } from "@/lib/app-entry"
 
-export const metadata = { title: "Users | AquaSmart" }
+export const metadata = { title: "Users | Samaki360" }
 
 type SearchParams = Record<string, string | string[] | undefined>
 
