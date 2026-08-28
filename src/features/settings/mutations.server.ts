@@ -46,7 +46,7 @@ const revokeInviteSchema = z.object({
 })
 
 const ACCESS_GRANT_ALLOWED_ROLES = new Set(["admin"])
-const PRODUCTION_APP_ORIGIN = "https://aquasmart-fish-management-system.vercel.app"
+const LOCAL_APP_ORIGIN = "http://localhost:3000"
 
 type InviteActionResult = {
   assigned: true
@@ -84,7 +84,7 @@ function getAppOrigin() {
     process.env.NEXT_PUBLIC_SITE_URL,
     process.env.VERCEL_PROJECT_PRODUCTION_URL,
     process.env.VERCEL_URL,
-    isHostedRuntime ? PRODUCTION_APP_ORIGIN : "http://localhost:3000",
+    isHostedRuntime ? null : LOCAL_APP_ORIGIN,
   ]
 
   for (const candidate of candidates) {
@@ -94,7 +94,9 @@ function getAppOrigin() {
     return origin
   }
 
-  return PRODUCTION_APP_ORIGIN
+  // On Vercel, VERCEL_PROJECT_PRODUCTION_URL is always injected, so this is only
+  // reached in unconfigured local runs.
+  return LOCAL_APP_ORIGIN
 }
 
 function buildInviteRedirectUrl() {

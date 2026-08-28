@@ -9,22 +9,25 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
 import { ReactQueryProvider } from "@/lib/react-query-provider"
 import "./globals.css"
 
+// Resolve the canonical site URL from configuration only -- explicit env first,
+// then the values Vercel injects automatically, and finally the local dev
+// origin. No production/brand URL is hard-coded; set NEXT_PUBLIC_APP_URL to
+// override.
 function resolveMetadataBase() {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
-  const fallback = "https://aquasmart.app"
+  const LOCAL_ORIGIN = "http://localhost:3000"
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||
+    process.env.VERCEL_URL?.trim() ||
+    LOCAL_ORIGIN
 
-  if (!configuredUrl) {
-    return new URL(fallback)
-  }
-
-  const normalized = /^https?:\/\//i.test(configuredUrl)
-    ? configuredUrl
-    : `https://${configuredUrl}`
+  const normalized = /^https?:\/\//i.test(configured) ? configured : `https://${configured}`
 
   try {
     return new URL(normalized)
   } catch {
-    return new URL(fallback)
+    return new URL(LOCAL_ORIGIN)
   }
 }
 
