@@ -41,7 +41,7 @@ export default function BatchesPageClient({
     <DashboardLayout
       initialFarmId={initialFarmId}
       initialFarmName={initialFarmName}
-      headerDataOverrides={{ role: initialFarmRole ?? null }}
+      headerDataOverrides={{ role: initialFarmRole ?? null, timeBounds: initialData.bounds }}
     >
       <div className="page-shell">
         <CommandCentreBanner alerts={initialData.alerts} />
