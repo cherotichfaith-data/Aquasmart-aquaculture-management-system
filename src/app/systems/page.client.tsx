@@ -11,17 +11,20 @@ import EfcrByPeriodChart from "@/features/systems/components/charts/efcr-by-peri
 import WaterQualityMonthlyChart from "@/features/systems/components/charts/water-quality-monthly-chart"
 import AbwProjectionChart from "@/features/systems/components/charts/abw-projection-chart"
 import { formatCageLabel } from "@/lib/system-options"
+import type { DashboardPageInitialFilters } from "@/features/dashboard/types"
 import type { SystemsPageInitialData } from "@/features/systems/types"
 
 export default function SystemsPageClient({
   initialFarmId,
   initialFarmName,
   initialFarmRole,
+  initialFilters,
   initialData,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
   initialFarmRole?: string | null
+  initialFilters: DashboardPageInitialFilters
   initialData: SystemsPageInitialData
 }) {
   // Cages that have been fully harvested or emptied out no longer belong in
@@ -45,7 +48,7 @@ export default function SystemsPageClient({
     <DashboardLayout
       initialFarmId={initialFarmId}
       initialFarmName={initialFarmName}
-      headerDataOverrides={{ role: initialFarmRole ?? null }}
+      headerDataOverrides={{ role: initialFarmRole ?? null, timeBounds: initialData.bounds }}
     >
       <div className="page-shell">
         <CommandCentreBanner alerts={initialData.alerts} />
@@ -57,6 +60,7 @@ export default function SystemsPageClient({
           cohortBySystemId={initialData.cohortBySystemId}
           mortalityByCage={initialData.mortalityByCage}
           alerts={initialData.alerts}
+          timePeriod={initialFilters.timePeriod}
           emptyMessage={initialData.systemsTable.meta.reason ?? "No active cages found"}
         />
 

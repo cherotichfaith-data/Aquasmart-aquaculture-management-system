@@ -13,10 +13,6 @@ export type PageTimeConfig = {
   showBatchFilter: boolean
   showStageFilter: boolean
   showSystemFilter?: boolean
-  /** Defaults to true. Set false to hide the date/time-period selector (and the
-   * resolved date-range text under the title) for pages that always show the
-   * full picture rather than a filterable rolling window. */
-  showTimePeriod?: boolean
 }
 
 export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
@@ -37,7 +33,6 @@ export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
       showBatchFilter: true,
       showStageFilter: true,
       showSystemFilter: false,
-      showTimePeriod: false,
     }
   }
   if (pathname.startsWith("/systems")) {
@@ -47,7 +42,6 @@ export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
       useSystemBounds: false,
       showBatchFilter: false,
       showStageFilter: true,
-      showTimePeriod: false,
     }
   }
   if (pathname.startsWith("/actions")) {

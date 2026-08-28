@@ -55,6 +55,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
       initialFarmId={farmId}
       initialFarmName={farmName}
       initialFarmRole={role}
+      initialFilters={initialFilters}
       initialData={initialData}
     />
   )

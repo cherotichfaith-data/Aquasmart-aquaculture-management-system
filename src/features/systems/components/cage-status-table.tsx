@@ -9,6 +9,7 @@ import type { DashboardSystemRow } from "@/features/dashboard/types"
 import { SeverityValue, buildSystemFlags, isFiniteNumber, isMortalityCritical, median } from "@/features/dashboard/lib/table-cells"
 import { formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
+import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import type { RecommendedActionRow } from "@/lib/types/insights"
 import type { CageMortalityTotal } from "@/features/systems/types"
 
@@ -55,15 +56,23 @@ export default function CageStatusTable({
   cohortBySystemId,
   mortalityByCage,
   alerts,
+  timePeriod = "all history",
   emptyMessage = "No active cages found",
 }: {
   rows: DashboardSystemRow[]
   cohortBySystemId: Record<number, string | null>
   mortalityByCage: CageMortalityTotal[]
   alerts: RecommendedActionRow[]
+  timePeriod?: TimePeriod
   emptyMessage?: string
 }) {
   const router = useRouter()
+  const openProductionPage = (systemId: number) => {
+    const params = new URLSearchParams()
+    params.set("system", String(systemId))
+    params.set("date", toTimePeriodUrlValue(timePeriod))
+    router.push(`/production?${params.toString()}`)
+  }
   const farmMedianEfcr = useMemo(() => median(rows.map((row) => row.efcr).filter(isFiniteNumber)), [rows])
   const alertSystemIds = useMemo(() => new Set(alerts.map((row) => row.system_id)), [alerts])
   const mortalityBySystemId = useMemo(
@@ -163,14 +172,14 @@ export default function CageStatusTable({
   return (
     <Card className="rounded-2xl">
       <CardHeader className="pb-1">
-        <CardTitle>Cage Status — Latest Data</CardTitle>
+        <CardTitle>{timePeriod === "all history" ? "Cage Status — Latest Data" : "Cage Status — Selected Period"}</CardTitle>
       </CardHeader>
       <CardContent className="pt-2">
         <DataTable<DashboardSystemRow>
           columns={columns}
           data={rows}
           rowKey={(row) => row.system_id}
-          onRowClick={(row) => router.push(`/production?system=${row.system_id}`)}
+          onRowClick={(row) => openProductionPage(row.system_id)}
           emptyMessage={emptyMessage}
           initialSorting={[{ id: "cage", desc: false }]}
           shellClassName="production-records-table max-h-[520px]"

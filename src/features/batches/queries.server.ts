@@ -5,7 +5,7 @@ import { listGrowthTrend, listMortalityData } from "@/features/shared/queries.se
 import { listBatchOptionRows } from "@/features/shared/query-seed.server"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
 import { normalizeStageFilter } from "@/lib/stage-filter"
-import type { TimeBounds } from "@/lib/time-period"
+import { parseCustomPeriodUrlValue, resolveTimePeriod, type TimeBounds } from "@/lib/time-period"
 import type { RecommendedActionRow } from "@/lib/types/insights"
 import type {
   BatchMortalityTotal,
@@ -45,22 +45,24 @@ async function withNetworkFallback<T>(
 }
 
 /**
- * This page has no date/time-period selector in its header -- like Cages, it
- * always shows the full real picture, so any stray `date` param is ignored
- * in favor of "all history". The batch filter, unlike the date filter, IS
- * shown here -- read from the same `batch` param the rest of the app uses.
+ * The batch and stage filters are read from the same `batch` / `stage` params
+ * the rest of the app uses. The shared `date` time-period param is honoured
+ * too -- the lineage table and every chart/KPI here are scoped to the resolved
+ * window, so the header's time-period selector drives them. With no `date`
+ * param present we default to "all history" -- this page's original view.
  */
 export function parseBatchesPageFilters(
   searchParams?: Record<string, string | string[] | undefined>,
 ): BatchesPageFilters {
   const selectedStageRaw = searchParams?.stage
   const selectedBatchRaw = searchParams?.batch
+  const timePeriodRaw = searchParams?.date
 
   return {
     selectedStage: normalizeStageFilter(selectedStageRaw),
     selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",
-    timePeriod: "all history",
-    customTimeRange: null,
+    timePeriod: resolveTimePeriod(timePeriodRaw, "all history"),
+    customTimeRange: parseCustomPeriodUrlValue(timePeriodRaw),
   }
 }
 
@@ -68,6 +70,7 @@ async function getTimeBounds(
   supabase: ServerClient,
   farmId: string,
   timePeriod: BatchesPageFilters["timePeriod"],
+  batchId?: number,
   customTimeRange?: BatchesPageFilters["customTimeRange"],
 ): Promise<TimeBounds> {
   return withNetworkFallback(
@@ -84,8 +87,9 @@ async function getTimeBounds(
       isTruncated: false,
       stalenessDays: null,
     },
-    // Farm-wide bounds -- this page never scopes to a single system.
-    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", undefined, undefined, customTimeRange),
+    // Never scopes to a single system, but a selected batch narrows the window
+    // to that batch's own data so the header's resolved range matches the page.
+    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", undefined, batchId, customTimeRange),
   )
 }
 
@@ -199,16 +203,23 @@ async function loadBatchesPageInitialData(
   if (!params.farmId) return buildEmptyBatchesPageInitialData()
   const farmId = params.farmId
 
-  const bounds = await getTimeBounds(supabase, farmId, params.filters.timePeriod, params.filters.customTimeRange)
+  const selectedBatchId =
+    params.filters.selectedBatch !== "all" && Number.isFinite(Number(params.filters.selectedBatch))
+      ? Number(params.filters.selectedBatch)
+      : undefined
+
+  const bounds = await getTimeBounds(
+    supabase,
+    farmId,
+    params.filters.timePeriod,
+    selectedBatchId,
+    params.filters.customTimeRange,
+  )
   if (!bounds.start || !bounds.end) {
     return { ...buildEmptyBatchesPageInitialData(), bounds }
   }
   const dateFrom = bounds.start
   const dateTo = bounds.end
-  const selectedBatchId =
-    params.filters.selectedBatch !== "all" && Number.isFinite(Number(params.filters.selectedBatch))
-      ? Number(params.filters.selectedBatch)
-      : undefined
 
   const batchRows = await withNetworkFallback(
     "batches:getDashboardBatchRows",

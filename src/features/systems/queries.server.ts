@@ -1,4 +1,5 @@
 import { createAccessTokenClient } from "@/lib/supabase/server"
+import { parseCustomPeriodUrlValue, resolveTimePeriod } from "@/lib/time-period"
 import { loadSystemsTableData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
 import type { DashboardPageInitialFilters } from "@/features/dashboard/types"
 import { listGrowthTrend, listMortalityData } from "@/features/shared/queries.server"
@@ -9,16 +10,22 @@ import type { CageMortalityTotal, SystemsPageInitialData, WaterQualityMonthlyPoi
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 
 /**
- * Same URL shape as the Home overview (system/cage, batch, stage), except
- * this page has no date/time-period selector in its header -- it always
- * shows the full real picture, so any stray `date` param is ignored in
- * favor of "all history".
+ * Same URL shape as the Home overview (system/cage, batch, stage) plus the
+ * shared `date` time-period param. The table and every chart/KPI on this page
+ * are scoped to the resolved window, so the header's time-period selector
+ * drives them just like it does on the dashboard. When no `date` param is
+ * present we default to "all history" -- the page's original full-picture view.
  */
 export function parseSystemsPageFilters(
   searchParams?: Record<string, string | string[] | undefined>,
 ): DashboardPageInitialFilters {
   const base = parseDashboardPageFilters(searchParams)
-  return { ...base, timePeriod: "all history", customTimeRange: null }
+  const timePeriodRaw = searchParams?.date
+  return {
+    ...base,
+    timePeriod: resolveTimePeriod(timePeriodRaw, "all history"),
+    customTimeRange: parseCustomPeriodUrlValue(timePeriodRaw),
+  }
 }
 
 function bucketWaterQualityMonthly(
