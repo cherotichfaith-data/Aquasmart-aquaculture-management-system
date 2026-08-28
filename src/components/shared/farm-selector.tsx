@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo } from "react"
 import { useBatchSystemIds } from "@/features/reports/hooks"
-import type { DashboardBatchRow } from "@/features/dashboard/types"
 import type { Enums } from "@/lib/types/database"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
-import type { SystemOption } from "@/lib/system-options"
 import { FilterPopover } from "@/components/shared/filter-popover"
 import { formatGrowthStage, GROWTH_STAGE_VALUES } from "@/lib/stage-filter"
 import { formatCageLabel } from "@/lib/system-options"
@@ -41,11 +39,6 @@ interface FarmSelectorProps {
   layout?: "grid" | "row"
   allSystemsLabel?: string
   wrap?: boolean
-  batchOptionsOverride?: DashboardBatchRow[]
-  systemOptionsOverride?: SystemOption[]
-  batchSystemIdsOverride?: number[] | null
-  batchesLoadingOverride?: boolean
-  systemsLoadingOverride?: boolean
 }
 
 export default function FarmSelector({
@@ -64,45 +57,29 @@ export default function FarmSelector({
   layout,
   allSystemsLabel = "All Cages",
   wrap = true,
-  batchOptionsOverride,
-  systemOptionsOverride,
-  batchSystemIdsOverride,
-  batchesLoadingOverride,
-  systemsLoadingOverride,
 }: FarmSelectorProps) {
   const { farmId, loading: farmLoading } = useActiveFarm({ initialFarmId })
   const batchId =
     selectedBatch !== "all" && Number.isFinite(Number(selectedBatch)) ? Number(selectedBatch) : undefined
 
   const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
-  const systemsQuery = useSystemOptions(
-    farmId ? { farmId, activeOnly: true, stockedOnly: !systemOptionsOverride } : undefined,
-  )
+  const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
   const batchSystemsQuery = useBatchSystemIds({
     batchId,
     farmId,
     enabled: selectedBatch !== "all",
   })
 
-  const normalizedBatchOptionsOverride = useMemo(
-    () =>
-      batchOptionsOverride?.map((row) => ({
-        id: row.batch_id,
-        label: row.batch_name,
-        date_of_delivery: null as string | null,
-      })),
-    [batchOptionsOverride],
+  const batches = (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []).filter(
+    (batch) => batch.id != null,
   )
-  const batches = (
-    normalizedBatchOptionsOverride ?? (batchesQuery.data?.status === "success" ? batchesQuery.data.data : [])
-  ).filter((batch) => batch.id != null)
-  const allSystems = (
-    systemOptionsOverride ?? (systemsQuery.data?.status === "success" ? systemsQuery.data.data : [])
-  ).filter((system) => system.id != null)
-  const batchesLoading = batchesLoadingOverride ?? batchesQuery.isLoading
-  const systemsLoading = systemsLoadingOverride ?? systemsQuery.isLoading
-  const batchesReady = batchOptionsOverride != null || batchesQuery.data?.status === "success"
-  const systemsReady = systemOptionsOverride != null || systemsQuery.data?.status === "success"
+  const allSystems = (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []).filter(
+    (system) => system.id != null,
+  )
+  const batchesLoading = batchesQuery.isLoading
+  const systemsLoading = systemsQuery.isLoading
+  const batchesReady = batchesQuery.data?.status === "success"
+  const systemsReady = systemsQuery.data?.status === "success"
   const selectedSystemId =
     selectedSystem !== "all" && Number.isFinite(Number(selectedSystem)) ? Number(selectedSystem) : null
   const selectedSystemRow = useMemo(
@@ -111,10 +88,9 @@ export default function FarmSelector({
   )
   const selectedBatchSystemIds = useMemo(() => {
     if (selectedBatch === "all") return null
-    if (Array.isArray(batchSystemIdsOverride)) return new Set(batchSystemIdsOverride)
     if (batchSystemsQuery.data?.status !== "success") return null
     return new Set(batchSystemsQuery.data.data.map((row) => row.system_id))
-  }, [batchSystemIdsOverride, batchSystemsQuery.data, selectedBatch])
+  }, [batchSystemsQuery.data, selectedBatch])
   const systems = useMemo(() => {
     const stageFiltered =
       selectedStage === "all"
@@ -210,14 +186,13 @@ export default function FarmSelector({
   useEffect(() => {
     if (!farmId || farmLoading || selectedStage === "all") return
     if (systemsLoading || !systemsReady) return
-    if (selectedBatch !== "all" && batchSystemIdsOverride == null && (batchSystemsQuery.isLoading || batchSystemsQuery.data?.status !== "success")) return
+    if (selectedBatch !== "all" && (batchSystemsQuery.isLoading || batchSystemsQuery.data?.status !== "success")) return
     if (!stages.some((stage) => stage.value === selectedStage)) {
       onStageChange(selectedSystemRow?.growth_stage ?? "all")
     }
   }, [
     batchSystemsQuery.data?.status,
     batchSystemsQuery.isLoading,
-    batchSystemIdsOverride,
     farmId,
     farmLoading,
     onStageChange,
@@ -234,7 +209,6 @@ export default function FarmSelector({
     if (systemsLoading || !systemsReady) return
     if (
       selectedBatch !== "all" &&
-      batchSystemIdsOverride == null &&
       (batchSystemsQuery.isLoading || batchSystemsQuery.data?.status !== "success")
     ) {
       return
@@ -245,7 +219,6 @@ export default function FarmSelector({
   }, [
     batchSystemsQuery.data?.status,
     batchSystemsQuery.isLoading,
-    batchSystemIdsOverride,
     farmId,
     farmLoading,
     onSystemChange,
@@ -302,12 +275,12 @@ export default function FarmSelector({
           value={selectedSystem}
           options={systemOptions}
           placeholder={
-            systemsLoading || (selectedBatch !== "all" && batchSystemIdsOverride == null && batchSystemsQuery.isLoading)
+            systemsLoading || (selectedBatch !== "all" && batchSystemsQuery.isLoading)
               ? "Loading cages..."
               : `${allSystemsLabel}${showCounts && systemCount ? ` (${systemCount})` : ""}`
           }
           onChange={onSystemChange}
-          disabled={systemsLoading || (selectedBatch !== "all" && batchSystemIdsOverride == null && batchSystemsQuery.isLoading)}
+          disabled={systemsLoading || (selectedBatch !== "all" && batchSystemsQuery.isLoading)}
           searchable
           searchPlaceholder="Search cage"
           emptyMessage="No cages found."

@@ -14,14 +14,8 @@ import Header from "./header"
 import MobileQuickEntry from "./mobile-quick-entry"
 import Sidebar, { DASHBOARD_SIDEBAR_COLLAPSED_WIDTH, DASHBOARD_SIDEBAR_WIDTH } from "./sidebar"
 import type { TimeBounds } from "@/lib/time-period"
-import type { SystemOption } from "@/lib/system-options"
-import type { Database } from "@/lib/types/database"
-
-type BatchOption = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 type HeaderDataOverrides = {
   role?: string | null
-  systemOptions?: SystemOption[]
-  batchOptions?: BatchOption[]
   timeBounds?: TimeBounds
 }
 
@@ -192,8 +186,6 @@ export default function DashboardLayout({
               initialFarmId={initialFarmId}
               initialFarmName={initialFarmName}
               roleOverride={headerDataOverrides?.role ?? null}
-              systemOptionsOverride={headerDataOverrides?.systemOptions}
-              batchOptionsOverride={headerDataOverrides?.batchOptions}
               timeBoundsOverride={headerDataOverrides?.timeBounds}
               onMenuClick={() => {
                 if (!isDesktop) {

@@ -6,15 +6,14 @@ import DashboardLayout from "@/components/layout/dashboard-layout"
 import { WORKSPACE_SELECT_PATH, resolveAppEntryPath, sanitizeNextPath } from "@/lib/app-entry"
 import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
 import { cleanScopedFilterState } from "@/features/shared/scoped-analytics.server"
-import { listBatchOptionRows } from "@/features/shared/query-seed.server"
 import { loadWorkspaceContextForUser } from "@/lib/server/workspace"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { ACTIVE_FARM_COOKIE, ACTIVE_ORGANIZATION_COOKIE, normalizeContextValue } from "@/lib/context"
 
 export const metadata: Metadata = {
-  title: "Dashboard | AquaSmart",
-  description: "Farm operations dashboard for AquaSmart.",
+  title: "Dashboard | Samaki360",
+  description: "Farm operations dashboard for Samaki360.",
 }
 
 type SearchParams = Record<string, string | string[] | undefined>
@@ -81,16 +80,12 @@ export default async function DashboardPage({
       : initialFilters
   const { data: farmRow } = await analyticsSupabase.from("farm").select("name").eq("id", farmId).maybeSingle()
   const initialFarmName = farmRow?.name ?? null
-  const batchOptions = await listBatchOptionRows(analyticsSupabase, { farmId })
-
   return (
     <DashboardLayout
       initialFarmId={farmId}
       initialFarmName={initialFarmName}
       headerDataOverrides={{
         role: workspaceContext.role,
-        systemOptions: initialData.systemOptions.status === "success" ? initialData.systemOptions.data : [],
-        batchOptions,
         timeBounds: initialData.bounds,
       }}
     >

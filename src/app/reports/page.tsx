@@ -110,7 +110,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
   }
 
   queryClient.setQueryData(
-    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: false }),
+    queryKeys.options.systems({ farmId, stage: effectiveFilters.selectedStage, activeOnly: false, userId: user.id }),
     initialData.growthSystems,
   )
   queryClient.setQueryData(queryKeys.appConfig(["target_harvest_weight_g"], user.id), initialData.appConfig)

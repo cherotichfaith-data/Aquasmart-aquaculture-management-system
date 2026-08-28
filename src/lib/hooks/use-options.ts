@@ -32,10 +32,11 @@ export function useSystemOptions(params?: {
   const enabled =
     !authLoading && (Boolean(session) || Boolean(user)) && Boolean(params?.farmId) && (params?.enabled ?? true)
   const query = useQuery({
-    queryKey: queryKeys.options.systems(params),
-    queryFn: ({ signal }) => getSystemOptions({ ...params, signal }),
+    queryKey: queryKeys.options.systems({ ...params, userId: user?.id }),
+    queryFn: ({ signal }) => getSystemOptions({ ...params, accessToken: session?.access_token, signal }),
     enabled,
     staleTime: 5 * 60_000,
+    refetchOnMount: "always",
   })
   const stockedSystems = useStockedSystemIds(params?.farmId, {
     enabled: enabled && Boolean(params?.stockedOnly),
@@ -61,8 +62,8 @@ export function useBatchOptions(params?: {
   const { session, user, isLoading: authLoading } = useAuth()
   const enabled = !authLoading && (Boolean(session) || Boolean(user)) && Boolean(params?.farmId)
   return useQuery({
-    queryKey: queryKeys.options.batches(params),
-    queryFn: ({ signal }) => getBatchOptions({ ...params, signal }),
+    queryKey: queryKeys.options.batches({ ...params, userId: user?.id }),
+    queryFn: ({ signal }) => getBatchOptions({ ...params, accessToken: session?.access_token, signal }),
     enabled,
     staleTime: 0,
     refetchOnMount: "always",
