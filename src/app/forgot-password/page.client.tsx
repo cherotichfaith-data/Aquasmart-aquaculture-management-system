@@ -50,10 +50,6 @@ export default function ForgotPasswordPageClient() {
         <div className="flex items-center gap-3">
           <Image src="/Bild.png" alt="Samaki360 logo" width={3284} height={528} className="h-auto w-[168px]" priority />
           <div>
-            <div className="font-serif text-[1.45rem] font-extrabold tracking-[-0.04em]">
-              <span className="text-[var(--secondary)]">Aqua</span>
-              <span className="text-primary">Smart</span>
-            </div>
             <h1 className="text-xl font-semibold tracking-tight text-card-foreground">Forgot your password?</h1>
           </div>
         </div>
