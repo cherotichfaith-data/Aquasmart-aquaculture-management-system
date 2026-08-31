@@ -59,7 +59,7 @@ export function printBrandedPdf(params: {
         </style>
       </head>
       <body>
-        <div class="brand"><div class="logo">S360</div><div><h1>${params.title}</h1></div></div>
+        <div class="brand"><div class="logo">AQ</div><div><h1>${params.title}</h1></div></div>
         ${params.subtitle ? `<div class="meta">${params.subtitle}</div>` : ""}
         <div class="meta">
           Farm: ${params.farmName ?? "N/A"}<br/>

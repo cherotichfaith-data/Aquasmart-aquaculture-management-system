@@ -141,16 +141,17 @@ export default function LandingPage() {
         <header className="absolute inset-x-0 top-0 z-20 px-4 pt-5 md:px-6">
           <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 py-2 text-white">
             <div className="flex items-center gap-3">
+              <Image
+                src="/use this.png"
+                alt="SUSTAIN Aquasmart logo"
+                width={40}
+                height={40}
+                className="h-10 w-10 shrink-0 rounded-full"
+                priority
+              />
               <div>
-                <Image
-                  src="/Bild.png"
-                  alt="SUSTAIN Aquasmart logo"
-                  width={3284}
-                  height={528}
-                  className="h-auto w-[168px]"
-                  priority
-                />
-                <p className="mt-1 text-xs text-white/70">Aquaculture management software</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">SUSTAIN Aquasmart</p>
+                <p className="text-xs text-white/70">Aquaculture management software</p>
               </div>
             </div>
 
@@ -188,16 +189,9 @@ export default function LandingPage() {
 
                 <h1 className="max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-5xl md:text-6xl lg:text-[4.5rem]">
                   Making aquaculture operations smarter
-                  <span className="block"> with</span>
+                  <span className="block md:inline"> with </span>
+                  <span className="text-primary">SUSTAIN Aquasmart</span>
                 </h1>
-                <Image
-                  src="/Bild.png"
-                  alt="SUSTAIN Aquasmart logo"
-                  width={3284}
-                  height={528}
-                  className="mx-auto mt-5 h-auto w-[260px] sm:w-[320px] md:mx-0 md:w-[360px]"
-                  priority
-                />
 
                 <p className="mt-7 max-w-2xl text-sm leading-7 text-white/84 sm:text-base sm:leading-8 md:text-[1.05rem]">
                   Monitor water quality, feeding, biomass, health, and reporting from one modern platform designed for
@@ -227,18 +221,9 @@ export default function LandingPage() {
               <div className="hidden w-[220px] md:flex lg:mr-20 lg:w-[270px]">
                 <div className="relative w-full rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,var(--brand-panel-from),var(--brand-panel-to))] p-3 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.7)]">
                   <div className="overflow-hidden rounded-[22px] bg-[linear-gradient(180deg,var(--brand-panel-shell-from),var(--brand-panel-shell-to))]">
-                    <div className="flex items-center justify-between bg-white px-4 py-3 text-sm font-semibold text-slate-700">
-                      <div className="flex items-center gap-2">
-                        <Image
-                          src="/Bild.png"
-                          alt="SUSTAIN Aquasmart logo"
-                          width={3284}
-                          height={528}
-                          className="h-auto w-[94px]"
-                        />
-                        <span>Live</span>
-                      </div>
-                      <span className="text-emerald-700">Online</span>
+                    <div className="flex items-center justify-between bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
+                      <span>SUSTAIN Aquasmart Live</span>
+                      <span>Online</span>
                     </div>
 
                     <div className="space-y-3 p-3">
@@ -423,16 +408,7 @@ export default function LandingPage() {
 
       <footer className="bg-[linear-gradient(180deg,var(--brand-footer-from)_0%,var(--brand-footer-to)_100%)] px-4 py-16 text-sm text-white/60 md:px-6 md:py-18">
         <div className="container mx-auto flex flex-col gap-4 border-t border-white/10 pt-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-2">
-            <Image
-              src="/Bild.png"
-              alt="SUSTAIN Aquasmart logo"
-              width={3284}
-              height={528}
-              className="h-auto w-[144px]"
-            />
-            <p>&copy; 2026. Aquaculture operations and analytics platform.</p>
-          </div>
+          <p>&copy; 2026 SUSTAIN Aquasmart. Aquaculture operations and analytics platform.</p>
           <div className="flex flex-wrap gap-4 self-start md:self-auto">
             {navItems.map((item) => (
               <button
