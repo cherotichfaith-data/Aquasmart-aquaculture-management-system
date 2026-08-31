@@ -41,9 +41,9 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/Bild.png",
-        width: 3284,
-        height: 528,
+        url: "/use this.png",
+        width: 60,
+        height: 60,
         alt: "SUSTAIN Aquasmart logo",
       },
     ],
@@ -52,12 +52,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SUSTAIN Aquasmart - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
-    images: ["/Bild.png"],
+    images: ["/use this.png"],
   },
   manifest: "/manifest.json",
   icons: {
-    icon: "/Bild.png",
-    apple: "/Bild.png",
+    icon: "/use this.png",
+    apple: "/use this.png",
   },
 }
 
