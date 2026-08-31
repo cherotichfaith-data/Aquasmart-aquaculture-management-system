@@ -12,8 +12,8 @@ import { createAccessTokenClient } from "@/lib/supabase/server"
 import { ACTIVE_FARM_COOKIE, ACTIVE_ORGANIZATION_COOKIE, normalizeContextValue } from "@/lib/context"
 
 export const metadata: Metadata = {
-  title: "Dashboard | Samaki360",
-  description: "Farm operations dashboard for Samaki360.",
+  title: "Dashboard | SUSTAIN Aquasmart",
+  description: "Farm operations dashboard for SUSTAIN Aquasmart.",
 }
 
 type SearchParams = Record<string, string | string[] | undefined>

@@ -8,8 +8,8 @@ import { createQueryClient } from "@/lib/react-query/query-client"
 import { requireUser, requireUserContext } from "@/lib/supabase/require-user"
 
 export const metadata: Metadata = {
-  title: "Onboarding | Samaki360",
-  description: "Complete your Samaki360 onboarding, confirm your role, and create or join a farm workspace.",
+  title: "Onboarding | SUSTAIN Aquasmart",
+  description: "Complete your SUSTAIN Aquasmart onboarding, confirm your role, and create or join a farm workspace.",
 }
 
 type SearchParams = Record<string, string | string[] | undefined>

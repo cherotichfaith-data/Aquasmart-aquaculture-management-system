@@ -16,16 +16,16 @@ import {
 import type { PendingFarmInvitation, SettingsFarmMember } from "@/features/settings/users.server"
 import { queryKeys } from "@/lib/cache/query-keys"
 import {
-  SAMAKI360_ROLE_OPTIONS,
+  AQUASMART_ROLE_OPTIONS,
   formatRoleLabel,
   normalizeRole,
   resolveAppEntryPath,
-  type Samaki360Role,
+  type AquasmartRole,
 } from "@/lib/app-entry"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 
-type GrantAccessRole = NonNullable<Samaki360Role>
+type GrantAccessRole = NonNullable<AquasmartRole>
 
 const inputCls =
   "w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -60,7 +60,7 @@ export default function UsersPageClient({
   const router = useRouter()
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const farmRoleQuery = useActiveFarmRole(farmId)
-  const farmRole = (farmRoleQuery.data ?? null) as Samaki360Role
+  const farmRole = (farmRoleQuery.data ?? null) as AquasmartRole
 
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<GrantAccessRole>("system_operator")
@@ -308,7 +308,7 @@ export default function UsersPageClient({
                   className={inputCls}
                   title={ROLE_HELP.find((item) => item.role === inviteRole)?.description}
                 >
-                  {SAMAKI360_ROLE_OPTIONS.map((role) => (
+                  {AQUASMART_ROLE_OPTIONS.map((role) => (
                     <option key={role.value} value={role.value}>
                       {role.label}
                     </option>
@@ -404,7 +404,7 @@ export default function UsersPageClient({
                             onChange={(event) => setEditingRole(event.target.value as GrantAccessRole)}
                             className={inputCls}
                           >
-                            {SAMAKI360_ROLE_OPTIONS.map((role) => (
+                            {AQUASMART_ROLE_OPTIONS.map((role) => (
                               <option key={role.value} value={role.value}>
                                 {role.label}
                               </option>

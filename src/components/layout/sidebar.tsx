@@ -160,7 +160,7 @@ function LogoBlock({
           onClick={mobile ? onClose : undefined}
         >
           {collapsed && !mobile ? (
-            <span className="block h-9 w-9 shrink-0 overflow-hidden" aria-label="Samaki360">
+            <span className="block h-9 w-9 shrink-0 overflow-hidden" aria-label="SUSTAIN Aquasmart">
               <Image
                 src="/Bild.png"
                 alt=""
@@ -173,7 +173,7 @@ function LogoBlock({
           ) : (
             <Image
               src="/Bild.png"
-              alt="Samaki360 logo"
+              alt="SUSTAIN Aquasmart logo"
               width={3284}
               height={528}
               className="h-auto w-[158px] shrink-0"

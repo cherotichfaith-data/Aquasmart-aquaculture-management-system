@@ -39,7 +39,7 @@ export default function WorkspaceSetupForm() {
     return (
       [metadata.organization_name, metadata.full_name, metadata.name, user?.email]
         .find((value): value is string => typeof value === "string" && value.trim().length > 0)
-        ?.trim() ?? "Samaki360 Organization"
+        ?.trim() ?? "SUSTAIN Aquasmart Organization"
     )
   }, [user?.email, user?.user_metadata])
   const organizationSourceToken = useMemo(() => Symbol(fallbackOrganizationName), [fallbackOrganizationName])

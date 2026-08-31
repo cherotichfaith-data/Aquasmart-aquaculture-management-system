@@ -492,7 +492,7 @@ export default function LoginForm() {
             <div className="logo-header">
               <Image
                 src="/Bild.png"
-                alt="Samaki360 logo"
+                alt="SUSTAIN Aquasmart logo"
                 width={3284}
                 height={528}
                 className="h-auto w-[180px]"

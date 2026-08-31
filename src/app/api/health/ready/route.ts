@@ -22,7 +22,7 @@ export async function GET() {
       {
         status: "error",
         check: "ready",
-        service: "samaki360-web",
+        service: "aquasmart-web",
         timestamp: new Date().toISOString(),
         checks: {
           env: {
@@ -52,7 +52,7 @@ export async function GET() {
         {
           status: "error",
           check: "ready",
-          service: "samaki360-web",
+          service: "aquasmart-web",
           timestamp: new Date().toISOString(),
           checks: {
             env: {
@@ -78,7 +78,7 @@ export async function GET() {
       {
         status: "ok",
         check: "ready",
-        service: "samaki360-web",
+        service: "aquasmart-web",
         timestamp: new Date().toISOString(),
         checks: {
           env: {
@@ -103,7 +103,7 @@ export async function GET() {
       {
         status: "error",
         check: "ready",
-        service: "samaki360-web",
+        service: "aquasmart-web",
         timestamp: new Date().toISOString(),
         checks: {
           env: {

@@ -1,6 +1,6 @@
-# Samaki360 – Aquaculture Farm Intelligence Platform
+# SUSTAIN Aquasmart – Aquaculture Farm Intelligence Platform
 
-Samaki360 is a real-time operational intelligence platform for modern aquaculture farms. Built with Next.js and Supabase, it lets farm teams capture daily production data in the field (online or offline), monitor key performance indicators, manage feed and stock, track sampling and mortality, watch water quality, and generate compliance-ready reports — all from a single, secure interface.
+SUSTAIN Aquasmart is a real-time operational intelligence platform for modern aquaculture farms. Built with Next.js and Supabase, it lets farm teams capture daily production data in the field (online or offline), monitor key performance indicators, manage feed and stock, track sampling and mortality, watch water quality, and generate compliance-ready reports — all from a single, secure interface.
 
 ---
 
@@ -79,7 +79,7 @@ Enable data-driven decision-making in aquaculture through:
 ## 📁 Project Structure
 
 ```
-samaki360/
+sustain-aquasmart/
 ├── src/
 │   ├── app/            # Next.js App Router: routes, layouts, API handlers, page shells
 │   ├── components/     # Shared UI and layout primitives
@@ -127,7 +127,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000         # canonical site URL for metad
 
 # Optional — planned-activity reminder emails (Vercel Cron + Resend)
 RESEND_API_KEY=your_resend_key
-REMINDER_EMAIL_FROM="Samaki360 <no-reply@yourdomain>"
+REMINDER_EMAIL_FROM="SUSTAIN Aquasmart <no-reply@yourdomain>"
 CRON_SECRET=your_cron_secret
 ```
 
@@ -191,7 +191,7 @@ npm run build         # production build
 
 ## 📄 License
 
-Proprietary – © 2026 Samaki360. All rights reserved.
+Proprietary – © 2026 SUSTAIN Aquasmart. All rights reserved.
 
 ---
 

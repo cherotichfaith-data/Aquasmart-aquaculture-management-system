@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useQueryClient } from "@tanstack/react-query";
 import { User, Session } from "@supabase/supabase-js";
 import { getMe } from "@/lib/api";
-import { normalizeRole, type Samaki360Role } from "@/lib/app-entry";
+import { normalizeRole, type AquasmartRole } from "@/lib/app-entry";
 import { redirectBrowserAfterSignOut } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import { clearBrowserWorkspaceContext } from "@/lib/context";
@@ -12,7 +12,7 @@ import { isSbAuthMissing, isSbInvalidRefreshToken, isSbNetworkError, isSbPermiss
 import { getSessionIdentity } from "@/lib/supabase/session";
 import { mergeUserContext } from "@/lib/user-context";
 
-type UserRole = Samaki360Role;
+type UserRole = AquasmartRole;
 type AuthProfile = Record<string, unknown> | null;
 type AuthSettings = Record<string, unknown> | null;
 

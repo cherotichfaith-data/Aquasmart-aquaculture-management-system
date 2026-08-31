@@ -1,4 +1,4 @@
-export type Samaki360Role =
+export type AquasmartRole =
   | "admin"
   | "farm_manager"
   | "system_operator"
@@ -6,7 +6,7 @@ export type Samaki360Role =
   | "viewer"
   | null
 
-export const SAMAKI360_ROLES = [
+export const AQUASMART_ROLES = [
   "admin",
   "farm_manager",
   "system_operator",
@@ -14,9 +14,9 @@ export const SAMAKI360_ROLES = [
   "viewer",
 ] as const
 
-export type CanonicalSamaki360Role = (typeof SAMAKI360_ROLES)[number]
+export type CanonicalAquasmartRole = (typeof AQUASMART_ROLES)[number]
 
-export const SAMAKI360_ROLE_OPTIONS: Array<{ value: CanonicalSamaki360Role; label: string }> = [
+export const AQUASMART_ROLE_OPTIONS: Array<{ value: CanonicalAquasmartRole; label: string }> = [
   { value: "admin", label: "Admin" },
   { value: "farm_manager", label: "Farm Manager" },
   { value: "system_operator", label: "System Operator" },
@@ -70,7 +70,7 @@ export function stripDashboardPath(pathname: string) {
   return pathname
 }
 
-export function normalizeRole(role: string | null | undefined): Samaki360Role {
+export function normalizeRole(role: string | null | undefined): AquasmartRole {
   if (!role) return null
   if (
     role === "admin" ||
@@ -90,10 +90,10 @@ export function normalizeRole(role: string | null | undefined): Samaki360Role {
 
 export function formatRoleLabel(role: string | null | undefined) {
   const normalizedRole = normalizeRole(role)
-  return SAMAKI360_ROLE_OPTIONS.find((option) => option.value === normalizedRole)?.label ?? role ?? "-"
+  return AQUASMART_ROLE_OPTIONS.find((option) => option.value === normalizedRole)?.label ?? role ?? "-"
 }
 
-export function resolveAppEntryPath(role: Samaki360Role) {
+export function resolveAppEntryPath(role: AquasmartRole) {
   if (role === "admin" || role === "farm_manager") return DASHBOARD_ROOT
   if (role === "system_operator") return `${DATA_ENTRY_PATH}?type=feeding`
   if (role === "data_analyst") return toDashboardPath("/production")
@@ -118,7 +118,7 @@ export function sanitizeNextPath(nextPath: string | null | undefined, fallback =
   }
 }
 
-export function canAccessDataEntry(role: Samaki360Role) {
+export function canAccessDataEntry(role: AquasmartRole) {
   return (
     role === "admin" ||
     role === "farm_manager" ||

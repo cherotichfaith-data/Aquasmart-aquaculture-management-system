@@ -10,12 +10,12 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { completeOnboardingProfileAction } from "@/features/onboarding/mutations.server"
 import type { OnboardingPageInitialData } from "@/features/onboarding/queries.server"
 import {
-  SAMAKI360_ROLE_OPTIONS,
+  AQUASMART_ROLE_OPTIONS,
   ONBOARDING_CREATE_WORKSPACE_PATH,
   normalizeRole,
   resolveAppEntryPath,
   sanitizeNextPath,
-  type Samaki360Role,
+  type AquasmartRole,
 } from "@/lib/app-entry"
 import { queryKeys } from "@/lib/cache/query-keys"
 
@@ -24,14 +24,14 @@ const inputCls =
 
 type MembershipState = {
   farmId: string | null
-  role: Samaki360Role
+  role: AquasmartRole
   source: "active" | "invite" | "none"
 }
 
 type OnboardingDraftState = {
   sourceToken: symbol
   fullName: string
-  role: Exclude<Samaki360Role, null>
+  role: Exclude<AquasmartRole, null>
   membership: MembershipState
 }
 
@@ -114,7 +114,7 @@ export default function OnboardingPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null)
   const assignedRole = membership.role
-  const effectiveRole = (assignedRole ?? role) as Exclude<Samaki360Role, null>
+  const effectiveRole = (assignedRole ?? role) as Exclude<AquasmartRole, null>
   const canChooseRole = !assignedRole
   const nextPath = sanitizeNextPath(searchParams.get("next"), resolveAppEntryPath(effectiveRole))
   const createWorkspaceHref = `${ONBOARDING_CREATE_WORKSPACE_PATH}?next=${encodeURIComponent(nextPath)}`
@@ -134,7 +134,7 @@ export default function OnboardingPageClient() {
     setNoticeMessage(null)
 
     try {
-      const selectedRole = (assignedRole ?? role) as Exclude<Samaki360Role, null>
+      const selectedRole = (assignedRole ?? role) as Exclude<AquasmartRole, null>
 
       const result = await completeOnboardingProfileAction({
         fullName: trimmedFullName,
@@ -216,12 +216,12 @@ export default function OnboardingPageClient() {
               <span className="text-sm font-medium text-foreground">Role</span>
               <select
                 value={effectiveRole}
-                onChange={(event) => updateDraft("role", event.target.value as Exclude<Samaki360Role, null>)}
+                onChange={(event) => updateDraft("role", event.target.value as Exclude<AquasmartRole, null>)}
                 disabled={!canChooseRole}
                 className={inputCls}
               >
                 {assignedRole === "admin" ? <option value="admin">Admin</option> : null}
-                {SAMAKI360_ROLE_OPTIONS.filter((option) => option.value !== "admin").map((option) => (
+                {AQUASMART_ROLE_OPTIONS.filter((option) => option.value !== "admin").map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
