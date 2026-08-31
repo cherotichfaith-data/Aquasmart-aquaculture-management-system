@@ -107,8 +107,8 @@ sustain-aquasmart/
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/cherotichfaith-data/Samaki360-aquaculture-management-system.git
-cd Samaki360-aquaculture-management-system
+git clone https://github.com/cherotichfaith-data/Aquasmart-aquaculture-management-system.git
+cd Aquasmart-aquaculture-management-system
 ```
 
 ### 2. Install dependencies
