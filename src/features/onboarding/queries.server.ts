@@ -2,7 +2,7 @@ import { runServerReadThrough } from "@/lib/cache/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
-import type { Samaki360Role } from "@/lib/app-entry"
+import type { AquasmartRole } from "@/lib/app-entry"
 
 export type OnboardingMembershipSource = "active" | "invite" | "none"
 
@@ -11,7 +11,7 @@ export type OnboardingPageInitialData = {
   fullName: string
   membership: {
     farmId: string | null
-    role: Samaki360Role
+    role: AquasmartRole
     source: OnboardingMembershipSource
   }
   canCreateWorkspace: boolean
@@ -112,7 +112,7 @@ export async function getOnboardingPageInitialData(params: { linkedFarmId: strin
 
       const firstMembership = (membershipRows ?? [])[0] ?? null
       const pendingInvite = !firstMembership ? await findPendingInvitationByEmail(user.email) : null
-      const membershipRole = (firstMembership?.role ?? pendingInvite?.role ?? null) as Samaki360Role
+      const membershipRole = (firstMembership?.role ?? pendingInvite?.role ?? null) as AquasmartRole
       const membershipFarmId = firstMembership?.farm_id ?? pendingInvite?.farmId ?? params.linkedFarmId ?? null
       const source: OnboardingMembershipSource = firstMembership
         ? "active"

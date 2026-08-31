@@ -11,8 +11,8 @@ import { requireUserContext } from "@/lib/supabase/require-user"
 import SelectWorkspacePageClient from "./page.client"
 
 export const metadata: Metadata = {
-  title: "Select Workspace | Samaki360",
-  description: "Choose your Samaki360 organization and farm workspace.",
+  title: "Select Workspace | SUSTAIN Aquasmart",
+  description: "Choose your SUSTAIN Aquasmart organization and farm workspace.",
 }
 
 type SearchParams = Record<string, string | string[] | undefined>

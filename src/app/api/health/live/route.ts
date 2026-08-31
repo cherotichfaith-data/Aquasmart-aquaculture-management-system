@@ -8,7 +8,7 @@ export async function GET() {
     {
       status: "ok",
       check: "live",
-      service: "samaki360-web",
+      service: "aquasmart-web",
       timestamp: new Date().toISOString(),
     },
     {

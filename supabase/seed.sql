@@ -1,4 +1,4 @@
--- Samaki360 synthetic seed data
+-- SUSTAIN Aquasmart synthetic seed data
 -- Intended for fresh/local environments where mock production and monitoring
 -- history is useful for validating dashboards, reports, and operational flows.
 
@@ -122,7 +122,7 @@ begin
   insert into public.farm (id, name, location, owner, email, phone, created_at)
   values (
     v_farm_id,
-    'Samaki360 Synthetic Farm',
+    'SUSTAIN Aquasmart Synthetic Farm',
     'Kisumu Bay, Lake Victoria',
     'Synthetic Ops',
     'demo@aquasmart.local',

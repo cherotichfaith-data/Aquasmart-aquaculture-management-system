@@ -155,7 +155,7 @@ export interface ReferenceCacheEntry {
   cachedAt: number
 }
 
-export class Samaki360OfflineDB extends Dexie {
+export class AquasmartOfflineDB extends Dexie {
   feeding!: Table<OfflineFeedingRecord, string>
   mortality!: Table<OfflineMortalityRecord, string>
   waterQuality!: Table<OfflineWaterQualityRecord, string>
@@ -217,4 +217,4 @@ export class Samaki360OfflineDB extends Dexie {
   }
 }
 
-export const offlineDB = new Samaki360OfflineDB()
+export const offlineDB = new AquasmartOfflineDB()

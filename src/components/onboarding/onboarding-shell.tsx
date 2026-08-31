@@ -20,7 +20,7 @@ export function OnboardingShell({
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-7">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Image src="/Bild.png" alt="Samaki360 logo" width={3284} height={528} className="h-auto w-[150px]" />
+            <Image src="/Bild.png" alt="SUSTAIN Aquasmart logo" width={3284} height={528} className="h-auto w-[150px]" />
             <span className="text-sm text-muted-foreground">Farm workspace setup</span>
           </div>
           <button

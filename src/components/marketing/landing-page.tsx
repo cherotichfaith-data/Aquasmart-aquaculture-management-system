@@ -144,7 +144,7 @@ export default function LandingPage() {
               <div>
                 <Image
                   src="/Bild.png"
-                  alt="Samaki360 logo"
+                  alt="SUSTAIN Aquasmart logo"
                   width={3284}
                   height={528}
                   className="h-auto w-[168px]"
@@ -192,7 +192,7 @@ export default function LandingPage() {
                 </h1>
                 <Image
                   src="/Bild.png"
-                  alt="Samaki360 logo"
+                  alt="SUSTAIN Aquasmart logo"
                   width={3284}
                   height={528}
                   className="mx-auto mt-5 h-auto w-[260px] sm:w-[320px] md:mx-0 md:w-[360px]"
@@ -231,7 +231,7 @@ export default function LandingPage() {
                       <div className="flex items-center gap-2">
                         <Image
                           src="/Bild.png"
-                          alt="Samaki360 logo"
+                          alt="SUSTAIN Aquasmart logo"
                           width={3284}
                           height={528}
                           className="h-auto w-[94px]"
@@ -426,7 +426,7 @@ export default function LandingPage() {
           <div className="flex flex-col gap-2">
             <Image
               src="/Bild.png"
-              alt="Samaki360 logo"
+              alt="SUSTAIN Aquasmart logo"
               width={3284}
               height={528}
               className="h-auto w-[144px]"

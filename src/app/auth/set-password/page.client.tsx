@@ -135,7 +135,7 @@ export default function SetPasswordPageClient() {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_12%,transparent),color-mix(in_srgb,var(--brand-panel-shell-from)_32%,transparent))]" />
       <section className="relative z-10 w-full max-w-md rounded-[24px] border border-[color:color-mix(in_srgb,var(--card)_70%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card)_82%,transparent),color-mix(in_srgb,var(--card)_68%,transparent))] p-6 shadow-[0_24px_70px_color-mix(in_srgb,var(--chart-5)_18%,transparent)] backdrop-blur-[18px]">
         <div className="flex items-center gap-3">
-          <Image src="/Bild.png" alt="Samaki360 logo" width={3284} height={528} className="h-auto w-[168px]" priority />
+          <Image src="/Bild.png" alt="SUSTAIN Aquasmart logo" width={3284} height={528} className="h-auto w-[168px]" priority />
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-card-foreground">Create your account</h1>
           </div>

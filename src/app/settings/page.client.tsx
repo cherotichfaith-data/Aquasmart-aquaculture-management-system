@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/app-ui/skeleton"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { queryKeys } from "@/lib/cache/query-keys"
-import { formatRoleLabel, resolveAppEntryPath, type Samaki360Role } from "@/lib/app-entry"
+import { formatRoleLabel, resolveAppEntryPath, type AquasmartRole } from "@/lib/app-entry"
 import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { getSessionUser } from "@/lib/supabase/session"
@@ -252,7 +252,7 @@ function FarmInformationSection({
   handleChange: (field: string, value: string | number) => void
   displayName: string
   accountEmail: string
-  farmRole: Samaki360Role
+  farmRole: AquasmartRole
 }) {
   return (
     <div className="soft-panel p-5 sm:p-6">
@@ -413,7 +413,7 @@ export default function SettingsPage({
   initialFarmId?: string | null
   initialFarmName?: string | null
   initialUserId?: string | null
-  initialFarmRole?: Samaki360Role | null
+  initialFarmRole?: AquasmartRole | null
   initialSettingsLoad?: SettingsLoadData
 }) {
   const initialThresholdRow = initialSettingsLoad?.thresholdRow ?? null
@@ -438,7 +438,7 @@ export default function SettingsPage({
   const { farm, farmId, loading: farmLoading } = useActiveFarm({ initialFarmId, initialFarmName })
   const resolvedFarmId = farmId ?? initialFarmId ?? null
   const farmRoleQuery = useActiveFarmRole(resolvedFarmId)
-  const farmRole = (farmRoleQuery.data ?? initialFarmRole ?? null) as Samaki360Role
+  const farmRole = (farmRoleQuery.data ?? initialFarmRole ?? null) as AquasmartRole
   const missingFarmAssignment = Boolean(resolvedUserId) && !farmLoading && !resolvedFarmId
   const router = useRouter()
   const canAccessSettings = !farmRole || farmRole === "admin" || farmRole === "farm_manager"

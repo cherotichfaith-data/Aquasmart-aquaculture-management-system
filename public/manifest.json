@@ -1,6 +1,6 @@
 {
-  "name": "Samaki360",
-  "short_name": "Samaki360",
+  "name": "SUSTAIN Aquasmart",
+  "short_name": "Aquasmart",
   "description": "Aquaculture farm management that works offline",
   "start_url": "/data-entry",
   "display": "standalone",

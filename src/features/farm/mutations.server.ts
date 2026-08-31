@@ -107,7 +107,7 @@ export async function createFarmWorkspaceAction(input: FarmWorkspaceInput): Prom
   }
 
   let organizationId = payload.organizationId ?? null
-  let organizationName = payload.organizationName?.trim() || `${fallbackOwner || "Samaki360"} Organization`
+  let organizationName = payload.organizationName?.trim() || `${fallbackOwner || "SUSTAIN Aquasmart"} Organization`
 
   if (organizationId) {
     const { data: organization, error: organizationError } = await admin
