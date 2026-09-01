@@ -6,6 +6,7 @@ import {
 } from "@/features/dashboard/planned-activities.server"
 import { formatPlannedActivityDateLabel, type PlannedActivity } from "@/features/dashboard/planned-activities"
 import { listFarmMembersForFarm } from "@/features/settings/users.server"
+import { renderPlannedActivityReminderEmail, sendEmailOrThrow } from "@/lib/email"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { logSbError } from "@/lib/supabase/log"
 
@@ -42,79 +43,28 @@ function isAuthorized(request: Request) {
   return authHeader === `Bearer ${configuredSecret}`
 }
 
-function buildReminderSubject(scheduledDate: string) {
-  return `SUSTAIN Aquasmart reminder: planned activities for ${formatPlannedActivityDateLabel(scheduledDate)}`
-}
-
-function buildReminderText(activities: PlannedActivity[], scheduledDate: string) {
-  const header = `Planned activities scheduled for ${formatPlannedActivityDateLabel(scheduledDate)}:`
-  const lines = activities.map((activity, index) => {
-    const notes = activity.notes.trim() ? ` - ${activity.notes.trim()}` : ""
-    return `${index + 1}. ${activity.title}${notes}`
-  })
-  return [header, "", ...lines].join("\n")
-}
-
-function buildReminderHtml(activities: PlannedActivity[], scheduledDate: string) {
-  const items = activities
-    .map((activity) => {
-      const notes = activity.notes.trim()
-      return `<li style="margin-bottom:12px;"><strong>${escapeHtml(activity.title)}</strong>${notes ? `<div style="margin-top:4px;color:#54616b;">${escapeHtml(notes)}</div>` : ""}</li>`
-    })
-    .join("")
-
-  return `
-    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#12212b;">
-      <h2 style="margin-bottom:8px;">SUSTAIN Aquasmart planned activities reminder</h2>
-      <p style="margin-bottom:16px;">These activities are scheduled for <strong>${escapeHtml(formatPlannedActivityDateLabel(scheduledDate))}</strong>.</p>
-      <ol style="padding-left:20px;margin:0;">${items}</ol>
-    </div>
-  `
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;")
-}
-
 async function sendReminderEmail(params: {
-  to: string[]
-  subject: string
-  text: string
-  html: string
+  to: string
+  scheduledDate: string
+  activities: PlannedActivity[]
 }) {
-  const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.REMINDER_EMAIL_FROM
-
-  if (!apiKey || !from) {
-    throw new Error("Missing RESEND_API_KEY or REMINDER_EMAIL_FROM.")
-  }
-
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: params.to,
-      subject: params.subject,
-      text: params.text,
-      html: params.html,
-    }),
+  const scheduledDateLabel = formatPlannedActivityDateLabel(params.scheduledDate)
+  const content = renderPlannedActivityReminderEmail({
+    scheduledDateLabel,
+    items: params.activities.map((activity) => ({
+      title: activity.title,
+      notes: activity.notes,
+    })),
   })
 
-  const payload = (await response.json().catch(() => null)) as { id?: string; message?: string; error?: string } | null
-  if (!response.ok) {
-    throw new Error(payload?.message ?? payload?.error ?? "Reminder email request failed.")
-  }
-
-  return payload?.id ?? null
+  return sendEmailOrThrow({
+    to: params.to,
+    ...content,
+    tags: [{ name: "type", value: "planned-activity-reminder" }],
+    // One reminder per recipient per scheduled date -- a retried cron run
+    // must not double-send.
+    idempotencyKey: `planned-activity-reminder:${params.scheduledDate}:${params.to}`,
+  })
 }
 
 export async function GET(request: Request) {
@@ -164,10 +114,9 @@ export async function GET(request: Request) {
         if (!pendingActivities.length) continue
 
         const providerMessageId = await sendReminderEmail({
-          to: [recipientEmail],
-          subject: buildReminderSubject(scheduledDate),
-          text: buildReminderText(pendingActivities, scheduledDate),
-          html: buildReminderHtml(pendingActivities, scheduledDate),
+          to: recipientEmail,
+          scheduledDate,
+          activities: pendingActivities,
         })
 
         await recordReminderDeliveries(

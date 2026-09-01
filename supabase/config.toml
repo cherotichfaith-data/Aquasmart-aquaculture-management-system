@@ -223,15 +223,17 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# Route local `supabase start` auth emails through Resend (matches the hosted
+# projects, which use Resend via the dashboard Custom SMTP setting). Requires
+# RESEND_API_KEY in the environment and a verified Resend sending domain.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# host = "smtp.resend.com"
+# port = 465
+# user = "resend"
+# pass = "env(RESEND_API_KEY)"
+# admin_email = "no-reply@yourdomain"
+# sender_name = "SUSTAIN Aquasmart"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -323,6 +325,19 @@ url = ""
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
+
+# Google sign-in. Hosted projects configure this in the Supabase dashboard
+# (Authentication -> Providers -> Google). This block is only for local
+# `supabase start`: set enabled = true and provide
+# SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID / _SECRET in your environment.
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+# Local sign-in with Google requires skipping the nonce check.
+skip_nonce_check = true
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
