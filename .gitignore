@@ -47,3 +47,9 @@ outputs/
 # local spreadsheet working files
 *.xlsx
 .~lock*
+
+# local machine-troubleshooting scratch, not part of the app
+network-repair.log
+pc-network-audit.ps1
+pc-network-audit.txt
+wifi-driver-rollback.log
