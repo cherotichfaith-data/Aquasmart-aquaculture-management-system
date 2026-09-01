@@ -35,7 +35,9 @@ export function buildPersistedSystemName(unit: string | null | undefined, name: 
 
   if (trimmedUnit && trimmedName) {
     if (hasDuplicatedUnitPrefix(trimmedUnit, trimmedName)) return trimmedName
-    return `${trimmedUnit}.${trimmedName}`
+    // Persist exactly what the form previews: unit and number joined with no
+    // separator (e.g. "G1" + "A" -> "G1A"), matching buildCompactSystemLabel.
+    return buildCompactSystemLabel(trimmedUnit, trimmedName)
   }
   return trimmedName || trimmedUnit || ""
 }

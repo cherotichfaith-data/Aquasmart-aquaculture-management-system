@@ -141,10 +141,10 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                                 <FormItem className="flex h-full flex-col">
                                     <FormLabel>Cage Unit</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="e.g. A" className="max-w-xs" {...field} />
+                                        <Input placeholder="e.g. G1" className="max-w-xs" {...field} />
                                     </FormControl>
                                     <FormDescription className="min-h-[2rem]">
-                                        This appears first in the cage name, for example `A` in `A.3`.
+                                        This appears first in the cage name, for example `G1` in `G1A`.
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>
@@ -159,9 +159,9 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                             <FormItem>
                                 <FormLabel>Cage Number</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="e.g. 3" className="max-w-xs" {...field} />
+                                    <Input placeholder="e.g. A" className="max-w-xs" {...field} />
                                 </FormControl>
-                                <FormDescription>This appears after the unit, for example `3` in `A.3`.</FormDescription>
+                                <FormDescription>This appears after the unit, for example `A` in `G1A`.</FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
