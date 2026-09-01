@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { type FormEvent, useMemo, useState } from "react"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button"
 import { login } from "@/lib/api"
 import { ONBOARDING_PATH, WORKSPACE_SELECT_PATH } from "@/lib/app-entry"
 import { buildCreateWorkspaceHref, buildWorkspaceSelectHref, buildWorkspaceSetupHref } from "@/lib/auth"
@@ -450,6 +451,26 @@ export default function LoginForm() {
           }
         }
 
+        .auth-divider {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin: 1.1rem 0;
+          color: color-mix(in srgb, var(--card-foreground) 60%, transparent);
+          font-size: 0.8rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+        }
+
+        .auth-divider::before,
+        .auth-divider::after {
+          content: "";
+          flex: 1;
+          height: 1px;
+          background: color-mix(in srgb, var(--border) 90%, transparent);
+        }
+
         .helper-row {
           margin-top: 1rem;
           text-align: center;
@@ -504,8 +525,9 @@ export default function LoginForm() {
             <h1>{authMode === "signin" ? "Sign in to your dashboard" : "Create your account"}</h1>
             {isInviteContinuation ? (
               <p>
-                If you arrived from an invite, open the latest invite email. The invite link sets up your
-                session before you choose a password.
+                If you arrived from an invite, continue with Google using the invited email address, or open
+                the latest invite email to set a password. Either way your assigned role is applied on first
+                sign-in.
               </p>
             ) : null}
           </div>
@@ -645,6 +667,13 @@ export default function LoginForm() {
               </span>
             </button>
           </form>
+
+          <div className="auth-divider">or</div>
+
+          <GoogleSignInButton
+            nextPath={isInviteContinuation ? ONBOARDING_PATH : null}
+            label={authMode === "signup" ? "Sign up with Google" : "Continue with Google"}
+          />
 
           <div className="helper-row">
             {isInviteContinuation ? (

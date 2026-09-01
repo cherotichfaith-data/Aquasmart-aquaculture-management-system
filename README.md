@@ -125,13 +125,37 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key   # server-only, admin tasks
 
 NEXT_PUBLIC_APP_URL=http://localhost:3000         # canonical site URL for metadata/links
 
-# Optional — planned-activity reminder emails (Vercel Cron + Resend)
+# Transactional email (Resend) — used by src/lib/email for app-sent mail
+# such as planned-activity reminders. Supabase Auth's own emails (signup
+# confirmation, password reset, invites) are delivered separately via the
+# Supabase project's Custom SMTP setting pointed at Resend.
 RESEND_API_KEY=your_resend_key
-REMINDER_EMAIL_FROM="SUSTAIN Aquasmart <no-reply@yourdomain>"
+EMAIL_FROM="SUSTAIN Aquasmart <no-reply@yourdomain>"   # must be on a verified Resend domain
+# REMINDER_EMAIL_FROM is still read as a fallback for EMAIL_FROM (legacy).
+
+# Planned-activity reminder cron (Vercel Cron)
 CRON_SECRET=your_cron_secret
+
+# Google sign-in — LOCAL `supabase start` only (hosted projects configure the
+# provider in the Supabase dashboard). Also set enabled = true under
+# [auth.external.google] in supabase/config.toml.
+SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=your_google_oauth_client_id
+SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=your_google_oauth_client_secret
 ```
 
 > 🔐 `.env.local` is gitignored — never commit it.
+
+### Authentication
+
+Users sign in with **email + password** or **Google** (`Continue with Google`).
+Both paths hit the same `/auth/callback` route, which exchanges the session and
+claims any pending farm invitations — so an invited teammate can just sign in
+with Google using the invited address and their assigned role is applied.
+
+To enable Google on a hosted project: create an OAuth 2.0 Web client in Google
+Cloud Console with redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`,
+then paste the client ID + secret into Supabase → Authentication → Providers →
+Google. No app deploy needed.
 
 ### 4. Run the development server
 ```bash

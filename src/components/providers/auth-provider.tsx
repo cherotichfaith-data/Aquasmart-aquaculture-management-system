@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useQueryClient } from "@tanstack/react-query";
 import { User, Session } from "@supabase/supabase-js";
 import { getMe } from "@/lib/api";
-import { normalizeRole, type AquasmartRole } from "@/lib/app-entry";
+import { DASHBOARD_ROOT, normalizeRole, sanitizeNextPath, type AquasmartRole } from "@/lib/app-entry";
 import { redirectBrowserAfterSignOut } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import { clearBrowserWorkspaceContext } from "@/lib/context";
@@ -25,6 +25,7 @@ interface AuthContextType {
     hasProfile: boolean;
     isLoading: boolean;
     signInWithPassword: (email: string, password: string) => Promise<void>;
+    signInWithGoogle: (nextPath?: string | null) => Promise<void>;
     signUpWithPassword: (params: { firstName: string; lastName: string; email: string; password: string }) => Promise<{ hasSession: boolean }>;
     resetPasswordForEmail: (email: string) => Promise<void>;
     signOut: () => Promise<void>;
@@ -351,6 +352,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await applyUserContext(data.session ?? null);
     }, [applyUserContext, supabase]);
 
+    const signInWithGoogle = useCallback(async (nextPath?: string | null) => {
+        // OAuth uses the same server callback as the email links: /auth/callback
+        // exchanges the code, claims any pending farm invitations, then redirects
+        // to `next`. Middleware (proxy.ts) takes it from there -- onboarding vs.
+        // workspace select vs. dashboard based on membership.
+        const destination = sanitizeNextPath(nextPath ?? null, DASHBOARD_ROOT);
+        const redirectTo =
+            typeof window !== "undefined"
+                ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(destination)}`
+                : undefined;
+
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+                redirectTo,
+                queryParams: { prompt: "select_account" },
+            },
+        });
+
+        if (error) {
+            throw error;
+        }
+        // On success the browser is navigating to Google; nothing else runs here.
+    }, [supabase]);
+
     const signUpWithPassword = useCallback(async (params: {
         firstName: string;
         lastName: string;
@@ -440,6 +466,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 hasProfile,
                 isLoading,
                 signInWithPassword,
+                signInWithGoogle,
                 signUpWithPassword,
                 resetPasswordForEmail,
                 signOut,

@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { type FormEvent, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button"
 
 export default function ForgotPasswordPageClient() {
   const { resetPasswordForEmail } = useAuth()
@@ -94,6 +95,16 @@ export default function ForgotPasswordPageClient() {
             {isSubmitting ? "Sending..." : "Send reset link"}
           </button>
         </form>
+
+        <div className="my-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-[color:color-mix(in_srgb,var(--card-foreground)_58%,transparent)]">
+          <span className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--border)_90%,transparent)]" />
+          or
+          <span className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--border)_90%,transparent)]" />
+        </div>
+        <GoogleSignInButton />
+        <p className="mt-2 text-xs text-[color:color-mix(in_srgb,var(--card-foreground)_66%,transparent)]">
+          Signed up with Google? You have no password to reset — just continue with Google.
+        </p>
 
         <p className="mt-5 text-center text-sm text-[color:color-mix(in_srgb,var(--card-foreground)_88%,transparent)]">
           <Link href="/auth" className="font-medium text-primary hover:underline">

@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff } from "lucide-react"
 import { sanitizeNextPath } from "@/lib/app-entry"
 import { supabaseBrowser } from "@/lib/supabase/client"
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button"
 import { completeAccountSetupAction } from "./actions.server"
 
 const inputClass =
@@ -215,6 +216,20 @@ export default function SetPasswordPageClient() {
             </button>
           </form>
         )}
+
+        {!isLoading ? (
+          <>
+            <div className="my-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-[color:color-mix(in_srgb,var(--card-foreground)_58%,transparent)]">
+              <span className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--border)_90%,transparent)]" />
+              or
+              <span className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--border)_90%,transparent)]" />
+            </div>
+            <GoogleSignInButton nextPath={nextPath} label="Continue with Google instead" />
+            <p className="mt-2 text-xs text-[color:color-mix(in_srgb,var(--card-foreground)_66%,transparent)]">
+              Use the same email address the invitation was sent to.
+            </p>
+          </>
+        ) : null}
 
         <p className="mt-5 text-center text-sm text-[color:color-mix(in_srgb,var(--card-foreground)_88%,transparent)]">
           <Link href="/auth" className="font-medium text-primary hover:underline">
