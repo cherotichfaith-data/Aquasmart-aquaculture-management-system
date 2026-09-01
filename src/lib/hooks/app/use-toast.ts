@@ -14,8 +14,12 @@ export type ToastProps = {
 
 export type ToastActionElement = React.ReactNode
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+// Show a short stack of toasts so simultaneous alerts (e.g. mortality on
+// several cages at once) are all visible, not just the most recent.
+const TOAST_LIMIT = 3
+// Clear dismissed toasts out of state a few seconds after they close, rather
+// than holding them for ~16 minutes (the upstream default).
+const TOAST_REMOVE_DELAY = 6000
 
 type ToasterToast = ToastProps & {
   id: string
