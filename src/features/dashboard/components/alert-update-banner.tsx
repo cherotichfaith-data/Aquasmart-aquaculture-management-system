@@ -1,168 +1,113 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, BellRing, Info } from "lucide-react"
+import { useMemo } from "react"
+import { AlertTriangle, BellRing } from "lucide-react"
+import { useRouter } from "next/navigation"
 import type { RecommendedAction } from "@/features/dashboard/types"
-import { useNotifications } from "@/components/notifications/notifications-provider"
+import { useNotifications, type ActiveAlert } from "@/components/notifications/notifications-provider"
+import { toDashboardPath } from "@/lib/app-entry"
 
-type BannerAlert = {
+type BannerItem = {
   id: string
   title: string
   description: string
-  priority: RecommendedAction["priority"]
-  sortTime: string | null
+  severity: "critical" | "warning"
+  href?: string
 }
 
-const PRIORITY_STYLES: Record<
-  RecommendedAction["priority"],
-  {
-    icon: typeof AlertTriangle
-    containerClassName: string
-    iconClassName: string
-    accentClassName: string
-    dotClassName: string
+const MAX_VISIBLE = 4
+
+function fromRecommendedAction(action: RecommendedAction, index: number): BannerItem {
+  return {
+    id: `seed:${action.priority}:${action.title}:${index}`,
+    title: action.title,
+    description: action.description,
+    severity: action.priority === "High" ? "critical" : "warning",
   }
-> = {
-  High: {
-    icon: AlertTriangle,
-    containerClassName: "border-destructive/20 bg-destructive/8",
-    iconClassName: "text-destructive",
-    accentClassName: "bg-destructive",
-    dotClassName: "bg-destructive",
-  },
-  Medium: {
-    icon: BellRing,
-    containerClassName: "border-sky-200 bg-sky-50/80",
-    iconClassName: "text-sky-700",
-    accentClassName: "bg-sky-500",
-    dotClassName: "bg-sky-500",
-  },
-  Info: {
-    icon: Info,
-    containerClassName: "border-teal-200 bg-teal-50/80",
-    iconClassName: "text-teal-700",
-    accentClassName: "bg-teal-500",
-    dotClassName: "bg-teal-500",
-  },
 }
 
-function buildAlertIdentity(alert: BannerAlert) {
-  return alert.id
+function fromActiveAlert(alert: ActiveAlert): BannerItem {
+  return {
+    id: alert.id,
+    title: alert.title,
+    description: alert.description,
+    severity: alert.severity,
+    href: alert.href,
+  }
 }
 
+/**
+ * Always-visible strip of the farm's currently-open alert conditions (empty
+ * cage, mortality rate high, water quality). Driven by the live `activeAlerts`
+ * feed so each entry appears and clears on its own; the server-rendered
+ * `alerts` prop is only a first-paint seed while that feed loads.
+ */
 export default function AlertUpdateBanner({
-  farmId,
   alerts,
 }: {
   farmId: string
   alerts: RecommendedAction[]
 }) {
-  const { notifications } = useNotifications()
-  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
-  const storageKey = useMemo(() => `dashboard-alert-update-${farmId}`, [farmId])
-  const bannerAlerts = useMemo<BannerAlert[]>(() => {
-    const notificationAlerts: BannerAlert[] = notifications
-      .filter((notification) => notification.kind === "water_quality" || notification.kind === "mortality" || notification.kind === "cage_empty")
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-      .map((notification) => ({
-        id: `notification:${notification.kind}`,
-        title: notification.title,
-        description: notification.description,
-        priority: notification.severity === "critical" ? "High" : "Medium",
-        sortTime: notification.createdAt,
-      }))
+  const router = useRouter()
+  const { activeAlerts, activeAlertsLoading } = useNotifications()
 
-    const recommendedAlerts: BannerAlert[] = alerts.map((alert) => ({
-      id: `recommended:${alert.priority}:${alert.title}`,
-      title: alert.title,
-      description: alert.description,
-      priority: alert.priority,
-      sortTime: null,
-    }))
-
-    const deduped = new Map<string, BannerAlert>()
-    for (const item of [...notificationAlerts, ...recommendedAlerts]) {
-      if (!deduped.has(item.id)) deduped.set(item.id, item)
+  const items = useMemo<BannerItem[]>(() => {
+    if (activeAlertsLoading && activeAlerts.length === 0) {
+      return alerts.map(fromRecommendedAction)
     }
+    return activeAlerts.map(fromActiveAlert)
+  }, [activeAlerts, activeAlertsLoading, alerts])
 
-    return Array.from(deduped.values()).sort((left, right) => {
-      const priorityDelta =
-        (left.priority === "High" ? 0 : left.priority === "Medium" ? 1 : 2) -
-        (right.priority === "High" ? 0 : right.priority === "Medium" ? 1 : 2)
-      if (priorityDelta !== 0) return priorityDelta
-      if (left.sortTime && right.sortTime && left.sortTime !== right.sortTime) {
-        return right.sortTime.localeCompare(left.sortTime)
-      }
-      if (left.sortTime && !right.sortTime) return -1
-      if (!left.sortTime && right.sortTime) return 1
-      return left.title.localeCompare(right.title)
-    })
-  }, [alerts, notifications])
+  if (items.length === 0) return null
 
-  const activeAlert = useMemo(() => {
-    if (!bannerAlerts.length) return null
-    const persisted = selectedAlertId ? bannerAlerts.find((alert) => buildAlertIdentity(alert) === selectedAlertId) : null
-    return persisted ?? bannerAlerts[0]
-  }, [bannerAlerts, selectedAlertId])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const stored = window.localStorage.getItem(storageKey)
-      setSelectedAlertId(stored || null)
-    } catch {
-      setSelectedAlertId(null)
-    }
-  }, [storageKey])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    if (!bannerAlerts.length) {
-      setSelectedAlertId(null)
-      try {
-        window.localStorage.removeItem(storageKey)
-      } catch {
-        // Ignore storage errors.
-      }
-      return
-    }
-
-    const hasPersistedAlert = selectedAlertId
-      ? bannerAlerts.some((alert) => buildAlertIdentity(alert) === selectedAlertId)
-      : false
-
-    if (hasPersistedAlert) return
-
-    const nextAlertId = buildAlertIdentity(bannerAlerts[0])
-    setSelectedAlertId(nextAlertId)
-    try {
-      window.localStorage.setItem(storageKey, nextAlertId)
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [bannerAlerts, selectedAlertId, storageKey])
-
-  if (!activeAlert) return null
-
-  const styles = PRIORITY_STYLES[activeAlert.priority]
-  const Icon = styles.icon
+  const visible = items.slice(0, MAX_VISIBLE)
+  const hiddenCount = items.length - visible.length
+  const hasCritical = items.some((item) => item.severity === "critical")
+  const Icon = hasCritical ? AlertTriangle : BellRing
 
   return (
-    <div className={`relative mb-3 overflow-hidden rounded-xl border px-3.5 py-3 shadow-none ${styles.containerClassName}`}>
-      <div className={`absolute inset-y-0 left-0 w-1 ${styles.accentClassName}`} />
-      <div className="flex items-start gap-2.5 pl-1">
-        <div className="mt-0.5 rounded-full bg-background/85 p-1.5 ring-1 ring-border/40">
-          <Icon className={`size-3.5 ${styles.iconClassName}`} />
-        </div>
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex size-2 rounded-full ${styles.dotClassName}`} />
-            <p className="text-[13px] font-semibold leading-5 text-foreground">{activeAlert.title}</p>
-          </div>
-          <p className="text-xs leading-5 text-muted-foreground">{activeAlert.description}</p>
-        </div>
+    <div
+      className={`mb-3 overflow-hidden rounded-xl border ${
+        hasCritical ? "border-destructive/25 bg-destructive/8" : "border-sky-200 bg-sky-50/80"
+      }`}
+    >
+      <div className="flex items-center gap-2 px-3.5 py-2">
+        <Icon className={`size-4 shrink-0 ${hasCritical ? "text-destructive" : "text-sky-700"}`} />
+        <p className="text-[13px] font-semibold text-foreground">
+          {items.length} {items.length === 1 ? "alert needs" : "alerts need"} attention
+        </p>
       </div>
+      <ul className="divide-y divide-border/50 border-t border-border/50">
+        {visible.map((item) => (
+          <li key={item.id}>
+            <button
+              type="button"
+              disabled={!item.href}
+              onClick={() => item.href && router.push(item.href)}
+              className="flex w-full items-start gap-2.5 px-3.5 py-2 text-left transition-colors enabled:hover:bg-background/60"
+            >
+              <span
+                className={`mt-1.5 inline-flex size-2 shrink-0 rounded-full ${
+                  item.severity === "critical" ? "bg-destructive" : "bg-sky-500"
+                }`}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-semibold leading-5 text-foreground">{item.title}</span>
+                <span className="block text-xs leading-5 text-muted-foreground">{item.description}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {hiddenCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => router.push(toDashboardPath("/systems"))}
+          className="block w-full border-t border-border/50 px-3.5 py-2 text-left text-xs font-semibold text-muted-foreground hover:bg-background/60"
+        >
+          +{hiddenCount} more — view all
+        </button>
+      ) : null}
     </div>
   )
 }

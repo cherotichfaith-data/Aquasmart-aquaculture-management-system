@@ -101,7 +101,7 @@ export default function Header({
   const searchParams = useSearchParams()
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const activeFarmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
-  const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead, clearAll, activeAlerts } = useNotifications()
   const [signingOut, setSigningOut] = useState(false)
   const [isCondensed, setIsCondensed] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
@@ -114,6 +114,15 @@ export default function Header({
   const resolvedRole = (roleOverride ?? activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const resolvedUser = user ?? null
   const resolvedUnreadCount = unreadCount ?? 0
+  // Active alerts are standing conditions (empty cage, mortality spiking) that
+  // stay until resolved, so they always count toward the bell badge.
+  const bellBadgeCount = resolvedUnreadCount + activeAlerts.length
+  // The persistent "cage empty" condition is now owned by activeAlerts; drop it
+  // from the point-in-time history list so it isn't shown twice.
+  const historyNotifications = useMemo(
+    () => notifications.filter((note) => note.kind !== "cage_empty"),
+    [notifications],
+  )
   const canAccessSettings = resolvedRole === "admin" || resolvedRole === "farm_manager"
   const allowDataEntry = canAccessDataEntry(resolvedRole)
   // Available from every page the shared header renders on, not just the
@@ -500,9 +509,9 @@ export default function Header({
                   className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
                   <Bell size={18} />
-                  {resolvedUnreadCount > 0 ? (
+                  {bellBadgeCount > 0 ? (
                     <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-micro font-bold leading-none text-destructive-foreground">
-                      {resolvedUnreadCount > 9 ? "9+" : resolvedUnreadCount}
+                      {bellBadgeCount > 9 ? "9+" : bellBadgeCount}
                     </span>
                   ) : null}
                 </button>
@@ -600,13 +609,42 @@ export default function Header({
           <p className="text-sm font-bold">Notifications</p>
         </div>
         <Separator />
-        <div className="max-h-80 overflow-y-auto py-1">
-          {notifications.length === 0 ? (
+        <div className="max-h-96 overflow-y-auto py-1">
+          {activeAlerts.length > 0 ? (
+            <>
+              <p className="px-4 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Needs attention · {activeAlerts.length}
+              </p>
+              {activeAlerts.map((alert) => (
+                <button
+                  key={alert.id}
+                  type="button"
+                  onClick={() => {
+                    if (alert.href) router.push(alert.href)
+                    setNotificationsAnchor(null)
+                  }}
+                  className={cn(
+                    "mx-1 my-0.5 block w-[calc(100%-0.5rem)] rounded-lg border px-3 py-2.5 text-left transition-colors",
+                    alert.severity === "critical"
+                      ? "border-destructive/40 bg-destructive/8"
+                      : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]",
+                  )}
+                >
+                  <p className="text-sm font-bold">{alert.title}</p>
+                  <p className="mt-1 block text-xs text-muted-foreground">{alert.description}</p>
+                </button>
+              ))}
+              {historyNotifications.length > 0 ? (
+                <p className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Recent</p>
+              ) : null}
+            </>
+          ) : null}
+          {activeAlerts.length === 0 && historyNotifications.length === 0 ? (
             <div className="px-4 py-6">
               <p className="text-center text-sm text-muted-foreground">No New Notifications</p>
             </div>
           ) : (
-            notifications.map((note) => (
+            historyNotifications.map((note) => (
               <button
                 key={note.id}
                 type="button"
@@ -625,10 +663,14 @@ export default function Header({
             ))
           )}
         </div>
-        <Separator />
-        <MenuItem onClick={clearAll} className="mx-1 justify-center font-bold">
-          Clear notifications
-        </MenuItem>
+        {historyNotifications.length > 0 ? (
+          <>
+            <Separator />
+            <MenuItem onClick={clearAll} className="mx-1 justify-center font-bold">
+              Clear recent
+            </MenuItem>
+          </>
+        ) : null}
       </Menu>
 
       <Menu anchorEl={userMenuAnchor} open={Boolean(userMenuAnchor)} onClose={() => setUserMenuAnchor(null)} className="mt-1 w-60">

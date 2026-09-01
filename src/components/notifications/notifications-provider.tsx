@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation"
 import { DATA_ENTRY_PATH, toDashboardPath } from "@/lib/app-entry"
 import { formatNumberValue } from "@/lib/analytics-format"
 import type { Tables } from "@/lib/types/database"
+import type { RecommendedActionRow } from "@/lib/types/insights"
 import { formatCageLabel } from "@/lib/system-options"
 
 type AlertThresholdRow = Tables<"alert_threshold">
@@ -39,12 +40,86 @@ export type AlertNotification = {
   actionLabel?: string
 }
 
+/**
+ * A live, state-derived alert. Unlike `AlertNotification` (a browser-stored log
+ * of things that fired while the app was open), these are recomputed from the
+ * database on an interval: an entry stays for exactly as long as its condition
+ * holds (cage empty, mortality spiking, water quality bad) and disappears on
+ * its own once resolved. They cannot be dismissed or cleared.
+ */
+export type ActiveAlert = {
+  id: string
+  systemId: number | null
+  systemName: string
+  title: string
+  description: string
+  severity: NotificationSeverity
+  kind: NotificationKind
+  href?: string
+}
+
 type NotificationsContextValue = {
   notifications: AlertNotification[]
   unreadCount: number
   markAllRead: () => void
   markRead: (id: string) => void
   clearAll: () => void
+  activeAlerts: ActiveAlert[]
+  activeAlertsLoading: boolean
+}
+
+const ACTIVE_ALERT_REFETCH_MS = 60_000
+
+function mapRecommendedActionRow(row: RecommendedActionRow): ActiveAlert {
+  const systemId = typeof row.system_id === "number" ? row.system_id : null
+  const systemName = row.system_name?.trim() || "Farm"
+  const metric = row.metric_name?.trim() || "signal"
+  const severity: NotificationSeverity = row.severity === "critical" ? "critical" : "warning"
+  const value = typeof row.current_value === "number" && Number.isFinite(row.current_value) ? row.current_value : null
+  const unit = row.unit?.trim() ? row.unit.trim() : ""
+
+  if (metric === "cage_empty") {
+    return {
+      id: `cage_empty:${systemId ?? systemName}`,
+      systemId,
+      systemName,
+      title: `${systemName} is empty`,
+      description: "No fish remaining — the cage is available for restocking.",
+      severity: "warning",
+      kind: "cage_empty",
+      href: systemId != null ? `${DATA_ENTRY_PATH}?type=stocking&system=${systemId}` : DATA_ENTRY_PATH,
+    }
+  }
+
+  if (metric === "mortality_rate") {
+    const threshold = typeof row.threshold_high === "number" ? row.threshold_high : null
+    return {
+      id: `mortality_rate:${systemId ?? systemName}`,
+      systemId,
+      systemName,
+      title: `${systemName}: mortality rate high`,
+      description:
+        value != null
+          ? `Mortality rate is ${value}%/day${threshold != null ? ` (threshold ${threshold}%/day)` : ""}.`
+          : "Mortality rate is above the alert threshold.",
+      severity,
+      kind: "mortality",
+      href: systemId != null ? `${toDashboardPath("/reports")}?tab=mortality&system=${systemId}` : toDashboardPath("/reports"),
+    }
+  }
+
+  // Water-quality parameter (dissolved_oxygen, ammonia, ...) or generic.
+  const label = metric.replace(/_/g, " ")
+  return {
+    id: `${metric}:${systemId ?? systemName}`,
+    systemId,
+    systemName,
+    title: `${systemName}: water quality`,
+    description: value != null ? `${label} is ${value}${unit ? ` ${unit}` : ""}.` : `${label} needs attention.`,
+    severity,
+    kind: "water_quality",
+    href: systemId != null ? `${toDashboardPath("/reports")}?tab=water-quality&system=${systemId}` : toDashboardPath("/reports"),
+  }
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined)
@@ -180,6 +255,39 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       return (data as AlertThresholdRow[]) ?? []
     },
   })
+
+  const activeAlertsQuery = useQuery({
+    queryKey: ["notifications", "active-alerts", farmId ?? "none"],
+    enabled: Boolean(session) && Boolean(farmId),
+    staleTime: 30_000,
+    refetchInterval: ACTIVE_ALERT_REFETCH_MS,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("api_recommended_actions", {
+        p_farm_id: farmId!,
+      })
+      if (error) {
+        if (!isSbPermissionDenied(error) && !isAbortLikeError(error)) {
+          logSbError("notifications:activeAlerts", error)
+        }
+        return [] as ActiveAlert[]
+      }
+      const rows = (data ?? []) as RecommendedActionRow[]
+      const deduped = new Map<string, ActiveAlert>()
+      for (const row of rows) {
+        const mapped = mapRecommendedActionRow(row)
+        if (!deduped.has(mapped.id)) deduped.set(mapped.id, mapped)
+      }
+      return Array.from(deduped.values()).sort((left, right) => {
+        if (left.severity !== right.severity) return left.severity === "critical" ? -1 : 1
+        return left.systemName.localeCompare(right.systemName) || left.title.localeCompare(right.title)
+      })
+    },
+  })
+  const activeAlerts = useMemo(() => activeAlertsQuery.data ?? [], [activeAlertsQuery.data])
+  const invalidateActiveAlerts = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["notifications", "active-alerts", farmId ?? "none"] })
+  }, [farmId, queryClient])
 
   const thresholds = useMemo(() => thresholdsQuery.data ?? [], [thresholdsQuery.data])
   const systemMap = useMemo(() => {
@@ -361,6 +469,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           if (!row?.system_id) return
           if (!systemMap[row.system_id]) return
 
+          invalidateActiveAlerts()
+
           const threshold = resolveThreshold(thresholds, row.system_id)
           if (!threshold) return
 
@@ -411,7 +521,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(qualityChannel)
     }
-  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
+  }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
@@ -433,6 +543,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           const row = payload.new as MortalityRow
           if (!row?.system_id) return
           if (!systemMap[row.system_id]) return
+
+          invalidateActiveAlerts()
 
           const threshold = resolveThreshold(thresholds, row.system_id)
           if (!threshold) return
@@ -463,7 +575,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(mortalityChannel)
     }
-  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
+  }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
 
   // Fires a "cage now empty" pop notification the moment a harvest or transfer
   // brings a cage's live fish count to zero, and refreshes the cached
@@ -477,6 +589,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
     const notifyIfEmptied = async (systemId: number, sourceId: string) => {
       if (!systemMap[systemId]) return
+      invalidateActiveAlerts()
       const { data: fishCount, error } = await supabase.rpc("current_fish_count", { p_system_id: systemId })
       if (error) {
         logSbError("notifications:cageEmpty", error)
@@ -545,7 +658,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       supabase.removeChannel(harvestChannel)
       supabase.removeChannel(transferChannel)
     }
-  }, [addNotification, farmId, queryClient, session, supabase, systemMap, systemsLoaded, systemsQuery.data])
+  }, [addNotification, farmId, invalidateActiveAlerts, queryClient, session, supabase, systemMap, systemsLoaded, systemsQuery.data])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded) return
@@ -567,6 +680,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           const row = payload.new as StockingRow
           if (!row?.system_id) return
 
+          invalidateActiveAlerts()
           void queryClient.invalidateQueries({ queryKey: ["stocked-systems", farmId] })
           void queryClient.invalidateQueries({
             predicate: ({ queryKey }) =>
@@ -583,11 +697,19 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(stockingChannel)
     }
-  }, [farmId, queryClient, session, setNotifications, supabase, systemsLoaded, systemsQuery.data])
+  }, [farmId, invalidateActiveAlerts, queryClient, session, setNotifications, supabase, systemsLoaded, systemsQuery.data])
 
   const value = useMemo(
-    () => ({ notifications, unreadCount, markAllRead, markRead, clearAll }),
-    [clearAll, markAllRead, markRead, notifications, unreadCount],
+    () => ({
+      notifications,
+      unreadCount,
+      markAllRead,
+      markRead,
+      clearAll,
+      activeAlerts,
+      activeAlertsLoading: activeAlertsQuery.isLoading,
+    }),
+    [activeAlerts, activeAlertsQuery.isLoading, clearAll, markAllRead, markRead, notifications, unreadCount],
   )
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>
