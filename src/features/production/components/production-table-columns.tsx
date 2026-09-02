@@ -25,7 +25,10 @@ function numberCell(
   return <span className={className}>{unit ? `${formatted} ${unit}` : formatted}</span>
 }
 
-export const productionTableColumns: Array<ColumnDef<ProductionPeriodViewRow, unknown>> = [
+export function buildProductionTableColumns(
+  scopeLabel: "System" | "Batch" = "System",
+): Array<ColumnDef<ProductionPeriodViewRow, unknown>> {
+  return [
   {
     id: "date",
     header: "Date",
@@ -38,7 +41,7 @@ export const productionTableColumns: Array<ColumnDef<ProductionPeriodViewRow, un
   },
   {
     id: "system",
-    header: "System",
+    header: scopeLabel,
     accessorFn: (row) => row.systemName ?? "",
     sortDescFirst: false,
     meta: { width: "110px" },
@@ -117,4 +120,8 @@ export const productionTableColumns: Array<ColumnDef<ProductionPeriodViewRow, un
     meta: { width: "130px", align: "right" },
     cell: ({ row }) => numberCell(row.original.mortalityRatePct, 2, "%"),
   },
-]
+  ]
+}
+
+/** Default (cage-scoped) columns, kept for callers that don't vary the label. */
+export const productionTableColumns = buildProductionTableColumns("System")

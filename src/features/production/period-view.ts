@@ -49,6 +49,7 @@ function attachUniqueRowIds(rows: ProductionPeriodViewRow[]) {
 
 type ConsolidatedAccumulator = {
   date: string
+  groupLabel: string | null
   periodStartFish: number
   numberOfFish: number
   biomassKg: number
@@ -68,6 +69,7 @@ type ConsolidatedAccumulator = {
   weightedFeedingRateNumerator: number
   weightedBiomassForAverages: number
   weightedSurvivalPctNumerator: number
+  weightedBiomassDensityNumerator: number
   survivalWeight: number
   feedTypes: Set<string>
 }
@@ -156,7 +158,11 @@ function mapProductionSummaryRow(
   }
 }
 
-function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: ProductionRowEnrichment) {
+function consolidateProductionRows(
+  rows: ProductionSummaryRpcRow[],
+  enrichment: ProductionRowEnrichment,
+  groupBy: "date" | "batch" = "date",
+) {
   const byDate = new Map<string, ConsolidatedAccumulator>()
 
   rows.forEach((row) => {
@@ -165,10 +171,13 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
     const key = buildSystemDateKey(systemId, row.date)
     const growth = enrichment.growthBySystemDate?.get(key)
     const feedType = enrichment.feedTypeBySystemDate?.get(key)
+    const groupLabel = groupBy === "batch" ? row.batch_name ?? "Unassigned batch" : null
+    const groupKey = groupBy === "batch" ? `${row.batch_id ?? "batch"}|${row.date}` : row.date
     const current =
-      byDate.get(row.date) ??
+      byDate.get(groupKey) ??
       {
         date: row.date,
+        groupLabel,
         periodStartFish: 0,
         numberOfFish: 0,
         biomassKg: 0,
@@ -189,6 +198,7 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
         weightedFeedingRateNumerator: 0,
         weightedBiomassForAverages: 0,
         weightedSurvivalPctNumerator: 0,
+        weightedBiomassDensityNumerator: 0,
         survivalWeight: 0,
       }
 
@@ -214,28 +224,34 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
     current.weightedFeedingRateNumerator += (row.feeding_rate_on_date ?? 0) * biomassWeight
     current.weightedBiomassForAverages += biomassWeight
     current.weightedSurvivalPctNumerator += (row.survival_rate_pct ?? 0) * survivalWeight
+    current.weightedBiomassDensityNumerator += (asFiniteNumber(row.biomass_density) ?? 0) * biomassWeight
     current.survivalWeight += survivalWeight
     if (feedType) current.feedTypes.add(feedType)
 
-    byDate.set(row.date, current)
+    byDate.set(groupKey, current)
   })
 
+  // When grouping by batch each output row covers just one batch, so the
+  // farm-wide `totalScopedVolumeM3` no longer applies -- density comes from a
+  // biomass-weighted average of the daily-fact values instead.
+  const useScopedVolume = groupBy === "date"
+
   return sortByDateAsc(Array.from(byDate.values()), (row) => row.date).map((row) => ({
-    rowId: row.date,
+    rowId: groupBy === "batch" ? `${row.date}|${row.groupLabel ?? "batch"}` : row.date,
     date: row.date,
-    systemName: null,
+    systemName: row.groupLabel,
     periodStartFish: row.periodStartFish,
     numberOfFish: row.numberOfFish,
     abwG: divideOrNull(row.biomassKg * 1000, row.numberOfFish),
     biomassKg: row.biomassKg,
     fishDensity:
-      enrichment.totalScopedVolumeM3 && enrichment.totalScopedVolumeM3 > 0
+      useScopedVolume && enrichment.totalScopedVolumeM3 && enrichment.totalScopedVolumeM3 > 0
         ? row.numberOfFish / enrichment.totalScopedVolumeM3
         : null,
     feedPeriodKg: row.feedPeriodKg,
     feedAggKg: row.feedAggKg,
     feedIntensityKgM3:
-      enrichment.totalScopedVolumeM3 && enrichment.totalScopedVolumeM3 > 0
+      useScopedVolume && enrichment.totalScopedVolumeM3 && enrichment.totalScopedVolumeM3 > 0
         ? row.feedPeriodKg / enrichment.totalScopedVolumeM3
         : null,
     growthKg: row.growthKg,
@@ -249,10 +265,11 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
     adgGDay: divideOrNull(row.weightedAdgNumerator, row.weightedBiomassForAverages),
     sgr: divideOrNull(row.weightedSgrNumerator, row.weightedBiomassForAverages),
     feedingRate: divideOrNull(row.weightedFeedingRateNumerator, row.weightedBiomassForAverages),
-    biomassDensity:
-      enrichment.totalScopedVolumeM3 && enrichment.totalScopedVolumeM3 > 0
+    biomassDensity: useScopedVolume
+      ? enrichment.totalScopedVolumeM3 && enrichment.totalScopedVolumeM3 > 0
         ? row.biomassKg / enrichment.totalScopedVolumeM3
-        : null,
+        : null
+      : divideOrNull(row.weightedBiomassDensityNumerator, row.weightedBiomassForAverages),
     periodEfcr: divideOrNull(row.feedPeriodKg, row.growthKg),
     aggregatedEfcr: divideOrNull(row.feedAggKg, row.cumulativeGrowthKg),
     cumulativeMortality: row.cumulativeMortality,
@@ -264,7 +281,12 @@ function consolidateProductionRows(rows: ProductionSummaryRpcRow[], enrichment: 
 
 export function buildProductionPeriodViewRows(params: {
   productionRows: ProductionSummaryRpcRow[]
-  consolidate: boolean
+  /**
+   * `"cage"` (default): one row per cage per date.
+   * `"farm"`: one consolidated row per date.
+   * `"batch"`: one consolidated row per batch per date.
+   */
+  consolidate: boolean | "cage" | "farm" | "batch"
   volumeBySystemId?: Map<number, number>
   growthBySystemDate?: Map<string, { adgGDay: number | null; sgrPctDay: number | null }>
   feedTypeBySystemDate?: Map<string, string | null>
@@ -276,9 +298,16 @@ export function buildProductionPeriodViewRows(params: {
     growthBySystemDate: params.growthBySystemDate,
     feedTypeBySystemDate: params.feedTypeBySystemDate,
   }
-  const rows = params.consolidate
-    ? consolidateProductionRows(params.productionRows, enrichment)
-    : params.productionRows.map((row) => mapProductionSummaryRow(row, enrichment))
+  const mode =
+    params.consolidate === true || params.consolidate === "farm"
+      ? "farm"
+      : params.consolidate === "batch"
+        ? "batch"
+        : "cage"
+  const rows =
+    mode === "cage"
+      ? params.productionRows.map((row) => mapProductionSummaryRow(row, enrichment))
+      : consolidateProductionRows(params.productionRows, enrichment, mode === "batch" ? "batch" : "date")
 
   return attachUniqueRowIds(sortByDateAsc(rows, (row) => row.date))
 }
