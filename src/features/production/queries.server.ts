@@ -207,6 +207,8 @@ export type ProductionPageInitialData = {
   scopedSystemIds: number[]
   /** System the page will render: URL `?system=` when valid, else lowest-id system. */
   systemId: number | null
+  /** Name of the `?batch=` filter, for the page header. */
+  batchName: string | null
   /** Stocking/transfer/harvest/water-quality events for the resolved system, for chart annotations. */
   markers: ProductionChartMarker[]
 }
@@ -243,6 +245,7 @@ async function loadProductionPageInitialData(
     enrichment: { volumeRows: [], growthTrendRows: [], feedingRecords: [] },
     scopedSystemIds: [],
     systemId: null,
+    batchName: null,
     markers: [],
   }
 
@@ -250,25 +253,30 @@ async function loadProductionPageInitialData(
 
   const batchId = parseSelectedNumericId(params.filters.selectedBatch)
   // Active cages only — same source as the shared header's cage filter.
-  const [systems, batchSystems] = await Promise.all([
+  const [systems, batchSystems, occupiedSystemIds] = await Promise.all([
     getScopedSystemOptions(supabase, params.farmId, params.filters.selectedStage, true),
     getScopedBatchSystems(supabase, batchId),
+    listOccupiedSystemIdsServer(supabase, params.farmId),
   ])
-  const resolvedSystemId =
-    resolveSystemIdFromFilterValue(params.filters.selectedSystem, systems) ??
-    (systems.length > 0 ? systems.reduce((low, s) => (s.id < low.id ? s : low)).id : null)
   const allowedSystemIds = systems
     .map((row) => row.id)
     .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
   const batchScopedSystemIds = new Set(batchSystems.map((row) => row.system_id))
+  const batchScopedAllowedIds = allowedSystemIds.filter((id) => batchScopedSystemIds.has(id))
+  // An explicit cage in the URL wins. Otherwise the cage filter is on "All
+  // cages": don't collapse to one cage -- scope to every cage in view (the
+  // selected batch's cages, or every stocked cage on the farm) and let the
+  // page render a consolidated series + a full per-cage records table.
+  const explicitSystemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, systems)
+  const resolvedSystemId = explicitSystemId ?? null
   const scopedSystemIds =
     resolvedSystemId != null
       ? allowedSystemIds.includes(resolvedSystemId)
         ? [resolvedSystemId]
         : []
       : batchId != null
-        ? allowedSystemIds.filter((id) => batchScopedSystemIds.has(id))
-        : allowedSystemIds
+        ? batchScopedAllowedIds
+        : allowedSystemIds.filter((id) => occupiedSystemIds.has(id))
   const batchCycles =
     batchId != null && scopedSystemIds.length > 0
       ? await listProductionCyclesForBatchServer(supabase, {
@@ -359,6 +367,9 @@ async function loadProductionPageInitialData(
           growthTrendRows,
         })
 
+  const batchName =
+    batchId != null ? productionSummary.find((row) => row.batch_id === batchId)?.batch_name ?? null : null
+
   return {
     bounds,
     systems: toQuerySuccess(systems),
@@ -368,6 +379,7 @@ async function loadProductionPageInitialData(
     enrichment,
     scopedSystemIds,
     systemId: resolvedSystemId ?? null,
+    batchName,
     markers,
   }
 }
@@ -539,6 +551,43 @@ async function listProductionSummaryRowsDirectServer(
       .filter((row) => typeof row.cycle_id === "number")
       .map((row) => [row.cycle_id, row]),
   )
+  // production_cycle.system_id is only the cycle's *home* cage, so a summary row
+  // written against a transferred-into cage (or any cage the cycle later moved
+  // through) references a cycle we didn't fetch above -> it would show up as
+  // "Unassigned batch". Backfill those cycles by id.
+  const summaryCycleIds = Array.from(
+    new Set(
+      ((summaryResult.data ?? []) as unknown as AnalyticsProductionSummaryRow[])
+        .map((row) => row.cycle_id)
+        .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
+    ),
+  )
+  const missingCycleIds = summaryCycleIds.filter((id) => !cyclesById.has(id))
+  if (missingCycleIds.length > 0) {
+    const { data: extraCycles } = await supabase
+      .from("production_cycle")
+      .select("cycle_id, system_id, batch_id, cycle_start, cycle_end, ongoing_cycle, target_weight_g")
+      .in("cycle_id", missingCycleIds)
+    for (const cycle of (extraCycles ?? []) as unknown as ProductionCycleRow[]) {
+      if (typeof cycle.cycle_id === "number") cyclesById.set(cycle.cycle_id, cycle)
+    }
+  }
+  const batchIds = Array.from(
+    new Set(
+      Array.from(cyclesById.values())
+        .map((cycle) => cycle.batch_id)
+        .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
+    ),
+  )
+  const batchNameById = new Map<number, string>()
+  if (batchIds.length > 0) {
+    const { data: batchRows } = await supabase.from("fingerling_batch").select("id, name").in("id", batchIds)
+    for (const batch of (batchRows ?? []) as Array<{ id: number; name: string | null }>) {
+      if (typeof batch.id === "number") {
+        batchNameById.set(batch.id, batch.name?.trim() || `Batch ${batch.id}`)
+      }
+    }
+  }
   const dailyFactsBySystemDate = new Map(
     ((dailyFactsResult.data ?? []) as unknown as DailySystemFactRow[])
       .filter((row) => typeof row.system_id === "number" && typeof row.inventory_date === "string")
@@ -552,10 +601,14 @@ async function listProductionSummaryRowsDirectServer(
       const system = row.system_id != null ? systemsById.get(row.system_id) : null
       const dailyFact = row.system_id != null ? dailyFactsBySystemDate.get(`${row.system_id}|${row.date}`) : null
 
+      const batchId = cycle?.batch_id ?? null
+
       return {
         cycle_id: row.cycle_id,
         system_id: row.system_id,
         system_name: system?.name ?? null,
+        batch_id: batchId,
+        batch_name: batchId != null ? batchNameById.get(batchId) ?? null : null,
         growth_stage: system?.growth_stage ?? null,
         ongoing_cycle: cycle?.ongoing_cycle ?? null,
         cycle_start: cycle?.cycle_start ?? null,
@@ -651,6 +704,26 @@ async function listSystemDailyTrendRowsServer(
       biomass_density: row.biomass_density ?? null,
     }))
     .sort((left, right) => left.date.localeCompare(right.date))
+}
+
+/** Cage IDs that currently hold live fish (system.cage_status = 'occupied'). */
+async function listOccupiedSystemIdsServer(
+  supabase: ReturnType<typeof createAccessTokenClient>,
+  farmId: string,
+): Promise<Set<number>> {
+  const { data, error } = await supabase
+    .from("system")
+    .select("id")
+    .eq("farm_id", farmId)
+    .eq("is_active", true)
+    .eq("cage_status", "occupied")
+
+  if (error) return new Set()
+  return new Set(
+    ((data ?? []) as Array<{ id: number | null }>)
+      .map((row) => row.id)
+      .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
+  )
 }
 
 async function listProductionCyclesForBatchServer(

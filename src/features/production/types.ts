@@ -2,6 +2,9 @@ export type ProductionSummaryRpcRow = {
   cycle_id: number | null
   system_id: number | null
   system_name: string | null
+  /** Present on server-loaded rows; used to roll the records table up by batch. */
+  batch_id?: number | null
+  batch_name?: string | null
   growth_stage: string | null
   ongoing_cycle: boolean | null
   cycle_start: string | null
