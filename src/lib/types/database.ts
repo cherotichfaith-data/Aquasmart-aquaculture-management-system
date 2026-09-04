@@ -1266,6 +1266,98 @@ export type Database = {
           },
         ]
       }
+      growth_cycle_benchmark: {
+        Row: {
+          created_at: string
+          cycle_month: number
+          end_abw_g: number
+          end_day: number
+          expected_cum_mortality_pct: number
+          expected_efcr: number | null
+          expected_feed_per_fish_g: number
+          expected_sgr_pct_day: number
+          period_no: number
+          scenario: string
+          start_abw_g: number
+          start_day: number
+        }
+        Insert: {
+          created_at?: string
+          cycle_month: number
+          end_abw_g: number
+          end_day: number
+          expected_cum_mortality_pct: number
+          expected_efcr?: number | null
+          expected_feed_per_fish_g: number
+          expected_sgr_pct_day: number
+          period_no: number
+          scenario: string
+          start_abw_g: number
+          start_day: number
+        }
+        Update: {
+          created_at?: string
+          cycle_month?: number
+          end_abw_g?: number
+          end_day?: number
+          expected_cum_mortality_pct?: number
+          expected_efcr?: number | null
+          expected_feed_per_fish_g?: number
+          expected_sgr_pct_day?: number
+          period_no?: number
+          scenario?: string
+          start_abw_g?: number
+          start_day?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_cycle_benchmark_scenario_fkey"
+            columns: ["scenario"]
+            isOneToOne: false
+            referencedRelation: "growth_model_scenario"
+            referencedColumns: ["scenario"]
+          },
+        ]
+      }
+      growth_model_scenario: {
+        Row: {
+          calibrated_at: string | null
+          created_at: string
+          is_default: boolean
+          label: string
+          richards_a: number
+          richards_k: number
+          richards_nu: number
+          scenario: string
+          source_note: string
+          updated_at: string
+        }
+        Insert: {
+          calibrated_at?: string | null
+          created_at?: string
+          is_default?: boolean
+          label: string
+          richards_a: number
+          richards_k: number
+          richards_nu: number
+          scenario: string
+          source_note?: string
+          updated_at?: string
+        }
+        Update: {
+          calibrated_at?: string | null
+          created_at?: string
+          is_default?: boolean
+          label?: string
+          richards_a?: number
+          richards_k?: number
+          richards_nu?: number
+          scenario?: string
+          source_note?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       growth_phase: {
         Row: {
           abw_max_g: number | null
@@ -2183,6 +2275,15 @@ export type Database = {
           number_of_fish: number
           supplier_id: number
           system_id: number
+        }[]
+      }
+      api_growth_standard_curve: {
+        Args: { p_days?: number; p_scenario?: string; p_start_abw_g?: number }
+        Returns: {
+          day: number
+          expected_abw_g: number
+          expected_feeding_rate_pct: number
+          expected_sgr_pct_day: number
         }[]
       }
       api_kpi_coverage: {

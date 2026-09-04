@@ -35,8 +35,11 @@ export function useSystemOptions(params?: {
     queryKey: queryKeys.options.systems({ ...params, userId: user?.id }),
     queryFn: ({ signal }) => getSystemOptions({ ...params, accessToken: session?.access_token, signal }),
     enabled,
+    // Cages change rarely and every data-entry mutation invalidates
+    // `options:systems:<farmId>`, so serve from cache across page navigations
+    // instead of refetching on every mount (that made the filter blink on
+    // every page change).
     staleTime: 5 * 60_000,
-    refetchOnMount: "always",
   })
   const stockedSystems = useStockedSystemIds(params?.farmId, {
     enabled: enabled && Boolean(params?.stockedOnly),
@@ -65,8 +68,11 @@ export function useBatchOptions(params?: {
     queryKey: queryKeys.options.batches({ ...params, userId: user?.id }),
     queryFn: ({ signal }) => getBatchOptions({ ...params, accessToken: session?.access_token, signal }),
     enabled,
-    staleTime: 0,
-    refetchOnMount: "always",
+    // Stocking / harvest / transfer mutations invalidate `options:batches:<farmId>`,
+    // so a fresh list arrives right when it actually changes -- no need to
+    // refetch on every page mount (that reloaded the batch dropdown on every
+    // navigation).
+    staleTime: 5 * 60_000,
   })
 }
 
