@@ -5,6 +5,14 @@
 -- sampling inserts to fail when the trigger cast those values back to the
 -- enum on `public.system.growth_stage`.
 
+-- The squashed baseline (20260813135423) ships this function RETURNING text.
+-- Postgres will not let CREATE OR REPLACE change a function's return type, so
+-- a clean `supabase db reset` aborts here. Drop it first: nothing holds a hard
+-- dependency on it (it is only called from the plpgsql body of
+-- trg_update_system_growth_stage, recreated below), so no CASCADE is needed
+-- and the statement is safe to replay on every environment.
+DROP FUNCTION IF EXISTS public.classify_growth_stage_tanganicae(numeric);
+
 CREATE OR REPLACE FUNCTION public.classify_growth_stage_tanganicae(p_abw_g numeric)
 RETURNS public.system_growth_stage
 LANGUAGE sql

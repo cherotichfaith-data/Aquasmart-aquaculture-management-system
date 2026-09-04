@@ -58,8 +58,11 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Disabled: supabase/seed.sql has drifted from the current schema (it still
+# references the removed farm.owner/email/phone columns, the old
+# feeding_response enum, feed_incoming, etc.) and needs a dedicated rewrite.
+# Migrations themselves replay cleanly with `supabase db reset`.
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]
