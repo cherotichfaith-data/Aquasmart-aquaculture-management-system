@@ -39,7 +39,11 @@ export function useTimePeriodBounds(params: {
             signal,
           }),
     enabled,
-    staleTime: 0,
+    // Bounds shift only as new production data lands, and every data-entry
+    // mutation invalidates `time-period-bounds:<farmId>`. Caching for a couple
+    // of minutes keeps the analytics pages from re-resolving the window (and
+    // flashing their skeletons) on every navigation.
+    staleTime: 2 * 60_000,
   })
 
   const bounds = query.data ?? { start: null, end: null }
