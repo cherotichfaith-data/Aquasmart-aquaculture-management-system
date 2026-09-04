@@ -24,6 +24,7 @@ export type KpiRpcName =
   | "api_feeding_alerts"
   | "api_feeding_rate_vs_target"
   | "api_feeding_response_distribution"
+  | "api_growth_standard_curve"
   | "api_production_summary"
   | "api_recent_activity_feed"
   | "api_recommended_actions"

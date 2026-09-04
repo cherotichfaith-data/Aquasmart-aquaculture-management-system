@@ -715,6 +715,17 @@ export const queryKeys = {
   appConfig(keys: string[], userId?: string | null) {
     return ["app-config", userId ?? "anon", keys.join(",") || "none"] as const
   },
+  growthModel: {
+    standardCurve(params: { scenario?: string | null; startAbwG?: number | null; days?: number | null }) {
+      return [
+        "growth-model",
+        "standard-curve",
+        params.scenario ?? "main",
+        numberToken(params.startAbwG),
+        numberToken(params.days, "365"),
+      ] as const
+    },
+  },
   farmUserRole(farmId?: string | null, userId?: string | null) {
     return ["farm-user-role", farmToken(farmId), userId ?? "anon"] as const
   },
