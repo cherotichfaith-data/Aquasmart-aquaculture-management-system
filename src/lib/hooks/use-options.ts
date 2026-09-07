@@ -45,6 +45,11 @@ export function useSystemOptions(params?: {
   return useMemo(() => {
     if (!params?.stockedOnly || query.data?.status !== "success") return query
     if (!stockedSystems.query.isSuccess) return query
+    // `cage_status` is trigger-maintained and can lag or sit NULL on farms whose
+    // history was imported outside the app. If it reports *nothing* stocked while
+    // active cages exist, treat the signal as unavailable rather than filtering
+    // the whole list away (which strands every dropdown on its "All ..." row).
+    if (stockedSystems.stockedIds.size === 0 && query.data.data.length > 0) return query
     return {
       ...query,
       data: {

@@ -8,7 +8,7 @@ import { DataErrorState, EmptyState } from "@/components/shared/data-states"
 import { FeedManagementDashboard } from "@/features/feed/components/feed-management-dashboard"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { useFeedDashboardKpis, useFeedEfcrTrend, useFeedPlanVsActual, useFeedVsBiomassGain, useFeedingAlerts, useFeedingRateVsTarget, useFeedingResponseDistribution, useSystemFeedStatus } from "@/features/feed/analytics-hooks"
+import { useFeedDashboard } from "@/features/feed/analytics-hooks"
 import { useScopedSystemIds } from "@/lib/hooks/use-scoped-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
@@ -136,23 +136,17 @@ export default function FeedPageClient({
     [dateFrom, dateTo, effectiveSystemIds, enabled, farmId],
   )
 
-  const kpisQuery = useFeedDashboardKpis(scopedParams)
-  const planQuery = useFeedPlanVsActual(scopedParams)
-  const statusQuery = useSystemFeedStatus(scopedParams)
-  const efcrQuery = useFeedEfcrTrend(scopedParams)
-  const rateQuery = useFeedingRateVsTarget(scopedParams)
-  const responseQuery = useFeedingResponseDistribution(scopedParams)
-  const scatterQuery = useFeedVsBiomassGain(scopedParams)
-  const alertsQuery = useFeedingAlerts(scopedParams)
+  const feedQuery = useFeedDashboard(scopedParams)
+  const feed = feedQuery.data?.status === "success" ? feedQuery.data.data : null
 
-  const kpiRow = kpisQuery.data?.status === "success" ? kpisQuery.data.data[0] ?? null : null
-  const planRows = planQuery.data?.status === "success" ? planQuery.data.data : []
-  const statusRows = statusQuery.data?.status === "success" ? statusQuery.data.data : []
-  const efcrRows = efcrQuery.data?.status === "success" ? efcrQuery.data.data : []
-  const rateRows = rateQuery.data?.status === "success" ? rateQuery.data.data : []
-  const responseRows = responseQuery.data?.status === "success" ? responseQuery.data.data : []
-  const scatterRows = scatterQuery.data?.status === "success" ? scatterQuery.data.data : []
-  const alertRows = alertsQuery.data?.status === "success" ? alertsQuery.data.data : []
+  const kpiRow = feed?.kpis[0] ?? null
+  const planRows = feed?.plan_vs_actual ?? []
+  const statusRows = feed?.system_status ?? []
+  const efcrRows = feed?.efcr_trend ?? []
+  const rateRows = feed?.feeding_rate ?? []
+  const responseRows = feed?.feeding_response ?? []
+  const scatterRows = feed?.feed_vs_biomass ?? []
+  const alertRows = feed?.alerts ?? []
 
   const errorMessages = [
     getErrorMessage(boundsQuery.error),
@@ -162,22 +156,8 @@ export default function FeedPageClient({
     getQueryResultError(systemsQuery.data),
     getErrorMessage(batchSystemsQuery.error),
     getQueryResultError(batchSystemsQuery.data),
-    getErrorMessage(kpisQuery.error),
-    getQueryResultError(kpisQuery.data),
-    getErrorMessage(planQuery.error),
-    getQueryResultError(planQuery.data),
-    getErrorMessage(statusQuery.error),
-    getQueryResultError(statusQuery.data),
-    getErrorMessage(efcrQuery.error),
-    getQueryResultError(efcrQuery.data),
-    getErrorMessage(rateQuery.error),
-    getQueryResultError(rateQuery.data),
-    getErrorMessage(responseQuery.error),
-    getQueryResultError(responseQuery.data),
-    getErrorMessage(scatterQuery.error),
-    getQueryResultError(scatterQuery.data),
-    getErrorMessage(alertsQuery.error),
-    getQueryResultError(alertsQuery.data),
+    getErrorMessage(feedQuery.error),
+    feedQuery.data?.status === "error" ? feedQuery.data.error : null,
   ].filter(Boolean) as string[]
 
   const pageBootstrapping =
@@ -213,14 +193,7 @@ export default function FeedPageClient({
               filterSystemsQuery.refetch()
               systemsQuery.refetch()
               batchSystemsQuery.refetch()
-              kpisQuery.refetch()
-              planQuery.refetch()
-              statusQuery.refetch()
-              efcrQuery.refetch()
-              rateQuery.refetch()
-              responseQuery.refetch()
-              scatterQuery.refetch()
-              alertsQuery.refetch()
+              feedQuery.refetch()
             }}
           />
         ) : null}
@@ -244,14 +217,14 @@ export default function FeedPageClient({
             responseRows={responseRows}
             scatterRows={scatterRows}
             alertRows={alertRows}
-            kpiLoading={pageBootstrapping || kpisQuery.isLoading}
-            planLoading={pageBootstrapping || planQuery.isLoading}
-            statusLoading={pageBootstrapping || statusQuery.isLoading}
-            efcrLoading={pageBootstrapping || efcrQuery.isLoading}
-            rateLoading={pageBootstrapping || rateQuery.isLoading}
-            responseLoading={pageBootstrapping || responseQuery.isLoading}
-            scatterLoading={pageBootstrapping || scatterQuery.isLoading}
-            alertsLoading={pageBootstrapping || alertsQuery.isLoading}
+            kpiLoading={pageBootstrapping || feedQuery.isLoading}
+            planLoading={pageBootstrapping || feedQuery.isLoading}
+            statusLoading={pageBootstrapping || feedQuery.isLoading}
+            efcrLoading={pageBootstrapping || feedQuery.isLoading}
+            rateLoading={pageBootstrapping || feedQuery.isLoading}
+            responseLoading={pageBootstrapping || feedQuery.isLoading}
+            scatterLoading={pageBootstrapping || feedQuery.isLoading}
+            alertsLoading={pageBootstrapping || feedQuery.isLoading}
           />
         )}
       </div>

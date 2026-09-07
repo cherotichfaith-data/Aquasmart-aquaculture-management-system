@@ -96,6 +96,7 @@ export async function getSystemsPageInitialData(params: {
   const { bounds, systemOptions, batchSystems, systemsTable } = await loadSystemsTableData(supabase, {
     farmId: params.farmId,
     filters: params.filters,
+    accessToken: params.accessToken,
   })
 
   const empty = { growthSeries: [], mortalityByCage: [], waterQualityMonthly: [], alerts: [], cohortBySystemId: {} }

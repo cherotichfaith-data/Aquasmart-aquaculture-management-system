@@ -7,13 +7,15 @@ import {
   isAbortLikeError,
   queryOptionsRpc,
   resolveClientReadQuery,
+  toQueryError,
   toQuerySuccess,
   type OptionsRpcName,
 } from "@/lib/supabase/query-transport"
 import type { SystemOption } from "@/lib/system-options"
 import { formatSystemOptionLabel } from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import { attachResolvedSystemIdsToBatches, type BatchOptionItem } from "@/features/shared/batch-options"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
+import { loadBatchOptionRows } from "@/features/shared/batch-options-source"
 
 type SystemListItem = SystemOption
 type BatchListItem = BatchOptionItem
@@ -107,72 +109,21 @@ export async function getBatchOptions(params?: {
     accessToken: params.accessToken,
   })
   if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
 
-  // Same reasoning as getSystemOptions: called directly on the client
-  // already resolved above (the one the supplier/api_dashboard_batches
-  // calls just below already use), instead of a round trip through
-  // /api/rpc for a read RLS already scopes correctly on its own.
-  let batchQuery = queryOptionsRpc(supabase, "api_fingerling_batch_options_rpc", {
-    p_farm_id: params.farmId,
-    p_active_only: params.activeOnly ?? true,
-  })
-  if (params.signal) batchQuery = batchQuery.abortSignal(params.signal)
-
-  const rpcResult = await resolveClientReadQuery<OptionsRpcRow<"api_fingerling_batch_options_rpc">>({
-    tag: "getBatchOptions",
-    query: batchQuery,
-    signal: params.signal,
-    quietWhen: isQuietTableError,
-  })
-  if (rpcResult.status !== "success") return rpcResult
-  const rows = rpcResult.data.filter((row) => Number.isFinite(row.id))
-  if (!rows.length) return toQuerySuccess<BatchListItem>([])
-
-  const supplierIds = Array.from(
-    new Set(
-      rows.map((row) => row.supplier_id).filter((value): value is number => Number.isFinite(value)),
-    ),
-  )
-  let suppliers: Array<Pick<Database["public"]["Tables"]["fingerling_supplier"]["Row"], "id" | "company_name">> = []
-  if (supplierIds.length) {
-    let suppliersQuery = supabase.from("fingerling_supplier").select("id, company_name").in("id", supplierIds)
-    if (params.signal) suppliersQuery = suppliersQuery.abortSignal(params.signal)
-
-    const suppliersResult = await resolveClientReadQuery<
-      Pick<Database["public"]["Tables"]["fingerling_supplier"]["Row"], "id" | "company_name">
-    >({
-      tag: "getBatchOptions:suppliers",
-      query: suppliersQuery,
+  // Called directly on the caller's own resolved client -- RLS already scopes
+  // this read -- rather than a round trip through /api/rpc. Shared with the
+  // server prefetch (`listBatchOptionRows`) so both stay in lockstep.
+  try {
+    const rows = await loadBatchOptionRows(clientResult.supabase, {
+      farmId: params.farmId,
+      activeOnly: params.activeOnly,
       signal: params.signal,
-      quietWhen: isQuietTableError,
     })
-    if (suppliersResult.status === "success") suppliers = suppliersResult.data
+    return toQuerySuccess<BatchListItem>(rows)
+  } catch (error) {
+    if (params.signal?.aborted || isQuietTableError(error)) return empty<BatchListItem>()
+    return toQueryError<BatchListItem>("getBatchOptions", error)
   }
-
-  const supplierNames = new Map<number, string>()
-  for (const supplier of suppliers) {
-    if (Number.isFinite(supplier.id)) supplierNames.set(supplier.id, supplier.company_name ?? "")
-  }
-
-  const batchSystemIds = new Map<number, number[]>()
-  const { data: dashboardBatchRows, error: dashboardBatchError } = await supabase.rpc("api_dashboard_batches", {
-    p_farm_id: params.farmId,
-    p_batch_ids: rows.map((row) => row.id),
-    p_stage: undefined,
-    p_start_date: undefined,
-    p_end_date: undefined,
-  })
-  if (!dashboardBatchError) {
-    for (const row of (dashboardBatchRows ?? []) as Array<{ batch_id: number; system_ids: Array<number | string> | null }>) {
-      const systemIds = (row.system_ids ?? [])
-        .map((value) => Number(value))
-        .filter((value): value is number => Number.isFinite(value) && value > 0)
-      batchSystemIds.set(row.batch_id, systemIds)
-    }
-  }
-
-  return toQuerySuccess<BatchListItem>(attachResolvedSystemIdsToBatches(rows, batchSystemIds, supplierNames))
 }
 
 export async function getFingerlingSupplierOptions(params?: {

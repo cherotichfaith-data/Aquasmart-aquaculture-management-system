@@ -5,8 +5,8 @@ import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import {
   getScopedBatchSystems,
   getScopedSystemOptions,
-  getScopedTimeBounds,
 } from "@/features/shared/scoped-analytics.server"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
 import type {
   DashboardPageInitialData,
   DashboardPageInitialFilters,
@@ -74,7 +74,7 @@ export function parseDashboardPageFilters(
 }
 
 async function getTimeBounds(
-  supabase: ServerClient,
+  accessToken: string,
   farmId: string,
   timePeriod: DashboardPageInitialFilters["timePeriod"],
   systemId?: number,
@@ -95,7 +95,15 @@ async function getTimeBounds(
       isTruncated: false,
       stalenessDays: null,
     },
-    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", systemId, batchId, customTimeRange),
+    () =>
+      resolveScopedTimeBounds(accessToken, {
+        farmId,
+        timePeriod,
+        scope: "dashboard",
+        systemId,
+        batchId,
+        customRange: customTimeRange,
+      }),
   )
 }
 
@@ -204,6 +212,7 @@ async function loadDashboardPageInitialData(
   params: {
     farmId: string | null
     filters: DashboardPageInitialFilters
+    accessToken: string
   },
 ): Promise<DashboardPageInitialData> {
   const empty = buildEmptyDashboardPageInitialData()
@@ -222,7 +231,7 @@ async function loadDashboardPageInitialData(
       ? Number(params.filters.selectedBatch)
       : undefined
   const bounds = await getTimeBounds(
-    supabase,
+    params.accessToken,
     farmId,
     params.filters.timePeriod,
     selectedSystemId,
@@ -384,6 +393,7 @@ export async function loadSystemsTableData(
   params: {
     farmId: string | null
     filters: DashboardPageInitialFilters
+    accessToken: string
   },
 ): Promise<{
   bounds: TimeBounds
@@ -424,7 +434,7 @@ export async function loadSystemsTableData(
       ? Number(params.filters.selectedBatch)
       : undefined
   const bounds = await getTimeBounds(
-    supabase,
+    params.accessToken,
     farmId,
     params.filters.timePeriod,
     selectedSystemId,

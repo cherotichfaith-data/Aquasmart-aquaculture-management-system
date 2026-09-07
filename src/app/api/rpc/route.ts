@@ -4,6 +4,8 @@ import { requireApiUser } from "@/lib/server/auth"
 import { createAccessTokenClient } from "@/lib/supabase/access-token-client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { toQueryError, toQuerySuccess, type KpiRpcName, type OptionsRpcName } from "@/lib/supabase/query-transport"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
+import type { AnalyticsTimeScope, DateType } from "@/lib/time-period"
 
 type RpcProxyName = KpiRpcName | OptionsRpcName
 
@@ -12,17 +14,9 @@ const ALLOWED_RPC_NAMES = new Set<RpcProxyName>([
   "api_dashboard_systems",
   "api_recent_activity_feed",
   "api_time_period_bounds_scoped",
-  "api_feed_dashboard_kpis",
-  "api_feed_efcr_trend",
-  "api_feed_plan_vs_actual",
-  "api_feed_recommendations",
-  "api_feed_vs_biomass_gain",
-  "api_feeding_alerts",
-  "api_feeding_rate_vs_target",
-  "api_feeding_response_distribution",
+  "api_feed_dashboard",
   "api_production_summary",
   "api_recommended_actions",
-  "api_system_feed_status",
   "api_latest_water_quality_status",
   "api_water_quality_trend",
   "api_water_quality_index",
@@ -57,6 +51,33 @@ export async function POST(request: Request) {
   }
 
   const tag = `api:rpc:${payload.name}`
+
+  // Time-period bounds go through the one shared resolver (cached + tagged),
+  // so the client hook and every server prefetch share a single result.
+  if (payload.name === "api_time_period_bounds_scoped") {
+    const args = payload.args ?? {}
+    const farmId = typeof args.p_farm_id === "string" ? args.p_farm_id : null
+    if (!farmId) {
+      return NextResponse.json(toQuerySuccess([{ start: null, end: null }]), {
+        headers: { "Cache-Control": "no-store" },
+      })
+    }
+    try {
+      const bounds = await resolveScopedTimeBounds(auth.accessToken, {
+        farmId,
+        timePeriod: String(args.p_time_period ?? "month") as DateType,
+        scope: (args.p_scope as AnalyticsTimeScope | undefined) ?? undefined,
+        systemId: args.p_system_id == null ? null : Number(args.p_system_id),
+        batchId: args.p_batch_id == null ? null : Number(args.p_batch_id),
+        anchorDate: args.p_anchor_date == null ? null : String(args.p_anchor_date),
+      })
+      return NextResponse.json(toQuerySuccess([bounds]), { headers: { "Cache-Control": "no-store" } })
+    } catch (error) {
+      logSbError(tag, error)
+      return NextResponse.json(toQueryError(tag, error), { status: 500 })
+    }
+  }
+
   const supabase = createAccessTokenClient(auth.accessToken)
 
   try {
