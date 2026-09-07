@@ -227,6 +227,78 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_report: {
+        Row: {
+          any_feed_waste: string | null
+          cage_checker: string | null
+          created_at: string
+          day_status: string | null
+          farm_name: string | null
+          high_mortality_cages: string | null
+          lake_condition: string | null
+          max_feed_waste_score: number
+          mortalities_collected: string | null
+          mortality_normal: string | null
+          payload: Json
+          report_date: string
+          saved_at: string | null
+          supervisor: string | null
+          synced_at: string
+          time_first_checked: string | null
+          time_last_checked: string | null
+          tomorrow_schedule: string | null
+          total_dead_fish: number
+          updated_at: string
+          week_tasks: string | null
+        }
+        Insert: {
+          any_feed_waste?: string | null
+          cage_checker?: string | null
+          created_at?: string
+          day_status?: string | null
+          farm_name?: string | null
+          high_mortality_cages?: string | null
+          lake_condition?: string | null
+          max_feed_waste_score?: number
+          mortalities_collected?: string | null
+          mortality_normal?: string | null
+          payload: Json
+          report_date: string
+          saved_at?: string | null
+          supervisor?: string | null
+          synced_at?: string
+          time_first_checked?: string | null
+          time_last_checked?: string | null
+          tomorrow_schedule?: string | null
+          total_dead_fish?: number
+          updated_at?: string
+          week_tasks?: string | null
+        }
+        Update: {
+          any_feed_waste?: string | null
+          cage_checker?: string | null
+          created_at?: string
+          day_status?: string | null
+          farm_name?: string | null
+          high_mortality_cages?: string | null
+          lake_condition?: string | null
+          max_feed_waste_score?: number
+          mortalities_collected?: string | null
+          mortality_normal?: string | null
+          payload?: Json
+          report_date?: string
+          saved_at?: string | null
+          supervisor?: string | null
+          synced_at?: string
+          time_first_checked?: string | null
+          time_last_checked?: string | null
+          tomorrow_schedule?: string | null
+          total_dead_fish?: number
+          updated_at?: string
+          week_tasks?: string | null
+        }
+        Relationships: []
+      }
       daily_water_quality_rating: {
         Row: {
           created_at: string
@@ -1266,6 +1338,98 @@ export type Database = {
           },
         ]
       }
+      growth_cycle_benchmark: {
+        Row: {
+          created_at: string
+          cycle_month: number
+          end_abw_g: number
+          end_day: number
+          expected_cum_mortality_pct: number
+          expected_efcr: number | null
+          expected_feed_per_fish_g: number
+          expected_sgr_pct_day: number
+          period_no: number
+          scenario: string
+          start_abw_g: number
+          start_day: number
+        }
+        Insert: {
+          created_at?: string
+          cycle_month: number
+          end_abw_g: number
+          end_day: number
+          expected_cum_mortality_pct: number
+          expected_efcr?: number | null
+          expected_feed_per_fish_g: number
+          expected_sgr_pct_day: number
+          period_no: number
+          scenario: string
+          start_abw_g: number
+          start_day: number
+        }
+        Update: {
+          created_at?: string
+          cycle_month?: number
+          end_abw_g?: number
+          end_day?: number
+          expected_cum_mortality_pct?: number
+          expected_efcr?: number | null
+          expected_feed_per_fish_g?: number
+          expected_sgr_pct_day?: number
+          period_no?: number
+          scenario?: string
+          start_abw_g?: number
+          start_day?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_cycle_benchmark_scenario_fkey"
+            columns: ["scenario"]
+            isOneToOne: false
+            referencedRelation: "growth_model_scenario"
+            referencedColumns: ["scenario"]
+          },
+        ]
+      }
+      growth_model_scenario: {
+        Row: {
+          calibrated_at: string | null
+          created_at: string
+          is_default: boolean
+          label: string
+          richards_a: number
+          richards_k: number
+          richards_nu: number
+          scenario: string
+          source_note: string
+          updated_at: string
+        }
+        Insert: {
+          calibrated_at?: string | null
+          created_at?: string
+          is_default?: boolean
+          label: string
+          richards_a: number
+          richards_k: number
+          richards_nu: number
+          scenario: string
+          source_note?: string
+          updated_at?: string
+        }
+        Update: {
+          calibrated_at?: string | null
+          created_at?: string
+          is_default?: boolean
+          label?: string
+          richards_a?: number
+          richards_k?: number
+          richards_nu?: number
+          scenario?: string
+          source_note?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       growth_phase: {
         Row: {
           abw_max_g: number | null
@@ -1849,6 +2013,54 @@ export type Database = {
           },
         ]
       }
+      daily_report_area_status: {
+        Row: {
+          area: string | null
+          comment: string | null
+          report_date: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
+      daily_report_checklist_item: {
+        Row: {
+          answer: string | null
+          check: string | null
+          checklist: string | null
+          details: string | null
+          report_date: string | null
+        }
+        Relationships: []
+      }
+      daily_report_feed_waste: {
+        Row: {
+          cages_affected: string | null
+          corrective_action: string | null
+          likely_cause: string | null
+          report_date: string | null
+          score: number | null
+        }
+        Relationships: []
+      }
+      daily_report_issue: {
+        Row: {
+          action: string | null
+          actioned: boolean | null
+          cage_area: string | null
+          issue: string | null
+          report_date: string | null
+        }
+        Relationships: []
+      }
+      daily_report_tomorrow_action: {
+        Row: {
+          action: string | null
+          assigned: boolean | null
+          report_date: string | null
+          responsible_person: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       api_batch_system_ids: {
@@ -2186,6 +2398,15 @@ export type Database = {
           system_ids: number[]
         }[]
       }
+      api_growth_standard_curve: {
+        Args: { p_days?: number; p_scenario?: string; p_start_abw_g?: number }
+        Returns: {
+          day: number
+          expected_abw_g: number
+          expected_feeding_rate_pct: number
+          expected_sgr_pct_day: number
+        }[]
+      }
       api_kpi_coverage: {
         Args: { p_date_from?: string; p_date_to?: string; p_farm_id: string }
         Returns: {
@@ -2474,6 +2695,25 @@ export type Database = {
         }
       }
       current_fish_count: { Args: { p_system_id: number }; Returns: number }
+      digest_mortality: {
+        Args: { p_date: string }
+        Returns: {
+          cage: string
+          dead: number
+          live: number
+          per_1000: number
+        }[]
+      }
+      digest_mortality_range: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          cage: string
+          dead: number
+          live: number
+          per_1000: number
+          report_date: string
+        }[]
+      }
       enforce_api_rate_limit: {
         Args: {
           p_ip_address?: unknown
@@ -2708,12 +2948,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2737,11 +2977,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2762,11 +3002,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2787,11 +3027,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2804,11 +3044,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
