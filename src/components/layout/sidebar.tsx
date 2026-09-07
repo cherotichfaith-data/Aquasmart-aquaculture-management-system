@@ -169,7 +169,7 @@ function LogoBlock({
               priority
             />
           ) : (
-            <Image src="/use this.png" alt="SUSTAIN Aquasmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
+            <Image src="/icon.png" alt="SUSTAIN Aquasmart logo" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg" priority />
           )}
         </Link>
       </div>
