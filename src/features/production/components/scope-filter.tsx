@@ -49,10 +49,13 @@ export default function ProductionScopeFilter({
   const mode: "cage" | "batch" =
     searchParams.get("scope") === "batch" || batchParam ? "batch" : "cage"
 
+  // Same option sources as the shared header filter (components/shared/
+  // farm-selector). `stockedOnly` is deliberately not set: it leans on the
+  // trigger-maintained `system.cage_status` flag, which sits stale/NULL on
+  // farms whose stock history was imported outside the app and then hides
+  // every real cage, leaving the dropdown stuck on just "All cages".
   const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
-  const systemsQuery = useSystemOptions(
-    farmId ? { farmId, activeOnly: true, stockedOnly: true } : undefined,
-  )
+  const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
 
   const batches = useMemo(
     () =>
