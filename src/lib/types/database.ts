@@ -2239,6 +2239,15 @@ export type Database = {
           updated_at: string
         }[]
       }
+      api_feed_dashboard: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+          p_system_ids?: number[]
+        }
+        Returns: Json
+      }
       api_feed_dashboard_kpis: {
         Args: {
           p_end_date?: string

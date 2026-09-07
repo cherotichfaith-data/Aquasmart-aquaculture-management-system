@@ -1,18 +1,9 @@
-import type { Database } from "@/lib/types/database"
-import type { QueryResult } from "@/lib/supabase-client"
-import { fetchRpc, toQuerySuccess } from "@/lib/supabase/query-transport"
+import { fetchRpc } from "@/lib/supabase/query-transport"
+import { EMPTY_FEED_DASHBOARD_PAYLOAD, type FeedDashboardPayload } from "@/features/feed/types"
 
-type FeedDashboardKpisRow = Database["public"]["Functions"]["api_feed_dashboard_kpis"]["Returns"][number]
-type FeedPlanVsActualRow = Database["public"]["Functions"]["api_feed_plan_vs_actual"]["Returns"][number]
-type SystemFeedStatusRow = Database["public"]["Functions"]["api_system_feed_status"]["Returns"][number]
-type FeedEfcrTrendRow = Database["public"]["Functions"]["api_feed_efcr_trend"]["Returns"][number]
-type FeedingRateVsTargetRow = Database["public"]["Functions"]["api_feeding_rate_vs_target"]["Returns"][number]
-type FeedingResponseDistributionRow =
-  Database["public"]["Functions"]["api_feeding_response_distribution"]["Returns"][number]
-type FeedVsBiomassGainRow = Database["public"]["Functions"]["api_feed_vs_biomass_gain"]["Returns"][number]
-type FeedingAlertRow = Database["public"]["Functions"]["api_feeding_alerts"]["Returns"][number]
-
-const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
+export type FeedDashboardResult =
+  | { status: "success"; data: FeedDashboardPayload }
+  | { status: "error"; error: string }
 
 function buildScopedArgs(params?: {
   farmId?: string | null
@@ -31,105 +22,35 @@ function buildScopedArgs(params?: {
   }
 }
 
-async function queryFeedRpc<Row>(
-  rpcName:
-    | "api_feed_dashboard_kpis"
-    | "api_feed_plan_vs_actual"
-    | "api_system_feed_status"
-    | "api_feed_efcr_trend"
-    | "api_feeding_rate_vs_target"
-    | "api_feeding_response_distribution"
-    | "api_feed_vs_biomass_gain"
-    | "api_feeding_alerts",
-  params?: {
-    farmId?: string | null
-    systemIds?: number[] | null
-    dateFrom?: string | null
-    dateTo?: string | null
-    signal?: AbortSignal
-  },
-): Promise<QueryResult<Row>> {
-  if (!params?.farmId) return empty<Row>()
-
-  return fetchRpc<Row>(`feed-management:${rpcName}`, rpcName, buildScopedArgs(params), params.signal)
-}
-
-export async function getFeedDashboardKpis(params?: {
+/**
+ * Every /feed section in one call. Replaces the 8 per-section feed RPCs this
+ * page used to fan out to. `api_feed_dashboard` returns a single JSONB object;
+ * the /api/rpc proxy forwards it verbatim.
+ */
+export async function getFeedDashboard(params?: {
   farmId?: string | null
   systemIds?: number[] | null
   dateFrom?: string | null
   dateTo?: string | null
   signal?: AbortSignal
-}): Promise<QueryResult<FeedDashboardKpisRow>> {
-  return queryFeedRpc<FeedDashboardKpisRow>("api_feed_dashboard_kpis", params)
-}
+}): Promise<FeedDashboardResult> {
+  if (!params?.farmId) return { status: "success", data: EMPTY_FEED_DASHBOARD_PAYLOAD }
 
-export async function getFeedPlanVsActual(params?: {
-  farmId?: string | null
-  systemIds?: number[] | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedPlanVsActualRow>> {
-  return queryFeedRpc<FeedPlanVsActualRow>("api_feed_plan_vs_actual", params)
-}
+  const res = await fetchRpc<unknown>(
+    "feed-management:api_feed_dashboard",
+    "api_feed_dashboard",
+    buildScopedArgs(params),
+    params.signal,
+  )
+  if (res.status === "error") return { status: "error", error: res.error }
 
-export async function getSystemFeedStatus(params?: {
-  farmId?: string | null
-  systemIds?: number[] | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<SystemFeedStatusRow>> {
-  return queryFeedRpc<SystemFeedStatusRow>("api_system_feed_status", params)
-}
+  // Scalar-jsonb RPC: the object may arrive directly or (defensively) wrapped
+  // in a one-element array by the transport's array-shaped QueryResult.
+  const raw: unknown = Array.isArray(res.data) ? res.data[0] : res.data
+  const payload = raw && typeof raw === "object" ? (raw as Partial<FeedDashboardPayload>) : null
 
-export async function getFeedEfcrTrend(params?: {
-  farmId?: string | null
-  systemIds?: number[] | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedEfcrTrendRow>> {
-  return queryFeedRpc<FeedEfcrTrendRow>("api_feed_efcr_trend", params)
-}
-
-export async function getFeedingRateVsTarget(params?: {
-  farmId?: string | null
-  systemIds?: number[] | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedingRateVsTargetRow>> {
-  return queryFeedRpc<FeedingRateVsTargetRow>("api_feeding_rate_vs_target", params)
-}
-
-export async function getFeedingResponseDistribution(params?: {
-  farmId?: string | null
-  systemIds?: number[] | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedingResponseDistributionRow>> {
-  return queryFeedRpc<FeedingResponseDistributionRow>("api_feeding_response_distribution", params)
-}
-
-export async function getFeedVsBiomassGain(params?: {
-  farmId?: string | null
-  systemIds?: number[] | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedVsBiomassGainRow>> {
-  return queryFeedRpc<FeedVsBiomassGainRow>("api_feed_vs_biomass_gain", params)
-}
-
-export async function getFeedingAlerts(params?: {
-  farmId?: string | null
-  systemIds?: number[] | null
-  dateFrom?: string | null
-  dateTo?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedingAlertRow>> {
-  return queryFeedRpc<FeedingAlertRow>("api_feeding_alerts", params)
+  return {
+    status: "success",
+    data: payload ? { ...EMPTY_FEED_DASHBOARD_PAYLOAD, ...payload } : EMPTY_FEED_DASHBOARD_PAYLOAD,
+  }
 }
