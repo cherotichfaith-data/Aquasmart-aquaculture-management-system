@@ -111,6 +111,13 @@ export function usePendingLatestEntries(
                     { label: "Feed Type", value: feedTypeLabel(row.feedTypeId) },
                     { label: "Response", value: row.feedingResponse != null ? `Level ${row.feedingResponse}` : "Not recorded" },
                   ],
+            metadata: {
+              feedTypeId: row.feedTypeId ?? 0,
+            },
+            duplicateMessage:
+              row.feedTypeId != null
+                ? `A feeding entry already exists for this cage on ${row.date} with ${feedTypeLabel(row.feedTypeId)}.`
+                : `A feeding entry already exists for this cage on ${row.date}.`,
           }))
         }
         case "mortality": {
