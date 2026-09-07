@@ -3,8 +3,6 @@
 import { useMemo, useState } from "react"
 import { useMortalityData } from "@/features/reports/hooks"
 import { useDashboardSystems } from "@/lib/hooks/use-dashboard-systems"
-import { useSyntheticBatchIds } from "@/lib/hooks/use-options"
-import { scrubSyntheticBatchId } from "@/features/reports/lib/scrub-synthetic-batch"
 import { sortByDateAsc } from "@/lib/utils"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
@@ -71,23 +69,11 @@ export default function MortalityReport({
     dateTo: dateRange?.to,
     enabled: boundsReady && showMortalityRecords,
   })
-  const { ids: syntheticBatchIds } = useSyntheticBatchIds(farmId)
   const rows = useMemo(
-    () =>
-      scrubSyntheticBatchId(
-        mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : [],
-        syntheticBatchIds,
-      ),
-    [mortalityQuery.data, syntheticBatchIds],
+    () => (mortalityQuery.data?.status === "success" ? mortalityQuery.data.data : []),
+    [mortalityQuery.data],
   )
-  const tableRows = useMemo(
-    () =>
-      scrubSyntheticBatchId(
-        mortalityTableQuery.data?.status === "success" ? mortalityTableQuery.data.data : [],
-        syntheticBatchIds,
-      ),
-    [mortalityTableQuery.data, syntheticBatchIds],
-  )
+  const tableRows = mortalityTableQuery.data?.status === "success" ? mortalityTableQuery.data.data : []
   const systemRows = useMemo(
     () => (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
     [systemsQuery.data],

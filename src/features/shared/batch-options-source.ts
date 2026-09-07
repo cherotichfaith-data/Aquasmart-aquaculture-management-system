@@ -1,10 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/types/database"
-import {
-  attachResolvedSystemIdsToBatches,
-  isSyntheticBatchName,
-  type BatchOptionItem,
-} from "@/features/shared/batch-options"
+import { attachResolvedSystemIdsToBatches, type BatchOptionItem } from "@/features/shared/batch-options"
 
 type BatchOptionsRpcRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 
@@ -12,13 +8,9 @@ type BatchOptionsRpcRow = Database["public"]["Functions"]["api_fingerling_batch_
  * Single source for the batch selector options, shared by the client hook
  * (`useBatchOptions`) and the server prefetch (`listBatchOptionRows`).
  *
- * `api_fingerling_batch_options_rpc` is the canonical list. It also returns
- * `system_ids[]` (the cages currently holding each batch), so there is no
- * second RPC -- callers used to hit `api_dashboard_batches`, a ~50-column
- * analytics RPC, purely to read that one array.
- *
- * Data-repair stand-in batches (INFERRED-*, BATCH-<n>) are filtered out here so
- * they never reach a selector, lineage view, KPI, chart, or data-entry form.
+ * `api_fingerling_batch_options_rpc` is the canonical list -- it returns only
+ * real, active batches (non-synthetic, with an ongoing cycle) and the
+ * `system_ids[]` array, so there is no second RPC and no client-side filtering.
  */
 export async function loadBatchOptionRows(
   supabase: SupabaseClient<Database>,
@@ -33,9 +25,7 @@ export async function loadBatchOptionRows(
   const { data, error } = await rpc
   if (error) throw error
 
-  const rows = ((data ?? []) as BatchOptionsRpcRow[]).filter(
-    (row) => Number.isFinite(row.id) && !isSyntheticBatchName(row.label),
-  )
+  const rows = ((data ?? []) as BatchOptionsRpcRow[]).filter((row) => Number.isFinite(row.id))
   if (!rows.length) return []
 
   const supplierIds = Array.from(

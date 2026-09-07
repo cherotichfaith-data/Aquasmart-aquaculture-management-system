@@ -7,7 +7,6 @@ import {
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
 import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
-import { isSyntheticBatchName } from "@/features/shared/batch-options"
 import { selectOccupiedSystemIds } from "@/features/shared/occupied-systems"
 import type { ProductionDailyTrendRow, ProductionSummaryRpcRow } from "@/features/production/types"
 import { normalizeStageFilter } from "@/lib/stage-filter"
@@ -580,11 +579,17 @@ async function listProductionSummaryRowsDirectServer(
         .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
     ),
   )
+  // Only real batches get a name here -- data-repair stand-ins
+  // (fingerling_batch.is_synthetic) are left out so their cages resolve to no
+  // batch at all, matching every other surface.
   const batchNameById = new Map<number, string>()
   if (batchIds.length > 0) {
-    const { data: batchRows } = await supabase.from("fingerling_batch").select("id, name").in("id", batchIds)
-    for (const batch of (batchRows ?? []) as Array<{ id: number; name: string | null }>) {
-      if (typeof batch.id === "number") {
+    const { data: batchRows } = await supabase
+      .from("fingerling_batch")
+      .select("id, name, is_synthetic")
+      .in("id", batchIds)
+    for (const batch of (batchRows ?? []) as Array<{ id: number; name: string | null; is_synthetic: boolean | null }>) {
+      if (typeof batch.id === "number" && !batch.is_synthetic) {
         batchNameById.set(batch.id, batch.name?.trim() || `Batch ${batch.id}`)
       }
     }
@@ -602,13 +607,11 @@ async function listProductionSummaryRowsDirectServer(
       const system = row.system_id != null ? systemsById.get(row.system_id) : null
       const dailyFact = row.system_id != null ? dailyFactsBySystemDate.get(`${row.system_id}|${row.date}`) : null
 
-      const rawBatchId = cycle?.batch_id ?? null
-      const rawBatchName = rawBatchId != null ? batchNameById.get(rawBatchId) ?? null : null
-      // Data-repair stand-ins (INFERRED-*, BATCH-<n>) are not real batches --
-      // strip their identity so they never surface as a batch anywhere.
-      const isSynthetic = isSyntheticBatchName(rawBatchName)
-      const batchId = isSynthetic ? null : rawBatchId
-      const batchName = isSynthetic ? null : rawBatchName
+      // A synthetic batch never made it into batchNameById, so its cages
+      // resolve to no batch.
+      const resolvedBatchId = cycle?.batch_id ?? null
+      const batchName = resolvedBatchId != null ? batchNameById.get(resolvedBatchId) ?? null : null
+      const batchId = batchName != null ? resolvedBatchId : null
 
       return {
         cycle_id: row.cycle_id,

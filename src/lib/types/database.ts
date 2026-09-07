@@ -885,6 +885,7 @@ export type Database = {
           date_of_delivery: string
           farm_id: string | null
           id: number
+          is_synthetic: boolean
           name: string
           number_of_fish: number
           supplier_id: number
@@ -896,6 +897,7 @@ export type Database = {
           date_of_delivery: string
           farm_id?: string | null
           id?: number
+          is_synthetic?: boolean
           name: string
           number_of_fish: number
           supplier_id: number
@@ -907,6 +909,7 @@ export type Database = {
           date_of_delivery?: string
           farm_id?: string | null
           id?: number
+          is_synthetic?: boolean
           name?: string
           number_of_fish?: number
           supplier_id?: number

@@ -14,7 +14,7 @@ import {
 import type { SystemOption } from "@/lib/system-options"
 import { formatSystemOptionLabel } from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import { isSyntheticBatchName, type BatchOptionItem } from "@/features/shared/batch-options"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
 import { loadBatchOptionRows } from "@/features/shared/batch-options-source"
 
 type SystemListItem = SystemOption
@@ -124,43 +124,6 @@ export async function getBatchOptions(params?: {
     if (params.signal?.aborted || isQuietTableError(error)) return empty<BatchListItem>()
     return toQueryError<BatchListItem>("getBatchOptions", error)
   }
-}
-
-/**
- * IDs of the data-repair stand-in batches (INFERRED-*, BATCH-<n>) for a farm.
- * Used to scrub synthetic `batch_id`s out of record tables so they never
- * surface anywhere in the UI, even as a bare number.
- */
-export async function getSyntheticBatchIds(params?: {
-  farmId?: string | null
-  accessToken?: string | null
-  signal?: AbortSignal
-}): Promise<QueryResult<number>> {
-  if (!params?.farmId) return empty<number>()
-
-  const clientResult = await getClientOrError("getSyntheticBatchIds", {
-    requireSession: true,
-    accessToken: params.accessToken,
-  })
-  if ("error" in clientResult) return clientResult.error
-
-  let query = clientResult.supabase
-    .from("fingerling_batch")
-    .select("id, name")
-    .eq("farm_id", params.farmId)
-  if (params.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params.signal?.aborted || isQuietTableError(error)) return empty<number>()
-    return toQueryError<number>("getSyntheticBatchIds", error)
-  }
-
-  return toQuerySuccess<number>(
-    ((data ?? []) as Array<{ id: number; name: string | null }>)
-      .filter((row) => isSyntheticBatchName(row.name))
-      .map((row) => row.id),
-  )
 }
 
 export async function getFingerlingSupplierOptions(params?: {

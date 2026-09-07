@@ -3,8 +3,6 @@
 import { useMemo, useState } from "react"
 import { useProductionSummary } from "@/features/production/hooks"
 import { useFeedingBreakdown, useFeedingRecords, useFeedingSummary } from "@/features/reports/hooks"
-import { useSyntheticBatchIds } from "@/lib/hooks/use-options"
-import { scrubSyntheticBatchId } from "@/features/reports/lib/scrub-synthetic-batch"
 import { sortByDateAsc } from "@/lib/utils"
 import { AnalyticsSection } from "@/components/shared/analytics-section"
 import { getCombinedQueryMessages } from "@/lib/utils/query-result"
@@ -88,23 +86,11 @@ export default function FeedingReport({
     enabled: boundsReady && showFeedingRecords,
   })
 
-  const { ids: syntheticBatchIds } = useSyntheticBatchIds(farmId)
   const records = useMemo(
-    () =>
-      scrubSyntheticBatchId(
-        feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : [],
-        syntheticBatchIds,
-      ),
-    [feedingRecordsQuery.data, syntheticBatchIds],
+    () => (feedingRecordsQuery.data?.status === "success" ? feedingRecordsQuery.data.data : []),
+    [feedingRecordsQuery.data],
   )
-  const tableRecords = useMemo(
-    () =>
-      scrubSyntheticBatchId(
-        feedingTableQuery.data?.status === "success" ? feedingTableQuery.data.data : [],
-        syntheticBatchIds,
-      ),
-    [feedingTableQuery.data, syntheticBatchIds],
-  )
+  const tableRecords = feedingTableQuery.data?.status === "success" ? feedingTableQuery.data.data : []
   const summaryRows = useMemo(
     () => (productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []),
     [productionSummaryQuery.data],
