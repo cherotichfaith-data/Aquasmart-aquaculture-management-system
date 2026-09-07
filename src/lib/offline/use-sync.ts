@@ -14,16 +14,20 @@ export function useSyncController() {
     if (syncingRef.current) return
 
     syncingRef.current = true
-    setIsSyncing(true)
-    setSyncError(null)
 
     try {
       const count = await getPendingCount()
       setPendingCount(count)
       if (count === 0) {
+        // Nothing queued -- the 60s heartbeat must stay silent. Flipping
+        // `isSyncing` here made the "Syncing to server..." status bar flash in
+        // and out every minute on every page.
         setNeedsReauth(false)
         return
       }
+
+      setIsSyncing(true)
+      setSyncError(null)
 
       const result = await runSync()
       setLastSyncedAt(new Date())

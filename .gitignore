@@ -53,3 +53,4 @@ network-repair.log
 pc-network-audit.ps1
 pc-network-audit.txt
 wifi-driver-rollback.log
+battery-report.html

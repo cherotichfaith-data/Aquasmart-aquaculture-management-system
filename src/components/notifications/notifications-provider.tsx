@@ -68,7 +68,12 @@ type NotificationsContextValue = {
   activeAlertsLoading: boolean
 }
 
-const ACTIVE_ALERT_REFETCH_MS = 60_000
+// Recommended actions are derived from KPI thresholds that move slowly, and the
+// realtime channels below already invalidate this query when the underlying
+// water-quality / threshold / settings rows change. A 5-minute background poll
+// is a cheap safety net, not a live feed -- a 1-minute poll was a needless
+// request every minute on every open tab.
+const ACTIVE_ALERT_REFETCH_MS = 5 * 60_000
 
 function mapRecommendedActionRow(row: RecommendedActionRow): ActiveAlert {
   const systemId = typeof row.system_id === "number" ? row.system_id : null
@@ -261,6 +266,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     enabled: Boolean(session) && Boolean(farmId),
     staleTime: 30_000,
     refetchInterval: ACTIVE_ALERT_REFETCH_MS,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("api_recommended_actions", {

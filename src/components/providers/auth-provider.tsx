@@ -420,7 +420,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, [supabase]);
 
-    const signOut = async () => {
+    const signOut = useCallback(async () => {
         // Clear local state immediately so UI responds quickly, even if network is slow.
         setUser(null);
         setSession(null);
@@ -453,29 +453,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             redirectBrowserAfterSignOut();
         }
-    };
+    }, [applyUserContext, resetClientStateForUser, supabase]);
 
-    return (
-        <AuthContext.Provider
-            value={{
-                user,
-                session,
-                role,
-                profile,
-                settings,
-                hasProfile,
-                isLoading,
-                signInWithPassword,
-                signInWithGoogle,
-                signUpWithPassword,
-                resetPasswordForEmail,
-                signOut,
-                refreshProfile,
-            }}
-        >
-            {children}
-        </AuthContext.Provider>
+    // Without this memo the context value is a fresh object on every render of
+    // AuthProvider, so every `useAuth()` consumer (which is nearly every hook in
+    // the app) re-renders whenever anything here changes -- including the
+    // periodic session/token churn.
+    const contextValue = useMemo<AuthContextType>(
+        () => ({
+            user,
+            session,
+            role,
+            profile,
+            settings,
+            hasProfile,
+            isLoading,
+            signInWithPassword,
+            signInWithGoogle,
+            signUpWithPassword,
+            resetPasswordForEmail,
+            signOut,
+            refreshProfile,
+        }),
+        [
+            user,
+            session,
+            role,
+            profile,
+            settings,
+            hasProfile,
+            isLoading,
+            signInWithPassword,
+            signInWithGoogle,
+            signUpWithPassword,
+            resetPasswordForEmail,
+            signOut,
+            refreshProfile,
+        ],
     );
+
+    return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {
