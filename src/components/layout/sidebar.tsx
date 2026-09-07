@@ -159,10 +159,18 @@ function LogoBlock({
           className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90"
           onClick={mobile ? onClose : undefined}
         >
-          <Image src="/use this.png" alt="SUSTAIN Aquasmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
           {!collapsed || mobile ? (
-            <span className="text-lg font-bold text-[color:var(--color-sidebar-foreground)]">SUSTAIN Aquasmart</span>
-          ) : null}
+            <Image
+              src="/sustain-aquasmart-wordmark-white.png"
+              alt="SUSTAIN Aquasmart"
+              width={1200}
+              height={131}
+              className="h-auto w-auto max-h-6 max-w-[168px] object-contain object-left"
+              priority
+            />
+          ) : (
+            <Image src="/use this.png" alt="SUSTAIN Aquasmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
+          )}
         </Link>
       </div>
       {mobile ? (
