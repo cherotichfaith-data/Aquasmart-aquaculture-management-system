@@ -2183,6 +2183,7 @@ export type Database = {
           number_of_fish: number
           supplier_id: number
           system_id: number
+          system_ids: number[]
         }[]
       }
       api_kpi_coverage: {

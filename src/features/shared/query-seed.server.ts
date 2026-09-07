@@ -1,7 +1,8 @@
 import type { Database } from "@/lib/types/database"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { buildProductionSummaryRpcArgs, type ProductionSummaryParams } from "@/lib/production-summary-rpc"
-import { attachResolvedSystemIdsToBatches, type BatchOptionItem } from "@/features/shared/batch-options"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
+import { loadBatchOptionRows } from "@/features/shared/batch-options-source"
 
 export type ServerClient = ReturnType<typeof createAccessTokenClient>
 
@@ -75,43 +76,14 @@ export async function listBatchOptionRows(
   supabase: ServerClient,
   params: { farmId: string; activeOnly?: boolean },
 ): Promise<BatchOptionRow[]> {
-  const { data: batchRows, error } = await supabase.rpc("api_fingerling_batch_options_rpc", {
-    p_farm_id: params.farmId,
-    p_active_only: params.activeOnly ?? true,
-  })
-  if (error) return []
-  const rows = ((batchRows ?? []) as Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"]).filter(
-    (row) => Number.isFinite(row.id),
-  )
-  if (!rows.length) return []
-
-  const supplierIds = Array.from(
-    new Set(rows.map((row) => row.supplier_id).filter((value): value is number => Number.isFinite(value))),
-  )
-  const { data: suppliers } = supplierIds.length
-    ? await supabase.from("fingerling_supplier").select("id, company_name").in("id", supplierIds)
-    : { data: [] as Array<{ id: number; company_name: string }> }
-  const supplierNames = new Map<number, string>()
-  for (const supplier of suppliers ?? []) {
-    if (Number.isFinite(supplier.id)) supplierNames.set(supplier.id, supplier.company_name ?? "")
+  try {
+    return await loadBatchOptionRows(supabase, {
+      farmId: params.farmId,
+      activeOnly: params.activeOnly,
+    })
+  } catch {
+    return []
   }
-
-  const batchSystemIds = new Map<number, number[]>()
-  const { data: dashboardBatches } = await supabase.rpc("api_dashboard_batches", {
-    p_farm_id: params.farmId,
-    p_batch_ids: rows.map((row) => row.id),
-    p_stage: undefined,
-    p_start_date: undefined,
-    p_end_date: undefined,
-  })
-  for (const row of (dashboardBatches ?? []) as Array<{ batch_id: number; system_ids: Array<number | string> | null }>) {
-    const systemIds = (row.system_ids ?? [])
-      .map((value) => Number(value))
-      .filter((value): value is number => Number.isFinite(value) && value > 0)
-    batchSystemIds.set(row.batch_id, systemIds)
-  }
-
-  return attachResolvedSystemIdsToBatches(rows, batchSystemIds, supplierNames)
 }
 
 export async function listFeedTypeOptionRows(

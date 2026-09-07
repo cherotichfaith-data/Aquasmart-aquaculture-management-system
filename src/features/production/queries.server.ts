@@ -7,6 +7,7 @@ import {
   getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
+import { selectOccupiedSystemIds } from "@/features/shared/occupied-systems"
 import type { ProductionDailyTrendRow, ProductionSummaryRpcRow } from "@/features/production/types"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
@@ -711,19 +712,11 @@ async function listOccupiedSystemIdsServer(
   supabase: ReturnType<typeof createAccessTokenClient>,
   farmId: string,
 ): Promise<Set<number>> {
-  const { data, error } = await supabase
-    .from("system")
-    .select("id")
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
-    .eq("cage_status", "occupied")
-
-  if (error) return new Set()
-  return new Set(
-    ((data ?? []) as Array<{ id: number | null }>)
-      .map((row) => row.id)
-      .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
-  )
+  try {
+    return await selectOccupiedSystemIds(supabase, farmId)
+  } catch {
+    return new Set()
+  }
 }
 
 async function listProductionCyclesForBatchServer(
