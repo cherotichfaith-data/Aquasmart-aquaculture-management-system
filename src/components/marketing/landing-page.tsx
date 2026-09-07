@@ -220,9 +220,18 @@ export default function LandingPage() {
               <div className="hidden w-[220px] md:flex lg:mr-20 lg:w-[270px]">
                 <div className="relative w-full rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,var(--brand-panel-from),var(--brand-panel-to))] p-3 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.7)]">
                   <div className="overflow-hidden rounded-[22px] bg-[linear-gradient(180deg,var(--brand-panel-shell-from),var(--brand-panel-shell-to))]">
-                    <div className="flex items-center justify-between bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
-                      <span>SUSTAIN Aquasmart Live</span>
-                      <span>Online</span>
+                    <div className="flex items-center justify-between gap-2 bg-primary px-4 py-3 text-primary-foreground">
+                      <Image
+                        src="/sustain-aquasmart-wordmark-white.png"
+                        alt="SUSTAIN Aquasmart"
+                        width={1200}
+                        height={131}
+                        className="h-3.5 w-auto"
+                      />
+                      <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        Live
+                      </span>
                     </div>
 
                     <div className="space-y-3 p-3">
