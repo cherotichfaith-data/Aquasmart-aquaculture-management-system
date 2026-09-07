@@ -12,7 +12,7 @@ import {
 } from "@/components/app-ui/select"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
-import { formatCageLabel } from "@/lib/system-options"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 
 /**
  * Production page scope selector: one small "Cages / Batches" switch, and the
@@ -35,9 +35,22 @@ export default function ProductionScopeFilter({
   initialFarmId,
   /** See ProductionMetricFilter's `startTransition` prop for why this exists. */
   startTransition,
+  /**
+   * Server-loaded fallbacks from the page's `initialData`. The client option
+   * RPCs gate on trigger-maintained state (`cage_status`, an ongoing
+   * `production_cycle`) that can be stale on imported/reconstructed farms and
+   * then return nothing, leaving the dropdown stuck on just "All ...". These
+   * lists come straight from the same data the chart/table already render, so
+   * we union them in and never show fewer entries than the page itself knows
+   * about.
+   */
+  fallbackSystems = [],
+  fallbackBatches = [],
 }: {
   initialFarmId?: string | null
   startTransition?: (callback: () => void) => void
+  fallbackSystems?: SystemOption[]
+  fallbackBatches?: Array<{ id: number; label: string }>
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -54,20 +67,36 @@ export default function ProductionScopeFilter({
     farmId ? { farmId, activeOnly: true, stockedOnly: true } : undefined,
   )
 
-  const batches = useMemo(
-    () =>
-      (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []).filter(
-        (batch) => batch.id != null,
-      ),
-    [batchesQuery.data],
-  )
-  const systems = useMemo(
-    () =>
-      (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []).filter(
-        (system) => system.id != null,
-      ),
-    [systemsQuery.data],
-  )
+  const batches = useMemo(() => {
+    const fromRpc = (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []).filter(
+      (batch) => batch.id != null,
+    )
+    const byId = new Map<number, { id: number; label: string }>()
+    for (const batch of fallbackBatches) {
+      if (batch.id != null) byId.set(batch.id, { id: batch.id, label: batch.label })
+    }
+    for (const batch of fromRpc) {
+      // RPC label wins when both know the batch -- it carries the real name.
+      byId.set(batch.id as number, {
+        id: batch.id as number,
+        label: normalizeBatchLabel(batch.label) || batch.label || `Batch ${batch.id}`,
+      })
+    }
+    return Array.from(byId.values()).sort((left, right) =>
+      left.label.localeCompare(right.label, undefined, { numeric: true }),
+    )
+  }, [batchesQuery.data, fallbackBatches])
+  const systems = useMemo(() => {
+    const fromRpc = (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []).filter(
+      (system) => system.id != null,
+    )
+    const byId = new Map<number, SystemOption>()
+    for (const system of fallbackSystems) {
+      if (system.id != null) byId.set(system.id, system)
+    }
+    for (const system of fromRpc) byId.set(system.id, system)
+    return Array.from(byId.values())
+  }, [systemsQuery.data, fallbackSystems])
 
   const setParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -144,10 +173,12 @@ export default function ProductionScopeFilter({
           <Select
             value={batchParam ?? "all"}
             onValueChange={handleBatchChange}
-            disabled={batchesQuery.isLoading}
+            disabled={batchesQuery.isLoading && batches.length === 0}
           >
             <SelectTrigger id="production-batch-filter" className="production-select">
-              <SelectValue placeholder={batchesQuery.isLoading ? "Loading batches..." : "All batches"} />
+              <SelectValue
+                placeholder={batchesQuery.isLoading && batches.length === 0 ? "Loading batches..." : "All batches"}
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -164,10 +195,12 @@ export default function ProductionScopeFilter({
           <Select
             value={systemParam ?? "all"}
             onValueChange={handleCageChange}
-            disabled={systemsQuery.isLoading}
+            disabled={systemsQuery.isLoading && systems.length === 0}
           >
             <SelectTrigger id="production-cage-filter" className="production-select">
-              <SelectValue placeholder={systemsQuery.isLoading ? "Loading cages..." : "All cages"} />
+              <SelectValue
+                placeholder={systemsQuery.isLoading && systems.length === 0 ? "Loading cages..." : "All cages"}
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>

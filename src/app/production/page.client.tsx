@@ -130,6 +130,18 @@ export default function ProductionPageClient({
     () => (initialData.dailyTrend.status === "success" ? initialData.dailyTrend.data : []),
     [initialData.dailyTrend],
   )
+  // Server-derived scope-filter fallbacks. The client option RPCs gate on
+  // trigger-maintained state that can be stale on imported farms and then
+  // return nothing; these come from the same rows the page already renders so
+  // the dropdown is never emptier than the view it controls.
+  const scopeBatchOptions = useMemo(() => {
+    const byId = new Map<number, string>()
+    for (const row of summaryRows) {
+      if (row.batch_id == null || isSyntheticBatchName(row.batch_name)) continue
+      if (!byId.has(row.batch_id)) byId.set(row.batch_id, row.batch_name?.trim() || `Batch ${row.batch_id}`)
+    }
+    return Array.from(byId, ([id, label]) => ({ id, label }))
+  }, [summaryRows])
   const volumeBySystemId = useMemo(
     () => new Map((initialData.enrichment.volumeRows ?? []).map((row) => [row.id, row.volume ?? 0])),
     [initialData.enrichment.volumeRows],
@@ -365,6 +377,8 @@ export default function ProductionPageClient({
               <ProductionScopeFilter
                 initialFarmId={initialFarmId}
                 startTransition={startTransition}
+                fallbackSystems={allSystems}
+                fallbackBatches={scopeBatchOptions}
               />
               <div className="w-[200px] shrink-0 md:w-[210px]">
                 <ProductionMetricFilter className="production-select" startTransition={startTransition} />
