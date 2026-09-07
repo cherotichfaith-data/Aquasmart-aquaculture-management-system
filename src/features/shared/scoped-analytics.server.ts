@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
-import { fetchTimePeriodBounds } from "@/lib/time-period"
 import type { Database, Enums } from "@/lib/types/database"
-import type { CustomTimeRange, TimePeriod } from "@/lib/time-period"
+import type { TimePeriod } from "@/lib/time-period"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>
@@ -27,24 +26,8 @@ export function cleanScopedFilterState<T extends { selectedSystem: string; selec
     : { ...filters, selectedSystem: "all" }
 }
 
-export async function getScopedTimeBounds(
-  supabase: ServerClient,
-  farmId: string,
-  timePeriod: ScopedAnalyticsTimePeriod,
-  scope: Parameters<typeof fetchTimePeriodBounds>[1]["scope"],
-  systemId?: number,
-  batchId?: number,
-  customRange?: CustomTimeRange | null,
-) {
-  return fetchTimePeriodBounds(supabase as never, {
-    farmId,
-    timePeriod,
-    customRange,
-    scope,
-    systemId,
-    batchId,
-  })
-}
+// Time-period bounds resolution lives in one place:
+// features/shared/time-bounds.server.ts::resolveScopedTimeBounds.
 
 export async function getScopedSystemOptions(
   supabase: ServerClient,

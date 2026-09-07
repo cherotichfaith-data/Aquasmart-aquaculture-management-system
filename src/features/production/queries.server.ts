@@ -4,9 +4,9 @@ import { requireUserContext } from "@/lib/supabase/require-user"
 import {
   getScopedBatchSystems,
   getScopedSystemOptions,
-  getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
 import { selectOccupiedSystemIds } from "@/features/shared/occupied-systems"
 import type { ProductionDailyTrendRow, ProductionSummaryRpcRow } from "@/features/production/types"
 import { normalizeStageFilter } from "@/lib/stage-filter"
@@ -235,7 +235,7 @@ export function parseProductionPageFilters(
 
 async function loadProductionPageInitialData(
   supabase: ReturnType<typeof createAccessTokenClient>,
-  params: { farmId: string | null; filters: ProductionPageFilters },
+  params: { farmId: string | null; filters: ProductionPageFilters; accessToken: string },
 ): Promise<ProductionPageInitialData> {
   const empty: ProductionPageInitialData = {
     bounds: { start: null, end: null },
@@ -287,15 +287,14 @@ async function loadProductionPageInitialData(
       : []
   const scopedCycleIds = batchId != null ? new Set(batchCycles.map((cycle) => cycle.cycle_id)) : null
   const systemId = resolvedSystemId ?? undefined
-  const bounds = await getScopedTimeBounds(
-    supabase,
-    params.farmId,
-    params.filters.timePeriod,
-    "production",
+  const bounds = await resolveScopedTimeBounds(params.accessToken, {
+    farmId: params.farmId,
+    timePeriod: params.filters.timePeriod,
+    scope: "production",
     systemId,
     batchId,
-    params.filters.customTimeRange,
-  )
+    customRange: params.filters.customTimeRange,
+  })
 
   if (!bounds.start || !bounds.end) {
     return {
@@ -802,6 +801,6 @@ export async function getProductionPageInitialData(params: {
 }) {
   const { accessToken } = await requireUserContext()
 
-  return loadProductionPageInitialData(createAccessTokenClient(accessToken), params)
+  return loadProductionPageInitialData(createAccessTokenClient(accessToken), { ...params, accessToken })
 }
 // structure refactor: transport moved to lib/supabase/query-transport

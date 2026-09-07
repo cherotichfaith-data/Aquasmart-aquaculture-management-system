@@ -1,6 +1,6 @@
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
-import { getScopedTimeBounds } from "@/features/shared/scoped-analytics.server"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
 import { listGrowthTrend, listMortalityData } from "@/features/shared/queries.server"
 import { listBatchOptionRows } from "@/features/shared/query-seed.server"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
@@ -67,7 +67,7 @@ export function parseBatchesPageFilters(
 }
 
 async function getTimeBounds(
-  supabase: ServerClient,
+  accessToken: string,
   farmId: string,
   timePeriod: BatchesPageFilters["timePeriod"],
   batchId?: number,
@@ -89,7 +89,14 @@ async function getTimeBounds(
     },
     // Never scopes to a single system, but a selected batch narrows the window
     // to that batch's own data so the header's resolved range matches the page.
-    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", undefined, batchId, customTimeRange),
+    () =>
+      resolveScopedTimeBounds(accessToken, {
+        farmId,
+        timePeriod,
+        scope: "dashboard",
+        batchId,
+        customRange: customTimeRange,
+      }),
   )
 }
 
@@ -198,7 +205,7 @@ function buildEmptyBatchesPageInitialData(): BatchesPageInitialData {
 
 async function loadBatchesPageInitialData(
   supabase: ServerClient,
-  params: { farmId: string | null; filters: BatchesPageFilters },
+  params: { farmId: string | null; filters: BatchesPageFilters; accessToken: string },
 ): Promise<BatchesPageInitialData> {
   if (!params.farmId) return buildEmptyBatchesPageInitialData()
   const farmId = params.farmId
@@ -209,7 +216,7 @@ async function loadBatchesPageInitialData(
       : undefined
 
   const bounds = await getTimeBounds(
-    supabase,
+    params.accessToken,
     farmId,
     params.filters.timePeriod,
     selectedBatchId,

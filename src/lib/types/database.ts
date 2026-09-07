@@ -2248,35 +2248,6 @@ export type Database = {
         }
         Returns: Json
       }
-      api_feed_dashboard_kpis: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          as_of_date: string
-          avg_feeding_rate_pct: number
-          feed_this_period_kg: number
-          feed_used_today_kg: number
-          overfeeding_systems: number
-          plan_vs_actual_pct: number
-          underfeeding_systems: number
-        }[]
-      }
-      api_feed_efcr_trend: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          date: string
-          efcr_period: number
-        }[]
-      }
       api_feed_inventory_feed_type_options_rpc: {
         Args: { p_date_to?: string; p_farm_id: string }
         Returns: {
@@ -2291,37 +2262,6 @@ export type Database = {
           visibility_scope: string
         }[]
       }
-      api_feed_plan_vs_actual: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          actual_feed_kg: number
-          date: string
-          planned_feed_kg: number
-        }[]
-      }
-      api_feed_recommendations: {
-        Args: { p_date?: string; p_farm_id: string; p_system_ids?: number[] }
-        Returns: {
-          abw_g: number
-          abw_projected_g: number
-          adjusted_feed_kg: number
-          biomass_kg: number
-          confidence: string
-          feeding_rate_pct: number
-          model_version: string
-          phase_id: number
-          planned_feed_kg: number
-          recommendation_date: string
-          scenario: string
-          system_id: number
-          system_name: string
-        }[]
-      }
       api_feed_type_options_rpc: {
         Args: { p_farm_id: string }
         Returns: {
@@ -2334,63 +2274,6 @@ export type Database = {
           id: number
           label: string
           visibility_scope: string
-        }[]
-      }
-      api_feed_vs_biomass_gain: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          biomass_gain_kg: number
-          date: string
-          feed_kg: number
-          system_id: number
-          system_name: string
-        }[]
-      }
-      api_feeding_alerts: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          alert: string
-          date: string
-          recommendation: string
-          severity: string
-          system_id: number
-          system_name: string
-        }[]
-      }
-      api_feeding_rate_vs_target: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          actual_rate: number
-          date: string
-          feed_rate_max_pct: number
-          feed_rate_min_pct: number
-        }[]
-      }
-      api_feeding_response_distribution: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          count: number
-          feeding_response: number
         }[]
       }
       api_fingerling_batch_options_rpc: {
@@ -2560,26 +2443,6 @@ export type Database = {
           number_of_fish: number
           system_id: number
           system_volume: number
-        }[]
-      }
-      api_system_feed_status: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          actual_feed_kg: number
-          biomass_kg: number
-          date: string
-          deviation_pct: number
-          efcr_period: number
-          feeding_rate_pct: number
-          planned_feed_kg: number
-          status: string
-          system_id: number
-          system_name: string
         }[]
       }
       api_system_options_rpc: {

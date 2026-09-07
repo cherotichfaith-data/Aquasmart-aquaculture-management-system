@@ -1,4 +1,4 @@
-import type { Database, Enums } from "@/lib/types/database"
+import type { Enums } from "@/lib/types/database"
 import type { TimePeriod } from "@/lib/time-period"
 
 export type FeedDashboardFilters = {
@@ -8,15 +8,71 @@ export type FeedDashboardFilters = {
   timePeriod: TimePeriod
 }
 
-export type FeedDashboardKpiRow = Database["public"]["Functions"]["api_feed_dashboard_kpis"]["Returns"][number]
-export type FeedPlanVsActualRow = Database["public"]["Functions"]["api_feed_plan_vs_actual"]["Returns"][number]
-export type SystemFeedStatusRow = Database["public"]["Functions"]["api_system_feed_status"]["Returns"][number]
-export type FeedEfcrTrendRow = Database["public"]["Functions"]["api_feed_efcr_trend"]["Returns"][number]
-export type FeedingRateVsTargetRow = Database["public"]["Functions"]["api_feeding_rate_vs_target"]["Returns"][number]
-export type FeedingResponseDistributionRow =
-  Database["public"]["Functions"]["api_feeding_response_distribution"]["Returns"][number]
-export type FeedVsBiomassGainRow = Database["public"]["Functions"]["api_feed_vs_biomass_gain"]["Returns"][number]
-export type FeedingAlertRow = Database["public"]["Functions"]["api_feeding_alerts"]["Returns"][number]
+// Section row shapes. These used to be derived from the api_feed_*/api_feeding_*
+// RPCs; those are gone (migration 20260907140000) and every section now comes
+// from api_feed_dashboard's JSONB payload, which emits the same rows.
+export type FeedDashboardKpiRow = {
+  as_of_date: string
+  feed_used_today_kg: number
+  feed_this_period_kg: number
+  plan_vs_actual_pct: number
+  avg_feeding_rate_pct: number
+  overfeeding_systems: number
+  underfeeding_systems: number
+}
+
+export type FeedPlanVsActualRow = {
+  date: string
+  planned_feed_kg: number
+  actual_feed_kg: number
+}
+
+export type SystemFeedStatusRow = {
+  system_id: number
+  system_name: string
+  date: string
+  biomass_kg: number
+  planned_feed_kg: number
+  actual_feed_kg: number
+  deviation_pct: number
+  feeding_rate_pct: number
+  efcr_period: number
+  status: string
+}
+
+export type FeedEfcrTrendRow = {
+  date: string
+  efcr_period: number
+}
+
+export type FeedingRateVsTargetRow = {
+  date: string
+  actual_rate: number
+  feed_rate_min_pct: number
+  feed_rate_max_pct: number
+}
+
+export type FeedingResponseDistributionRow = {
+  feeding_response: number
+  count: number
+}
+
+export type FeedVsBiomassGainRow = {
+  system_id: number
+  system_name: string
+  date: string
+  feed_kg: number
+  biomass_gain_kg: number
+}
+
+export type FeedingAlertRow = {
+  system_id: number
+  system_name: string
+  date: string
+  alert: string
+  recommendation: string
+  severity: string
+}
 
 /** One-call payload from `api_feed_dashboard` -- every /feed section in a single RPC. */
 export type FeedDashboardPayload = {

@@ -2,10 +2,10 @@ import { toQuerySuccess } from "@/lib/supabase/query-transport"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import {
-  getScopedTimeBounds,
   getScopedSystemOptions,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
 import {
   listAlertThresholdRows,
   listAppConfigRows,
@@ -98,7 +98,7 @@ async function getScopedGrowthTrendRows(
 
 async function loadReportsPageInitialData(
   supabase: ReturnType<typeof createAccessTokenClient>,
-  params: { farmId: string | null; filters: ReportsPageFilters; userId: string },
+  params: { farmId: string | null; filters: ReportsPageFilters; userId: string; accessToken: string },
 ): Promise<ReportsPageInitialData> {
   const empty: ReportsPageInitialData = {
     bounds: { start: null, end: null },
@@ -123,7 +123,13 @@ async function loadReportsPageInitialData(
     listAlertThresholdRows(supabase, params.farmId, params.userId),
   ])
   const systemId = resolveSystemIdFromFilterValue(params.filters.selectedSystem, growthSystems)
-  const bounds = await getScopedTimeBounds(supabase, params.farmId, params.filters.timePeriod, "production", systemId, batchId)
+  const bounds = await resolveScopedTimeBounds(params.accessToken, {
+    farmId: params.farmId,
+    timePeriod: params.filters.timePeriod,
+    scope: "production",
+    systemId,
+    batchId,
+  })
 
   if (!bounds.start || !bounds.end) {
     return {
@@ -210,5 +216,9 @@ async function loadReportsPageInitialData(
 
 export async function getReportsPageInitialData(params: { farmId: string | null; filters: ReportsPageFilters }) {
   const { user, accessToken } = await requireUserContext()
-  return loadReportsPageInitialData(createAccessTokenClient(accessToken), { ...params, userId: user.id })
+  return loadReportsPageInitialData(createAccessTokenClient(accessToken), {
+    ...params,
+    userId: user.id,
+    accessToken,
+  })
 }
