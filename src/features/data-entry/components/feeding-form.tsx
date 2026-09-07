@@ -39,7 +39,7 @@ import {
 import {
   LatestEntryGuard,
   pickLatestEntryByRecordDate,
-  pickSameDayEntry,
+  pickSameDayEntryByMetadata,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
@@ -110,10 +110,12 @@ function toFeedingEntrySummary(row: {
   date?: string | null
   feeding_amount?: number | null
   feeding_response?: number | null
+  feed_type_id?: number | null
   notes?: string | null
   feed_type?: { feed_line?: string | null } | null
 }, keyPrefix: string): LatestEntrySummary {
   const amount = row.feeding_amount ?? 0
+  const feedLabel = row.feed_type?.feed_line || "Not recorded"
   return {
     key: `${keyPrefix}-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
     date: row.date ?? "",
@@ -123,9 +125,16 @@ function toFeedingEntrySummary(row: {
       amount === 0
         ? [{ label: "Reason", value: row.notes?.trim() || "No reason recorded" }]
         : [
-            { label: "Feed Type", value: row.feed_type?.feed_line || "Not recorded" },
+            { label: "Feed Type", value: feedLabel },
             { label: "Response", value: row.feeding_response != null ? `Level ${row.feeding_response}` : "Not recorded" },
           ],
+    metadata: {
+      feedTypeId: row.feed_type_id ?? 0,
+    },
+    duplicateMessage:
+      row.feed_type_id != null
+        ? `A feeding entry already exists for this cage on ${row.date ?? ""} with ${feedLabel}.`
+        : `A feeding entry already exists for this cage on ${row.date ?? ""}.`,
   }
 }
 
@@ -162,6 +171,10 @@ export function FeedingForm({
   const selectedSystemValue = useWatch({ control: form.control, name: "system_id" })
   const selectedSystemId = Number(selectedSystemValue)
   const selectedDate = useWatch({ control: form.control, name: "date" })
+  const selectedFeedValue = useWatch({ control: form.control, name: "feed_id" })
+  const selectedFeedTypeId = parseOptionalNumericId(selectedFeedValue) ?? 0
+  const selectedFeedLabel =
+    feeds.find((feed) => String(feed.id) === selectedFeedValue)?.label ?? null
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
   const feedOptions = feeds
@@ -233,12 +246,21 @@ export function FeedingForm({
   const latestServerEntries = latestServerRecords.map((row) => toFeedingEntrySummary(row, "feeding"))
   const duplicateServerEntries = existingDailyRecords.map((row) => toFeedingEntrySummary(row, "feeding-duplicate"))
   const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
-  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
+  const duplicateEntry = pickSameDayEntryByMetadata([...duplicateServerEntries, ...pendingEntries], {
+    date: selectedDate,
+    metadataKey: "feedTypeId",
+    metadataValue: selectedFeedTypeId,
+  })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       if (duplicateEntry) {
-        form.setError("date", { message: `A feeding entry already exists for ${values.date}.` })
+        const feedLabel = selectedFeedLabel ?? (selectedFeedTypeId ? "this feed type" : null)
+        form.setError("feed_id", {
+          message: feedLabel
+            ? `A feeding entry with ${feedLabel} already exists for ${values.date}. Pick a different feed type to add a supplemental entry.`
+            : `A feeding entry already exists for ${values.date}.`,
+        })
         return
       }
 
