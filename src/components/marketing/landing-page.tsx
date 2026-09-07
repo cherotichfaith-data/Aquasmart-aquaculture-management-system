@@ -142,17 +142,16 @@ export default function LandingPage() {
           <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 py-2 text-white">
             <div className="flex items-center gap-3">
               <Image
-                src="/use this.png"
-                alt="SUSTAIN Aquasmart logo"
-                width={40}
-                height={40}
-                className="h-10 w-10 shrink-0 rounded-full"
+                src="/sustain-aquasmart-wordmark-white.png"
+                alt="SUSTAIN Aquasmart"
+                width={1200}
+                height={131}
+                className="h-8 w-auto shrink-0"
                 priority
               />
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">SUSTAIN Aquasmart</p>
-                <p className="text-xs text-white/70">Aquaculture management software</p>
-              </div>
+              <p className="hidden border-l border-white/20 pl-3 text-xs text-white/70 sm:block">
+                Aquaculture management software
+              </p>
             </div>
 
             <nav className="hidden items-center gap-8 text-sm font-medium tracking-[0.08em] text-white/82 md:flex">
@@ -408,7 +407,16 @@ export default function LandingPage() {
 
       <footer className="bg-[linear-gradient(180deg,var(--brand-footer-from)_0%,var(--brand-footer-to)_100%)] px-4 py-16 text-sm text-white/60 md:px-6 md:py-18">
         <div className="container mx-auto flex flex-col gap-4 border-t border-white/10 pt-6 md:flex-row md:items-center md:justify-between">
-          <p>&copy; 2026 SUSTAIN Aquasmart. Aquaculture operations and analytics platform.</p>
+          <div className="flex flex-col items-start gap-2">
+            <Image
+              src="/sustain-aquasmart-wordmark-white.png"
+              alt="SUSTAIN Aquasmart"
+              width={1200}
+              height={131}
+              className="h-7 w-auto opacity-90"
+            />
+            <p>&copy; 2026 SUSTAIN Aquasmart. Aquaculture operations and analytics platform.</p>
+          </div>
           <div className="flex flex-wrap gap-4 self-start md:self-auto">
             {navItems.map((item) => (
               <button

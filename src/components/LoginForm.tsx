@@ -275,12 +275,9 @@ export default function LoginForm() {
           margin-bottom: 1.25rem;
         }
 
-        .logo-text {
-          font-size: 1.5rem;
-          font-weight: 800;
-          letter-spacing: -0.6px;
-          font-family: var(--font-serif);
-          color: var(--auth-accent);
+        .logo-wordmark {
+          height: 1.9rem;
+          width: auto;
         }
 
         .login-header h1 {
@@ -519,8 +516,14 @@ export default function LoginForm() {
         <section className="login-card">
           <div className="login-header">
             <div className="logo-header">
-              <Image src="/use this.png" alt="SUSTAIN Aquasmart fish logo" width={36} height={36} priority />
-              <span className="logo-text">SUSTAIN Aquasmart</span>
+              <Image
+                src="/sustain-aquasmart-wordmark.png"
+                alt="SUSTAIN Aquasmart"
+                width={1200}
+                height={131}
+                className="logo-wordmark"
+                priority
+              />
             </div>
             <h1>{authMode === "signin" ? "Sign in to your dashboard" : "Create your account"}</h1>
             {isInviteContinuation ? (
