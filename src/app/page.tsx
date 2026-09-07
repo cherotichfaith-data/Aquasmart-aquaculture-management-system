@@ -29,10 +29,10 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/use this.png",
-        width: 60,
-        height: 60,
-        alt: "SUSTAIN Aquasmart logo",
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "SUSTAIN Aquasmart",
       },
     ],
   },
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     title: "SUSTAIN Aquasmart | Aquaculture Management Software",
     description:
       "Aquaculture management software for KPI monitoring, feed tracking, water quality, inventory, and reporting.",
-    images: ["/use this.png"],
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,
