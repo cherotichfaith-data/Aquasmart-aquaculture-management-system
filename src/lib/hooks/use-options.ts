@@ -10,6 +10,7 @@ import {
   getBatchOptions,
   getFarmOptions,
   getFingerlingSupplierOptions,
+  getSyntheticBatchIds,
   getAppConfig,
   getSystemOptions,
 } from "@/features/shared/options.client"
@@ -73,6 +74,22 @@ export function useBatchOptions(params?: {
     staleTime: 0,
     refetchOnMount: "always",
   })
+}
+
+export function useSyntheticBatchIds(farmId?: string | null) {
+  const { session, user, isLoading: authLoading } = useAuth()
+  const enabled = !authLoading && (Boolean(session) || Boolean(user)) && Boolean(farmId)
+  const query = useQuery({
+    queryKey: ["options", "synthetic-batch-ids", farmId ?? "none", user?.id ?? "anon"],
+    queryFn: ({ signal }) => getSyntheticBatchIds({ farmId, accessToken: session?.access_token, signal }),
+    enabled,
+    staleTime: 5 * 60_000,
+  })
+  const ids = useMemo(
+    () => new Set(query.data?.status === "success" ? query.data.data : []),
+    [query.data],
+  )
+  return { ...query, ids }
 }
 
 export function useFingerlingSupplierOptions(params?: { enabled?: boolean }) {

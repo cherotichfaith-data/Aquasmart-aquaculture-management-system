@@ -7,6 +7,7 @@ import {
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
 import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
+import { isSyntheticBatchName } from "@/features/shared/batch-options"
 import { selectOccupiedSystemIds } from "@/features/shared/occupied-systems"
 import type { ProductionDailyTrendRow, ProductionSummaryRpcRow } from "@/features/production/types"
 import { normalizeStageFilter } from "@/lib/stage-filter"
@@ -601,14 +602,20 @@ async function listProductionSummaryRowsDirectServer(
       const system = row.system_id != null ? systemsById.get(row.system_id) : null
       const dailyFact = row.system_id != null ? dailyFactsBySystemDate.get(`${row.system_id}|${row.date}`) : null
 
-      const batchId = cycle?.batch_id ?? null
+      const rawBatchId = cycle?.batch_id ?? null
+      const rawBatchName = rawBatchId != null ? batchNameById.get(rawBatchId) ?? null : null
+      // Data-repair stand-ins (INFERRED-*, BATCH-<n>) are not real batches --
+      // strip their identity so they never surface as a batch anywhere.
+      const isSynthetic = isSyntheticBatchName(rawBatchName)
+      const batchId = isSynthetic ? null : rawBatchId
+      const batchName = isSynthetic ? null : rawBatchName
 
       return {
         cycle_id: row.cycle_id,
         system_id: row.system_id,
         system_name: system?.name ?? null,
         batch_id: batchId,
-        batch_name: batchId != null ? batchNameById.get(batchId) ?? null : null,
+        batch_name: batchName,
         growth_stage: system?.growth_stage ?? null,
         ongoing_cycle: cycle?.ongoing_cycle ?? null,
         cycle_start: cycle?.cycle_start ?? null,

@@ -18,12 +18,11 @@ type BatchOptionsRpcRow = Database["public"]["Functions"]["api_fingerling_batch_
  * analytics RPC, purely to read that one array.
  *
  * Data-repair stand-in batches (INFERRED-*, BATCH-<n>) are filtered out here so
- * they never reach a selector, lineage view, KPI or chart -- pass
- * `includeSynthetic: true` only where full batch attribution is required.
+ * they never reach a selector, lineage view, KPI, chart, or data-entry form.
  */
 export async function loadBatchOptionRows(
   supabase: SupabaseClient<Database>,
-  params: { farmId: string; activeOnly?: boolean; includeSynthetic?: boolean; signal?: AbortSignal },
+  params: { farmId: string; activeOnly?: boolean; signal?: AbortSignal },
 ): Promise<BatchOptionItem[]> {
   let rpc = supabase.rpc("api_fingerling_batch_options_rpc", {
     p_farm_id: params.farmId,
@@ -35,7 +34,7 @@ export async function loadBatchOptionRows(
   if (error) throw error
 
   const rows = ((data ?? []) as BatchOptionsRpcRow[]).filter(
-    (row) => Number.isFinite(row.id) && (params.includeSynthetic || !isSyntheticBatchName(row.label)),
+    (row) => Number.isFinite(row.id) && !isSyntheticBatchName(row.label),
   )
   if (!rows.length) return []
 

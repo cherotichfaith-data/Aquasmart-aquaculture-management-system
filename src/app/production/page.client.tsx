@@ -21,7 +21,6 @@ import type { ProductionPageInitialData, ProductionPageFilters } from "@/feature
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { formatCustomRangeLabel, parseCustomPeriodUrlValue, TIME_PERIOD_LABELS, type TimePeriod } from "@/lib/time-period"
 import { downloadCsv } from "@/lib/utils/report-export"
-import { isSyntheticBatchName } from "@/features/shared/batch-options"
 import { cn } from "@/lib/utils"
 
 const PRODUCTION_DATE_TYPES: TimePeriod[] = [
@@ -181,25 +180,19 @@ export default function ProductionPageClient({
         : viewRows,
     [isConsolidated, viewRows, summaryRows, volumeBySystemId, growthBySystemDate, feedTypeBySystemDate, totalScopedVolumeM3],
   )
-  // "All cages" / "All batches" with nothing else pinned.
-  const isAllScope = selectedSystemParam === "all" && !searchParams.get("batch")
   // In an "All cages" / "All batches" view the records table lists the periodic
   // recorded events -- one row per sampling / stocking / transfer date -- rather
   // than the carried-forward "today" snapshot every cage emits (which just
   // stacks a wall of same-date rows). A single cage still shows its full
   // timeline including that live row.
   const periodicSummaryRows = useMemo(() => {
-    // In the "All ..." view drop the data-repair placeholder batches
-    // (INFERRED-*, BATCH-<n>-*) -- they aren't real production batches. A
-    // specific cage or batch view keeps everything.
-    const scoped = isAllScope
-      ? summaryRows.filter((row) => !isSyntheticBatchName(row.batch_name))
-      : summaryRows
+    // Data-repair stand-in batches (INFERRED-*, BATCH-<n>) have their identity
+    // stripped server-side, so nothing to filter for names here.
     // Per cage: prefer the recorded sampling/stocking/transfer rows; keep the
     // live "current" row only for cages that have nothing else in the window,
     // so every stocked cage still shows up.
     const bySystem = new Map<number | string, typeof summaryRows>()
-    for (const row of scoped) {
+    for (const row of summaryRows) {
       const key = row.system_id ?? "unassigned"
       const bucket = bySystem.get(key)
       if (bucket) bucket.push(row)
@@ -211,12 +204,14 @@ export default function ProductionPageClient({
       out.push(...(events.length > 0 ? events : rows))
     }
     return out
-  }, [summaryRows, isAllScope])
+  }, [summaryRows])
   // Records table rows: rolled up by batch in "Batches" mode, per cage otherwise.
   const tableViewRows = useMemo(() => {
     if (scopeMode === "batch") {
       return buildProductionPeriodViewRows({
-        productionRows: periodicSummaryRows,
+        // Cages whose batch identity was stripped (data-repair stand-ins) carry
+        // no batch -- keep them out of the by-batch rollup entirely.
+        productionRows: periodicSummaryRows.filter((row) => row.batch_id != null),
         consolidate: "batch",
         volumeBySystemId,
         growthBySystemDate,
