@@ -2,6 +2,16 @@ import type { Database } from "@/lib/types/database"
 
 type BatchOptionRpcRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 
+// Data-repair stand-in batches created during historical reconstruction, e.g.
+// "INFERRED-C4-2025-10-18" or "BATCH-7-2024-11-26". Real farm batches use the
+// farm's own codes (e.g. "02.26aK"). These are not real production batches and
+// must not surface in batch listings, lineage, KPIs, or charts.
+const SYNTHETIC_BATCH_NAME_RE = /^\s*(INFERRED-|BATCH-\d)/i
+
+export function isSyntheticBatchName(name: string | null | undefined): boolean {
+  return typeof name === "string" && SYNTHETIC_BATCH_NAME_RE.test(name)
+}
+
 export type BatchOptionItem = BatchOptionRpcRow & {
   current_system_id: number | null
   current_system_ids: number[]

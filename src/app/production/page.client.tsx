@@ -21,14 +21,8 @@ import type { ProductionPageInitialData, ProductionPageFilters } from "@/feature
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { formatCustomRangeLabel, parseCustomPeriodUrlValue, TIME_PERIOD_LABELS, type TimePeriod } from "@/lib/time-period"
 import { downloadCsv } from "@/lib/utils/report-export"
+import { isSyntheticBatchName } from "@/features/shared/batch-options"
 import { cn } from "@/lib/utils"
-
-// Auto-generated stand-in batches from historical data reconstruction, e.g.
-// "INFERRED-C4-2025-10-18" or "BATCH-7-2024-11-26". Real farm batches follow the
-// farm's own codes (e.g. "02.26aK").
-const SYNTHETIC_BATCH_NAME_RE = /^\s*(INFERRED-|BATCH-\d)/i
-const isSyntheticBatchName = (name: string | null | undefined) =>
-  typeof name === "string" && SYNTHETIC_BATCH_NAME_RE.test(name)
 
 const PRODUCTION_DATE_TYPES: TimePeriod[] = [
   "day",

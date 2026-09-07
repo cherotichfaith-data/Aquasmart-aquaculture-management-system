@@ -74,12 +74,13 @@ export async function listAppConfigRows(
 
 export async function listBatchOptionRows(
   supabase: ServerClient,
-  params: { farmId: string; activeOnly?: boolean },
+  params: { farmId: string; activeOnly?: boolean; includeSynthetic?: boolean },
 ): Promise<BatchOptionRow[]> {
   try {
     return await loadBatchOptionRows(supabase, {
       farmId: params.farmId,
       activeOnly: params.activeOnly,
+      includeSynthetic: params.includeSynthetic,
     })
   } catch {
     return []

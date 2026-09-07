@@ -15,7 +15,9 @@ async function getSystems(supabase: DataEntrySupabaseClient, farmId: string) {
 }
 
 async function getBatches(supabase: DataEntrySupabaseClient, farmId: string) {
-  return toQuerySuccess(await listBatchOptionRows(supabase, { farmId }))
+  // Keep data-repair stand-ins here so a new record for a cage that only maps
+  // to an INFERRED batch still resolves its batch_id (resolveBatchIdForSystem).
+  return toQuerySuccess(await listBatchOptionRows(supabase, { farmId, includeSynthetic: true }))
 }
 
 async function getFeedTypes(supabase: DataEntrySupabaseClient, farmId: string) {

@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/types/database"
-import { attachResolvedSystemIdsToBatches, type BatchOptionItem } from "@/features/shared/batch-options"
+import {
+  attachResolvedSystemIdsToBatches,
+  isSyntheticBatchName,
+  type BatchOptionItem,
+} from "@/features/shared/batch-options"
 
 type BatchOptionsRpcRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 
@@ -12,10 +16,14 @@ type BatchOptionsRpcRow = Database["public"]["Functions"]["api_fingerling_batch_
  * `system_ids[]` (the cages currently holding each batch), so there is no
  * second RPC -- callers used to hit `api_dashboard_batches`, a ~50-column
  * analytics RPC, purely to read that one array.
+ *
+ * Data-repair stand-in batches (INFERRED-*, BATCH-<n>) are filtered out here so
+ * they never reach a selector, lineage view, KPI or chart -- pass
+ * `includeSynthetic: true` only where full batch attribution is required.
  */
 export async function loadBatchOptionRows(
   supabase: SupabaseClient<Database>,
-  params: { farmId: string; activeOnly?: boolean; signal?: AbortSignal },
+  params: { farmId: string; activeOnly?: boolean; includeSynthetic?: boolean; signal?: AbortSignal },
 ): Promise<BatchOptionItem[]> {
   let rpc = supabase.rpc("api_fingerling_batch_options_rpc", {
     p_farm_id: params.farmId,
@@ -26,7 +34,9 @@ export async function loadBatchOptionRows(
   const { data, error } = await rpc
   if (error) throw error
 
-  const rows = ((data ?? []) as BatchOptionsRpcRow[]).filter((row) => Number.isFinite(row.id))
+  const rows = ((data ?? []) as BatchOptionsRpcRow[]).filter(
+    (row) => Number.isFinite(row.id) && (params.includeSynthetic || !isSyntheticBatchName(row.label)),
+  )
   if (!rows.length) return []
 
   const supplierIds = Array.from(

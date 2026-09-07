@@ -1,6 +1,7 @@
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
+import { isSyntheticBatchName } from "@/features/shared/batch-options"
 import { listGrowthTrend, listMortalityData } from "@/features/shared/queries.server"
 import { listBatchOptionRows } from "@/features/shared/query-seed.server"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
@@ -228,7 +229,7 @@ async function loadBatchesPageInitialData(
   const dateFrom = bounds.start
   const dateTo = bounds.end
 
-  const batchRows = await withNetworkFallback(
+  const fetchedBatchRows = await withNetworkFallback(
     "batches:getDashboardBatchRows",
     [] as DashboardBatchRpcRow[],
     () =>
@@ -241,6 +242,9 @@ async function loadBatchesPageInitialData(
       }),
     { allowMissingObject: true },
   )
+  // Data-repair stand-ins (INFERRED-*, BATCH-<n>) are not real production
+  // batches -- keep them out of lineage, KPIs and every chart on this page.
+  const batchRows = fetchedBatchRows.filter((row) => !isSyntheticBatchName(row.batch_name))
 
   const systemIdToBatchId = buildSystemIdToBatchId(batchRows)
   const allSystemIds = Array.from(new Set(Object.keys(systemIdToBatchId).map(Number)))
