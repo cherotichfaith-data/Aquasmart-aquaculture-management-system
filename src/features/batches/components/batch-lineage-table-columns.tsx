@@ -33,7 +33,7 @@ export function buildBatchLineageColumns(params: {
       header: "Batch",
       accessorFn: (row) => (row.batch_name?.trim() || `Batch #${row.batch_id}`).toLowerCase(),
       sortDescFirst: false,
-      meta: { width: "150px" },
+      meta: { width: "118px" },
       cell: ({ row }) => {
         const data = row.original
         const title = data.batch_name?.trim() || `Batch #${data.batch_id}`
@@ -51,7 +51,7 @@ export function buildBatchLineageColumns(params: {
       id: "source",
       header: "Source",
       accessorFn: (row) => shortSourceName(stockingByBatchId[row.batch_id]?.supplierName),
-      meta: { width: "100px" },
+      meta: { width: "70px" },
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
           {shortSourceName(stockingByBatchId[row.original.batch_id]?.supplierName)}
@@ -62,7 +62,7 @@ export function buildBatchLineageColumns(params: {
       id: "stock_date",
       header: "Stock Date",
       accessorFn: (row) => stockingByBatchId[row.batch_id]?.dateOfDelivery ?? "",
-      meta: { width: "105px" },
+      meta: { width: "84px" },
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
           {formatDateOnly(stockingByBatchId[row.original.batch_id]?.dateOfDelivery, "--")}
@@ -71,29 +71,29 @@ export function buildBatchLineageColumns(params: {
     },
     {
       id: "qty_stocked",
-      header: "Qty Stocked",
+      header: "Stocked",
       accessorFn: (row) => stockingByBatchId[row.batch_id]?.numberOfFish ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "95px", align: "right" },
+      meta: { width: "74px", align: "right" },
       cell: ({ row }) => num(metricValue(stockingByBatchId[row.original.batch_id]?.numberOfFish, 0)),
     },
     {
       id: "fish",
-      header: "Live Count",
+      header: "Live",
       accessorFn: (row) => row.fish_end ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "90px", align: "right" },
+      meta: { width: "58px", align: "right" },
       cell: ({ row }) => num(metricValue(row.original.fish_end, 0)),
     },
     {
       id: "abw_at_stock",
-      header: "ABW at Stock",
+      header: "Stock ABW",
       accessorFn: (row) => stockingByBatchId[row.batch_id]?.abw ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "105px", unit: "g", align: "right" },
+      meta: { width: "88px", unit: "g", align: "right" },
       cell: ({ row }) => num(metricValue(stockingByBatchId[row.original.batch_id]?.abw, 2)),
     },
     {
@@ -102,7 +102,7 @@ export function buildBatchLineageColumns(params: {
       accessorFn: (row) => row.abw ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "95px", unit: "g", align: "right" },
+      meta: { width: "72px", unit: "g", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.abw, 1)
@@ -123,7 +123,7 @@ export function buildBatchLineageColumns(params: {
       accessorFn: (row) => row.efcr ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "85px", align: "right" },
+      meta: { width: "64px", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.efcr, 2)
@@ -145,7 +145,7 @@ export function buildBatchLineageColumns(params: {
       accessorFn: (row) => row.efcr_acc ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "90px", align: "right" },
+      meta: { width: "76px", align: "right" },
       cell: ({ row }) => num(metricValue(row.original.efcr_acc, 2)),
     },
     {
@@ -159,7 +159,7 @@ export function buildBatchLineageColumns(params: {
       },
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "85px", unit: "%", align: "right" },
+      meta: { width: "72px", unit: "%", align: "right" },
       cell: ({ row }) => {
         const stocked = stockingByBatchId[row.original.batch_id]?.numberOfFish
         const survival =
@@ -175,7 +175,7 @@ export function buildBatchLineageColumns(params: {
       accessorFn: (row) => row.mortality_rate ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "90px", unit: "%", align: "right" },
+      meta: { width: "82px", unit: "%", align: "right" },
       cell: ({ row }) => {
         const value = metricValue(row.original.mortality_rate, 2)
         return num(value)
@@ -185,7 +185,7 @@ export function buildBatchLineageColumns(params: {
       id: "stage",
       header: "Stage",
       accessorFn: (row) => row.growth_stage ?? "",
-      meta: { width: "100px" },
+      meta: { width: "96px" },
       cell: ({ row }) => <Badge variant="secondary">{formatGrowthStage(row.original.growth_stage)}</Badge>,
     },
   ]

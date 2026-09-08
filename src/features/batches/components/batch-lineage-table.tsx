@@ -65,7 +65,7 @@ export default function BatchLineageTable({
           emptyMessage="No batches found."
           initialSorting={[{ id: "batch", desc: false }]}
           shellClassName="production-records-table max-h-[560px]"
-          tableClassName="min-w-[1200px] table-fixed"
+          tableClassName="w-full min-w-[820px] table-fixed"
           headerVariant="plain"
           renderMobileCard={(row) => <BatchCardBody row={row} stockingByBatchId={stockingByBatchId} />}
         />
