@@ -601,8 +601,24 @@ async function listProductionSummaryRowsDirectServer(
       .map((row) => [`${row.system_id}|${row.inventory_date}`, row]),
   )
 
+  // A cage's current cohort starts with the ongoing production cycle homed at
+  // it; rows dated earlier belong to a previous occupant and are dropped so the
+  // page never shows a prior cycle's performance. Cages with no homed ongoing
+  // cycle (holding cages) get no cutoff. Mirrors private.system_cohort_start.
+  const cohortStartBySystem = new Map<number, string>()
+  for (const cycle of cyclesById.values()) {
+    if (cycle.ongoing_cycle !== true) continue
+    if (typeof cycle.system_id !== "number" || typeof cycle.cycle_start !== "string") continue
+    const existing = cohortStartBySystem.get(cycle.system_id)
+    if (!existing || cycle.cycle_start > existing) cohortStartBySystem.set(cycle.system_id, cycle.cycle_start)
+  }
+
   let rows: ProductionSummaryRpcRow[] = ((summaryResult.data ?? []) as unknown as AnalyticsProductionSummaryRow[])
-    .filter((row) => typeof row.system_id === "number" && allowedSystemIds.has(row.system_id))
+    .filter((row) => {
+      if (typeof row.system_id !== "number" || !allowedSystemIds.has(row.system_id)) return false
+      const cohortStart = cohortStartBySystem.get(row.system_id)
+      return !(cohortStart && typeof row.date === "string" && row.date < cohortStart)
+    })
     .map((row) => {
       const cycle = row.cycle_id != null ? cyclesById.get(row.cycle_id) : null
       const system = row.system_id != null ? systemsById.get(row.system_id) : null

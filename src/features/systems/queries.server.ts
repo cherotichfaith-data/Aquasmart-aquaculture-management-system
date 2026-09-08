@@ -2,6 +2,7 @@ import { createAccessTokenClient } from "@/lib/supabase/server"
 import { parseCustomPeriodUrlValue, resolveTimePeriod } from "@/lib/time-period"
 import { loadSystemsTableData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
 import type { DashboardPageInitialFilters } from "@/features/dashboard/types"
+import { filterRowsToCohort, selectSystemCohortStarts } from "@/features/shared/cohort"
 import { listGrowthTrend, listMortalityData } from "@/features/shared/queries.server"
 import { listBatchOptionRows, listWaterQualityTrendRows } from "@/features/shared/query-seed.server"
 import type { RecommendedActionRow } from "@/lib/types/insights"
@@ -110,7 +111,7 @@ export async function getSystemsPageInitialData(params: {
     .filter((row) => (row.fish_end ?? 0) > 0)
     .map((row) => row.system_id)
 
-  const [growthSeries, mortalityRows, waterQualityRows, alerts, cohortBySystemId] = await Promise.all([
+  const [growthSeries, mortalityRows, waterQualityRows, alerts, cohortBySystemId, cohortStartBySystem] = await Promise.all([
     stockedSystemIds.length
       ? listGrowthTrend(supabase, { farmId, systemIds: stockedSystemIds, dateFrom, dateTo })
       : Promise.resolve([]),
@@ -120,6 +121,7 @@ export async function getSystemsPageInitialData(params: {
     listWaterQualityTrendRows(supabase, { farmId, dateFrom, dateTo }),
     getAlertRows(supabase, farmId),
     getCohortBySystemId(supabase, farmId),
+    selectSystemCohortStarts(supabase, farmId).catch(() => new Map<number, string>()),
   ])
 
   return {
@@ -128,7 +130,9 @@ export async function getSystemsPageInitialData(params: {
     batchSystems,
     systemsTable,
     growthSeries,
-    mortalityByCage: sumMortalityByCage(mortalityRows),
+    // Growth trend already comes from the cohort-clamped api_production_summary;
+    // mortality reads raw fish_mortality, so drop any pre-cohort rows here.
+    mortalityByCage: sumMortalityByCage(filterRowsToCohort(mortalityRows, cohortStartBySystem)),
     waterQualityMonthly: bucketWaterQualityMonthly(waterQualityRows),
     alerts,
     cohortBySystemId,
