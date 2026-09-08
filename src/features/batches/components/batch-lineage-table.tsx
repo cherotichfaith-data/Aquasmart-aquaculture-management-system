@@ -83,11 +83,6 @@ function BatchCardBody({
 }) {
   const title = row.batch_name?.trim() || `Batch #${row.batch_id}`
   const stocking = stockingByBatchId[row.batch_id]
-  const stockedCount = stocking?.numberOfFish
-  const survivalRate =
-    isFiniteNumber(stockedCount) && stockedCount > 0 && isFiniteNumber(row.fish_end)
-      ? (row.fish_end / stockedCount) * 100
-      : null
 
   return (
     <>
@@ -99,13 +94,13 @@ function BatchCardBody({
         {shortSourceName(stocking?.supplierName)} · {formatDateOnly(stocking?.dateOfDelivery, "no stock date")}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        <MobileMetric label="Qty Stocked" value={formatNumberValue(stocking?.numberOfFish)} />
+        <MobileMetric label="Qty Stocked" value={formatNumberValue(row.total_stocked)} />
         <MobileMetric label="Live Count" value={formatNumberValue(row.fish_end)} />
         <MobileMetric label="ABW at Stock" value={formatUnitValue(stocking?.abw ?? null, 2, "g")} />
         <MobileMetric label="Current ABW" value={formatUnitValue(row.abw, 1, "g")} />
         <MobileMetric label="eFCR" value={formatNumberValue(row.efcr, { decimals: 2 })} />
         <MobileMetric label="Acc eFCR" value={formatNumberValue(row.efcr_acc, { decimals: 2 })} />
-        <MobileMetric label="Survival Rate" value={formatPercent(survivalRate, 1)} />
+        <MobileMetric label="Survival Rate" value={formatPercent(row.survival_pct, 1)} />
         <MobileMetric label="Mortality" value={formatPercent(row.mortality_rate)} />
       </div>
     </>

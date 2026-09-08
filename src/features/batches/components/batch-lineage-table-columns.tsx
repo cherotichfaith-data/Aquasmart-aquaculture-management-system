@@ -80,11 +80,11 @@ export function buildBatchLineageColumns(params: {
     {
       id: "qty_stocked",
       header: "Stocked",
-      accessorFn: (row) => stockingByBatchId[row.batch_id]?.numberOfFish ?? undefined,
+      accessorFn: (row) => row.total_stocked ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
       meta: { width: "74px", align: "right" },
-      cell: ({ row }) => numCell(stockingByBatchId[row.original.batch_id]?.numberOfFish, 0),
+      cell: ({ row }) => numCell(row.original.total_stocked, 0),
     },
     {
       id: "fish",
@@ -134,23 +134,11 @@ export function buildBatchLineageColumns(params: {
     {
       id: "survival_rate",
       header: "Survival",
-      accessorFn: (row) => {
-        const stocked = stockingByBatchId[row.batch_id]?.numberOfFish
-        return isFiniteNumber(stocked) && stocked > 0 && isFiniteNumber(row.fish_end)
-          ? (row.fish_end / stocked) * 100
-          : undefined
-      },
+      accessorFn: (row) => row.survival_pct ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
       meta: { width: "76px", align: "right" },
-      cell: ({ row }) => {
-        const stocked = stockingByBatchId[row.original.batch_id]?.numberOfFish
-        const survival =
-          isFiniteNumber(stocked) && stocked > 0 && isFiniteNumber(row.original.fish_end)
-            ? (row.original.fish_end / stocked) * 100
-            : null
-        return numCell(survival, 1, "%")
-      },
+      cell: ({ row }) => numCell(row.original.survival_pct, 1, "%"),
     },
     {
       id: "mortality_rate",

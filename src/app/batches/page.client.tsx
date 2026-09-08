@@ -44,7 +44,7 @@ export default function BatchesPageClient({
       <div className="page-shell">
         <CommandCentreBanner alerts={initialData.alerts} />
 
-        <BatchesKpis batches={rows} stockingByBatchId={initialData.stockingByBatchId} />
+        <BatchesKpis summary={initialData.summary} />
 
         <BatchLineageTable
           rows={rows}

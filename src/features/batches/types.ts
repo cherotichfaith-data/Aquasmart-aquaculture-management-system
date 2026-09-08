@@ -11,6 +11,10 @@ import type { RecommendedActionRow } from "@/lib/types/insights"
  */
 export type DashboardBatchRpcRow = Database["public"]["Functions"]["api_dashboard_batches"]["Returns"][number]
 
+/** Farm-wide KPI rollup for the Batches page -- every number here is computed in
+ * SQL (api_batches_summary), the page just formats and displays it. */
+export type BatchesSummaryRow = Database["public"]["Functions"]["api_batches_summary"]["Returns"][number]
+
 export type BatchMortalityTotal = { batch_id: number; total: number }
 
 /** The stocking/lineage side of a batch -- from fingerling_batch + fingerling_supplier,
@@ -42,4 +46,6 @@ export type BatchesPageInitialData = {
   cycleIdToBatchId: Record<number, number>
   /** Stocking/lineage details per batch (fingerling_batch + fingerling_supplier). */
   stockingByBatchId: Record<number, BatchStockingInfo>
+  /** Backend-computed KPI totals for the header cards (api_batches_summary). */
+  summary: BatchesSummaryRow | null
 }

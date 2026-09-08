@@ -2092,6 +2092,20 @@ export type Database = {
           system_id: number
         }[]
       }
+      api_batches_summary: {
+        Args: {
+          p_farm_id: string
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
+        }
+        Returns: {
+          active_batches: number
+          overall_efcr: number
+          survival_pct: number
+          total_biomass_kg: number
+          total_live: number
+          total_stocked: number
+        }[]
+      }
       api_dashboard_batches: {
         Args: {
           p_batch_ids?: number[]
@@ -2135,10 +2149,12 @@ export type Database = {
           sampling_end_date: string
           sgr: number
           sgr_arrow: string
+          survival_pct: number
           system_count: number
           system_ids: number[]
           target_weight_g: number
           target_weight_progress_pct: number
+          total_stocked: number
           water_quality_arrow: string
           water_quality_latest_date: string
           water_quality_rating_average: string
@@ -2509,6 +2525,21 @@ export type Database = {
           resolved_start: string
           snapshot_as_of: string
           system_id: number
+        }[]
+      }
+      api_systems_summary: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
+          p_start_date?: string
+        }
+        Returns: {
+          active_cages: number
+          avg_dissolved_o2: number
+          overall_efcr: number
+          total_biomass_kg: number
+          total_live_fish: number
         }[]
       }
       api_time_period_bounds_scoped: {

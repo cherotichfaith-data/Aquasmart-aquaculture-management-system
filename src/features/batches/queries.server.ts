@@ -13,6 +13,7 @@ import type {
   BatchStockingInfo,
   BatchesPageFilters,
   BatchesPageInitialData,
+  BatchesSummaryRow,
   DashboardBatchRpcRow,
 } from "./types"
 
@@ -126,6 +127,24 @@ async function getAlertRows(supabase: ServerClient, farmId: string): Promise<Rec
   const { data, error } = await supabase.rpc("api_recommended_actions", { p_farm_id: farmId })
   if (error) return []
   return (data ?? []) as RecommendedActionRow[]
+}
+
+/**
+ * Farm-wide KPI totals for the header cards. Every figure (stocked, live,
+ * biomass, weighted survival %, feed-weighted cumulative eFCR) is computed in
+ * SQL -- the page never sums rows itself. Not time-scoped: /batches shows the
+ * full picture for every ongoing batch.
+ */
+async function getBatchesSummary(
+  supabase: ServerClient,
+  params: { farmId: string; stage?: BatchesPageFilters["selectedStage"] },
+): Promise<BatchesSummaryRow | null> {
+  const { data, error } = await supabase.rpc("api_batches_summary", {
+    p_farm_id: params.farmId,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+  })
+  if (error) return null
+  return ((data ?? [])[0] as BatchesSummaryRow | undefined) ?? null
 }
 
 async function getStockingByBatchId(
@@ -247,6 +266,7 @@ function buildEmptyBatchesPageInitialData(): BatchesPageInitialData {
     alerts: [],
     cycleIdToBatchId: {},
     stockingByBatchId: {},
+    summary: null,
   }
 }
 
@@ -292,7 +312,7 @@ async function loadBatchesPageInitialData(
   const batchIds = batchRows.map((row) => row.batch_id)
   const knownBatchIds = new Set(batchIds)
 
-  const [growthSeries, mortalityRows, alerts, stockingByBatchId, cycleIdToBatchId] = await Promise.all([
+  const [growthSeries, mortalityRows, alerts, stockingByBatchId, cycleIdToBatchId, summary] = await Promise.all([
     batchIds.length
       ? listBatchGrowthTrend(supabase, { farmId, batchIds, dateFrom, dateTo })
       : Promise.resolve([]),
@@ -302,6 +322,7 @@ async function loadBatchesPageInitialData(
     getAlertRows(supabase, farmId),
     getStockingByBatchId(supabase, { farmId, batchIds }),
     getCycleIdToBatchId(supabase, batchIds),
+    getBatchesSummary(supabase, { farmId, stage: params.filters.selectedStage }),
   ])
 
   return {
@@ -312,6 +333,7 @@ async function loadBatchesPageInitialData(
     alerts,
     cycleIdToBatchId,
     stockingByBatchId,
+    summary,
   }
 }
 
