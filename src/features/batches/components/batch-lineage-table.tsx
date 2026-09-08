@@ -9,9 +9,8 @@ import { DataErrorState } from "@/components/shared/data-states"
 import type { BatchStockingInfo, DashboardBatchRpcRow } from "@/features/batches/types"
 import { formatDateOnly, formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatGrowthStage } from "@/lib/stage-filter"
-import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import { isFiniteNumber } from "@/features/dashboard/lib/table-cells"
-import { buildBatchLineageColumns } from "./batch-lineage-table-columns"
+import { buildBatchLineageColumns, shortSourceName } from "./batch-lineage-table-columns"
 
 interface BatchLineageTableProps {
   rows: DashboardBatchRpcRow[]
@@ -19,7 +18,6 @@ interface BatchLineageTableProps {
   isError?: boolean
   errorMessage?: string | null
   onRetry?: () => void
-  timePeriod?: TimePeriod
   showHeader?: boolean
 }
 
@@ -32,20 +30,13 @@ export default function BatchLineageTable({
   isError = false,
   errorMessage,
   onRetry,
-  timePeriod = "all history",
   showHeader = true,
 }: BatchLineageTableProps) {
   const router = useRouter()
-  const columns = useMemo(
-    () => buildBatchLineageColumns({ timePeriod, stockingByBatchId }),
-    [timePeriod, stockingByBatchId],
-  )
+  const columns = useMemo(() => buildBatchLineageColumns({ stockingByBatchId }), [stockingByBatchId])
 
   const openProductionPage = (batchId: number) => {
-    const params = new URLSearchParams()
-    params.set("batch", String(batchId))
-    if (timePeriod) params.set("date", toTimePeriodUrlValue(timePeriod))
-    router.push(`/production?${params.toString()}`)
+    router.push(`/production?batch=${batchId}`)
   }
 
   if (isError) {
@@ -74,7 +65,7 @@ export default function BatchLineageTable({
           emptyMessage="No batches found."
           initialSorting={[{ id: "batch", desc: false }]}
           shellClassName="production-records-table max-h-[560px]"
-          tableClassName="min-w-[1420px] table-fixed"
+          tableClassName="min-w-[1200px] table-fixed"
           headerVariant="plain"
           renderMobileCard={(row) => <BatchCardBody row={row} stockingByBatchId={stockingByBatchId} />}
         />
@@ -105,7 +96,7 @@ function BatchCardBody({
         <Badge variant="secondary">{formatGrowthStage(row.growth_stage)}</Badge>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        {stocking?.supplierName ?? "Unknown source"} · {formatDateOnly(stocking?.dateOfDelivery, "no stock date")}
+        {shortSourceName(stocking?.supplierName)} · {formatDateOnly(stocking?.dateOfDelivery, "no stock date")}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
         <MobileMetric label="Qty Stocked" value={formatNumberValue(stocking?.numberOfFish)} />

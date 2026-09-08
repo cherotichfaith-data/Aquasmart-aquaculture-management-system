@@ -13,6 +13,9 @@ export type PageTimeConfig = {
   showBatchFilter: boolean
   showStageFilter: boolean
   showSystemFilter?: boolean
+  /** Batches page metrics are all sampling-anchored, so the period selector does
+   * nothing there -- hide it. Defaults to shown. */
+  showTimePeriod?: boolean
 }
 
 export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
@@ -33,6 +36,7 @@ export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
       showBatchFilter: true,
       showStageFilter: true,
       showSystemFilter: false,
+      showTimePeriod: false,
     }
   }
   if (pathname.startsWith("/systems")) {

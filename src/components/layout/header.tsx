@@ -565,17 +565,19 @@ export default function Header({
                   </div>
                 </div>
                 <div className="flex w-full flex-col gap-2 md:ml-auto md:w-auto md:flex-row md:items-center md:justify-end">
-                  <div className="w-full shrink-0 md:w-[170px]">
-                    <TimePeriodSelector
-                      selectedPeriod={timePeriod}
-                      onPeriodChange={handleTimePeriodChange}
-                      label={undefined}
-                      customRange={customTimeRange}
-                      onCustomRangeChange={handleCustomRangeChange}
-                      variant="compact"
-                      periods={timePeriodOptions}
-                    />
-                  </div>
+                  {pageTimeConfig.showTimePeriod !== false ? (
+                    <div className="w-full shrink-0 md:w-[170px]">
+                      <TimePeriodSelector
+                        selectedPeriod={timePeriod}
+                        onPeriodChange={handleTimePeriodChange}
+                        label={undefined}
+                        customRange={customTimeRange}
+                        onCustomRangeChange={handleCustomRangeChange}
+                        variant="compact"
+                        periods={timePeriodOptions}
+                      />
+                    </div>
+                  ) : null}
                   {showAddData ? (
                     <Button
                       variant="default"
