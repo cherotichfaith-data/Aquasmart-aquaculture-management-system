@@ -572,24 +572,25 @@ async function listProductionSummaryRowsDirectServer(
       if (typeof cycle.cycle_id === "number") cyclesById.set(cycle.cycle_id, cycle)
     }
   }
-  const batchIds = Array.from(
+  // Only currently-active batches -- those with an ongoing production cycle --
+  // get a name here. Closed historical batches resolve to no batch at all,
+  // matching the batch selector and every other surface.
+  const activeBatchIds = Array.from(
     new Set(
       Array.from(cyclesById.values())
+        .filter((cycle) => cycle.ongoing_cycle === true)
         .map((cycle) => cycle.batch_id)
         .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
     ),
   )
-  // Only real batches get a name here -- data-repair stand-ins
-  // (fingerling_batch.is_synthetic) are left out so their cages resolve to no
-  // batch at all, matching every other surface.
   const batchNameById = new Map<number, string>()
-  if (batchIds.length > 0) {
+  if (activeBatchIds.length > 0) {
     const { data: batchRows } = await supabase
       .from("fingerling_batch")
-      .select("id, name, is_synthetic")
-      .in("id", batchIds)
-    for (const batch of (batchRows ?? []) as Array<{ id: number; name: string | null; is_synthetic: boolean | null }>) {
-      if (typeof batch.id === "number" && !batch.is_synthetic) {
+      .select("id, name")
+      .in("id", activeBatchIds)
+    for (const batch of (batchRows ?? []) as Array<{ id: number; name: string | null }>) {
+      if (typeof batch.id === "number") {
         batchNameById.set(batch.id, batch.name?.trim() || `Batch ${batch.id}`)
       }
     }
@@ -607,7 +608,7 @@ async function listProductionSummaryRowsDirectServer(
       const system = row.system_id != null ? systemsById.get(row.system_id) : null
       const dailyFact = row.system_id != null ? dailyFactsBySystemDate.get(`${row.system_id}|${row.date}`) : null
 
-      // A synthetic batch never made it into batchNameById, so its cages
+      // A closed batch never made it into batchNameById, so its cages
       // resolve to no batch.
       const resolvedBatchId = cycle?.batch_id ?? null
       const batchName = resolvedBatchId != null ? batchNameById.get(resolvedBatchId) ?? null : null

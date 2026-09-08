@@ -1,6 +1,8 @@
--- api_fingerling_batch_options_rpc: return only real, active batches --
--- non-synthetic, with an ongoing production cycle. Adds
--- `coalesce(fb.is_synthetic, false) = false` to the existing filters.
+-- The INFERRED-<cage> / BATCH-<n> fingerling_batch rows are real, closed
+-- historical batches, not synthetic data. An "active batch" is simply one with
+-- an ongoing production cycle -- exactly the gate this RPC already had before a
+-- short-lived is_synthetic experiment (migrations 20260907145931/150012/150135,
+-- since reverted). This restores the ongoing-cycle gate as the only filter.
 
 drop function if exists "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid", "p_active_only" boolean);
 
@@ -57,7 +59,6 @@ from public.fingerling_batch fb
 left join resolved_system rs on rs.batch_id = fb.id
 where (p_farm_id is null or private.is_farm_member(p_farm_id))
   and (p_farm_id is null or fb.farm_id = p_farm_id)
-  and coalesce(fb.is_synthetic, false) = false
   and exists (select 1 from public.farm_user fu where fu.farm_id = fb.farm_id and fu.user_id = (select auth.uid()))
   and exists (select 1 from public.production_cycle pc where pc.batch_id = fb.id and pc.ongoing_cycle = true)
   and (
@@ -75,4 +76,4 @@ alter function "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid", "
 revoke all on function "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid", "p_active_only" boolean) from public;
 grant all on function "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid", "p_active_only" boolean) to "authenticated";
 grant all on function "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid", "p_active_only" boolean) to "service_role";
-comment on function "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid", "p_active_only" boolean) is 'L3. Component: Batch Selector Dropdown. Real (non-synthetic) batches with an ongoing cycle. Returns system_ids[]. Last reviewed: 2026-09. Owner: @aquasmart-backend';
+comment on function "public"."api_fingerling_batch_options_rpc"("p_farm_id" "uuid", "p_active_only" boolean) is 'L3. Component: Batch Selector Dropdown. Active batches (those with an ongoing production cycle). Returns system_ids[]. Last reviewed: 2026-09. Owner: @aquasmart-backend';

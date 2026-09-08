@@ -9,8 +9,8 @@ type BatchOptionsRpcRow = Database["public"]["Functions"]["api_fingerling_batch_
  * (`useBatchOptions`) and the server prefetch (`listBatchOptionRows`).
  *
  * `api_fingerling_batch_options_rpc` is the canonical list -- it returns only
- * real, active batches (non-synthetic, with an ongoing cycle) and the
- * `system_ids[]` array, so there is no second RPC and no client-side filtering.
+ * active batches (those with an ongoing production cycle) and the `system_ids[]`
+ * array, so there is no second RPC and no client-side filtering.
  */
 export async function loadBatchOptionRows(
   supabase: SupabaseClient<Database>,
