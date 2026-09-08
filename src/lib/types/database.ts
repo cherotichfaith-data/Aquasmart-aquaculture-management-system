@@ -2115,6 +2115,7 @@ export type Database = {
           biomass_end: number
           cycle_day: number
           efcr: number
+          efcr_acc: number
           efcr_arrow: string
           efcr_latest_date: string
           feed_total: number

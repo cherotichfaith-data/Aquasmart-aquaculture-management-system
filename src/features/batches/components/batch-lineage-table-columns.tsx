@@ -143,6 +143,26 @@ export function buildBatchLineageColumns(params: {
       },
     },
     {
+      id: "efcr_acc",
+      header: "Acc eFCR",
+      accessorFn: (row) => row.efcr_acc ?? undefined,
+      sortUndefined: "last",
+      sortDescFirst: true,
+      meta: { width: "100px" },
+      cell: ({ row }) => {
+        const data = row.original
+        const value = metricValue(data.efcr_acc, 2)
+        if (value == null) return <NoData />
+        return (
+          <MetricCell
+            href={productionHref(data.batch_id)}
+            value={value}
+            subtext={formatLastDate(data.efcr_latest_date)}
+          />
+        )
+      },
+    },
+    {
       id: "survival_rate",
       header: "Survival",
       accessorFn: (row) => {

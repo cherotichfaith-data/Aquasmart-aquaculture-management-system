@@ -74,7 +74,7 @@ export default function BatchLineageTable({
           emptyMessage="No batches found."
           initialSorting={[{ id: "batch", desc: false }]}
           shellClassName="production-records-table max-h-[560px]"
-          tableClassName="min-w-[1320px] table-fixed"
+          tableClassName="min-w-[1420px] table-fixed"
           headerVariant="plain"
           renderMobileCard={(row) => <BatchCardBody row={row} stockingByBatchId={stockingByBatchId} />}
         />
@@ -113,6 +113,7 @@ function BatchCardBody({
         <MobileMetric label="ABW at Stock" value={formatUnitValue(stocking?.abw ?? null, 2, "g")} />
         <MobileMetric label="Current ABW" value={formatUnitValue(row.abw, 1, "g")} />
         <MobileMetric label="eFCR" value={formatNumberValue(row.efcr, { decimals: 2 })} />
+        <MobileMetric label="Acc eFCR" value={formatNumberValue(row.efcr_acc, { decimals: 2 })} />
         <MobileMetric label="Survival Rate" value={formatPercent(survivalRate, 1)} />
         <MobileMetric label="Mortality" value={formatPercent(row.mortality_rate)} />
       </div>
