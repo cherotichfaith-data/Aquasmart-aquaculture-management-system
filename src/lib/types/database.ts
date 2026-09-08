@@ -2419,6 +2419,13 @@ export type Database = {
           unit: string
         }[]
       }
+      api_system_cohort_starts: {
+        Args: { p_farm_id: string }
+        Returns: {
+          cohort_start: string
+          system_id: number
+        }[]
+      }
       api_system_daily_trend: {
         Args: {
           p_end_date?: string

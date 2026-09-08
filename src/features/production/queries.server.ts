@@ -7,6 +7,7 @@ import {
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
 import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
+import { selectSystemCohortStarts } from "@/features/shared/cohort"
 import { selectOccupiedSystemIds } from "@/features/shared/occupied-systems"
 import type { ProductionDailyTrendRow, ProductionSummaryRpcRow } from "@/features/production/types"
 import { normalizeStageFilter } from "@/lib/stage-filter"
@@ -505,7 +506,7 @@ async function listProductionSummaryRowsDirectServer(
     .gte("date", params.dateFrom)
     .lte("date", params.dateTo)
 
-  const [summaryResult, dailyFactsResult, cycleResult, systemResult] = await Promise.all([
+  const [summaryResult, dailyFactsResult, cycleResult, systemResult, cohortStartBySystem] = await Promise.all([
     summaryQuery.order("date", { ascending: false }).order("system_id", { ascending: false }),
     analyticsClient
       .from("daily_system_facts")
@@ -522,6 +523,7 @@ async function listProductionSummaryRowsDirectServer(
       .select("id, name, growth_stage")
       .eq("farm_id", params.farmId)
       .in("id", params.systemIds),
+    selectSystemCohortStarts(supabase, params.farmId).catch(() => new Map<number, string>()),
   ])
 
   if (summaryResult.error || dailyFactsResult.error || cycleResult.error || systemResult.error) {
@@ -601,18 +603,10 @@ async function listProductionSummaryRowsDirectServer(
       .map((row) => [`${row.system_id}|${row.inventory_date}`, row]),
   )
 
-  // A cage's current cohort starts with the ongoing production cycle homed at
-  // it; rows dated earlier belong to a previous occupant and are dropped so the
-  // page never shows a prior cycle's performance. Cages with no homed ongoing
-  // cycle (holding cages) get no cutoff. Mirrors private.system_cohort_start.
-  const cohortStartBySystem = new Map<number, string>()
-  for (const cycle of cyclesById.values()) {
-    if (cycle.ongoing_cycle !== true) continue
-    if (typeof cycle.system_id !== "number" || typeof cycle.cycle_start !== "string") continue
-    const existing = cohortStartBySystem.get(cycle.system_id)
-    if (!existing || cycle.cycle_start > existing) cohortStartBySystem.set(cycle.system_id, cycle.cycle_start)
-  }
-
+  // Rows dated before a cage's current cohort start belong to a previous
+  // occupant and are dropped so the page never shows a prior cycle's
+  // performance -- same cutoff api_production_summary applies, via the shared
+  // api_system_cohort_starts RPC (this path reads the MV directly).
   let rows: ProductionSummaryRpcRow[] = ((summaryResult.data ?? []) as unknown as AnalyticsProductionSummaryRow[])
     .filter((row) => {
       if (typeof row.system_id !== "number" || !allowedSystemIds.has(row.system_id)) return false
