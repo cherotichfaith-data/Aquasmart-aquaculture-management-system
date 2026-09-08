@@ -8,10 +8,9 @@ type BatchOptionsRpcRow = Database["public"]["Functions"]["api_fingerling_batch_
  * Single source for the batch selector options, shared by the client hook
  * (`useBatchOptions`) and the server prefetch (`listBatchOptionRows`).
  *
- * `api_fingerling_batch_options_rpc` is the canonical list. It also returns
- * `system_ids[]` (the cages currently holding each batch), so there is no
- * second RPC -- callers used to hit `api_dashboard_batches`, a ~50-column
- * analytics RPC, purely to read that one array.
+ * `api_fingerling_batch_options_rpc` is the canonical list -- it returns only
+ * active batches (those with an ongoing production cycle) and the `system_ids[]`
+ * array, so there is no second RPC and no client-side filtering.
  */
 export async function loadBatchOptionRows(
   supabase: SupabaseClient<Database>,

@@ -9,6 +9,9 @@ type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"][
 type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 export type GrowthTrendRow = {
   system_id: number
+  /** The production cycle this row belongs to -- lets a batch view attribute
+   * rows by cycle (its own) rather than by the cage's *current* occupant. */
+  cycle_id: number | null
   sample_date: string
   /** api_production_summary's boundary type: 'stocking' | 'sampling' | 'transfer' | 'current'.
    * Only 'sampling' rows are an actual weighing event -- 'current' in particular is a
@@ -183,6 +186,7 @@ export async function listGrowthTrend(
       )
       return rows.map<GrowthTrendRow>((row) => ({
         system_id: row.system_id ?? systemId,
+        cycle_id: row.cycle_id ?? null,
         sample_date: row.date,
         activity: row.activity,
         abw_g: row.average_body_weight,
@@ -344,6 +348,7 @@ export async function listMortalityData(
     systemId?: number
     systemIds?: number[]
     batchId?: number
+    batchIds?: number[]
     dateFrom?: string
     dateTo?: string
     limit?: number
@@ -351,12 +356,17 @@ export async function listMortalityData(
 ): Promise<FishMortalityRow[]> {
   let query = supabase.from("fish_mortality").select("*")
   if (params?.farmId) query = query.eq("farm_id", params.farmId)
-  if (params?.systemId) {
+  if (params?.batchId) {
+    // A batch's mortality follows its fish across cage moves -- scope by batch,
+    // not by the cages it currently sits in.
+    query = query.eq("batch_id", params.batchId)
+  } else if (params?.batchIds && params.batchIds.length > 0) {
+    query = query.in("batch_id", params.batchIds)
+  } else if (params?.systemId) {
     query = query.eq("system_id", params.systemId)
   } else if (params?.systemIds && params.systemIds.length > 0) {
     query = query.in("system_id", params.systemIds)
   }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)

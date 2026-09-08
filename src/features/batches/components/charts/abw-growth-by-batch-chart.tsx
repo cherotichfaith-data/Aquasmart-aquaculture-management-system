@@ -19,11 +19,11 @@ import { aggregateGrowthByBatch } from "./batch-chart-utils"
 
 export default function AbwGrowthByBatchChart({
   growthSeries,
-  systemIdToBatchId,
+  cycleIdToBatchId,
   batchLabels,
 }: {
   growthSeries: GrowthTrendRow[]
-  systemIdToBatchId: Record<number, number>
+  cycleIdToBatchId: Record<number, number>
   batchLabels: Record<number, string>
 }) {
   const palette = getChartPalette()
@@ -32,8 +32,8 @@ export default function AbwGrowthByBatchChart({
   // are an actual sample.
   const samplingRows = useMemo(() => growthSeries.filter((row) => row.activity === "sampling"), [growthSeries])
   const points = useMemo(
-    () => aggregateGrowthByBatch(samplingRows, systemIdToBatchId),
-    [samplingRows, systemIdToBatchId],
+    () => aggregateGrowthByBatch(samplingRows, cycleIdToBatchId),
+    [samplingRows, cycleIdToBatchId],
   )
   const domain = useMemo(() => buildSharedDateDomain(points.map((point) => point.sample_date)), [points])
 
