@@ -38,7 +38,6 @@ export default function BatchesKpis({ summary }: { summary: BatchesSummaryRow | 
       <StatCard
         label="Overall SGR"
         value={isFiniteNumber(overallSgr) ? `${formatNumberValue(overallSgr, { decimals: 2 })}%/day` : "--"}
-        hint="biomass-weighted"
       />
     </div>
   )
