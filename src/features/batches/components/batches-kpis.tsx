@@ -48,7 +48,6 @@ export default function BatchesKpis({
       <StatCard
         label="Overall eFCR"
         value={overallEfcr != null ? formatNumberValue(overallEfcr, { decimals: 2 }) : "--"}
-        hint="all batches in production"
       />
     </div>
   )
