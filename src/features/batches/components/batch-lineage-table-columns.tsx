@@ -5,24 +5,27 @@ import { Badge } from "@/components/app-ui/badge"
 import type { BatchStockingInfo, DashboardBatchRpcRow } from "@/features/batches/types"
 import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import { formatGrowthStage } from "@/lib/stage-filter"
-import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import { MetricCell, NoData, formatLastDate, isFiniteNumber } from "@/features/dashboard/lib/table-cells"
 
+/** "KIPILI FARM" -> "Kipili", "KIMBWELA HATCHERY" -> "Kimbwela". */
+export function shortSourceName(name: string | null | undefined): string {
+  const first = name?.trim().split(/[\s-]+/)[0]
+  if (!first) return "--"
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()
+}
+
 export function buildBatchLineageColumns(params: {
-  timePeriod?: TimePeriod
   stockingByBatchId: Record<number, BatchStockingInfo>
 }): Array<ColumnDef<DashboardBatchRpcRow, unknown>> {
-  const { timePeriod, stockingByBatchId } = params
+  const { stockingByBatchId } = params
 
-  const productionHref = (batchId: number) => {
-    const query = new URLSearchParams()
-    query.set("batch", String(batchId))
-    if (timePeriod) query.set("date", toTimePeriodUrlValue(timePeriod))
-    return `/production?${query.toString()}`
-  }
+  const productionHref = (batchId: number) => `/production?batch=${batchId}`
 
   const metricValue = (value: number | null | undefined, decimals: number) =>
     isFiniteNumber(value) ? formatNumberValue(value, { decimals, minimumDecimals: decimals }) : null
+
+  const num = (value: string | null) =>
+    value == null ? <NoData /> : <span className="text-sm text-foreground">{value}</span>
 
   return [
     {
@@ -30,7 +33,7 @@ export function buildBatchLineageColumns(params: {
       header: "Batch",
       accessorFn: (row) => (row.batch_name?.trim() || `Batch #${row.batch_id}`).toLowerCase(),
       sortDescFirst: false,
-      meta: { width: "180px" },
+      meta: { width: "118px" },
       cell: ({ row }) => {
         const data = row.original
         const title = data.batch_name?.trim() || `Batch #${data.batch_id}`
@@ -47,17 +50,19 @@ export function buildBatchLineageColumns(params: {
     {
       id: "source",
       header: "Source",
-      accessorFn: (row) => stockingByBatchId[row.batch_id]?.supplierName ?? "",
-      meta: { width: "150px" },
+      accessorFn: (row) => shortSourceName(stockingByBatchId[row.batch_id]?.supplierName),
+      meta: { width: "70px" },
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{stockingByBatchId[row.original.batch_id]?.supplierName ?? "--"}</span>
+        <span className="text-sm text-muted-foreground">
+          {shortSourceName(stockingByBatchId[row.original.batch_id]?.supplierName)}
+        </span>
       ),
     },
     {
       id: "stock_date",
       header: "Stock Date",
       accessorFn: (row) => stockingByBatchId[row.batch_id]?.dateOfDelivery ?? "",
-      meta: { width: "120px" },
+      meta: { width: "84px" },
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
           {formatDateOnly(stockingByBatchId[row.original.batch_id]?.dateOfDelivery, "--")}
@@ -66,38 +71,30 @@ export function buildBatchLineageColumns(params: {
     },
     {
       id: "qty_stocked",
-      header: "Qty Stocked",
+      header: "Stocked",
       accessorFn: (row) => stockingByBatchId[row.batch_id]?.numberOfFish ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "110px" },
-      cell: ({ row }) => (
-        <span className="text-sm">{formatNumberValue(stockingByBatchId[row.original.batch_id]?.numberOfFish)}</span>
-      ),
+      meta: { width: "74px", align: "right" },
+      cell: ({ row }) => num(metricValue(stockingByBatchId[row.original.batch_id]?.numberOfFish, 0)),
     },
     {
       id: "fish",
-      header: "Live Count",
+      header: "Live",
       accessorFn: (row) => row.fish_end ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "100px" },
-      cell: ({ row }) => {
-        const value = metricValue(row.original.fish_end, 0)
-        return value == null ? <NoData /> : <span className="text-sm text-foreground">{value}</span>
-      },
+      meta: { width: "58px", align: "right" },
+      cell: ({ row }) => num(metricValue(row.original.fish_end, 0)),
     },
     {
       id: "abw_at_stock",
-      header: "ABW at Stock",
+      header: "Stock ABW",
       accessorFn: (row) => stockingByBatchId[row.batch_id]?.abw ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "120px", unit: "g" },
-      cell: ({ row }) => {
-        const value = metricValue(stockingByBatchId[row.original.batch_id]?.abw, 2)
-        return value == null ? <NoData /> : <span className="text-sm">{value} g</span>
-      },
+      meta: { width: "88px", unit: "g", align: "right" },
+      cell: ({ row }) => num(metricValue(stockingByBatchId[row.original.batch_id]?.abw, 2)),
     },
     {
       id: "abw",
@@ -105,7 +102,7 @@ export function buildBatchLineageColumns(params: {
       accessorFn: (row) => row.abw ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "110px", unit: "g" },
+      meta: { width: "72px", unit: "g", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.abw, 1)
@@ -114,7 +111,7 @@ export function buildBatchLineageColumns(params: {
           <MetricCell
             href={productionHref(data.batch_id)}
             value={value}
-            arrow={data.abw_arrow}
+            align="right"
             subtext={formatLastDate(data.abw_latest_date)}
           />
         )
@@ -126,7 +123,7 @@ export function buildBatchLineageColumns(params: {
       accessorFn: (row) => row.efcr ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "100px" },
+      meta: { width: "64px", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.efcr, 2)
@@ -137,10 +134,19 @@ export function buildBatchLineageColumns(params: {
             value={value}
             arrow={data.efcr_arrow}
             invertArrow
-            subtext={formatLastDate(data.efcr_latest_date)}
+            align="right"
           />
         )
       },
+    },
+    {
+      id: "efcr_acc",
+      header: "Acc eFCR",
+      accessorFn: (row) => row.efcr_acc ?? undefined,
+      sortUndefined: "last",
+      sortDescFirst: true,
+      meta: { width: "76px", align: "right" },
+      cell: ({ row }) => num(metricValue(row.original.efcr_acc, 2)),
     },
     {
       id: "survival_rate",
@@ -153,15 +159,14 @@ export function buildBatchLineageColumns(params: {
       },
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "100px", unit: "%" },
+      meta: { width: "72px", unit: "%", align: "right" },
       cell: ({ row }) => {
         const stocked = stockingByBatchId[row.original.batch_id]?.numberOfFish
         const survival =
           isFiniteNumber(stocked) && stocked > 0 && isFiniteNumber(row.original.fish_end)
             ? (row.original.fish_end / stocked) * 100
             : null
-        const value = metricValue(survival, 1)
-        return value == null ? <NoData /> : <span className="text-sm">{value}%</span>
+        return num(metricValue(survival, 1))
       },
     },
     {
@@ -170,28 +175,17 @@ export function buildBatchLineageColumns(params: {
       accessorFn: (row) => row.mortality_rate ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "110px", unit: "%" },
+      meta: { width: "82px", unit: "%", align: "right" },
       cell: ({ row }) => {
-        const data = row.original
-        const value = metricValue(data.mortality_rate, 2)
-        if (value == null) return <NoData />
-        const rising = String(data.mortality_rate_arrow ?? "").toLowerCase() === "up"
-        return (
-          <MetricCell
-            href={productionHref(data.batch_id)}
-            value={<span className={rising ? "text-destructive" : undefined}>{value}</span>}
-            arrow={data.mortality_rate_arrow}
-            invertArrow
-            subtext={formatLastDate(data.mortality_rate_latest_date)}
-          />
-        )
+        const value = metricValue(row.original.mortality_rate, 2)
+        return num(value)
       },
     },
     {
       id: "stage",
       header: "Stage",
       accessorFn: (row) => row.growth_stage ?? "",
-      meta: { width: "110px" },
+      meta: { width: "96px" },
       cell: ({ row }) => <Badge variant="secondary">{formatGrowthStage(row.original.growth_stage)}</Badge>,
     },
   ]

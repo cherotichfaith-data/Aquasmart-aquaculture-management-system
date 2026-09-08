@@ -97,6 +97,7 @@ export function MetricCell({
   invertArrow,
   neutralArrow,
   subtext,
+  align = "left",
 }: {
   href?: string
   value: ReactNode
@@ -104,18 +105,19 @@ export function MetricCell({
   invertArrow?: boolean
   neutralArrow?: boolean
   subtext?: string | null
+  align?: "left" | "right"
 }) {
   const body = (
-    <>
+    <span className={`flex flex-col ${align === "right" ? "items-end" : "items-start"}`}>
       <span className="flex items-center gap-1.5">
         <span className="text-sm leading-5 text-foreground">{value}</span>
         {arrow !== undefined ? <ArrowBadge arrow={arrow} invert={invertArrow} neutral={neutralArrow} /> : null}
       </span>
-      {subtext ? <span className="mt-0.5 block text-[10px] leading-3 text-muted-foreground">{subtext}</span> : null}
-    </>
+      {subtext ? <span className="mt-0.5 text-[10px] leading-3 text-muted-foreground">{subtext}</span> : null}
+    </span>
   )
 
-  if (!href) return <span className="block">{body}</span>
+  if (!href) return body
 
   return (
     <Link

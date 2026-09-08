@@ -9,19 +9,17 @@ import AbwGrowthByBatchChart from "@/features/batches/components/charts/abw-grow
 import MortalityByBatchChart from "@/features/batches/components/charts/mortality-by-batch-chart"
 import EfcrByPeriodBatchChart from "@/features/batches/components/charts/efcr-by-period-batch-chart"
 import AbwProjectionByBatchChart from "@/features/batches/components/charts/abw-projection-by-batch-chart"
-import type { BatchesPageFilters, BatchesPageInitialData } from "@/features/batches/types"
+import type { BatchesPageInitialData } from "@/features/batches/types"
 
 export default function BatchesPageClient({
   initialFarmId,
   initialFarmName,
   initialFarmRole,
-  initialFilters,
   initialData,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
   initialFarmRole?: string | null
-  initialFilters: BatchesPageFilters
   initialData: BatchesPageInitialData
 }) {
   const rows = useMemo(
@@ -53,7 +51,6 @@ export default function BatchesPageClient({
           stockingByBatchId={initialData.stockingByBatchId}
           isError={isError}
           errorMessage={errorMessage}
-          timePeriod={initialFilters.timePeriod}
           showHeader
         />
 
