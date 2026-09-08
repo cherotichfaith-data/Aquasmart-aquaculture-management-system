@@ -37,9 +37,7 @@ export type BatchesPageInitialData = {
   growthSeries: GrowthTrendRow[]
   mortalityByBatch: BatchMortalityTotal[]
   alerts: RecommendedActionRow[]
-  /** Cage -> batch membership, derived from each batch row's own system_ids. */
-  systemIdToBatchId: Record<number, number>
-  /** Production cycle -> batch. The correct key for attributing growthSeries rows:
+  /** Production cycle -> batch. The key for attributing growthSeries rows:
    * a cage's current batch is not who its historical cycles belonged to. */
   cycleIdToBatchId: Record<number, number>
   /** Stocking/lineage details per batch (fingerling_batch + fingerling_supplier). */

@@ -1,8 +1,9 @@
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
-import { listGrowthTrend, listMortalityData } from "@/features/shared/queries.server"
+import { listMortalityData, type GrowthTrendRow } from "@/features/shared/queries.server"
 import { listBatchOptionRows } from "@/features/shared/query-seed.server"
+import type { Database } from "@/lib/types/database"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { parseCustomPeriodUrlValue, resolveTimePeriod, type TimeBounds } from "@/lib/time-period"
@@ -182,6 +183,44 @@ function bucketMortalityByBatch(
   return Array.from(totals.entries()).map(([batch_id, total]) => ({ batch_id, total }))
 }
 
+type BatchGrowthTrendRpcRow = Database["public"]["Functions"]["api_batch_growth_trend"]["Returns"][number]
+
+/**
+ * A batch's full-cycle ABW/eFCR series -- from stocking, through every cage its
+ * fish moved through. Selects by the batch's own production cycle (via
+ * api_batch_growth_trend), so a cage the batch has since left / a cage's earlier
+ * tenant never leaks in.
+ */
+async function listBatchGrowthTrend(
+  supabase: ServerClient,
+  params: { farmId: string; batchIds: number[]; dateFrom: string; dateTo: string },
+): Promise<GrowthTrendRow[]> {
+  if (params.batchIds.length === 0) return []
+  const { data, error } = await supabase.rpc("api_batch_growth_trend", {
+    p_farm_id: params.farmId,
+    p_batch_ids: params.batchIds,
+    p_start_date: params.dateFrom,
+    p_end_date: params.dateTo,
+  })
+  if (error) return []
+  return ((data ?? []) as BatchGrowthTrendRpcRow[]).map<GrowthTrendRow>((row) => ({
+    system_id: row.system_id ?? 0,
+    cycle_id: row.cycle_id ?? null,
+    sample_date: row.date,
+    activity: row.activity,
+    abw_g: row.average_body_weight,
+    fish_count: row.number_of_fish_inventory,
+    adg_g_day: row.agr,
+    sgr_pct_day: row.sgr,
+    efcr_period: row.efcr_period,
+    days_interval: row.days_in_period,
+    weight_gain_g: row.biomass_increase_period,
+    age_days: null,
+    expected_abw_g: row.target_weight_g,
+    growth_deviation_pct: null,
+  }))
+}
+
 async function getCycleIdToBatchId(
   supabase: ServerClient,
   batchIds: number[],
@@ -199,16 +238,6 @@ async function getCycleIdToBatchId(
   return map
 }
 
-function buildSystemIdToBatchId(batches: DashboardBatchRpcRow[]): Record<number, number> {
-  const map: Record<number, number> = {}
-  for (const batch of batches) {
-    for (const systemId of batch.system_ids ?? []) {
-      if (typeof systemId === "number") map[systemId] = batch.batch_id
-    }
-  }
-  return map
-}
-
 function buildEmptyBatchesPageInitialData(): BatchesPageInitialData {
   return {
     bounds: { start: null, end: null },
@@ -216,7 +245,6 @@ function buildEmptyBatchesPageInitialData(): BatchesPageInitialData {
     growthSeries: [],
     mortalityByBatch: [],
     alerts: [],
-    systemIdToBatchId: {},
     cycleIdToBatchId: {},
     stockingByBatchId: {},
   }
@@ -261,28 +289,20 @@ async function loadBatchesPageInitialData(
     { allowMissingObject: true },
   )
 
-  const systemIdToBatchId = buildSystemIdToBatchId(batchRows)
-  const allSystemIds = Array.from(new Set(Object.keys(systemIdToBatchId).map(Number)))
   const batchIds = batchRows.map((row) => row.batch_id)
   const knownBatchIds = new Set(batchIds)
 
-  const [growthSeriesRaw, mortalityRows, alerts, stockingByBatchId, cycleIdToBatchId] = await Promise.all([
-    allSystemIds.length
-      ? listGrowthTrend(supabase, { farmId, systemIds: allSystemIds, dateFrom, dateTo })
+  const [growthSeries, mortalityRows, alerts, stockingByBatchId, cycleIdToBatchId] = await Promise.all([
+    batchIds.length
+      ? listBatchGrowthTrend(supabase, { farmId, batchIds, dateFrom, dateTo })
       : Promise.resolve([]),
-    allSystemIds.length
-      ? listMortalityData(supabase, { farmId, systemIds: allSystemIds, dateFrom, dateTo })
+    batchIds.length
+      ? listMortalityData(supabase, { farmId, batchIds, dateFrom, dateTo })
       : Promise.resolve([]),
     getAlertRows(supabase, farmId),
     getStockingByBatchId(supabase, { farmId, batchIds }),
     getCycleIdToBatchId(supabase, batchIds),
   ])
-
-  // Keep only rows from the displayed batches' own production cycles -- a cage
-  // this batch now occupies may still carry a previous cycle's series.
-  const growthSeries = growthSeriesRaw.filter(
-    (row) => row.cycle_id != null && cycleIdToBatchId[row.cycle_id] != null,
-  )
 
   return {
     bounds,
@@ -290,7 +310,6 @@ async function loadBatchesPageInitialData(
     growthSeries,
     mortalityByBatch: bucketMortalityByBatch(mortalityRows, knownBatchIds),
     alerts,
-    systemIdToBatchId,
     cycleIdToBatchId,
     stockingByBatchId,
   }

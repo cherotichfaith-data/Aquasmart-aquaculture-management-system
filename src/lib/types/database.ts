@@ -2063,6 +2063,29 @@ export type Database = {
       }
     }
     Functions: {
+      api_batch_growth_trend: {
+        Args: {
+          p_batch_ids: number[]
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+        }
+        Returns: {
+          activity: string
+          agr: number
+          average_body_weight: number
+          batch_id: number
+          biomass_increase_period: number
+          cycle_id: number
+          date: string
+          days_in_period: number
+          efcr_period: number
+          number_of_fish_inventory: number
+          sgr: number
+          system_id: number
+          target_weight_g: number
+        }[]
+      }
       api_batch_system_ids: {
         Args: { p_batch_id: number }
         Returns: {

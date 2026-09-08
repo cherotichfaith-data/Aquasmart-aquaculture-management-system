@@ -7,15 +7,16 @@
 --
 -- private.system_cohort_starts(farm_id) -> (system_id, cohort_start) is the
 -- single source of that anchor, from analytics.production_summary's reconciled
--- cycle_id timeline. Applied by:
---   * api_dashboard_systems / api_dashboard_consolidated -- always (per-cage/farm)
---   * api_system_daily_trend -- always (production-page per-cage charts)
---   * api_time_period_bounds_scoped -- ONLY when p_system_id is set and
---     p_batch_id is null (single-cage scope). Batch scope keeps the full cycle
---     from stocking, since a batch follows its fish across cage moves.
--- api_production_summary is left UNSCOPED: the batches page reads it per-system
--- to assemble a batch's full-cycle trend; the systems page applies the cohort
--- filter in app code instead. Reports are unscoped everywhere.
+-- cycle_id timeline. Per-cage RPCs LEFT JOIN it once and filter
+-- `<date> >= coalesce(cohort_start, <date>)`:
+--   * api_dashboard_systems / api_dashboard_consolidated / api_system_daily_trend
+--     / api_production_summary -- always (per-cage views).
+--   * api_time_period_bounds_scoped -- ONLY for single-cage scope
+--     (p_system_id set, p_batch_id null). Batch and farm-wide scopes stay full.
+-- The BATCH view must NOT be cohort-clamped: a batch's performance runs from
+-- stocking through every cage its fish moved through. The batches page uses
+-- api_batch_growth_trend (migration 20260908084124), which selects by the
+-- batch's own production_cycle, not by cage. Reports are unscoped everywhere.
 --
 -- Applied to prod 2026-09-08. The five large RPC bodies below were applied via
 -- execute_sql (the auto-mode classifier blocks their verbatim CREATE OR REPLACE
@@ -179,6 +180,7 @@ on pc.cycle_id = ps.cycle_id
 left join analytics.daily_system_facts dsf
 on dsf.system_id = ps.system_id
 and dsf.inventory_date = ps.date
+left join private.system_cohort_starts(p_farm_id) csr on csr.system_id = ps.system_id
 where s.farm_id = p_farm_id
 and private.app_rpc_scope_ok(
 p_farm_id,
@@ -191,6 +193,7 @@ and (p_system_id is null or ps.system_id = p_system_id)
 and (p_stage is null or s.growth_stage = p_stage)
 and (p_start_date is null or ps.date >= p_start_date)
 and (p_end_date is null or ps.date <= p_end_date)
+and ps.date >= coalesce(csr.cohort_start, ps.date)
 order by ps.date desc, ps.system_id desc;
 $function$
 ;

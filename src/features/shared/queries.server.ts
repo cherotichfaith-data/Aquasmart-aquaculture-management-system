@@ -348,6 +348,7 @@ export async function listMortalityData(
     systemId?: number
     systemIds?: number[]
     batchId?: number
+    batchIds?: number[]
     dateFrom?: string
     dateTo?: string
     limit?: number
@@ -355,12 +356,17 @@ export async function listMortalityData(
 ): Promise<FishMortalityRow[]> {
   let query = supabase.from("fish_mortality").select("*")
   if (params?.farmId) query = query.eq("farm_id", params.farmId)
-  if (params?.systemId) {
+  if (params?.batchId) {
+    // A batch's mortality follows its fish across cage moves -- scope by batch,
+    // not by the cages it currently sits in.
+    query = query.eq("batch_id", params.batchId)
+  } else if (params?.batchIds && params.batchIds.length > 0) {
+    query = query.in("batch_id", params.batchIds)
+  } else if (params?.systemId) {
     query = query.eq("system_id", params.systemId)
   } else if (params?.systemIds && params.systemIds.length > 0) {
     query = query.in("system_id", params.systemIds)
   }
-  if (params?.batchId) query = query.eq("batch_id", params.batchId)
   if (params?.dateFrom) query = query.gte("date", params.dateFrom)
   if (params?.dateTo) query = query.lte("date", params.dateTo)
   if (params?.limit) query = query.limit(params.limit)
