@@ -7,10 +7,15 @@
 --
 -- private.system_cohort_starts(farm_id) -> (system_id, cohort_start) is the
 -- single source of that anchor, from analytics.production_summary's reconciled
--- cycle_id timeline. Every per-cage analytics RPC LEFT JOINs it once and filters
--- `<date> >= coalesce(cohort_start, <date>)` where it reads daily_system_facts /
--- production_summary / daily_water_quality_rating. Cages never stocked get no
--- clamp. Reports are intentionally left unscoped.
+-- cycle_id timeline. Applied by:
+--   * api_dashboard_systems / api_dashboard_consolidated -- always (per-cage/farm)
+--   * api_system_daily_trend -- always (production-page per-cage charts)
+--   * api_time_period_bounds_scoped -- ONLY when p_system_id is set and
+--     p_batch_id is null (single-cage scope). Batch scope keeps the full cycle
+--     from stocking, since a batch follows its fish across cage moves.
+-- api_production_summary is left UNSCOPED: the batches page reads it per-system
+-- to assemble a batch's full-cycle trend; the systems page applies the cohort
+-- filter in app code instead. Reports are unscoped everywhere.
 --
 -- Applied to prod 2026-09-08. The five large RPC bodies below were applied via
 -- execute_sql (the auto-mode classifier blocks their verbatim CREATE OR REPLACE
@@ -174,7 +179,6 @@ on pc.cycle_id = ps.cycle_id
 left join analytics.daily_system_facts dsf
 on dsf.system_id = ps.system_id
 and dsf.inventory_date = ps.date
-left join private.system_cohort_starts(p_farm_id) csr on csr.system_id = ps.system_id
 where s.farm_id = p_farm_id
 and private.app_rpc_scope_ok(
 p_farm_id,
@@ -187,7 +191,6 @@ and (p_system_id is null or ps.system_id = p_system_id)
 and (p_stage is null or s.growth_stage = p_stage)
 and (p_start_date is null or ps.date >= p_start_date)
 and (p_end_date is null or ps.date <= p_end_date)
-and ps.date >= coalesce(csr.cohort_start, ps.date)
 order by ps.date desc, ps.system_id desc;
 $function$
 ;
@@ -970,7 +973,7 @@ AS $function$
           join public.daily_water_quality_rating dwr on dwr.system_id = s.id
           left join private.system_cohort_starts(p_farm_id) csr on csr.system_id = s.id
           where dwr.rating_date <= current_date
-            and dwr.rating_date >= coalesce(csr.cohort_start, dwr.rating_date)
+            and (not (p_system_id is not null and p_batch_id is null) or dwr.rating_date >= coalesce(csr.cohort_start, dwr.rating_date))
         )
         when 'feeding' then (
           select min(fr.date)
@@ -978,7 +981,7 @@ AS $function$
           join public.feeding_record fr on fr.system_id = s.id
           left join private.system_cohort_starts(p_farm_id) csr on csr.system_id = s.id
           where fr.date <= current_date
-            and fr.date >= coalesce(csr.cohort_start, fr.date)
+            and (not (p_system_id is not null and p_batch_id is null) or fr.date >= coalesce(csr.cohort_start, fr.date))
         )
         when 'feed_inventory' then (
           select min(fi.inventory_date)
@@ -994,7 +997,7 @@ AS $function$
           join analytics.daily_system_facts d on d.system_id = s.id
           left join private.system_cohort_starts(p_farm_id) csr on csr.system_id = s.id
           where d.inventory_date <= current_date
-            and d.inventory_date >= coalesce(csr.cohort_start, d.inventory_date)
+            and (not (p_system_id is not null and p_batch_id is null) or d.inventory_date >= coalesce(csr.cohort_start, d.inventory_date))
         )
       end as first_data_date
     from resolved_scope rs

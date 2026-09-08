@@ -30,14 +30,20 @@ export async function selectSystemCohortStarts(
   return bySystem
 }
 
-/** Drop rows dated before their cage's current-cohort start. */
-export function filterRowsToCohort<T extends { system_id: number | null; date: string | null }>(
+/**
+ * Drop rows dated before their cage's current-cohort start. `getDate` defaults
+ * to `row.date`; pass one for rows that name the date field differently.
+ */
+export function filterRowsToCohort<T extends { system_id: number | null }>(
   rows: T[],
   cohortStartBySystem: Map<number, string>,
+  getDate: (row: T) => string | null | undefined = (row) => (row as { date?: string | null }).date,
 ): T[] {
   return rows.filter((row) => {
     if (typeof row.system_id !== "number") return true
     const cohortStart = cohortStartBySystem.get(row.system_id)
-    return !(cohortStart && typeof row.date === "string" && row.date < cohortStart)
+    if (!cohortStart) return true
+    const date = getDate(row)
+    return !(typeof date === "string" && date < cohortStart)
   })
 }

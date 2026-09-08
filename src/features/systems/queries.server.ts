@@ -129,9 +129,10 @@ export async function getSystemsPageInitialData(params: {
     systemOptions,
     batchSystems,
     systemsTable,
-    growthSeries,
-    // Growth trend already comes from the cohort-clamped api_production_summary;
-    // mortality reads raw fish_mortality, so drop any pre-cohort rows here.
+    // This page is per-cage: growth trend and mortality both get scoped to each
+    // cage's current cohort. (api_production_summary itself is left unscoped --
+    // the batches page reads it per-system to build a batch's full-cycle trend.)
+    growthSeries: filterRowsToCohort(growthSeries, cohortStartBySystem, (row) => row.sample_date),
     mortalityByCage: sumMortalityByCage(filterRowsToCohort(mortalityRows, cohortStartBySystem)),
     waterQualityMonthly: bucketWaterQualityMonthly(waterQualityRows),
     alerts,
