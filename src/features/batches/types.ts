@@ -32,13 +32,16 @@ export type BatchesPageFilters = {
 export type BatchesPageInitialData = {
   bounds: TimeBounds
   batches: QueryResult<DashboardBatchRpcRow>
-  /** Per-cage ABW/eFCR series across every cage any fetched batch touches -- charts
-   * roll this up to batch level via systemIdToBatchId + aggregateGrowthByBatch. */
+  /** ABW/eFCR series for the fetched batches' own production cycles -- charts roll
+   * this up to batch level via cycleIdToBatchId + aggregateGrowthByBatch. */
   growthSeries: GrowthTrendRow[]
   mortalityByBatch: BatchMortalityTotal[]
   alerts: RecommendedActionRow[]
   /** Cage -> batch membership, derived from each batch row's own system_ids. */
   systemIdToBatchId: Record<number, number>
+  /** Production cycle -> batch. The correct key for attributing growthSeries rows:
+   * a cage's current batch is not who its historical cycles belonged to. */
+  cycleIdToBatchId: Record<number, number>
   /** Stocking/lineage details per batch (fingerling_batch + fingerling_supplier). */
   stockingByBatchId: Record<number, BatchStockingInfo>
 }

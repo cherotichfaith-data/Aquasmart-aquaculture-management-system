@@ -19,11 +19,11 @@ import { aggregateGrowthByBatch } from "./batch-chart-utils"
 
 export default function EfcrByPeriodBatchChart({
   growthSeries,
-  systemIdToBatchId,
+  cycleIdToBatchId,
   batchLabels,
 }: {
   growthSeries: GrowthTrendRow[]
-  systemIdToBatchId: Record<number, number>
+  cycleIdToBatchId: Record<number, number>
   batchLabels: Record<number, string>
 }) {
   const palette = getChartPalette()
@@ -33,10 +33,10 @@ export default function EfcrByPeriodBatchChart({
   const samplingRows = useMemo(() => growthSeries.filter((row) => row.activity === "sampling"), [growthSeries])
   const points = useMemo(
     () =>
-      aggregateGrowthByBatch(samplingRows, systemIdToBatchId).filter(
+      aggregateGrowthByBatch(samplingRows, cycleIdToBatchId).filter(
         (point) => point.efcr_period != null && Number.isFinite(point.efcr_period),
       ),
-    [samplingRows, systemIdToBatchId],
+    [samplingRows, cycleIdToBatchId],
   )
   const domain = useMemo(() => buildSharedDateDomain(points.map((point) => point.sample_date)), [points])
 

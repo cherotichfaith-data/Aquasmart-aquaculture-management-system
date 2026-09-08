@@ -9,6 +9,9 @@ type FeedTypeRow = Database["public"]["Functions"]["api_feed_type_options_rpc"][
 type ProductionSummaryRow = Database["public"]["Functions"]["api_production_summary"]["Returns"][number]
 export type GrowthTrendRow = {
   system_id: number
+  /** The production cycle this row belongs to -- lets a batch view attribute
+   * rows by cycle (its own) rather than by the cage's *current* occupant. */
+  cycle_id: number | null
   sample_date: string
   /** api_production_summary's boundary type: 'stocking' | 'sampling' | 'transfer' | 'current'.
    * Only 'sampling' rows are an actual weighing event -- 'current' in particular is a
@@ -183,6 +186,7 @@ export async function listGrowthTrend(
       )
       return rows.map<GrowthTrendRow>((row) => ({
         system_id: row.system_id ?? systemId,
+        cycle_id: row.cycle_id ?? null,
         sample_date: row.date,
         activity: row.activity,
         abw_g: row.average_body_weight,

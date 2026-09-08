@@ -168,17 +168,35 @@ async function getStockingByBatchId(
 }
 
 function bucketMortalityByBatch(
-  rows: Array<{ system_id: number | null; number_of_fish_mortality: number | null }>,
-  systemIdToBatchId: Record<number, number>,
+  rows: Array<{ batch_id: number | null; number_of_fish_mortality: number | null }>,
+  knownBatchIds: Set<number>,
 ): BatchMortalityTotal[] {
+  // fish_mortality rows carry their own batch_id, so attribute by that -- not by
+  // the cage's *current* occupant, which would fold a previous cycle's deaths
+  // into whichever batch sits there now.
   const totals = new Map<number, number>()
   for (const row of rows) {
-    if (typeof row.system_id !== "number") continue
-    const batchId = systemIdToBatchId[row.system_id]
-    if (batchId == null) continue
-    totals.set(batchId, (totals.get(batchId) ?? 0) + (row.number_of_fish_mortality ?? 0))
+    if (typeof row.batch_id !== "number" || !knownBatchIds.has(row.batch_id)) continue
+    totals.set(row.batch_id, (totals.get(row.batch_id) ?? 0) + (row.number_of_fish_mortality ?? 0))
   }
   return Array.from(totals.entries()).map(([batch_id, total]) => ({ batch_id, total }))
+}
+
+async function getCycleIdToBatchId(
+  supabase: ServerClient,
+  batchIds: number[],
+): Promise<Record<number, number>> {
+  if (batchIds.length === 0) return {}
+  const { data, error } = await supabase
+    .from("production_cycle")
+    .select("cycle_id, batch_id")
+    .in("batch_id", batchIds)
+  if (error) return {}
+  const map: Record<number, number> = {}
+  for (const row of (data ?? []) as Array<{ cycle_id: number | null; batch_id: number | null }>) {
+    if (typeof row.cycle_id === "number" && typeof row.batch_id === "number") map[row.cycle_id] = row.batch_id
+  }
+  return map
 }
 
 function buildSystemIdToBatchId(batches: DashboardBatchRpcRow[]): Record<number, number> {
@@ -199,6 +217,7 @@ function buildEmptyBatchesPageInitialData(): BatchesPageInitialData {
     mortalityByBatch: [],
     alerts: [],
     systemIdToBatchId: {},
+    cycleIdToBatchId: {},
     stockingByBatchId: {},
   }
 }
@@ -245,8 +264,9 @@ async function loadBatchesPageInitialData(
   const systemIdToBatchId = buildSystemIdToBatchId(batchRows)
   const allSystemIds = Array.from(new Set(Object.keys(systemIdToBatchId).map(Number)))
   const batchIds = batchRows.map((row) => row.batch_id)
+  const knownBatchIds = new Set(batchIds)
 
-  const [growthSeries, mortalityRows, alerts, stockingByBatchId] = await Promise.all([
+  const [growthSeriesRaw, mortalityRows, alerts, stockingByBatchId, cycleIdToBatchId] = await Promise.all([
     allSystemIds.length
       ? listGrowthTrend(supabase, { farmId, systemIds: allSystemIds, dateFrom, dateTo })
       : Promise.resolve([]),
@@ -255,15 +275,23 @@ async function loadBatchesPageInitialData(
       : Promise.resolve([]),
     getAlertRows(supabase, farmId),
     getStockingByBatchId(supabase, { farmId, batchIds }),
+    getCycleIdToBatchId(supabase, batchIds),
   ])
+
+  // Keep only rows from the displayed batches' own production cycles -- a cage
+  // this batch now occupies may still carry a previous cycle's series.
+  const growthSeries = growthSeriesRaw.filter(
+    (row) => row.cycle_id != null && cycleIdToBatchId[row.cycle_id] != null,
+  )
 
   return {
     bounds,
     batches: toQuerySuccess(batchRows),
     growthSeries,
-    mortalityByBatch: bucketMortalityByBatch(mortalityRows, systemIdToBatchId),
+    mortalityByBatch: bucketMortalityByBatch(mortalityRows, knownBatchIds),
     alerts,
     systemIdToBatchId,
+    cycleIdToBatchId,
     stockingByBatchId,
   }
 }

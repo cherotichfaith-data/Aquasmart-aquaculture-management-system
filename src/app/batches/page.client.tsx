@@ -60,7 +60,7 @@ export default function BatchesPageClient({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <AbwGrowthByBatchChart
             growthSeries={initialData.growthSeries}
-            systemIdToBatchId={initialData.systemIdToBatchId}
+            cycleIdToBatchId={initialData.cycleIdToBatchId}
             batchLabels={batchLabels}
           />
           <MortalityByBatchChart mortalityByBatch={initialData.mortalityByBatch} batchLabels={batchLabels} />
@@ -68,12 +68,12 @@ export default function BatchesPageClient({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <EfcrByPeriodBatchChart
             growthSeries={initialData.growthSeries}
-            systemIdToBatchId={initialData.systemIdToBatchId}
+            cycleIdToBatchId={initialData.cycleIdToBatchId}
             batchLabels={batchLabels}
           />
           <AbwProjectionByBatchChart
             growthSeries={initialData.growthSeries}
-            systemIdToBatchId={initialData.systemIdToBatchId}
+            cycleIdToBatchId={initialData.cycleIdToBatchId}
             batchLabels={batchLabels}
           />
         </div>
