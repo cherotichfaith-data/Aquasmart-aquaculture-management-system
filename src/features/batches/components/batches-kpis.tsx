@@ -12,10 +12,16 @@ export default function BatchesKpis({
 }) {
   const stockingRows = batches.map((batch) => stockingByBatchId[batch.batch_id]).filter(Boolean) as BatchStockingInfo[]
   const totalStocked = stockingRows.reduce((sum, row) => sum + (row.numberOfFish ?? 0), 0)
-  const finiteEfcrBatches = batches.filter((batch) => isFiniteNumber(batch.efcr))
-  const bestEfcrBatch = finiteEfcrBatches.length
-    ? finiteEfcrBatches.reduce((best, batch) => (batch.efcr! < best.efcr! ? batch : best))
-    : null
+
+  // Farm-wide eFCR across every batch in production: total feed / total biomass
+  // gain (gain_i = feed_i / eFCR_i), so it's weighted by feed rather than a flat
+  // average -- a small trial batch can't swing the headline number.
+  const efcrInputs = batches.filter(
+    (batch) => isFiniteNumber(batch.efcr) && batch.efcr! > 0 && isFiniteNumber(batch.feed_total) && batch.feed_total! > 0,
+  )
+  const totalFeedForEfcr = efcrInputs.reduce((sum, batch) => sum + batch.feed_total!, 0)
+  const totalGainForEfcr = efcrInputs.reduce((sum, batch) => sum + batch.feed_total! / batch.efcr!, 0)
+  const overallEfcr = totalGainForEfcr > 0 ? totalFeedForEfcr / totalGainForEfcr : null
 
   // Survival = live fish now (fish_end) against fish stocked at delivery, weighted across
   // batches (not a simple average) so a handful of small batches can't skew the headline number.
@@ -40,9 +46,9 @@ export default function BatchesKpis({
         hint="live vs. stocked"
       />
       <StatCard
-        label="Best eFCR"
-        value={bestEfcrBatch ? formatNumberValue(bestEfcrBatch.efcr, { decimals: 2 }) : "--"}
-        hint={bestEfcrBatch ? bestEfcrBatch.batch_name ?? undefined : undefined}
+        label="Overall eFCR"
+        value={overallEfcr != null ? formatNumberValue(overallEfcr, { decimals: 2 }) : "--"}
+        hint="all batches in production"
       />
     </div>
   )
