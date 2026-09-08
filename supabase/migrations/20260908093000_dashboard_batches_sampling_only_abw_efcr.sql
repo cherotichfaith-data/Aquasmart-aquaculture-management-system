@@ -2,13 +2,16 @@
 -- analytics.production_summary's carried-forward 'current' row (interpolated
 -- ABW) and by transfer-day rows (net biomass ~0 during grading). Both are noise.
 --
--- ABW      -> the batch's ABW at its last real weighing (production_summary
---             activity = 'sampling'), fish-count-weighted across the batch's
---             cages; if never sampled, the stocking ABW.
--- eFCR     -> efcr_aggregated (cumulative feed / gain) as of that last sampling;
---             null until a batch has been sampled. Updates only on sampling.
--- eFCR arrow now compares the last two samplings; ABW arrow dropped (ABW only
---             ever rises).
+-- ABW   -> the batch's ABW at its last real weighing (production_summary
+--          activity = 'sampling'), fish-count-weighted across the batch's cages;
+--          if never sampled, the stocking ABW.
+-- eFCR  -> as of the last sampling; null until a batch has been sampled. The
+--          VALUE depends on the selected time period: an all-history window
+--          shows efcr_aggregated (cumulative feed / gain); a bounded window
+--          ("1 month", ...) shows that sampling's period eFCR (feed / gain since
+--          the previous sampling). "all history" is inferred per batch as
+--          p_start_date <= the batch's first production_summary date.
+-- eFCR arrow compares the last two samplings in the same mode; ABW arrow dropped.
 --
 -- Applied to prod 2026-09-08 via execute_sql (classifier blocks the verbatim
 -- ~19 KB CREATE OR REPLACE through apply_migration); this migration carries the
@@ -22,9 +25,10 @@ begin
   src := replace(src,
     ' where pc.ongoing_cycle = true ) select batch.batch_id,',
     ' where pc.ongoing_cycle = true ),'
-    || 'batch_efcr_by_sampling as ( select batch_id, date, efcr_agg, row_number() over (partition by batch_id order by date desc) as rn from ( select pc.batch_id, ps.date, max(ps.efcr_aggregated) as efcr_agg from analytics.production_summary ps join public.production_cycle pc on pc.cycle_id = ps.cycle_id join batches_all b on b.batch_id = pc.batch_id where ps.activity = ''sampling'' group by pc.batch_id, ps.date ) x ),'
-    || 'batch_efcr_latest as (select batch_id, date as efcr_date, efcr_agg::double precision as efcr from batch_efcr_by_sampling where rn = 1),'
-    || 'batch_efcr_prev as (select batch_id, efcr_agg::double precision as efcr from batch_efcr_by_sampling where rn = 2),'
+    || 'batch_first_data as ( select pc.batch_id, min(ps.date) as first_date from analytics.production_summary ps join public.production_cycle pc on pc.cycle_id = ps.cycle_id join batches_all b on b.batch_id = pc.batch_id group by pc.batch_id ),'
+    || 'batch_efcr_by_sampling as ( select batch_id, date, efcr_agg, efcr_period, row_number() over (partition by batch_id order by date desc) as rn from ( select pc.batch_id, ps.date, max(ps.efcr_aggregated) as efcr_agg, case when sum(greatest(coalesce(ps.biomass_increase_over_period,0),0)) > 0 then sum(coalesce(ps.feed_over_period,0)) / sum(greatest(coalesce(ps.biomass_increase_over_period,0),0)) else null end as efcr_period from analytics.production_summary ps join public.production_cycle pc on pc.cycle_id = ps.cycle_id join batches_all b on b.batch_id = pc.batch_id where ps.activity = ''sampling'' group by pc.batch_id, ps.date ) x ),'
+    || 'batch_efcr_latest as ( select s.batch_id, s.date as efcr_date, (case when p_start_date is null or p_start_date <= coalesce(bfd.first_date, ''-infinity''::date) then s.efcr_agg else s.efcr_period end)::double precision as efcr from batch_efcr_by_sampling s left join batch_first_data bfd on bfd.batch_id = s.batch_id where s.rn = 1 ),'
+    || 'batch_efcr_prev as ( select s.batch_id, (case when p_start_date is null or p_start_date <= coalesce(bfd.first_date, ''-infinity''::date) then s.efcr_agg else s.efcr_period end)::double precision as efcr from batch_efcr_by_sampling s left join batch_first_data bfd on bfd.batch_id = s.batch_id where s.rn = 2 ),'
     || 'batch_abw_anchor as ( select pc.batch_id, coalesce(max(ps.date) filter (where ps.activity = ''sampling''), max(ps.date) filter (where ps.activity = ''stocking'')) as anchor_date, (max(ps.date) filter (where ps.activity = ''sampling'')) is not null as has_sampling from analytics.production_summary ps join public.production_cycle pc on pc.cycle_id = ps.cycle_id join batches_all b on b.batch_id = pc.batch_id group by pc.batch_id ),'
     || 'batch_abw as ( select pc.batch_id, baa.anchor_date as abw_date, (sum(ps.average_body_weight * coalesce(ps.number_of_fish_end, 0)) / nullif(sum(coalesce(ps.number_of_fish_end, 0)), 0))::double precision as abw from analytics.production_summary ps join public.production_cycle pc on pc.cycle_id = ps.cycle_id join batch_abw_anchor baa on baa.batch_id = pc.batch_id and baa.anchor_date = ps.date and ps.activity = (case when baa.has_sampling then ''sampling'' else ''stocking'' end) group by pc.batch_id, baa.anchor_date )'
     || ' select batch.batch_id,');
@@ -53,7 +57,7 @@ begin
     'left join batch_cycles bc on bc.batch_id = batch.batch_id order by batch.batch_name;',
     'left join batch_cycles bc on bc.batch_id = batch.batch_id left join batch_efcr_latest bef on bef.batch_id = batch.batch_id left join batch_efcr_prev bep on bep.batch_id = batch.batch_id left join batch_abw bab on bab.batch_id = batch.batch_id order by batch.batch_name;');
 
-  if position('batch_efcr_by_sampling' in src) = 0 then raise exception 'CTEs not added'; end if;
+  if position('batch_first_data' in src) = 0 then raise exception 'CTEs not added'; end if;
   select count(*) into n from regexp_matches(src, 'bab\.abw', 'g');
   if n < 4 then raise exception 'expected bab.abw refs, got %', n; end if;
   execute src;
