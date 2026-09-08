@@ -53,7 +53,7 @@ export default function SystemsPageClient({
       <div className="page-shell">
         <CommandCentreBanner alerts={initialData.alerts} />
 
-        <CommandCentreKpis stockedRows={stockedRows} waterQualityMonthly={initialData.waterQualityMonthly} />
+        <CommandCentreKpis summary={initialData.summary} />
 
         <CageStatusTable
           rows={stockedRows}
