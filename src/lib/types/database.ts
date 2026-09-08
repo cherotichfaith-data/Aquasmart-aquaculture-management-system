@@ -2100,6 +2100,7 @@ export type Database = {
         Returns: {
           active_batches: number
           overall_efcr: number
+          overall_sgr: number
           survival_pct: number
           total_biomass_kg: number
           total_live: number

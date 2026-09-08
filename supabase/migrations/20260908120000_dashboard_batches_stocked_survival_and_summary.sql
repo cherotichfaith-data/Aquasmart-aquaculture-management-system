@@ -70,7 +70,10 @@ $function$
 -- Farm-wide KPI rollup for the Batches page. Aggregates api_dashboard_batches
 -- (all ongoing batches, no time window -- /batches shows the full picture) into
 -- a single row so the KPI cards display backend numbers verbatim.
-create or replace function public.api_batches_summary(
+--   overall_efcr -- feed-weighted cumulative eFCR across batches
+--   overall_sgr  -- biomass-weighted specific growth rate (%/day) across batches
+drop function if exists public.api_batches_summary(uuid, system_growth_stage);
+create function public.api_batches_summary(
   p_farm_id uuid,
   p_stage system_growth_stage default null
 )
@@ -80,7 +83,8 @@ returns table(
   active_batches integer,
   total_biomass_kg double precision,
   survival_pct double precision,
-  overall_efcr double precision
+  overall_efcr double precision,
+  overall_sgr double precision
 )
 language sql
 stable
@@ -107,7 +111,13 @@ as $function$
       then sum(b.feed_total) filter (where b.efcr_acc > 0 and b.feed_total > 0)
          / nullif(sum(b.feed_total / b.efcr_acc) filter (where b.efcr_acc > 0 and b.feed_total > 0), 0)
       else null
-    end::double precision as overall_efcr
+    end::double precision as overall_efcr,
+    case
+      when sum(b.biomass_end) filter (where b.sgr is not null and b.biomass_end > 0) > 0
+      then sum(b.sgr * b.biomass_end) filter (where b.sgr is not null and b.biomass_end > 0)
+         / sum(b.biomass_end) filter (where b.sgr is not null and b.biomass_end > 0)
+      else null
+    end::double precision as overall_sgr
   from b;
 $function$;
 
@@ -116,4 +126,4 @@ revoke all on function public.api_batches_summary(uuid, system_growth_stage) fro
 grant all on function public.api_batches_summary(uuid, system_growth_stage) to authenticated;
 grant all on function public.api_batches_summary(uuid, system_growth_stage) to service_role;
 comment on function public.api_batches_summary(uuid, system_growth_stage) is
-  'L3. Farm-wide KPI rollup for the Batches page (backend-computed; no browser-side summing). Last reviewed: 2026-09. Owner: @aquasmart-backend';
+  'L3. Farm-wide KPI rollup for the Batches page (backend-computed; no browser-side summing). overall_sgr is biomass-weighted across batches. Last reviewed: 2026-09. Owner: @aquasmart-backend';

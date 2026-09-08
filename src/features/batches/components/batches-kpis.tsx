@@ -13,9 +13,10 @@ export default function BatchesKpis({ summary }: { summary: BatchesSummaryRow | 
   const activeBatches = summary?.active_batches ?? null
   const survivalRate = summary?.survival_pct ?? null
   const overallEfcr = summary?.overall_efcr ?? null
+  const overallSgr = summary?.overall_sgr ?? null
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
       <StatCard
         label="Total Stocked"
         value={isFiniteNumber(totalStocked) ? formatNumberValue(totalStocked) : "--"}
@@ -33,6 +34,11 @@ export default function BatchesKpis({ summary }: { summary: BatchesSummaryRow | 
       <StatCard
         label="Overall eFCR"
         value={isFiniteNumber(overallEfcr) ? formatNumberValue(overallEfcr, { decimals: 2 }) : "--"}
+      />
+      <StatCard
+        label="Overall SGR"
+        value={isFiniteNumber(overallSgr) ? `${formatNumberValue(overallSgr, { decimals: 2 })}%/day` : "--"}
+        hint="biomass-weighted"
       />
     </div>
   )
