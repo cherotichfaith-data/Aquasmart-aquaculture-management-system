@@ -6,7 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { DataTable } from "@/components/shared/data-table"
 import type { DashboardSystemRow } from "@/features/dashboard/types"
-import { SeverityValue, buildSystemFlags, isFiniteNumber, isMortalityCritical, median } from "@/features/dashboard/lib/table-cells"
+import { SeverityValue, buildSystemFlags, isFiniteNumber, isMortalityCritical } from "@/features/dashboard/lib/table-cells"
 import { formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
 import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
@@ -30,25 +30,21 @@ const STATUS_ICON: Record<CageStatus, string> = {
 }
 
 /**
- * Real-data status rules (no arbitrary scoring): Critical = an actual
- * water-quality breach / eFCR outlier flag, or a rising mortality rate.
- * Monitor = an open recommended action for the cage, or a stale sample.
- * Optimal = clean and beating the farm's median eFCR. Good = clean, everything else.
+ * Real-data status rules (no arbitrary scoring, no farm-relative comparison):
+ * Critical = an actual water-quality breach / stale-sample flag, or a rising
+ * mortality rate. Monitor = an open recommended action for the cage, or a stale
+ * sample. Optimal = clean and water quality is Acceptable or better. Good =
+ * clean but water quality is unknown or below Acceptable.
  */
-function deriveStatus(params: {
-  row: DashboardSystemRow
-  farmMedianEfcr: number | null
-  hasOpenAlert: boolean
-}): CageStatus {
-  const { row, farmMedianEfcr, hasOpenAlert } = params
-  const flags = buildSystemFlags(row, farmMedianEfcr)
+function deriveStatus(params: { row: DashboardSystemRow; hasOpenAlert: boolean }): CageStatus {
+  const { row, hasOpenAlert } = params
+  const flags = buildSystemFlags(row)
 
   if (flags.length > 0 || isMortalityCritical(row)) return "Critical"
   if (hasOpenAlert || (row.sample_age_days ?? 0) > 30) return "Monitor"
-  if (isFiniteNumber(row.efcr) && isFiniteNumber(farmMedianEfcr) && farmMedianEfcr > 0 && row.efcr <= farmMedianEfcr) {
-    return "Optimal"
-  }
-  return "Good"
+  const waterQualityOk =
+    isFiniteNumber(row.water_quality_rating_numeric_average) && row.water_quality_rating_numeric_average >= 1.5
+  return waterQualityOk ? "Optimal" : "Good"
 }
 
 export default function CageStatusTable({
@@ -73,7 +69,6 @@ export default function CageStatusTable({
     params.set("date", toTimePeriodUrlValue(timePeriod))
     router.push(`/production?${params.toString()}`)
   }
-  const farmMedianEfcr = useMemo(() => median(rows.map((row) => row.efcr).filter(isFiniteNumber)), [rows])
   const alertSystemIds = useMemo(() => new Set(alerts.map((row) => row.system_id)), [alerts])
   const mortalityBySystemId = useMemo(
     () => new Map(mortalityByCage.map((row) => [row.system_id, row.total])),
@@ -148,12 +143,11 @@ export default function CageStatusTable({
       {
         id: "status",
         header: "Status",
-        accessorFn: (row) => deriveStatus({ row, farmMedianEfcr, hasOpenAlert: alertSystemIds.has(row.system_id) }),
+        accessorFn: (row) => deriveStatus({ row, hasOpenAlert: alertSystemIds.has(row.system_id) }),
         meta: { width: "130px" },
         cell: ({ row }) => {
           const status = deriveStatus({
             row: row.original,
-            farmMedianEfcr,
             hasOpenAlert: alertSystemIds.has(row.original.system_id),
           })
           return (
@@ -166,7 +160,7 @@ export default function CageStatusTable({
         },
       },
     ],
-    [alertSystemIds, cohortBySystemId, farmMedianEfcr, mortalityBySystemId],
+    [alertSystemIds, cohortBySystemId, mortalityBySystemId],
   )
 
   return (
@@ -190,7 +184,7 @@ export default function CageStatusTable({
               row={row}
               cohort={cohortBySystemId[row.system_id] ?? null}
               mortalityTotal={mortalityBySystemId.get(row.system_id) ?? 0}
-              status={deriveStatus({ row, farmMedianEfcr, hasOpenAlert: alertSystemIds.has(row.system_id) })}
+              status={deriveStatus({ row, hasOpenAlert: alertSystemIds.has(row.system_id) })}
             />
           )}
         />

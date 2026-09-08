@@ -187,16 +187,6 @@ export function median(values: number[]): number | null {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
-/** eFCR more than 3x the farm median -- shared by the flag icon, the eFCR
- * cell's severity chip, and the Cages page's status derivation, so the
- * threshold lives in exactly one place. */
-export function isEfcrOutlier(
-  row: Pick<DashboardSystemRow, "efcr">,
-  farmMedianEfcr: number | null,
-): boolean {
-  return isFiniteNumber(row.efcr) && isFiniteNumber(farmMedianEfcr) && farmMedianEfcr > 0 && row.efcr > farmMedianEfcr * 3
-}
-
 /** Daily mortality rate is both rising and above 1% -- same threshold the
  * Cages page's status column already uses, now shared so the mortality
  * cell's severity chip can't quietly drift from it. */
@@ -230,11 +220,10 @@ export function SeverityValue({
   return <span className={`rounded-md px-1.5 py-0.5 font-semibold ${toneClass}`}>{value}</span>
 }
 
-export function buildSystemFlags(row: DashboardSystemRow, farmMedianEfcr: number | null): SystemFlag[] {
+export function buildSystemFlags(row: DashboardSystemRow): SystemFlag[] {
   const staleSample = (row.sample_age_days ?? 0) > 30
   const wqBreach =
     isFiniteNumber(row.water_quality_rating_numeric_average) && row.water_quality_rating_numeric_average <= 1
-  const efcrOutlier = isEfcrOutlier(row, farmMedianEfcr)
 
   return [
     staleSample
@@ -253,27 +242,17 @@ export function buildSystemFlags(row: DashboardSystemRow, farmMedianEfcr: number
           className: "bg-destructive/15 text-destructive",
         }
       : null,
-    efcrOutlier
-      ? {
-          key: "efcr-outlier",
-          title: "eFCR is above 3x the farm median.",
-          icon: TriangleAlert,
-          className: "bg-destructive/15 text-destructive",
-        }
-      : null,
   ].filter(Boolean) as SystemFlag[]
 }
 
 export function WaterQualityFlagsCell({
   row,
-  farmMedianEfcr,
   size = "table",
 }: {
   row: DashboardSystemRow
-  farmMedianEfcr: number | null
   size?: "table" | "card"
 }) {
-  const flags = buildSystemFlags(row, farmMedianEfcr)
+  const flags = buildSystemFlags(row)
   const showWaterQuality = hasWaterQualityData(row.water_quality_rating_average)
   const thresholdFlag = flags.find((flag) => flag.key === "wq-breach") ?? null
   const displayFlags = showWaterQuality ? flags.filter((flag) => flag.key !== "wq-breach") : flags

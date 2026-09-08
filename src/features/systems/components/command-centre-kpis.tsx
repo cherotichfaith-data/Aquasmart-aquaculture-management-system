@@ -25,6 +25,7 @@ export default function CommandCentreKpis({ summary }: { summary: SystemsSummary
       <StatCard
         label="Total Biomass"
         value={isFiniteNumber(totalBiomassKg) ? formatUnitValue(totalBiomassKg, 0, "kg") : "--"}
+        hint="at last sampling"
       />
       <StatCard
         label="Overall eFCR"

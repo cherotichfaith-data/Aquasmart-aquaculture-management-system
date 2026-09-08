@@ -10,12 +10,7 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/s
 import type { TimePeriod } from "@/lib/time-period"
 import { toTimePeriodUrlValue } from "@/lib/time-period"
 import { buildDashboardSystemColumns } from "./systems-table-columns"
-import {
-  formatSampleAgeText,
-  isFiniteNumber,
-  median,
-  WaterQualityFlagsCell,
-} from "@/features/dashboard/lib/table-cells"
+import { formatSampleAgeText, isFiniteNumber, WaterQualityFlagsCell } from "@/features/dashboard/lib/table-cells"
 import { formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
 
@@ -59,11 +54,7 @@ export default function SystemsTable({
 }: SystemsTableProps) {
   const router = useRouter()
 
-  const farmMedianEfcr = useMemo(() => median(rows.map((row) => row.efcr).filter(isFiniteNumber)), [rows])
-  const columns = useMemo(
-    () => buildDashboardSystemColumns({ farmMedianEfcr, timePeriod }),
-    [farmMedianEfcr, timePeriod],
-  )
+  const columns = useMemo(() => buildDashboardSystemColumns({ timePeriod }), [timePeriod])
 
   const emptyMessage =
     emptyReason === "Missing time bounds"
@@ -129,7 +120,7 @@ export default function SystemsTable({
             shellClassName="production-records-table dashboard-production-table max-h-[520px]"
             tableClassName="min-w-[960px] table-fixed"
             headerVariant="plain"
-            renderMobileCard={(row) => <SystemCardBody row={row} farmMedianEfcr={farmMedianEfcr} />}
+            renderMobileCard={(row) => <SystemCardBody row={row} />}
           />
         )}
       </CardContent>
@@ -137,7 +128,7 @@ export default function SystemsTable({
   )
 }
 
-function SystemCardBody({ row, farmMedianEfcr }: { row: DashboardSystemRow; farmMedianEfcr: number | null }) {
+function SystemCardBody({ row }: { row: DashboardSystemRow }) {
   const title = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
 
   return (
@@ -160,7 +151,7 @@ function SystemCardBody({ row, farmMedianEfcr }: { row: DashboardSystemRow; farm
         <MobileMetric label="Density" value={formatUnitValue(row.biomass_density, 2, "kg/m3")} />
         <div className="col-span-2 rounded-md bg-muted/45 px-2.5 py-2">
           <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">WQ / Flags</p>
-          <WaterQualityFlagsCell row={row} farmMedianEfcr={farmMedianEfcr} size="card" />
+          <WaterQualityFlagsCell row={row} size="card" />
         </div>
       </div>
     </>

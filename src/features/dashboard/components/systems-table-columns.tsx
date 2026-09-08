@@ -13,7 +13,6 @@ import {
   WaterQualityFlagsCell,
   formatLastDate,
   formatSampleAgeText,
-  isEfcrOutlier,
   isFiniteNumber,
   isMortalityCritical,
 } from "@/features/dashboard/lib/table-cells"
@@ -21,10 +20,9 @@ import {
 const identityDotColor = (systemId: number) => `var(--chart-${(Math.abs(systemId) % 5) + 1})`
 
 export function buildDashboardSystemColumns(params: {
-  farmMedianEfcr: number | null
   timePeriod?: TimePeriod
 }): Array<ColumnDef<DashboardSystemRow, unknown>> {
-  const { farmMedianEfcr, timePeriod } = params
+  const { timePeriod } = params
 
   const productionHref = (systemId: number, filter?: ProductionMetric) => {
     const query = new URLSearchParams()
@@ -84,7 +82,7 @@ export function buildDashboardSystemColumns(params: {
         return (
           <MetricCell
             href={productionHref(data.system_id, "efcr")}
-            value={<SeverityValue value={value} active={isEfcrOutlier(data, farmMedianEfcr)} />}
+            value={value}
             arrow={data.efcr_arrow}
             invertArrow
             subtext={formatLastDate(data.efcr_latest_date)}
@@ -188,7 +186,7 @@ export function buildDashboardSystemColumns(params: {
       cell: ({ row }) => (
         <MetricCell
           href={waterQualityHref(row.original.system_id)}
-          value={<WaterQualityFlagsCell row={row.original} farmMedianEfcr={farmMedianEfcr} size="table" />}
+          value={<WaterQualityFlagsCell row={row.original} size="table" />}
         />
       ),
     },
