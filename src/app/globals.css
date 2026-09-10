@@ -570,7 +570,7 @@ next-router-prefetch {
   }
 
   .data-entry-workspace {
-    @apply grid gap-0 bg-muted/15 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start;
+    @apply grid gap-0 bg-muted/15 xl:grid-cols-[minmax(0,1fr)_248px] xl:items-start;
   }
 
   .data-entry-canvas {
