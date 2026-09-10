@@ -339,11 +339,11 @@ export default function ApprovalsClient({
               <div key={groupType} className="border-b border-border last:border-b-0">
                 <h3 className="px-5 pt-5 text-sm font-bold text-primary">{approvalTypes[groupType]}</h3>
                 <div className="overflow-x-auto px-5 pb-5">
-                  <table className="mt-3 w-full min-w-[820px] border-separate border-spacing-0 text-left text-sm">
+                  <table className="mt-3 w-full min-w-[820px] border-collapse border border-border text-left text-sm [&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2.5 [&_th]:border [&_th]:border-border [&_th]:bg-muted/40 [&_th]:px-3 [&_th]:py-2 [&_th]:font-bold [&_th]:text-foreground">
                     <thead>
-                      <tr className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground [&>th]:border-b [&>th]:border-border [&>th]:pb-2.5">
+                      <tr>
                         {showChecks && (
-                          <th className="w-9 pr-2">
+                          <th className="w-9">
                             {groupType !== "feed_inventory" && (
                               <input
                                 type="checkbox"
@@ -360,18 +360,18 @@ export default function ApprovalsClient({
                           </th>
                         )}
                         {cols.map((col) => (
-                          <th key={col.header} className={`whitespace-nowrap pr-5 ${col.align === "right" ? "text-right" : ""}`}>{col.header}</th>
+                          <th key={col.header} className={`whitespace-nowrap ${col.align === "right" ? "text-right" : ""}`}>{col.header}</th>
                         ))}
-                        <th className="whitespace-nowrap pr-5">Submitted by</th>
-                        <th className="whitespace-nowrap text-right">{status === "pending" ? "" : "Status"}</th>
+                        <th className="whitespace-nowrap">Submitted by</th>
+                        <th className="whitespace-nowrap">{status === "pending" ? "Actions" : "Status"}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {rows.map((entry) => (
                         <Fragment key={entry.id}>
-                          <tr className="align-middle transition-colors hover:bg-muted/40 [&>td]:border-b [&>td]:border-border/60 [&>td]:py-3.5">
+                          <tr className="align-middle transition-colors hover:bg-muted/30">
                             {showChecks && (
-                              <td className="pr-2">
+                              <td className="text-center">
                                 {groupType !== "feed_inventory" && (
                                   <input
                                     aria-label={`Select submission ${entry.id}`}
@@ -387,18 +387,18 @@ export default function ApprovalsClient({
                             {cols.map((col, index) => (
                               <td
                                 key={col.header}
-                                className={`max-w-[220px] break-words pr-5 ${col.align === "right" ? "text-right tabular-nums" : ""} ${index === 0 ? "font-semibold tabular-nums text-foreground" : "text-muted-foreground"}`}
+                                className={`max-w-[240px] break-words ${col.align === "right" ? "text-right tabular-nums" : ""} ${index === 0 ? "font-semibold tabular-nums text-foreground" : "text-foreground"}`}
                               >
                                 {col.cell(entry.payload)}
                               </td>
                             ))}
-                            <td className="whitespace-nowrap pr-5 text-xs text-muted-foreground">
+                            <td className="whitespace-nowrap text-xs text-muted-foreground">
                               <span className="block font-semibold text-foreground">{names.user(entry.submitted_by)}</span>
                               {new Date(entry.submitted_at).toLocaleString()}
                             </td>
-                            <td className="whitespace-nowrap text-right">
+                            <td className="whitespace-nowrap">
                               {entry.status === "pending" ? (
-                                <div className="flex flex-wrap justify-end gap-1.5">
+                                <div className="flex flex-wrap gap-1.5">
                                   {canEdit(entry) && editId !== entry.id && (
                                     <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3 text-xs font-bold disabled:opacity-45" disabled={!!review} onClick={() => beginEdit(entry)}>
                                       <Pencil className="h-3.5 w-3.5" /> Edit
@@ -434,7 +434,7 @@ export default function ApprovalsClient({
                           </tr>
                           {editId === entry.id && (
                             <tr>
-                              <td colSpan={span} className="border-b border-border/60 bg-muted/25 px-1 py-4">
+                              <td colSpan={span} className="bg-muted/25">
                                 <div className="space-y-3">
                                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                     {editableKeys(entry.payload).map((key) => {
@@ -468,7 +468,7 @@ export default function ApprovalsClient({
                           )}
                           {entry.review_reason && (
                             <tr>
-                              <td colSpan={span} className="border-b border-border/60 px-1 py-2.5 text-xs text-muted-foreground">Review note: {entry.review_reason}</td>
+                              <td colSpan={span} className="bg-muted/10 text-xs text-muted-foreground">Review note: {entry.review_reason}</td>
                             </tr>
                           )}
                         </Fragment>
