@@ -8,6 +8,14 @@ import { offlineDB } from "@/lib/offline/db"
 import { formatGrowthStage } from "@/lib/stage-filter"
 import { createSystemLabelResolver, type SystemOption } from "@/lib/system-options"
 import type { Tables } from "@/lib/types/database"
+import {
+  useFeedingRecords,
+  useHarvests,
+  useMortalityData,
+  useSamplingData,
+  useStockingData,
+  useTransferData,
+} from "@/features/reports/hooks"
 
 type PendingMeta = {
   status?: "pending"
@@ -230,6 +238,45 @@ function scopeToCage<T extends CageKeyed>(rows: readonly T[], systemId: number |
   )
 }
 
+/**
+ * When a cage is picked in the form, pull that cage's own recent history for the
+ * active entry type (not just whatever fell inside the farm-wide prefetch window).
+ * Returns null while there is no cage or the type has no scoped source, so the
+ * caller falls back to the (client-filtered) prefetch.
+ */
+function useScopedRecentRows(type: RecentEntriesListProps["type"], systemId: number | null): unknown[] | null {
+  const sid = systemId ?? undefined
+  const on = (target: string) => systemId != null && type === target
+  const feeding = useFeedingRecords({ systemId: sid, limit: 5, enabled: on("feeding") })
+  const mortality = useMortalityData({ systemId: sid, limit: 5, enabled: on("mortality") })
+  const sampling = useSamplingData({ systemId: sid, limit: 5, enabled: on("sampling") })
+  const stocking = useStockingData({ systemId: sid, limit: 5, enabled: on("stocking") })
+  const harvest = useHarvests({ systemId: sid, limit: 5, enabled: on("harvest") })
+  const transfer = useTransferData({ systemId: sid, limit: 5, enabled: on("transfer") })
+
+  if (systemId == null) return null
+  const pick = (result: { data?: unknown }) => {
+    const payload = result.data as { status?: string; data?: unknown[] } | undefined
+    return payload?.status === "success" ? payload.data ?? [] : null
+  }
+  switch (type) {
+    case "feeding":
+      return pick(feeding)
+    case "mortality":
+      return pick(mortality)
+    case "sampling":
+      return pick(sampling)
+    case "stocking":
+      return pick(stocking)
+    case "harvest":
+      return pick(harvest)
+    case "transfer":
+      return pick(transfer)
+    default:
+      return null
+  }
+}
+
 function EntriesSection({
   cards,
   pendingCount,
@@ -242,12 +289,9 @@ function EntriesSection({
   return (
     <div className="data-entry-recent-panel">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Recent Entries</h3>
-          <p className="text-xs text-muted-foreground">
-            {scopeLabel ? `Latest saved records for ${scopeLabel}.` : "Latest saved records for this entry type."}
-          </p>
-        </div>
+        <h3 className="text-sm font-semibold text-foreground">
+          {scopeLabel ? `Recent Entries · ${scopeLabel}` : "Recent Entries"}
+        </h3>
         {pendingCount > 0 ? (
           <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
               <Clock3 className="h-3 w-3" />
@@ -299,6 +343,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
   // Only scope entry types that carry a cage; feed inventory and system setup are farm-level.
   const scopedSystemId = type === "feed_inventory" || type === "system" ? null : activeSystemId
   const scopeLabel = scopedSystemId != null ? formatSystemName(scopedSystemId) : null
+  const scopedRows = useScopedRecentRows(type, scopedSystemId)
   const formatFeedTypeName = (feedTypeId: number | null | undefined) => {
     if (feedTypeId == null) return "Not selected"
     const feedType = feeds?.find((item) => item.id === feedTypeId)
@@ -309,7 +354,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
   let pendingCount = 0
 
   if (type === "mortality") {
-    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as MortalityRow[], scopedSystemId), (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as MortalityRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as MortalityRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as MortalityRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -322,7 +367,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "feeding") {
-    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as FeedingRow[], scopedSystemId), (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as FeedingRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as FeedingRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as FeedingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -336,7 +381,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "sampling") {
-    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as SamplingRow[], scopedSystemId), (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as SamplingRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as SamplingRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as SamplingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -350,7 +395,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "transfer") {
-    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as TransferRow[], scopedSystemId), (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as TransferRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as TransferRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as TransferRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -365,7 +410,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "harvest") {
-    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as HarvestRow[], scopedSystemId), (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as HarvestRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as HarvestRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as HarvestRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -379,7 +424,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "water_quality") {
-    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as WaterQualityRow[], scopedSystemId), (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as WaterQualityRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as WaterQualityRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as WaterQualityRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -411,7 +456,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       }
     })
   } else if (type === "stocking") {
-    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as StockingRow[], scopedSystemId), (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as StockingRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as StockingRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as StockingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
