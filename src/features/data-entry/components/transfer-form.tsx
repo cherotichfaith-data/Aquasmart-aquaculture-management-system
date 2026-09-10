@@ -24,6 +24,11 @@ import { TRANSFER_TYPE_LABELS, UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
+  findUnitForSystem,
+  getSystemUnits,
+  getSystemsForUnit,
+} from "./form-support"
+import {
   parseRequiredNumericId,
   reportDataEntrySubmitError,
   requireActiveFarmId,
@@ -40,7 +45,9 @@ import { FieldGrid, FormActions, FormSection } from "./form-layout"
 const EXTERNAL_DESTINATION = "__external__"
 
 const formSchema = z.object({
+  origin_unit: z.string().min(1, "Origin unit is required"),
   origin_system_id: z.string().min(1, "Origin cage is required"),
+  target_unit: z.string().optional(),
   target_system_id: z.string().optional(),
   external_target_name: z.string().optional(),
   transfer_type: z.enum(UI_TRANSFER_TYPES),
@@ -60,6 +67,13 @@ const formSchema = z.object({
     return
   }
 
+  if (!values.target_unit) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["target_unit"],
+      message: "Destination unit is required",
+    })
+  }
   if (!values.target_system_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -81,6 +95,9 @@ interface TransferFormProps {
 export function TransferForm({ farmId, systems, batches, defaultSystemId = null, onSystemChange }: TransferFormProps) {
   const mutation = useRecordTransfer()
 
+  const units = useMemo(() => getSystemUnits(systems), [systems])
+  const defaultUnit = findUnitForSystem(systems, defaultSystemId)
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     mode: "onBlur",
@@ -88,20 +105,61 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       date: toIsoDate(new Date()),
       number_of_fish: 0,
       total_weight_kg: 0,
+      origin_unit: defaultUnit,
       origin_system_id: defaultSystemId ? String(defaultSystemId) : "",
+      target_unit: "",
       target_system_id: "",
       external_target_name: "",
       transfer_type: "transfer",
       notes: "",
     },
   })
+  const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
+  const originUnit = useWatch({ control: form.control, name: "origin_unit" })
+  const targetUnit = useWatch({ control: form.control, name: "target_unit" })
   const originSystemId = useWatch({ control: form.control, name: "origin_system_id" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
   const transferType = useWatch({ control: form.control, name: "transfer_type" })
   const isExternalOut = transferType === "external_out"
   const resolvedOriginSystemId = Number(originSystemId)
   const hasValidOriginSystemId = Number.isFinite(resolvedOriginSystemId) && resolvedOriginSystemId > 0
+  const originSystemsForUnit = useMemo(() => getSystemsForUnit(systems, originUnit), [originUnit, systems])
+  const targetSystemsForUnit = useMemo(() => getSystemsForUnit(systems, targetUnit), [targetUnit, systems])
+
+  useEffect(() => {
+    if (!defaultSystemValue) return
+    const resolvedUnit = findUnitForSystem(systems, defaultSystemId)
+    if (!resolvedUnit) return
+
+    const currentSystem = form.getValues("origin_system_id")
+    if (currentSystem && currentSystem !== defaultSystemValue) return
+
+    if (form.getValues("origin_unit") !== resolvedUnit) {
+      form.setValue("origin_unit", resolvedUnit, { shouldValidate: true })
+    }
+    if (currentSystem !== defaultSystemValue) {
+      form.setValue("origin_system_id", defaultSystemValue, { shouldValidate: true })
+    }
+  }, [defaultSystemId, defaultSystemValue, form, systems])
+
+  useEffect(() => {
+    if (!originUnit) return
+    const currentValue = form.getValues("origin_system_id")
+    if (!currentValue) return
+    if (!originSystemsForUnit.some((system) => String(system.id) === currentValue)) {
+      form.setValue("origin_system_id", "", { shouldValidate: true })
+    }
+  }, [form, originUnit, originSystemsForUnit])
+
+  useEffect(() => {
+    if (!targetUnit) return
+    const currentValue = form.getValues("target_system_id")
+    if (!currentValue || currentValue === EXTERNAL_DESTINATION) return
+    if (!targetSystemsForUnit.some((system) => String(system.id) === currentValue)) {
+      form.setValue("target_system_id", "", { shouldValidate: true })
+    }
+  }, [form, targetUnit, targetSystemsForUnit])
 
   useEffect(() => {
     onSystemChange?.(hasValidOriginSystemId ? resolvedOriginSystemId : null)
@@ -168,7 +226,9 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
         date: toIsoDate(new Date()),
         number_of_fish: 0,
         total_weight_kg: 0,
+        origin_unit: values.origin_unit,
         origin_system_id: values.origin_system_id,
+        target_unit: "",
         target_system_id: "",
         external_target_name: "",
         transfer_type: values.transfer_type,
@@ -255,18 +315,43 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
 
               <FormField
                 control={form.control}
+                name="origin_unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Origin Unit</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {units.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="origin_system_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Origin Cage</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!originUnit}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select origin" />
+                          <SelectValue placeholder={originUnit ? "Select origin" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {systems.map((system) => (
+                        {originSystemsForUnit.map((system) => (
                           <SelectItem key={system.id} value={String(system.id)}>
                             {formatCageLabel(system)}
                           </SelectItem>
@@ -283,7 +368,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                   control={form.control}
                   name="external_target_name"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="data-entry-field-wide">
                       <FormLabel>Destination Location</FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="e.g. KIMBWELA Pond 3" />
@@ -293,39 +378,68 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                   )}
                 />
               ) : (
-                <FormField
-                  control={form.control}
-                  name="target_system_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Destination Cage</FormLabel>
-                      <Select
-                        onValueChange={(value) => {
-                          field.onChange(value)
-                          if (value === EXTERNAL_DESTINATION) {
-                            form.setValue("transfer_type", "external_out", { shouldValidate: true })
-                          }
-                        }}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select destination" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {systems.map((system) => (
-                            <SelectItem key={system.id} value={String(system.id)}>
-                              {formatCageLabel(system)}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value={EXTERNAL_DESTINATION}>External location</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={form.control}
+                    name="target_unit"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Destination Unit</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            if (value === EXTERNAL_DESTINATION) {
+                              form.setValue("transfer_type", "external_out", { shouldValidate: true })
+                              form.setValue("target_system_id", EXTERNAL_DESTINATION, { shouldValidate: false })
+                              return
+                            }
+                            field.onChange(value)
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {units.map((unit) => (
+                              <SelectItem key={unit} value={unit}>
+                                {unit}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value={EXTERNAL_DESTINATION}>External location</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="target_system_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Destination Cage</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!targetUnit}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={targetUnit ? "Select destination" : "Select unit first"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {targetSystemsForUnit.map((system) => (
+                              <SelectItem key={system.id} value={String(system.id)}>
+                                {formatCageLabel(system)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
 
               <FormField

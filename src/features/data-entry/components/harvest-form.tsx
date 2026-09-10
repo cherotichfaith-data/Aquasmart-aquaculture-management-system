@@ -29,6 +29,11 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
 import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
+    findUnitForSystem,
+    getSystemUnits,
+    getSystemsForUnit,
+} from "./form-support"
+import {
     parseNumericId,
     parseRequiredNumericId,
     reportDataEntrySubmitError,
@@ -43,7 +48,8 @@ import { SelectionChips } from "./selection-info"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const formSchema = z.object({
-    system_id: z.string().min(1, "System is required"),
+    unit: z.string().min(1, "Cage unit is required"),
+    system_id: z.string().min(1, "Cage number is required"),
     date: z.string().min(1, "Date is required"),
     number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Count must be positive"),
     amount_kg: z.coerce.number().min(0.01, "Weight must be positive"),
@@ -243,18 +249,24 @@ export function HarvestForm({
     const [confirmOpen, setConfirmOpen] = useState(false)
     const [pendingConfirmation, setPendingConfirmation] = useState<z.infer<typeof formSchema> | null>(null)
 
+    const units = useMemo(() => getSystemUnits(systems), [systems])
+    const defaultUnit = findUnitForSystem(systems, defaultSystemId)
+
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         mode: "onBlur",
         defaultValues: {
             date: new Date().toISOString().split("T")[0],
+            unit: defaultUnit,
             number_of_fish: 0,
             amount_kg: 0,
             type_of_harvest: "partial",
             system_id: defaultSystemId ? String(defaultSystemId) : "",
         },
     })
+    const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
+    const selectedUnit = useWatch({ control: form.control, name: "unit" })
     const selectedSystemId = useWatch({ control: form.control, name: "system_id" })
     const selectedDate = useWatch({ control: form.control, name: "date" })
     const harvestType = useWatch({ control: form.control, name: "type_of_harvest" })
@@ -264,6 +276,33 @@ export function HarvestForm({
         [resolvedSystemId, systems],
     )
     const selectedCageLabel = resolvedSystemId ? formatCageLabel(selectedSystem) : "this system"
+    const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
+
+    useEffect(() => {
+        if (!defaultSystemValue) return
+        const resolvedUnit = findUnitForSystem(systems, defaultSystemId)
+        if (!resolvedUnit) return
+
+        const currentSystem = form.getValues("system_id")
+        if (currentSystem && currentSystem !== defaultSystemValue) return
+
+        if (form.getValues("unit") !== resolvedUnit) {
+            form.setValue("unit", resolvedUnit, { shouldValidate: true })
+        }
+        if (currentSystem !== defaultSystemValue) {
+            form.setValue("system_id", defaultSystemValue, { shouldValidate: true })
+        }
+    }, [defaultSystemId, defaultSystemValue, form, systems])
+
+    useEffect(() => {
+        if (!selectedUnit) return
+        const currentValue = form.getValues("system_id")
+        if (!currentValue) return
+        const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
+        if (!existsInUnit) {
+            form.setValue("system_id", "", { shouldValidate: true })
+        }
+    }, [form, selectedUnit, systemsForUnit])
 
     useEffect(() => {
         onSystemChange?.(resolvedSystemId ?? null)
@@ -312,6 +351,7 @@ export function HarvestForm({
 
         form.reset({
             date: new Date().toISOString().split("T")[0],
+            unit: values.unit,
             number_of_fish: 0,
             amount_kg: 0,
             type_of_harvest: "partial",
@@ -381,18 +421,43 @@ export function HarvestForm({
 
                                 <FormField
                                     control={form.control}
-                                    name="system_id"
+                                    name="unit"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>System</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value || undefined}>
+                                            <FormLabel>Cage Unit</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
                                                 <FormControl>
                                                     <SelectTrigger>
-                                                        <SelectValue placeholder="Select system" />
+                                                        <SelectValue placeholder="Select unit" />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    {systems.map((system) => (
+                                                    {units.map((unit) => (
+                                                        <SelectItem key={unit} value={unit}>
+                                                            {unit}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="system_id"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Cage Number</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!selectedUnit}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {systemsForUnit.map((system) => (
                                                         <SelectItem key={system.id} value={String(system.id)}>
                                                             {formatCageLabel(system)}
                                                         </SelectItem>
