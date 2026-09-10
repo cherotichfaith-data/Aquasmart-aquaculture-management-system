@@ -1,12 +1,16 @@
 "use client"
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, CheckCircle2, Loader2, Pencil, X, XCircle } from "lucide-react"
-import { approvalTypes, type ApprovalEntry } from "@/lib/approvals"
+import { approvalTypes, type ApprovalEntry, type ApprovalType } from "@/lib/approvals"
 
 type ApprovalStatus = ApprovalEntry["status"]
 type Counts = Record<ApprovalStatus, number>
 type ApprovalsResponse = { entries: ApprovalEntry[]; total: number; counts: Counts }
+type NamedOption = { id: number; name: string }
+type Member = { id: string; name: string }
+type Payload = Record<string, unknown>
+type Column = { header: string; cell: (payload: Payload) => string }
 
 const fieldLabel = (key: string) => key.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
@@ -14,9 +18,22 @@ const unit = (key: string) => (key.startsWith("total_weight") || key === "feedin
 const control = "rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
 // Structural fields the queue owns; everything else in the payload is operator-editable.
 const lockedFields = ["local_id", "synced_at", "farm_id", "system_id"]
-const hiddenInPreview = ["local_id", "synced_at", "farm_id", "system_id", "date", "inventory_date"]
 
-export default function ApprovalsClient({ farmId, canReview, currentUserId, systems }: { farmId: string; canReview: boolean; currentUserId: string; systems: { id: number; name: string }[] }) {
+const text = (value: unknown) => (value == null || value === "" ? "—" : String(value))
+const count = (value: unknown) => (value == null || value === "" ? "—" : Number(value).toLocaleString("en-US"))
+const kg = (value: unknown) => (value == null || value === "" ? "—" : `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 3 })} kg`)
+
+export default function ApprovalsClient({
+  farmId, canReview, currentUserId, systems, batches, feedTypes, members,
+}: {
+  farmId: string
+  canReview: boolean
+  currentUserId: string
+  systems: NamedOption[]
+  batches: NamedOption[]
+  feedTypes: NamedOption[]
+  members: Member[]
+}) {
   const [status, setStatus] = useState<ApprovalStatus>("pending")
   const [type, setType] = useState("")
   const [page, setPage] = useState(0)
@@ -26,7 +43,7 @@ export default function ApprovalsClient({ farmId, canReview, currentUserId, syst
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
-  const [draft, setDraft] = useState<Record<string, unknown>>({})
+  const [draft, setDraft] = useState<Payload>({})
   const [savingEdit, setSavingEdit] = useState(false)
   const cache = useQueryClient()
 
@@ -47,11 +64,108 @@ export default function ApprovalsClient({ farmId, canReview, currentUserId, syst
     return () => window.removeEventListener("offline-sync-complete", refresh)
   }, [cache, farmId])
 
-  const entries = query.data?.entries ?? []
+  const names = useMemo(() => {
+    const sys = new Map(systems.map((row) => [row.id, row.name]))
+    const batch = new Map(batches.map((row) => [row.id, row.name]))
+    const feed = new Map(feedTypes.map((row) => [row.id, row.name]))
+    const user = new Map(members.filter((row) => row.name).map((row) => [row.id, row.name]))
+    return {
+      system: (id: unknown) => (id == null || id === "" ? "—" : sys.get(Number(id)) ?? `Cage #${id}`),
+      batch: (id: unknown) => (id == null || id === "" ? "—" : batch.get(Number(id)) ?? `Batch #${id}`),
+      feed: (id: unknown) => (id == null || id === "" ? "—" : feed.get(Number(id)) ?? `Feed #${id}`),
+      user: (id: string) => user.get(id) ?? "Unknown user",
+    }
+  }, [systems, batches, feedTypes, members])
+
+  const columnsByType = useMemo<Record<ApprovalType, Column[]>>(() => ({
+    feeding: [
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Amount", cell: (p) => kg(p.feeding_amount) },
+      { header: "Feed type", cell: (p) => names.feed(p.feed_type_id) },
+      { header: "Response", cell: (p) => text(p.feeding_response) },
+      { header: "Notes", cell: (p) => text(p.notes) },
+    ],
+    mortality: [
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Dead fish", cell: (p) => count(p.number_of_fish_mortality) },
+      { header: "Weight", cell: (p) => kg(p.total_weight_mortality) },
+      { header: "Cause", cell: (p) => text(p.cause) },
+      { header: "Notes", cell: (p) => text(p.notes) },
+    ],
+    sampling: [
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Fish sampled", cell: (p) => count(p.number_of_fish_sampling) },
+      { header: "Weight", cell: (p) => kg(p.total_weight_sampling) },
+      { header: "Notes", cell: (p) => text(p.notes) },
+    ],
+    stocking: [
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Fish stocked", cell: (p) => count(p.number_of_fish_stocking) },
+      { header: "Weight", cell: (p) => kg(p.total_weight_stocking) },
+      { header: "Type", cell: (p) => text(p.type_of_stocking) },
+      { header: "Notes", cell: (p) => text(p.notes) },
+    ],
+    transfer: [
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "From", cell: (p) => names.system(p.origin_system_id) },
+      { header: "To", cell: (p) => (p.transfer_type === "external_out" ? text(p.external_target_name) : names.system(p.target_system_id)) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Fish", cell: (p) => count(p.number_of_fish_transfer) },
+      { header: "Weight", cell: (p) => kg(p.total_weight_transfer) },
+      { header: "Type", cell: (p) => text(p.transfer_type) },
+      { header: "Notes", cell: (p) => text(p.notes) },
+    ],
+    harvest: [
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Fish harvested", cell: (p) => count(p.number_of_fish_harvest) },
+      { header: "Weight", cell: (p) => kg(p.total_weight_harvest) },
+      { header: "Type", cell: (p) => text(p.type_of_harvest) },
+    ],
+    water_quality: [
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Time", cell: (p) => text(p.time) },
+      { header: "Depth", cell: (p) => (p.water_depth == null ? "—" : `${p.water_depth} m`) },
+      { header: "Parameter", cell: (p) => text(String(p.parameter_name ?? "").replaceAll("_", " ") || "—") },
+      { header: "Value", cell: (p) => text(p.parameter_value) },
+      { header: "Location", cell: (p) => text(p.location_reference) },
+    ],
+    feed_inventory: [
+      { header: "Date", cell: (p) => text(p.inventory_date) },
+      { header: "Time", cell: (p) => text(p.inventory_time) },
+      { header: "Feed type", cell: (p) => names.feed(p.feed_type_id) },
+      { header: "Bag weight", cell: (p) => kg(p.bag_weight) },
+      { header: "Bags", cell: (p) => count(p.amount_of_bags) },
+      { header: "Opened bags", cell: (p) => text(p.opened_bags) },
+      { header: "Comments", cell: (p) => text(p.comments) },
+    ],
+  }), [names])
+
+  const entries = useMemo(() => query.data?.entries ?? [], [query.data?.entries])
   const counts = query.data?.counts
   const total = query.data?.total ?? 0
   const bulkIds = entries.filter((entry) => entry.entry_type !== "feed_inventory").map((entry) => entry.id)
-  const systemName = (id: number | null | undefined) => systems.find((system) => system.id === id)?.name
+
+  const groups = useMemo(() => {
+    const order = Object.keys(approvalTypes) as ApprovalType[]
+    const byType = new Map<ApprovalType, ApprovalEntry[]>()
+    for (const entry of entries) {
+      const list = byType.get(entry.entry_type) ?? []
+      list.push(entry)
+      byType.set(entry.entry_type, list)
+    }
+    return order.filter((key) => byType.has(key)).map((key) => [key, byType.get(key)!] as const)
+  }, [entries])
 
   function begin(ids: number[], decision: "approved" | "rejected") { setMessage(null); setReason(""); setReview({ ids, decision }) }
   function reset() { setPage(0); setSelected([]); setMessage(null); setEditId(null) }
@@ -71,7 +185,7 @@ export default function ApprovalsClient({ farmId, canReview, currentUserId, syst
   }
 
   const canEdit = (entry: ApprovalEntry) => entry.status === "pending" && (canReview || entry.submitted_by === currentUserId)
-  const editableKeys = (payload: Record<string, unknown>) => Object.keys(payload).filter((key) => !lockedFields.includes(key))
+  const editableKeys = (payload: Payload) => Object.keys(payload).filter((key) => !lockedFields.includes(key))
   function beginEdit(entry: ApprovalEntry) { setMessage(null); setReview(null); setEditId(entry.id); setDraft({ ...entry.payload }) }
   async function saveEdit() {
     if (editId == null) return
@@ -90,6 +204,7 @@ export default function ApprovalsClient({ farmId, canReview, currentUserId, syst
   }
 
   const busyAny = busy || savingEdit
+  const showChecks = canReview && status === "pending"
 
   return (
     <section className="space-y-3">
@@ -133,7 +248,7 @@ export default function ApprovalsClient({ farmId, canReview, currentUserId, syst
             <button type="button" className={control} disabled={query.isFetching || !!review} onClick={() => { setSelected([]); void query.refetch() }}>
               Refresh
             </button>
-            {canReview && status === "pending" && (
+            {showChecks && (
               <>
                 <button
                   type="button"
@@ -191,8 +306,8 @@ export default function ApprovalsClient({ farmId, canReview, currentUserId, syst
           </div>
         )}
 
-        {canReview && status === "pending" && entries.length > 0 && (
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-sm">
+        {showChecks && entries.length > 0 && (
+          <label className="flex items-center gap-2 border-b border-border px-4 py-2 text-sm">
             <input
               type="checkbox"
               className="h-4 w-4 accent-primary"
@@ -201,7 +316,7 @@ export default function ApprovalsClient({ farmId, canReview, currentUserId, syst
               onChange={(event) => setSelected(event.target.checked ? bulkIds : [])}
             />
             Select all on this page (feed counts are reviewed individually)
-          </div>
+          </label>
         )}
 
         {query.isPending ? (
@@ -215,103 +330,148 @@ export default function ApprovalsClient({ farmId, canReview, currentUserId, syst
             </div>
           </div>
         ) : (
-          <ul className="divide-y divide-border">
-            {entries.map((entry) => (
-              <li key={entry.id} className="px-4 py-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex gap-3">
-                    {canReview && status === "pending" && entry.entry_type !== "feed_inventory" && (
-                      <input
-                        aria-label={`Select submission ${entry.id}`}
-                        type="checkbox"
-                        className="mt-1 h-4 w-4 accent-primary"
-                        disabled={!!review}
-                        checked={selected.includes(entry.id)}
-                        onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))}
-                      />
-                    )}
-                    <div>
-                      <h3 className="font-semibold">{approvalTypes[entry.entry_type]} · {entry.event_date}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {systemName(entry.system_id) ?? "Farm inventory"} · Submission #{entry.id}
-                        {entry.status !== "pending" ? ` · ${entry.status}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {canEdit(entry) && editId !== entry.id && (
-                      <button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-bold disabled:opacity-45" disabled={!!review} onClick={() => beginEdit(entry)}>
-                        <Pencil className="h-3.5 w-3.5" /> Edit
-                      </button>
-                    )}
-                    {canReview && status === "pending" && (
-                      <>
-                        <button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "approved")}>
-                          <Check className="h-3.5 w-3.5" /> Approve
-                        </button>
-                        <button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-bold text-destructive hover:bg-destructive/5 disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "rejected")}>
-                          <X className="h-3.5 w-3.5" /> Reject
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {editId === entry.id ? (
-                  <div className="mt-3 space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {editableKeys(entry.payload).map((key) => {
-                        const original = entry.payload[key]
-                        return (
-                          <label key={key} className="block text-sm">
-                            <span className="text-muted-foreground">{fieldLabel(key)}{unit(key)}</span>
-                            <input
-                              className={`${control} mt-1 block w-full`}
-                              disabled={savingEdit}
-                              type={typeof original === "number" ? "number" : "text"}
-                              value={draft[key] == null ? "" : String(draft[key])}
-                              onChange={(event) => {
-                                const raw = event.target.value
-                                setDraft((current) => ({ ...current, [key]: raw === "" ? null : typeof original === "number" ? Number(raw) : raw }))
-                              }}
-                            />
-                          </label>
-                        )
-                      })}
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="button" className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit} onClick={() => void saveEdit()}>
-                        {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save changes
-                      </button>
-                      <button type="button" className={control} disabled={savingEdit} onClick={() => setEditId(null)}>Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                    {Object.entries(entry.payload)
-                      .filter(([key, value]) => value != null && !hiddenInPreview.includes(key))
-                      .map(([key, value]) => (
-                        <div key={key}>
-                          <dt className="text-muted-foreground">{fieldLabel(key)}{unit(key)}</dt>
-                          <dd className="break-words font-medium">
-                            {key === "target_system_id" || key === "origin_system_id" ? systemName(value as number) ?? String(value) : String(value)}
-                          </dd>
-                        </div>
+          groups.map(([groupType, rows]) => {
+            const cols = columnsByType[groupType] ?? []
+            const groupBulkIds = groupType === "feed_inventory" ? [] : rows.map((entry) => entry.id)
+            const groupAllSelected = groupBulkIds.length > 0 && groupBulkIds.every((id) => selected.includes(id))
+            const span = (showChecks ? 1 : 0) + cols.length + 2
+            return (
+              <div key={groupType} className="border-b border-border last:border-b-0">
+                <h3 className="px-4 pt-4 text-sm font-bold text-primary">{approvalTypes[groupType]}</h3>
+                <div className="overflow-x-auto px-4 pb-4">
+                  <table className="mt-2 w-full min-w-[760px] text-left text-sm">
+                    <thead className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                      <tr className="border-b border-border">
+                        {showChecks && (
+                          <th className="w-8 py-2">
+                            {groupType !== "feed_inventory" && (
+                              <input
+                                type="checkbox"
+                                aria-label={`Select all ${approvalTypes[groupType]} entries`}
+                                className="h-4 w-4 accent-primary"
+                                disabled={!!review}
+                                checked={groupAllSelected}
+                                onChange={(event) => setSelected((ids) => {
+                                  const without = ids.filter((id) => !groupBulkIds.includes(id))
+                                  return event.target.checked ? [...without, ...groupBulkIds] : without
+                                })}
+                              />
+                            )}
+                          </th>
+                        )}
+                        {cols.map((col) => <th key={col.header} className="whitespace-nowrap py-2 pr-4">{col.header}</th>)}
+                        <th className="whitespace-nowrap py-2 pr-4">Submitted by</th>
+                        <th className="whitespace-nowrap py-2">{status === "pending" ? "" : "Result"}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {rows.map((entry) => (
+                        <Fragment key={entry.id}>
+                          <tr className="align-top">
+                            {showChecks && (
+                              <td className="py-3 pr-2">
+                                {groupType !== "feed_inventory" && (
+                                  <input
+                                    aria-label={`Select submission ${entry.id}`}
+                                    type="checkbox"
+                                    className="mt-0.5 h-4 w-4 accent-primary"
+                                    disabled={!!review}
+                                    checked={selected.includes(entry.id)}
+                                    onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))}
+                                  />
+                                )}
+                              </td>
+                            )}
+                            {cols.map((col) => (
+                              <td key={col.header} className="max-w-[220px] break-words py-3 pr-4 align-top">{col.cell(entry.payload)}</td>
+                            ))}
+                            <td className="whitespace-nowrap py-3 pr-4 align-top text-xs text-muted-foreground">
+                              <span className="block font-medium text-foreground">{names.user(entry.submitted_by)}</span>
+                              {new Date(entry.submitted_at).toLocaleString()}
+                            </td>
+                            <td className="whitespace-nowrap py-3 align-top">
+                              {entry.status === "pending" ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {canEdit(entry) && editId !== entry.id && (
+                                    <button type="button" className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2.5 text-xs font-bold disabled:opacity-45" disabled={!!review} onClick={() => beginEdit(entry)}>
+                                      <Pencil className="h-3.5 w-3.5" /> Edit
+                                    </button>
+                                  )}
+                                  {canReview && (
+                                    <>
+                                      <button type="button" className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-2.5 text-xs font-bold text-primary-foreground disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "approved")}>
+                                        <Check className="h-3.5 w-3.5" /> Approve
+                                      </button>
+                                      <button type="button" className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2.5 text-xs font-bold text-destructive hover:bg-destructive/5 disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "rejected")}>
+                                        <X className="h-3.5 w-3.5" /> Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-xs">
+                                  <span className={`inline-flex rounded-full border px-2 py-0.5 font-bold ${
+                                    entry.status === "approved" ? "border-success/30 bg-success/10 text-success" : "border-destructive/30 bg-destructive/10 text-destructive"
+                                  }`}>
+                                    {cap(entry.status)}
+                                  </span>
+                                  {entry.reviewed_at && (
+                                    <span className="mt-1 block text-muted-foreground">
+                                      {names.user(entry.reviewed_by ?? "")} · {new Date(entry.reviewed_at).toLocaleDateString()}
+                                      {entry.official_record_id ? ` · #${entry.official_record_id}` : ""}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                          {editId === entry.id && (
+                            <tr>
+                              <td colSpan={span} className="bg-muted/20 px-1 py-3">
+                                <div className="space-y-3">
+                                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    {editableKeys(entry.payload).map((key) => {
+                                      const original = entry.payload[key]
+                                      return (
+                                        <label key={key} className="block text-sm">
+                                          <span className="text-muted-foreground">{fieldLabel(key)}{unit(key)}</span>
+                                          <input
+                                            className={`${control} mt-1 block w-full`}
+                                            disabled={savingEdit}
+                                            type={typeof original === "number" ? "number" : "text"}
+                                            value={draft[key] == null ? "" : String(draft[key])}
+                                            onChange={(event) => {
+                                              const raw = event.target.value
+                                              setDraft((currentDraft) => ({ ...currentDraft, [key]: raw === "" ? null : typeof original === "number" ? Number(raw) : raw }))
+                                            }}
+                                          />
+                                        </label>
+                                      )
+                                    })}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button type="button" className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit} onClick={() => void saveEdit()}>
+                                      {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save changes
+                                    </button>
+                                    <button type="button" className={control} disabled={savingEdit} onClick={() => setEditId(null)}>Cancel</button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {entry.review_reason && (
+                            <tr>
+                              <td colSpan={span} className="px-1 pb-3 text-xs text-muted-foreground">Review note: {entry.review_reason}</td>
+                            </tr>
+                          )}
+                        </Fragment>
                       ))}
-                  </dl>
-                )}
-
-                <p className="mt-3 text-xs text-muted-foreground">Submitted {new Date(entry.submitted_at).toLocaleString()} · User {entry.submitted_by}</p>
-                {entry.reviewed_at && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Reviewed {new Date(entry.reviewed_at).toLocaleString()} · User {entry.reviewed_by}
-                    {entry.official_record_id ? ` · Official record #${entry.official_record_id}` : ""}
-                  </p>
-                )}
-                {entry.review_reason && <p className="mt-2 text-sm">Review note: {entry.review_reason}</p>}
-              </li>
-            ))}
-          </ul>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })
         )}
 
         {total > 50 && (
