@@ -53,20 +53,16 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
         <h1 className="text-xl font-semibold leading-tight tracking-tight">Data Entry</h1>
 
         <div className="data-entry-tabs-shell">
-          <div className="relative overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="data-entry-tabs-list" role="tablist" aria-label="Data entry forms and approvals">
-              {dataEntryTabs.map(([id, label]) => (
-                <Link key={id} href={`${DATA_ENTRY_PATH}?type=${id}`} className="data-entry-tab data-entry-tab-idle" role="tab" aria-selected="false">
-                  <span>{label}</span>
-                </Link>
-              ))}
-              <span className="ml-1 border-l border-border pl-4">
-                <span className="data-entry-tab data-entry-tab-active" role="tab" aria-selected="true">
-                  {canReview ? "Approval" : "My submissions"}
-                </span>
-              </span>
-            </div>
-            <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-muted/50 to-transparent" />
+          <div className="data-entry-tabs-list" role="tablist" aria-label="Data entry forms and approvals">
+            {dataEntryTabs.map(([id, label]) => (
+              <Link key={id} href={`${DATA_ENTRY_PATH}?type=${id}`} className="data-entry-tab data-entry-tab-idle" role="tab" aria-selected="false">
+                <span>{label}</span>
+              </Link>
+            ))}
+            <span className="mx-1 self-stretch border-l border-border" aria-hidden />
+            <span className="data-entry-tab data-entry-tab-active" role="tab" aria-selected="true">
+              {canReview ? "Approval" : "My submissions"}
+            </span>
           </div>
         </div>
 

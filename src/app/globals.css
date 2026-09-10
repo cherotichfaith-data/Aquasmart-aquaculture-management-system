@@ -536,7 +536,7 @@ next-router-prefetch {
   }
 
   .data-entry-header {
-    @apply flex flex-col gap-1.5 border-b border-border/55 bg-card px-4 py-3 sm:px-5 sm:py-3.5 md:flex-row md:items-center md:justify-between;
+    @apply flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-border/55 bg-card px-4 py-2.5 sm:px-5 sm:py-3;
   }
 
   .data-entry-required-note {
@@ -544,23 +544,29 @@ next-router-prefetch {
   }
 
   .data-entry-tabs-shell {
-    @apply border-b border-border/55 bg-primary/[0.04] px-2 py-2 sm:px-4;
+    @apply border-b border-border/55 bg-primary/[0.04] px-3 py-2.5 sm:px-4 sm:py-3;
   }
 
   .data-entry-tabs-list {
-    @apply flex min-w-max gap-1;
+    @apply flex flex-wrap items-center gap-1.5;
   }
 
+  /* Pill tabs -- shared with the /approvals tab strip. Wrap instead of scroll. */
   .data-entry-tab {
-    @apply inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors;
+    @apply inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors;
   }
 
   .data-entry-tab-active {
-    @apply bg-primary/10 text-primary shadow-none ring-1 ring-primary/25;
+    @apply border-primary bg-primary text-primary-foreground;
   }
 
   .data-entry-tab-idle {
-    @apply text-foreground/70 hover:bg-card hover:text-foreground;
+    @apply text-muted-foreground hover:border-primary/45 hover:text-foreground;
+  }
+
+  /* Phone-only jump-to-form picker */
+  .data-entry-tab-select {
+    @apply h-11 w-full min-w-0 flex-1 rounded-full border border-border bg-card px-4 text-sm font-semibold text-foreground;
   }
 
   .data-entry-workspace {
@@ -589,8 +595,52 @@ next-router-prefetch {
     max-width: none;
   }
 
-  .data-entry-workspace > aside {
+  .data-entry-aside {
     @apply border-t border-border/55 bg-card xl:border-t-0 xl:border-l;
+  }
+
+  /* Phone/tablet: the recent-entries panel is a tap-to-expand row so it stops
+     adding a screenful of scrolling under every form. Always open at xl. */
+  .data-entry-aside-toggle {
+    @apply flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-muted-foreground xl:hidden;
+  }
+
+  .data-entry-aside-body {
+    @apply px-1 pb-2 xl:px-0 xl:pb-0;
+  }
+
+  /* ---- Shared form primitives (FormSection / FieldGrid / FormActions) ---- */
+  .data-entry-section {
+    @apply grid gap-4 rounded-2xl border border-border/70 bg-card p-4 shadow-none sm:p-5;
+  }
+
+  .data-entry-section-head {
+    @apply grid gap-0.5;
+  }
+
+  .data-entry-section-kicker {
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-primary;
+  }
+
+  .data-entry-section-title {
+    @apply text-base font-bold tracking-tight text-foreground;
+  }
+
+  .data-entry-section-desc {
+    @apply text-sm leading-6 text-muted-foreground;
+  }
+
+  .data-entry-field-grid {
+    @apply grid gap-3.5;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  }
+
+  .data-entry-form-actions {
+    @apply flex flex-col-reverse gap-2.5 pt-1 sm:flex-row sm:justify-end;
+  }
+
+  .data-entry-form-actions > * {
+    @apply w-full sm:w-auto;
   }
 
   .data-entry-canvas h2 {

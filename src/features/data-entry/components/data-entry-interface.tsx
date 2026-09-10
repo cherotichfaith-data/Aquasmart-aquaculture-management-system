@@ -1,7 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
+import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MortalityForm } from "./mortality-form"
 import { FeedingForm } from "./feeding-form"
@@ -132,6 +134,12 @@ export function DataEntryInterface({
         setLiveSystemId(defaultSystemId)
     }, [defaultSystemId])
 
+    const router = useRouter()
+    const [asideOpen, setAsideOpen] = useState(false)
+    const isReviewer = farmRole === "admin" || farmRole === "farm_manager"
+    const approvalHref = `/approvals?farmId=${encodeURIComponent(farmId ?? "")}`
+    const approvalLabel = isReviewer ? "Approval" : "My submissions"
+
     if (isRestrictedTab) {
         return (
             <div className="rounded-lg border border-border/80 bg-card p-6 shadow-sm">
@@ -228,48 +236,58 @@ export function DataEntryInterface({
     return (
         <div className="data-entry-layout data-entry-board">
             <div className="data-entry-header">
-                <div className="min-w-0">
-                    <h1 className="text-xl font-semibold leading-tight tracking-tight text-foreground">
-                        Data Entry
-                    </h1>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        {activeItem?.label ?? "Farm"} records
-                    </p>
-                </div>
-                <p className="data-entry-required-note">
+                <h1 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                    Data Entry
+                </h1>
+                <span className="truncate text-sm text-muted-foreground">
+                    {activeItem?.label ?? "Farm"} records
+                </span>
+                <p className="data-entry-required-note ml-auto hidden md:block">
                     Required fields must be completed before saving.
                 </p>
             </div>
 
             <div className="data-entry-tabs-shell">
-                <div className="relative overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <div className="data-entry-tabs-list" role="tablist" aria-label="Data entry forms">
-                        {visibleSidebarItems.map((item) => {
-                            const isActive = activeTab === item.id
-                            return (
-                                <Link
-                                    key={item.id}
-                                    href={buildDataEntryTabHref(item.id, liveSystemId, defaultBatchId)}
-                                    className={cn(
-                                        "data-entry-tab",
-                                        isActive
-                                            ? "data-entry-tab-active"
-                                            : "data-entry-tab-idle"
-                                    )}
-                                    aria-selected={isActive}
-                                    role="tab"
-                                >
-                                    <span>{item.label}</span>
-                                </Link>
-                            )
-                        })}
-                        <span className="ml-1 border-l border-border pl-4">
-                            <Link href={`/approvals?farmId=${encodeURIComponent(farmId ?? "")}`} className="data-entry-tab data-entry-tab-idle">
-                                {farmRole === "admin" || farmRole === "farm_manager" ? "Approval" : "My submissions"}
+                {/* Phone: one-line jump-to-form picker instead of a wrapping / scrolling strip */}
+                <div className="flex items-center gap-2 sm:hidden">
+                    <label className="sr-only" htmlFor="data-entry-tab-select">Choose a form</label>
+                    <select
+                        id="data-entry-tab-select"
+                        className="data-entry-tab-select"
+                        value={activeTab}
+                        onChange={(event) =>
+                            router.push(buildDataEntryTabHref(event.target.value as DataEntryTabId, liveSystemId, defaultBatchId))
+                        }
+                    >
+                        {visibleSidebarItems.map((item) => (
+                            <option key={item.id} value={item.id}>{item.label}</option>
+                        ))}
+                    </select>
+                    <Link href={approvalHref} className="data-entry-tab data-entry-tab-idle shrink-0">
+                        {approvalLabel}
+                    </Link>
+                </div>
+
+                {/* Tablet and up: one wrapping row of pills */}
+                <div className="hidden flex-wrap items-center gap-1.5 sm:flex" role="tablist" aria-label="Data entry forms">
+                    {visibleSidebarItems.map((item) => {
+                        const isActive = activeTab === item.id
+                        return (
+                            <Link
+                                key={item.id}
+                                href={buildDataEntryTabHref(item.id, liveSystemId, defaultBatchId)}
+                                className={cn("data-entry-tab", isActive ? "data-entry-tab-active" : "data-entry-tab-idle")}
+                                aria-selected={isActive}
+                                role="tab"
+                            >
+                                <span>{item.label}</span>
                             </Link>
-                        </span>
-                    </div>
-                    <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-muted/50 to-transparent" />
+                        )
+                    })}
+                    <span className="mx-1 self-stretch border-l border-border" aria-hidden />
+                    <Link href={approvalHref} className="data-entry-tab data-entry-tab-idle">
+                        {approvalLabel}
+                    </Link>
                 </div>
             </div>
 
@@ -277,8 +295,19 @@ export function DataEntryInterface({
                 <main className="data-entry-canvas min-w-0">
                     {form}
                 </main>
-                <aside className="min-w-0">
-                    <RecentEntriesList {...recentEntryProps} systems={systems} feeds={feeds} />
+                <aside className="data-entry-aside min-w-0">
+                    <button
+                        type="button"
+                        className="data-entry-aside-toggle xl:hidden"
+                        onClick={() => setAsideOpen((open) => !open)}
+                        aria-expanded={asideOpen}
+                    >
+                        <span>Recent {(activeItem?.label ?? "").toLowerCase()} entries</span>
+                        <ChevronDown className={cn("h-4 w-4 transition-transform", asideOpen && "rotate-180")} />
+                    </button>
+                    <div className={cn("data-entry-aside-body", !asideOpen && "hidden xl:block")}>
+                        <RecentEntriesList {...recentEntryProps} systems={systems} feeds={feeds} />
+                    </div>
                 </aside>
             </div>
         </div>
