@@ -1,7 +1,7 @@
 "use client"
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, X, XCircle } from "lucide-react"
+import { Check, CheckCircle2, Loader2, Pencil, X, XCircle } from "lucide-react"
 import { approvalTypes, type ApprovalEntry, type ApprovalType } from "@/lib/approvals"
 
 type ApprovalStatus = ApprovalEntry["status"]
@@ -10,7 +10,7 @@ type ApprovalsResponse = { entries: ApprovalEntry[]; total: number; counts: Coun
 type NamedOption = { id: number; name: string }
 type Member = { id: string; name: string }
 type Payload = Record<string, unknown>
-type Field = { label: string; value: (payload: Payload) => string }
+type Column = { header: string; cell: (payload: Payload) => string; align?: "right" }
 
 const fieldLabel = (key: string) => key.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
@@ -38,7 +38,6 @@ export default function ApprovalsClient({
   const [type, setType] = useState("")
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
-  const [openId, setOpenId] = useState<number | null>(null)
   const [review, setReview] = useState<{ ids: number[]; decision: "approved" | "rejected" } | null>(null)
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
@@ -78,109 +77,79 @@ export default function ApprovalsClient({
     }
   }, [systems, batches, feedTypes, members])
 
-  // Full field breakdown per type, shown when a row is opened.
-  const fieldsByType = useMemo<Record<ApprovalType, Field[]>>(() => ({
+  const columnsByType = useMemo<Record<ApprovalType, Column[]>>(() => ({
     feeding: [
-      { label: "Date", value: (p) => text(p.date) },
-      { label: "Cage", value: (p) => names.system(p.system_id) },
-      { label: "Batch", value: (p) => names.batch(p.batch_id) },
-      { label: "Feeding amount", value: (p) => kg(p.feeding_amount) },
-      { label: "Feed type", value: (p) => names.feed(p.feed_type_id) },
-      { label: "Feeding response", value: (p) => text(p.feeding_response) },
-      { label: "Notes", value: (p) => text(p.notes) },
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Amount", cell: (p) => kg(p.feeding_amount), align: "right" },
+      { header: "Feed type", cell: (p) => names.feed(p.feed_type_id) },
+      { header: "Response", cell: (p) => text(p.feeding_response), align: "right" },
+      { header: "Notes", cell: (p) => text(p.notes) },
     ],
     mortality: [
-      { label: "Date", value: (p) => text(p.date) },
-      { label: "Cage", value: (p) => names.system(p.system_id) },
-      { label: "Batch", value: (p) => names.batch(p.batch_id) },
-      { label: "Dead fish", value: (p) => count(p.number_of_fish_mortality) },
-      { label: "Total weight", value: (p) => kg(p.total_weight_mortality) },
-      { label: "Cause", value: (p) => text(p.cause) },
-      { label: "Notes", value: (p) => text(p.notes) },
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Dead fish", cell: (p) => count(p.number_of_fish_mortality), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_mortality), align: "right" },
+      { header: "Cause", cell: (p) => text(p.cause) },
+      { header: "Notes", cell: (p) => text(p.notes) },
     ],
     sampling: [
-      { label: "Date", value: (p) => text(p.date) },
-      { label: "Cage", value: (p) => names.system(p.system_id) },
-      { label: "Batch", value: (p) => names.batch(p.batch_id) },
-      { label: "Fish sampled", value: (p) => count(p.number_of_fish_sampling) },
-      { label: "Total weight", value: (p) => kg(p.total_weight_sampling) },
-      { label: "Notes", value: (p) => text(p.notes) },
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Fish sampled", cell: (p) => count(p.number_of_fish_sampling), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_sampling), align: "right" },
+      { header: "Notes", cell: (p) => text(p.notes) },
     ],
     stocking: [
-      { label: "Date", value: (p) => text(p.date) },
-      { label: "Cage", value: (p) => names.system(p.system_id) },
-      { label: "Batch", value: (p) => names.batch(p.batch_id) },
-      { label: "Fish stocked", value: (p) => count(p.number_of_fish_stocking) },
-      { label: "Total weight", value: (p) => kg(p.total_weight_stocking) },
-      { label: "Stocking type", value: (p) => text(p.type_of_stocking) },
-      { label: "Notes", value: (p) => text(p.notes) },
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Fish stocked", cell: (p) => count(p.number_of_fish_stocking), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_stocking), align: "right" },
+      { header: "Type", cell: (p) => text(p.type_of_stocking) },
+      { header: "Notes", cell: (p) => text(p.notes) },
     ],
     transfer: [
-      { label: "Date", value: (p) => text(p.date) },
-      { label: "From cage", value: (p) => names.system(p.origin_system_id) },
-      { label: "To", value: (p) => (p.transfer_type === "external_out" ? text(p.external_target_name) : names.system(p.target_system_id)) },
-      { label: "Batch", value: (p) => names.batch(p.batch_id) },
-      { label: "Fish transferred", value: (p) => count(p.number_of_fish_transfer) },
-      { label: "Total weight", value: (p) => kg(p.total_weight_transfer) },
-      { label: "Transfer type", value: (p) => text(p.transfer_type) },
-      { label: "Notes", value: (p) => text(p.notes) },
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "From", cell: (p) => names.system(p.origin_system_id) },
+      { header: "To", cell: (p) => (p.transfer_type === "external_out" ? text(p.external_target_name) : names.system(p.target_system_id)) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Fish", cell: (p) => count(p.number_of_fish_transfer), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_transfer), align: "right" },
+      { header: "Type", cell: (p) => text(p.transfer_type) },
+      { header: "Notes", cell: (p) => text(p.notes) },
     ],
     harvest: [
-      { label: "Date", value: (p) => text(p.date) },
-      { label: "Cage", value: (p) => names.system(p.system_id) },
-      { label: "Batch", value: (p) => names.batch(p.batch_id) },
-      { label: "Fish harvested", value: (p) => count(p.number_of_fish_harvest) },
-      { label: "Total weight", value: (p) => kg(p.total_weight_harvest) },
-      { label: "Harvest type", value: (p) => text(p.type_of_harvest) },
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Batch", cell: (p) => names.batch(p.batch_id) },
+      { header: "Fish harvested", cell: (p) => count(p.number_of_fish_harvest), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_harvest), align: "right" },
+      { header: "Type", cell: (p) => text(p.type_of_harvest) },
     ],
     water_quality: [
-      { label: "Date", value: (p) => text(p.date) },
-      { label: "Cage", value: (p) => names.system(p.system_id) },
-      { label: "Time", value: (p) => text(p.time) },
-      { label: "Water depth", value: (p) => (p.water_depth == null ? "—" : `${p.water_depth} m`) },
-      { label: "Parameter", value: (p) => text(String(p.parameter_name ?? "").replaceAll("_", " ") || "—") },
-      { label: "Value", value: (p) => text(p.parameter_value) },
-      { label: "Location", value: (p) => text(p.location_reference) },
+      { header: "Date", cell: (p) => text(p.date) },
+      { header: "Cage", cell: (p) => names.system(p.system_id) },
+      { header: "Time", cell: (p) => text(p.time) },
+      { header: "Depth", cell: (p) => (p.water_depth == null ? "—" : `${p.water_depth} m`), align: "right" },
+      { header: "Parameter", cell: (p) => text(String(p.parameter_name ?? "").replaceAll("_", " ") || "—") },
+      { header: "Value", cell: (p) => text(p.parameter_value), align: "right" },
+      { header: "Location", cell: (p) => text(p.location_reference) },
     ],
     feed_inventory: [
-      { label: "Date", value: (p) => text(p.inventory_date) },
-      { label: "Time", value: (p) => text(p.inventory_time) },
-      { label: "Feed type", value: (p) => names.feed(p.feed_type_id) },
-      { label: "Bag weight", value: (p) => kg(p.bag_weight) },
-      { label: "Bags counted", value: (p) => count(p.amount_of_bags) },
-      { label: "Opened bags", value: (p) => text(p.opened_bags) },
-      { label: "Comments", value: (p) => text(p.comments) },
+      { header: "Date", cell: (p) => text(p.inventory_date) },
+      { header: "Time", cell: (p) => text(p.inventory_time) },
+      { header: "Feed type", cell: (p) => names.feed(p.feed_type_id) },
+      { header: "Bag weight", cell: (p) => kg(p.bag_weight), align: "right" },
+      { header: "Bags", cell: (p) => count(p.amount_of_bags), align: "right" },
+      { header: "Opened bags", cell: (p) => text(p.opened_bags), align: "right" },
+      { header: "Comments", cell: (p) => text(p.comments) },
     ],
   }), [names])
-
-  // Compact one-line summary shown on the table row.
-  const summarize = (entry: ApprovalEntry): string => {
-    const p = entry.payload
-    switch (entry.entry_type) {
-      case "feeding":
-        return Number(p.feeding_amount) > 0 ? `${kg(p.feeding_amount)} · ${names.feed(p.feed_type_id)}` : "Feeding not done"
-      case "mortality":
-        return `${count(p.number_of_fish_mortality)} fish · ${text(p.cause)}`
-      case "sampling":
-        return `${count(p.number_of_fish_sampling)} fish · ${kg(p.total_weight_sampling)}`
-      case "stocking":
-        return `${count(p.number_of_fish_stocking)} fish · ${kg(p.total_weight_stocking)}`
-      case "transfer":
-        return `${count(p.number_of_fish_transfer)} fish → ${p.transfer_type === "external_out" ? text(p.external_target_name) : names.system(p.target_system_id)}`
-      case "harvest":
-        return `${count(p.number_of_fish_harvest)} fish · ${kg(p.total_weight_harvest)}`
-      case "water_quality":
-        return `${text(String(p.parameter_name ?? "").replaceAll("_", " "))} ${text(p.parameter_value)}`
-      case "feed_inventory":
-        return `${count(p.amount_of_bags)} bags · ${names.feed(p.feed_type_id)}`
-      default:
-        return "—"
-    }
-  }
-  const rowCage = (entry: ApprovalEntry) =>
-    entry.entry_type === "feed_inventory"
-      ? "Farm inventory"
-      : names.system(entry.entry_type === "transfer" ? entry.payload.origin_system_id : entry.system_id)
 
   const entries = useMemo(() => query.data?.entries ?? [], [query.data?.entries])
   const counts = query.data?.counts
@@ -188,8 +157,19 @@ export default function ApprovalsClient({
   const bulkIds = entries.filter((entry) => entry.entry_type !== "feed_inventory").map((entry) => entry.id)
   const showChecks = canReview && status === "pending"
 
+  const groups = useMemo(() => {
+    const order = Object.keys(approvalTypes) as ApprovalType[]
+    const byType = new Map<ApprovalType, ApprovalEntry[]>()
+    for (const entry of entries) {
+      const list = byType.get(entry.entry_type) ?? []
+      list.push(entry)
+      byType.set(entry.entry_type, list)
+    }
+    return order.filter((key) => byType.has(key)).map((key) => [key, byType.get(key)!] as const)
+  }, [entries])
+
   function begin(ids: number[], decision: "approved" | "rejected") { setMessage(null); setReason(""); setReview({ ids, decision }) }
-  function reset() { setPage(0); setSelected([]); setMessage(null); setEditId(null); setOpenId(null) }
+  function reset() { setPage(0); setSelected([]); setMessage(null); setEditId(null) }
 
   async function decide() {
     if (!review) return
@@ -199,7 +179,7 @@ export default function ApprovalsClient({
       const body = await response.json()
       if (!response.ok) throw new Error(body.error ?? "Review failed")
       setMessage({ tone: "ok", text: `${review.ids.length} ${review.ids.length === 1 ? "entry" : "entries"} ${review.decision}.` })
-      setReview(null); setSelected([]); setOpenId(null)
+      setReview(null); setSelected([])
       await cache.invalidateQueries()
     } catch (error) { setMessage({ tone: "error", text: error instanceof Error ? error.message : "Review failed" }) }
     finally { setBusy(false) }
@@ -207,7 +187,7 @@ export default function ApprovalsClient({
 
   const canEdit = (entry: ApprovalEntry) => entry.status === "pending" && (canReview || entry.submitted_by === currentUserId)
   const editableKeys = (payload: Payload) => Object.keys(payload).filter((key) => !lockedFields.includes(key))
-  function beginEdit(entry: ApprovalEntry) { setMessage(null); setReview(null); setOpenId(entry.id); setEditId(entry.id); setDraft({ ...entry.payload }) }
+  function beginEdit(entry: ApprovalEntry) { setMessage(null); setReview(null); setEditId(entry.id); setDraft({ ...entry.payload }) }
   async function saveEdit() {
     if (editId == null) return
     setSavingEdit(true); setMessage(null)
@@ -225,7 +205,6 @@ export default function ApprovalsClient({
   }
 
   const busyAny = busy || savingEdit
-  const columnCount = (showChecks ? 1 : 0) + (status === "pending" ? 5 : 6) + 1
 
   return (
     <section className="space-y-4">
@@ -253,9 +232,7 @@ export default function ApprovalsClient({
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2 className="text-lg font-bold text-primary">{cap(status)} entries</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {status === "pending" ? "Open a row to see the full record, then approve, reject or edit it." : "Open a row to see the full record."}
-            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">Validation is repeated immediately before every approval.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <select
@@ -329,6 +306,19 @@ export default function ApprovalsClient({
           </div>
         )}
 
+        {showChecks && entries.length > 0 && (
+          <label className="flex items-center gap-2 border-b border-border px-5 py-2.5 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              disabled={!!review || !bulkIds.length}
+              checked={bulkIds.length > 0 && bulkIds.every((id) => selected.includes(id))}
+              onChange={(event) => setSelected(event.target.checked ? bulkIds : [])}
+            />
+            Select all on this page (feed counts are reviewed individually)
+          </label>
+        )}
+
         {query.isPending ? (
           <div className="grid min-h-52 place-items-center px-6 py-12 text-sm text-muted-foreground">Loading submissions…</div>
         ) : !query.error && entries.length === 0 ? (
@@ -340,165 +330,162 @@ export default function ApprovalsClient({
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                <tr className="border-b border-border">
-                  {showChecks && (
-                    <th className="w-10 py-3 pl-5">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all on this page"
-                        className="h-4 w-4 accent-primary"
-                        disabled={!!review || !bulkIds.length}
-                        checked={bulkIds.length > 0 && bulkIds.every((id) => selected.includes(id))}
-                        onChange={(event) => setSelected(event.target.checked ? bulkIds : [])}
-                      />
-                    </th>
-                  )}
-                  <th className={`py-3 ${showChecks ? "" : "pl-5"}`}>Date</th>
-                  <th className="py-3 pl-4">Type</th>
-                  <th className="py-3 pl-4">Cage</th>
-                  <th className="py-3 pl-4">Summary</th>
-                  <th className="py-3 pl-4">Submitted by</th>
-                  {status !== "pending" && <th className="py-3 pl-4">Status</th>}
-                  <th className="py-3 pl-4 pr-5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {entries.map((entry) => {
-                  const open = openId === entry.id
-                  return (
-                    <Fragment key={entry.id}>
-                      <tr
-                        className="cursor-pointer align-middle transition-colors hover:bg-muted/40"
-                        onClick={() => { setOpenId(open ? null : entry.id); if (open) setEditId(null) }}
-                      >
+          groups.map(([groupType, rows]) => {
+            const cols = columnsByType[groupType] ?? []
+            const groupBulkIds = groupType === "feed_inventory" ? [] : rows.map((entry) => entry.id)
+            const groupAllSelected = groupBulkIds.length > 0 && groupBulkIds.every((id) => selected.includes(id))
+            const span = (showChecks ? 1 : 0) + cols.length + 2
+            return (
+              <div key={groupType} className="border-b border-border last:border-b-0">
+                <h3 className="px-5 pt-5 text-sm font-bold text-primary">{approvalTypes[groupType]}</h3>
+                <div className="overflow-x-auto px-5 pb-5">
+                  <table className="mt-3 w-full min-w-[820px] border-separate border-spacing-0 text-left text-sm">
+                    <thead>
+                      <tr className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground [&>th]:border-b [&>th]:border-border [&>th]:pb-2.5">
                         {showChecks && (
-                          <td className="py-3.5 pl-5" onClick={(event) => event.stopPropagation()}>
-                            {entry.entry_type !== "feed_inventory" && (
+                          <th className="w-9 pr-2">
+                            {groupType !== "feed_inventory" && (
                               <input
-                                aria-label={`Select submission ${entry.id}`}
                                 type="checkbox"
+                                aria-label={`Select all ${approvalTypes[groupType]} entries`}
                                 className="h-4 w-4 accent-primary"
                                 disabled={!!review}
-                                checked={selected.includes(entry.id)}
-                                onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))}
+                                checked={groupAllSelected}
+                                onChange={(event) => setSelected((ids) => {
+                                  const without = ids.filter((id) => !groupBulkIds.includes(id))
+                                  return event.target.checked ? [...without, ...groupBulkIds] : without
+                                })}
                               />
                             )}
-                          </td>
+                          </th>
                         )}
-                        <td className={`py-3.5 font-semibold tabular-nums text-foreground ${showChecks ? "" : "pl-5"}`}>{entry.event_date}</td>
-                        <td className="py-3.5 pl-4">
-                          <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground">
-                            {approvalTypes[entry.entry_type]}
-                          </span>
-                        </td>
-                        <td className="py-3.5 pl-4 text-muted-foreground">{rowCage(entry)}</td>
-                        <td className="max-w-[280px] truncate py-3.5 pl-4">{summarize(entry)}</td>
-                        <td className="py-3.5 pl-4 text-muted-foreground">{names.user(entry.submitted_by)}</td>
-                        {status !== "pending" && (
-                          <td className="py-3.5 pl-4">
-                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                              entry.status === "approved" ? "bg-success/12 text-success" : "bg-destructive/12 text-destructive"
-                            }`}>
-                              {cap(entry.status)}
-                            </span>
-                          </td>
-                        )}
-                        <td className="py-3.5 pl-4 pr-5 text-right">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-bold">
-                            {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                            {open ? "Close" : "Open"}
-                          </span>
-                        </td>
+                        {cols.map((col) => (
+                          <th key={col.header} className={`whitespace-nowrap pr-5 ${col.align === "right" ? "text-right" : ""}`}>{col.header}</th>
+                        ))}
+                        <th className="whitespace-nowrap pr-5">Submitted by</th>
+                        <th className="whitespace-nowrap text-right">{status === "pending" ? "" : "Status"}</th>
                       </tr>
-
-                      {open && (
-                        <tr>
-                          <td colSpan={columnCount} className="bg-muted/25 px-5 py-4">
-                            {editId === entry.id ? (
-                              <div className="space-y-3">
-                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                  {editableKeys(entry.payload).map((key) => {
-                                    const original = entry.payload[key]
-                                    return (
-                                      <label key={key} className="block text-sm">
-                                        <span className="text-muted-foreground">{fieldLabel(key)}{unit(key)}</span>
-                                        <input
-                                          className={`${control} mt-1 block w-full`}
-                                          disabled={savingEdit}
-                                          type={typeof original === "number" ? "number" : "text"}
-                                          value={draft[key] == null ? "" : String(draft[key])}
-                                          onChange={(event) => {
-                                            const raw = event.target.value
-                                            setDraft((currentDraft) => ({ ...currentDraft, [key]: raw === "" ? null : typeof original === "number" ? Number(raw) : raw }))
-                                          }}
-                                        />
-                                      </label>
-                                    )
-                                  })}
-                                </div>
-                                <div className="flex gap-2">
-                                  <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit} onClick={() => void saveEdit()}>
-                                    {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save changes
-                                  </button>
-                                  <button type="button" className={control} disabled={savingEdit} onClick={() => setEditId(null)}>Cancel</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                                  {(fieldsByType[entry.entry_type] ?? []).map((field) => (
-                                    <div key={field.label}>
-                                      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{field.label}</dt>
-                                      <dd className="mt-0.5 break-words font-medium text-foreground">{field.value(entry.payload)}</dd>
-                                    </div>
-                                  ))}
-                                </dl>
-                                <p className="mt-4 text-xs text-muted-foreground">
-                                  Submitted by {names.user(entry.submitted_by)} · {new Date(entry.submitted_at).toLocaleString()}
-                                  {entry.reviewed_at ? ` · Reviewed by ${names.user(entry.reviewed_by ?? "")} · ${new Date(entry.reviewed_at).toLocaleString()}` : ""}
-                                  {entry.official_record_id ? ` · Official record #${entry.official_record_id}` : ""}
-                                </p>
-                                {entry.review_reason && <p className="mt-1 text-sm text-foreground">Review note: {entry.review_reason}</p>}
-                                {entry.status === "pending" && (canEdit(entry) || canReview) && (
-                                  <div className="mt-4 flex flex-wrap gap-2">
-                                    {canEdit(entry) && (
-                                      <button type="button" className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-sm font-bold disabled:opacity-45" disabled={!!review} onClick={() => beginEdit(entry)}>
-                                        <Pencil className="h-4 w-4" /> Edit
-                                      </button>
-                                    )}
-                                    {canReview && (
-                                      <>
-                                        <button type="button" className="inline-flex h-10 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={!!review} onClick={() => begin([entry.id], "approved")}>
-                                          <Check className="h-4 w-4" /> Approve
-                                        </button>
-                                        <button type="button" className="inline-flex h-10 items-center gap-1.5 rounded-full border border-destructive/40 bg-card px-4 text-sm font-bold text-destructive hover:bg-destructive/5 disabled:opacity-45" disabled={!!review} onClick={() => begin([entry.id], "rejected")}>
-                                          <X className="h-4 w-4" /> Reject
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
+                    </thead>
+                    <tbody>
+                      {rows.map((entry) => (
+                        <Fragment key={entry.id}>
+                          <tr className="align-middle transition-colors hover:bg-muted/40 [&>td]:border-b [&>td]:border-border/60 [&>td]:py-3.5">
+                            {showChecks && (
+                              <td className="pr-2">
+                                {groupType !== "feed_inventory" && (
+                                  <input
+                                    aria-label={`Select submission ${entry.id}`}
+                                    type="checkbox"
+                                    className="h-4 w-4 accent-primary"
+                                    disabled={!!review}
+                                    checked={selected.includes(entry.id)}
+                                    onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))}
+                                  />
                                 )}
-                              </>
+                              </td>
                             )}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                            {cols.map((col, index) => (
+                              <td
+                                key={col.header}
+                                className={`max-w-[220px] break-words pr-5 ${col.align === "right" ? "text-right tabular-nums" : ""} ${index === 0 ? "font-semibold tabular-nums text-foreground" : "text-muted-foreground"}`}
+                              >
+                                {col.cell(entry.payload)}
+                              </td>
+                            ))}
+                            <td className="whitespace-nowrap pr-5 text-xs text-muted-foreground">
+                              <span className="block font-semibold text-foreground">{names.user(entry.submitted_by)}</span>
+                              {new Date(entry.submitted_at).toLocaleString()}
+                            </td>
+                            <td className="whitespace-nowrap text-right">
+                              {entry.status === "pending" ? (
+                                <div className="flex flex-wrap justify-end gap-1.5">
+                                  {canEdit(entry) && editId !== entry.id && (
+                                    <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3 text-xs font-bold disabled:opacity-45" disabled={!!review} onClick={() => beginEdit(entry)}>
+                                      <Pencil className="h-3.5 w-3.5" /> Edit
+                                    </button>
+                                  )}
+                                  {canReview && (
+                                    <>
+                                      <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "approved")}>
+                                        <Check className="h-3.5 w-3.5" /> Approve
+                                      </button>
+                                      <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-destructive/40 bg-card px-3 text-xs font-bold text-destructive hover:bg-destructive/5 disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "rejected")}>
+                                        <X className="h-3.5 w-3.5" /> Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-xs">
+                                  <span className={`inline-flex rounded-full px-2.5 py-0.5 font-bold ${
+                                    entry.status === "approved" ? "bg-success/12 text-success" : "bg-destructive/12 text-destructive"
+                                  }`}>
+                                    {cap(entry.status)}
+                                  </span>
+                                  {entry.reviewed_at && (
+                                    <span className="mt-1 block text-muted-foreground">
+                                      {names.user(entry.reviewed_by ?? "")} · {new Date(entry.reviewed_at).toLocaleDateString()}
+                                      {entry.official_record_id ? ` · #${entry.official_record_id}` : ""}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                          {editId === entry.id && (
+                            <tr>
+                              <td colSpan={span} className="border-b border-border/60 bg-muted/25 px-1 py-4">
+                                <div className="space-y-3">
+                                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    {editableKeys(entry.payload).map((key) => {
+                                      const original = entry.payload[key]
+                                      return (
+                                        <label key={key} className="block text-sm">
+                                          <span className="text-muted-foreground">{fieldLabel(key)}{unit(key)}</span>
+                                          <input
+                                            className={`${control} mt-1 block w-full`}
+                                            disabled={savingEdit}
+                                            type={typeof original === "number" ? "number" : "text"}
+                                            value={draft[key] == null ? "" : String(draft[key])}
+                                            onChange={(event) => {
+                                              const raw = event.target.value
+                                              setDraft((currentDraft) => ({ ...currentDraft, [key]: raw === "" ? null : typeof original === "number" ? Number(raw) : raw }))
+                                            }}
+                                          />
+                                        </label>
+                                      )
+                                    })}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit} onClick={() => void saveEdit()}>
+                                      {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save changes
+                                    </button>
+                                    <button type="button" className={control} disabled={savingEdit} onClick={() => setEditId(null)}>Cancel</button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {entry.review_reason && (
+                            <tr>
+                              <td colSpan={span} className="border-b border-border/60 px-1 py-2.5 text-xs text-muted-foreground">Review note: {entry.review_reason}</td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })
         )}
 
         {total > 50 && (
           <div className="flex items-center justify-between border-t border-border px-5 py-3 text-sm">
-            <button type="button" className={control} disabled={page === 0 || busyAny || !!review} onClick={() => { setPage(page - 1); reset() }}>Previous</button>
+            <button type="button" className={control} disabled={page === 0 || busyAny || !!review} onClick={() => { setPage(page - 1); setSelected([]); setEditId(null) }}>Previous</button>
             <span>Page {page + 1} · {total.toLocaleString("en-US")} entries</span>
-            <button type="button" className={control} disabled={(page + 1) * 50 >= total || busyAny || !!review} onClick={() => { setPage(page + 1); reset() }}>Next</button>
+            <button type="button" className={control} disabled={(page + 1) * 50 >= total || busyAny || !!review} onClick={() => { setPage(page + 1); setSelected([]); setEditId(null) }}>Next</button>
           </div>
         )}
       </section>
