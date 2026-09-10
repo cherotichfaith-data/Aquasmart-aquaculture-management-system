@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
@@ -24,15 +24,26 @@ import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
+  findUnitForSystem,
+  getSystemUnits,
+  getSystemsForUnit,
+} from "./form-support"
+import {
   pickSameDayEntry,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
 import { SelectionChips } from "./selection-info"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
-import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import {
+  parseRequiredNumericId,
+  reportDataEntrySubmitError,
+  requireActiveFarmId,
+  toIsoDate,
+} from "./form-utils"
 
 const formSchema = z.object({
+  unit: z.string().min(1, "Cage unit is required"),
   system_id: z.string().min(1, "Cage number is required"),
   date: z.string().min(1, "Date is required"),
   number_of_fish: z.coerce.number().int("Count must be a whole number").min(1, "Must be positive"),
@@ -73,23 +84,56 @@ const CAUSE_LABELS: Record<MortalityCause, string> = {
 export function MortalityForm({ farmId, systems, batches, defaultSystemId = null, onSystemChange }: MortalityFormProps) {
   const mutation = useRecordMortality()
 
+  const units = useMemo(() => getSystemUnits(systems), [systems])
+  const defaultUnit = findUnitForSystem(systems, defaultSystemId)
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     mode: "onBlur",
     defaultValues: {
-      date: new Date().toISOString().split("T")[0],
+      date: toIsoDate(new Date()),
+      unit: defaultUnit,
       number_of_fish: 0,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       total_weight_mortality: undefined,
       notes: "",
     },
   })
+  const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
-  const selectedSystemId = useWatch({ control: form.control, name: "system_id" })
+  const selectedUnit = useWatch({ control: form.control, name: "unit" })
+  const selectedSystemValue = useWatch({ control: form.control, name: "system_id" })
   const mortalityCount = useWatch({ control: form.control, name: "number_of_fish" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
-  const resolvedSystemId = Number(selectedSystemId)
+  const resolvedSystemId = Number(selectedSystemValue)
   const hasValidSystemId = Number.isFinite(resolvedSystemId) && resolvedSystemId > 0
+  const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
+
+  useEffect(() => {
+    if (!defaultSystemValue) return
+    const resolvedUnit = findUnitForSystem(systems, defaultSystemId)
+    if (!resolvedUnit) return
+
+    const currentSystem = form.getValues("system_id")
+    if (currentSystem && currentSystem !== defaultSystemValue) return
+
+    if (form.getValues("unit") !== resolvedUnit) {
+      form.setValue("unit", resolvedUnit, { shouldValidate: true })
+    }
+    if (currentSystem !== defaultSystemValue) {
+      form.setValue("system_id", defaultSystemValue, { shouldValidate: true })
+    }
+  }, [defaultSystemId, defaultSystemValue, form, systems])
+
+  useEffect(() => {
+    if (!selectedUnit) return
+    const currentValue = form.getValues("system_id")
+    if (!currentValue) return
+    const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
+    if (!existsInUnit) {
+      form.setValue("system_id", "", { shouldValidate: true })
+    }
+  }, [form, selectedUnit, systemsForUnit])
 
   useEffect(() => {
     onSystemChange?.(hasValidSystemId ? resolvedSystemId : null)
@@ -138,7 +182,8 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       })
 
       form.reset({
-        date: new Date().toISOString().split("T")[0],
+        date: toIsoDate(new Date()),
+        unit: values.unit,
         number_of_fish: 0,
         system_id: values.system_id,
         total_weight_mortality: undefined,
@@ -189,18 +234,43 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
               <FormField
                 control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cage Unit</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {units.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="system_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cage Number</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select cage" />
+                          <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {systems.map((system) => (
+                        {systemsForUnit.map((system) => (
                           <SelectItem key={system.id} value={String(system.id)}>
                             {formatCageLabel(system)}
                           </SelectItem>
