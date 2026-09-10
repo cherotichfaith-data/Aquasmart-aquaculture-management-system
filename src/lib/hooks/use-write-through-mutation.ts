@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useToast } from "@/lib/hooks/app/use-toast"
 import { hasPendingSyncMeta } from "@/lib/offline/result"
+import { hasPendingApproval } from "@/lib/approvals"
 import {
   addOptimisticActivity,
   addOptimisticRecentEntry,
@@ -56,6 +57,7 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
     },
     onSuccess: async (result, payload) => {
       const pendingSync = hasPendingSyncMeta(result) && Boolean(result.meta.pendingSync)
+      const pendingApproval = hasPendingApproval(result)
 
       if (!pendingSync) {
         void Promise.resolve(config.invalidate?.({ queryClient, payload, result })).catch((error) => {
@@ -65,8 +67,8 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
 
       toast({
         variant: pendingSync ? "warning" : "success",
-        title: pendingSync ? "Saved offline" : "Record saved",
-        description: pendingSync ? "Saved locally and queued for sync." : config.successMessage,
+        title: pendingSync ? "Saved offline" : pendingApproval ? "Submitted for approval" : "Record saved",
+        description: pendingSync ? "Saved locally; it will be submitted for approval when synced." : pendingApproval ? "A farm manager can review this entry in Approvals." : config.successMessage,
         duration: pendingSync ? 7000 : 6000,
       })
     },

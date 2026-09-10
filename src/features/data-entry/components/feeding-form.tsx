@@ -269,8 +269,6 @@ export function FeedingForm({
       const feedTypeId = parseOptionalNumericId(values.feed_id)
       const feedingResponse = parseOptionalNumericId(values.feeding_response) as FeedingResponseLevel | undefined
       const batchId = resolvedBatchId
-      const existingTotal = existingDailyRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
-      const dailyTotal = existingTotal + values.amount_kg
       const payload = {
         farm_id: resolvedFarmId,
         system_id: systemId,
@@ -282,9 +280,9 @@ export function FeedingForm({
         notes: values.notes?.trim() ? values.notes.trim() : null,
       } as FeedingInsertOverride
 
-      await mutation.mutateAsync(payload)
+      const result = await mutation.mutateAsync(payload)
       setSubmissionSummary(
-        `Saved for ${formatCageLabel(selectedSystem)}. Daily total: ${dailyTotal.toFixed(2)} kg.`,
+        `Submission saved for ${formatCageLabel(selectedSystem)}: ${values.amount_kg.toFixed(2)} kg.${"pendingApproval" in result.meta && result.meta.pendingApproval ? " Official totals update after manager approval." : ""}`,
       )
       form.reset({
         date: toIsoDate(new Date()),

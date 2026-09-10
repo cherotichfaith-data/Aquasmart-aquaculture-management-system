@@ -263,6 +263,11 @@ export function DataEntryInterface({
                                 </Link>
                             )
                         })}
+                        <span className="ml-1 border-l border-border pl-4">
+                            <Link href={`/approvals?farmId=${encodeURIComponent(farmId ?? "")}`} className="data-entry-tab data-entry-tab-idle">
+                                {farmRole === "admin" || farmRole === "farm_manager" ? "Approval" : "My submissions"}
+                            </Link>
+                        </span>
                     </div>
                     <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-muted/50 to-transparent" />
                 </div>

@@ -14,6 +14,17 @@ export type Database = {
   }
   public: {
     Tables: {
+      production_pending_entry: {
+        Row: {
+          id: number; farm_id: string; entry_type: string; system_id: number | null;
+          event_date: string; payload: Json; local_id: string; status: string;
+          submitted_by: string; submitted_at: string; reviewed_by: string | null;
+          reviewed_at: string | null; review_reason: string | null; official_record_id: number | null;
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       _affected_systems: {
         Row: {
           min_affected_date: string
@@ -2063,6 +2074,18 @@ export type Database = {
       }
     }
     Functions: {
+      submit_production_entries: {
+        Args: { p_type: string; p_farm_id: string; p_payloads: Json }
+        Returns: Json
+      }
+      review_production_entries: {
+        Args: { p_farm_id: string; p_ids: number[]; p_decision: string; p_reason?: string | null }
+        Returns: Json
+      }
+      update_pending_entry: {
+        Args: { p_id: number; p_payload: Json }
+        Returns: Json
+      }
       api_batch_growth_trend: {
         Args: {
           p_batch_ids: number[]

@@ -1,10 +1,9 @@
 "use server"
 
 import { z } from "zod"
-import { feedInventoryWriteTags } from "@/lib/cache/tags"
-import { revalidateWriteTags } from "@/lib/server/write-through"
+import { submitApproval } from "@/lib/server/approvals"
 import { requireMutationActionUser } from "@/lib/server/mutation-actions"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { logSbError } from "@/lib/supabase/log"
 import type { Database } from "@/lib/types/database"
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
@@ -27,7 +26,7 @@ const feedInventorySchema = z.object({
 
 export async function recordFeedInventorySnapshotAction(
   payload: FeedInventorySnapshotInput,
-): Promise<{ data: Row<"feed_inventory">; meta: { farmId: string; date: string } }> {
+): Promise<{ data: Row<"feed_inventory">; meta: { farmId: string; date: string; pendingApproval: true } }> {
   const { supabase, user } = await requireMutationActionUser("feed-inventory:record")
 
   let parsedPayload: z.infer<typeof feedInventorySchema>
@@ -55,43 +54,9 @@ export async function recordFeedInventorySnapshotAction(
     throw new Error("You do not have permission to record feed inventory.")
   }
 
-  // "feed_inventory: insert write roles" now checks the same role set as
-  // FEED_INVENTORY_ALLOWED_ROLES above (admin/farm_manager/system_operator
-  // -- see the 20260818090000 migration that fixed the policy's stale
-  // farm_technician reference). The caller's own client is enough; the
-  // membership check above stays for the friendlier error message instead
-  // of a raw RLS-violation error, not because the database needs help
-  // enforcing the rule.
-  const { data, error } = await supabase
-    .from("feed_inventory")
-    .insert({
-      farm_id: parsedPayload.farm_id,
-      inventory_date: parsedPayload.inventory_date,
-      inventory_time: parsedPayload.inventory_time ?? null,
-      feed_type_id: parsedPayload.feed_type_id,
-      bag_weight: parsedPayload.bag_weight,
-      amount_of_bags: parsedPayload.amount_of_bags,
-      opened_bags: parsedPayload.opened_bags ?? null,
-      comments: parsedPayload.comments?.trim() ? parsedPayload.comments.trim() : null,
-    })
-    .select()
-    .single()
-
-  if (error || !data) {
-    logSbError("feed-inventory:record:insert", error)
-    if (isSbPermissionDenied(error)) {
-      throw new Error("Unable to record feed inventory.")
-    }
-    throw new Error("Unable to record feed inventory.")
-  }
-
-  revalidateWriteTags(feedInventoryWriteTags({ farmId: parsedPayload.farm_id }))
-
+  const [entry] = await submitApproval(supabase, "feed_inventory", parsedPayload.farm_id, parsedPayload)
   return {
-    data,
-    meta: {
-      farmId: parsedPayload.farm_id,
-      date: parsedPayload.inventory_date,
-    },
+    data: { ...entry.payload, id: entry.id, approval_status: entry.status } as unknown as Row<"feed_inventory">,
+    meta: { farmId: parsedPayload.farm_id, date: parsedPayload.inventory_date, pendingApproval: true },
   }
 }

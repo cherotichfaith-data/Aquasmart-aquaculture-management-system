@@ -1,17 +1,10 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { inventoryWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { getSystemFarmId, requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
-import { Constants, type Database } from "@/lib/types/database"
-
-type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
-type DbAssignedStockingInsert = Omit<StockingInsert, "abw" | "cycle_id"> & {
-  abw?: never
-  cycle_id?: StockingInsert["cycle_id"]
-}
+import { Constants } from "@/lib/types/database"
 
 const stockingSchema = z.object({
   system_id: z.number().int().positive(),
@@ -41,7 +34,7 @@ export async function POST(request: Request) {
   const systemScope = await getSystemFarmId(supabase, payload.system_id, "stocking:record")
   if ("response" in systemScope) return systemScope.response
 
-  const insertPayload: DbAssignedStockingInsert = {
+  const insertPayload = {
     system_id: payload.system_id,
     batch_id: payload.batch_id,
     date: payload.date,
@@ -53,41 +46,5 @@ export async function POST(request: Request) {
     synced_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase
-    .from("fish_stocking")
-    .upsert(insertPayload as unknown as StockingInsert, { onConflict: "local_id" })
-    .select()
-    .maybeSingle()
-
-  if (error || !data) {
-    logSbError("stocking:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record stocking." }, { status })
-  }
-
-  const { error: statusError } = await supabase
-    .from("system")
-    .update({ cage_status: "occupied" })
-    .eq("id", payload.system_id)
-    .eq("farm_id", systemScope.farmId)
-
-  if (statusError) {
-    logSbError("stocking:record:updateCageStatus", statusError)
-  }
-
-  revalidateWriteTags(
-    inventoryWriteTags({ farmId: systemScope.farmId, systemId: payload.system_id, includeProduction: true }),
-  )
-
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: systemScope.farmId,
-        systemId: payload.system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "stocking", systemScope.farmId, insertPayload)
 }
