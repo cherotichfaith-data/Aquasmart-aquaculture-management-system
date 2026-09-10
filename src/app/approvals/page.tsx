@@ -30,7 +30,22 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
   const role = normalizeRole(membership?.role)
   if (!canAccessDataEntry(role)) redirect("/unauthorized")
   const canReview = role === "admin" || role === "farm_manager"
-  const { data: systems } = await client.from("system").select("id,name").eq("farm_id", farmId)
+
+  const [systemsRes, batchesRes, feedTypesRes, memberRows] = await Promise.all([
+    client.from("system").select("id,name").eq("farm_id", farmId),
+    client.from("fingerling_batch").select("id,name").eq("farm_id", farmId),
+    client.rpc("api_feed_type_options_rpc", { p_farm_id: farmId }),
+    client.from("farm_user").select("user_id").eq("farm_id", farmId),
+  ])
+  const memberIds = (memberRows.data ?? []).map((row) => row.user_id)
+  const { data: profiles } = memberIds.length
+    ? await client.from("user_profile").select("user_id,full_name").in("user_id", memberIds)
+    : { data: [] as { user_id: string; full_name: string | null }[] }
+
+  const systems = (systemsRes.data ?? []).map((row) => ({ id: row.id, name: row.name ?? `Cage #${row.id}` }))
+  const batches = (batchesRes.data ?? []).map((row) => ({ id: row.id, name: row.name ?? `Batch #${row.id}` }))
+  const feedTypes = (feedTypesRes.data ?? []).map((row) => ({ id: row.id, name: row.label }))
+  const members = (profiles ?? []).map((row) => ({ id: row.user_id, name: row.full_name ?? "" }))
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-8">
@@ -55,7 +70,15 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
           </div>
         </div>
 
-        <ApprovalsClient farmId={farmId} canReview={canReview} currentUserId={user.id} systems={systems ?? []} />
+        <ApprovalsClient
+          farmId={farmId}
+          canReview={canReview}
+          currentUserId={user.id}
+          systems={systems}
+          batches={batches}
+          feedTypes={feedTypes}
+          members={members}
+        />
       </div>
     </main>
   )
