@@ -6,7 +6,7 @@ import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/app-ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/app-ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { Dialog } from "@/components/app-ui/dialog"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { useProductionSummary } from "@/features/production/hooks"
@@ -35,13 +35,12 @@ import {
     requireActiveFarmId,
 } from "./form-utils"
 import {
-    LatestEntryGuard,
-    pickLatestEntryByRecordDate,
     pickSameDayEntry,
     usePendingLatestEntries,
     type LatestEntrySummary,
 } from "./latest-entry-guard"
-import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+import { SelectionChips } from "./selection-info"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const formSchema = z.object({
     system_id: z.string().min(1, "System is required"),
@@ -173,26 +172,23 @@ function HarvestCycleSummary({
     const isLoadingSummary =
         summaryQuery.isLoading || stockingQuery.isLoading || mortalityQuery.isLoading || transferQuery.isLoading || harvestQuery.isLoading
 
+    if (!systemId) return null
+
     return (
-        <Card className="xl:sticky xl:top-6">
+        <Card>
             <CardHeader>
-                <CardTitle>Current Cycle Summary</CardTitle>
-                <CardDescription>
-                    {summaryLabel}
-                    {asOfDate ? ` as of ${formatDateOnly(asOfDate)}` : ""}
-                </CardDescription>
+                <CardTitle className="text-base">
+                    Current cycle · {summaryLabel}
+                    {asOfDate ? ` — as of ${formatDateOnly(asOfDate)}` : ""}
+                </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-                {!systemId ? (
-                    <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
-                        Select a system to load cycle checks before submitting harvest.
-                    </div>
-                ) : queryError ? (
+                {queryError ? (
                     <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive">
                         Unable to load cycle summary. {queryError}
                     </div>
                 ) : isLoadingSummary ? (
-                    <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                    <div className="grid gap-3 sm:grid-cols-3">
                         {Array.from({ length: 3 }).map((_, index) => (
                             <div key={index} className="rounded-md border border-border/80 bg-muted/30 p-3">
                                 <div className="h-3 w-24 animate-pulse rounded bg-muted" />
@@ -206,7 +202,7 @@ function HarvestCycleSummary({
                     </div>
                 ) : (
                     <>
-                        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                        <div className="grid gap-3 sm:grid-cols-3">
                             <div className="rounded-md border border-border/80 bg-muted/20 p-3">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Days In Cycle</p>
                                 <p className="mt-2 text-2xl font-semibold">{formatNumberValue(cycleDays)}</p>
@@ -277,12 +273,6 @@ export function HarvestForm({
         () => resolveBatchIdForSystem(batches, resolvedSystemId),
         [batches, resolvedSystemId],
     )
-    const latestEntryQuery = useHarvests({
-        farmId,
-        systemId: resolvedSystemId ?? undefined,
-        limit: 1,
-        enabled: Boolean(resolvedSystemId),
-    })
     const duplicateQuery = useHarvests({
         farmId,
         systemId: resolvedSystemId ?? undefined,
@@ -292,27 +282,13 @@ export function HarvestForm({
         enabled: Boolean(resolvedSystemId) && Boolean(selectedDate),
     })
     const pendingEntries = usePendingLatestEntries("harvest", resolvedSystemId)
-    const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
-        key: `harvest-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
-        date: row.date ?? "",
-        createdAt: row.created_at ?? null,
-        summary: `${row.total_weight_harvest ?? 0} kg harvested`,
-        details: [
-            { label: "Count", value: String(row.number_of_fish_harvest ?? 0) },
-            { label: "Type", value: row.type_of_harvest ?? "Not recorded" },
-        ],
-    }))
     const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
         key: `harvest-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
         date: row.date ?? "",
         createdAt: row.created_at ?? null,
         summary: `${row.total_weight_harvest ?? 0} kg harvested`,
-        details: [
-            { label: "Count", value: String(row.number_of_fish_harvest ?? 0) },
-            { label: "Type", value: row.type_of_harvest ?? "Not recorded" },
-        ],
+        details: [],
     }))
-    const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
     const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
     async function submitHarvest(values: z.infer<typeof formSchema>) {
@@ -373,18 +349,36 @@ export function HarvestForm({
 
     return (
         <>
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-                <div>
-                    <div className="data-entry-form-intro">
-                        <h2 className="text-xl font-semibold tracking-tight">Record Harvest</h2>
-                    </div>
-                    <div className="data-entry-status">
-                        <OfflineSaveBadge result={mutation.data} />
-                    </div>
-                    <LatestEntryGuard latestEntry={latestEntry} duplicateEntry={duplicateEntry} itemLabel="harvest" />
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
-                            <div className="data-entry-secondary-grid">
+            <div className="space-y-4">
+                <div className="data-entry-status">
+                    <OfflineSaveBadge result={mutation.data} />
+                </div>
+
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormSection title="Record harvest">
+                            <SelectionChips
+                                systems={systems}
+                                systemId={resolvedSystemId}
+                                batches={batches}
+                                batchId={resolvedBatchId}
+                            />
+
+                            <FieldGrid>
+                                <FormField
+                                    control={form.control}
+                                    name="date"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Date</FormLabel>
+                                            <FormControl>
+                                                <Input type="date" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
                                 <FormField
                                     control={form.control}
                                     name="system_id"
@@ -393,7 +387,7 @@ export function HarvestForm({
                                             <FormLabel>System</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value || undefined}>
                                                 <FormControl>
-                                                    <SelectTrigger className="max-w-xs">
+                                                    <SelectTrigger>
                                                         <SelectValue placeholder="Select system" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -409,27 +403,7 @@ export function HarvestForm({
                                         </FormItem>
                                     )}
                                 />
-                                <FormField
-                                    control={form.control}
-                                    name="date"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Date</FormLabel>
-                                            <FormControl>
-                                                <Input type="date" className="max-w-xs" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
 
-                            <div className="data-entry-secondary-grid">
-                                <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-                                <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
-                            </div>
-
-                            <div className="data-entry-secondary-grid">
                                 <FormField
                                     control={form.control}
                                     name="number_of_fish"
@@ -437,12 +411,13 @@ export function HarvestForm({
                                         <FormItem>
                                             <FormLabel>Harvested Fish Count</FormLabel>
                                             <FormControl>
-                                                <Input type="number" step="1" className="max-w-xs" {...field} />
+                                                <Input type="number" step="1" inputMode="numeric" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
                                 />
+
                                 <FormField
                                     control={form.control}
                                     name="amount_kg"
@@ -450,15 +425,13 @@ export function HarvestForm({
                                         <FormItem>
                                             <FormLabel>Total Harvested Weight (kg)</FormLabel>
                                             <FormControl>
-                                                <Input type="number" step="0.01" className="max-w-xs" {...field} />
+                                                <Input type="number" step="0.01" inputMode="decimal" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
                                 />
-                            </div>
 
-                            <div className="data-entry-secondary-grid">
                                 <FormField
                                     control={form.control}
                                     name="type_of_harvest"
@@ -467,7 +440,7 @@ export function HarvestForm({
                                             <FormLabel>Harvest Type</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value}>
                                                 <FormControl>
-                                                    <SelectTrigger className="max-w-xs">
+                                                    <SelectTrigger>
                                                         <SelectValue placeholder="Select type" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -480,10 +453,10 @@ export function HarvestForm({
                                         </FormItem>
                                     )}
                                 />
-                            </div>
+                            </FieldGrid>
 
                             {harvestType === "final" ? (
-                                <div className="data-entry-callout-alert rounded-md border border-destructive/30 bg-destructive/5 text-sm">
+                                <div className="data-entry-callout-alert border-destructive/30 bg-destructive/5">
                                     <p className="font-medium text-foreground">Final harvest will close this cycle.</p>
                                     <p className="mt-1 text-muted-foreground">
                                         This will close the production cycle for {selectedCageLabel}. All subsequent
@@ -491,24 +464,28 @@ export function HarvestForm({
                                     </p>
                                 </div>
                             ) : null}
+                        </FormSection>
 
-                            <div className="flex justify-end pt-1">
-                                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
-                                    {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Record Harvest
-                                </Button>
-                            </div>
-                        </form>
-                    </Form>
-                </div>
+                        <HarvestCycleSummary
+                            farmId={farmId}
+                            system={selectedSystem}
+                            systemId={resolvedSystemId}
+                            batchId={resolvedBatchId}
+                            selectedDate={selectedDate}
+                        />
 
-                <HarvestCycleSummary
-                    farmId={farmId}
-                    system={selectedSystem}
-                    systemId={resolvedSystemId}
-                    batchId={resolvedBatchId}
-                    selectedDate={selectedDate}
-                />
+                        <FormActions>
+                            <Button
+                                type="submit"
+                                className="min-h-11 rounded-lg px-5"
+                                disabled={form.formState.isSubmitting || mutation.isPending}
+                            >
+                                {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Record Harvest
+                            </Button>
+                        </FormActions>
+                    </form>
+                </Form>
             </div>
 
             <Dialog

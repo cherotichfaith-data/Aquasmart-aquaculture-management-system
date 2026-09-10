@@ -30,13 +30,12 @@ import {
   toIsoDate,
 } from "./form-utils"
 import {
-  LatestEntryGuard,
-  pickLatestEntryByRecordDate,
   pickSameDayEntry,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
-import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+import { SelectionChips } from "./selection-info"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const EXTERNAL_DESTINATION = "__external__"
 
@@ -81,14 +80,6 @@ interface TransferFormProps {
 
 export function TransferForm({ farmId, systems, batches, defaultSystemId = null, onSystemChange }: TransferFormProps) {
   const mutation = useRecordTransfer()
-  const resolveSystemLabel = useMemo(
-    () => (systemId: number | null | undefined) => {
-      if (systemId == null) return "Not recorded"
-      const system = systems.find((item) => item.id === systemId) ?? null
-      return system ? formatCageLabel(system) : `Cage ${systemId}`
-    },
-    [systems],
-  )
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -106,10 +97,8 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   })
 
   const originSystemId = useWatch({ control: form.control, name: "origin_system_id" })
-  const targetSystemId = useWatch({ control: form.control, name: "target_system_id" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
   const transferType = useWatch({ control: form.control, name: "transfer_type" })
-  const externalTargetName = useWatch({ control: form.control, name: "external_target_name" })
   const isExternalOut = transferType === "external_out"
   const resolvedOriginSystemId = Number(originSystemId)
   const hasValidOriginSystemId = Number.isFinite(resolvedOriginSystemId) && resolvedOriginSystemId > 0
@@ -122,12 +111,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
     () => resolveBatchIdForSystem(batches, resolvedOriginSystemId),
     [batches, resolvedOriginSystemId],
   )
-  const latestEntryQuery = useTransferData({
-    farmId,
-    systemId: hasValidOriginSystemId ? resolvedOriginSystemId : undefined,
-    limit: 1,
-    enabled: hasValidOriginSystemId,
-  })
   const duplicateQuery = useTransferData({
     farmId,
     systemId: hasValidOriginSystemId ? resolvedOriginSystemId : undefined,
@@ -137,33 +120,13 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
     enabled: hasValidOriginSystemId && Boolean(selectedDate),
   })
   const pendingEntries = usePendingLatestEntries("transfer", hasValidOriginSystemId ? resolvedOriginSystemId : null)
-  const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
-    key: `transfer-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
-    date: row.date ?? "",
-    createdAt: row.created_at ?? null,
-    summary: `${row.number_of_fish_transfer ?? 0} fish transferred`,
-    details: [
-      {
-        label: "Destination",
-        value: row.external_target_name?.trim() || resolveSystemLabel(row.target_system_id),
-      },
-      { label: "Weight", value: row.total_weight_transfer != null ? `${row.total_weight_transfer} kg` : "Not recorded" },
-    ],
-  }))
   const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
     key: `transfer-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
     date: row.date ?? "",
     createdAt: row.created_at ?? null,
     summary: `${row.number_of_fish_transfer ?? 0} fish transferred`,
-    details: [
-      {
-        label: "Destination",
-        value: row.external_target_name?.trim() || resolveSystemLabel(row.target_system_id),
-      },
-      { label: "Weight", value: row.total_weight_transfer != null ? `${row.total_weight_transfer} kg` : "Not recorded" },
-    ],
+    details: [],
   }))
-  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
   const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -218,108 +181,88 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   }
 
   return (
-    <div className="space-y-6">
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Transfer</h2>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <LatestEntryGuard
-        latestEntry={latestEntry}
-        duplicateEntry={duplicateEntry}
-        itemLabel="transfer"
-        isLoading={latestEntryQuery.isLoading}
-      />
-
-        {isExternalOut ? (
-          <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
-            Fish will leave this farm system and no receiving cage will be tracked.
-          </div>
-        ) : null}
+      {isExternalOut ? (
+        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
+          Fish will leave this farm system and no receiving cage will be tracked.
+        </div>
+      ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
-          <FormField
-            control={form.control}
-            name="date"
-            render={({ field }) => (
-              <FormItem className="max-w-sm">
-                <FormLabel>Date</FormLabel>
-                <FormControl>
-                  <Input type="date" className="max-w-xs" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="data-entry-secondary-grid">
-            <FormField
-              control={form.control}
-              name="origin_system_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Origin Cage</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value)
-                    }}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="max-w-xs">
-                        <SelectValue placeholder="Select origin" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {systems.map((system) => (
-                        <SelectItem key={system.id} value={String(system.id)}>
-                          {formatCageLabel(system)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormSection title="Record transfer">
+            <SelectionChips
+              systems={systems}
+              systemId={resolvedOriginSystemId}
+              batches={batches}
+              batchId={resolvedBatchId}
             />
 
-            {isExternalOut ? (
+            <FieldGrid>
               <FormField
                 control={form.control}
-                name="external_target_name"
+                name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Destination Location</FormLabel>
+                    <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <Input {...field} className="max-w-sm" placeholder="e.g. KIMBWELA Pond 3" />
+                      <Input type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            ) : (
+
               <FormField
                 control={form.control}
-                name="target_system_id"
+                name="transfer_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Destination Cage</FormLabel>
+                    <FormLabel>Transfer Type</FormLabel>
                     <Select
                       onValueChange={(value) => {
                         field.onChange(value)
-                        if (value === EXTERNAL_DESTINATION) {
-                          form.setValue("transfer_type", "external_out", { shouldValidate: true })
+                        if (value === "external_out") {
+                          form.setValue("target_system_id", EXTERNAL_DESTINATION, { shouldValidate: false })
+                        } else if (form.getValues("target_system_id") === EXTERNAL_DESTINATION) {
+                          form.setValue("target_system_id", "", { shouldValidate: false })
+                          form.setValue("external_target_name", "")
                         }
                       }}
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger className="max-w-xs">
-                          <SelectValue placeholder="Select destination" />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select transfer type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {UI_TRANSFER_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {TRANSFER_TYPE_LABELS[type]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="origin_system_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Origin Cage</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select origin" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -328,126 +271,124 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                             {formatCageLabel(system)}
                           </SelectItem>
                         ))}
-                        <SelectItem value={EXTERNAL_DESTINATION}>External location</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
-          </div>
 
-          <div className="data-entry-secondary-grid">
-            <FormField
-              control={form.control}
-              name="transfer_type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Transfer Type</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value)
-                      if (value === "external_out") {
-                        form.setValue("target_system_id", EXTERNAL_DESTINATION, { shouldValidate: false })
-                      } else if (form.getValues("target_system_id") === EXTERNAL_DESTINATION) {
-                        form.setValue("target_system_id", "", { shouldValidate: false })
-                        form.setValue("external_target_name", "")
-                      }
-                    }}
-                    value={field.value}
-                  >
+              {isExternalOut ? (
+                <FormField
+                  control={form.control}
+                  name="external_target_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Destination Location</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. KIMBWELA Pond 3" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="target_system_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Destination Cage</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value)
+                          if (value === EXTERNAL_DESTINATION) {
+                            form.setValue("transfer_type", "external_out", { shouldValidate: true })
+                          }
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select destination" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {systems.map((system) => (
+                            <SelectItem key={system.id} value={String(system.id)}>
+                              {formatCageLabel(system)}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value={EXTERNAL_DESTINATION}>External location</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
+                name="number_of_fish"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Fish</FormLabel>
                     <FormControl>
-                      <SelectTrigger className="max-w-xs">
-                        <SelectValue placeholder="Select transfer type" />
-                      </SelectTrigger>
+                      <Input type="number" step="1" inputMode="numeric" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {UI_TRANSFER_TYPES.map((transferType) => (
-                        <SelectItem key={transferType} value={transferType}>
-                          {TRANSFER_TYPE_LABELS[transferType]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <SelectedSystemInfo systems={systems} systemId={originSystemId} title="Origin System" />
-            {isExternalOut ? (
-              <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
-                <div className="font-medium">Destination</div>
-                <div className="text-muted-foreground">{externalTargetName?.trim() || "External location"}</div>
-              </div>
-            ) : (
-              <SelectedSystemInfo systems={systems} systemId={targetSystemId} title="Destination System" />
-            )}
-          </div>
+              <FormField
+                control={form.control}
+                name="total_weight_kg"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Total Weight (kg)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" inputMode="decimal" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem className="data-entry-field-wide">
+                    <FormLabel>Comment</FormLabel>
+                    <FormControl>
+                      <textarea
+                        {...field}
+                        rows={3}
+                        className="data-entry-textarea"
+                        placeholder="Reason for movement, handling detail, or receiving location note."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
+          </FormSection>
 
-          <div className="data-entry-secondary-grid">
-            <FormField
-              control={form.control}
-              name="number_of_fish"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Number of Fish</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="1" className="max-w-xs" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="total_weight_kg"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Total Weight (kg)</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" className="max-w-xs" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Comment</FormLabel>
-                <FormControl>
-                  <textarea
-                    {...field}
-                    rows={3}
-                    className="data-entry-textarea"
-                    placeholder="Reason for movement, handling detail, or receiving location note."
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="flex justify-end pt-1">
-            <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+          <FormActions>
+            <Button
+              type="submit"
+              className="min-h-11 rounded-lg px-5"
+              disabled={form.formState.isSubmitting || mutation.isPending}
+            >
               {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Record Transfer
             </Button>
-          </div>
+          </FormActions>
         </form>
       </Form>
     </div>
   )
 }
-

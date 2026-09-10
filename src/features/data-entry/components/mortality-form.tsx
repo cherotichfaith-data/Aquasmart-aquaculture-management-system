@@ -24,13 +24,12 @@ import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 import {
-  LatestEntryGuard,
-  pickLatestEntryByRecordDate,
   pickSameDayEntry,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
-import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+import { SelectionChips } from "./selection-info"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
 import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 
 const formSchema = z.object({
@@ -98,12 +97,6 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
 
   const resolvedBatchId = resolveBatchIdForSystem(batches, resolvedSystemId)
 
-  const latestEntryQuery = useMortalityData({
-    farmId,
-    systemId: hasValidSystemId ? resolvedSystemId : undefined,
-    limit: 1,
-    enabled: hasValidSystemId,
-  })
   const duplicateQuery = useMortalityData({
     farmId,
     systemId: hasValidSystemId ? resolvedSystemId : undefined,
@@ -114,33 +107,13 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
   })
   const pendingEntries = usePendingLatestEntries("mortality", hasValidSystemId ? resolvedSystemId : null)
 
-  const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
-    key: `mortality-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
-    date: row.date ?? "",
-    createdAt: row.created_at ?? null,
-    summary: `${row.number_of_fish_mortality ?? 0} dead fish`,
-    details: [
-      { label: "Cause", value: row.cause ?? "Unknown" },
-      {
-        label: "Dead Weight",
-        value: row.total_weight_mortality != null ? `${row.total_weight_mortality} kg` : "Not recorded",
-      },
-    ],
-  }))
   const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
     key: `mortality-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
     date: row.date ?? "",
     createdAt: row.created_at ?? null,
     summary: `${row.number_of_fish_mortality ?? 0} dead fish`,
-    details: [
-      { label: "Cause", value: row.cause ?? "Unknown" },
-      {
-        label: "Dead Weight",
-        value: row.total_weight_mortality != null ? `${row.total_weight_mortality} kg` : "Not recorded",
-      },
-    ],
+    details: [],
   }))
-  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
   const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -178,157 +151,153 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
   }
 
   return (
-    <div className="space-y-6">
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Mortality</h2>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <LatestEntryGuard
-        latestEntry={latestEntry}
-        duplicateEntry={duplicateEntry}
-        itemLabel="mortality"
-        isLoading={latestEntryQuery.isLoading}
-      />
-
-        {mortalityCount >= 100 ? (
-        <div className="data-entry-callout-alert rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
-            Mass mortality threshold exceeded. Weigh the dead fish and record the total dead weight, then complete a DO and water-quality check for this cage.
-          </div>
-        ) : null}
+      {mortalityCount >= 100 ? (
+        <div className="data-entry-callout-alert border-destructive/40 bg-destructive/10 text-destructive">
+          Mass mortality threshold exceeded. Weigh the dead fish and record the total dead weight, then complete a DO and water-quality check for this cage.
+        </div>
+      ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
-          <div className="data-entry-secondary-grid">
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" className="max-w-xs" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormSection title="Record mortality">
+            <SelectionChips
+              systems={systems}
+              systemId={resolvedSystemId}
+              batches={batches}
+              batchId={resolvedBatchId}
             />
 
-            <FormField
-              control={form.control}
-              name="system_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cage Number</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+            <FieldGrid>
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <SelectTrigger className="max-w-xs">
-                        <SelectValue placeholder="Select cage" />
-                      </SelectTrigger>
+                      <Input type="date" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {systems.map((system) => (
-                        <SelectItem key={system.id} value={String(system.id)}>
-                          {formatCageLabel(system)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="number_of_fish"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Number of Dead Fish</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="1" className="max-w-xs" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+              <FormField
+                control={form.control}
+                name="system_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cage Number</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select cage" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {systems.map((system) => (
+                          <SelectItem key={system.id} value={String(system.id)}>
+                            {formatCageLabel(system)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <div className="data-entry-secondary-grid">
-            <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-            <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
-          </div>
+              <FormField
+                control={form.control}
+                name="number_of_fish"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Dead Fish</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="1" inputMode="numeric" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <FormField
-            control={form.control}
-            name="cause"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cause</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="max-w-xs">
-                      <SelectValue placeholder="Select cause" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {MORTALITY_CAUSES.map((cause) => (
-                      <SelectItem key={cause} value={cause}>
-                        {CAUSE_LABELS[cause]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              <FormField
+                control={form.control}
+                name="cause"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cause</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select cause" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {MORTALITY_CAUSES.map((cause) => (
+                          <SelectItem key={cause} value={cause}>
+                            {CAUSE_LABELS[cause]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <FormField
-            control={form.control}
-            name="total_weight_mortality"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Total Dead Weight (kg){mortalityCount >= 100 ? " *" : ""}</FormLabel>
-                <FormControl>
-                  <Input type="number" step="0.01" className="max-w-xs" {...field} value={field.value ?? ""} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              <FormField
+                control={form.control}
+                name="total_weight_mortality"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Total Dead Weight (kg){mortalityCount >= 100 ? " *" : ""}</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Comments</FormLabel>
-                <FormControl>
-                  <textarea
-                    {...field}
-                    rows={3}
-                    className="data-entry-textarea"
-                    placeholder="Observed signs, handling issue, water condition, or follow-up action."
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem className="data-entry-field-wide">
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <textarea
+                        {...field}
+                        rows={3}
+                        className="data-entry-textarea"
+                        placeholder="Observed signs, handling issue, water condition, or follow-up action."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
+          </FormSection>
 
-          <div className="flex justify-end pt-1">
-            <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
+          <FormActions>
+            <Button
+              type="submit"
+              className="min-h-11 rounded-lg px-5"
+              disabled={form.formState.isSubmitting || mutation.isPending}
+            >
               {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Record Mortality
             </Button>
-          </div>
+          </FormActions>
         </form>
       </Form>
     </div>
   )
 }
-
