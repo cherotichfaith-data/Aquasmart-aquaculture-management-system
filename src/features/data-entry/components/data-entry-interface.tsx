@@ -239,9 +239,6 @@ export function DataEntryInterface({
                 <h1 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
                     Data Entry
                 </h1>
-                <span className="truncate text-sm text-muted-foreground">
-                    {activeItem?.label ?? "Farm"} records
-                </span>
                 <p className="data-entry-required-note ml-auto hidden md:block">
                     Required fields must be completed before saving.
                 </p>

@@ -37,8 +37,6 @@ import {
   toIsoDate,
 } from "./form-utils"
 import {
-  LatestEntryGuard,
-  pickLatestEntryByRecordDate,
   pickSameDayEntryByMetadata,
   usePendingLatestEntries,
   type LatestEntrySummary,
@@ -233,20 +231,11 @@ export function FeedingForm({
     limit: 20,
     enabled: Boolean(selectedDate) && hasValidSystemId,
   })
-  const latestEntryQuery = useFeedingRecords({
-    farmId,
-    systemId: hasValidSystemId ? selectedSystemId : undefined,
-    limit: 1,
-    enabled: hasValidSystemId,
-  })
   const pendingEntries = usePendingLatestEntries("feeding", hasValidSystemId ? selectedSystemId : null, feeds)
 
   const existingDailyRecords = duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []
-  const latestServerRecords = latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []
 
-  const latestServerEntries = latestServerRecords.map((row) => toFeedingEntrySummary(row, "feeding"))
   const duplicateServerEntries = existingDailyRecords.map((row) => toFeedingEntrySummary(row, "feeding-duplicate"))
-  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
   const duplicateEntry = pickSameDayEntryByMetadata([...duplicateServerEntries, ...pendingEntries], {
     date: selectedDate,
     metadataKey: "feedTypeId",
@@ -306,12 +295,6 @@ export function FeedingForm({
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <LatestEntryGuard
-        latestEntry={latestEntry}
-        duplicateEntry={duplicateEntry}
-        itemLabel="feeding"
-        isLoading={latestEntryQuery.isLoading}
-      />
       {submissionSummary ? (
         <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
           {submissionSummary}
@@ -495,7 +478,7 @@ export function FeedingForm({
             <Button
               type="submit"
               className="min-h-11 rounded-lg px-5"
-              disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}
+              disabled={form.formState.isSubmitting || mutation.isPending}
             >
               {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Record Feeding
