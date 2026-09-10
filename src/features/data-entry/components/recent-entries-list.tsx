@@ -70,7 +70,7 @@ type RecentEntriesListProps = (
   | { type: "feed_inventory"; data: FeedInventoryRow[] }
   | { type: "stocking"; data: StockingRow[] }
   | { type: "system"; data: SystemEntryRow[] }
-) & { systems: SystemOption[]; feeds?: FeedTypeOption[]; activeSystemId?: number | null }
+) & { systems: SystemOption[]; feeds?: FeedTypeOption[]; activeSystemId?: number | null; farmId?: string | null }
 
 type CageKeyed = { system_id?: number | null; origin_system_id?: number | null; target_system_id?: number | null }
 
@@ -244,15 +244,19 @@ function scopeToCage<T extends CageKeyed>(rows: readonly T[], systemId: number |
  * Returns null while there is no cage or the type has no scoped source, so the
  * caller falls back to the (client-filtered) prefetch.
  */
-function useScopedRecentRows(type: RecentEntriesListProps["type"], systemId: number | null): unknown[] | null {
+function useScopedRecentRows(
+  type: RecentEntriesListProps["type"],
+  systemId: number | null,
+  farmId: string | null | undefined,
+): unknown[] | null {
   const sid = systemId ?? undefined
-  const on = (target: string) => systemId != null && type === target
-  const feeding = useFeedingRecords({ systemId: sid, limit: 5, enabled: on("feeding") })
-  const mortality = useMortalityData({ systemId: sid, limit: 5, enabled: on("mortality") })
-  const sampling = useSamplingData({ systemId: sid, limit: 5, enabled: on("sampling") })
-  const stocking = useStockingData({ systemId: sid, limit: 5, enabled: on("stocking") })
-  const harvest = useHarvests({ systemId: sid, limit: 5, enabled: on("harvest") })
-  const transfer = useTransferData({ systemId: sid, limit: 5, enabled: on("transfer") })
+  const on = (target: string) => systemId != null && Boolean(farmId) && type === target
+  const feeding = useFeedingRecords({ farmId, systemId: sid, limit: 5, enabled: on("feeding") })
+  const mortality = useMortalityData({ farmId, systemId: sid, limit: 5, enabled: on("mortality") })
+  const sampling = useSamplingData({ farmId, systemId: sid, limit: 5, enabled: on("sampling") })
+  const stocking = useStockingData({ farmId, systemId: sid, limit: 5, enabled: on("stocking") })
+  const harvest = useHarvests({ farmId, systemId: sid, limit: 5, enabled: on("harvest") })
+  const transfer = useTransferData({ farmId, systemId: sid, limit: 5, enabled: on("transfer") })
 
   if (systemId == null) return null
   const pick = (result: { data?: unknown }) => {
@@ -343,7 +347,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
   // Only scope entry types that carry a cage; feed inventory and system setup are farm-level.
   const scopedSystemId = type === "feed_inventory" || type === "system" ? null : activeSystemId
   const scopeLabel = scopedSystemId != null ? formatSystemName(scopedSystemId) : null
-  const scopedRows = useScopedRecentRows(type, scopedSystemId)
+  const scopedRows = useScopedRecentRows(type, scopedSystemId, props.farmId)
   const formatFeedTypeName = (feedTypeId: number | null | undefined) => {
     if (feedTypeId == null) return "Not selected"
     const feedType = feeds?.find((item) => item.id === feedTypeId)
