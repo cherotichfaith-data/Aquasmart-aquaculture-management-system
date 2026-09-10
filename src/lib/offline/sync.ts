@@ -193,6 +193,7 @@ const syncConfigs: { [Key in OfflineTableName]: SyncConfig<OfflineRecordByTable[
   feedInventory: {
     apiPath: syncTargets.feedInventory,
     buildBody: (record) => ({
+      local_id: record.localId,
       farm_id: record.farmId ?? null,
       inventory_date: record.inventoryDate,
       inventory_time: record.inventoryTime ?? null,

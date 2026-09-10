@@ -1,10 +1,9 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { inventoryWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { getSystemFarmId, requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { Constants } from "@/lib/types/database"
 
 const harvestSchema = z.object({
@@ -45,31 +44,5 @@ export async function POST(request: Request) {
     synced_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase
-    .from("fish_harvest")
-    .upsert(insertPayload, { onConflict: "local_id" })
-    .select()
-    .maybeSingle()
-
-  if (error || !data) {
-    logSbError("harvest:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record harvest." }, { status })
-  }
-
-  revalidateWriteTags(
-    inventoryWriteTags({ farmId: systemScope.farmId, systemId: payload.system_id, includeProduction: true }),
-  )
-
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: systemScope.farmId,
-        systemId: payload.system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "harvest", systemScope.farmId, insertPayload)
 }

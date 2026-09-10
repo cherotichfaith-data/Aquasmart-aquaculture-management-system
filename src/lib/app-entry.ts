@@ -31,6 +31,7 @@ export const ONBOARDING_CREATE_WORKSPACE_PATH = "/onboarding/create-workspace"
 export const WORKSPACE_SELECT_PATH = "/onboarding/select-workspace"
 
 const STANDALONE_FEATURE_PREFIXES = [
+  "/approvals",
   "/feed",
   "/production",
   "/reports",
