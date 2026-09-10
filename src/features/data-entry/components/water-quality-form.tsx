@@ -23,16 +23,15 @@ import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useRecordWaterQuality, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { InfoPanel, InfoStat } from "./form-support"
+import { InfoStat } from "./form-support"
 import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 import {
-  LatestEntryGuard,
-  pickLatestEntryByRecordDate,
   pickSameDayEntryByMetadata,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
-import { SelectedSystemInfo } from "./selection-info"
+import { SelectionChips } from "./selection-info"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const optionalNumber = z.preprocess(
   (value) => (value === "" || value == null ? undefined : Number(value)),
@@ -127,14 +126,6 @@ export function WaterQualityForm({
     onSystemChange?.(hasValidSystemId ? selectedSystemId : null)
   }, [hasValidSystemId, onSystemChange, selectedSystemId])
 
-  const latestEntryQuery = useWaterQualityMeasurements({
-    farmId,
-    systemId: hasValidSystemId ? selectedSystemId : undefined,
-    limit: 1,
-    latestFirst: true,
-    requireSystem: true,
-    enabled: hasValidSystemId,
-  })
   const duplicateQuery = useWaterQualityMeasurements({
     farmId,
     systemId: hasValidSystemId ? selectedSystemId : undefined,
@@ -193,28 +184,12 @@ export function WaterQualityForm({
     }
   }, [doValue, supabase])
 
-  const latestServerEntries = (latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []).map<LatestEntrySummary>((row) => ({
-    key: `water-quality-${row.id ?? row.created_at ?? row.date ?? "latest"}`,
-    date: row.date ?? "",
-    createdAt: row.created_at ?? null,
-    summary: `${row.parameter_name ?? "Parameter"}: ${row.parameter_value ?? ""}`,
-    details: [
-      { label: "Time", value: row.time ?? "Not recorded" },
-      { label: "Depth", value: row.water_depth != null ? `${row.water_depth} m` : "Not recorded" },
-    ],
-    metadata: {
-      waterDepth: row.water_depth ?? null,
-    },
-  }))
   const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
     key: `water-quality-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
     date: row.date ?? "",
     createdAt: row.created_at ?? null,
     summary: `${row.parameter_name ?? "Parameter"}: ${row.parameter_value ?? ""}`,
-    details: [
-      { label: "Time", value: row.time ?? "Not recorded" },
-      { label: "Depth", value: row.water_depth != null ? `${row.water_depth} m` : "Not recorded" },
-    ],
+    details: [],
     metadata: {
       waterDepth: row.water_depth ?? null,
     },
@@ -223,7 +198,6 @@ export function WaterQualityForm({
         ? `A water quality entry already exists for this cage on ${row.date} at ${row.water_depth} m depth.`
         : `A water quality entry already exists for this cage on ${row.date}.`,
   }))
-  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
   const duplicateEntry = pickSameDayEntryByMetadata(
     [...duplicateServerEntries, ...pendingEntries],
     {
@@ -235,6 +209,15 @@ export function WaterQualityForm({
           : null,
     },
   )
+
+  const doTone =
+    doClassification === "lethal"
+      ? "critical"
+      : doClassification === "critical"
+        ? "warning"
+        : doClassification === "optimal"
+          ? "success"
+          : "default"
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -303,233 +286,212 @@ export function WaterQualityForm({
   }
 
   return (
-    <div>
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Water Quality</h2>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
-        <div className="space-y-6">
-            <LatestEntryGuard
-              latestEntry={latestEntry}
-              duplicateEntry={duplicateEntry}
-              itemLabel="water quality"
-              isLoading={latestEntryQuery.isLoading}
-            />
-            {selectedTime < "12:00" ? (
-              <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-warning">
-                Morning measurement logged. Remember to return for the PM measurement as well.
-              </div>
-            ) : null}
+      {selectedTime < "12:00" ? (
+        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
+          Morning measurement logged. Remember to return for the PM measurement as well.
+        </div>
+      ) : null}
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-3xl space-y-3.5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" className="max-w-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormSection title="Reading details">
+            <SelectionChips systems={selectableSystems} systemId={selectedSystemId} />
 
-                <FormField
-                  control={form.control}
-                  name="time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" step="900" className="max-w-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="system_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>System / Cage</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="max-w-xs">
-                            <SelectValue placeholder="Select system" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {selectableSystems.map((system) => (
-                            <SelectItem key={system.id} value={String(system.id)}>
-                              {formatCageLabel(system)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="location_reference"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isLakeReference ? "Location / Reference" : "Location / Reference (Optional)"}</FormLabel>
-                      <FormControl>
-                        <Input
-                          className="max-w-sm"
-                          {...field}
-                          placeholder={isLakeReference ? "e.g. lake edge, 20m from cage line" : "Optional reference note"}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
+            <FieldGrid>
               <FormField
                 control={form.control}
-                name="water_depth"
+                name="date"
                 render={({ field }) => (
-                  <FormItem className="max-w-sm">
-                    <FormLabel>Water Depth (m)</FormLabel>
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.1" {...field} />
+                      <Input type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <SelectedSystemInfo systems={selectableSystems} systemId={selectedSystemId} />
+              <FormField
+                control={form.control}
+                name="time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Time</FormLabel>
+                    <FormControl>
+                      <Input type="time" step="900" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              <div className="data-entry-compact-grid sm:grid-cols-2 xl:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="temperature"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Temperature (C)</FormLabel>
+              <FormField
+                control={form.control}
+                name="system_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>System / Cage</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <Input type="number" step="0.1" {...field} value={field.value ?? ""} />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select system" />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="dissolved_oxygen"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>DO (mg/L)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="pH"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>pH</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.1" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="total_ammonia"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ammonia (mg/L)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="no2"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nitrite (mg/L)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="no3"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nitrate (mg/L)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      <SelectContent>
+                        {selectableSystems.map((system) => (
+                          <SelectItem key={system.id} value={String(system.id)}>
+                            {formatCageLabel(system)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              <div className="flex justify-end pt-1">
-                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}>
-                  {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Record Water Quality
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </div>
+              <FormField
+                control={form.control}
+                name="water_depth"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Water Depth (m)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.1" inputMode="decimal" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-        <InfoPanel title="DO Classification Preview">
-          <InfoStat
-            label="DO Rating"
-            tone={
-              doClassification === "lethal"
-                ? "critical"
-                : doClassification === "critical"
-                  ? "warning"
-                  : doClassification === "acceptable"
-                    ? "default"
-                    : doClassification === "optimal"
-                      ? "success"
-                      : "default"
-            }
-            value={doClassification ? doClassification.replace("_", " ") : "Enter DO value"}
-          />
-          <InfoStat label="Selected System" value={selectedSystem ? formatCageLabel(selectedSystem) : "No system selected"} />
-          <InfoStat label="Depth" value={`${selectedDepth} m`} />
-          <InfoStat label="PM Check" value={selectedTime < "12:00" ? "Still due today" : "PM reading captured"} />
-        </InfoPanel>
-      </div>
+              <FormField
+                control={form.control}
+                name="location_reference"
+                render={({ field }) => (
+                  <FormItem className="data-entry-field-wide">
+                    <FormLabel>{isLakeReference ? "Location / Reference" : "Location / Reference (Optional)"}</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder={isLakeReference ? "e.g. lake edge, 20m from cage line" : "Optional reference note"}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
+          </FormSection>
+
+          <FormSection title="Measurements">
+            <FieldGrid>
+              <FormField
+                control={form.control}
+                name="temperature"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Temperature (C)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dissolved_oxygen"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>DO (mg/L)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="pH"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>pH</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="total_ammonia"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ammonia (mg/L)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="no2"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nitrite (mg/L)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="no3"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nitrate (mg/L)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
+
+            {doClassification ? (
+              <InfoStat
+                label="DO Rating"
+                tone={doTone}
+                value={doClassification.replace("_", " ")}
+              />
+            ) : null}
+          </FormSection>
+
+          <FormActions>
+            <Button
+              type="submit"
+              className="min-h-11 rounded-lg px-5"
+              disabled={form.formState.isSubmitting || mutation.isPending}
+            >
+              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Water Quality
+            </Button>
+          </FormActions>
+        </form>
+      </Form>
     </div>
   )
 }
-
