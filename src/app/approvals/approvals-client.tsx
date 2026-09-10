@@ -10,7 +10,7 @@ type ApprovalsResponse = { entries: ApprovalEntry[]; total: number; counts: Coun
 type NamedOption = { id: number; name: string }
 type Member = { id: string; name: string }
 type Payload = Record<string, unknown>
-type Column = { header: string; cell: (payload: Payload) => string }
+type Column = { header: string; cell: (payload: Payload) => string; align?: "right" }
 
 const fieldLabel = (key: string) => key.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
@@ -82,17 +82,17 @@ export default function ApprovalsClient({
       { header: "Date", cell: (p) => text(p.date) },
       { header: "Cage", cell: (p) => names.system(p.system_id) },
       { header: "Batch", cell: (p) => names.batch(p.batch_id) },
-      { header: "Amount", cell: (p) => kg(p.feeding_amount) },
+      { header: "Amount", cell: (p) => kg(p.feeding_amount), align: "right" },
       { header: "Feed type", cell: (p) => names.feed(p.feed_type_id) },
-      { header: "Response", cell: (p) => text(p.feeding_response) },
+      { header: "Response", cell: (p) => text(p.feeding_response), align: "right" },
       { header: "Notes", cell: (p) => text(p.notes) },
     ],
     mortality: [
       { header: "Date", cell: (p) => text(p.date) },
       { header: "Cage", cell: (p) => names.system(p.system_id) },
       { header: "Batch", cell: (p) => names.batch(p.batch_id) },
-      { header: "Dead fish", cell: (p) => count(p.number_of_fish_mortality) },
-      { header: "Weight", cell: (p) => kg(p.total_weight_mortality) },
+      { header: "Dead fish", cell: (p) => count(p.number_of_fish_mortality), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_mortality), align: "right" },
       { header: "Cause", cell: (p) => text(p.cause) },
       { header: "Notes", cell: (p) => text(p.notes) },
     ],
@@ -100,16 +100,16 @@ export default function ApprovalsClient({
       { header: "Date", cell: (p) => text(p.date) },
       { header: "Cage", cell: (p) => names.system(p.system_id) },
       { header: "Batch", cell: (p) => names.batch(p.batch_id) },
-      { header: "Fish sampled", cell: (p) => count(p.number_of_fish_sampling) },
-      { header: "Weight", cell: (p) => kg(p.total_weight_sampling) },
+      { header: "Fish sampled", cell: (p) => count(p.number_of_fish_sampling), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_sampling), align: "right" },
       { header: "Notes", cell: (p) => text(p.notes) },
     ],
     stocking: [
       { header: "Date", cell: (p) => text(p.date) },
       { header: "Cage", cell: (p) => names.system(p.system_id) },
       { header: "Batch", cell: (p) => names.batch(p.batch_id) },
-      { header: "Fish stocked", cell: (p) => count(p.number_of_fish_stocking) },
-      { header: "Weight", cell: (p) => kg(p.total_weight_stocking) },
+      { header: "Fish stocked", cell: (p) => count(p.number_of_fish_stocking), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_stocking), align: "right" },
       { header: "Type", cell: (p) => text(p.type_of_stocking) },
       { header: "Notes", cell: (p) => text(p.notes) },
     ],
@@ -118,8 +118,8 @@ export default function ApprovalsClient({
       { header: "From", cell: (p) => names.system(p.origin_system_id) },
       { header: "To", cell: (p) => (p.transfer_type === "external_out" ? text(p.external_target_name) : names.system(p.target_system_id)) },
       { header: "Batch", cell: (p) => names.batch(p.batch_id) },
-      { header: "Fish", cell: (p) => count(p.number_of_fish_transfer) },
-      { header: "Weight", cell: (p) => kg(p.total_weight_transfer) },
+      { header: "Fish", cell: (p) => count(p.number_of_fish_transfer), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_transfer), align: "right" },
       { header: "Type", cell: (p) => text(p.transfer_type) },
       { header: "Notes", cell: (p) => text(p.notes) },
     ],
@@ -127,26 +127,26 @@ export default function ApprovalsClient({
       { header: "Date", cell: (p) => text(p.date) },
       { header: "Cage", cell: (p) => names.system(p.system_id) },
       { header: "Batch", cell: (p) => names.batch(p.batch_id) },
-      { header: "Fish harvested", cell: (p) => count(p.number_of_fish_harvest) },
-      { header: "Weight", cell: (p) => kg(p.total_weight_harvest) },
+      { header: "Fish harvested", cell: (p) => count(p.number_of_fish_harvest), align: "right" },
+      { header: "Weight", cell: (p) => kg(p.total_weight_harvest), align: "right" },
       { header: "Type", cell: (p) => text(p.type_of_harvest) },
     ],
     water_quality: [
       { header: "Date", cell: (p) => text(p.date) },
       { header: "Cage", cell: (p) => names.system(p.system_id) },
       { header: "Time", cell: (p) => text(p.time) },
-      { header: "Depth", cell: (p) => (p.water_depth == null ? "—" : `${p.water_depth} m`) },
+      { header: "Depth", cell: (p) => (p.water_depth == null ? "—" : `${p.water_depth} m`), align: "right" },
       { header: "Parameter", cell: (p) => text(String(p.parameter_name ?? "").replaceAll("_", " ") || "—") },
-      { header: "Value", cell: (p) => text(p.parameter_value) },
+      { header: "Value", cell: (p) => text(p.parameter_value), align: "right" },
       { header: "Location", cell: (p) => text(p.location_reference) },
     ],
     feed_inventory: [
       { header: "Date", cell: (p) => text(p.inventory_date) },
       { header: "Time", cell: (p) => text(p.inventory_time) },
       { header: "Feed type", cell: (p) => names.feed(p.feed_type_id) },
-      { header: "Bag weight", cell: (p) => kg(p.bag_weight) },
-      { header: "Bags", cell: (p) => count(p.amount_of_bags) },
-      { header: "Opened bags", cell: (p) => text(p.opened_bags) },
+      { header: "Bag weight", cell: (p) => kg(p.bag_weight), align: "right" },
+      { header: "Bags", cell: (p) => count(p.amount_of_bags), align: "right" },
+      { header: "Opened bags", cell: (p) => text(p.opened_bags), align: "right" },
       { header: "Comments", cell: (p) => text(p.comments) },
     ],
   }), [names])
@@ -155,6 +155,7 @@ export default function ApprovalsClient({
   const counts = query.data?.counts
   const total = query.data?.total ?? 0
   const bulkIds = entries.filter((entry) => entry.entry_type !== "feed_inventory").map((entry) => entry.id)
+  const showChecks = canReview && status === "pending"
 
   const groups = useMemo(() => {
     const order = Object.keys(approvalTypes) as ApprovalType[]
@@ -204,10 +205,9 @@ export default function ApprovalsClient({
   }
 
   const busyAny = busy || savingEdit
-  const showChecks = canReview && status === "pending"
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Approval status summary">
         {(["pending", "approved", "rejected"] as const).map((value) => (
           <button
@@ -216,23 +216,23 @@ export default function ApprovalsClient({
             disabled={!!review}
             aria-current={status === value ? "true" : undefined}
             onClick={() => { setStatus(value); reset() }}
-            className={`rounded-xl border bg-card px-4 py-3 text-left shadow-sm transition-colors disabled:opacity-60 ${
+            className={`rounded-2xl border bg-card px-5 py-4 text-left shadow-sm transition-colors disabled:opacity-60 ${
               status === value ? "border-primary ring-1 ring-primary/15" : "border-border hover:border-primary/45"
             }`}
           >
-            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{cap(value)}</span>
-            <strong className="mt-1 block text-2xl font-bold tabular-nums text-primary">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{cap(value)}</span>
+            <strong className="mt-1.5 block text-3xl font-bold tabular-nums text-primary">
               {(counts?.[value] ?? 0).toLocaleString("en-US")}
             </strong>
           </button>
         ))}
       </div>
 
-      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            <h2 className="text-base font-bold text-primary">{cap(status)} entries</h2>
-            <p className="text-xs text-muted-foreground">Validation is repeated immediately before every approval.</p>
+            <h2 className="text-lg font-bold text-primary">{cap(status)} entries</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">Validation is repeated immediately before every approval.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <select
@@ -254,7 +254,7 @@ export default function ApprovalsClient({
                   type="button"
                   onClick={() => begin(selected, "rejected")}
                   disabled={!selected.length || !!review}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-destructive/40 bg-card px-4 text-sm font-bold text-destructive transition-colors hover:bg-destructive/5 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex h-10 items-center gap-2 rounded-full border border-destructive/40 bg-card px-4 text-sm font-bold text-destructive transition-colors hover:bg-destructive/5 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <XCircle className="h-4 w-4" /> Reject selected ({selected.length})
                 </button>
@@ -262,7 +262,7 @@ export default function ApprovalsClient({
                   type="button"
                   onClick={() => begin(selected, "approved")}
                   disabled={!selected.length || !!review}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground shadow-sm transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground shadow-sm transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <CheckCircle2 className="h-4 w-4" /> Approve selected ({selected.length})
                 </button>
@@ -272,13 +272,13 @@ export default function ApprovalsClient({
         </div>
 
         {query.error && (
-          <div className="mx-4 mt-4 rounded-lg border border-destructive/35 bg-destructive/10 px-3.5 py-3 text-sm font-medium text-destructive" role="alert">
+          <div className="mx-5 mt-4 rounded-lg border border-destructive/35 bg-destructive/10 px-3.5 py-3 text-sm font-medium text-destructive" role="alert">
             {(query.error as Error).message}
           </div>
         )}
         {message && (
           <div
-            className={`mx-4 mt-4 rounded-lg border px-3.5 py-3 text-sm font-medium ${
+            className={`mx-5 mt-4 rounded-lg border px-3.5 py-3 text-sm font-medium ${
               message.tone === "ok" ? "border-success/35 bg-success/10 text-success" : "border-destructive/35 bg-destructive/10 text-destructive"
             }`}
             role="status"
@@ -287,7 +287,7 @@ export default function ApprovalsClient({
           </div>
         )}
         {review && (
-          <div role="region" aria-label="Confirm review" className="mx-4 mt-4 space-y-3 rounded-lg border-2 border-primary bg-background p-4">
+          <div role="region" aria-label="Confirm review" className="mx-5 mt-4 space-y-3 rounded-lg border-2 border-primary bg-background p-4">
             <h3 className="font-semibold">{review.decision === "approved" ? "Approve" : "Reject"} {review.ids.length} {review.ids.length === 1 ? "entry" : "entries"}?</h3>
             <p className="text-sm">
               {review.decision === "approved"
@@ -298,7 +298,7 @@ export default function ApprovalsClient({
               <textarea autoFocus disabled={busy} maxLength={1000} className={`${control} mt-1 block w-full`} value={reason} onChange={(event) => setReason(event.target.value)} />
             </label>
             <div className="flex gap-2">
-              <button type="button" className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={busy} onClick={() => void decide()}>
+              <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={busy} onClick={() => void decide()}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirm decision
               </button>
               <button type="button" className={control} disabled={busy} onClick={() => setReview(null)}>Cancel</button>
@@ -307,7 +307,7 @@ export default function ApprovalsClient({
         )}
 
         {showChecks && entries.length > 0 && (
-          <label className="flex items-center gap-2 border-b border-border px-4 py-2 text-sm">
+          <label className="flex items-center gap-2 border-b border-border px-5 py-2.5 text-sm text-muted-foreground">
             <input
               type="checkbox"
               className="h-4 w-4 accent-primary"
@@ -337,13 +337,13 @@ export default function ApprovalsClient({
             const span = (showChecks ? 1 : 0) + cols.length + 2
             return (
               <div key={groupType} className="border-b border-border last:border-b-0">
-                <h3 className="px-4 pt-4 text-sm font-bold text-primary">{approvalTypes[groupType]}</h3>
-                <div className="overflow-x-auto px-4 pb-4">
-                  <table className="mt-2 w-full min-w-[760px] text-left text-sm">
-                    <thead className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-                      <tr className="border-b border-border">
+                <h3 className="px-5 pt-5 text-sm font-bold text-primary">{approvalTypes[groupType]}</h3>
+                <div className="overflow-x-auto px-5 pb-5">
+                  <table className="mt-3 w-full min-w-[820px] border-collapse border border-border text-left text-sm [&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2.5 [&_th]:border [&_th]:border-border [&_th]:bg-muted/40 [&_th]:px-3 [&_th]:py-2 [&_th]:font-bold [&_th]:text-foreground">
+                    <thead>
+                      <tr>
                         {showChecks && (
-                          <th className="w-8 py-2">
+                          <th className="w-9">
                             {groupType !== "feed_inventory" && (
                               <input
                                 type="checkbox"
@@ -359,22 +359,24 @@ export default function ApprovalsClient({
                             )}
                           </th>
                         )}
-                        {cols.map((col) => <th key={col.header} className="whitespace-nowrap py-2 pr-4">{col.header}</th>)}
-                        <th className="whitespace-nowrap py-2 pr-4">Submitted by</th>
-                        <th className="whitespace-nowrap py-2">{status === "pending" ? "" : "Result"}</th>
+                        {cols.map((col) => (
+                          <th key={col.header} className={`whitespace-nowrap ${col.align === "right" ? "text-right" : ""}`}>{col.header}</th>
+                        ))}
+                        <th className="whitespace-nowrap">Submitted by</th>
+                        <th className="whitespace-nowrap">{status === "pending" ? "Actions" : "Status"}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody>
                       {rows.map((entry) => (
                         <Fragment key={entry.id}>
-                          <tr className="align-top">
+                          <tr className="align-middle transition-colors hover:bg-muted/30">
                             {showChecks && (
-                              <td className="py-3 pr-2">
+                              <td className="text-center">
                                 {groupType !== "feed_inventory" && (
                                   <input
                                     aria-label={`Select submission ${entry.id}`}
                                     type="checkbox"
-                                    className="mt-0.5 h-4 w-4 accent-primary"
+                                    className="h-4 w-4 accent-primary"
                                     disabled={!!review}
                                     checked={selected.includes(entry.id)}
                                     onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))}
@@ -382,27 +384,32 @@ export default function ApprovalsClient({
                                 )}
                               </td>
                             )}
-                            {cols.map((col) => (
-                              <td key={col.header} className="max-w-[220px] break-words py-3 pr-4 align-top">{col.cell(entry.payload)}</td>
+                            {cols.map((col, index) => (
+                              <td
+                                key={col.header}
+                                className={`max-w-[240px] break-words ${col.align === "right" ? "text-right tabular-nums" : ""} ${index === 0 ? "font-semibold tabular-nums text-foreground" : "text-foreground"}`}
+                              >
+                                {col.cell(entry.payload)}
+                              </td>
                             ))}
-                            <td className="whitespace-nowrap py-3 pr-4 align-top text-xs text-muted-foreground">
-                              <span className="block font-medium text-foreground">{names.user(entry.submitted_by)}</span>
+                            <td className="whitespace-nowrap text-xs text-muted-foreground">
+                              <span className="block font-semibold text-foreground">{names.user(entry.submitted_by)}</span>
                               {new Date(entry.submitted_at).toLocaleString()}
                             </td>
-                            <td className="whitespace-nowrap py-3 align-top">
+                            <td className="whitespace-nowrap">
                               {entry.status === "pending" ? (
                                 <div className="flex flex-wrap gap-1.5">
                                   {canEdit(entry) && editId !== entry.id && (
-                                    <button type="button" className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2.5 text-xs font-bold disabled:opacity-45" disabled={!!review} onClick={() => beginEdit(entry)}>
+                                    <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3 text-xs font-bold disabled:opacity-45" disabled={!!review} onClick={() => beginEdit(entry)}>
                                       <Pencil className="h-3.5 w-3.5" /> Edit
                                     </button>
                                   )}
                                   {canReview && (
                                     <>
-                                      <button type="button" className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-2.5 text-xs font-bold text-primary-foreground disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "approved")}>
+                                      <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "approved")}>
                                         <Check className="h-3.5 w-3.5" /> Approve
                                       </button>
-                                      <button type="button" className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2.5 text-xs font-bold text-destructive hover:bg-destructive/5 disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "rejected")}>
+                                      <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-destructive/40 bg-card px-3 text-xs font-bold text-destructive hover:bg-destructive/5 disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "rejected")}>
                                         <X className="h-3.5 w-3.5" /> Reject
                                       </button>
                                     </>
@@ -410,8 +417,8 @@ export default function ApprovalsClient({
                                 </div>
                               ) : (
                                 <div className="text-xs">
-                                  <span className={`inline-flex rounded-full border px-2 py-0.5 font-bold ${
-                                    entry.status === "approved" ? "border-success/30 bg-success/10 text-success" : "border-destructive/30 bg-destructive/10 text-destructive"
+                                  <span className={`inline-flex rounded-full px-2.5 py-0.5 font-bold ${
+                                    entry.status === "approved" ? "bg-success/12 text-success" : "bg-destructive/12 text-destructive"
                                   }`}>
                                     {cap(entry.status)}
                                   </span>
@@ -427,7 +434,7 @@ export default function ApprovalsClient({
                           </tr>
                           {editId === entry.id && (
                             <tr>
-                              <td colSpan={span} className="bg-muted/20 px-1 py-3">
+                              <td colSpan={span} className="bg-muted/25">
                                 <div className="space-y-3">
                                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                     {editableKeys(entry.payload).map((key) => {
@@ -450,7 +457,7 @@ export default function ApprovalsClient({
                                     })}
                                   </div>
                                   <div className="flex gap-2">
-                                    <button type="button" className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit} onClick={() => void saveEdit()}>
+                                    <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit} onClick={() => void saveEdit()}>
                                       {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save changes
                                     </button>
                                     <button type="button" className={control} disabled={savingEdit} onClick={() => setEditId(null)}>Cancel</button>
@@ -461,7 +468,7 @@ export default function ApprovalsClient({
                           )}
                           {entry.review_reason && (
                             <tr>
-                              <td colSpan={span} className="px-1 pb-3 text-xs text-muted-foreground">Review note: {entry.review_reason}</td>
+                              <td colSpan={span} className="bg-muted/10 text-xs text-muted-foreground">Review note: {entry.review_reason}</td>
                             </tr>
                           )}
                         </Fragment>
@@ -475,10 +482,10 @@ export default function ApprovalsClient({
         )}
 
         {total > 50 && (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm">
-            <button type="button" className={control} disabled={page === 0 || busyAny || !!review} onClick={() => { setPage(page - 1); setSelected([]) }}>Previous</button>
+          <div className="flex items-center justify-between border-t border-border px-5 py-3 text-sm">
+            <button type="button" className={control} disabled={page === 0 || busyAny || !!review} onClick={() => { setPage(page - 1); setSelected([]); setEditId(null) }}>Previous</button>
             <span>Page {page + 1} · {total.toLocaleString("en-US")} entries</span>
-            <button type="button" className={control} disabled={(page + 1) * 50 >= total || busyAny || !!review} onClick={() => { setPage(page + 1); setSelected([]) }}>Next</button>
+            <button type="button" className={control} disabled={(page + 1) * 50 >= total || busyAny || !!review} onClick={() => { setPage(page + 1); setSelected([]); setEditId(null) }}>Next</button>
           </div>
         )}
       </section>
