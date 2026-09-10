@@ -62,7 +62,9 @@ type RecentEntriesListProps = (
   | { type: "feed_inventory"; data: FeedInventoryRow[] }
   | { type: "stocking"; data: StockingRow[] }
   | { type: "system"; data: SystemEntryRow[] }
-) & { systems: SystemOption[]; feeds?: FeedTypeOption[] }
+) & { systems: SystemOption[]; feeds?: FeedTypeOption[]; activeSystemId?: number | null }
+
+type CageKeyed = { system_id?: number | null; origin_system_id?: number | null; target_system_id?: number | null }
 
 type RecentCard = {
   key: string
@@ -222,19 +224,33 @@ function cageDetail(formatSystemName: (systemId: number | null | undefined) => s
   return { label: "Cage", value: formatSystemName(systemId) }
 }
 
+function scopeToCage<T extends CageKeyed>(rows: readonly T[], systemId: number | null): T[] {
+  if (systemId == null) return rows as T[]
+  return rows.filter(
+    (row) =>
+      row.system_id === systemId ||
+      row.origin_system_id === systemId ||
+      row.target_system_id === systemId,
+  )
+}
+
 function EntriesSection({
   cards,
   pendingCount,
+  scopeLabel,
 }: {
   cards: RecentCard[]
   pendingCount: number
+  scopeLabel?: string | null
 }) {
   return (
     <div className="data-entry-recent-panel">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Recent Entries</h3>
-          <p className="text-xs text-muted-foreground">Latest saved records for this entry type.</p>
+          <p className="text-xs text-muted-foreground">
+            {scopeLabel ? `Latest saved records for ${scopeLabel}.` : "Latest saved records for this entry type."}
+          </p>
         </div>
         {pendingCount > 0 ? (
           <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
@@ -246,7 +262,7 @@ function EntriesSection({
 
       {cards.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border/70 bg-background/70 px-3 py-4 text-sm text-muted-foreground">
-          No recent entries found.
+          {scopeLabel ? `No recent entries for ${scopeLabel}.` : "No recent entries found."}
         </div>
       ) : (
         <div className="data-entry-recent-list">
@@ -282,6 +298,11 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
   const { data, type, systems, feeds } = props
   const pendingEntries = usePendingOfflineEntries(type)
   const formatSystemName = createSystemLabelResolver(systems)
+
+  const activeSystemId = props.activeSystemId ?? null
+  // Only scope entry types that carry a cage; feed inventory and system setup are farm-level.
+  const scopedSystemId = type === "feed_inventory" || type === "system" ? null : activeSystemId
+  const scopeLabel = scopedSystemId != null ? formatSystemName(scopedSystemId) : null
   const formatFeedTypeName = (feedTypeId: number | null | undefined) => {
     if (feedTypeId == null) return "Not selected"
     const feedType = feeds?.find((item) => item.id === feedTypeId)
@@ -292,7 +313,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
   let pendingCount = 0
 
   if (type === "mortality") {
-    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as MortalityRow[], (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as MortalityRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as MortalityRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -306,7 +327,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "feeding") {
-    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as FeedingRow[], (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as FeedingRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as FeedingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -321,7 +342,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "sampling") {
-    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as SamplingRow[], (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as SamplingRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as SamplingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -336,7 +357,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "transfer") {
-    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as TransferRow[], (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as TransferRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as TransferRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -351,7 +372,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "harvest") {
-    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as HarvestRow[], (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as HarvestRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as HarvestRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -366,7 +387,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else if (type === "water_quality") {
-    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as WaterQualityRow[], (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as WaterQualityRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as WaterQualityRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -399,7 +420,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       }
     })
   } else if (type === "stocking") {
-    const rows = mergeRecentEntriesByPrimaryDate(data, pendingEntries as StockingRow[], (row) => row.date)
+    const rows = mergeRecentEntriesByPrimaryDate(scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as StockingRow[], scopedSystemId), (row) => row.date)
     pendingCount = (pendingEntries as StockingRow[]).length
     cards = rows.map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
@@ -428,6 +449,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
     }))
   }
 
-  return <EntriesSection cards={cards} pendingCount={pendingCount} />
+  return <EntriesSection cards={cards} pendingCount={pendingCount} scopeLabel={scopeLabel} />
 }
 

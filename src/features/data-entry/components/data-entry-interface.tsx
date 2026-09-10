@@ -303,7 +303,7 @@ export function DataEntryInterface({
                         <ChevronDown className={cn("h-4 w-4 transition-transform", asideOpen && "rotate-180")} />
                     </button>
                     <div className={cn("data-entry-aside-body", !asideOpen && "hidden xl:block")}>
-                        <RecentEntriesList {...recentEntryProps} systems={systems} feeds={feeds} />
+                        <RecentEntriesList {...recentEntryProps} systems={systems} feeds={feeds} activeSystemId={liveSystemId} />
                     </div>
                 </aside>
             </div>
