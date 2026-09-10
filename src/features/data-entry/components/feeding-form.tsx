@@ -43,7 +43,8 @@ import {
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
-import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+import { SelectionChips } from "./selection-info"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
   farm_id?: string | null
@@ -300,36 +301,39 @@ export function FeedingForm({
   }
 
   return (
-    <div>
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <div className="space-y-6">
-        <LatestEntryGuard
-          latestEntry={latestEntry}
-          duplicateEntry={duplicateEntry}
-          itemLabel="feeding"
-          isLoading={latestEntryQuery.isLoading}
-        />
-        {submissionSummary ? (
-          <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
-            {submissionSummary}
-          </div>
-        ) : null}
-        {feedOptions.length === 0 ? (
-          <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
-            No feed types are available for this farm yet.
-          </div>
-        ) : null}
+      <LatestEntryGuard
+        latestEntry={latestEntry}
+        duplicateEntry={duplicateEntry}
+        itemLabel="feeding"
+        isLoading={latestEntryQuery.isLoading}
+      />
+      {submissionSummary ? (
+        <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
+          {submissionSummary}
+        </div>
+      ) : null}
+      {feedOptions.length === 0 ? (
+        <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
+          No feed types are available for this farm yet.
+        </div>
+      ) : null}
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
-            <div className="data-entry-secondary-grid">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormSection kicker="Feeding" title="Record feeding">
+            <SelectionChips
+              systems={systems}
+              systemId={selectedSystemId}
+              batches={batches}
+              batchId={resolvedBatchId}
+            />
+
+            <FieldGrid>
               <FormField
                 control={form.control}
                 name="date"
@@ -337,7 +341,7 @@ export function FeedingForm({
                   <FormItem>
                     <FormLabel>Date</FormLabel>
                     <FormControl>
-                        <Input type="date" className="max-w-xs" {...field} />
+                      <Input type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -358,7 +362,7 @@ export function FeedingForm({
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger className="max-w-xs">
+                        <SelectTrigger>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -383,7 +387,7 @@ export function FeedingForm({
                     <FormLabel>Cage Number</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                       <FormControl>
-                        <SelectTrigger className="max-w-xs">
+                        <SelectTrigger>
                           <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
@@ -408,7 +412,7 @@ export function FeedingForm({
                     <FormLabel>Feed Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="max-w-xs">
+                        <SelectTrigger>
                           <SelectValue placeholder="Select feed" />
                         </SelectTrigger>
                       </FormControl>
@@ -425,14 +429,7 @@ export function FeedingForm({
                   </FormItem>
                 )}
               />
-            </div>
 
-            <div className="data-entry-secondary-grid">
-              <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-              <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
-            </div>
-
-            <div className="data-entry-secondary-grid">
               <FormField
                 control={form.control}
                 name="amount_kg"
@@ -440,39 +437,39 @@ export function FeedingForm({
                   <FormItem>
                     <FormLabel>Amount (kg)</FormLabel>
                     <FormControl>
-                        <Input type="number" step="0.01" className="max-w-xs" {...field} />
+                      <Input type="number" step="0.01" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="feeding_response"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Feeding Response</FormLabel>
-                  <Select onValueChange={field.onChange} value={String(field.value)}>
-                    <FormControl>
-                      <SelectTrigger className="max-w-xs">
-                        <SelectValue placeholder="Select response" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={OPTIONAL_SELECT_VALUE}>Not recorded</SelectItem>
-                      {FEEDING_RESPONSE_LEVELS.map((option) => (
-                        <SelectItem key={option.level} value={String(option.level)}>
-                          Level {option.level} - {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="feeding_response"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Feeding Response</FormLabel>
+                    <Select onValueChange={field.onChange} value={String(field.value)}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select response" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={OPTIONAL_SELECT_VALUE}>Not recorded</SelectItem>
+                        {FEEDING_RESPONSE_LEVELS.map((option) => (
+                          <SelectItem key={option.level} value={String(option.level)}>
+                            Level {option.level} - {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
 
             <FormField
               control={form.control}
@@ -492,20 +489,20 @@ export function FeedingForm({
                 </FormItem>
               )}
             />
+          </FormSection>
 
-            <div className="flex justify-end pt-1">
-              <Button
-                type="submit"
-                className="min-h-11 rounded-lg px-5"
-                disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}
-              >
-                {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Record Feeding
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </div>
+          <FormActions>
+            <Button
+              type="submit"
+              className="min-h-11 rounded-lg px-5"
+              disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}
+            >
+              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Feeding
+            </Button>
+          </FormActions>
+        </form>
+      </Form>
     </div>
   )
 }
