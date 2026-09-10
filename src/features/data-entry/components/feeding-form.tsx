@@ -349,6 +349,20 @@ export function FeedingForm({
             <FieldGrid>
               <FormField
                 control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="unit"
                 render={({ field }) => (
                   <FormItem>
@@ -436,21 +450,7 @@ export function FeedingForm({
                   <FormItem>
                     <FormLabel>Feeding Amount (kg)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" className="max-w-[180px]" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" className="max-w-[200px]" {...field} />
+                      <Input type="number" step="0.01" inputMode="decimal" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
