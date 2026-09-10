@@ -308,7 +308,7 @@ export function FeedingForm({
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormSection kicker="Feeding" title="Record feeding">
+          <FormSection title="Record feeding">
             <SelectionChips
               systems={systems}
               systemId={selectedSystemId}
