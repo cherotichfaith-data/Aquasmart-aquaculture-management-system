@@ -639,23 +639,6 @@ next-router-prefetch {
     @apply sm:col-span-2;
   }
 
-  /* Segmented 1-5 scale (feeding response) */
-  .data-entry-scale {
-    @apply flex gap-1.5;
-  }
-
-  .data-entry-scale-step {
-    @apply flex h-10 flex-1 items-center justify-center rounded-[10px] border border-border/70 bg-muted/30 text-sm font-bold text-muted-foreground transition-colors;
-  }
-
-  .data-entry-scale-step:hover:not(:disabled) {
-    @apply border-primary/45 text-foreground;
-  }
-
-  .data-entry-scale-step-on {
-    @apply border-success bg-success/12 text-success;
-  }
-
   .data-entry-form-actions {
     @apply flex flex-col-reverse gap-2.5 pt-1 sm:flex-row sm:justify-end;
   }
@@ -799,11 +782,11 @@ next-router-prefetch {
   }
 
   .data-entry-recent-item {
-    @apply rounded-lg border border-border/55 bg-muted/20 p-3;
+    @apply rounded-lg border border-border/55 bg-muted/20 p-2.5;
   }
 
   .data-entry-recent-item-header {
-    @apply flex items-start justify-between gap-3;
+    @apply flex items-start justify-between gap-2;
   }
 
   .data-entry-recent-item-title {
@@ -819,11 +802,11 @@ next-router-prefetch {
   }
 
   .data-entry-recent-grid {
-    @apply mt-3 grid grid-cols-1 gap-2;
+    @apply mt-2 grid grid-cols-1 gap-1.5;
   }
 
   .data-entry-recent-detail {
-    @apply flex items-center justify-between gap-3 border-t border-border/55 pt-2 text-xs;
+    @apply flex items-center justify-between gap-3 border-t border-border/55 pt-1.5 text-xs;
   }
 
   .data-entry-recent-detail-label {

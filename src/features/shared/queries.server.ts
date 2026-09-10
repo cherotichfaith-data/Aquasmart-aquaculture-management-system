@@ -395,7 +395,9 @@ async function getRecentRows<T>(
     limit?: number
   },
 ): Promise<T[]> {
-  const limit = params.limit ?? 5
+  // A wider farm-wide window so the data-entry panel can still show a few rows
+  // after it is filtered down to a single selected cage.
+  const limit = params.limit ?? 25
   const { farmId, farmSystemIds } = params
 
   if (!farmId) return []

@@ -217,11 +217,7 @@ function mergeRecentEntriesByPrimaryDate<T extends { created_at: string | null; 
       if (dateCompare !== 0) return dateCompare
       return new Date(right.created_at ?? 0).getTime() - new Date(left.created_at ?? 0).getTime()
     })
-    .slice(0, 5)
-}
-
-function cageDetail(formatSystemName: (systemId: number | null | undefined) => string, systemId: number | null | undefined) {
-  return { label: "Cage", value: formatSystemName(systemId) }
+    .slice(0, 3)
 }
 
 function scopeToCage<T extends CageKeyed>(rows: readonly T[], systemId: number | null): T[] {
@@ -245,7 +241,7 @@ function EntriesSection({
 }) {
   return (
     <div className="data-entry-recent-panel">
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Recent Entries</h3>
           <p className="text-xs text-muted-foreground">
@@ -322,7 +318,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
-        cageDetail(formatSystemName, row.system_id),
         { label: "Dead Fish", value: String(row.number_of_fish_mortality) },
       ],
     }))
@@ -336,7 +331,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
-        cageDetail(formatSystemName, row.system_id),
         { label: "Feed Type", value: formatFeedTypeName(row.feed_type_id) },
         { label: "Amount", value: `${row.feeding_amount} kg` },
       ],
@@ -351,7 +345,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
-        cageDetail(formatSystemName, row.system_id),
         { label: "Sampled", value: String(row.number_of_fish_sampling) },
         { label: "ABW", value: row.abw != null ? `${row.abw} g` : "-" },
       ],
@@ -381,7 +374,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
-        cageDetail(formatSystemName, row.system_id),
         { label: "Harvest", value: String(row.type_of_harvest) },
         { label: "Weight", value: `${row.total_weight_harvest} kg` },
       ],
@@ -396,7 +388,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
-        cageDetail(formatSystemName, row.system_id),
         { label: "Parameter", value: String(row.parameter_name) },
         { label: "Value", value: String(row.parameter_value) },
       ],
@@ -429,7 +420,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
-        cageDetail(formatSystemName, row.system_id),
         { label: "Count", value: String(row.number_of_fish_stocking) },
         { label: "Type", value: String(row.type_of_stocking) },
       ],
