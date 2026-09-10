@@ -631,8 +631,29 @@ next-router-prefetch {
   }
 
   .data-entry-field-grid {
-    @apply grid gap-3.5;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+    @apply grid gap-x-6 gap-y-4 sm:grid-cols-2;
+  }
+
+  /* A field that should run the full width of the two-column grid. */
+  .data-entry-field-grid > .data-entry-field-wide {
+    @apply sm:col-span-2;
+  }
+
+  /* Segmented 1-5 scale (feeding response) */
+  .data-entry-scale {
+    @apply flex gap-1.5;
+  }
+
+  .data-entry-scale-step {
+    @apply flex h-10 flex-1 items-center justify-center rounded-[10px] border border-border/70 bg-muted/30 text-sm font-bold text-muted-foreground transition-colors;
+  }
+
+  .data-entry-scale-step:hover:not(:disabled) {
+    @apply border-primary/45 text-foreground;
+  }
+
+  .data-entry-scale-step-on {
+    @apply border-success bg-success/12 text-success;
   }
 
   .data-entry-form-actions {

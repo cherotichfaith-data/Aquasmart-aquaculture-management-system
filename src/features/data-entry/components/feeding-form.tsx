@@ -6,6 +6,7 @@ import { useForm, useWatch } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/app-ui/button"
 import { Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import {
   Form,
   FormControl,
@@ -135,6 +136,35 @@ function toFeedingEntrySummary(row: {
         ? `A feeding entry already exists for this cage on ${row.date ?? ""} with ${feedLabel}.`
         : `A feeding entry already exists for this cage on ${row.date ?? ""}.`,
   }
+}
+
+function FeedingResponseScale({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="data-entry-scale" role="radiogroup" aria-label="Feeding response">
+      {FEEDING_RESPONSE_LEVELS.map((option) => {
+        const isOn = value === String(option.level)
+        return (
+          <button
+            key={option.level}
+            type="button"
+            role="radio"
+            aria-checked={isOn}
+            title={`Level ${option.level} — ${option.label}`}
+            onClick={() => onChange(isOn ? OPTIONAL_SELECT_VALUE : String(option.level))}
+            className={cn("data-entry-scale-step", isOn && "data-entry-scale-step-on")}
+          >
+            {option.level}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 export function FeedingForm({
@@ -319,20 +349,6 @@ export function FeedingForm({
             <FieldGrid>
               <FormField
                 control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="unit"
                 render={({ field }) => (
                   <FormItem>
@@ -418,9 +434,23 @@ export function FeedingForm({
                 name="amount_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount (kg)</FormLabel>
+                    <FormLabel>Feeding Amount (kg)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input type="number" step="0.01" inputMode="decimal" className="max-w-[180px]" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" className="max-w-[200px]" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -433,45 +463,34 @@ export function FeedingForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Feeding Response</FormLabel>
-                    <Select onValueChange={field.onChange} value={String(field.value)}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select response" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={OPTIONAL_SELECT_VALUE}>Not recorded</SelectItem>
-                        {FEEDING_RESPONSE_LEVELS.map((option) => (
-                          <SelectItem key={option.level} value={String(option.level)}>
-                            Level {option.level} - {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FeedingResponseScale
+                      value={String(field.value ?? OPTIONAL_SELECT_VALUE)}
+                      onChange={field.onChange}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem className="data-entry-field-wide">
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <textarea
+                        {...field}
+                        rows={3}
+                        className="data-entry-textarea"
+                        placeholder="Feed behaviour, weather, missed appetite, or any exception."
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </FieldGrid>
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Comments</FormLabel>
-                  <FormControl>
-                    <textarea
-                      {...field}
-                      rows={3}
-                      className="data-entry-textarea"
-                      placeholder="Feed behaviour, weather, missed appetite, or any exception."
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </FormSection>
 
           <FormActions>
