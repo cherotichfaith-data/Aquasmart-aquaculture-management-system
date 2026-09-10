@@ -1,8 +1,6 @@
 "use client"
 
 import { useLiveQuery } from "dexie-react-hooks"
-import { Badge } from "@/components/app-ui/badge"
-import { Skeleton } from "@/components/app-ui/skeleton"
 import { offlineDB } from "@/lib/offline/db"
 
 export type LatestEntrySummary = {
@@ -30,26 +28,8 @@ const toCreatedAt = (createdAtLocal: number) => new Date(createdAtLocal).toISOSt
 const toEntryTimestamp = (entry: LatestEntrySummary) =>
   new Date(entry.createdAt ?? `${entry.date}T00:00:00`).getTime()
 
-const toEntryDateValue = (entry: LatestEntrySummary) => entry.date || ""
-
 export function sortLatestEntries(entries: LatestEntrySummary[]) {
   return [...entries].sort((left, right) => toEntryTimestamp(right) - toEntryTimestamp(left))
-}
-
-export function pickLatestEntry(entries: LatestEntrySummary[]) {
-  return sortLatestEntries(entries)[0] ?? null
-}
-
-export function sortLatestEntriesByRecordDate(entries: LatestEntrySummary[]) {
-  return [...entries].sort((left, right) => {
-    const dateCompare = toEntryDateValue(right).localeCompare(toEntryDateValue(left))
-    if (dateCompare !== 0) return dateCompare
-    return toEntryTimestamp(right) - toEntryTimestamp(left)
-  })
-}
-
-export function pickLatestEntryByRecordDate(entries: LatestEntrySummary[]) {
-  return sortLatestEntriesByRecordDate(entries)[0] ?? null
 }
 
 export function pickSameDayEntry(entries: LatestEntrySummary[], date?: string | null) {
@@ -239,79 +219,5 @@ export function usePendingLatestEntries(
         }
       }
     }, [feedTypes, kind, systemId]) ?? []
-  )
-}
-
-export function LatestEntryGuard({
-  latestEntry,
-  duplicateEntry,
-  itemLabel,
-  isLoading = false,
-}: {
-  latestEntry: LatestEntrySummary | null
-  duplicateEntry: LatestEntrySummary | null
-  itemLabel: string
-  /**
-   * Whether the server-backed "latest entry" query is still on its first
-   * fetch. A pending offline entry can already satisfy `latestEntry` before
-   * that resolves, so this only matters -- and only renders a skeleton --
-   * when neither entry is known yet, instead of the panel just being absent
-   * and then popping in once the network call finishes.
-   */
-  isLoading?: boolean
-}) {
-  if (!latestEntry && !duplicateEntry) {
-    if (!isLoading) return null
-
-    return (
-      <div className="rounded-md border border-border/80 bg-muted/15 px-4 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1.5">
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-3 w-20" />
-          </div>
-        </div>
-        <Skeleton className="mt-3 h-4 w-40" />
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <Skeleton className="h-12 rounded-md" />
-          <Skeleton className="h-12 rounded-md" />
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      {duplicateEntry ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm text-destructive">
-          {duplicateEntry.duplicateMessage ?? `A ${itemLabel} entry already exists for this cage on ${duplicateEntry.date}.`}
-        </div>
-      ) : null}
-
-      {latestEntry ? (
-        <div className="rounded-md border border-border/80 bg-muted/15 px-4 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-foreground">Latest {itemLabel} entry for this cage</div>
-              <div className="text-xs text-muted-foreground">{latestEntry.date}</div>
-            </div>
-            {latestEntry.pending ? (
-              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
-                Pending sync
-              </Badge>
-            ) : null}
-          </div>
-          <div className="mt-3 text-sm font-medium text-foreground">{latestEntry.summary}</div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {latestEntry.details.map((detail) => (
-              <div key={`${latestEntry.key}-${detail.label}`} className="rounded-md border border-border/70 bg-background/70 px-3 py-2">
-                <div className="text-tag uppercase tracking-wide text-muted-foreground">{detail.label}</div>
-                <div className="text-sm text-foreground">{detail.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
   )
 }

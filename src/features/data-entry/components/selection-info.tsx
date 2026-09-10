@@ -12,8 +12,8 @@ type BatchOption = BatchOptionItem & {
 }
 
 /**
- * Compact one-line replacement for the stacked SelectedSystemInfo +
- * SelectedBatchSupplierInfo cards. Renders only the chips that resolve.
+ * Compact one-line summary of the selected cage and its resolved batch/supplier.
+ * Renders only the chips that resolve, and nothing at all until a cage is picked.
  */
 export function SelectionChips({
   systems,
@@ -48,70 +48,6 @@ export function SelectionChips({
       {batch ? <span className="data-entry-chip"><b>Batch</b> {batch.label}</span> : null}
       {supplierName ? <span className="data-entry-chip"><b>Source</b> {supplierName}</span> : null}
       {batch?.date_of_delivery ? <span className="data-entry-chip"><b>Delivered</b> {batch.date_of_delivery}</span> : null}
-    </div>
-  )
-}
-
-export function SelectedSystemInfo({
-  systems,
-  systemId,
-  title = "Selected System",
-}: {
-  systems: SystemOption[]
-  systemId: number | string | null | undefined
-  title?: string
-}) {
-  const resolvedSystemId = parseNumericId(systemId)
-  const selectedSystem = systems.find((system) => system.id === resolvedSystemId) ?? null
-
-  if (!selectedSystem) return null
-
-  return (
-    <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
-      <div className="font-medium">{title}</div>
-      <div className="text-muted-foreground">Cage: {formatCageLabel(selectedSystem)}</div>
-      <div className="text-muted-foreground">Unit: {selectedSystem.unit?.trim() || "Not set"}</div>
-      <div className="text-muted-foreground">
-        Type: {String(selectedSystem.type ?? "").replaceAll("_", " ") || "Not set"}
-      </div>
-      <div className="text-muted-foreground">Stage: {formatGrowthStage(selectedSystem.growth_stage)}</div>
-      <div className="text-muted-foreground">Status: {selectedSystem.is_active ? "Active" : "Inactive"}</div>
-    </div>
-  )
-}
-
-export function SelectedBatchSupplierInfo({
-  batches,
-  batchId,
-}: {
-  batches: BatchOption[]
-  batchId: number | string | null | undefined
-}) {
-  const resolvedBatchId = parseNumericId(batchId)
-  const selectedBatch = batches.find((batch) => batch.id === resolvedBatchId) ?? null
-  const suppliersQuery = useFingerlingSupplierOptions({ enabled: Boolean(selectedBatch) })
-
-  const suppliers = useMemo(
-    () => (suppliersQuery.data?.status === "success" ? suppliersQuery.data.data : []),
-    [suppliersQuery.data],
-  )
-  const selectedSupplier = useMemo(() => {
-    if (!selectedBatch) return null
-    return suppliers.find((supplier) => supplier.id === selectedBatch.supplier_id) ?? null
-  }, [selectedBatch, suppliers])
-  const sourceName =
-    selectedBatch?.supplier_name?.trim() ||
-    selectedSupplier?.company_name ||
-    (suppliersQuery.isLoading ? null : "Source not found")
-
-  if (!selectedBatch) return null
-
-  return (
-    <div className="data-entry-note-card rounded-md border border-border/80 px-3 py-2 text-sm">
-      <div className="font-medium">Selected Batch</div>
-      <div className="text-muted-foreground">Batch: {selectedBatch.label}</div>
-      {sourceName ? <div className="text-muted-foreground">Source: {sourceName}</div> : null}
-      <div className="text-muted-foreground">Delivery Date: {selectedBatch.date_of_delivery}</div>
     </div>
   )
 }
