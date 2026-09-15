@@ -11,7 +11,9 @@ import { formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
 import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import type { RecommendedActionRow } from "@/lib/types/insights"
-import type { CageMortalityTotal } from "@/features/systems/types"
+
+const formatPercent = (value: number | null | undefined, decimals = 2) =>
+  typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(decimals)}%` : "--"
 
 type CageStatus = "Optimal" | "Good" | "Monitor" | "Critical"
 
@@ -50,14 +52,12 @@ function deriveStatus(params: { row: DashboardSystemRow; hasOpenAlert: boolean }
 export default function CageStatusTable({
   rows,
   cohortBySystemId,
-  mortalityByCage,
   alerts,
   timePeriod = "all history",
   emptyMessage = "No active cages found",
 }: {
   rows: DashboardSystemRow[]
   cohortBySystemId: Record<number, string | null>
-  mortalityByCage: CageMortalityTotal[]
   alerts: RecommendedActionRow[]
   timePeriod?: TimePeriod
   emptyMessage?: string
@@ -70,10 +70,6 @@ export default function CageStatusTable({
     router.push(`/production?${params.toString()}`)
   }
   const alertSystemIds = useMemo(() => new Set(alerts.map((row) => row.system_id)), [alerts])
-  const mortalityBySystemId = useMemo(
-    () => new Map(mortalityByCage.map((row) => [row.system_id, row.total])),
-    [mortalityByCage],
-  )
 
   const columns = useMemo<Array<ColumnDef<DashboardSystemRow, unknown>>>(
     () => [
@@ -128,13 +124,13 @@ export default function CageStatusTable({
       {
         id: "mortality",
         header: "Mortality",
-        accessorFn: (row) => mortalityBySystemId.get(row.system_id) ?? 0,
+        accessorFn: (row) => row.mortality_rate ?? 0,
         sortDescFirst: true,
         meta: { width: "110px" },
         cell: ({ row }) => (
           <span className="text-sm">
             <SeverityValue
-              value={formatNumberValue(mortalityBySystemId.get(row.original.system_id) ?? 0)}
+              value={formatPercent(row.original.mortality_rate)}
               active={isMortalityCritical(row.original)}
             />
           </span>
@@ -160,7 +156,7 @@ export default function CageStatusTable({
         },
       },
     ],
-    [alertSystemIds, cohortBySystemId, mortalityBySystemId],
+    [alertSystemIds, cohortBySystemId],
   )
 
   return (
@@ -183,7 +179,6 @@ export default function CageStatusTable({
             <CageStatusCardBody
               row={row}
               cohort={cohortBySystemId[row.system_id] ?? null}
-              mortalityTotal={mortalityBySystemId.get(row.system_id) ?? 0}
               status={deriveStatus({ row, hasOpenAlert: alertSystemIds.has(row.system_id) })}
             />
           )}
@@ -196,12 +191,10 @@ export default function CageStatusTable({
 function CageStatusCardBody({
   row,
   cohort,
-  mortalityTotal,
   status,
 }: {
   row: DashboardSystemRow
   cohort: string | null
-  mortalityTotal: number
   status: CageStatus
 }) {
   const title = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
@@ -221,7 +214,7 @@ function CageStatusCardBody({
         <MobileMetric label="Biomass" value={formatUnitValue(row.biomass_end, 0, "kg")} />
         <MobileMetric
           label="Mortality"
-          value={<SeverityValue value={formatNumberValue(mortalityTotal)} active={isMortalityCritical(row)} />}
+          value={<SeverityValue value={formatPercent(row.mortality_rate)} active={isMortalityCritical(row)} />}
         />
       </div>
     </>

@@ -15,8 +15,6 @@ export type DashboardBatchRpcRow = Database["public"]["Functions"]["api_dashboar
  * SQL (api_batches_summary), the page just formats and displays it. */
 export type BatchesSummaryRow = Database["public"]["Functions"]["api_batches_summary"]["Returns"][number]
 
-export type BatchMortalityTotal = { batch_id: number; total: number }
-
 /** The stocking/lineage side of a batch -- from fingerling_batch + fingerling_supplier,
  * not from api_dashboard_batches (which only knows current/period state). */
 export type BatchStockingInfo = {
@@ -39,7 +37,6 @@ export type BatchesPageInitialData = {
   /** ABW/eFCR series for the fetched batches' own production cycles -- charts roll
    * this up to batch level via cycleIdToBatchId + aggregateGrowthByBatch. */
   growthSeries: GrowthTrendRow[]
-  mortalityByBatch: BatchMortalityTotal[]
   alerts: RecommendedActionRow[]
   /** Production cycle -> batch. The key for attributing growthSeries rows:
    * a cage's current batch is not who its historical cycles belonged to. */

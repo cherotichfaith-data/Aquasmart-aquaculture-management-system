@@ -60,7 +60,7 @@ export default function BatchesPageClient({
             cycleIdToBatchId={initialData.cycleIdToBatchId}
             batchLabels={batchLabels}
           />
-          <MortalityByBatchChart mortalityByBatch={initialData.mortalityByBatch} batchLabels={batchLabels} />
+          <MortalityByBatchChart rows={rows} batchLabels={batchLabels} />
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <EfcrByPeriodBatchChart

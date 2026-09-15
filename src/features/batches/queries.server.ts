@@ -1,7 +1,7 @@
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
-import { listMortalityData, type GrowthTrendRow } from "@/features/shared/queries.server"
+import type { GrowthTrendRow } from "@/features/shared/queries.server"
 import { listBatchOptionRows } from "@/features/shared/query-seed.server"
 import type { Database } from "@/lib/types/database"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
@@ -9,7 +9,6 @@ import { normalizeStageFilter } from "@/lib/stage-filter"
 import { parseCustomPeriodUrlValue, resolveTimePeriod, type TimeBounds } from "@/lib/time-period"
 import type { RecommendedActionRow } from "@/lib/types/insights"
 import type {
-  BatchMortalityTotal,
   BatchStockingInfo,
   BatchesPageFilters,
   BatchesPageInitialData,
@@ -187,21 +186,6 @@ async function getStockingByBatchId(
   return result
 }
 
-function bucketMortalityByBatch(
-  rows: Array<{ batch_id: number | null; number_of_fish_mortality: number | null }>,
-  knownBatchIds: Set<number>,
-): BatchMortalityTotal[] {
-  // fish_mortality rows carry their own batch_id, so attribute by that -- not by
-  // the cage's *current* occupant, which would fold a previous cycle's deaths
-  // into whichever batch sits there now.
-  const totals = new Map<number, number>()
-  for (const row of rows) {
-    if (typeof row.batch_id !== "number" || !knownBatchIds.has(row.batch_id)) continue
-    totals.set(row.batch_id, (totals.get(row.batch_id) ?? 0) + (row.number_of_fish_mortality ?? 0))
-  }
-  return Array.from(totals.entries()).map(([batch_id, total]) => ({ batch_id, total }))
-}
-
 type BatchGrowthTrendRpcRow = Database["public"]["Functions"]["api_batch_growth_trend"]["Returns"][number]
 
 /**
@@ -262,7 +246,6 @@ function buildEmptyBatchesPageInitialData(): BatchesPageInitialData {
     bounds: { start: null, end: null },
     batches: toQuerySuccess([]),
     growthSeries: [],
-    mortalityByBatch: [],
     alerts: [],
     cycleIdToBatchId: {},
     stockingByBatchId: {},
@@ -310,14 +293,10 @@ async function loadBatchesPageInitialData(
   )
 
   const batchIds = batchRows.map((row) => row.batch_id)
-  const knownBatchIds = new Set(batchIds)
 
-  const [growthSeries, mortalityRows, alerts, stockingByBatchId, cycleIdToBatchId, summary] = await Promise.all([
+  const [growthSeries, alerts, stockingByBatchId, cycleIdToBatchId, summary] = await Promise.all([
     batchIds.length
       ? listBatchGrowthTrend(supabase, { farmId, batchIds, dateFrom, dateTo })
-      : Promise.resolve([]),
-    batchIds.length
-      ? listMortalityData(supabase, { farmId, batchIds, dateFrom, dateTo })
       : Promise.resolve([]),
     getAlertRows(supabase, farmId),
     getStockingByBatchId(supabase, { farmId, batchIds }),
@@ -329,7 +308,6 @@ async function loadBatchesPageInitialData(
     bounds,
     batches: toQuerySuccess(batchRows),
     growthSeries,
-    mortalityByBatch: bucketMortalityByBatch(mortalityRows, knownBatchIds),
     alerts,
     cycleIdToBatchId,
     stockingByBatchId,
