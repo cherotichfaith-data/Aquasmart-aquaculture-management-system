@@ -630,17 +630,17 @@ next-router-prefetch {
     @apply text-sm leading-6 text-muted-foreground;
   }
 
+  /* Single column: per EUI form-layout guidance, keep inputs in one column
+     rather than spreading them side by side. data-entry-field-wide is now a
+     no-op (every field is already full width) but left on FormItems in case
+     a future field genuinely needs different treatment. */
   .data-entry-field-grid {
-    @apply grid gap-x-6 gap-y-4 sm:grid-cols-2;
-  }
-
-  /* A field that should run the full width of the two-column grid. */
-  .data-entry-field-grid > .data-entry-field-wide {
-    @apply sm:col-span-2;
+    @apply grid grid-cols-1 gap-4;
   }
 
   .data-entry-form-actions {
-    @apply flex flex-col-reverse gap-2.5 pt-1 sm:flex-row sm:justify-end;
+    @apply sticky bottom-0 z-10 flex flex-col-reverse gap-2.5 border-t border-border bg-background py-3 sm:static sm:flex-row sm:justify-end sm:border-0;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 
   .data-entry-form-actions > * {

@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -37,6 +38,8 @@ import {
   toIsoDate,
 } from "./form-utils"
 import { SelectionChips } from "./selection-info"
+import { useEntrySequence } from "./entry-sequence"
+import { EntryDraft } from "./entry-draft"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const formSchema = z.object({
@@ -85,14 +88,17 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
     defaultValues: {
       date: toIsoDate(new Date()),
       unit: defaultUnit,
-      number_of_fish: 0,
-      total_weight_kg: 0,
+      number_of_fish: undefined,
+      total_weight_kg: undefined,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       notes: "",
     },
   })
+  const sequence = useEntrySequence(form, systems)
   const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
+  const sampleCount = Number(useWatch({ control: form.control, name: "number_of_fish" }))
+  const sampleWeight = Number(useWatch({ control: form.control, name: "total_weight_kg" }))
   const selectedUnit = useWatch({ control: form.control, name: "unit" })
   const selectedSystemValue = useWatch({ control: form.control, name: "system_id" })
   const selectedSystemId = Number(selectedSystemValue)
@@ -120,7 +126,7 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
   }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
-    if (!selectedUnit) return
+    if (!selectedUnit || form.getValues("unit") !== selectedUnit) return
     const currentValue = form.getValues("system_id")
     if (!currentValue) return
     const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
@@ -175,11 +181,11 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
 
-      form.reset({
-        date: toIsoDate(new Date()),
+      sequence.reset({
+        date: values.date,
         unit: values.unit,
-        number_of_fish: 0,
-        total_weight_kg: 0,
+        number_of_fish: undefined,
+        total_weight_kg: undefined,
         system_id: values.system_id,
         notes: "",
       })
@@ -196,13 +202,14 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
       </div>
 
       {isVeryRecentResample ? (
-        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
+        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning-foreground">
           Last sampling was {formatRelativeDays(daysSinceLastSample)}. Bi-weekly and monthly schedules are supported, but this entry is close to the previous sample, so confirm the date before saving.
         </div>
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="sampling" savedResult={mutation.data} />
           <FormSection title="Record sampling">
             <SelectionChips
               systems={systems}
@@ -217,9 +224,9 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -231,10 +238,10 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Unit</FormLabel>
+                    <FormLabel>Cage Unit <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -256,10 +263,10 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="system_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Number</FormLabel>
+                    <FormLabel>Cage Number <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
@@ -281,9 +288,9 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="number_of_fish"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Number of Fish Sampled</FormLabel>
+                    <FormLabel>Number of Fish Sampled <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="1" inputMode="numeric" {...field} />
+                      <Input aria-required={true} type="number" step="1" inputMode="numeric" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -295,10 +302,11 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="total_weight_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total Weight (kg)</FormLabel>
+                    <FormLabel>Total Weight (kg) <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} />
+                      <Input aria-required={true} type="number" step="0.001" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
+                    <FormDescription>Combined weight of every fish in the sample, to the nearest gram.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -309,15 +317,15 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="notes"
                 render={({ field }) => (
                   <FormItem className="data-entry-field-wide">
-                    <FormLabel>Comments</FormLabel>
+                    <FormLabel>Comments (optional)</FormLabel>
                     <FormControl>
-                      <textarea
+                      <textarea aria-required={false}
                         {...field}
-                        rows={3}
+                        rows={2}
                         className="data-entry-textarea"
-                        placeholder="Net size, fish condition, uneven sample, or any reason the reading may be atypical."
                       />
                     </FormControl>
+                    <FormDescription>Net size, fish condition, or anything that could make this sample atypical.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -337,16 +345,19 @@ export function SamplingForm({ farmId, systems, batches, defaultSystemId = null,
                   value={daysSinceLastSample != null ? formatRelativeDays(daysSinceLastSample) : "No prior sample"}
                 />
                 <InfoStat
-                  label="Expected ABW Today"
+                  label="Expected ABW on selected date"
                   value={projectedAbw != null ? `${projectedAbw.toFixed(2)} g` : "Projection unavailable"}
                 />
               </div>
             </FormSection>
           ) : null}
 
+          {sampleCount > 0 && sampleWeight > 0 && <p role="status" className="text-sm">Sample average body weight: {(sampleWeight * 1000 / sampleCount).toFixed(2)} g/fish</p>}
           <FormActions>
+            {sequence.next && <Button type="submit" variant="outline" disabled={form.formState.isSubmitting || mutation.isPending} onClick={() => sequence.requestNext(true)}>Save &amp; next cage</Button>}
             <Button
               type="submit"
+              onClick={() => sequence.requestNext(false)}
               className="min-h-11 rounded-lg px-5"
               disabled={form.formState.isSubmitting || mutation.isPending}
             >

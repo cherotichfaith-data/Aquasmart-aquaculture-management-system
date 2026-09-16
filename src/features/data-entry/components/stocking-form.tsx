@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -42,6 +43,8 @@ import {
   type LatestEntrySummary,
 } from "./latest-entry-guard"
 import { SelectionChips } from "./selection-info"
+import { useEntrySequence } from "./entry-sequence"
+import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 type StockingInsert = Database["public"]["Tables"]["fish_stocking"]["Insert"]
@@ -99,14 +102,15 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
     defaultValues: {
       stocking_date: toIsoDate(new Date()),
       unit: defaultUnit,
-      number_of_fish: 0,
-      total_weight_kg: 0,
+      number_of_fish: undefined,
+      total_weight_kg: undefined,
       notes: "",
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       batch_id: defaultBatchId ? String(defaultBatchId) : "",
       type_of_stocking: "empty",
     },
   })
+  const sequence = useEntrySequence(form, systems)
   const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
   const selectedUnit = useWatch({ control: form.control, name: "unit" })
@@ -173,7 +177,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
   }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
-    if (!selectedUnit) return
+    if (!selectedUnit || form.getValues("unit") !== selectedUnit) return
     const currentValue = form.getValues("system_id")
     if (!currentValue) return
     const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
@@ -215,11 +219,11 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
 
       await mutation.mutateAsync(payload)
 
-      form.reset({
-        stocking_date: toIsoDate(new Date()),
+      sequence.reset({
+        stocking_date: values.stocking_date,
         unit: values.unit,
-        number_of_fish: 0,
-        total_weight_kg: 0,
+        number_of_fish: undefined,
+        total_weight_kg: undefined,
         notes: "",
         system_id: values.system_id,
         batch_id: values.batch_id,
@@ -246,10 +250,10 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
               name="unit"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cage Unit</FormLabel>
+                  <FormLabel>Cage Unit <span aria-hidden="true">*</span></FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger className="max-w-xs">
+                      <SelectTrigger aria-required={true} className="max-w-xs">
                         <SelectValue placeholder="Select unit" />
                       </SelectTrigger>
                     </FormControl>
@@ -271,10 +275,10 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
               name="system_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cage Number</FormLabel>
+                  <FormLabel>Cage Number <span aria-hidden="true">*</span></FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                     <FormControl>
-                      <SelectTrigger className="max-w-xs">
+                      <SelectTrigger aria-required={true} className="max-w-xs">
                         <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                       </SelectTrigger>
                     </FormControl>
@@ -318,7 +322,9 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="stocking" savedResult={mutation.data} />
+          <ExistingEntryNotice message={duplicateEntry?.duplicateMessage ?? (duplicateEntry ? "An entry already exists for this date. Review it before submitting another record." : null)} farmId={farmId} />
           <FormSection title="Record stocking">
             <SelectionChips
               systems={systems}
@@ -333,9 +339,9 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="stocking_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -347,10 +353,10 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Unit</FormLabel>
+                    <FormLabel>Cage Unit <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -372,10 +378,10 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="system_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Number</FormLabel>
+                    <FormLabel>Cage Number <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
@@ -397,10 +403,10 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="batch_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Batch Number</FormLabel>
+                    <FormLabel>Batch Number <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select batch number" />
                         </SelectTrigger>
                       </FormControl>
@@ -422,9 +428,9 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="number_of_fish"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Number of Fish</FormLabel>
+                    <FormLabel>Number of Fish <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="1" inputMode="numeric" {...field} />
+                      <Input aria-required={true} type="number" step="1" inputMode="numeric" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -436,9 +442,9 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="total_weight_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total Weight (kg)</FormLabel>
+                    <FormLabel>Total Weight (kg) <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} />
+                      <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -450,10 +456,10 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="type_of_stocking"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Stocking Type</FormLabel>
+                    <FormLabel>Stocking Type <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                       </FormControl>
@@ -472,15 +478,15 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
                 name="notes"
                 render={({ field }) => (
                   <FormItem className="data-entry-field-wide">
-                    <FormLabel>Comments</FormLabel>
+                    <FormLabel>Comments (optional)</FormLabel>
                     <FormControl>
-                      <textarea
+                      <textarea aria-required={false}
                         {...field}
-                        rows={3}
+                        rows={2}
                         className="data-entry-textarea"
-                        placeholder="Source condition, acclimation detail, or any exception."
                       />
                     </FormControl>
+                    <FormDescription>Source condition, acclimation detail, or any exception.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -489,8 +495,10 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
           </FormSection>
 
           <FormActions>
+            {sequence.next && <Button type="submit" variant="outline" disabled={form.formState.isSubmitting || mutation.isPending} onClick={() => sequence.requestNext(true)}>Save &amp; next cage</Button>}
             <Button
               type="submit"
+              onClick={() => sequence.requestNext(false)}
               className="min-h-11 rounded-lg px-5"
               disabled={form.formState.isSubmitting || mutation.isPending}
             >

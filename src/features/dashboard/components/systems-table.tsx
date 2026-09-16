@@ -117,9 +117,10 @@ export default function SystemsTable({
             onRowClick={(row) => openProductionPage(row.system_id)}
             emptyMessage={emptyMessage}
             initialSorting={[{ id: "system", desc: false }]}
-            shellClassName="production-records-table dashboard-production-table max-h-[520px]"
+            shellClassName="production-records-table dashboard-production-table"
             tableClassName="min-w-[960px] table-fixed"
             headerVariant="plain"
+            pagination={{ pageSize: 25 }}
             renderMobileCard={(row) => <SystemCardBody row={row} />}
           />
         )}

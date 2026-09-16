@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -40,6 +41,7 @@ import {
   type LatestEntrySummary,
 } from "./latest-entry-guard"
 import { SelectionChips } from "./selection-info"
+import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const EXTERNAL_DESTINATION = "__external__"
@@ -103,8 +105,8 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
     mode: "onBlur",
     defaultValues: {
       date: toIsoDate(new Date()),
-      number_of_fish: 0,
-      total_weight_kg: 0,
+      number_of_fish: undefined,
+      total_weight_kg: undefined,
       origin_unit: defaultUnit,
       origin_system_id: defaultSystemId ? String(defaultSystemId) : "",
       target_unit: "",
@@ -144,7 +146,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
-    if (!originUnit) return
+    if (!originUnit || form.getValues("origin_unit") !== originUnit) return
     const currentValue = form.getValues("origin_system_id")
     if (!currentValue) return
     if (!originSystemsForUnit.some((system) => String(system.id) === currentValue)) {
@@ -153,7 +155,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
   }, [form, originUnit, originSystemsForUnit])
 
   useEffect(() => {
-    if (!targetUnit) return
+    if (!targetUnit || form.getValues("target_unit") !== targetUnit) return
     const currentValue = form.getValues("target_system_id")
     if (!currentValue || currentValue === EXTERNAL_DESTINATION) return
     if (!targetSystemsForUnit.some((system) => String(system.id) === currentValue)) {
@@ -189,11 +191,6 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      if (duplicateEntry) {
-        form.setError("date", { message: `A transfer entry already exists for ${values.date}.` })
-        return
-      }
-
       const resolvedFarmId = requireActiveFarmId(farmId)
       const isExternalTransfer = values.transfer_type === "external_out"
       if (!isExternalTransfer && values.origin_system_id === values.target_system_id) {
@@ -223,9 +220,9 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       })
 
       form.reset({
-        date: toIsoDate(new Date()),
-        number_of_fish: 0,
-        total_weight_kg: 0,
+        date: values.date,
+        number_of_fish: undefined,
+        total_weight_kg: undefined,
         origin_unit: values.origin_unit,
         origin_system_id: values.origin_system_id,
         target_unit: "",
@@ -247,13 +244,15 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
       </div>
 
       {isExternalOut ? (
-        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
+        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning-foreground">
           Fish will leave this farm system and no receiving cage will be tracked.
         </div>
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="transfer" savedResult={mutation.data} />
+          <ExistingEntryNotice message={duplicateEntry ? "This cage has another transfer on this date. Check its destination and count before adding a separate movement." : null} farmId={farmId} />
           <FormSection title="Record transfer">
             <SelectionChips
               systems={systems}
@@ -268,9 +267,9 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -282,7 +281,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 name="transfer_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Transfer Type</FormLabel>
+                    <FormLabel>Transfer Type <span aria-hidden="true">*</span></FormLabel>
                     <Select
                       onValueChange={(value) => {
                         field.onChange(value)
@@ -296,7 +295,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select transfer type" />
                         </SelectTrigger>
                       </FormControl>
@@ -318,10 +317,10 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 name="origin_unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Origin Unit</FormLabel>
+                    <FormLabel>Origin Unit <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -343,10 +342,10 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 name="origin_system_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Origin Cage</FormLabel>
+                    <FormLabel>Origin Cage <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!originUnit}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder={originUnit ? "Select origin" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
@@ -369,9 +368,9 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                   name="external_target_name"
                   render={({ field }) => (
                     <FormItem className="data-entry-field-wide">
-                      <FormLabel>Destination Location</FormLabel>
+                      <FormLabel>Destination Location <span aria-hidden="true">*</span></FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g. KIMBWELA Pond 3" />
+                        <Input aria-required={true} {...field} placeholder="KIMBWELA Pond 3" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -384,7 +383,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                     name="target_unit"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Destination Unit</FormLabel>
+                        <FormLabel>Destination Unit <span aria-hidden="true">*</span></FormLabel>
                         <Select
                           onValueChange={(value) => {
                             if (value === EXTERNAL_DESTINATION) {
@@ -397,7 +396,7 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                               <SelectValue placeholder="Select unit" />
                             </SelectTrigger>
                           </FormControl>
@@ -420,10 +419,10 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                     name="target_system_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Destination Cage</FormLabel>
+                        <FormLabel>Destination Cage <span aria-hidden="true">*</span></FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={!targetUnit}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                               <SelectValue placeholder={targetUnit ? "Select destination" : "Select unit first"} />
                             </SelectTrigger>
                           </FormControl>
@@ -447,9 +446,9 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 name="number_of_fish"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Number of Fish</FormLabel>
+                    <FormLabel>Number of Fish <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="1" inputMode="numeric" {...field} />
+                      <Input aria-required={true} type="number" step="1" inputMode="numeric" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -461,9 +460,9 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 name="total_weight_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total Weight (kg)</FormLabel>
+                    <FormLabel>Total Weight (kg) <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} />
+                      <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -475,15 +474,15 @@ export function TransferForm({ farmId, systems, batches, defaultSystemId = null,
                 name="notes"
                 render={({ field }) => (
                   <FormItem className="data-entry-field-wide">
-                    <FormLabel>Comment</FormLabel>
+                    <FormLabel>Comment (optional)</FormLabel>
                     <FormControl>
-                      <textarea
+                      <textarea aria-required={false}
                         {...field}
-                        rows={3}
+                        rows={2}
                         className="data-entry-textarea"
-                        placeholder="Reason for movement, handling detail, or receiving location note."
                       />
                     </FormControl>
+                    <FormDescription>Reason for movement, handling detail, or receiving location note.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

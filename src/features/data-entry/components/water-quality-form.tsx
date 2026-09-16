@@ -1,5 +1,7 @@
 "use client"
 
+import { entryQuarterHour } from "@/lib/entry-time"
+import { findWaterQualityDuplicate } from "./water-quality-duplicate"
 import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -9,6 +11,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -24,13 +27,14 @@ import { useRecordWaterQuality, useWaterQualityMeasurements } from "@/features/w
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoStat } from "./form-support"
-import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import { toIsoDate, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
 import {
-  pickSameDayEntryByMetadata,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
 import { SelectionChips } from "./selection-info"
+import { useEntrySequence } from "./entry-sequence"
+import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const optionalNumber = z.preprocess(
@@ -45,23 +49,16 @@ const formSchema = z.object({
   location_reference: z.string().optional(),
   water_depth: z.coerce.number().min(0, "Depth must be positive"),
   temperature: optionalNumber,
-  dissolved_oxygen: optionalNumber,
-  pH: optionalNumber,
-  total_ammonia: optionalNumber,
-  no2: optionalNumber,
-  no3: optionalNumber,
+  dissolved_oxygen: optionalNumber.refine((v) => v == null || v >= 0, "DO cannot be negative"),
+  pH: optionalNumber.refine((v) => v == null || (v >= 0 && v <= 14), "pH must be between 0 and 14"),
+  total_ammonia: optionalNumber.refine((v) => v == null || v >= 0, "Concentration cannot be negative"),
+  no2: optionalNumber.refine((v) => v == null || v >= 0, "Concentration cannot be negative"),
+  no3: optionalNumber.refine((v) => v == null || v >= 0, "Concentration cannot be negative"),
 })
 
 type MeasurementParameter =
   Database["public"]["Tables"]["water_quality_measurement"]["Row"]["parameter_name"]
 
-const nearestQuarterHour = () => {
-  const now = new Date()
-  const minutes = now.getMinutes()
-  const rounded = Math.round(minutes / 15) * 15
-  now.setMinutes(rounded, 0, 0)
-  return now.toISOString().split("T")[1]?.slice(0, 5) ?? "08:00"
-}
 
 export function WaterQualityForm({
   farmId,
@@ -76,6 +73,7 @@ export function WaterQualityForm({
 }) {
   const mutation = useRecordWaterQuality()
   const supabase = useMemo(() => createClient(), [])
+  const [doStatus, setDoStatus] = useState<"idle" | "checking" | "ready" | "unavailable">("idle")
   const [doClassification, setDoClassification] = useState<Database["public"]["Enums"]["water_quality_rating"] | null>(null)
 
   const allSystemsQuery = useSystemOptions({ farmId, activeOnly: false, enabled: Boolean(farmId) })
@@ -93,9 +91,9 @@ export function WaterQualityForm({
     resolver: zodResolver(formSchema),
     mode: "onBlur",
     defaultValues: {
-      date: new Date().toISOString().split("T")[0],
+      date: toIsoDate(new Date()),
       system_id: defaultSystemId ? String(defaultSystemId) : "",
-      time: nearestQuarterHour(),
+      time: entryQuarterHour(new Date()),
       location_reference: "",
       water_depth: 1,
       temperature: undefined,
@@ -106,11 +104,13 @@ export function WaterQualityForm({
       no3: undefined,
     },
   })
+  const sequence = useEntrySequence(form, systems)
 
   const selectedSystemValue = form.watch("system_id")
   const selectedSystemId = Number(selectedSystemValue)
   const selectedDate = form.watch("date")
-  const doValue = form.watch("dissolved_oxygen")
+  const rawDoValue = form.watch("dissolved_oxygen")
+  const doValue = rawDoValue == null || String(rawDoValue).trim() === "" ? null : Number(rawDoValue)
   const selectedTime = form.watch("time")
   const selectedDepth = form.watch("water_depth")
   const selectedDepthValue =
@@ -150,10 +150,11 @@ export function WaterQualityForm({
 
     async function classifyDo() {
       if (typeof doValue !== "number" || Number.isNaN(doValue)) {
-        if (active) setDoClassification(null)
+        if (active) { setDoClassification(null); setDoStatus("idle") }
         return
       }
 
+      if (active) setDoStatus("checking")
       const { data: framework, error: frameworkError } = await supabase
         .from("water_quality_framework")
         .select("parameter_optimal, parameter_acceptable, parameter_critical, parameter_lethal")
@@ -161,7 +162,7 @@ export function WaterQualityForm({
         .maybeSingle()
 
       if (frameworkError || !framework) {
-        if (active) setDoClassification(null)
+        if (active) { setDoClassification(null); setDoStatus("unavailable") }
         return
       }
 
@@ -173,13 +174,17 @@ export function WaterQualityForm({
         p_lethal: framework.parameter_lethal,
       })
 
-      if (!active || error) return
+      if (!active) return
+      if (error) { setDoStatus("unavailable"); return }
+      setDoStatus("ready")
       setDoClassification(data?.[0]?.measurement_rating ?? null)
     }
 
-    void classifyDo()
+    setDoClassification(null)
+    const timer = setTimeout(() => void classifyDo(), 300)
 
     return () => {
+      clearTimeout(timer)
       active = false
     }
   }, [doValue, supabase])
@@ -192,23 +197,15 @@ export function WaterQualityForm({
     details: [],
     metadata: {
       waterDepth: row.water_depth ?? null,
+      time: row.time?.slice(0, 5) ?? null,
+      parameterName: row.parameter_name ?? null,
     },
     duplicateMessage:
       row.water_depth != null
-        ? `A water quality entry already exists for this cage on ${row.date} at ${row.water_depth} m depth.`
+        ? `${row.parameter_name} already has a reading at ${row.time?.slice(0, 5)} on ${row.date}, ${row.water_depth} m deep.`
         : `A water quality entry already exists for this cage on ${row.date}.`,
   }))
-  const duplicateEntry = pickSameDayEntryByMetadata(
-    [...duplicateServerEntries, ...pendingEntries],
-    {
-      date: selectedDate,
-      metadataKey: "waterDepth",
-      metadataValue:
-        Number.isFinite(selectedDepthValue) && selectedDepthValue >= 0
-          ? selectedDepthValue
-          : null,
-    },
-  )
+  const duplicateEntry = findWaterQualityDuplicate([...duplicateServerEntries, ...pendingEntries], form.watch())
 
   const doTone =
     doClassification === "lethal"
@@ -223,7 +220,7 @@ export function WaterQualityForm({
     try {
       if (duplicateEntry) {
         form.setError("water_depth", {
-          message: `A water quality entry already exists for ${values.date} at ${values.water_depth} m depth.`,
+          message: `This parameter already has a reading at ${values.time} on ${values.date}, ${values.water_depth} m deep. Change the time or remove the repeated parameter.`,
         })
         return
       }
@@ -266,8 +263,8 @@ export function WaterQualityForm({
       }))
 
       await mutation.mutateAsync(payload)
-      form.reset({
-        date: new Date().toISOString().split("T")[0],
+      sequence.reset({
+        date: values.date,
         system_id: values.system_id,
         time: values.time,
         location_reference: isLakeReference ? values.location_reference : "",
@@ -292,13 +289,15 @@ export function WaterQualityForm({
       </div>
 
       {selectedTime < "12:00" ? (
-        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning">
-          Morning measurement logged. Remember to return for the PM measurement as well.
+        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning-foreground">
+          Morning reading selected. Remember to return for the PM measurement as well.
         </div>
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="water_quality" savedResult={mutation.data} />
+          <ExistingEntryNotice message={duplicateEntry?.duplicateMessage ?? (duplicateEntry ? "An entry already exists for this date. Review it before submitting another record." : null)} farmId={farmId} />
           <FormSection title="Reading details">
             <SelectionChips systems={selectableSystems} systemId={selectedSystemId} />
 
@@ -308,9 +307,9 @@ export function WaterQualityForm({
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -322,10 +321,11 @@ export function WaterQualityForm({
                 name="time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Time</FormLabel>
+                    <FormLabel>Time <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="time" step="900" {...field} />
+                      <Input aria-required={true} type="time" step="900" {...field} />
                     </FormControl>
+                    <FormDescription>Uses this device&apos;s clock. If you&apos;re away from the farm&apos;s timezone, set your device to local time first.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -336,10 +336,10 @@ export function WaterQualityForm({
                 name="system_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>System / Cage</FormLabel>
+                    <FormLabel>System / Cage <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select system" />
                         </SelectTrigger>
                       </FormControl>
@@ -361,9 +361,9 @@ export function WaterQualityForm({
                 name="water_depth"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Water Depth (m)</FormLabel>
+                    <FormLabel>Water Depth (m) <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.1" inputMode="decimal" {...field} />
+                      <Input aria-required={true} type="number" step="0.1" inputMode="decimal" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -377,9 +377,9 @@ export function WaterQualityForm({
                   <FormItem className="data-entry-field-wide">
                     <FormLabel>{isLakeReference ? "Location / Reference" : "Location / Reference (Optional)"}</FormLabel>
                     <FormControl>
-                      <Input
+                      <Input aria-required={isLakeReference}
                         {...field}
-                        placeholder={isLakeReference ? "e.g. lake edge, 20m from cage line" : "Optional reference note"}
+                        placeholder={isLakeReference ? "Lake edge, 20m from cage line" : "Optional reference note"}
                       />
                     </FormControl>
                     <FormMessage />
@@ -389,7 +389,7 @@ export function WaterQualityForm({
             </FieldGrid>
           </FormSection>
 
-          <FormSection title="Measurements">
+          <FormSection title="Measurements" description="Enter at least one measurement. Leave unmeasured parameters blank; zero is a recorded measurement.">
             <FieldGrid>
               <FormField
                 control={form.control}
@@ -398,7 +398,7 @@ export function WaterQualityForm({
                   <FormItem>
                     <FormLabel>Temperature (C)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
+                      <Input aria-required={false} type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -411,8 +411,9 @@ export function WaterQualityForm({
                   <FormItem>
                     <FormLabel>DO (mg/L)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                      <Input aria-required={false} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
+                    <FormDescription>Checked against the farm&apos;s dissolved-oxygen thresholds once you finish typing.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -424,8 +425,9 @@ export function WaterQualityForm({
                   <FormItem>
                     <FormLabel>pH</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
+                      <Input aria-required={false} type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
+                    <FormDescription>Standard scale from 0 to 14.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -437,7 +439,7 @@ export function WaterQualityForm({
                   <FormItem>
                     <FormLabel>Ammonia (mg/L)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                      <Input aria-required={false} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -450,7 +452,7 @@ export function WaterQualityForm({
                   <FormItem>
                     <FormLabel>Nitrite (mg/L)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                      <Input aria-required={false} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -463,7 +465,7 @@ export function WaterQualityForm({
                   <FormItem>
                     <FormLabel>Nitrate (mg/L)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                      <Input aria-required={false} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -471,6 +473,8 @@ export function WaterQualityForm({
               />
             </FieldGrid>
 
+            {doStatus === "checking" && <p role="status" className="text-sm text-muted-foreground">Checking dissolved oxygen rating…</p>}
+            {doStatus === "unavailable" && <p role="status" className="text-sm text-muted-foreground">Rating unavailable. The reading can still be recorded.</p>}
             {doClassification ? (
               <InfoStat
                 label="DO Rating"
@@ -481,8 +485,10 @@ export function WaterQualityForm({
           </FormSection>
 
           <FormActions>
+            {sequence.next && <Button type="submit" variant="outline" disabled={form.formState.isSubmitting || mutation.isPending} onClick={() => sequence.requestNext(true)}>Save &amp; next cage</Button>}
             <Button
               type="submit"
+              onClick={() => sequence.requestNext(false)}
               className="min-h-11 rounded-lg px-5"
               disabled={form.formState.isSubmitting || mutation.isPending}
             >

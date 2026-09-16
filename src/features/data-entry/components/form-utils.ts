@@ -1,6 +1,6 @@
 import { toast } from "@/lib/hooks/app/use-toast"
 
-export const toIsoDate = (date: Date) => date.toISOString().split("T")[0]
+export { entryDate as toIsoDate } from "@/lib/entry-time"
 
 export const parseNumericId = (value: number | string | null | undefined): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value

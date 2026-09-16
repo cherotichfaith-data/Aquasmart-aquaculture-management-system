@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -34,6 +35,8 @@ import {
   type LatestEntrySummary,
 } from "./latest-entry-guard"
 import { SelectionChips } from "./selection-info"
+import { useEntrySequence } from "./entry-sequence"
+import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 import {
   parseRequiredNumericId,
@@ -93,12 +96,13 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
     defaultValues: {
       date: toIsoDate(new Date()),
       unit: defaultUnit,
-      number_of_fish: 0,
+      number_of_fish: undefined,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       total_weight_mortality: undefined,
       notes: "",
     },
   })
+  const sequence = useEntrySequence(form, systems)
   const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
   const selectedUnit = useWatch({ control: form.control, name: "unit" })
@@ -126,7 +130,7 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
   }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
-    if (!selectedUnit) return
+    if (!selectedUnit || form.getValues("unit") !== selectedUnit) return
     const currentValue = form.getValues("system_id")
     if (!currentValue) return
     const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
@@ -181,10 +185,10 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
         notes: values.notes?.trim() ? values.notes.trim() : null,
       })
 
-      form.reset({
-        date: toIsoDate(new Date()),
+      sequence.reset({
+        date: values.date,
         unit: values.unit,
-        number_of_fish: 0,
+        number_of_fish: undefined,
         system_id: values.system_id,
         total_weight_mortality: undefined,
         notes: "",
@@ -202,13 +206,15 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
       </div>
 
       {mortalityCount >= 100 ? (
-        <div className="data-entry-callout-alert border-destructive/40 bg-destructive/10 text-destructive">
+        <div className="data-entry-callout-alert border-destructive/40 bg-destructive/10 text-destructive-strong">
           Mass mortality threshold exceeded. Weigh the dead fish and record the total dead weight, then complete a DO and water-quality check for this cage.
         </div>
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="mortality" savedResult={mutation.data} />
+          <ExistingEntryNotice message={duplicateEntry?.duplicateMessage ?? (duplicateEntry ? "An entry already exists for this date. Review it before submitting another record." : null)} farmId={farmId} />
           <FormSection title="Record mortality">
             <SelectionChips
               systems={systems}
@@ -223,9 +229,9 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -237,10 +243,10 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 name="unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Unit</FormLabel>
+                    <FormLabel>Cage Unit <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -262,10 +268,10 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 name="system_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Number</FormLabel>
+                    <FormLabel>Cage Number <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
@@ -287,9 +293,9 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 name="number_of_fish"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Number of Dead Fish</FormLabel>
+                    <FormLabel>Number of Dead Fish <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="1" inputMode="numeric" {...field} />
+                      <Input aria-required={true} type="number" step="1" inputMode="numeric" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -301,10 +307,10 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 name="cause"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cause</FormLabel>
+                    <FormLabel>Cause <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select cause" />
                         </SelectTrigger>
                       </FormControl>
@@ -326,9 +332,9 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 name="total_weight_mortality"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total Dead Weight (kg){mortalityCount >= 100 ? " *" : ""}</FormLabel>
+                    <FormLabel>Total Dead Weight (kg){mortalityCount >= 100 ? " *" : " (optional)"}</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                      <Input aria-required={mortalityCount >= 100} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -340,15 +346,15 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
                 name="notes"
                 render={({ field }) => (
                   <FormItem className="data-entry-field-wide">
-                    <FormLabel>Notes</FormLabel>
+                    <FormLabel>Notes (optional)</FormLabel>
                     <FormControl>
-                      <textarea
+                      <textarea aria-required={false}
                         {...field}
-                        rows={3}
+                        rows={2}
                         className="data-entry-textarea"
-                        placeholder="Observed signs, handling issue, water condition, or follow-up action."
                       />
                     </FormControl>
+                    <FormDescription>Observed signs, handling issue, water condition, or follow-up action.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -357,8 +363,10 @@ export function MortalityForm({ farmId, systems, batches, defaultSystemId = null
           </FormSection>
 
           <FormActions>
+            {sequence.next && <Button type="submit" variant="outline" disabled={form.formState.isSubmitting || mutation.isPending} onClick={() => sequence.requestNext(true)}>Save &amp; next cage</Button>}
             <Button
               type="submit"
+              onClick={() => sequence.requestNext(false)}
               className="min-h-11 rounded-lg px-5"
               disabled={form.formState.isSubmitting || mutation.isPending}
             >

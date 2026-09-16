@@ -62,7 +62,7 @@ export function buildDashboardSystemColumns(params: {
               style={{ backgroundColor: identityDotColor(data.system_id) }}
             />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold leading-5 text-foreground">{title}</span>
+              <span title={title} className="block truncate text-sm font-semibold leading-5 text-foreground">{title}</span>
             </span>
           </span>
         )
@@ -74,7 +74,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.efcr ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "110px" },
+      meta: { width: "110px", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.efcr, 2)
@@ -86,6 +86,7 @@ export function buildDashboardSystemColumns(params: {
             arrow={data.efcr_arrow}
             invertArrow
             subtext={formatLastDate(data.efcr_latest_date)}
+            align="right"
           />
         )
       },
@@ -96,7 +97,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.abw ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "120px", unit: "g" },
+      meta: { width: "120px", unit: "g", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.abw, 1)
@@ -107,6 +108,7 @@ export function buildDashboardSystemColumns(params: {
             value={value}
             arrow={data.abw_arrow}
             subtext={formatSampleAgeText(data.sample_age_days)}
+            align="right"
           />
         )
       },
@@ -117,7 +119,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.feeding_rate ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "120px", unit: "%" },
+      meta: { width: "120px", unit: "%", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.feeding_rate, 2)
@@ -128,6 +130,7 @@ export function buildDashboardSystemColumns(params: {
             value={value}
             arrow={data.feeding_rate_arrow}
             subtext={formatLastDate(data.feeding_rate_latest_date)}
+            align="right"
           />
         )
       },
@@ -138,7 +141,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.mortality_rate ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "140px", unit: "%" },
+      meta: { width: "140px", unit: "%", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.mortality_rate, 2)
@@ -150,6 +153,7 @@ export function buildDashboardSystemColumns(params: {
             arrow={data.mortality_rate_arrow}
             invertArrow
             subtext={formatLastDate(data.mortality_rate_latest_date)}
+            align="right"
           />
         )
       },
@@ -160,7 +164,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.biomass_density ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "120px", unit: "kg/m3" },
+      meta: { width: "120px", unit: "kg/m3", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.biomass_density, 1)
@@ -172,6 +176,7 @@ export function buildDashboardSystemColumns(params: {
             arrow={data.biomass_density_arrow}
             neutralArrow
             subtext={formatLastDate(data.biomass_density_latest_date)}
+            align="right"
           />
         )
       },

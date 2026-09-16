@@ -1,4 +1,5 @@
 "use client"
+import { EntryEditor, waterQualityUnit } from "./entry-editor"
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, CheckCircle2, Loader2, Pencil, X, XCircle } from "lucide-react"
@@ -12,12 +13,8 @@ type Member = { id: string; name: string }
 type Payload = Record<string, unknown>
 type Column = { header: string; cell: (payload: Payload) => string; align?: "right" }
 
-const fieldLabel = (key: string) => key.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
-const unit = (key: string) => (key.startsWith("total_weight") || key === "feeding_amount" || key === "bag_weight" ? " (kg)" : "")
 const control = "rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
-// Structural fields the queue owns; everything else in the payload is operator-editable.
-const lockedFields = ["local_id", "synced_at", "farm_id", "system_id"]
 
 const text = (value: unknown) => (value == null || value === "" ? "—" : String(value))
 const count = (value: unknown) => (value == null || value === "" ? "—" : Number(value).toLocaleString("en-US"))
@@ -137,7 +134,7 @@ export default function ApprovalsClient({
       { header: "Time", cell: (p) => text(p.time) },
       { header: "Depth", cell: (p) => (p.water_depth == null ? "—" : `${p.water_depth} m`), align: "right" },
       { header: "Parameter", cell: (p) => text(String(p.parameter_name ?? "").replaceAll("_", " ") || "—") },
-      { header: "Value", cell: (p) => text(p.parameter_value), align: "right" },
+      { header: "Value", cell: (p) => `${text(p.parameter_value)} ${waterQualityUnit(p.parameter_name)}`, align: "right" },
       { header: "Location", cell: (p) => text(p.location_reference) },
     ],
     feed_inventory: [
@@ -145,8 +142,8 @@ export default function ApprovalsClient({
       { header: "Time", cell: (p) => text(p.inventory_time) },
       { header: "Feed type", cell: (p) => names.feed(p.feed_type_id) },
       { header: "Bag weight", cell: (p) => kg(p.bag_weight), align: "right" },
-      { header: "Bags", cell: (p) => count(p.amount_of_bags), align: "right" },
-      { header: "Opened bags", cell: (p) => text(p.opened_bags), align: "right" },
+      { header: "Unopened bags", cell: (p) => count(p.amount_of_bags), align: "right" },
+      { header: "Loose feed", cell: (p) => `${text(p.opened_bags)} g`, align: "right" },
       { header: "Comments", cell: (p) => text(p.comments) },
     ],
   }), [names])
@@ -173,6 +170,7 @@ export default function ApprovalsClient({
 
   async function decide() {
     if (!review) return
+    if (review.decision === "rejected" && !reason.trim()) { setMessage({ tone: "error", text: "Explain what needs correcting before rejecting this entry." }); return }
     setBusy(true); setMessage(null)
     try {
       const response = await fetch("/api/approvals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ farmId, ...review, reason }) })
@@ -185,19 +183,18 @@ export default function ApprovalsClient({
     finally { setBusy(false) }
   }
 
-  const canEdit = (entry: ApprovalEntry) => entry.status === "pending" && (canReview || entry.submitted_by === currentUserId)
-  const editableKeys = (payload: Payload) => Object.keys(payload).filter((key) => !lockedFields.includes(key))
+  const canEdit = (entry: ApprovalEntry) => (entry.status === "pending" || entry.status === "rejected") && (canReview || entry.submitted_by === currentUserId)
   function beginEdit(entry: ApprovalEntry) { setMessage(null); setReview(null); setEditId(entry.id); setDraft({ ...entry.payload }) }
   async function saveEdit() {
     if (editId == null) return
     setSavingEdit(true); setMessage(null)
     try {
       const response = await fetch(`/api/approvals/${editId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload: draft }),
+        method: entries.find((entry) => entry.id === editId)?.status === "rejected" ? "POST" : "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload: draft }),
       })
       const body = await response.json()
       if (!response.ok) throw new Error(body.error ?? "Could not save the change")
-      setMessage({ tone: "ok", text: "Entry updated." })
+      setMessage({ tone: "ok", text: entries.find((entry) => entry.id === editId)?.status === "rejected" ? "Correction submitted for approval. The original rejection remains in history." : "Entry updated." })
       setEditId(null)
       await cache.invalidateQueries({ queryKey: ["approvals", farmId] })
     } catch (error) { setMessage({ tone: "error", text: error instanceof Error ? error.message : "Could not save the change" }) }
@@ -213,7 +210,7 @@ export default function ApprovalsClient({
           <button
             key={value}
             type="button"
-            disabled={!!review}
+            disabled={!!review || editId != null}
             aria-current={status === value ? "true" : undefined}
             onClick={() => { setStatus(value); reset() }}
             className={`rounded-2xl border bg-card px-5 py-4 text-left shadow-sm transition-colors disabled:opacity-60 ${
@@ -222,7 +219,7 @@ export default function ApprovalsClient({
           >
             <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{cap(value)}</span>
             <strong className="mt-1.5 block text-3xl font-bold tabular-nums text-primary">
-              {(counts?.[value] ?? 0).toLocaleString("en-US")}
+              {counts ? counts[value].toLocaleString("en-US") : query.error ? "Unavailable" : "…"}
             </strong>
           </button>
         ))}
@@ -238,14 +235,14 @@ export default function ApprovalsClient({
             <select
               aria-label="Entry type"
               className={control}
-              disabled={!!review}
+              disabled={!!review || editId != null}
               value={type}
               onChange={(event) => { setType(event.target.value); reset() }}
             >
               <option value="">All entry types</option>
               {Object.entries(approvalTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <button type="button" className={control} disabled={query.isFetching || !!review} onClick={() => { setSelected([]); void query.refetch() }}>
+            <button type="button" className={control} disabled={query.isFetching || !!review || editId != null} onClick={() => { setSelected([]); void query.refetch() }}>
               Refresh
             </button>
             {showChecks && (
@@ -254,7 +251,7 @@ export default function ApprovalsClient({
                   type="button"
                   onClick={() => begin(selected, "rejected")}
                   disabled={!selected.length || !!review}
-                  className="inline-flex h-10 items-center gap-2 rounded-full border border-destructive/40 bg-card px-4 text-sm font-bold text-destructive transition-colors hover:bg-destructive/5 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex h-10 items-center gap-2 rounded-full border border-destructive/40 bg-card px-4 text-sm font-bold text-destructive-strong transition-colors hover:bg-destructive/5 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <XCircle className="h-4 w-4" /> Reject selected ({selected.length})
                 </button>
@@ -272,14 +269,14 @@ export default function ApprovalsClient({
         </div>
 
         {query.error && (
-          <div className="mx-5 mt-4 rounded-lg border border-destructive/35 bg-destructive/10 px-3.5 py-3 text-sm font-medium text-destructive" role="alert">
+          <div className="mx-5 mt-4 rounded-lg border border-destructive/35 bg-destructive/10 px-3.5 py-3 text-sm font-medium text-destructive-strong" role="alert">
             {(query.error as Error).message}
           </div>
         )}
         {message && (
           <div
             className={`mx-5 mt-4 rounded-lg border px-3.5 py-3 text-sm font-medium ${
-              message.tone === "ok" ? "border-success/35 bg-success/10 text-success" : "border-destructive/35 bg-destructive/10 text-destructive"
+              message.tone === "ok" ? "border-success/35 bg-success/10 text-success-foreground" : "border-destructive/35 bg-destructive/10 text-destructive-strong"
             }`}
             role="status"
           >
@@ -294,11 +291,11 @@ export default function ApprovalsClient({
                 ? "Approval writes the records and their inventory effects together. If validation fails, none of this selection is approved."
                 : "Rejected entries remain in history and do not change production or inventory."}
             </p>
-            <label className="block text-sm">Review note (optional)
+            <label className="block text-sm">{review.decision === "rejected" ? "Reason for rejection (required)" : "Review note (optional)"}
               <textarea autoFocus disabled={busy} maxLength={1000} className={`${control} mt-1 block w-full`} value={reason} onChange={(event) => setReason(event.target.value)} />
             </label>
             <div className="flex gap-2">
-              <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={busy} onClick={() => void decide()}>
+              <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={busy || (review.decision === "rejected" && !reason.trim())} onClick={() => void decide()}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirm decision
               </button>
               <button type="button" className={control} disabled={busy} onClick={() => setReview(null)}>Cancel</button>
@@ -349,7 +346,7 @@ export default function ApprovalsClient({
                                 type="checkbox"
                                 aria-label={`Select all ${approvalTypes[groupType]} entries`}
                                 className="h-4 w-4 accent-primary"
-                                disabled={!!review}
+                                disabled={!!review || editId != null}
                                 checked={groupAllSelected}
                                 onChange={(event) => setSelected((ids) => {
                                   const without = ids.filter((id) => !groupBulkIds.includes(id))
@@ -377,7 +374,7 @@ export default function ApprovalsClient({
                                     aria-label={`Select submission ${entry.id}`}
                                     type="checkbox"
                                     className="h-4 w-4 accent-primary"
-                                    disabled={!!review}
+                                    disabled={!!review || editId != null}
                                     checked={selected.includes(entry.id)}
                                     onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))}
                                   />
@@ -400,16 +397,16 @@ export default function ApprovalsClient({
                               {entry.status === "pending" ? (
                                 <div className="flex flex-wrap gap-1.5">
                                   {canEdit(entry) && editId !== entry.id && (
-                                    <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3 text-xs font-bold disabled:opacity-45" disabled={!!review} onClick={() => beginEdit(entry)}>
+                                    <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3 text-xs font-bold disabled:opacity-45" disabled={!!review || editId != null} onClick={() => beginEdit(entry)}>
                                       <Pencil className="h-3.5 w-3.5" /> Edit
                                     </button>
                                   )}
                                   {canReview && (
                                     <>
-                                      <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "approved")}>
+                                      <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-45" disabled={!!review || editId != null} onClick={() => begin([entry.id], "approved")}>
                                         <Check className="h-3.5 w-3.5" /> Approve
                                       </button>
-                                      <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-destructive/40 bg-card px-3 text-xs font-bold text-destructive hover:bg-destructive/5 disabled:opacity-45" disabled={!!review || editId === entry.id} onClick={() => begin([entry.id], "rejected")}>
+                                      <button type="button" className="inline-flex h-9 items-center gap-1 rounded-full border border-destructive/40 bg-card px-3 text-xs font-bold text-destructive-strong hover:bg-destructive/5 disabled:opacity-45" disabled={!!review || editId != null} onClick={() => begin([entry.id], "rejected")}>
                                         <X className="h-3.5 w-3.5" /> Reject
                                       </button>
                                     </>
@@ -418,10 +415,11 @@ export default function ApprovalsClient({
                               ) : (
                                 <div className="text-xs">
                                   <span className={`inline-flex rounded-full px-2.5 py-0.5 font-bold ${
-                                    entry.status === "approved" ? "bg-success/12 text-success" : "bg-destructive/12 text-destructive"
+                                    entry.status === "approved" ? "bg-success/12 text-success-foreground" : "bg-destructive/12 text-destructive-strong"
                                   }`}>
                                     {cap(entry.status)}
                                   </span>
+                                  {entry.status === "rejected" && canEdit(entry) && editId !== entry.id && <button type="button" className={`${control} mt-2 block`} disabled={busyAny || editId != null} onClick={() => beginEdit(entry)}>Correct and resubmit</button>}
                                   {entry.reviewed_at && (
                                     <span className="mt-1 block text-muted-foreground">
                                       {names.user(entry.reviewed_by ?? "")} · {new Date(entry.reviewed_at).toLocaleDateString()}
@@ -435,34 +433,15 @@ export default function ApprovalsClient({
                           {editId === entry.id && (
                             <tr>
                               <td colSpan={span} className="bg-muted/25">
-                                <div className="space-y-3">
-                                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                    {editableKeys(entry.payload).map((key) => {
-                                      const original = entry.payload[key]
-                                      return (
-                                        <label key={key} className="block text-sm">
-                                          <span className="text-muted-foreground">{fieldLabel(key)}{unit(key)}</span>
-                                          <input
-                                            className={`${control} mt-1 block w-full`}
-                                            disabled={savingEdit}
-                                            type={typeof original === "number" ? "number" : "text"}
-                                            value={draft[key] == null ? "" : String(draft[key])}
-                                            onChange={(event) => {
-                                              const raw = event.target.value
-                                              setDraft((currentDraft) => ({ ...currentDraft, [key]: raw === "" ? null : typeof original === "number" ? Number(raw) : raw }))
-                                            }}
-                                          />
-                                        </label>
-                                      )
-                                    })}
-                                  </div>
+                                <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void saveEdit() }}>
+                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={setDraft} disabled={savingEdit} systems={systems} batches={batches} feeds={feedTypes} />
                                   <div className="flex gap-2">
-                                    <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit} onClick={() => void saveEdit()}>
-                                      {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save changes
+                                    <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit}>
+                                      {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {entry.status === "rejected" ? "Submit correction for approval" : "Save changes"}
                                     </button>
                                     <button type="button" className={control} disabled={savingEdit} onClick={() => setEditId(null)}>Cancel</button>
                                   </div>
-                                </div>
+                                </form>
                               </td>
                             </tr>
                           )}
@@ -483,9 +462,9 @@ export default function ApprovalsClient({
 
         {total > 50 && (
           <div className="flex items-center justify-between border-t border-border px-5 py-3 text-sm">
-            <button type="button" className={control} disabled={page === 0 || busyAny || !!review} onClick={() => { setPage(page - 1); setSelected([]); setEditId(null) }}>Previous</button>
+            <button type="button" className={control} disabled={page === 0 || busyAny || !!review || editId != null} onClick={() => { setPage(page - 1); setSelected([]); setEditId(null) }}>Previous</button>
             <span>Page {page + 1} · {total.toLocaleString("en-US")} entries</span>
-            <button type="button" className={control} disabled={(page + 1) * 50 >= total || busyAny || !!review} onClick={() => { setPage(page + 1); setSelected([]); setEditId(null) }}>Next</button>
+            <button type="button" className={control} disabled={(page + 1) * 50 >= total || busyAny || !!review || editId != null} onClick={() => { setPage(page + 1); setSelected([]); setEditId(null) }}>Next</button>
           </div>
         )}
       </section>

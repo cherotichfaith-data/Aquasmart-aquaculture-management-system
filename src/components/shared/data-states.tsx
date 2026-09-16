@@ -12,14 +12,11 @@ export function DataFetchingBadge({
   isFetching: boolean
   isLoading?: boolean
 }) {
-  void isFetching
-  void isLoading
-  return null
+  return isFetching && !isLoading ? <span role="status" className="text-xs text-muted-foreground">Updating…</span> : null
 }
 
 export function DataUpdatedAt({ updatedAt }: { updatedAt?: number | null }) {
-  void updatedAt
-  return null
+  return updatedAt ? <time suppressHydrationWarning dateTime={new Date(updatedAt).toISOString()} className="text-xs text-muted-foreground">Updated {new Date(updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time> : null
 }
 
 export function DataErrorState({
@@ -41,7 +38,7 @@ export function DataErrorState({
         <p className="text-sm font-bold text-foreground">{title}</p>
         <p className="mt-0.75 text-xs text-[color-mix(in_srgb,var(--color-destructive)_70%,black)]">{description}</p>
         {onRetry ? (
-          <Button type="button" variant="outline" size="sm" onClick={onRetry} className="mt-1.5 rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10">
+          <Button type="button" variant="outline" size="sm" onClick={onRetry} className="mt-1.5 rounded-lg border-destructive/40 text-destructive-strong hover:bg-destructive/10">
             Try Again
           </Button>
         ) : null}

@@ -1,5 +1,9 @@
 "use client"
 
+import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
+import { createClient } from "@/lib/supabase/client"
+import { useWaterQualityMeasurements } from "@/features/water-quality/hooks"
 import { useLiveQuery } from "dexie-react-hooks"
 import { format } from "date-fns"
 import { Clock3, Loader2 } from "lucide-react"
@@ -41,7 +45,7 @@ type SamplingRow = Omit<
 } & PendingMeta
 type TransferRow = Pick<Tables<"fish_transfer">, "id" | "date" | "origin_system_id" | "target_system_id" | "external_target_name" | "number_of_fish_transfer" | "created_at"> & PendingMeta
 type HarvestRow = Pick<Tables<"fish_harvest">, "id" | "date" | "system_id" | "type_of_harvest" | "total_weight_harvest" | "created_at"> & PendingMeta
-type WaterQualityRow = Pick<Tables<"water_quality_measurement">, "id" | "date" | "system_id" | "parameter_name" | "parameter_value" | "created_at"> & PendingMeta
+type WaterQualityRow = Pick<Tables<"water_quality_measurement">, "id" | "date" | "system_id" | "parameter_name" | "parameter_value" | "time" | "water_depth" | "created_at"> & PendingMeta
 type FeedInventoryRow = Pick<
   Tables<"feed_inventory">,
   | "id"
@@ -95,12 +99,12 @@ function toCreatedAt(createdAtLocal: number) {
   return new Date(createdAtLocal).toISOString()
 }
 
-function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
+function usePendingOfflineEntries(type: RecentEntriesListProps["type"], farmId?: string | null) {
   return (
     useLiveQuery(async () => {
       switch (type) {
         case "feeding": {
-          const rows = await offlineDB.feeding.where("syncStatus").equals("pending").toArray()
+          const rows = await offlineDB.feeding.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
           return rows
             .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
             .map<FeedingRow>((row) => ({
@@ -115,7 +119,7 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
             }))
         }
         case "mortality": {
-          const rows = await offlineDB.mortality.where("syncStatus").equals("pending").toArray()
+          const rows = await offlineDB.mortality.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
           return rows
             .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
             .map<MortalityRow>((row) => ({
@@ -129,7 +133,7 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
             }))
         }
         case "sampling": {
-          const rows = await offlineDB.sampling.where("syncStatus").equals("pending").toArray()
+          const rows = await offlineDB.sampling.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
           return rows
             .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
             .map<SamplingRow>((row) => ({
@@ -144,7 +148,7 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
             }))
         }
         case "transfer": {
-          const rows = await offlineDB.transfer.where("syncStatus").equals("pending").toArray()
+          const rows = await offlineDB.transfer.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
           return rows
             .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
             .map<TransferRow>((row) => ({
@@ -160,7 +164,7 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
             }))
         }
         case "harvest": {
-          const rows = await offlineDB.harvest.where("syncStatus").equals("pending").toArray()
+          const rows = await offlineDB.harvest.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
           return rows
             .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
             .map<HarvestRow>((row) => ({
@@ -175,7 +179,7 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
             }))
         }
         case "water_quality": {
-          const rows = await offlineDB.waterQuality.where("syncStatus").equals("pending").toArray()
+          const rows = await offlineDB.waterQuality.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
           return rows
             .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
             .map<WaterQualityRow>((row) => ({
@@ -186,11 +190,13 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
               system_id: row.systemId,
               parameter_name: row.parameterName,
               parameter_value: row.parameterValue,
+              time: row.time,
+              water_depth: row.waterDepth,
               created_at: toCreatedAt(row.createdAtLocal),
             }))
         }
         case "stocking": {
-          const rows = await offlineDB.stocking.where("syncStatus").equals("pending").toArray()
+          const rows = await offlineDB.stocking.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
           return rows
             .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
             .map<StockingRow>((row) => ({
@@ -207,7 +213,7 @@ function usePendingOfflineEntries(type: RecentEntriesListProps["type"]) {
         default:
           return []
       }
-    }, [type]) ?? []
+    }, [type, farmId]) ?? []
   )
 }
 
@@ -248,9 +254,9 @@ function useScopedRecentRows(
   type: RecentEntriesListProps["type"],
   systemId: number | null,
   farmId: string | null | undefined,
-): unknown[] | null {
+) {
   const sid = systemId ?? undefined
-  const on = (target: string) => systemId != null && Boolean(farmId) && type === target
+  const on = (target: string) => Boolean(farmId) && type === target
   const feeding = useFeedingRecords({ farmId, systemId: sid, limit: 5, enabled: on("feeding") })
   const mortality = useMortalityData({ farmId, systemId: sid, limit: 5, enabled: on("mortality") })
   const sampling = useSamplingData({ farmId, systemId: sid, limit: 5, enabled: on("sampling") })
@@ -258,10 +264,23 @@ function useScopedRecentRows(
   const harvest = useHarvests({ farmId, systemId: sid, limit: 5, enabled: on("harvest") })
   const transfer = useTransferData({ farmId, systemId: sid, limit: 5, enabled: on("transfer") })
 
-  if (systemId == null) return null
-  const pick = (result: { data?: unknown }) => {
+  const farmHistory = useQuery({
+    queryKey: ["entry-history", farmId, type],
+    enabled: Boolean(farmId) && (type === "system" || type === "feed_inventory"),
+    queryFn: async () => {
+      const client = createClient()
+      const result = type === "system"
+        ? await client.from("system").select("*").eq("farm_id", farmId!).order("commissioned_at", { ascending: false }).order("id", { ascending: false }).limit(5)
+        : await client.from("feed_inventory").select("*").eq("farm_id", farmId!).order("inventory_date", { ascending: false }).order("id", { ascending: false }).limit(5)
+      if (result.error) throw result.error
+      return { status: "success", data: result.data }
+    },
+    staleTime: 30000,
+  })
+  const waterQuality = useWaterQualityMeasurements({ farmId, systemId: sid, limit: 12, enabled: on("water_quality"), latestFirst: true })
+  const pick = (result: { data?: unknown; isPending: boolean; error: unknown; refetch: () => unknown }) => {
     const payload = result.data as { status?: string; data?: unknown[] } | undefined
-    return payload?.status === "success" ? payload.data ?? [] : null
+    return { rows: payload?.status === "success" ? payload.data ?? [] : [], loading: result.isPending, error: Boolean(result.error) || (payload != null && payload.status !== "success"), retry: result.refetch }
   }
   switch (type) {
     case "feeding":
@@ -274,6 +293,11 @@ function useScopedRecentRows(
       return pick(stocking)
     case "harvest":
       return pick(harvest)
+    case "system":
+    case "feed_inventory":
+      return pick(farmHistory)
+    case "water_quality":
+      return pick(waterQuality)
     case "transfer":
       return pick(transfer)
     default:
@@ -293,11 +317,11 @@ function EntriesSection({
   return (
     <div className="data-entry-recent-panel">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold text-foreground">
+        <h2 className="text-sm font-semibold text-foreground">
           {scopeLabel ? `Recent Entries · ${scopeLabel}` : "Recent Entries"}
-        </h3>
+        </h2>
         {pendingCount > 0 ? (
-          <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
+          <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning-foreground">
               <Clock3 className="h-3 w-3" />
               {pendingCount} queued
           </Badge>
@@ -316,7 +340,8 @@ function EntriesSection({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <PendingIcon pending={card.pending} />
-                    <h4 className="data-entry-recent-item-title">{card.title}</h4>
+                    <h3 className="data-entry-recent-item-title">{card.title}</h3>
+                    <span className="text-xs text-muted-foreground">{card.pending ? "Queued offline" : "Recorded"}</span>
                   </div>
                   <p className="data-entry-recent-item-subtitle">{card.subtitle}</p>
                 </div>
@@ -340,14 +365,18 @@ function EntriesSection({
 
 export function RecentEntriesList(props: RecentEntriesListProps) {
   const { data, type, systems, feeds } = props
-  const pendingEntries = usePendingOfflineEntries(type)
+  const allPendingEntries = usePendingOfflineEntries(type, props.farmId)
+  const pendingEntries = scopeToCage(allPendingEntries as CageKeyed[], props.activeSystemId ?? null)
   const formatSystemName = createSystemLabelResolver(systems)
 
   const activeSystemId = props.activeSystemId ?? null
   // Only scope entry types that carry a cage; feed inventory and system setup are farm-level.
   const scopedSystemId = type === "feed_inventory" || type === "system" ? null : activeSystemId
   const scopeLabel = scopedSystemId != null ? formatSystemName(scopedSystemId) : null
-  const scopedRows = useScopedRecentRows(type, scopedSystemId, props.farmId)
+  const recentQuery = useScopedRecentRows(type, scopedSystemId, props.farmId)
+  const scopedRows = recentQuery?.rows ?? null
+  if (recentQuery?.loading) return <p role="status" className="p-4 text-sm text-muted-foreground">Loading recent entries…</p>
+  if (recentQuery?.error) return <div role="alert" className="p-4 text-sm"><p>Unable to load recent entries.</p><button type="button" className="mt-2 underline" onClick={() => recentQuery.retry()}>Retry</button></div>
   const formatFeedTypeName = (feedTypeId: number | null | undefined) => {
     if (feedTypeId == null) return "Not selected"
     const feedType = feeds?.find((item) => item.id === feedTypeId)
@@ -437,18 +466,20 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       meta: formatCreatedAt(row.created_at),
       pending: row.status === "pending",
       details: [
-        { label: "Parameter", value: String(row.parameter_name) },
-        { label: "Value", value: String(row.parameter_value) },
+        { label: "Parameter", value: String(row.parameter_name).replaceAll("_", " ") },
+        { label: "Value", value: `${row.parameter_value} ${row.parameter_name === "temperature" ? "°C" : row.parameter_name === "pH" ? "pH" : "mg/L"}` },
+        { label: "Time", value: row.time?.slice(0, 5) ?? "—" },
+        { label: "Depth", value: `${row.water_depth ?? "—"} m` },
       ],
     }))
   } else if (type === "feed_inventory") {
     const feedInventoryPendingEntries = pendingEntries as unknown as FeedInventoryRow[]
-    const rows = mergeRecentEntriesByPrimaryDate(data, feedInventoryPendingEntries, (row) => row.inventory_date)
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as FeedInventoryRow[] | null) ?? data, feedInventoryPendingEntries, (row) => row.inventory_date)
     pendingCount = feedInventoryPendingEntries.length
     cards = rows.map((row, index) => {
       return {
         key: String(row.localId ?? row.id ?? index),
-        title: row.feed_type_label?.trim() as string,
+        title: row.feed_type_label?.trim() || formatFeedTypeName(row.feed_type_id),
         subtitle: formatDate(row.inventory_date),
         meta: formatCreatedAt(row.created_at),
         pending: row.status === "pending",
@@ -474,7 +505,7 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
       ],
     }))
   } else {
-    cards = data.slice(0, 5).map((row, index) => ({
+    cards = ((scopedRows as SystemEntryRow[] | null) ?? data).slice(0, 5).map((row, index) => ({
       key: String(row.localId ?? row.id ?? index),
       title: row.name,
       subtitle: formatDate(row.commissioned_at),
@@ -488,6 +519,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
     }))
   }
 
-  return <EntriesSection cards={cards} pendingCount={pendingCount} scopeLabel={scopeLabel} />
+  return <><EntriesSection cards={cards} pendingCount={pendingCount} scopeLabel={scopeLabel} /><Link className="mt-3 inline-block text-sm underline" href={`/approvals?farmId=${encodeURIComponent(props.farmId ?? "")}`}>View submissions and review status</Link></>
 }
 

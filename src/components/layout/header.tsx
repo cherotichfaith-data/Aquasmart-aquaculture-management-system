@@ -422,19 +422,15 @@ export default function Header({
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const scrollRoot = document.getElementById("app-scroll-root")
+    // #app-scroll-root (dashboard-layout.tsx) is min-h-screen with no
+    // overflow-y of its own, so the page actually scrolls at the window
+    // level, not inside that div -- listen there directly instead of on an
+    // element that never emits a scroll event.
     const handleScroll = () => {
-      const scrollTop = scrollRoot instanceof HTMLElement ? scrollRoot.scrollTop : window.scrollY
-      setIsCondensed(scrollTop > 72)
+      setIsCondensed(window.scrollY > 72)
     }
 
     handleScroll()
-
-    if (scrollRoot instanceof HTMLElement) {
-      scrollRoot.addEventListener("scroll", handleScroll, { passive: true })
-      return () => scrollRoot.removeEventListener("scroll", handleScroll)
-    }
-
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
@@ -466,10 +462,15 @@ export default function Header({
   }
 
   return (
-    <header className="relative px-3 pt-1.5 sm:px-6 sm:pt-2 md:px-8 md:pt-3 lg:px-12">
+    <header
+      className={cn(
+        "sticky top-0 z-30 border-b bg-background px-3 pt-1.5 transition-colors duration-300 sm:px-6 sm:pt-2 md:px-8 md:pt-3 lg:px-12",
+        isCondensed ? "border-border" : "border-transparent",
+      )}
+    >
       <div
         className={cn(
-          "mx-auto max-w-[1640px] px-4 transition-[padding] duration-300 md:px-8",
+          "mx-auto max-w-[1640px] transition-[padding] duration-300",
           isCondensed ? "py-2" : "py-2.5",
         )}
       >
@@ -531,8 +532,8 @@ export default function Header({
           {showToolbar ? (
             <div className="grid gap-2">
               <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-                  <div className="hidden min-w-0 flex-1 md:block">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <div className="hidden min-w-0 md:flex md:flex-wrap md:items-center md:gap-2">
                     <FarmSelector
                       initialFarmId={initialFarmId}
                       selectedBatch={selectedBatch}
@@ -564,7 +565,7 @@ export default function Header({
                     </Button>
                   </div>
                 </div>
-                <div className="flex w-full flex-col gap-2 md:ml-auto md:w-auto md:flex-row md:items-center md:justify-end">
+                <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
                   {pageTimeConfig.showTimePeriod !== false ? (
                     <div className="w-full shrink-0 md:w-[170px]">
                       <TimePeriodSelector
