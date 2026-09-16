@@ -47,7 +47,7 @@ export function buildBatchLineageColumns(params: {
         const title = data.batch_name?.trim() || `Batch #${data.batch_id}`
         return (
           <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold leading-5 text-foreground">{title}</span>
+            <span title={title} className="block truncate text-sm font-semibold leading-5 text-foreground">{title}</span>
             {isFiniteNumber(data.cycle_day) ? (
               <span className="block text-tag text-muted-foreground">Day {data.cycle_day}</span>
             ) : null}

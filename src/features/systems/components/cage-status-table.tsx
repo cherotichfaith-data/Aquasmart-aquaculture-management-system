@@ -11,15 +11,17 @@ import { formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
 import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import type { RecommendedActionRow } from "@/lib/types/insights"
-import type { CageMortalityTotal } from "@/features/systems/types"
+
+const formatPercent = (value: number | null | undefined, decimals = 2) =>
+  typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(decimals)}%` : "--"
 
 type CageStatus = "Optimal" | "Good" | "Monitor" | "Critical"
 
 const STATUS_STYLES: Record<CageStatus, string> = {
-  Optimal: "bg-success/15 text-success",
+  Optimal: "bg-success/15 text-success-foreground",
   Good: "bg-muted text-muted-foreground",
-  Monitor: "bg-warning/15 text-warning",
-  Critical: "bg-destructive/15 text-destructive",
+  Monitor: "bg-warning/15 text-warning-foreground",
+  Critical: "bg-destructive/15 text-destructive-strong",
 }
 
 const STATUS_ICON: Record<CageStatus, string> = {
@@ -50,14 +52,12 @@ function deriveStatus(params: { row: DashboardSystemRow; hasOpenAlert: boolean }
 export default function CageStatusTable({
   rows,
   cohortBySystemId,
-  mortalityByCage,
   alerts,
   timePeriod = "all history",
   emptyMessage = "No active cages found",
 }: {
   rows: DashboardSystemRow[]
   cohortBySystemId: Record<number, string | null>
-  mortalityByCage: CageMortalityTotal[]
   alerts: RecommendedActionRow[]
   timePeriod?: TimePeriod
   emptyMessage?: string
@@ -70,10 +70,6 @@ export default function CageStatusTable({
     router.push(`/production?${params.toString()}`)
   }
   const alertSystemIds = useMemo(() => new Set(alerts.map((row) => row.system_id)), [alerts])
-  const mortalityBySystemId = useMemo(
-    () => new Map(mortalityByCage.map((row) => [row.system_id, row.total])),
-    [mortalityByCage],
-  )
 
   const columns = useMemo<Array<ColumnDef<DashboardSystemRow, unknown>>>(
     () => [
@@ -104,7 +100,7 @@ export default function CageStatusTable({
         accessorFn: (row) => row.fish_end ?? undefined,
         sortUndefined: "last",
         sortDescFirst: true,
-        meta: { width: "110px" },
+        meta: { width: "110px", align: "right" },
         cell: ({ row }) => <span className="text-sm">{formatNumberValue(row.original.fish_end)}</span>,
       },
       {
@@ -113,7 +109,7 @@ export default function CageStatusTable({
         accessorFn: (row) => row.abw ?? undefined,
         sortUndefined: "last",
         sortDescFirst: true,
-        meta: { width: "100px" },
+        meta: { width: "100px", align: "right" },
         cell: ({ row }) => <span className="text-sm">{formatUnitValue(row.original.abw, 1, "g")}</span>,
       },
       {
@@ -122,19 +118,19 @@ export default function CageStatusTable({
         accessorFn: (row) => row.biomass_end ?? undefined,
         sortUndefined: "last",
         sortDescFirst: true,
-        meta: { width: "110px" },
+        meta: { width: "110px", align: "right" },
         cell: ({ row }) => <span className="text-sm">{formatUnitValue(row.original.biomass_end, 0, "kg")}</span>,
       },
       {
         id: "mortality",
         header: "Mortality",
-        accessorFn: (row) => mortalityBySystemId.get(row.system_id) ?? 0,
+        accessorFn: (row) => row.mortality_rate ?? 0,
         sortDescFirst: true,
-        meta: { width: "110px" },
+        meta: { width: "110px", align: "right" },
         cell: ({ row }) => (
           <span className="text-sm">
             <SeverityValue
-              value={formatNumberValue(mortalityBySystemId.get(row.original.system_id) ?? 0)}
+              value={formatPercent(row.original.mortality_rate)}
               active={isMortalityCritical(row.original)}
             />
           </span>
@@ -160,7 +156,7 @@ export default function CageStatusTable({
         },
       },
     ],
-    [alertSystemIds, cohortBySystemId, mortalityBySystemId],
+    [alertSystemIds, cohortBySystemId],
   )
 
   return (
@@ -176,14 +172,14 @@ export default function CageStatusTable({
           onRowClick={(row) => openProductionPage(row.system_id)}
           emptyMessage={emptyMessage}
           initialSorting={[{ id: "cage", desc: false }]}
-          shellClassName="production-records-table max-h-[520px]"
+          shellClassName="production-records-table"
           tableClassName="min-w-[860px] table-fixed"
           headerVariant="plain"
+          pagination={{ pageSize: 25 }}
           renderMobileCard={(row) => (
             <CageStatusCardBody
               row={row}
               cohort={cohortBySystemId[row.system_id] ?? null}
-              mortalityTotal={mortalityBySystemId.get(row.system_id) ?? 0}
               status={deriveStatus({ row, hasOpenAlert: alertSystemIds.has(row.system_id) })}
             />
           )}
@@ -196,12 +192,10 @@ export default function CageStatusTable({
 function CageStatusCardBody({
   row,
   cohort,
-  mortalityTotal,
   status,
 }: {
   row: DashboardSystemRow
   cohort: string | null
-  mortalityTotal: number
   status: CageStatus
 }) {
   const title = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
@@ -209,7 +203,7 @@ function CageStatusCardBody({
   return (
     <>
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">{title}</p>
+        <p title={title} className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">{title}</p>
         <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[status]}`}>
           <span aria-hidden>{STATUS_ICON[status]}</span> {status}
         </span>
@@ -221,7 +215,7 @@ function CageStatusCardBody({
         <MobileMetric label="Biomass" value={formatUnitValue(row.biomass_end, 0, "kg")} />
         <MobileMetric
           label="Mortality"
-          value={<SeverityValue value={formatNumberValue(mortalityTotal)} active={isMortalityCritical(row)} />}
+          value={<SeverityValue value={formatPercent(row.mortality_rate)} active={isMortalityCritical(row)} />}
         />
       </div>
     </>

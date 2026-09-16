@@ -34,6 +34,7 @@ import {
     getSystemsForUnit,
 } from "./form-support"
 import {
+    toIsoDate,
     parseNumericId,
     parseRequiredNumericId,
     reportDataEntrySubmitError,
@@ -45,6 +46,8 @@ import {
     type LatestEntrySummary,
 } from "./latest-entry-guard"
 import { SelectionChips } from "./selection-info"
+import { useEntrySequence } from "./entry-sequence"
+import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const formSchema = z.object({
@@ -190,7 +193,7 @@ function HarvestCycleSummary({
             </CardHeader>
             <CardContent className="space-y-4">
                 {queryError ? (
-                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive">
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive-strong">
                         Unable to load cycle summary. {queryError}
                     </div>
                 ) : isLoadingSummary ? (
@@ -256,14 +259,15 @@ export function HarvestForm({
         resolver: zodResolver(formSchema),
         mode: "onBlur",
         defaultValues: {
-            date: new Date().toISOString().split("T")[0],
+            date: toIsoDate(new Date()),
             unit: defaultUnit,
-            number_of_fish: 0,
-            amount_kg: 0,
+            number_of_fish: undefined,
+            amount_kg: undefined,
             type_of_harvest: "partial",
             system_id: defaultSystemId ? String(defaultSystemId) : "",
         },
     })
+    const sequence = useEntrySequence(form, systems)
     const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
     const selectedUnit = useWatch({ control: form.control, name: "unit" })
@@ -295,7 +299,7 @@ export function HarvestForm({
     }, [defaultSystemId, defaultSystemValue, form, systems])
 
     useEffect(() => {
-        if (!selectedUnit) return
+        if (!selectedUnit || form.getValues("unit") !== selectedUnit) return
         const currentValue = form.getValues("system_id")
         if (!currentValue) return
         const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
@@ -349,11 +353,11 @@ export function HarvestForm({
             type_of_harvest: values.type_of_harvest,
         })
 
-        form.reset({
-            date: new Date().toISOString().split("T")[0],
+        sequence.reset({
+            date: values.date,
             unit: values.unit,
-            number_of_fish: 0,
-            amount_kg: 0,
+            number_of_fish: undefined,
+            amount_kg: undefined,
             type_of_harvest: "partial",
             system_id: values.system_id,
         })
@@ -395,7 +399,9 @@ export function HarvestForm({
                 </div>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="harvest" savedResult={mutation.data} />
+          <ExistingEntryNotice message={duplicateEntry?.duplicateMessage ?? (duplicateEntry ? "An entry already exists for this date. Review it before submitting another record." : null)} farmId={farmId} />
                         <FormSection title="Record harvest">
                             <SelectionChips
                                 systems={systems}
@@ -410,9 +416,9 @@ export function HarvestForm({
                                     name="date"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Date</FormLabel>
+                                            <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                                             <FormControl>
-                                                <Input type="date" {...field} />
+                                                <Input aria-required={true} type="date" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -424,10 +430,10 @@ export function HarvestForm({
                                     name="unit"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Cage Unit</FormLabel>
+                                            <FormLabel>Cage Unit <span aria-hidden="true">*</span></FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value}>
                                                 <FormControl>
-                                                    <SelectTrigger>
+                                                    <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                                                         <SelectValue placeholder="Select unit" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -449,10 +455,10 @@ export function HarvestForm({
                                     name="system_id"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Cage Number</FormLabel>
+                                            <FormLabel>Cage Number <span aria-hidden="true">*</span></FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!selectedUnit}>
                                                 <FormControl>
-                                                    <SelectTrigger>
+                                                    <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                                                         <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -474,9 +480,9 @@ export function HarvestForm({
                                     name="number_of_fish"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Harvested Fish Count</FormLabel>
+                                            <FormLabel>Harvested Fish Count <span aria-hidden="true">*</span></FormLabel>
                                             <FormControl>
-                                                <Input type="number" step="1" inputMode="numeric" {...field} />
+                                                <Input aria-required={true} type="number" step="1" inputMode="numeric" {...field} value={field.value ?? ""} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -488,9 +494,9 @@ export function HarvestForm({
                                     name="amount_kg"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Total Harvested Weight (kg)</FormLabel>
+                                            <FormLabel>Total Harvested Weight (kg) <span aria-hidden="true">*</span></FormLabel>
                                             <FormControl>
-                                                <Input type="number" step="0.01" inputMode="decimal" {...field} />
+                                                <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -502,10 +508,10 @@ export function HarvestForm({
                                     name="type_of_harvest"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Harvest Type</FormLabel>
+                                            <FormLabel>Harvest Type <span aria-hidden="true">*</span></FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value}>
                                                 <FormControl>
-                                                    <SelectTrigger>
+                                                    <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                                                         <SelectValue placeholder="Select type" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -540,8 +546,10 @@ export function HarvestForm({
                         />
 
                         <FormActions>
+                            {sequence.next && <Button type="submit" variant="outline" disabled={form.formState.isSubmitting || mutation.isPending} onClick={() => sequence.requestNext(true)}>Save &amp; next cage</Button>}
                             <Button
                                 type="submit"
+                                onClick={() => sequence.requestNext(false)}
                                 className="min-h-11 rounded-lg px-5"
                                 disabled={form.formState.isSubmitting || mutation.isPending}
                             >

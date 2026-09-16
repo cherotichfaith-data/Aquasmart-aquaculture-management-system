@@ -91,7 +91,7 @@ export function buildProductionTableColumns(
     sortUndefined: "last",
     sortDescFirst: true,
     meta: { width: "130px", align: "right" },
-    cell: ({ row }) => numberCell(row.original.growthKg, 2, "kg", "text-success"),
+    cell: ({ row }) => numberCell(row.original.growthKg, 2, "kg", "text-success-foreground"),
   },
   {
     id: "feedPeriodKg",

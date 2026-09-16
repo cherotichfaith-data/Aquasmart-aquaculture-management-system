@@ -183,7 +183,7 @@ export default function WorkspaceSelector({
 
         <div className="mx-auto mt-10 flex w-full max-w-5xl flex-col gap-6">
           {errorMessage ? (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-strong">
               {errorMessage}
             </div>
           ) : null}

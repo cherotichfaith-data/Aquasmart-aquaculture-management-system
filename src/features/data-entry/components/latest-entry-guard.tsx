@@ -213,6 +213,8 @@ export function usePendingLatestEntries(
             ],
             metadata: {
               waterDepth: row.waterDepth,
+                time: row.time?.slice(0, 5),
+                parameterName: row.parameterName,
             },
             duplicateMessage: `A water quality entry already exists for this cage on ${row.date} at ${row.waterDepth} m depth.`,
           }))

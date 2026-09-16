@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -42,6 +43,8 @@ import {
   type LatestEntrySummary,
 } from "./latest-entry-guard"
 import { SelectionChips } from "./selection-info"
+import { useEntrySequence } from "./entry-sequence"
+import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
@@ -58,7 +61,7 @@ const formSchema = z
     unit: z.string().min(1, "Cage unit is required"),
     system_id: z.string().min(1, "Cage number is required"),
     feed_id: z.string().optional(),
-    amount_kg: z.coerce.number().min(0, "Amount cannot be negative"),
+    amount_kg: z.preprocess((value) => value === "" ? undefined : value, z.coerce.number({ invalid_type_error: "Enter the feed amount, including 0 when no feed was given" }).min(0, "Amount cannot be negative")),
     feeding_response: z.string().optional(),
     notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
   })
@@ -157,18 +160,20 @@ export function FeedingForm({
     defaultValues: {
       date: toIsoDate(new Date()),
       unit: defaultUnit,
-      amount_kg: 0,
+      amount_kg: undefined,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       feed_id: OPTIONAL_SELECT_VALUE,
       feeding_response: OPTIONAL_SELECT_VALUE,
       notes: "",
     },
   })
+  const sequence = useEntrySequence(form, systems)
   const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
   const selectedUnit = useWatch({ control: form.control, name: "unit" })
   const selectedSystemValue = useWatch({ control: form.control, name: "system_id" })
   const selectedSystemId = Number(selectedSystemValue)
+  const selectedAmount = useWatch({ control: form.control, name: "amount_kg" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
   const selectedFeedValue = useWatch({ control: form.control, name: "feed_id" })
   const selectedFeedTypeId = parseOptionalNumericId(selectedFeedValue) ?? 0
@@ -199,7 +204,7 @@ export function FeedingForm({
   }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
-    if (!selectedUnit) return
+    if (!selectedUnit || form.getValues("unit") !== selectedUnit) return
     const currentValue = form.getValues("system_id")
     if (!currentValue) return
     const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
@@ -274,10 +279,10 @@ export function FeedingForm({
       setSubmissionSummary(
         `Submission saved for ${formatCageLabel(selectedSystem)}: ${values.amount_kg.toFixed(2)} kg.${"pendingApproval" in result.meta && result.meta.pendingApproval ? " Official totals update after manager approval." : ""}`,
       )
-      form.reset({
-        date: toIsoDate(new Date()),
+      sequence.reset({
+        date: values.date,
         unit: values.unit,
-        amount_kg: 0,
+        amount_kg: undefined,
         system_id: values.system_id,
         feed_id: values.feed_id,
         feeding_response: values.feeding_response,
@@ -296,19 +301,21 @@ export function FeedingForm({
       </div>
 
       {submissionSummary ? (
-        <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
+        <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success-foreground">
           {submissionSummary}
         </div>
       ) : null}
       {feedOptions.length === 0 ? (
-        <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
+        <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning-foreground">
           No feed types are available for this farm yet.
         </div>
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormSection title="Record feeding">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="feeding" savedResult={mutation.data} />
+          <ExistingEntryNotice message={duplicateEntry?.duplicateMessage ?? (duplicateEntry ? "An entry already exists for this date. Review it before submitting another record." : null)} farmId={farmId} />
+          <FormSection title="Record feeding" description="Date, unit, cage and amount are required. When feed is given, select its type and response. For zero feed, explain why in Notes.">
             <SelectionChips
               systems={systems}
               systemId={selectedSystemId}
@@ -322,9 +329,9 @@ export function FeedingForm({
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -336,7 +343,7 @@ export function FeedingForm({
                 name="unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Unit</FormLabel>
+                    <FormLabel>Cage Unit <span aria-hidden="true">*</span></FormLabel>
                     <Select
                       onValueChange={(value) => {
                         field.onChange(value)
@@ -345,7 +352,7 @@ export function FeedingForm({
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -367,10 +374,10 @@ export function FeedingForm({
                 name="system_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Number</FormLabel>
+                    <FormLabel>Cage Number <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
@@ -395,7 +402,7 @@ export function FeedingForm({
                     <FormLabel>Feed Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={Number(selectedAmount) > 0} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select feed" />
                         </SelectTrigger>
                       </FormControl>
@@ -418,9 +425,9 @@ export function FeedingForm({
                 name="amount_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Feeding Amount (kg)</FormLabel>
+                    <FormLabel>Feeding Amount (kg) <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} />
+                      <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -435,7 +442,7 @@ export function FeedingForm({
                     <FormLabel>Feeding Response</FormLabel>
                     <Select onValueChange={field.onChange} value={String(field.value)}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={Number(selectedAmount) > 0} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select response" />
                         </SelectTrigger>
                       </FormControl>
@@ -458,15 +465,18 @@ export function FeedingForm({
                 name="notes"
                 render={({ field }) => (
                   <FormItem className="data-entry-field-wide">
-                    <FormLabel>Notes</FormLabel>
+                    <FormLabel>Notes{selectedAmount != null && Number(selectedAmount) === 0 ? "" : " (optional)"}</FormLabel>
                     <FormControl>
-                      <textarea
+                      <textarea aria-required={selectedAmount != null && Number(selectedAmount) === 0}
                         {...field}
-                        rows={3}
+                        rows={2}
                         className="data-entry-textarea"
-                        placeholder="Feed behaviour, weather, missed appetite, or any exception."
                       />
                     </FormControl>
+                    <FormDescription>
+                      Feed behaviour, weather, missed appetite, or any exception.
+                      {selectedAmount != null && Number(selectedAmount) === 0 ? " Required when no feed was given." : null}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -475,8 +485,10 @@ export function FeedingForm({
           </FormSection>
 
           <FormActions>
+            {sequence.next && <Button type="submit" variant="outline" disabled={form.formState.isSubmitting || mutation.isPending} onClick={() => sequence.requestNext(true)}>Save &amp; next cage</Button>}
             <Button
               type="submit"
+              onClick={() => sequence.requestNext(false)}
               className="min-h-11 rounded-lg px-5"
               disabled={form.formState.isSubmitting || mutation.isPending}
             >

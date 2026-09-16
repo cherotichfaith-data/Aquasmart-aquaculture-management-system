@@ -276,8 +276,8 @@ export function BenchmarkStatusSection({
             const benchmark = isMortality ? `${(item.benchmark * 100).toFixed(2)}%` : item.benchmark.toFixed(2)
             const toneClass =
               item.tone === "good"
-                ? "bg-success/10 border-success/25 text-success"
-                : "bg-warning/10 border-warning/25 text-warning"
+                ? "bg-success/10 border-success/25 text-success-foreground"
+                : "bg-warning/10 border-warning/25 text-warning-foreground"
 
             return (
               <div key={item.metric} className="rounded-2xl border border-border/60 bg-background p-3">

@@ -147,9 +147,9 @@ export function waterQualityLabel(value: string | null | undefined) {
 
 export function ratingToneClass(value: string | null | undefined) {
   const normalized = normalizeWaterQuality(value)
-  if (normalized === "optimal") return "bg-success/15 text-success"
-  if (normalized === "acceptable") return "bg-warning/15 text-warning"
-  if (normalized === "critical" || normalized === "lethal") return "bg-destructive/15 text-destructive"
+  if (normalized === "optimal") return "bg-success/15 text-success-foreground"
+  if (normalized === "acceptable") return "bg-warning/15 text-warning-foreground"
+  if (normalized === "critical" || normalized === "lethal") return "bg-destructive/15 text-destructive-strong"
   return "bg-muted text-muted-foreground"
 }
 
@@ -216,7 +216,7 @@ export function SeverityValue({
   tone?: "negative" | "warning"
 }) {
   if (!active) return <>{value}</>
-  const toneClass = tone === "warning" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"
+  const toneClass = tone === "warning" ? "bg-warning/10 text-warning-foreground" : "bg-destructive/10 text-destructive-strong"
   return <span className={`rounded-md px-1.5 py-0.5 font-semibold ${toneClass}`}>{value}</span>
 }
 

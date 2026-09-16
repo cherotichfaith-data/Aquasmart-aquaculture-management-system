@@ -12,7 +12,7 @@ import SelectWorkspacePageClient from "./page.client"
 
 export const metadata: Metadata = {
   title: "Select Workspace | SUSTAIN Aquasmart",
-  description: "Choose your SUSTAIN Aquasmart organization and farm workspace.",
+  description: "Select your SUSTAIN Aquasmart organization and farm workspace.",
 }
 
 type SearchParams = Record<string, string | string[] | undefined>

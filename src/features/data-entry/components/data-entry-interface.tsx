@@ -1,7 +1,5 @@
 "use client"
 
-import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -17,7 +15,7 @@ import { SystemForm } from "./system-form"
 import { RecentEntriesList } from "./recent-entries-list"
 import type { Database, Tables } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
-import { DATA_ENTRY_PATH } from "@/lib/app-entry"
+import { DataEntryNavigation } from "./data-entry-navigation"
 import type { BatchOptionItem } from "@/features/shared/batch-options"
 
 type DataEntryTabId =
@@ -90,13 +88,6 @@ function getRecentEntriesForTab(recentEntries: RecentEntriesByTab, tab: DataEntr
     }
 }
 
-function buildDataEntryTabHref(tabId: DataEntryTabId, defaultSystemId?: number | null, defaultBatchId?: number | null) {
-    const params = new URLSearchParams({ type: tabId })
-    if (defaultSystemId) params.set("system", String(defaultSystemId))
-    if (defaultBatchId) params.set("batch", String(defaultBatchId))
-    return `${DATA_ENTRY_PATH}?${params.toString()}`
-}
-
 export function DataEntryInterface({
     farmId,
     farmRole = null,
@@ -134,11 +125,7 @@ export function DataEntryInterface({
         setLiveSystemId(defaultSystemId)
     }, [defaultSystemId])
 
-    const router = useRouter()
     const [asideOpen, setAsideOpen] = useState(false)
-    const isReviewer = farmRole === "admin" || farmRole === "farm_manager"
-    const approvalHref = `/approvals?farmId=${encodeURIComponent(farmId ?? "")}`
-    const approvalLabel = isReviewer ? "Approval" : "My submissions"
 
     if (isRestrictedTab) {
         return (
@@ -240,58 +227,16 @@ export function DataEntryInterface({
                     Data Entry
                 </h1>
                 <p className="data-entry-required-note ml-auto hidden md:block">
-                    Required fields must be completed before saving.
+                    * Required. Conditional requirements are explained in each form.
                 </p>
             </div>
 
-            <div className="data-entry-tabs-shell">
-                {/* Phone: one-line jump-to-form picker instead of a wrapping / scrolling strip */}
-                <div className="flex items-center gap-2 sm:hidden">
-                    <label className="sr-only" htmlFor="data-entry-tab-select">Choose a form</label>
-                    <select
-                        id="data-entry-tab-select"
-                        className="data-entry-tab-select"
-                        value={activeTab}
-                        onChange={(event) =>
-                            router.push(buildDataEntryTabHref(event.target.value as DataEntryTabId, liveSystemId, defaultBatchId))
-                        }
-                    >
-                        {visibleSidebarItems.map((item) => (
-                            <option key={item.id} value={item.id}>{item.label}</option>
-                        ))}
-                    </select>
-                    <Link href={approvalHref} className="data-entry-tab data-entry-tab-idle shrink-0">
-                        {approvalLabel}
-                    </Link>
-                </div>
-
-                {/* Tablet and up: one wrapping row of pills */}
-                <div className="hidden flex-wrap items-center gap-1.5 sm:flex" role="tablist" aria-label="Data entry forms">
-                    {visibleSidebarItems.map((item) => {
-                        const isActive = activeTab === item.id
-                        return (
-                            <Link
-                                key={item.id}
-                                href={buildDataEntryTabHref(item.id, liveSystemId, defaultBatchId)}
-                                className={cn("data-entry-tab", isActive ? "data-entry-tab-active" : "data-entry-tab-idle")}
-                                aria-selected={isActive}
-                                role="tab"
-                            >
-                                <span>{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                    <span className="mx-1 self-stretch border-l border-border" aria-hidden />
-                    <Link href={approvalHref} className="data-entry-tab data-entry-tab-idle">
-                        {approvalLabel}
-                    </Link>
-                </div>
-            </div>
+            <DataEntryNavigation active={activeTab} farmId={farmId} role={farmRole} systemId={liveSystemId} batchId={defaultBatchId} />
 
             <div className="data-entry-workspace">
-                <main className="data-entry-canvas min-w-0">
+                <section className="data-entry-canvas min-w-0" aria-label="Entry form">
                     {form}
-                </main>
+                </section>
                 <aside className="data-entry-aside min-w-0">
                     <button
                         type="button"

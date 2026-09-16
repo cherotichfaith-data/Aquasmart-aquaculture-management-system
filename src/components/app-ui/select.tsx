@@ -2,6 +2,7 @@
 
 import {
   Children,
+  forwardRef,
   Fragment,
   createContext,
   isValidElement,
@@ -39,6 +40,13 @@ function useSelectContext() {
     throw new Error("Select components must be used within <Select>")
   }
   return context
+}
+
+function selectLabelText(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(selectLabelText).join("")
+  if (isValidElement(node)) return selectLabelText(node.props.children)
+  return ""
 }
 
 function flattenSelectItems(children: React.ReactNode): SelectItemDef[] {
@@ -127,7 +135,7 @@ function SelectValue(props: { placeholder?: string }) {
   return null
 }
 
-function SelectTrigger({
+const SelectTrigger = forwardRef<HTMLSelectElement, Omit<React.ComponentProps<"select">, "size"> & { size?: "sm" | "default" }>(function SelectTrigger({
   className,
   size = "default",
   children,
@@ -135,10 +143,8 @@ function SelectTrigger({
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
   disabled,
-}: React.ComponentProps<"div"> & {
-  size?: "sm" | "default"
-  disabled?: boolean
-}) {
+  ...props
+}, ref) {
   const { value, onValueChange, disabled: rootDisabled, contentChildren } = useSelectContext()
   const items = useMemo(() => flattenSelectItems(contentChildren), [contentChildren])
   const placeholder = findSelectValuePlaceholder(children)
@@ -148,11 +154,13 @@ function SelectTrigger({
     <div
       data-slot="select-trigger"
       className={cn(
-        "relative w-fit",
+        "relative w-full",
         className,
       )}
     >
       <select
+        {...props}
+        ref={ref}
         id={id ?? triggerId}
         data-slot="select-input"
         aria-describedby={ariaDescribedBy}
@@ -170,14 +178,14 @@ function SelectTrigger({
         </option>
         {items.map((item) => (
           <option key={item.value} value={item.value} disabled={item.disabled}>
-            {typeof item.label === "string" ? item.label : String(item.value)}
+            {selectLabelText(item.label)}
           </option>
         ))}
       </select>
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
     </div>
   )
-}
+})
 
 function SelectContent({ children }: { children: React.ReactNode }) {
   const { setContentChildren } = useSelectContext()

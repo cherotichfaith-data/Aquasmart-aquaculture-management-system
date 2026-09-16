@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -20,7 +21,8 @@ import type { Database } from "@/lib/types/database"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { InfoStat } from "./form-support"
-import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import { toIsoDate, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import { EntryDraft } from "./entry-draft"
 import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const formSchema = z.object({
@@ -28,7 +30,7 @@ const formSchema = z.object({
   inventory_time: z.string().min(1, "Time is required"),
   feed_id: z.string().min(1, "Feed type is required"),
   bag_weight_kg: z.coerce.number().min(0.01, "Bag weight must be positive"),
-  number_of_bags: z.coerce.number().finite().min(0, "Amount of bags cannot be negative"),
+  number_of_bags: z.coerce.number().finite().int("Count unopened whole bags; enter loose feed separately in grams").min(0, "Amount of bags cannot be negative"),
   opened_bags: z.coerce.number().int().min(0, "Open feed cannot be negative"),
   comments: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 })
@@ -46,7 +48,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
     resolver: zodResolver(formSchema),
     mode: "onBlur",
     defaultValues: {
-      inventory_date: new Date().toISOString().split("T")[0],
+      inventory_date: toIsoDate(new Date()),
       inventory_time: "16:00",
       feed_id: "",
       bag_weight_kg: 25,
@@ -84,7 +86,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
       })
 
       form.reset({
-        inventory_date: new Date().toISOString().split("T")[0],
+        inventory_date: values.inventory_date,
         inventory_time: values.inventory_time,
         feed_id: values.feed_id,
         bag_weight_kg: values.bag_weight_kg,
@@ -113,17 +115,18 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormSection title="Record feed inventory">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="feed_inventory" savedResult={mutation.data} />
+          <FormSection title="Record feed inventory" description="Count unopened whole bags and weigh loose feed separately in grams. All fields except comments are required.">
             <FieldGrid>
               <FormField
                 control={form.control}
                 name="inventory_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -135,9 +138,9 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                 name="inventory_time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Time</FormLabel>
+                    <FormLabel>Time <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="time" {...field} />
+                      <Input aria-required={true} type="time" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -149,10 +152,10 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                 name="feed_id"
                 render={({ field }) => (
                   <FormItem className="data-entry-field-wide">
-                    <FormLabel>Feed Type</FormLabel>
+                    <FormLabel>Feed Type <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select feed" />
                         </SelectTrigger>
                       </FormControl>
@@ -174,9 +177,9 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                 name="bag_weight_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bag Weight (kg)</FormLabel>
+                    <FormLabel>Bag Weight (kg) <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} />
+                      <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -188,10 +191,11 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                 name="number_of_bags"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount of Bags</FormLabel>
+                    <FormLabel>Amount of Bags <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" inputMode="decimal" {...field} />
+                      <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} />
                     </FormControl>
+                    <FormDescription>Whole unopened bags only -- record any partial or loose feed as Loose Feed (g) below.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -202,9 +206,9 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                 name="opened_bags"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Open Feed (g)</FormLabel>
+                    <FormLabel>Loose Feed (g) <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" step="1" inputMode="numeric" {...field} />
+                      <Input aria-required={true} type="number" step="1" inputMode="numeric" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -216,15 +220,15 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
                 name="comments"
                 render={({ field }) => (
                   <FormItem className="data-entry-field-wide">
-                    <FormLabel>Comments</FormLabel>
+                    <FormLabel>Comments (optional)</FormLabel>
                     <FormControl>
-                      <textarea
+                      <textarea aria-required={false}
                         {...field}
-                        rows={3}
+                        rows={2}
                         className="data-entry-textarea"
-                        placeholder="Stock count note, adjustment reason, or storage observation."
                       />
                     </FormControl>
+                    <FormDescription>Stock count note, adjustment reason, or storage observation.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -235,7 +239,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
           <FormSection title="Snapshot totals">
             <div className="grid gap-3 sm:grid-cols-3">
               <InfoStat label="Bag Weight" value={`${Number.isFinite(bagWeightKg) ? bagWeightKg : 0} kg`} />
-              <InfoStat label="Closed Bags" value={`${Number.isFinite(numberOfBags) ? numberOfBags : 0}`} />
+              <InfoStat label="Unopened Bags" value={`${Number.isFinite(numberOfBags) ? numberOfBags : 0}`} />
               <InfoStat label="Open Feed" tone="success" value={`${Number.isFinite(openedBags) ? openedBags : 0} g`} />
             </div>
           </FormSection>

@@ -102,6 +102,11 @@ next-router-prefetch {
   --sidebar-foreground: var(--color-on-secondary);
   --secondary-foreground: var(--color-on-secondary);
   --destructive-foreground: var(--color-on-destructive);
+  /* Accessible dark-on-light text tone for destructive content (error copy,
+     validation messages, negative table values). --destructive-foreground
+     above is white, meant for text on a solid --destructive button/badge
+     background, so it can't double as body text on white/tinted surfaces. */
+  --destructive-strong: #b91c1c;
   --success-foreground: var(--color-on-success);
   --warning-foreground: #8d5e09;
   --sidebar-accent-foreground: color-mix(in srgb, var(--color-on-secondary) 92%, white);
@@ -180,6 +185,7 @@ next-router-prefetch {
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-strong: var(--destructive-strong);
   --color-success-foreground: var(--success-foreground);
   --color-warning-foreground: var(--warning-foreground);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -630,17 +636,17 @@ next-router-prefetch {
     @apply text-sm leading-6 text-muted-foreground;
   }
 
+  /* Single column: per EUI form-layout guidance, keep inputs in one column
+     rather than spreading them side by side. data-entry-field-wide is now a
+     no-op (every field is already full width) but left on FormItems in case
+     a future field genuinely needs different treatment. */
   .data-entry-field-grid {
-    @apply grid gap-x-6 gap-y-4 sm:grid-cols-2;
-  }
-
-  /* A field that should run the full width of the two-column grid. */
-  .data-entry-field-grid > .data-entry-field-wide {
-    @apply sm:col-span-2;
+    @apply grid grid-cols-1 gap-4;
   }
 
   .data-entry-form-actions {
-    @apply flex flex-col-reverse gap-2.5 pt-1 sm:flex-row sm:justify-end;
+    @apply sticky bottom-0 z-10 flex flex-col-reverse gap-2.5 border-t border-border bg-background py-3 sm:static sm:flex-row sm:justify-end sm:border-0;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 
   .data-entry-form-actions > * {

@@ -287,6 +287,8 @@ function SidebarContent({
                   const link = (
                     <Link
                       href={contextualHref}
+                      aria-label={resolvedLabel}
+                      aria-current={isActive ? "page" : undefined}
                       onClick={closeAfterNavigate}
                       className={cn(
                         "flex min-h-12 items-center gap-3 rounded-2xl text-current no-underline transition-colors hover:bg-white/10",
@@ -334,7 +336,7 @@ function SidebarContent({
             collapsed && !mobile ? "justify-center px-3" : "justify-start px-3.5",
           )}
         >
-          <LogOut size={16} />
+          {collapsed && !mobile ? <span className="sr-only">Log out</span> : null}<LogOut size={16} aria-hidden />
           {!collapsed || mobile ? (signingOut ? "Logging out..." : "Log out") : null}
         </Button>
       </div>

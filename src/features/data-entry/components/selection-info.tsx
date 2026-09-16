@@ -43,7 +43,6 @@ export function SelectionChips({
   return (
     <div className="data-entry-chip-strip">
       {system ? <span className="data-entry-chip"><b>Cage</b> {formatCageLabel(system)}</span> : null}
-      {system?.unit?.trim() ? <span className="data-entry-chip"><b>Unit</b> {system.unit.trim()}</span> : null}
       {system ? <span className="data-entry-chip"><b>Stage</b> {formatGrowthStage(system.growth_stage)}</span> : null}
       {batch ? <span className="data-entry-chip"><b>Batch</b> {batch.label}</span> : null}
       {supplierName ? <span className="data-entry-chip"><b>Source</b> {supplierName}</span> : null}

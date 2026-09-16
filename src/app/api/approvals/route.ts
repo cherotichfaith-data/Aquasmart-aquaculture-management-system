@@ -26,6 +26,7 @@ export async function GET(request: Request) {
   const [{ data, count, error }, pending, approved, rejected] = await Promise.all([
     query, countFor("pending"), countFor("approved"), countFor("rejected"),
   ])
+  if (pending.error || approved.error || rejected.error) return NextResponse.json({ error: "Unable to load approval counts." }, { status: 503 })
   if (error) return NextResponse.json({ error: error.code === "42P01" || error.code === "PGRST205"
     ? "The approvals database migration has not been installed on this environment." : "Unable to load approvals." }, { status: 503 })
   return NextResponse.json({
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
 }
 
 const reviewSchema = z.object({ farmId: z.string().uuid(), ids: z.array(z.number().int().positive()).min(1).max(100),
-  decision: z.enum(["approved", "rejected"]), reason: z.string().trim().max(1000).optional() })
+  decision: z.enum(["approved", "rejected"]), reason: z.string().trim().max(1000).optional() }).refine((value) => value.decision !== "rejected" || Boolean(value.reason), "A rejection reason is required")
 export async function POST(request: Request) {
   const auth = await requireRateLimitedApiUser(request, "approvals:review", apiRateLimits.mutation)
   if ("response" in auth) return auth.response

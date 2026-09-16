@@ -64,9 +64,10 @@ export default function BatchLineageTable({
           onRowClick={(row) => openProductionPage(row.batch_id)}
           emptyMessage="No batches found."
           initialSorting={[{ id: "batch", desc: false }]}
-          shellClassName="production-records-table max-h-[560px]"
+          shellClassName="production-records-table"
           tableClassName="w-full min-w-[820px] table-fixed"
           headerVariant="plain"
+          pagination={{ pageSize: 25 }}
           renderMobileCard={(row) => <BatchCardBody row={row} stockingByBatchId={stockingByBatchId} />}
         />
       </CardContent>

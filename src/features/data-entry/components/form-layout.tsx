@@ -30,7 +30,7 @@ export function FormSection({
       {hasHead ? (
         <header className="data-entry-section-head">
           {kicker != null ? <span className="data-entry-section-kicker">{kicker}</span> : null}
-          {title != null ? <h3 className="data-entry-section-title">{title}</h3> : null}
+          {title != null ? <h2 className="data-entry-section-title">{title}</h2> : null}
           {description != null ? <p className="data-entry-section-desc">{description}</p> : null}
         </header>
       ) : null}

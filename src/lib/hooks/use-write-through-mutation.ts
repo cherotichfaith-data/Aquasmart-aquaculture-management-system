@@ -60,6 +60,7 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
       const pendingApproval = hasPendingApproval(result)
 
       if (!pendingSync) {
+        void queryClient.invalidateQueries({ queryKey: ["entry-history", farmId] })
         void Promise.resolve(config.invalidate?.({ queryClient, payload, result })).catch((error) => {
           console.error("dataEntry:invalidate", error)
         })
@@ -69,7 +70,7 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
         variant: pendingSync ? "warning" : "success",
         title: pendingSync ? "Saved offline" : pendingApproval ? "Submitted for approval" : "Record saved",
         description: pendingSync ? "Saved locally; it will be submitted for approval when synced." : pendingApproval ? "A farm manager can review this entry in Approvals." : config.successMessage,
-        duration: pendingSync ? 7000 : 6000,
+        duration: 10000,
       })
     },
     onError: (error: unknown, _payload, context) => {

@@ -58,7 +58,6 @@ export default function SystemsPageClient({
         <CageStatusTable
           rows={stockedRows}
           cohortBySystemId={initialData.cohortBySystemId}
-          mortalityByCage={initialData.mortalityByCage}
           alerts={initialData.alerts}
           timePeriod={initialFilters.timePeriod}
           emptyMessage={initialData.systemsTable.meta.reason ?? "No active cages found"}
@@ -66,7 +65,7 @@ export default function SystemsPageClient({
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <AbwGrowthChart growthSeries={initialData.growthSeries} systemLabels={systemLabels} />
-          <MortalityByCageChart mortalityByCage={initialData.mortalityByCage} systemLabels={systemLabels} />
+          <MortalityByCageChart rows={stockedRows} systemLabels={systemLabels} />
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <EfcrByPeriodChart growthSeries={initialData.growthSeries} systemLabels={systemLabels} />
