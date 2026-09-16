@@ -32,13 +32,15 @@ function Tooltip({
   wrapperClassName?: string
   children: React.ReactElement
 }) {
+  const descriptionId = React.useId()
   if (disabled || !content) return children
 
   return (
     <span className={cn("group/tooltip relative inline-flex", wrapperClassName)}>
-      {children}
+      {React.cloneElement(children, { "aria-describedby": [children.props["aria-describedby"], descriptionId].filter(Boolean).join(" ") })}
       <span
         role="tooltip"
+        id={descriptionId}
         className={cn(
           "pointer-events-none absolute z-50 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100",
           sideClassName[side],

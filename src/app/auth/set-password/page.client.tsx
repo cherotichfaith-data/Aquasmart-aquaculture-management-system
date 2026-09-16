@@ -203,7 +203,7 @@ export default function SetPasswordPageClient() {
             </label>
 
             {errorMessage ? (
-              <div className="rounded-[12px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div className="rounded-[12px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-strong">
                 {errorMessage}
               </div>
             ) : null}

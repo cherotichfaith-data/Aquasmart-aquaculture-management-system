@@ -18,10 +18,10 @@ const formatPercent = (value: number | null | undefined, decimals = 2) =>
 type CageStatus = "Optimal" | "Good" | "Monitor" | "Critical"
 
 const STATUS_STYLES: Record<CageStatus, string> = {
-  Optimal: "bg-success/15 text-success",
+  Optimal: "bg-success/15 text-success-foreground",
   Good: "bg-muted text-muted-foreground",
-  Monitor: "bg-warning/15 text-warning",
-  Critical: "bg-destructive/15 text-destructive",
+  Monitor: "bg-warning/15 text-warning-foreground",
+  Critical: "bg-destructive/15 text-destructive-strong",
 }
 
 const STATUS_ICON: Record<CageStatus, string> = {
@@ -100,7 +100,7 @@ export default function CageStatusTable({
         accessorFn: (row) => row.fish_end ?? undefined,
         sortUndefined: "last",
         sortDescFirst: true,
-        meta: { width: "110px" },
+        meta: { width: "110px", align: "right" },
         cell: ({ row }) => <span className="text-sm">{formatNumberValue(row.original.fish_end)}</span>,
       },
       {
@@ -109,7 +109,7 @@ export default function CageStatusTable({
         accessorFn: (row) => row.abw ?? undefined,
         sortUndefined: "last",
         sortDescFirst: true,
-        meta: { width: "100px" },
+        meta: { width: "100px", align: "right" },
         cell: ({ row }) => <span className="text-sm">{formatUnitValue(row.original.abw, 1, "g")}</span>,
       },
       {
@@ -118,7 +118,7 @@ export default function CageStatusTable({
         accessorFn: (row) => row.biomass_end ?? undefined,
         sortUndefined: "last",
         sortDescFirst: true,
-        meta: { width: "110px" },
+        meta: { width: "110px", align: "right" },
         cell: ({ row }) => <span className="text-sm">{formatUnitValue(row.original.biomass_end, 0, "kg")}</span>,
       },
       {
@@ -126,7 +126,7 @@ export default function CageStatusTable({
         header: "Mortality",
         accessorFn: (row) => row.mortality_rate ?? 0,
         sortDescFirst: true,
-        meta: { width: "110px" },
+        meta: { width: "110px", align: "right" },
         cell: ({ row }) => (
           <span className="text-sm">
             <SeverityValue
@@ -172,9 +172,10 @@ export default function CageStatusTable({
           onRowClick={(row) => openProductionPage(row.system_id)}
           emptyMessage={emptyMessage}
           initialSorting={[{ id: "cage", desc: false }]}
-          shellClassName="production-records-table max-h-[520px]"
+          shellClassName="production-records-table"
           tableClassName="min-w-[860px] table-fixed"
           headerVariant="plain"
+          pagination={{ pageSize: 25 }}
           renderMobileCard={(row) => (
             <CageStatusCardBody
               row={row}
@@ -202,7 +203,7 @@ function CageStatusCardBody({
   return (
     <>
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">{title}</p>
+        <p title={title} className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">{title}</p>
         <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[status]}`}>
           <span aria-hidden>{STATUS_ICON[status]}</span> {status}
         </span>
