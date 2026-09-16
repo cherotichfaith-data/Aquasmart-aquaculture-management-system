@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, type KeyboardEvent, type ReactNode } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import {
   flexRender,
   getCoreRowModel,
@@ -259,6 +260,32 @@ export function DataTable<TRow>({
   )
 }
 
+type PageItem = { type: "page"; value: number } | { type: "gap"; key: string }
+
+/**
+ * Windowed page list for numbered pagination: always show the first and last
+ * page plus the current page and its immediate neighbours, collapsing the gaps
+ * to an ellipsis so a long batch history stays one jumpable row instead of a
+ * strip of dozens of buttons. Returns every page unwindowed at 7 or fewer.
+ */
+function buildPageItems(currentPage: number, pageCount: number): PageItem[] {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, index) => ({ type: "page", value: index + 1 }))
+  }
+  const shown = [1, pageCount, currentPage, currentPage - 1, currentPage + 1]
+    .filter((page) => page >= 1 && page <= pageCount)
+    .sort((a, b) => a - b)
+  const unique = [...new Set(shown)]
+  const items: PageItem[] = []
+  let previous = 0
+  for (const page of unique) {
+    if (page - previous > 1) items.push({ type: "gap", key: `gap-${previous}-${page}` })
+    items.push({ type: "page", value: page })
+    previous = page
+  }
+  return items
+}
+
 function DataTablePagination<TRow>({
   table,
   totalRows,
@@ -270,6 +297,7 @@ function DataTablePagination<TRow>({
 }) {
   const { pageIndex, pageSize } = table.getState().pagination
   const pageCount = table.getPageCount()
+  const currentPage = pageIndex + 1
   const firstRow = totalRows === 0 ? 0 : pageIndex * pageSize + 1
   const lastRow = Math.min(totalRows, (pageIndex + 1) * pageSize)
   const showPageSizeSelect = pageSizeOptions.length > 1 && totalRows > Math.min(...pageSizeOptions)
@@ -301,29 +329,47 @@ function DataTablePagination<TRow>({
             </Select>
           </label>
         ) : null}
-        <div className="flex items-center gap-2">
+        <nav aria-label="Pagination" className="flex items-center gap-1">
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon-sm"
+            aria-label="Previous page"
             disabled={!table.getCanPreviousPage()}
             onClick={() => table.previousPage()}
           >
-            Previous
+            <ChevronLeft className="size-4" />
           </Button>
-          <span className="whitespace-nowrap">
-            Page {pageCount === 0 ? 0 : pageIndex + 1} of {pageCount}
-          </span>
+          {buildPageItems(currentPage, pageCount).map((item) =>
+            item.type === "gap" ? (
+              <span key={item.key} aria-hidden className="px-1.5 text-muted-foreground">
+                …
+              </span>
+            ) : (
+              <Button
+                key={item.value}
+                type="button"
+                variant={item.value === currentPage ? "default" : "ghost"}
+                size="icon-sm"
+                aria-label={`Page ${item.value}`}
+                aria-current={item.value === currentPage ? "page" : undefined}
+                onClick={() => table.setPageIndex(item.value - 1)}
+              >
+                {item.value}
+              </Button>
+            ),
+          )}
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon-sm"
+            aria-label="Next page"
             disabled={!table.getCanNextPage()}
             onClick={() => table.nextPage()}
           >
-            Next
+            <ChevronRight className="size-4" />
           </Button>
-        </div>
+        </nav>
       </div>
     </div>
   )
