@@ -8,6 +8,7 @@ import {
   FlaskConical,
   LogOut,
   Menu as MenuIcon,
+  PackageOpen,
   PlusCircle,
   Settings,
   X,
@@ -45,6 +46,39 @@ import {
   type CustomTimeRange,
   type TimeBounds,
 } from "@/lib/time-period"
+
+// Leading icon per alert kind (water quality / mortality / empty cage), so the
+// notification list is scannable by type at a glance instead of reading titles.
+function notificationIcon(kind: string) {
+  if (kind === "water_quality") return Droplets
+  if (kind === "mortality") return Fish
+  if (kind === "cage_empty") return PackageOpen
+  return Bell
+}
+
+// Icon-circle tint by severity, using the accessible destructive/warning tokens.
+// A read history item drops to muted so unread entries stand out.
+function notificationTint(severity: string, read?: boolean) {
+  if (read) return "bg-muted text-muted-foreground"
+  if (severity === "critical") return "bg-destructive/10 text-destructive-strong"
+  return "bg-warning/15 text-warning-foreground"
+}
+
+// Relative time for recent alerts ("6 min ago"); falls back to the absolute
+// stamp once an item is more than a week old.
+function formatRelativeTime(iso: string) {
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return ""
+  const diffMs = Date.now() - then
+  if (diffMs < 60_000) return "just now"
+  const minutes = Math.floor(diffMs / 60_000)
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} d ago`
+  return formatStableDateTime(iso)
+}
 
 const normalizeBatchDisplayLabel = (label: string | null | undefined) => {
   const trimmed = label?.trim() ?? ""
@@ -503,10 +537,7 @@ export default function Header({
               <Tooltip content="Notifications">
                 <button
                   type="button"
-                  onClick={openMenu((value) => {
-                    if (value) markAllRead()
-                    setNotificationsAnchor(value)
-                  })}
+                  onClick={openMenu(setNotificationsAnchor)}
                   className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
                   <Bell size={18} />
@@ -608,8 +639,17 @@ export default function Header({
       </div>
 
       <Menu anchorEl={notificationsAnchor} open={Boolean(notificationsAnchor)} onClose={() => setNotificationsAnchor(null)} className="mt-1 w-[calc(100vw-24px)] sm:w-[340px]">
-        <div className="px-4 py-3">
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
           <p className="text-sm font-bold">Notifications</p>
+          {resolvedUnreadCount > 0 ? (
+            <button
+              type="button"
+              onClick={markAllRead}
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              Mark all read
+            </button>
+          ) : null}
         </div>
         <Separator />
         <div className="max-h-96 overflow-y-auto py-1">
@@ -618,25 +658,33 @@ export default function Header({
               <p className="px-4 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 Needs attention · {activeAlerts.length}
               </p>
-              {activeAlerts.map((alert) => (
-                <button
-                  key={alert.id}
-                  type="button"
-                  onClick={() => {
-                    if (alert.href) router.push(alert.href)
-                    setNotificationsAnchor(null)
-                  }}
-                  className={cn(
-                    "mx-1 my-0.5 block w-[calc(100%-0.5rem)] rounded-lg border px-3 py-2.5 text-left transition-colors",
-                    alert.severity === "critical"
-                      ? "border-destructive/40 bg-destructive/8"
-                      : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]",
-                  )}
-                >
-                  <p className="text-sm font-bold">{alert.title}</p>
-                  <p className="mt-1 block text-xs text-muted-foreground">{alert.description}</p>
-                </button>
-              ))}
+              {activeAlerts.map((alert) => {
+                const AlertIcon = notificationIcon(alert.kind)
+                return (
+                  <button
+                    key={alert.id}
+                    type="button"
+                    onClick={() => {
+                      if (alert.href) router.push(alert.href)
+                      setNotificationsAnchor(null)
+                    }}
+                    className={cn(
+                      "mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                      alert.severity === "critical"
+                        ? "border-destructive/40 bg-destructive/8"
+                        : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]",
+                    )}
+                  >
+                    <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", notificationTint(alert.severity))}>
+                      <AlertIcon size={16} aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-bold">{alert.title}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{alert.description}</span>
+                    </span>
+                  </button>
+                )
+              })}
               {historyNotifications.length > 0 ? (
                 <p className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Recent</p>
               ) : null}
@@ -647,23 +695,31 @@ export default function Header({
               <p className="text-center text-sm text-muted-foreground">No New Notifications</p>
             </div>
           ) : (
-            historyNotifications.map((note) => (
-              <button
-                key={note.id}
-                type="button"
-                onClick={() => markRead(note.id)}
-                className={cn(
-                  "mx-1 my-0.5 block w-[calc(100%-0.5rem)] rounded-lg border px-3 py-2.5 text-left transition-colors",
-                  note.read
-                    ? "border-[color-mix(in_srgb,var(--color-border)_50%,transparent)]"
-                    : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_5%,transparent)]",
-                )}
-              >
-                <p className="text-sm font-bold">{note.title}</p>
-                <p className="mt-1 block text-xs text-muted-foreground">{note.description}</p>
-                <p className="mt-2 block text-xs text-muted-foreground">{formatStableDateTime(note.createdAt)}</p>
-              </button>
-            ))
+            historyNotifications.map((note) => {
+              const NoteIcon = notificationIcon(note.kind)
+              return (
+                <button
+                  key={note.id}
+                  type="button"
+                  onClick={() => markRead(note.id)}
+                  className={cn(
+                    "mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                    note.read
+                      ? "border-[color-mix(in_srgb,var(--color-border)_50%,transparent)]"
+                      : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_5%,transparent)]",
+                  )}
+                >
+                  <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", notificationTint(note.severity, note.read))}>
+                    <NoteIcon size={16} aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold">{note.title}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{note.description}</span>
+                    <span className="mt-2 block text-xs text-muted-foreground">{formatRelativeTime(note.createdAt)}</span>
+                  </span>
+                </button>
+              )
+            })
           )}
         </div>
         {historyNotifications.length > 0 ? (
