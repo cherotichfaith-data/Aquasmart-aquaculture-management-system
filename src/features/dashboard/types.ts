@@ -76,5 +76,4 @@ export type DashboardPageInitialData = {
   kpiOverview: KpiOverviewData
   systemsTable: SystemsTableData
   waterQualityMeasurements: QueryResult<DashboardWaterQualityMeasurement>
-  recommendedActions: RecommendedAction[]
 }

@@ -63,6 +63,7 @@ type NotificationsContextValue = {
   unreadCount: number
   markAllRead: () => void
   markRead: (id: string) => void
+  dismiss: (id: string) => void
   clearAll: () => void
   activeAlerts: ActiveAlert[]
   activeAlertsLoading: boolean
@@ -309,6 +310,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     setNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item)),
     )
+  }, [setNotifications])
+
+  const dismiss = useCallback((id: string) => {
+    // Drop a single history entry. Its id stays in seenIds so the same
+    // point-in-time event doesn't immediately re-add itself this session.
+    setNotifications((prev) => prev.filter((item) => item.id !== id))
   }, [setNotifications])
 
   const clearAll = useCallback(() => {
@@ -682,11 +689,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       unreadCount,
       markAllRead,
       markRead,
+      dismiss,
       clearAll,
       activeAlerts,
       activeAlertsLoading: activeAlertsQuery.isLoading,
     }),
-    [activeAlerts, activeAlertsQuery.isLoading, clearAll, markAllRead, markRead, notifications, unreadCount],
+    [activeAlerts, activeAlertsQuery.isLoading, clearAll, dismiss, markAllRead, markRead, notifications, unreadCount],
   )
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>
