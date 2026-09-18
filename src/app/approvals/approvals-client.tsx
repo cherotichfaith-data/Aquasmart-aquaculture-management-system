@@ -4,6 +4,8 @@ import { Fragment, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, CheckCircle2, Loader2, Pencil, X, XCircle } from "lucide-react"
 import { approvalTypes, type ApprovalEntry, type ApprovalType } from "@/lib/approvals"
+import { useSystemOptions } from "@/lib/hooks/use-options"
+import { formatCageLabel } from "@/lib/system-options"
 
 type ApprovalStatus = ApprovalEntry["status"]
 type Counts = Record<ApprovalStatus, number>
@@ -21,13 +23,12 @@ const count = (value: unknown) => (value == null || value === "" ? "—" : Numbe
 const kg = (value: unknown) => (value == null || value === "" ? "—" : `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 3 })} kg`)
 
 export default function ApprovalsClient({
-  farmId, canReview, currentUserId, systems, activeSystems, batches, feedTypes, members,
+  farmId, canReview, currentUserId, systems, batches, feedTypes, members,
 }: {
   farmId: string
   canReview: boolean
   currentUserId: string
   systems: NamedOption[]
-  activeSystems: NamedOption[]
   batches: NamedOption[]
   feedTypes: NamedOption[]
   members: Member[]
@@ -61,6 +62,18 @@ export default function ApprovalsClient({
     window.addEventListener("offline-sync-complete", refresh)
     return () => window.removeEventListener("offline-sync-complete", refresh)
   }, [cache, farmId])
+
+  // Cage picker for the editor uses the same shared source/logic as the
+  // systems/cages filter elsewhere (api_system_options_rpc, active only).
+  const systemOptionsQuery = useSystemOptions({ farmId, activeOnly: true })
+  const activeSystems = useMemo<NamedOption[]>(
+    () =>
+      (systemOptionsQuery.data?.data ?? []).map((system) => ({
+        id: system.id,
+        name: formatCageLabel(system),
+      })),
+    [systemOptionsQuery.data],
+  )
 
   const names = useMemo(() => {
     const sys = new Map(systems.map((row) => [row.id, row.name]))
