@@ -6,13 +6,13 @@ import { FEEDING_RESPONSE_LEVELS } from "@/lib/feeding-response"
 type Option = { id: number; name: string }
 type Payload = Record<string, unknown>
 const keys: Record<ApprovalType, string[]> = {
-  feeding: ["date", "feed_type_id", "feeding_amount", "feeding_response", "notes"],
-  mortality: ["date", "number_of_fish_mortality", "total_weight_mortality", "cause", "notes"],
-  sampling: ["date", "number_of_fish_sampling", "total_weight_sampling", "notes"],
-  stocking: ["date", "batch_id", "type_of_stocking", "number_of_fish_stocking", "total_weight_stocking", "notes"],
-  harvest: ["date", "type_of_harvest", "number_of_fish_harvest", "total_weight_harvest"],
-  transfer: ["date", "transfer_type", "target_system_id", "external_target_name", "number_of_fish_transfer", "total_weight_transfer", "notes"],
-  water_quality: ["date", "time", "water_depth", "parameter_name", "parameter_value", "location_reference"],
+  feeding: ["date", "system_id", "feed_type_id", "feeding_amount", "feeding_response", "notes"],
+  mortality: ["date", "system_id", "number_of_fish_mortality", "total_weight_mortality", "cause", "notes"],
+  sampling: ["date", "system_id", "number_of_fish_sampling", "total_weight_sampling", "notes"],
+  stocking: ["date", "system_id", "batch_id", "type_of_stocking", "number_of_fish_stocking", "total_weight_stocking", "notes"],
+  harvest: ["date", "system_id", "type_of_harvest", "number_of_fish_harvest", "total_weight_harvest"],
+  transfer: ["date", "origin_system_id", "transfer_type", "target_system_id", "external_target_name", "number_of_fish_transfer", "total_weight_transfer", "notes"],
+  water_quality: ["date", "system_id", "time", "water_depth", "parameter_name", "parameter_value", "location_reference"],
   feed_inventory: ["inventory_date", "inventory_time", "feed_type_id", "bag_weight", "amount_of_bags", "opened_bags", "comments"],
 }
 const enums: Record<string, readonly string[]> = {
@@ -23,6 +23,7 @@ const enums: Record<string, readonly string[]> = {
 }
 const labels: Record<string, string> = {
   feeding_amount: "Feed given (kg)", feeding_response: "Feeding response", feed_type_id: "Feed type", batch_id: "Batch",
+  system_id: "Cage", origin_system_id: "Source cage",
   target_system_id: "Destination cage", external_target_name: "External destination", water_depth: "Depth (m)",
   bag_weight: "Weight per bag (kg)", amount_of_bags: "Unopened whole bags", opened_bags: "Loose feed (g)",
 }
@@ -37,7 +38,11 @@ export function EntryEditor({ type, draft, onChange, disabled, systems, batches,
     !(key === "target_system_id" && draft.transfer_type === "external_out") &&
     !(key === "external_target_name" && draft.transfer_type !== "external_out")
   ).map((key) => {
-    const options = key === "feed_type_id" ? feeds : key === "target_system_id" ? systems.filter((s) => s.id !== Number(draft.origin_system_id)) : key === "batch_id" ? batches : null
+    const options = key === "feed_type_id" ? feeds
+      : key === "system_id" ? systems
+      : key === "origin_system_id" ? systems.filter((s) => s.id !== Number(draft.target_system_id))
+      : key === "target_system_id" ? systems.filter((s) => s.id !== Number(draft.origin_system_id))
+      : key === "batch_id" ? batches : null
     const numeric = !!options || key === "feeding_response" || key.startsWith("number_of_") || key.startsWith("total_weight_") || ["feeding_amount", "water_depth", "parameter_value", "bag_weight", "amount_of_bags", "opened_bags"].includes(key)
     const conditionallyRequired = (type === "feeding" && key === "notes" && Number(draft.feeding_amount) === 0) || (type === "mortality" && key === "total_weight_mortality" && Number(draft.number_of_fish_mortality) >= 100)
     const optional = !conditionallyRequired && (["notes", "comments", "location_reference", "total_weight_mortality"].includes(key) || (type === "feeding" && Number(draft.feeding_amount) === 0 && ["feeding_response", "feed_type_id"].includes(key)))

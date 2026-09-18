@@ -11,6 +11,7 @@ export type OrganizationSummary = {
   id: string
   name: string
   slug: string | null
+  isOwner?: boolean
 }
 
 export type FarmSummary = {

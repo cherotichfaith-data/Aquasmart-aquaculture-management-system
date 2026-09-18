@@ -91,7 +91,7 @@ async function loadWorkspaceAssets(userId: string, accessToken?: string | null) 
       farmIds.length > 0
         ? admin.from("farm").select("id, name, location, organization_id").in("id", farmIds).order("name")
         : Promise.resolve({ data: [], error: null }),
-      admin.from("organization").select("id, name, slug").eq("owner_id", userId).order("name"),
+      admin.from("organization").select("id, name, slug, owner_id").eq("owner_id", userId).order("name"),
     ])
 
   if (farmError) {
@@ -117,7 +117,7 @@ async function loadWorkspaceAssets(userId: string, accessToken?: string | null) 
 
   const { data: organizationRows, error: organizationError } =
     organizationIds.length > 0
-      ? await admin.from("organization").select("id, name, slug").in("id", organizationIds).order("name")
+      ? await admin.from("organization").select("id, name, slug, owner_id").in("id", organizationIds).order("name")
       : { data: [], error: null }
 
   if (organizationError) {
@@ -131,6 +131,7 @@ async function loadWorkspaceAssets(userId: string, accessToken?: string | null) 
     id: row.id,
     name: row.name,
     slug: row.slug ?? null,
+    isOwner: (row as { owner_id?: string | null }).owner_id === userId,
   }))
 
   return {
