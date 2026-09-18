@@ -21,12 +21,13 @@ const count = (value: unknown) => (value == null || value === "" ? "—" : Numbe
 const kg = (value: unknown) => (value == null || value === "" ? "—" : `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 3 })} kg`)
 
 export default function ApprovalsClient({
-  farmId, canReview, currentUserId, systems, batches, feedTypes, members,
+  farmId, canReview, currentUserId, systems, activeSystems, batches, feedTypes, members,
 }: {
   farmId: string
   canReview: boolean
   currentUserId: string
   systems: NamedOption[]
+  activeSystems: NamedOption[]
   batches: NamedOption[]
   feedTypes: NamedOption[]
   members: Member[]
@@ -434,7 +435,7 @@ export default function ApprovalsClient({
                             <tr>
                               <td colSpan={span} className="bg-muted/25">
                                 <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void saveEdit() }}>
-                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={setDraft} disabled={savingEdit} systems={systems} batches={batches} feeds={feedTypes} />
+                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={setDraft} disabled={savingEdit} systems={activeSystems} batches={batches} feeds={feedTypes} />
                                   <div className="flex gap-2">
                                     <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit}>
                                       {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {entry.status === "rejected" ? "Submit correction for approval" : "Save changes"}

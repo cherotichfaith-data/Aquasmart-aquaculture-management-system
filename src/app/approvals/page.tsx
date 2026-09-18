@@ -21,7 +21,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
   const canReview = role === "admin" || role === "farm_manager"
 
   const [systemsRes, batchesRes, feedTypesRes, memberRows] = await Promise.all([
-    client.from("system").select("id,name").eq("farm_id", farmId),
+    client.from("system").select("id,name,is_active").eq("farm_id", farmId),
     client.from("fingerling_batch").select("id,name").eq("farm_id", farmId),
     client.rpc("api_feed_type_options_rpc", { p_farm_id: farmId }),
     client.from("farm_user").select("user_id").eq("farm_id", farmId),
@@ -32,7 +32,13 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
     ? await client.from("user_profile").select("user_id,full_name").in("user_id", memberIds)
     : { data: [] as { user_id: string; full_name: string | null }[] }
 
-  const systems = (systemsRes.data ?? []).map((row) => ({ id: row.id, name: row.name ?? `Cage #${row.id}` }))
+  const systemRows = systemsRes.data ?? []
+  const systems = systemRows.map((row) => ({ id: row.id, name: row.name ?? `Cage #${row.id}` }))
+  // Only active cages are selectable when editing; the full list above still resolves
+  // names for historical entries on retired cages.
+  const activeSystems = systemRows
+    .filter((row) => row.is_active !== false)
+    .map((row) => ({ id: row.id, name: row.name ?? `Cage #${row.id}` }))
   const batches = (batchesRes.data ?? []).map((row) => ({ id: row.id, name: row.name ?? `Batch #${row.id}` }))
   const feedTypes = (feedTypesRes.data ?? []).map((row) => ({ id: row.id, name: row.label }))
   const members = (profiles ?? []).map((row) => ({ id: row.user_id, name: row.full_name ?? "" }))
@@ -53,6 +59,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
               canReview={canReview}
               currentUserId={user.id}
               systems={systems}
+              activeSystems={activeSystems}
               batches={batches}
               feedTypes={feedTypes}
               members={members}
