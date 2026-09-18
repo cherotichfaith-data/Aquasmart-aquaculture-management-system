@@ -48,8 +48,16 @@ export async function POST(request: Request, context: { params: Promise<{ entryI
     return NextResponse.json({ error: "You cannot correct this submission." }, { status: 403 })
   }
   const original = source.payload as Record<string, unknown>
+  const edited = parsed.data.payload
   // A stable local id makes repeated requests idempotent and retains source lineage.
-  const payload = { ...parsed.data.payload, farm_id: source.farm_id, system_id: original.system_id, origin_system_id: original.origin_system_id, local_id: `correction:${id}` }
+  // Cage (system) is correctable: honour the edited value, falling back to the original.
+  const payload = {
+    ...edited,
+    farm_id: source.farm_id,
+    system_id: edited.system_id ?? original.system_id,
+    origin_system_id: edited.origin_system_id ?? original.origin_system_id,
+    local_id: `correction:${id}`,
+  }
   try {
     const entries = await submitApproval(auth.supabase, source.entry_type as ApprovalEntry["entry_type"], source.farm_id, payload)
     return NextResponse.json({ entry: entries[0] }, { status: 202 })
