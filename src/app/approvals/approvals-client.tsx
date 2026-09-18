@@ -4,6 +4,8 @@ import { Fragment, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, CheckCircle2, Loader2, Pencil, X, XCircle } from "lucide-react"
 import { approvalTypes, type ApprovalEntry, type ApprovalType } from "@/lib/approvals"
+import { useSystemOptions } from "@/lib/hooks/use-options"
+import { formatCageLabel } from "@/lib/system-options"
 
 type ApprovalStatus = ApprovalEntry["status"]
 type Counts = Record<ApprovalStatus, number>
@@ -60,6 +62,18 @@ export default function ApprovalsClient({
     window.addEventListener("offline-sync-complete", refresh)
     return () => window.removeEventListener("offline-sync-complete", refresh)
   }, [cache, farmId])
+
+  // Cage picker for the editor uses the same shared source/logic as the
+  // systems/cages filter elsewhere (api_system_options_rpc, active only).
+  const systemOptionsQuery = useSystemOptions({ farmId, activeOnly: true })
+  const activeSystems = useMemo<NamedOption[]>(
+    () =>
+      (systemOptionsQuery.data?.data ?? []).map((system) => ({
+        id: system.id,
+        name: formatCageLabel(system),
+      })),
+    [systemOptionsQuery.data],
+  )
 
   const names = useMemo(() => {
     const sys = new Map(systems.map((row) => [row.id, row.name]))
@@ -434,7 +448,7 @@ export default function ApprovalsClient({
                             <tr>
                               <td colSpan={span} className="bg-muted/25">
                                 <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void saveEdit() }}>
-                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={setDraft} disabled={savingEdit} systems={systems} batches={batches} feeds={feedTypes} />
+                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={setDraft} disabled={savingEdit} systems={activeSystems} batches={batches} feeds={feedTypes} />
                                   <div className="flex gap-2">
                                     <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit}>
                                       {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {entry.status === "rejected" ? "Submit correction for approval" : "Save changes"}
