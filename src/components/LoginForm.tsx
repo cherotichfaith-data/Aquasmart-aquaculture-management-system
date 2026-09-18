@@ -4,12 +4,13 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { type FormEvent, useMemo, useState } from "react"
-import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button"
 import { login } from "@/lib/api"
 import { ONBOARDING_PATH, WORKSPACE_SELECT_PATH } from "@/lib/app-entry"
 import { buildCreateWorkspaceHref, buildWorkspaceSelectHref, buildWorkspaceSetupHref } from "@/lib/auth"
+import { cn } from "@/lib/utils"
 
 type AuthMode = "signin" | "signup"
 
@@ -163,389 +164,54 @@ export default function LoginForm() {
     }
   }
 
-  const inputClassName = (field: FieldName) =>
-    `form-input${fieldErrors[field] ? " form-input-invalid" : ""}${field === "password" ? " form-input-password" : ""}`
+  const fieldInputClass = (field: FieldName) =>
+    cn(
+      "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20",
+      field === "password" && "pr-10",
+      fieldErrors[field] && "border-destructive focus:border-destructive focus:ring-destructive/20",
+    )
 
   return (
-    <div className="auth-page">
-      <div className="auth-back-link">
-        <Link href="/" aria-label="Back to home">
-          <ArrowLeft size={16} />
-        </Link>
-      </div>
+    <div className="grid min-h-svh lg:grid-cols-2">
+      <div className="flex flex-col gap-4 p-6 md:p-10">
+        <div className="flex justify-center gap-2 md:justify-start">
+          <Link href="/" className="flex items-center gap-2 font-medium" aria-label="SUSTAIN Aquasmart home">
+            <Image
+              src="/sustain-aquasmart-wordmark.png"
+              alt="SUSTAIN Aquasmart"
+              width={1200}
+              height={131}
+              className="h-7 w-auto"
+              priority
+            />
+          </Link>
+        </div>
 
-      <style jsx global>{`
-        .auth-page,
-        .auth-page * {
-          box-sizing: border-box;
-        }
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-sm">
+            <form onSubmit={(event) => void handlePasswordAuth(event)} noValidate className="flex flex-col gap-6">
+              <div className="flex flex-col items-center gap-1 text-center">
+                <h1 className="text-2xl font-bold text-foreground">
+                  {authMode === "signin" ? "Sign in to your dashboard" : "Create your account"}
+                </h1>
+                {isInviteContinuation ? (
+                  <p className="text-sm text-balance text-muted-foreground">
+                    If you arrived from an invite, continue with Google using the invited email address, or open
+                    the latest invite email to set a password. Either way your assigned role is applied on first
+                    sign-in.
+                  </p>
+                ) : null}
+              </div>
 
-        .auth-page {
-          --auth-accent: var(--color-primary);
-          --auth-accent-hover: var(--color-primary-hover);
-          --auth-accent-soft: color-mix(in srgb, var(--color-primary) 16%, transparent);
-          min-height: 100vh;
-          font-family: var(--font-sans);
-          color: var(--foreground);
-          overflow: hidden;
-          position: relative;
-          background:
-            linear-gradient(
-              135deg,
-              var(--brand-hero-from),
-              var(--brand-hero-mid),
-              var(--brand-hero-to)
-            ),
-            url("/Multi-region-aquaculture-scaled.webp") center / cover no-repeat;
-        }
-
-        .auth-page::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(
-            135deg,
-            color-mix(in srgb, var(--color-primary) 42%, black),
-            color-mix(in srgb, var(--color-primary) 12%, transparent) 46%,
-            transparent 100%
-          );
-          pointer-events: none;
-        }
-
-        .auth-back-link {
-          position: fixed;
-          z-index: 2;
-        }
-
-        .auth-back-link {
-          top: 1rem;
-          left: 1rem;
-        }
-
-        .auth-back-link a {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 2.5rem;
-          height: 2.5rem;
-          border-radius: 0.75rem;
-          border: 1px solid color-mix(in srgb, var(--card) 30%, transparent);
-          background: color-mix(in srgb, var(--card) 22%, transparent);
-          color: var(--card-foreground);
-          backdrop-filter: blur(14px);
-          transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-        }
-
-        .auth-back-link a:hover {
-          background: color-mix(in srgb, var(--color-primary) 18%, transparent);
-          border-color: color-mix(in srgb, var(--color-primary) 38%, transparent);
-          transform: translateY(-1px);
-        }
-
-        .auth-shell {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 5rem 1rem 1.5rem;
-          position: relative;
-          z-index: 1;
-        }
-
-        .login-card {
-          width: 100%;
-          max-width: 28rem;
-          border-radius: 24px;
-          border: 1px solid color-mix(in srgb, var(--card) 70%, transparent);
-          background: linear-gradient(
-            135deg,
-            color-mix(in srgb, var(--card) 82%, transparent),
-            color-mix(in srgb, var(--card) 68%, transparent)
-          );
-          padding: 2rem 1.5rem;
-          backdrop-filter: blur(18px);
-          box-shadow: 0 24px 70px color-mix(in srgb, var(--chart-5) 18%, transparent);
-        }
-
-        .logo-header {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.75rem;
-          margin-bottom: 1.25rem;
-        }
-
-        .logo-wordmark {
-          height: 1.9rem;
-          width: auto;
-        }
-
-        .login-header h1 {
-          font-size: 1.1rem;
-          font-weight: 800;
-          color: var(--card-foreground);
-        }
-
-        .login-header p {
-          margin-top: 0.45rem;
-          margin-bottom: 1.5rem;
-          color: color-mix(in srgb, var(--card-foreground) 76%, transparent);
-          font-size: 0.95rem;
-          line-height: 1.55;
-        }
-
-        .form-group {
-          margin-bottom: 1rem;
-        }
-
-        .form-label {
-          display: block;
-          margin-bottom: 0.45rem;
-          color: var(--card-foreground);
-          font-size: 0.9rem;
-          font-weight: 700;
-        }
-
-        .input-shell {
-          position: relative;
-        }
-
-        .form-input {
-          width: 100%;
-          border-radius: 14px;
-          border: 1px solid color-mix(in srgb, var(--border) 92%, transparent);
-          background: color-mix(in srgb, var(--card) 74%, transparent);
-          color: var(--card-foreground);
-          padding: 0.92rem 1rem;
-          font: inherit;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-          backdrop-filter: blur(10px);
-        }
-
-        .form-input::placeholder {
-          color: color-mix(in srgb, var(--card-foreground) 54%, transparent);
-        }
-
-        .form-input:hover:not(:focus) {
-          border-color: var(--auth-accent);
-        }
-
-        .form-input:focus {
-          outline: none;
-          border-color: var(--auth-accent);
-          box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 18%, transparent);
-          background: color-mix(in srgb, var(--card) 92%, transparent);
-        }
-
-        .form-input-invalid {
-          border-color: color-mix(in srgb, var(--destructive) 74%, white);
-          box-shadow: 0 0 0 1px color-mix(in srgb, var(--destructive) 30%, transparent);
-        }
-
-        .form-input-invalid:focus {
-          border-color: color-mix(in srgb, var(--destructive) 74%, white);
-          box-shadow: 0 0 0 4px color-mix(in srgb, var(--destructive) 18%, transparent);
-        }
-
-        .form-input-password {
-          padding-right: 3rem;
-        }
-
-        .password-toggle {
-          position: absolute;
-          top: 50%;
-          right: 0.75rem;
-          transform: translateY(-50%);
-          border: none;
-          background: transparent;
-          color: color-mix(in srgb, var(--card-foreground) 74%, transparent);
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 2rem;
-          height: 2rem;
-        }
-
-        .field-error,
-        .form-error,
-        .form-notice {
-          margin-top: 0.45rem;
-          font-size: 0.82rem;
-          line-height: 1.45;
-          color: var(--destructive);
-        }
-
-        .field-hint {
-          margin-top: 0.45rem;
-          font-size: 0.82rem;
-          color: color-mix(in srgb, var(--card-foreground) 72%, transparent);
-        }
-
-        .form-error {
-          margin-bottom: 1rem;
-          border: 1px solid color-mix(in srgb, var(--destructive) 26%, transparent);
-          background: color-mix(in srgb, var(--destructive) 8%, transparent);
-          border-radius: 12px;
-          padding: 0.85rem 0.95rem;
-        }
-
-        .form-notice {
-          margin-bottom: 1rem;
-          border: 1px solid color-mix(in srgb, var(--color-primary) 26%, transparent);
-          background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-          border-radius: 12px;
-          padding: 0.85rem 0.95rem;
-          color: var(--card-foreground);
-        }
-
-        .submit-button {
-          width: 100%;
-          min-height: 3.125rem;
-          margin-top: 0.4rem;
-          border: none;
-          border-radius: 12px;
-          background: var(--auth-accent);
-          color: var(--color-on-primary);
-          font-size: 1rem;
-          font-weight: 800;
-          cursor: pointer;
-          transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-          box-shadow: 0 12px 28px color-mix(in srgb, var(--color-primary) 36%, transparent);
-        }
-
-        .submit-button:hover:not(:disabled) {
-          background: var(--auth-accent-hover);
-          transform: translateY(-2px);
-          box-shadow: 0 18px 36px color-mix(in srgb, var(--color-primary) 42%, transparent);
-        }
-
-        .submit-button:disabled {
-          cursor: not-allowed;
-          opacity: 0.78;
-          transform: none;
-        }
-
-        .button-content {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.55rem;
-        }
-
-        .button-spinner {
-          width: 1rem;
-          height: 1rem;
-          border-radius: 999px;
-          border: 2px solid color-mix(in srgb, var(--background) 28%, transparent);
-          border-top-color: color-mix(in srgb, var(--background) 92%, transparent);
-          animation: auth-spin 0.7s linear infinite;
-        }
-
-        @keyframes auth-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .auth-divider {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          margin: 1.1rem 0;
-          color: color-mix(in srgb, var(--card-foreground) 60%, transparent);
-          font-size: 0.8rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-        }
-
-        .auth-divider::before,
-        .auth-divider::after {
-          content: "";
-          flex: 1;
-          height: 1px;
-          background: color-mix(in srgb, var(--border) 90%, transparent);
-        }
-
-        .helper-row {
-          margin-top: 1rem;
-          text-align: center;
-          font-size: 0.92rem;
-          color: color-mix(in srgb, var(--card-foreground) 88%, transparent);
-        }
-
-        .secondary-link-row {
-          margin-top: -0.35rem;
-          margin-bottom: 1rem;
-          text-align: right;
-        }
-
-        .secondary-link {
-          color: var(--auth-accent);
-          font-size: 0.88rem;
-          font-weight: 700;
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
-
-        .link-btn {
-          border: none;
-          background: transparent;
-          color: var(--auth-accent);
-          font: inherit;
-          font-weight: 700;
-          cursor: pointer;
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
-
-        @media (max-width: 640px) {
-          .auth-shell {
-            padding: 4.75rem 0.9rem 1rem;
-          }
-
-          .login-card {
-            padding: 1.5rem 1rem;
-            border-radius: 20px;
-          }
-        }
-      `}</style>
-
-      <main className="auth-shell">
-        <section className="login-card">
-          <div className="login-header">
-            <div className="logo-header">
-              <Image
-                src="/sustain-aquasmart-wordmark.png"
-                alt="SUSTAIN Aquasmart"
-                width={1200}
-                height={131}
-                className="logo-wordmark"
-                priority
-              />
-            </div>
-            <h1>{authMode === "signin" ? "Sign in to your dashboard" : "Create your account"}</h1>
-            {isInviteContinuation ? (
-              <p>
-                If you arrived from an invite, continue with Google using the invited email address, or open
-                the latest invite email to set a password. Either way your assigned role is applied on first
-                sign-in.
-              </p>
-            ) : null}
-          </div>
-
-          <form onSubmit={(event) => void handlePasswordAuth(event)} noValidate>
-            {authMode === "signup" ? (
-              <div className="form-group">
-                <label htmlFor="fullName" className="form-label">
-                  Full name
-                </label>
-                <div className="input-shell">
+              {authMode === "signup" ? (
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="fullName" className="text-sm font-medium text-foreground">
+                    Full name
+                  </label>
                   <input
                     id="fullName"
                     type="text"
-                    className={inputClassName("fullName")}
+                    className={fieldInputClass("fullName")}
                     placeholder="Jane Otieno"
                     autoComplete="name"
                     aria-invalid={Boolean(fieldErrors.fullName)}
@@ -557,24 +223,22 @@ export default function LoginForm() {
                       clearFieldError("fullName")
                     }}
                   />
+                  {fieldErrors.fullName ? (
+                    <p id="fullName-error" className="text-sm text-destructive" role="alert">
+                      {fieldErrors.fullName}
+                    </p>
+                  ) : null}
                 </div>
-                {fieldErrors.fullName ? (
-                  <div id="fullName-error" className="field-error" role="alert">
-                    {fieldErrors.fullName}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+              ) : null}
 
-            <div className="form-group">
-              <label htmlFor="email" className="form-label">
-                Email
-              </label>
-              <div className="input-shell">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="email" className="text-sm font-medium text-foreground">
+                  Email
+                </label>
                 <input
                   id="email"
                   type="email"
-                  className={inputClassName("email")}
+                  className={fieldInputClass("email")}
                   placeholder="name@company.com"
                   autoComplete="email"
                   inputMode="email"
@@ -587,134 +251,165 @@ export default function LoginForm() {
                     clearFieldError("email")
                   }}
                 />
+                {fieldErrors.email ? (
+                  <p id="email-error" className="text-sm text-destructive" role="alert">
+                    {fieldErrors.email}
+                  </p>
+                ) : null}
               </div>
-              {fieldErrors.email ? (
-                <div id="email-error" className="field-error" role="alert">
-                  {fieldErrors.email}
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center">
+                  <label htmlFor="password" className="text-sm font-medium text-foreground">
+                    Password
+                  </label>
+                  {authMode === "signin" ? (
+                    <Link
+                      href="/forgot-password"
+                      className="ml-auto text-sm text-primary underline-offset-4 hover:underline"
+                    >
+                      Forgot password?
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    className={fieldInputClass("password")}
+                    autoComplete="off"
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    aria-describedby={fieldErrors.password ? "password-error" : authMode === "signup" ? "password-hint" : undefined}
+                    value={password}
+                    onBlur={() => handleBlur("password")}
+                    onChange={(event) => {
+                      setPassword(event.target.value)
+                      clearFieldError("password")
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {fieldErrors.password ? (
+                  <p id="password-error" className="text-sm text-destructive" role="alert">
+                    {fieldErrors.password}
+                  </p>
+                ) : authMode === "signup" ? (
+                  <p id="password-hint" className="text-sm text-muted-foreground">
+                    Use at least 8 characters.
+                  </p>
+                ) : null}
+              </div>
+
+              {formError ? (
+                <div
+                  className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                  role="alert"
+                >
+                  {formError}
                 </div>
               ) : null}
-            </div>
 
-            <div className="form-group">
-              <label htmlFor="password" className="form-label">
-                Password
-              </label>
-              <div className="input-shell">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  className={inputClassName("password")}
-                  autoComplete="off"
-                  aria-invalid={Boolean(fieldErrors.password)}
-                  aria-describedby={fieldErrors.password ? "password-error" : authMode === "signup" ? "password-hint" : undefined}
-                  value={password}
-                  onBlur={() => handleBlur("password")}
-                  onChange={(event) => {
-                    setPassword(event.target.value)
-                    clearFieldError("password")
-                  }}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword((current) => !current)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  title={showPassword ? "Hide password" : "Show password"}
+              {formNotice ? (
+                <div
+                  className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground"
+                  role="status"
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {fieldErrors.password ? (
-                <div id="password-error" className="field-error" role="alert">
-                  {fieldErrors.password}
-                </div>
-              ) : authMode === "signup" ? (
-                <div id="password-hint" className="field-hint">
-                  Use at least 8 characters.
+                  {formNotice}
                 </div>
               ) : null}
-            </div>
 
-            {authMode === "signin" ? (
-              <div className="secondary-link-row">
-                <Link href="/forgot-password" className="secondary-link">
-                  Forgot password?
-                </Link>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-70"
+              >
+                {isSubmitting ? (
+                  <span
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {isSubmitting
+                  ? authMode === "signin"
+                    ? "Signing in..."
+                    : "Creating account..."
+                  : authMode === "signin"
+                    ? "Sign In"
+                    : "Create Account"}
+              </button>
+
+              <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or
+                <span className="h-px flex-1 bg-border" />
               </div>
-            ) : null}
 
-            {formError ? (
-              <div className="form-error" role="alert">
-                {formError}
+              <GoogleSignInButton
+                nextPath={isInviteContinuation ? ONBOARDING_PATH : null}
+                label={authMode === "signup" ? "Sign up with Google" : "Continue with Google"}
+                className="flex w-full items-center justify-center gap-2.5 rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent disabled:opacity-70"
+              />
+
+              <div className="text-center text-sm text-muted-foreground">
+                {isInviteContinuation ? (
+                  <span>Need a fresh invite link? Ask your farm admin to resend the invitation.</span>
+                ) : authMode === "signin" ? (
+                  <>
+                    New here?{" "}
+                    <button
+                      type="button"
+                      className="font-medium text-primary underline underline-offset-4"
+                      onClick={() => {
+                        setAuthMode("signup")
+                        setFieldErrors({})
+                        setFormError(null)
+                      }}
+                    >
+                      Create your account
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Already have an account?{" "}
+                    <button
+                      type="button"
+                      className="font-medium text-primary underline underline-offset-4"
+                      onClick={() => {
+                        setAuthMode("signin")
+                        setFieldErrors({})
+                        setFormError(null)
+                      }}
+                    >
+                      Sign in instead
+                    </button>
+                  </>
+                )}
               </div>
-            ) : null}
-
-            {formNotice ? (
-              <div className="form-notice" role="status">
-                {formNotice}
-              </div>
-            ) : null}
-
-            <button type="submit" className="submit-button" disabled={isSubmitting}>
-              <span className="button-content">
-                {isSubmitting ? <span className="button-spinner" aria-hidden="true" /> : null}
-                <span>
-                  {isSubmitting
-                    ? authMode === "signin"
-                      ? "Signing in..."
-                      : "Creating account..."
-                    : authMode === "signin"
-                      ? "Sign In"
-                      : "Create Account"}
-                </span>
-              </span>
-            </button>
-          </form>
-
-          <div className="auth-divider">or</div>
-
-          <GoogleSignInButton
-            nextPath={isInviteContinuation ? ONBOARDING_PATH : null}
-            label={authMode === "signup" ? "Sign up with Google" : "Continue with Google"}
-          />
-
-          <div className="helper-row">
-            {isInviteContinuation ? (
-              <span>Need a fresh invite link? Ask your farm admin to resend the invitation.</span>
-            ) : authMode === "signin" ? (
-              <>
-                New here?{" "}
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => {
-                    setAuthMode("signup")
-                    setFieldErrors({})
-                    setFormError(null)
-                  }}
-                >
-                  Create your account
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => {
-                    setAuthMode("signin")
-                    setFieldErrors({})
-                    setFormError(null)
-                  }}
-                >
-                  Sign in instead
-                </button>
-              </>
-            )}
+            </form>
           </div>
-        </section>
-      </main>
+        </div>
+      </div>
+
+      <div className="relative hidden bg-muted lg:block">
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          autoPlay
+          loop
+          muted
+          playsInline
+          poster="/Multi-region-aquaculture-scaled.webp"
+        >
+          <source src="/login-hero.mp4" type="video/mp4" />
+        </video>
+      </div>
     </div>
   )
 }
