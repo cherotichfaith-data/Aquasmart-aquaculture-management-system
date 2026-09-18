@@ -80,6 +80,85 @@ function formatRelativeTime(iso: string) {
   return formatStableDateTime(iso)
 }
 
+// Human category label for a notification kind, shown in each row's meta line.
+function notificationCategory(kind: string) {
+  if (kind === "water_quality") return "Water quality"
+  if (kind === "mortality") return "Mortality"
+  if (kind === "cage_empty") return "Empty cage"
+  return "Alert"
+}
+
+type NotifIcon = ReturnType<typeof notificationIcon>
+
+// One notification row: tinted icon box, title, description, a "time · category"
+// meta line, an optional dismiss (X) and an unread dot -- the PropXYZ layout.
+function NotificationRow({
+  Icon,
+  tint,
+  title,
+  description,
+  time,
+  category,
+  unread,
+  onClick,
+  onDismiss,
+}: {
+  Icon: NotifIcon
+  tint: string
+  title: string
+  description: string
+  time?: string
+  category: string
+  unread?: boolean
+  onClick?: () => void
+  onDismiss?: () => void
+}) {
+  return (
+    <div className="flex items-start gap-3 border-t border-border/60 px-4 py-3 first:border-t-0">
+      <span className={cn("mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg", tint)}>
+        <Icon size={17} aria-hidden />
+      </span>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!onClick}
+        className="min-w-0 flex-1 text-left disabled:cursor-default"
+      >
+        <span className="block text-sm font-semibold text-foreground">{title}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{description}</span>
+        <span className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          {time ? (
+            <>
+              <span>{time}</span>
+              <span aria-hidden className="inline-block size-1 rounded-full bg-current opacity-50" />
+            </>
+          ) : null}
+          <span>{category}</span>
+        </span>
+      </button>
+      <div className="flex shrink-0 flex-col items-center gap-2 pt-0.5">
+        {onDismiss ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss notification"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X size={15} />
+          </button>
+        ) : (
+          <span className="size-[15px]" aria-hidden />
+        )}
+        {unread ? <span aria-hidden className="size-2 rounded-full bg-primary" /> : null}
+      </div>
+    </div>
+  )
+}
+
+function NotificationEmpty({ text }: { text: string }) {
+  return <p className="px-4 py-10 text-center text-sm text-muted-foreground">{text}</p>
+}
+
 const normalizeBatchDisplayLabel = (label: string | null | undefined) => {
   const trimmed = label?.trim() ?? ""
   if (!trimmed) return ""
@@ -135,28 +214,37 @@ export default function Header({
   const searchParams = useSearchParams()
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const activeFarmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
-  const { notifications, unreadCount, markAllRead, markRead, clearAll, activeAlerts } = useNotifications()
+  const { notifications, markAllRead, markRead, dismiss, activeAlerts } = useNotifications()
   const [signingOut, setSigningOut] = useState(false)
   const [isCondensed, setIsCondensed] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null)
   const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null)
   const [addDataAnchor, setAddDataAnchor] = useState<HTMLElement | null>(null)
+  const [notifTab, setNotifTab] = useState<"alerts" | "recent">("alerts")
 
   const pageMeta = getHeaderPageMeta(appPathname, searchParams.get("tab"))
   const pageTimeConfig = useMemo(() => getHeaderPageTimeConfig(appPathname), [appPathname])
   const resolvedRole = (roleOverride ?? activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const resolvedUser = user ?? null
-  const resolvedUnreadCount = unreadCount ?? 0
-  // Active alerts are standing conditions (empty cage, mortality spiking) that
-  // stay until resolved, so they always count toward the bell badge.
-  const bellBadgeCount = resolvedUnreadCount + activeAlerts.length
   // The persistent "cage empty" condition is now owned by activeAlerts; drop it
   // from the point-in-time history list so it isn't shown twice.
   const historyNotifications = useMemo(
     () => notifications.filter((note) => note.kind !== "cage_empty"),
     [notifications],
   )
+  // Unread count for the discrete event log only. cage_empty rows are excluded
+  // because that condition is already surfaced by activeAlerts (and the
+  // always-on banner) -- counting the raw unreadCount double-counts it and,
+  // since cage_empty rows are hidden from the list below, leaves a phantom the
+  // user can never open to clear, so the badge looks permanently stuck.
+  const historyUnreadCount = useMemo(
+    () => historyNotifications.filter((note) => !note.read).length,
+    [historyNotifications],
+  )
+  // Active alerts are standing conditions (empty cage, mortality spiking) that
+  // stay until resolved, so they always count toward the bell badge.
+  const bellBadgeCount = historyUnreadCount + activeAlerts.length
   const canAccessSettings = resolvedRole === "admin" || resolvedRole === "farm_manager"
   const allowDataEntry = canAccessDataEntry(resolvedRole)
   // Available from every page the shared header renders on, not just the
@@ -476,6 +564,12 @@ export default function Header({
     setAddDataAnchor(null)
   }, [pathname, searchParams])
 
+  // When the bell panel opens, land on whichever tab actually has something.
+  useEffect(() => {
+    if (notificationsAnchor) setNotifTab(activeAlerts.length > 0 ? "alerts" : "recent")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationsAnchor])
+
   const openMenu = (setter: (element: HTMLElement | null) => void) => (event: MouseEvent<HTMLElement>) => {
     setter(event.currentTarget)
   }
@@ -638,98 +732,92 @@ export default function Header({
         </div>
       </div>
 
-      <Menu anchorEl={notificationsAnchor} open={Boolean(notificationsAnchor)} onClose={() => setNotificationsAnchor(null)} className="mt-1 w-[calc(100vw-24px)] sm:w-[340px]">
-        <div className="flex items-center justify-between gap-2 px-4 py-3">
-          <p className="text-sm font-bold">Notifications</p>
-          {resolvedUnreadCount > 0 ? (
-            <button
-              type="button"
-              onClick={markAllRead}
-              className="text-xs font-semibold text-primary hover:underline"
-            >
+      <Menu anchorEl={notificationsAnchor} open={Boolean(notificationsAnchor)} onClose={() => setNotificationsAnchor(null)} className="mt-1 w-[calc(100vw-24px)] p-0 sm:w-[400px]">
+        <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-3.5">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Notifications</p>
+            {bellBadgeCount > 0 ? (
+              <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-bold text-primary">{bellBadgeCount} New</span>
+            ) : null}
+          </div>
+          {historyUnreadCount > 0 ? (
+            <button type="button" onClick={markAllRead} className="text-xs font-semibold text-primary hover:underline">
               Mark all read
             </button>
           ) : null}
         </div>
-        <Separator />
-        <div className="max-h-96 overflow-y-auto py-1">
-          {activeAlerts.length > 0 ? (
-            <>
-              <p className="px-4 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Needs attention · {activeAlerts.length}
-              </p>
-              {activeAlerts.map((alert) => {
-                const AlertIcon = notificationIcon(alert.kind)
-                return (
-                  <button
-                    key={alert.id}
-                    type="button"
-                    onClick={() => {
-                      if (alert.href) router.push(alert.href)
-                      setNotificationsAnchor(null)
-                    }}
-                    className={cn(
-                      "mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                      alert.severity === "critical"
-                        ? "border-destructive/40 bg-destructive/8"
-                        : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]",
-                    )}
-                  >
-                    <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", notificationTint(alert.severity))}>
-                      <AlertIcon size={16} aria-hidden />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold">{alert.title}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">{alert.description}</span>
-                    </span>
-                  </button>
-                )
-              })}
-              {historyNotifications.length > 0 ? (
-                <p className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Recent</p>
-              ) : null}
-            </>
-          ) : null}
-          {activeAlerts.length === 0 && historyNotifications.length === 0 ? (
-            <div className="px-4 py-6">
-              <p className="text-center text-sm text-muted-foreground">No New Notifications</p>
-            </div>
+        <div role="tablist" aria-label="Notifications" className="flex items-center gap-5 border-b border-border px-4">
+          {(
+            [
+              ["alerts", "Alerts"],
+              ["recent", "Recent"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={notifTab === key}
+              onClick={() => setNotifTab(key)}
+              className={cn(
+                "-mb-px border-b-2 pb-2 pt-1 text-sm font-semibold transition-colors",
+                notifTab === key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="max-h-[26rem] overflow-y-auto">
+          {notifTab === "alerts" ? (
+            activeAlerts.length === 0 ? (
+              <NotificationEmpty text="No active alerts — everything is within range." />
+            ) : (
+              activeAlerts.map((alert) => (
+                <NotificationRow
+                  key={alert.id}
+                  Icon={notificationIcon(alert.kind)}
+                  tint={notificationTint(alert.severity)}
+                  title={alert.title}
+                  description={alert.description}
+                  category={notificationCategory(alert.kind)}
+                  unread
+                  onClick={
+                    alert.href
+                      ? () => {
+                          router.push(alert.href!)
+                          setNotificationsAnchor(null)
+                        }
+                      : undefined
+                  }
+                />
+              ))
+            )
+          ) : historyNotifications.length === 0 ? (
+            <NotificationEmpty text="No recent notifications." />
           ) : (
-            historyNotifications.map((note) => {
-              const NoteIcon = notificationIcon(note.kind)
-              return (
-                <button
-                  key={note.id}
-                  type="button"
-                  onClick={() => markRead(note.id)}
-                  className={cn(
-                    "mx-1 my-0.5 flex w-[calc(100%-0.5rem)] items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                    note.read
-                      ? "border-[color-mix(in_srgb,var(--color-border)_50%,transparent)]"
-                      : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_5%,transparent)]",
-                  )}
-                >
-                  <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", notificationTint(note.severity, note.read))}>
-                    <NoteIcon size={16} aria-hidden />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold">{note.title}</span>
-                    <span className="mt-1 block text-xs text-muted-foreground">{note.description}</span>
-                    <span className="mt-2 block text-xs text-muted-foreground">{formatRelativeTime(note.createdAt)}</span>
-                  </span>
-                </button>
-              )
-            })
+            historyNotifications.map((note) => (
+              <NotificationRow
+                key={note.id}
+                Icon={notificationIcon(note.kind)}
+                tint={notificationTint(note.severity, note.read)}
+                title={note.title}
+                description={note.description}
+                time={formatRelativeTime(note.createdAt)}
+                category={notificationCategory(note.kind)}
+                unread={!note.read}
+                onClick={() => {
+                  markRead(note.id)
+                  if (note.href) {
+                    router.push(note.href)
+                    setNotificationsAnchor(null)
+                  }
+                }}
+                onDismiss={() => dismiss(note.id)}
+              />
+            ))
           )}
         </div>
-        {historyNotifications.length > 0 ? (
-          <>
-            <Separator />
-            <MenuItem onClick={clearAll} className="mx-1 justify-center font-bold">
-              Clear recent
-            </MenuItem>
-          </>
-        ) : null}
       </Menu>
 
       <Menu anchorEl={userMenuAnchor} open={Boolean(userMenuAnchor)} onClose={() => setUserMenuAnchor(null)} className="mt-1 w-60">
