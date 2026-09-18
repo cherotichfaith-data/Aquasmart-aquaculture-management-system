@@ -42,8 +42,13 @@ export default function WorkspaceSelector({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { profile, user } = useAuth()
+  const { profile, user, signOut } = useAuth()
   const nextPath = sanitizeNextPath(searchParams.get("next"), "/dashboard")
+
+  const handleBackToAuth = async () => {
+    await signOut()
+    router.push("/auth")
+  }
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>(initialOrganizations)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null)
   const [selectedFarmId, setSelectedFarmId] = useState<string | null>(null)
@@ -230,6 +235,17 @@ export default function WorkspaceSelector({
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,var(--color-accent)_0%,var(--color-background)_54%,color-mix(in_srgb,var(--color-primary)_13%,white)_100%)] px-4 py-6 text-foreground sm:px-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col">
+        <div className="flex items-center justify-start">
+          <button
+            type="button"
+            onClick={() => void handleBackToAuth()}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-primary transition hover:bg-primary/10"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to sign in
+          </button>
+        </div>
+
         <header className="mx-auto mt-8 text-center sm:mt-10">
           <h1 className="font-serif text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
             Hey, {displayName},
