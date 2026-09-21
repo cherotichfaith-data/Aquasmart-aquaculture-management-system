@@ -3,7 +3,7 @@
 import type { MouseEvent, ReactNode } from "react"
 import Link from "next/link"
 import { ArrowDown, ArrowRight, ArrowUp, Clock, TriangleAlert, type LucideIcon } from "lucide-react"
-import { formatNumberValue } from "@/lib/analytics-format"
+import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import type { DashboardSystemRow } from "@/features/dashboard/types"
 
 /**
@@ -62,25 +62,23 @@ export function ArrowBadge({
   )
 }
 
-/** Relative "freshness" text for a metric's latest date. */
+/**
+ * The latest date a metric has data for, e.g. "Sep 15". The year is added
+ * only when it isn't the current year, so recent metrics stay compact while
+ * older data is still unambiguous.
+ */
 export function formatLastDate(value: string | null | undefined): string | null {
   if (!value) return null
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const diffDays = Math.round((today.getTime() - parsed.getTime()) / 86_400_000)
-  if (diffDays <= 0) return "Today"
-  if (diffDays === 1) return "Yesterday"
-  if (diffDays < 60) return `${diffDays} days ago`
-  return value
-}
-
-export function formatSampleAgeText(value: number | null | undefined): string {
-  if (!isFiniteNumber(value)) return "No sample"
-  if (value === 0) return "Today"
-  if (value === 1) return "Yesterday"
-  return `${formatNumberValue(value)}d ago`
+  const includeYear = parsed.getFullYear() !== new Date().getFullYear()
+  return formatDateOnly(
+    value,
+    value,
+    includeYear
+      ? { year: "numeric", month: "short", day: "numeric" }
+      : { month: "short", day: "numeric" },
+  )
 }
 
 export const NoData = () => <span className="text-sm text-muted-foreground">--</span>

@@ -12,7 +12,6 @@ import {
   SeverityValue,
   WaterQualityFlagsCell,
   formatLastDate,
-  formatSampleAgeText,
   isFiniteNumber,
   isMortalityCritical,
 } from "@/features/dashboard/lib/table-cells"
@@ -85,7 +84,11 @@ export function buildDashboardSystemColumns(params: {
             value={value}
             arrow={data.efcr_arrow}
             invertArrow
-            subtext={formatLastDate(data.efcr_latest_date)}
+            // eFCR is only as current as the biomass it's measured against, so
+            // its freshness tracks the last known ABW (latest sampling or
+            // stocking) -- the same date the ABW column shows -- not the daily
+            // production-summary date, which would look misleadingly fresh.
+            subtext={formatLastDate(data.abw_latest_date)}
             align="right"
           />
         )
@@ -107,7 +110,7 @@ export function buildDashboardSystemColumns(params: {
             href={productionHref(data.system_id, "abw")}
             value={value}
             arrow={data.abw_arrow}
-            subtext={formatSampleAgeText(data.sample_age_days)}
+            subtext={formatLastDate(data.abw_latest_date)}
             align="right"
           />
         )
