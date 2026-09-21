@@ -10,8 +10,8 @@ import { useStockedSystemIds } from "@/lib/hooks/use-stocked-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/lib/hooks/app/use-toast"
-import { useRouter } from "next/navigation"
-import { DATA_ENTRY_PATH, toDashboardPath } from "@/lib/app-entry"
+import { usePathname, useRouter } from "next/navigation"
+import { DATA_ENTRY_PATH, isOnboardingRoute, isPublicRoute, toDashboardPath } from "@/lib/app-entry"
 import { formatNumberValue } from "@/lib/analytics-format"
 import type { Tables } from "@/lib/types/database"
 import type { RecommendedActionRow } from "@/lib/types/insights"
@@ -155,6 +155,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const supabase = useMemo(() => createClient(), [])
   const queryClient = useQueryClient()
   const router = useRouter()
+  const pathname = usePathname()
+  // A farm is only "entered" once the user is on an in-farm screen. On the
+  // login/landing and onboarding routes (including the workspace selector)
+  // `useActiveFarm` still resolves a default farm, but the user hasn't picked
+  // one yet -- so farm-scoped pop notifications (e.g. "cage empty") must not
+  // fire there. They fire once the user is actually inside a farm's dashboard.
+  const inFarmWorkspace = Boolean(pathname) && !isPublicRoute(pathname) && !isOnboardingRoute(pathname)
   const { farmId: liveFarmId } = useActiveFarm()
   const { profile, session, user } = useAuth()
   const { toast } = useToast()
@@ -329,7 +336,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const thresholdsLoaded = thresholdsQuery.isSuccess
 
   useEffect(() => {
-    if (!session || !farmId || !systemsLoaded) return
+    if (!session || !farmId || !systemsLoaded || !inFarmWorkspace) return
 
     systemRows.forEach((system) => {
       if (!hasMissingSystemName({ name: system.name })) return
@@ -347,7 +354,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         actionLabel: "Update",
       })
     })
-  }, [addNotification, farmId, session, systemsLoaded, systemRows])
+  }, [addNotification, farmId, inFarmWorkspace, session, systemsLoaded, systemRows])
 
   // The harvest/transfer realtime listener below only catches a cage going
   // empty *after* this page is open and subscribed -- it can't see a cage
@@ -360,7 +367,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     enabled: Boolean(session) && Boolean(farmId),
   })
   useEffect(() => {
-    if (!session || !farmId || !systemsLoaded || !stockedSystemsQuery.isSuccess) return
+    if (!session || !farmId || !systemsLoaded || !stockedSystemsQuery.isSuccess || !inFarmWorkspace) return
 
     systemRows.forEach((system) => {
       if (currentlyStockedIds.has(system.id)) return
@@ -378,7 +385,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         actionLabel: "Restock cage",
       })
     })
-  }, [addNotification, currentlyStockedIds, farmId, session, stockedSystemsQuery.isSuccess, systemMap, systemsLoaded, systemRows])
+  }, [addNotification, currentlyStockedIds, farmId, inFarmWorkspace, session, stockedSystemsQuery.isSuccess, systemMap, systemsLoaded, systemRows])
 
   useEffect(() => {
     setNotifications((prev) =>
