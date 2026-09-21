@@ -10,7 +10,7 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/s
 import type { TimePeriod } from "@/lib/time-period"
 import { toTimePeriodUrlValue } from "@/lib/time-period"
 import { buildDashboardSystemColumns } from "./systems-table-columns"
-import { formatSampleAgeText, isFiniteNumber, WaterQualityFlagsCell } from "@/features/dashboard/lib/table-cells"
+import { formatLastDate, isFiniteNumber, WaterQualityFlagsCell } from "@/features/dashboard/lib/table-cells"
 import { formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
 
@@ -84,9 +84,17 @@ export default function SystemsTable({
     )
   }
 
+  let asOfDate: string | null = null
+  if (stalenessDays != null && stalenessDays > 0) {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - stalenessDays)
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    asOfDate = formatLastDate(iso)
+  }
   const subtitle = [
     "Latest values per system in the selected period",
-    stalenessDays != null && stalenessDays > 0 ? `data as of ${stalenessDays}d ago` : null,
+    asOfDate ? `data as of ${asOfDate}` : null,
   ]
     .filter(Boolean)
     .join(" · ")
@@ -143,7 +151,7 @@ function SystemCardBody({ row }: { row: DashboardSystemRow }) {
         <MobileMetric
           label="ABW"
           value={formatUnitValue(row.abw, 1, "g")}
-          subtext={formatSampleAgeText(row.sample_age_days)}
+          subtext={formatLastDate(row.abw_latest_date)}
         />
         <MobileMetric label="SGR" value={formatPercent(row.sgr, 2, "%/day")} />
         <MobileMetric label="Feed kg" value={formatUnitValue(row.feed_total, 1, "kg")} />
