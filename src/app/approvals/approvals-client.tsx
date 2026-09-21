@@ -4,8 +4,9 @@ import { Fragment, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, CheckCircle2, Loader2, Pencil, X, XCircle } from "lucide-react"
 import { approvalTypes, type ApprovalEntry, type ApprovalType } from "@/lib/approvals"
-import { useSystemOptions } from "@/lib/hooks/use-options"
+import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { formatCageLabel } from "@/lib/system-options"
+import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
 
 type ApprovalStatus = ApprovalEntry["status"]
 type Counts = Record<ApprovalStatus, number>
@@ -14,6 +15,13 @@ type NamedOption = { id: number; name: string }
 type Member = { id: string; name: string }
 type Payload = Record<string, unknown>
 type Column = { header: string; cell: (payload: Payload) => string; align?: "right" }
+
+// Entry types whose batch follows the cage rather than being chosen directly.
+// The data-entry forms never let you pick a batch for these -- they derive it
+// from the (origin) cage -- so the approvals editor re-derives it too when the
+// reviewer corrects the cage. Stocking is excluded: there the batch is the
+// operator's explicit selection and stays editable.
+const derivedBatchTypes = new Set<ApprovalType>(["feeding", "mortality", "sampling", "harvest", "transfer"])
 
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 const control = "rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
@@ -94,6 +102,28 @@ export default function ApprovalsClient({
     }
     return extra.length ? [...activeSystems, ...extra] : activeSystems
   }, [activeSystems, systems, draft])
+
+  // Cage->batch linkage, sourced the same way the data-entry forms are. Used to
+  // keep batch_id in step with the cage when a reviewer edits a submission.
+  const batchOptionsQuery = useBatchOptions({ farmId })
+  const linkedBatches = useMemo<BatchOptionItem[]>(
+    () => batchOptionsQuery.data?.data ?? [],
+    [batchOptionsQuery.data],
+  )
+
+  // Wrap the editor's onChange so that whenever the cage changes on a
+  // derived-batch entry, batch_id is re-resolved from the new cage (matching
+  // the forms, which never expose a batch picker for these types).
+  function changeDraft(entryType: ApprovalType, next: Payload) {
+    if (derivedBatchTypes.has(entryType)) {
+      const cageKey = entryType === "transfer" ? "origin_system_id" : "system_id"
+      if (String(next[cageKey] ?? "") !== String(draft[cageKey] ?? "")) {
+        const systemId = Number(next[cageKey])
+        next = { ...next, batch_id: resolveBatchIdForSystem(linkedBatches, Number.isFinite(systemId) ? systemId : null) }
+      }
+    }
+    setDraft(next)
+  }
 
   const names = useMemo(() => {
     const sys = new Map(systems.map((row) => [row.id, row.name]))
@@ -468,7 +498,7 @@ export default function ApprovalsClient({
                             <tr>
                               <td colSpan={span} className="bg-muted/25">
                                 <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void saveEdit() }}>
-                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={setDraft} disabled={savingEdit} systems={editorSystems} batches={batches} feeds={feedTypes} />
+                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={(next) => changeDraft(entry.entry_type, next)} disabled={savingEdit} systems={editorSystems} batches={batches} feeds={feedTypes} />
                                   <div className="flex gap-2">
                                     <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit}>
                                       {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {entry.status === "rejected" ? "Submit correction for approval" : "Save changes"}
