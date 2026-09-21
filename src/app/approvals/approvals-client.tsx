@@ -75,6 +75,26 @@ export default function ApprovalsClient({
     [systemOptionsQuery.data],
   )
 
+  // Active cages are the only ones offered for a *new* pick, but the entry
+  // being edited may sit on a retired/inactive cage that the active-only list
+  // omits. Without its option the dropdown renders blank on a required field,
+  // so inject any cage the draft already references (resolved from the full
+  // system list) as a labelled fallback.
+  const editorSystems = useMemo<NamedOption[]>(() => {
+    const present = new Set(activeSystems.map((system) => system.id))
+    const namesById = new Map(systems.map((row) => [row.id, row.name]))
+    const extra: NamedOption[] = []
+    for (const key of ["system_id", "origin_system_id", "target_system_id"] as const) {
+      const raw = draft[key]
+      if (raw == null || raw === "") continue
+      const id = Number(raw)
+      if (!Number.isFinite(id) || present.has(id)) continue
+      present.add(id)
+      extra.push({ id, name: `${namesById.get(id) ?? `Cage #${id}`} (inactive)` })
+    }
+    return extra.length ? [...activeSystems, ...extra] : activeSystems
+  }, [activeSystems, systems, draft])
+
   const names = useMemo(() => {
     const sys = new Map(systems.map((row) => [row.id, row.name]))
     const batch = new Map(batches.map((row) => [row.id, row.name]))
@@ -448,7 +468,7 @@ export default function ApprovalsClient({
                             <tr>
                               <td colSpan={span} className="bg-muted/25">
                                 <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void saveEdit() }}>
-                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={setDraft} disabled={savingEdit} systems={activeSystems} batches={batches} feeds={feedTypes} />
+                                  <EntryEditor type={entry.entry_type} draft={draft} onChange={setDraft} disabled={savingEdit} systems={editorSystems} batches={batches} feeds={feedTypes} />
                                   <div className="flex gap-2">
                                     <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-45" disabled={savingEdit}>
                                       {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {entry.status === "rejected" ? "Submit correction for approval" : "Save changes"}

@@ -46,7 +46,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams?: P
 
         <DataEntryNavigation active="approvals" farmId={farmId} role={role} systemId={Number(params.system) || null} batchId={Number(params.batch) || null} />
 
-        <div className="data-entry-workspace">
+        <div className="data-entry-workspace-solo">
           <section className="data-entry-canvas min-w-0" aria-label="Approvals">
             <ApprovalsClient
               farmId={farmId}
