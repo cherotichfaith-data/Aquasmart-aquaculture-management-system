@@ -1,0 +1,91 @@
+/* Monthly reports: the daily planner's table design (planner-card / plan-table / purple pills), scoped so it cannot leak. */
+
+.tb-monthly {
+  --line: #e6ddd0;
+  --ink: #232a25;
+  --muted: #6f746f;
+  --forest: var(--sidebar, #0f4c81);
+  --forest-deep: var(--sidebar, #0f4c81);
+  --sand: #f5ead3;
+  --amber: #b98939;
+  --red: #c4604e;
+  --green: var(--sidebar, #0f4c81);
+  display: grid;
+  gap: 16px;
+  font-family: inherit;
+  color: var(--ink);
+}
+.tb-monthly h2,
+.tb-monthly h3 { margin: 0; font-family: var(--font-heading); }
+.tb-monthly * { box-sizing: border-box; }
+
+.tb-monthly .planner-card {
+  background: rgba(255, 253, 249, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 28px;
+  box-shadow: 0 22px 34px rgba(35, 42, 37, 0.08);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.tb-monthly .planner-card > * { min-width: 0; }
+.tb-monthly .section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.tb-monthly .eyebrow {
+  margin: 0 0 8px; color: var(--forest); text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.72rem; font-weight: 700;
+}
+.tb-monthly .section-head h2 { font-size: clamp(1.4rem, 2.2vw, 1.9rem); line-height: 1.15; }
+.tb-monthly .planner-note { color: var(--muted); line-height: 1.6; margin: 0; }
+.tb-monthly .btn {
+  font: inherit; font-weight: 600; font-size: 0.9rem; border-radius: 999px; padding: 10px 18px; cursor: pointer; border: 0; white-space: nowrap;
+  text-decoration: none; display: inline-block;
+}
+.tb-monthly .btn--primary { background: var(--forest-deep); color: #fff; box-shadow: 0 10px 18px rgba(15, 76, 129, 0.28); }
+
+.tb-monthly .rpt-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.tb-monthly .rpt-pill {
+  border: 1px solid var(--line); background: #fffdf9; border-radius: 999px; padding: 7px 12px;
+  font: inherit; font-weight: 600; font-size: 0.8rem; color: var(--ink); cursor: pointer;
+}
+.tb-monthly .rpt-pill.is-active { background: var(--forest-deep); color: #fff; border-color: var(--forest-deep); }
+.tb-monthly .rpt-question { margin: 0; font-weight: 600; color: var(--forest-deep); font-size: 1.05rem; }
+.tb-monthly .rpt-kpis { display: flex; flex-wrap: wrap; gap: 10px; }
+.tb-monthly .rpt-kpi { background: var(--sidebar, #0f4c81); color: #fff; border-radius: 6px; padding: 8px 14px; min-width: 150px; }
+.tb-monthly .rpt-kpi b { display: block; font-size: 1.05rem; }
+.tb-monthly .rpt-kpi span { font-size: 0.72rem; opacity: 0.85; }
+.tb-monthly .rpt-note {
+  background: var(--sand); border-left: 4px solid var(--amber); border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; line-height: 1.5; margin: 0;
+}
+.tb-monthly .rpt-small { color: var(--muted); font-size: 0.74rem; line-height: 1.5; margin: 0; }
+.tb-monthly .rpt-heading { font-weight: 800; font-size: 1rem; margin: 6px 0 -4px; }
+
+.tb-monthly .plan-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.tb-monthly .plan-table { border-collapse: collapse; font-size: 0.78rem; width: 100%; }
+.tb-monthly .plan-table th,
+.tb-monthly .plan-table td { border: 1px solid #9aa5a0; padding: 4px 6px; text-align: left; vertical-align: top; background: transparent; }
+.tb-monthly .plan-table th { background: #dce6f1; font-weight: 700; font-size: 0.72rem; text-align: center; vertical-align: middle; }
+.tb-monthly .plan-table th:first-child { background: #fff; position: sticky; left: 0; z-index: 2; }
+.tb-monthly .plan-table td:first-child { position: sticky; left: 0; background: #fffdf9; box-shadow: 2px 0 4px rgba(35, 42, 37, 0.12); font-weight: 700; }
+.tb-monthly .plan-table td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.tb-monthly .plan-table tbody tr:nth-child(even) td:not(:first-child) { background: #f4f7fa; }
+.tb-monthly .plan-table tr.rpt-total td { background: #dce6f1 !important; font-weight: 800; }
+.tb-monthly .plan-table td.rpt-flag { color: var(--red); font-weight: 700; }
+.tb-monthly .plan-table td.rpt-ok { color: var(--green); font-weight: 700; }
+@media (max-width: 640px) { .tb-monthly .section-head { flex-direction: column; } }
+
+.tb-monthly .rpt-filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.tb-monthly .rpt-filter-report { width: 100%; }
+@media (min-width: 640px) { .tb-monthly .rpt-filter-report { width: 340px; } }
+
+.tb-monthly .rpt-titlebar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.tb-monthly .rpt-titlebar h2 { font-size: clamp(1.4rem, 2.2vw, 1.9rem); line-height: 1.15; color: var(--ink); }
+
+.tb-monthly .rpt-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tb-monthly .rpt-actions button { height: 40px; border-radius: 999px; }
+.tb-monthly .btn { height: 40px; display: inline-flex; align-items: center; }
+
+.tb-monthly .rpt-chart { margin: 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px 6px; background: #fffdf9; }
+.tb-monthly .rpt-chart__title { font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; }
+.tb-monthly .rpt-chart__legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+.tb-monthly .rpt-chart__legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.tb-monthly .rpt-chart__svg { width: 100%; height: auto; display: block; font-family: inherit; }

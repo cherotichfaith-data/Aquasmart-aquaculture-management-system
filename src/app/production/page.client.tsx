@@ -18,6 +18,7 @@ import { buildProductionTableColumns } from "@/features/production/components/pr
 import { buildProductionDailyMetricRows, buildProductionMetricRows } from "@/features/production/lib/production-page"
 import { buildProductionPeriodViewRows } from "@/features/production/period-view"
 import type { ProductionPageInitialData, ProductionPageFilters } from "@/features/production/queries.server"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { formatCustomRangeLabel, parseCustomPeriodUrlValue, TIME_PERIOD_LABELS, type TimePeriod } from "@/lib/time-period"
 import { downloadCsv } from "@/lib/utils/report-export"
@@ -73,6 +74,7 @@ function ProductionPeriodFilter({
         onCustomRangeChange={handleCustomRangeChange}
         variant="compact"
         periods={PRODUCTION_DATE_TYPES}
+        customLabels={{ "all history": "Cycle to date" }}
       />
     </div>
   )
@@ -84,12 +86,14 @@ export default function ProductionPageClient({
   initialFarmRole,
   initialFilters,
   initialData,
+  initialBatchOptions,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
   initialFarmRole?: string | null
   initialFilters: ProductionPageFilters
   initialData: ProductionPageInitialData
+  initialBatchOptions?: BatchOptionItem[]
 }) {
   const searchParams = useSearchParams()
   // Filter changes (period/system/metric/compare) all write to the URL and
@@ -279,7 +283,9 @@ export default function ProductionPageClient({
     if (!initialData.bounds.start || !initialData.bounds.end) return null
     const rangeLabel = initialFilters.customTimeRange
       ? formatCustomRangeLabel(initialFilters.customTimeRange)
-      : TIME_PERIOD_LABELS[initialFilters.timePeriod]
+      : initialFilters.timePeriod === "all history"
+        ? "Cycle to date"
+        : TIME_PERIOD_LABELS[initialFilters.timePeriod]
     if (scopeMode === "batch") {
       return `${rangeLabel} · ${initialData.batchName ?? "All batches"}`
     }
@@ -353,6 +359,8 @@ export default function ProductionPageClient({
             <div className="flex flex-wrap items-end gap-2">
               <ProductionScopeFilter
                 initialFarmId={initialFarmId}
+                fallbackBatches={initialBatchOptions}
+                fallbackSystems={initialData.systems.status === "success" ? initialData.systems.data : undefined}
                 startTransition={startTransition}
               />
               <div className="w-[200px] shrink-0 md:w-[210px]">

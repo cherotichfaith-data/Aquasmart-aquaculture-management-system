@@ -224,12 +224,16 @@ export function parseProductionPageFilters(
   const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
   const dateRaw = searchParams?.date
+  const hasScope =
+    (typeof selectedBatchRaw === "string" && selectedBatchRaw !== "all") ||
+    (typeof selectedSystemRaw === "string" && selectedSystemRaw !== "all")
 
   return {
     selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",
     selectedSystem: typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all",
     selectedStage: normalizeStageFilter(selectedStageRaw),
-    timePeriod: resolveTimePeriod(dateRaw, DEFAULT_TIME_PERIOD),
+    // A single batch or cage defaults to its whole cycle ("Cycle to date"); the farm-wide view stays on a month.
+    timePeriod: resolveTimePeriod(dateRaw, hasScope ? "all history" : DEFAULT_TIME_PERIOD),
     customTimeRange: parseCustomPeriodUrlValue(dateRaw),
   }
 }
@@ -319,6 +323,7 @@ async function loadProductionPageInitialData(
     dateFrom,
     dateTo,
     limit: 2500,
+    skipCohortClamp: batchId != null && resolvedSystemId == null,
   })).filter((row) => {
     if (scopedSystemIds.length === 0) return false
     if (row.system_id == null || !scopedSystemIds.includes(row.system_id)) return false
@@ -348,7 +353,9 @@ async function loadProductionPageInitialData(
           dateTo,
         }),
     resolvedSystemId == null
-      ? Promise.resolve<ProductionChartMarker[]>([])
+      ? batchId != null
+        ? listBatchChartMarkersServer(supabase, { batchId, dateFrom, dateTo })
+        : Promise.resolve<ProductionChartMarker[]>([])
       : listProductionChartMarkersServer(supabase, {
           farmId: params.farmId,
           systemId: resolvedSystemId,
@@ -456,6 +463,116 @@ async function listProductionChartMarkersServer(
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+/**
+ * Chart events for a whole batch: its stockings, transfers and harvests across every cage it has used.
+ * Read straight from the event tables by batch id, so (unlike the farm-wide activity feed used for a single
+ * cage) a long history is never cut off by a row limit.
+ */
+async function listBatchChartMarkersServer(
+  supabase: ReturnType<typeof createAccessTokenClient>,
+  params: { batchId: number; dateFrom: string; dateTo: string },
+): Promise<ProductionChartMarker[]> {
+  const range = <T extends { gte: (c: string, v: string) => T; lte: (c: string, v: string) => T }>(query: T) =>
+    query.gte("date", params.dateFrom).lte("date", params.dateTo)
+
+  const [stocking, transfers, harvests] = await Promise.all([
+    withTimeout(
+      (async () => {
+        const { data } = await range(
+          supabase.from("fish_stocking").select("date, notes, number_of_fish_stocking, system_id").eq("batch_id", params.batchId),
+        )
+        return data ?? []
+      })(),
+      4000,
+      [],
+    ),
+    withTimeout(
+      (async () => {
+        const { data } = await range(
+          supabase
+            .from("fish_transfer")
+            .select("date, notes, number_of_fish_transfer, transfer_type, origin_system_id, target_system_id")
+            .eq("batch_id", params.batchId),
+        )
+        return data ?? []
+      })(),
+      4000,
+      [],
+    ),
+    withTimeout(
+      (async () => {
+        const { data } = await range(
+          supabase.from("fish_harvest").select("date, number_of_fish_harvest, system_id").eq("batch_id", params.batchId),
+        )
+        return data ?? []
+      })(),
+      4000,
+      [],
+    ),
+  ])
+
+  const systemIds = Array.from(
+    new Set(
+      [
+        ...stocking.map((row) => row.system_id),
+        ...transfers.flatMap((row) => [row.origin_system_id, row.target_system_id]),
+        ...harvests.map((row) => row.system_id),
+      ].filter((id): id is number => typeof id === "number"),
+    ),
+  )
+  const nameById = new Map<number, string>()
+  if (systemIds.length > 0) {
+    const { data } = await supabase.from("system").select("id, name").in("id", systemIds)
+    for (const row of (data ?? []) as Array<{ id: number; name: string | null }>) nameById.set(row.id, row.name ?? `Cage ${row.id}`)
+  }
+  const cage = (id: number | null | undefined) => (id != null ? nameById.get(id) ?? `Cage ${id}` : "outside")
+  const fish = (value: number | null | undefined) => (typeof value === "number" ? ` ${value.toLocaleString("en-US")} fish` : "")
+
+  const markers: ProductionChartMarker[] = [
+    ...stocking.map((row) => ({
+      date: String(row.date).slice(0, 10),
+      type: "stocking" as const,
+      label: `Stocking in ${cage(row.system_id)}${fish(row.number_of_fish_stocking) ? ` -${fish(row.number_of_fish_stocking)}` : ""}`,
+      notes: row.notes ?? null,
+    })),
+    ...transfers.map((row) => ({
+      date: String(row.date).slice(0, 10),
+      type: "transfer" as const,
+      label: `${row.transfer_type === "grading" ? "Grading" : "Transfer"} ${cage(row.origin_system_id)} to ${cage(row.target_system_id)}${
+        fish(row.number_of_fish_transfer) ? ` -${fish(row.number_of_fish_transfer)}` : ""
+      }`,
+      notes: row.notes ?? null,
+    })),
+    ...harvests.map((row) => ({
+      date: String(row.date).slice(0, 10),
+      type: "harvest" as const,
+      label: `Harvest in ${cage(row.system_id)}${fish(row.number_of_fish_harvest) ? ` -${fish(row.number_of_fish_harvest)}` : ""}`,
+      notes: null,
+    })),
+  ]
+  return markers.sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/**
+ * Biomass gained in a period once fish moved in or out of the cage are accounted for.
+ *
+ * The summary's raw `biomass_increase_over_period` is just closing biomass minus opening biomass, so a
+ * period in which fish were harvested or transferred out reads as a loss (e.g. -178 kg on a day 206 kg was
+ * harvested). Its `efcr_period` is already computed against the movement-adjusted gain, so that gain is
+ * feed / eFCR whenever an eFCR exists. A cage's first boundary in a cycle (eFCR 0) has no prior period and
+ * contributes nothing. Any other row falls back to the raw figure.
+ */
+function movementAdjustedBiomassIncrease(row: {
+  biomass_increase_over_period: number | null
+  feed_over_period: number | null
+  efcr_period: number | null
+}) {
+  const { efcr_period: efcr, feed_over_period: feed, biomass_increase_over_period: raw } = row
+  if (efcr === 0) return 0
+  if (typeof efcr === "number" && efcr > 0 && typeof feed === "number" && feed > 0) return feed / efcr
+  return raw
+}
+
 async function listProductionSummaryRowsDirectServer(
   supabase: ReturnType<typeof createAccessTokenClient>,
   params: {
@@ -465,6 +582,12 @@ async function listProductionSummaryRowsDirectServer(
     dateFrom: string
     dateTo: string
     limit?: number
+    /**
+     * Batch views keep a batch's whole history, including cages it has since left (which now hold other
+     * batches). Their rows are kept or dropped by the batch's own cycle ids later, so the per-cage
+     * "current occupant" cutoff must not apply.
+     */
+    skipCohortClamp?: boolean
   },
 ): Promise<ProductionSummaryRpcRow[]> {
   if (params.systemIds.length === 0) return []
@@ -610,6 +733,7 @@ async function listProductionSummaryRowsDirectServer(
   let rows: ProductionSummaryRpcRow[] = ((summaryResult.data ?? []) as unknown as AnalyticsProductionSummaryRow[])
     .filter((row) => {
       if (typeof row.system_id !== "number" || !allowedSystemIds.has(row.system_id)) return false
+      if (params.skipCohortClamp) return true
       const cohortStart = cohortStartBySystem.get(row.system_id)
       return !(cohortStart && typeof row.date === "string" && row.date < cohortStart)
     })
@@ -649,7 +773,7 @@ async function listProductionSummaryRowsDirectServer(
         number_of_fish_transfer_out: row.transfers_out_over_period,
         number_of_fish_harvested: row.harvest_fish_over_period,
         total_weight_harvested: row.harvest_weight_kg_over_period,
-        biomass_increase_period: row.biomass_increase_over_period,
+        biomass_increase_period: movementAdjustedBiomassIncrease(row),
         feeding_rate_on_date: dailyFact?.feeding_rate ?? null,
         efcr_period: row.efcr_period,
         sgr: row.sgr,

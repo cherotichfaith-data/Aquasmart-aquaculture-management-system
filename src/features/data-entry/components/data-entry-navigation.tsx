@@ -10,7 +10,7 @@ export const entryNavigationItems = [
   ["harvest", "Harvest"], ["stocking", "Stocking"], ["system", "System Setup"],
 ] as const
 
-export function DataEntryNavigation({ active, farmId, role, systemId, batchId }: {
+export function DataEntryNavigation({ active, role, systemId, batchId }: {
   active: string; farmId: string | null; role?: string | null; systemId?: number | null; batchId?: number | null
 }) {
   const router = useRouter()
@@ -19,7 +19,6 @@ export function DataEntryNavigation({ active, farmId, role, systemId, batchId }:
   const items = [...entryNavigationItems.filter(([id]) => id !== "feed_inventory" || reviewer || role === "system_operator"), ["approvals", reviewer ? "Approvals" : "My submissions"]]
   function href(id: string) {
     const params = new URLSearchParams()
-    if (farmId) params.set("farmId", farmId)
     if (systemId) params.set("system", String(systemId))
     if (batchId) params.set("batch", String(batchId))
     if (id !== "approvals") params.set("type", id)

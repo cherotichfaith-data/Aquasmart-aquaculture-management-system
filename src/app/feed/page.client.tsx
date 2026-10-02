@@ -20,10 +20,12 @@ import type { FeedDashboardFilters } from "@/features/feed/types"
 export default function FeedPageClient({
   initialFarmId,
   initialFarmName,
+  initialFarmRole,
   initialFilters,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
+  initialFarmRole?: string | null
   initialFilters?: FeedDashboardFilters
 }) {
   const router = useRouter()
@@ -96,7 +98,9 @@ export default function FeedPageClient({
     selectedBatch,
     selectedSystem,
     activeOnly: false,
-    enabled: boundsReady,
+    // Cage and batch scope do not depend on the date window, so load them alongside the
+    // bounds query instead of after it. Waiting on `boundsReady` added a full extra round
+    // trip before the dashboard call could start.
   })
 
   useEffect(() => {
@@ -183,7 +187,7 @@ export default function FeedPageClient({
     errorMessages.length === 0
 
   return (
-    <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName}>
+    <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName} headerDataOverrides={{ role: initialFarmRole ?? null }}>
       <div className="space-y-6">
         {errorMessages.length > 0 ? (
           <DataErrorState

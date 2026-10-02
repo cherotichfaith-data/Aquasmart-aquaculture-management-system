@@ -1,143 +1,73 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
+import { useCallback } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import FeedingReport from "@/features/reports/components/feeding-report"
-import PerformanceReport from "@/features/reports/components/performance-report"
-import MortalityReport from "@/features/reports/components/mortality-report"
-import GrowthReport from "@/features/reports/components/growth-report"
-import WaterQualityComplianceReport from "@/features/reports/components/water-quality-compliance-report"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/app-ui/tabs"
+import TimePeriodSelector from "@/components/shared/time-period-selector"
+import MonthlyReports from "@/features/reports/components/monthly-report-pack"
 import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
+import {
+  formatCustomRangeLabel,
+  parseCustomPeriodUrlValue,
+  toCustomPeriodUrlValue,
+  type CustomTimeRange,
+} from "@/lib/time-period"
 
 export default function ReportsPage({
   initialFarmId,
   initialFarmName,
+  initialFarmRole,
   initialFilters,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
+  initialFarmRole?: string | null
   initialFilters?: Partial<SharedFiltersState>
 }) {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const tabParam = searchParams.get("tab")
-  const normalizedTab = tabParam?.toLowerCase() ?? null
-  const allowedTabs = new Set(["performance", "feeding", "mortality", "growth", "water-quality"])
-  const activeTab = normalizedTab && allowedTabs.has(normalizedTab) ? normalizedTab : "performance"
-  const {
-    farm,
-    farmId,
-    selectedBatch,
-    selectedSystem,
-    selectedStage,
-    dateFrom: boundsStart,
-    dateTo: boundsEnd,
-    boundsQuery,
-  } = useAnalyticsPageBootstrap({
+  const { farm, dateFrom, dateTo, timePeriod } = useAnalyticsPageBootstrap({
     initialFarmId,
     initialFarmName,
     initialFilters,
+    useSystemBounds: false,
     boundsScope: "production",
   })
-  const dateFrom = boundsStart ?? ""
-  const dateTo = boundsEnd ?? ""
-  const dateRange = { from: dateFrom, to: dateTo, days: boundsQuery.data.resolvedDays }
+  const customRange = parseCustomPeriodUrlValue(searchParams.get("date"))
 
-  const selectedSystemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
-  const selectedBatchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
+  const handleCustomRangeChange = useCallback(
+    (range: CustomTimeRange) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("date", toCustomPeriodUrlValue(range))
+      router.replace(`${pathname}?${params.toString()}`)
+    },
+    [pathname, router, searchParams],
+  )
 
   return (
-    <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName}>
-      <div className="page-shell">
-        <Tabs value={activeTab} className="w-full">
-          <div className="rounded-3xl bg-muted/20 p-1.5">
-            <TabsList className="grid w-full grid-cols-1 gap-1 !border-0 bg-transparent p-0 !shadow-none backdrop-blur-0 sm:grid-cols-2 xl:grid-cols-5">
-              <TabsTrigger
-                value="performance"
-                className="min-h-11 px-4 text-center leading-5 whitespace-normal !border-0 !shadow-none [aria-selected=true]:bg-card [aria-selected=true]:text-foreground [aria-selected=true]:!shadow-none"
-              >
-                Performance
-              </TabsTrigger>
-              <TabsTrigger
-                value="feeding"
-                className="min-h-11 px-4 text-center leading-5 whitespace-normal !border-0 !shadow-none [aria-selected=true]:bg-card [aria-selected=true]:text-foreground [aria-selected=true]:!shadow-none"
-              >
-                Feeding
-              </TabsTrigger>
-              <TabsTrigger
-                value="mortality"
-                className="min-h-11 px-4 text-center leading-5 whitespace-normal !border-0 !shadow-none [aria-selected=true]:bg-card [aria-selected=true]:text-foreground [aria-selected=true]:!shadow-none"
-              >
-                Mortality
-              </TabsTrigger>
-              <TabsTrigger
-                value="growth"
-                className="min-h-11 px-4 text-center leading-5 whitespace-normal !border-0 !shadow-none [aria-selected=true]:bg-card [aria-selected=true]:text-foreground [aria-selected=true]:!shadow-none"
-              >
-                Growth
-              </TabsTrigger>
-              <TabsTrigger
-                value="water-quality"
-                className="min-h-11 px-4 text-center leading-5 whitespace-normal !border-0 !shadow-none [aria-selected=true]:bg-card [aria-selected=true]:text-foreground [aria-selected=true]:!shadow-none"
-              >
-                Water Quality
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="performance" className="mt-5">
-            <PerformanceReport
-              farmId={farmId}
-              dateRange={dateRange}
-              systemId={selectedSystemId}
-              stage={selectedStage}
-              farmName={farm?.name ?? null}
-            />
-          </TabsContent>
-
-          <TabsContent value="feeding" className="mt-5">
-            <FeedingReport
-              farmId={farmId}
-              dateRange={dateRange}
-              systemId={selectedSystemId}
-              batchId={selectedBatchId}
-              farmName={farm?.name ?? null}
-            />
-          </TabsContent>
-
-          <TabsContent value="mortality" className="mt-5">
-            <MortalityReport
-              farmId={farmId}
-              dateRange={dateRange}
-              systemId={selectedSystemId}
-              batchId={selectedBatchId}
-              farmName={farm?.name ?? null}
-            />
-          </TabsContent>
-
-          <TabsContent value="growth" className="mt-5">
-            <GrowthReport
-              farmId={farmId}
-              dateRange={dateRange}
-              systemId={selectedSystemId}
-              stage={selectedStage}
-              farmName={farm?.name ?? null}
-            />
-          </TabsContent>
-
-          <TabsContent value="water-quality" className="mt-5">
-            <WaterQualityComplianceReport
-              farmId={farmId}
-              dateRange={dateRange}
-              systemId={selectedSystemId}
-              farmName={farm?.name ?? null}
-            />
-          </TabsContent>
-        </Tabs>
+    <DashboardLayout initialFarmId={initialFarmId} initialFarmName={initialFarmName} headerDataOverrides={{ role: initialFarmRole ?? null }}>
+      <div className="page-shell !space-y-3 md:-mt-2">
+        <MonthlyReports
+          farmName={farm?.name ?? initialFarmName ?? null}
+          dateFrom={dateFrom ?? null}
+          dateTo={dateTo ?? null}
+          filterSlot={
+            <div className="w-full sm:w-[240px]">
+              <TimePeriodSelector
+                calendarOnly
+                selectedPeriod={timePeriod}
+                onPeriodChange={() => {}}
+                customRange={customRange}
+                onCustomRangeChange={handleCustomRangeChange}
+                calendarLabel={dateFrom && dateTo ? formatCustomRangeLabel({ start: dateFrom, end: dateTo }) : undefined}
+                variant="compact"
+              />
+            </div>
+          }
+        />
       </div>
     </DashboardLayout>
   )
 }
-
-

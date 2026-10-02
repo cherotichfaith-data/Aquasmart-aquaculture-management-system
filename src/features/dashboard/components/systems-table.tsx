@@ -48,7 +48,6 @@ export default function SystemsTable({
   stage,
   batch = "all",
   timePeriod = "2 weeks",
-  farmId,
   showHeader = true,
   stalenessDays,
 }: SystemsTableProps) {
@@ -66,7 +65,6 @@ export default function SystemsTable({
   const openProductionPage = (systemId: number) => {
     const params = new URLSearchParams()
     params.set("system", String(systemId))
-    if (farmId) params.set("farmId", farmId)
     if (batch && batch !== "all") params.set("batch", batch)
     if (stage && stage !== "all") params.set("stage", stage)
     if (timePeriod) params.set("date", toTimePeriodUrlValue(timePeriod))
