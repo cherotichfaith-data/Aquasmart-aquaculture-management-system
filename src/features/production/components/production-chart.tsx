@@ -11,7 +11,7 @@ import {
   readCssVar,
   withAlpha,
 } from "@/components/charts/chartjs-theme"
-import { chartEventMarkersPlugin, type ChartEventMarker } from "@/components/charts/chart-event-markers-plugin"
+import { chartEventMarkersPlugin, eventLabelTopPadding, type ChartEventMarker } from "@/components/charts/chart-event-markers-plugin"
 import { Card, CardContent, CardHeader } from "@/components/app-ui/card"
 import { DataErrorState, EmptyState } from "@/components/shared/data-states"
 import { useIsDesktop } from "@/lib/hooks/use-is-desktop"
@@ -223,6 +223,14 @@ export default function ProductionChart({
     })
     return {
       ...base,
+      // Room above the plot for the event labels (only when there are events).
+      layout: {
+        ...base.layout,
+        padding: {
+          ...(typeof base.layout?.padding === "object" ? base.layout.padding : {}),
+          top: eventMarkers.length > 0 ? eventLabelTopPadding() : 8,
+        },
+      },
       plugins: {
         ...base.plugins,
         chartEventMarkers: {

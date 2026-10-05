@@ -70,9 +70,9 @@ export function EntryDraft({ farmId, kind, savedResult }: { farmId: string | nul
   </>
 }
 
-export function ExistingEntryNotice({ message, farmId }: { message?: string | null; farmId: string | null }) {
+export function ExistingEntryNotice({ message }: { message?: string | null; farmId: string | null }) {
   if (!message) return null
   return <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm" role="status">
-    <p>{message}</p><a className="mt-1 inline-block underline" href={`/approvals?farmId=${encodeURIComponent(farmId ?? "")}`}>View submissions and review status</a>
+    <p>{message}</p><a className="mt-1 inline-block underline" href="/approvals">View submissions and review status</a>
   </div>
 }

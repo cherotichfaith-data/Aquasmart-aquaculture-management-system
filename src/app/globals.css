@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap");
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -71,14 +71,15 @@ next-router-prefetch {
   --primary: var(--color-primary);
   --sidebar: var(--color-secondary);
   --font-mono: "IBM Plex Mono", monospace;
-  --font-sans: "DM Sans", sans-serif;
+  --font-sans: var(--font-plex), "IBM Plex Sans", sans-serif;
+  --font-heading: var(--font-manrope), "Manrope", sans-serif;
   /* The type scale itself lives in the @theme block below as --text-micro/
      -tag/-dense plus Tailwind's own xs/sm/base/lg/xl/2xl/3xl/7xl steps --
      components should reach for those utilities rather than one-off
      text-[…] values. */
   --secondary: var(--color-secondary);
   --background: var(--color-background);
-  --font-serif: "Lora", serif;
+  --font-serif: var(--font-heading);
   --foreground: var(--color-foreground);
   --destructive: var(--color-destructive);
   --success: var(--color-success);
@@ -299,6 +300,7 @@ next-router-prefetch {
   h1,
   h2,
   h3 {
+    font-family: var(--font-heading);
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
@@ -891,4 +893,80 @@ next-router-prefetch {
     }
   }
 
+}
+
+/* ---------------------------------------------------------------------------
+   Table design shared by every page (same look as the Monthly reports):
+   blue-tinted header, full grid lines, bold pinned first column, zebra rows.
+   Unlayered on purpose so it wins over per-table utility classes.
+   --------------------------------------------------------------------------- */
+:root {
+  --table-line: color-mix(in srgb, var(--foreground) 30%, transparent);
+  --table-head-bg: color-mix(in srgb, var(--color-primary) 15%, var(--background));
+  --table-zebra: color-mix(in srgb, var(--color-primary) 5%, var(--background));
+  --table-hover: color-mix(in srgb, var(--color-primary) 11%, var(--background));
+}
+
+[data-slot="table"] {
+  border-collapse: collapse;
+}
+
+[data-slot="table-head"],
+[data-slot="table-cell"] {
+  border: 1px solid var(--table-line);
+}
+
+[data-slot="table-head"] {
+  background: var(--table-head-bg);
+  color: var(--foreground);
+  text-align: center;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+[data-slot="table-head"] :is(button, span) {
+  color: var(--foreground);
+  justify-content: center;
+}
+
+[data-slot="table-body"] > [data-slot="table-row"] {
+  background: var(--background);
+}
+
+[data-slot="table-body"] > [data-slot="table-row"]:nth-child(even) {
+  background: var(--table-zebra);
+}
+
+[data-slot="table-body"] > [data-slot="table-row"]:hover {
+  background: var(--table-hover);
+}
+
+[data-slot="table-cell"]:first-child,
+[data-slot="table-head"]:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 2px 0 4px color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+[data-slot="table-cell"]:first-child {
+  font-weight: 700;
+  background: inherit;
+}
+
+[data-slot="table-head"]:first-child {
+  background: var(--table-head-bg);
+  z-index: 2;
+}
+
+[data-slot="table-cell"] {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slot="table-footer"] > [data-slot="table-row"],
+[data-slot="table-footer"] [data-slot="table-cell"] {
+  background: var(--table-head-bg);
+  font-weight: 800;
 }

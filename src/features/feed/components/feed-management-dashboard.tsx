@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { ChartData, ChartOptions, TooltipItem } from "chart.js"
 import { AlertTriangle, Info } from "lucide-react"
 import { Badge } from "@/components/app-ui/badge"
@@ -643,6 +643,8 @@ function FeedVsBiomassGainChart({
   )
 }
 
+const ALERTS_COLLAPSED_COUNT = 4
+
 function FeedAlertsPanel({
   rows,
   isLoading,
@@ -650,6 +652,14 @@ function FeedAlertsPanel({
   rows: FeedingAlertRow[]
   isLoading?: boolean
 }) {
+  const [showAll, setShowAll] = useState(false)
+  // Most urgent first, then keep the incoming order; only the top few show until expanded.
+  const ordered = useMemo(
+    () => [...rows].sort((a, b) => Number(b.severity === "critical") - Number(a.severity === "critical")),
+    [rows],
+  )
+  const visibleRows = showAll ? ordered : ordered.slice(0, ALERTS_COLLAPSED_COUNT)
+  const hiddenCount = ordered.length - visibleRows.length
   return (
     <SectionCard title="Alerts & Actions" isLoading={isLoading}>
       {isLoading ? (
@@ -661,7 +671,7 @@ function FeedAlertsPanel({
         </div>
       ) : (
         <div className="space-y-3">
-          {rows.map((row) => {
+          {visibleRows.map((row) => {
             const critical = row.severity === "critical"
             return (
               <div
@@ -685,6 +695,15 @@ function FeedAlertsPanel({
               </div>
             )
           })}
+          {ordered.length > ALERTS_COLLAPSED_COUNT ? (
+            <button
+              type="button"
+              onClick={() => setShowAll((value) => !value)}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/35"
+            >
+              {showAll ? "Show fewer" : `Show ${hiddenCount} more alert${hiddenCount === 1 ? "" : "s"}`}
+            </button>
+          ) : null}
         </div>
       )}
     </SectionCard>

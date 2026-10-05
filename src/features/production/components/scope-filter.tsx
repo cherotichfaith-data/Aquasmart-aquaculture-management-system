@@ -12,7 +12,9 @@ import {
 } from "@/components/app-ui/select"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
-import { formatCageLabel } from "@/lib/system-options"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
+import { toTimePeriodUrlValue } from "@/lib/time-period"
 
 /**
  * Production page scope selector: one small "Cages / Batches" switch, and the
@@ -33,10 +35,15 @@ const normalizeBatchLabel = (label: string | null | undefined) => {
 
 export default function ProductionScopeFilter({
   initialFarmId,
+  fallbackBatches,
+  fallbackSystems,
   /** See ProductionMetricFilter's `startTransition` prop for why this exists. */
   startTransition,
 }: {
   initialFarmId?: string | null
+  /** Server-loaded lists, used whenever the browser-side lookup has not succeeded (or came back empty). */
+  fallbackBatches?: BatchOptionItem[]
+  fallbackSystems?: SystemOption[]
   startTransition?: (callback: () => void) => void
 }) {
   const router = useRouter()
@@ -57,20 +64,14 @@ export default function ProductionScopeFilter({
   const batchesQuery = useBatchOptions(farmId ? { farmId } : undefined)
   const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
 
-  const batches = useMemo(
-    () =>
-      (batchesQuery.data?.status === "success" ? batchesQuery.data.data : []).filter(
-        (batch) => batch.id != null,
-      ),
-    [batchesQuery.data],
-  )
-  const systems = useMemo(
-    () =>
-      (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []).filter(
-        (system) => system.id != null,
-      ),
-    [systemsQuery.data],
-  )
+  const batches = useMemo(() => {
+    const fromQuery = batchesQuery.data?.status === "success" ? batchesQuery.data.data : []
+    return (fromQuery.length > 0 ? fromQuery : (fallbackBatches ?? [])).filter((batch) => batch.id != null)
+  }, [batchesQuery.data, fallbackBatches])
+  const systems = useMemo(() => {
+    const fromQuery = systemsQuery.data?.status === "success" ? systemsQuery.data.data : []
+    return (fromQuery.length > 0 ? fromQuery : (fallbackSystems ?? [])).filter((system) => system.id != null)
+  }, [fallbackSystems, systemsQuery.data])
 
   const setParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -105,6 +106,8 @@ export default function ProductionScopeFilter({
       batch: value === "all" ? null : value,
       system: null,
       cage: null,
+      // One batch defaults to its whole cycle; back on "All" the farm view returns to the month default.
+      date: value === "all" ? null : toTimePeriodUrlValue("all history"),
     })
   }
 
@@ -115,6 +118,7 @@ export default function ProductionScopeFilter({
       system: value === "all" ? null : value,
       cage: null,
       batch: null,
+      date: value === "all" ? null : toTimePeriodUrlValue("all history"),
     })
   }
 
@@ -147,7 +151,7 @@ export default function ProductionScopeFilter({
           <Select
             value={batchParam ?? "all"}
             onValueChange={handleBatchChange}
-            disabled={batchesQuery.isLoading}
+            disabled={batchesQuery.isLoading && batches.length === 0}
           >
             <SelectTrigger id="production-batch-filter" className="production-select">
               <SelectValue placeholder={batchesQuery.isLoading ? "Loading batches..." : "All batches"} />
@@ -167,7 +171,7 @@ export default function ProductionScopeFilter({
           <Select
             value={systemParam ?? "all"}
             onValueChange={handleCageChange}
-            disabled={systemsQuery.isLoading}
+            disabled={systemsQuery.isLoading && systems.length === 0}
           >
             <SelectTrigger id="production-cage-filter" className="production-select">
               <SelectValue placeholder={systemsQuery.isLoading ? "Loading cages..." : "All cages"} />

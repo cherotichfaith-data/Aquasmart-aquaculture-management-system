@@ -96,7 +96,14 @@ function resolveDisplayEfcr(row: ProductionSummaryRpcRow) {
     return aggregatedEfcr ?? periodicEfcr
   }
 
-  return periodicEfcr
+  if (periodicEfcr != null) return periodicEfcr
+
+  // A period with a loss in biomass (e.g. a lower sample) has no stored eFCR. Still show feed / gain
+  // (negative) so the column is never empty; a negative value flags that biomass fell.
+  const feed = asFiniteNumber(row.total_feed_amount_period)
+  const gain = asFiniteNumber(row.biomass_increase_period)
+  if (feed != null && feed > 0 && gain != null && gain !== 0) return feed / gain
+  return aggregatedEfcr
 }
 
 const buildSystemDateKey = (systemId: number | null | undefined, date: string | null | undefined) =>

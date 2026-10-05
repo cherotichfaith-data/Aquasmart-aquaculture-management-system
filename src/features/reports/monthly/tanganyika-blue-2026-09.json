@@ -1,0 +1,4132 @@
+{
+ "meta": {
+  "farm": "Tanganyika Blue",
+  "window": "2026-08-23 (closing balance) to 2026-09-23 (inclusive)",
+  "source": "pijcykcuxnbdpmqqokgo (sustain-aquasmart-tb-farm-mirror)",
+  "extract": "01 October 2026"
+ },
+ "reports": [
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "397,540",
+       "Opening book fish (23 Aug)"
+      ],
+      [
+       "7,221",
+       "Stocked in window"
+      ],
+      [
+       "2,297",
+       "Recorded deaths"
+      ],
+      [
+       "11,259",
+       "Unaccounted external loss"
+      ],
+      [
+       "389,430",
+       "Closing book fish (23 Sep)"
+      ],
+      [
+       "0",
+       "Batches with a verified count"
+      ]
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Batch stock ledger"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Batch",
+      "Opening fish",
+      "Stocked",
+      "External in",
+      "External out / loss",
+      "Recorded deaths",
+      "Harvest fish",
+      "Expected closing",
+      "Latest verified count",
+      "Arithmetic"
+     ],
+     "rows": [
+      [
+       "02.26aK",
+       "37,172",
+       "0",
+       "0",
+       "0",
+       "9",
+       "0",
+       "37,163",
+       "Not established",
+       "OK"
+      ],
+      [
+       "02.26b",
+       "14,081",
+       "0",
+       "0",
+       "0",
+       "97",
+       "13",
+       "13,971",
+       "Not established",
+       "OK"
+      ],
+      [
+       "02.26cK",
+       "73,453",
+       "0",
+       "0",
+       "11,259",
+       "2,024",
+       "0",
+       "60,170",
+       "Not established",
+       "OK"
+      ],
+      [
+       "03.26aK",
+       "36,420",
+       "0",
+       "0",
+       "0",
+       "23",
+       "0",
+       "36,397",
+       "Not established",
+       "OK"
+      ],
+      [
+       "03.26b",
+       "4,710",
+       "0",
+       "0",
+       "0",
+       "4",
+       "1,742",
+       "2,964",
+       "Not established",
+       "OK"
+      ],
+      [
+       "03.26c",
+       "16,188",
+       "0",
+       "0",
+       "0",
+       "15",
+       "0",
+       "16,173",
+       "Not established",
+       "OK"
+      ],
+      [
+       "05.26aK",
+       "25,423",
+       "0",
+       "0",
+       "0",
+       "14",
+       "0",
+       "25,409",
+       "Not established",
+       "OK"
+      ],
+      [
+       "05.26b",
+       "13,024",
+       "0",
+       "0",
+       "0",
+       "28",
+       "0",
+       "12,996",
+       "Not established",
+       "OK"
+      ],
+      [
+       "05.26cK",
+       "29,805",
+       "0",
+       "0",
+       "0",
+       "9",
+       "0",
+       "29,796",
+       "Not established",
+       "OK"
+      ],
+      [
+       "06.26a",
+       "41,109",
+       "0",
+       "0",
+       "0",
+       "5",
+       "0",
+       "41,104",
+       "Not established",
+       "OK"
+      ],
+      [
+       "07.26a",
+       "56,842",
+       "0",
+       "0",
+       "0",
+       "3",
+       "0",
+       "56,839",
+       "Not established",
+       "OK"
+      ],
+      [
+       "07.26b",
+       "31,060",
+       "0",
+       "0",
+       "0",
+       "27",
+       "0",
+       "31,033",
+       "Not established",
+       "OK"
+      ],
+      [
+       "08.26",
+       "18,253",
+       "1,607",
+       "0",
+       "0",
+       "37",
+       "20",
+       "19,803",
+       "Not established",
+       "OK"
+      ],
+      [
+       "09.26a",
+       "0",
+       "5,614",
+       "0",
+       "0",
+       "2",
+       "0",
+       "5,612",
+       "Not established",
+       "OK"
+      ],
+      [
+       "TOTAL",
+       "397,540",
+       "7,221",
+       "0",
+       "11,259",
+       "2,297",
+       "1,775",
+       "389,430",
+       "",
+       ""
+      ]
+     ],
+     "total": true
+    },
+    {
+     "t": "small",
+     "text": "Expected closing = opening + stocked + external in - external out - deaths - harvest. Within-farm transfers cancel at batch level. Adjustments are only the recorded external_out reconciliation entry; no other adjustment rows exist. 'Verified count' = a physical count recorded in fish_inventory_count (none exist)."
+    },
+    {
+     "t": "h",
+     "text": "Discrepancies and investigation status"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Cage / item",
+      "Date",
+      "Book balance / quantity",
+      "Confirmed count",
+      "Discrepancy (fish)",
+      "Recorded evidence",
+      "Investigation status"
+     ],
+     "rows": [
+      [
+       "02.26cK / 1B",
+       "2026-08-28",
+       "-1,008",
+       "0 (user-confirmed empty)",
+       "+1,008",
+       "Reconciliation row recorded (count_difference); ledger balance not yet adjusted",
+       "Open - count evidence not attached"
+      ],
+      [
+       "02.26cK / 1C",
+       "2026-09-11",
+       "-749",
+       "0 (final transfer)",
+       "+749",
+       "Reconciliation row recorded (count_difference); ledger balance not yet adjusted",
+       "Open - count evidence not attached"
+      ],
+      [
+       "02.26cK / 1A",
+       "-",
+       "-11",
+       "-",
+       "-11",
+       "Residual from earlier movements; no reconciliation row",
+       "Open - not investigated"
+      ],
+      [
+       "02.26cK / external_out",
+       "2026-08-28",
+       "11,259 fish (673.8 kg)",
+       "-",
+       "15.3% of batch opening",
+       "Booked as 'Lost / unaccounted - 1B transfer reconciliation' on 2026-09-01 (not via the app form)",
+       "Open - cause not established"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "note",
+     "html": "<b>Counting method and evidence:</b> not recorded for any batch. The two reconciliation rows have no linked count (inventory_count_id is empty) and fish_inventory_count holds no rows. The closing figures above are book stock, not certified physical stock."
+    },
+    {
+     "t": "h",
+     "text": "Cage-level closing book (2026-09-23)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Cage",
+      "Batch",
+      "Book fish",
+      "Latest sample",
+      "Sample fish",
+      "Sample ABW g / note"
+     ],
+     "rows": [
+      [
+       "1A",
+       "03.26aK",
+       "7,690",
+       "2026-09-23",
+       "250",
+       "47.2"
+      ],
+      [
+       "1D",
+       "03.26c",
+       "16,173",
+       "2026-09-23",
+       "250",
+       "96.0"
+      ],
+      [
+       "1E",
+       "03.26aK",
+       "28,707",
+       "2026-09-23",
+       "250",
+       "54.5"
+      ],
+      [
+       "1F",
+       "08.26",
+       "19,803",
+       "2026-09-23",
+       "500",
+       "6.5"
+      ],
+      [
+       "2A",
+       "09.26a",
+       "5,612",
+       "2026-09-23",
+       "500",
+       "5.4"
+      ],
+      [
+       "2B",
+       "05.26b",
+       "12,996",
+       "2026-09-23",
+       "250",
+       "41.7"
+      ],
+      [
+       "2C",
+       "02.26b",
+       "9,582",
+       "2026-09-23",
+       "100",
+       "132.1"
+      ],
+      [
+       "2D",
+       "02.26b",
+       "4,389",
+       "2026-09-23",
+       "100",
+       "222.1"
+      ],
+      [
+       "3A",
+       "05.26aK",
+       "25,409",
+       "2026-09-23",
+       "250",
+       "47.0"
+      ],
+      [
+       "3B",
+       "05.26cK",
+       "29,796",
+       "2026-09-23",
+       "250",
+       "34.3"
+      ],
+      [
+       "3C",
+       "06.26a",
+       "41,104",
+       "2026-09-23",
+       "500",
+       "22.1"
+      ],
+      [
+       "3D",
+       "03.26b",
+       "2,964",
+       "2026-09-23",
+       "125",
+       "116.4"
+      ],
+      [
+       "3E",
+       "07.26a",
+       "56,839",
+       "2026-09-23",
+       "500",
+       "11.5"
+      ],
+      [
+       "3F",
+       "07.26b",
+       "31,033",
+       "2026-09-23",
+       "500",
+       "10.5"
+      ],
+      [
+       "G1.A",
+       "02.26cK",
+       "61,938",
+       "2026-09-23",
+       "250",
+       "63.0"
+      ],
+      [
+       "G1.D",
+       "02.26aK",
+       "37,163",
+       "2026-09-23",
+       "100",
+       "82.9"
+      ],
+      [
+       "1A",
+       "02.26cK",
+       "-11",
+       "-",
+       "-",
+       "negative balance"
+      ],
+      [
+       "1B",
+       "02.26cK",
+       "-1,008",
+       "-",
+       "-",
+       "negative balance"
+      ],
+      [
+       "1C",
+       "02.26cK",
+       "-749",
+       "-",
+       "-",
+       "negative balance"
+      ]
+     ],
+     "total": false
+    }
+   ],
+   "id": "01",
+   "file": "01-stock-reconciliation-and-discrepancy.pdf",
+   "title": "Stock Reconciliation and Discrepancy Report",
+   "question": "Do we actually have the fish the system shows?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "391,198",
+       "Book fish in cages"
+      ],
+      [
+       "17,854 kg",
+       "Book biomass (count x sample ABW)"
+      ],
+      [
+       "45.6 g",
+       "Weighted ABW"
+      ],
+      [
+       "9,014 kg",
+       "Feed fed in window"
+      ],
+      [
+       "2,297",
+       "Deaths in window"
+      ]
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Batch performance"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Batch",
+      "Origin",
+      "Stocked",
+      "Days",
+      "Stage",
+      "Fish",
+      "ABW g",
+      "Biomass kg",
+      "Open ABW g",
+      "Gain kg",
+      "Feed kg",
+      "Mort %",
+      "eFCR*",
+      "Target"
+     ],
+     "rows": [
+      [
+       "02.26aK",
+       "Kipili",
+       "2026-02-09",
+       "226",
+       "Grow-out",
+       "37,163",
+       "82.9",
+       "3,081",
+       "65.2",
+       "657.2",
+       "1,705",
+       "0.02%",
+       "2.59",
+       "250 g"
+      ],
+      [
+       "02.26b",
+       "Kimbwela",
+       "2026-02-13",
+       "222",
+       "Grow-out",
+       "13,971",
+       "160.4",
+       "2,241",
+       "123.2",
+       "508.3",
+       "670",
+       "0.69%",
+       "1.32",
+       "250 g"
+      ],
+      [
+       "02.26cK",
+       "Kipili",
+       "2026-02-18",
+       "217",
+       "Grow-out",
+       "61,938",
+       "63.0",
+       "3,902",
+       "-",
+       "-",
+       "2,017",
+       "2.76%",
+       "-",
+       "250 g"
+      ],
+      [
+       "03.26aK",
+       "Kipili",
+       "2026-03-05",
+       "202",
+       "Nursing",
+       "36,397",
+       "53.0",
+       "1,927",
+       "35.3",
+       "642.6",
+       "927",
+       "0.06%",
+       "1.44",
+       "250 g"
+      ],
+      [
+       "03.26b",
+       "Kimbwela",
+       "2026-03-26",
+       "181",
+       "Nursing",
+       "2,964",
+       "116.4",
+       "345",
+       "92.7",
+       "114.6",
+       "243",
+       "0.08%",
+       "2.12",
+       "250 g"
+      ],
+      [
+       "03.26c",
+       "Kimbwela",
+       "2026-03-27",
+       "180",
+       "Nursing",
+       "16,173",
+       "96.0",
+       "1,553",
+       "64.8",
+       "503.6",
+       "748",
+       "0.09%",
+       "1.48",
+       "250 g"
+      ],
+      [
+       "05.26aK",
+       "Kimbwela",
+       "2026-05-18",
+       "128",
+       "Nursing",
+       "25,409",
+       "47.0",
+       "1,194",
+       "31.5",
+       "393.4",
+       "586",
+       "0.06%",
+       "1.49",
+       "400 g (plan)"
+      ],
+      [
+       "05.26b",
+       "Kimbwela",
+       "2026-05-21",
+       "125",
+       "Nursing",
+       "12,996",
+       "41.7",
+       "542",
+       "-",
+       "-",
+       "260",
+       "0.21%",
+       "-",
+       "400 g (plan)"
+      ],
+      [
+       "05.26cK",
+       "Kipili",
+       "2026-05-21",
+       "125",
+       "Nursing",
+       "29,796",
+       "34.3",
+       "1,022",
+       "25.3",
+       "267.9",
+       "551",
+       "0.03%",
+       "2.06",
+       "400 g (plan)"
+      ],
+      [
+       "06.26a",
+       "Kimbwela",
+       "2026-06-11",
+       "104",
+       "Nursing",
+       "41,104",
+       "22.1",
+       "908",
+       "13.6",
+       "349.3",
+       "457",
+       "0.01%",
+       "1.31",
+       "400 g (plan)"
+      ],
+      [
+       "07.26a",
+       "Kimbwela",
+       "2026-07-10",
+       "75",
+       "Nursing",
+       "56,839",
+       "11.5",
+       "654",
+       "6.2",
+       "301.2",
+       "514",
+       "0.01%",
+       "1.71",
+       "400 g (plan)"
+      ],
+      [
+       "07.26b",
+       "Kimbwela",
+       "2026-07-24",
+       "61",
+       "Nursing",
+       "31,033",
+       "10.5",
+       "326",
+       "5.0",
+       "170.5",
+       "222",
+       "0.09%",
+       "1.30",
+       "400 g (plan)"
+      ],
+      [
+       "08.26",
+       "Kimbwela",
+       "2026-08-19",
+       "35",
+       "Nursing",
+       "19,803",
+       "6.5",
+       "129",
+       "-",
+       "-",
+       "96",
+       "0.19%",
+       "-",
+       "400 g (plan)"
+      ],
+      [
+       "09.26a",
+       "Kimbwela",
+       "2026-09-04",
+       "19",
+       "Nursing",
+       "5,612",
+       "5.4",
+       "30",
+       "-",
+       "-",
+       "19",
+       "0.04%",
+       "-",
+       "400 g (plan)"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "small",
+     "text": "Stage: Grow-out = grow-out cages, Nursing = nursing cages. Broodstock and reserved stock are not recorded anywhere in the data. Mort % = deaths in window / (opening + stocked). *eFCR = feed in window / (closing biomass - opening biomass + harvested kg); indicative, from book counts x sampled ABW, not verified counts. Target: production_cycle.target_weight_g (250 g on older cycles) or the plan's 400 g where no cycle target is set."
+    },
+    {
+     "t": "h",
+     "text": "Target variance (plan model v2 vs latest measured ABW)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Cage",
+      "Batch",
+      "Measured ABW g (23 Sep)",
+      "Plan ABW g (22 Sep)",
+      "Variance",
+      "Book fish",
+      "Plan days to 400 g",
+      "Biomass kg"
+     ],
+     "rows": [
+      [
+       "1A",
+       "03.26aK",
+       "47.2",
+       "64.7",
+       "-27.0%",
+       "7,690",
+       "161",
+       "363"
+      ],
+      [
+       "1D",
+       "03.26c",
+       "96.0",
+       "107.0",
+       "-10.3%",
+       "16,173",
+       "131",
+       "1,553"
+      ],
+      [
+       "1E",
+       "03.26aK",
+       "54.5",
+       "64.9",
+       "-16.0%",
+       "28,707",
+       "161",
+       "1,565"
+      ],
+      [
+       "1F",
+       "08.26",
+       "6.5",
+       "8.1",
+       "-19.8%",
+       "19,803",
+       "246",
+       "129"
+      ],
+      [
+       "2A",
+       "09.26a",
+       "5.4",
+       "5.3",
+       "1.9%",
+       "5,612",
+       "259",
+       "30"
+      ],
+      [
+       "2B",
+       "05.26b",
+       "41.7",
+       "67.9",
+       "-38.6%",
+       "12,996",
+       "158",
+       "542"
+      ],
+      [
+       "2C",
+       "02.26b",
+       "132.1",
+       "146.2",
+       "-9.6%",
+       "9,582",
+       "109",
+       "1,266"
+      ],
+      [
+       "2D",
+       "02.26b",
+       "222.1",
+       "226.7",
+       "-2.0%",
+       "4,389",
+       "71",
+       "975"
+      ],
+      [
+       "3A",
+       "05.26aK",
+       "47.0",
+       "59.0",
+       "-20.3%",
+       "25,409",
+       "166",
+       "1,194"
+      ],
+      [
+       "3B",
+       "05.26cK",
+       "34.3",
+       "49.3",
+       "-30.4%",
+       "29,796",
+       "175",
+       "1,022"
+      ],
+      [
+       "3C",
+       "06.26a",
+       "22.1",
+       "29.5",
+       "-25.1%",
+       "41,104",
+       "199",
+       "908"
+      ],
+      [
+       "3D",
+       "03.26b",
+       "116.4",
+       "130.1",
+       "-10.5%",
+       "2,964",
+       "118",
+       "345"
+      ],
+      [
+       "3E",
+       "07.26a",
+       "11.5",
+       "15.3",
+       "-24.8%",
+       "56,839",
+       "225",
+       "654"
+      ],
+      [
+       "3F",
+       "07.26b",
+       "10.5",
+       "12.9",
+       "-18.6%",
+       "31,033",
+       "231",
+       "326"
+      ],
+      [
+       "G1.A",
+       "02.26cK",
+       "63.0",
+       "84.5",
+       "-25.4%",
+       "61,938",
+       "146",
+       "3,902"
+      ],
+      [
+       "G1.D",
+       "02.26aK",
+       "82.9",
+       "107.5",
+       "-22.9%",
+       "37,163",
+       "131",
+       "3,081"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "note",
+     "html": "Measured ABW is below the plan's starting ABW in 15 of 16 cages (see report 4). Plan harvest dates are therefore optimistic until the model is re-anchored to the measured weights."
+    },
+    {
+     "t": "h",
+     "text": "Cage view"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Cage",
+      "Batch",
+      "Stage",
+      "Volume m3",
+      "Fish",
+      "ABW g",
+      "Biomass kg",
+      "kg/m3",
+      "Sample date",
+      "Sample n"
+     ],
+     "rows": [
+      [
+       "1A",
+       "03.26aK",
+       "nursing",
+       "125",
+       "7,690",
+       "47.2",
+       "363",
+       "2.9",
+       "2026-09-23",
+       "250"
+      ],
+      [
+       "1D",
+       "03.26c",
+       "nursing",
+       "125",
+       "16,173",
+       "96.0",
+       "1,553",
+       "12.4",
+       "2026-09-23",
+       "250"
+      ],
+      [
+       "1E",
+       "03.26aK",
+       "nursing",
+       "125",
+       "28,707",
+       "54.5",
+       "1,565",
+       "12.5",
+       "2026-09-23",
+       "250"
+      ],
+      [
+       "1F",
+       "08.26",
+       "nursing",
+       "125",
+       "19,803",
+       "6.5",
+       "129",
+       "1.0",
+       "2026-09-23",
+       "500"
+      ],
+      [
+       "2A",
+       "09.26a",
+       "nursing",
+       "125",
+       "5,612",
+       "5.4",
+       "30",
+       "0.2",
+       "2026-09-23",
+       "500"
+      ],
+      [
+       "2B",
+       "05.26b",
+       "nursing",
+       "125",
+       "12,996",
+       "41.7",
+       "542",
+       "4.3",
+       "2026-09-23",
+       "250"
+      ],
+      [
+       "2C",
+       "02.26b",
+       "grow-out",
+       "125",
+       "9,582",
+       "132.1",
+       "1,266",
+       "10.1",
+       "2026-09-23",
+       "100"
+      ],
+      [
+       "2D",
+       "02.26b",
+       "grow-out",
+       "125",
+       "4,389",
+       "222.1",
+       "975",
+       "7.8",
+       "2026-09-23",
+       "100"
+      ],
+      [
+       "3A",
+       "05.26aK",
+       "nursing",
+       "125",
+       "25,409",
+       "47.0",
+       "1,194",
+       "9.6",
+       "2026-09-23",
+       "250"
+      ],
+      [
+       "3B",
+       "05.26cK",
+       "nursing",
+       "125",
+       "29,796",
+       "34.3",
+       "1,022",
+       "8.2",
+       "2026-09-23",
+       "250"
+      ],
+      [
+       "3C",
+       "06.26a",
+       "nursing",
+       "125",
+       "41,104",
+       "22.1",
+       "908",
+       "7.3",
+       "2026-09-23",
+       "500"
+      ],
+      [
+       "3D",
+       "03.26b",
+       "nursing",
+       "125",
+       "2,964",
+       "116.4",
+       "345",
+       "2.8",
+       "2026-09-23",
+       "125"
+      ],
+      [
+       "3E",
+       "07.26a",
+       "nursing",
+       "125",
+       "56,839",
+       "11.5",
+       "654",
+       "5.2",
+       "2026-09-23",
+       "500"
+      ],
+      [
+       "3F",
+       "07.26b",
+       "nursing",
+       "125",
+       "31,033",
+       "10.5",
+       "326",
+       "2.6",
+       "2026-09-23",
+       "500"
+      ],
+      [
+       "G1.A",
+       "02.26cK",
+       "grow-out",
+       "750",
+       "61,938",
+       "63.0",
+       "3,902",
+       "5.2",
+       "2026-09-23",
+       "250"
+      ],
+      [
+       "G1.D",
+       "02.26aK",
+       "grow-out",
+       "790",
+       "37,163",
+       "82.9",
+       "3,081",
+       "3.9",
+       "2026-09-23",
+       "100"
+      ],
+      [
+       "1B",
+       "-",
+       "nursing",
+       "125",
+       "0",
+       "-",
+       "0",
+       "0.0",
+       "-",
+       "available"
+      ],
+      [
+       "1C",
+       "-",
+       "nursing",
+       "125",
+       "0",
+       "-",
+       "0",
+       "0.0",
+       "-",
+       "available"
+      ],
+      [
+       "2E",
+       "-",
+       "grow-out",
+       "125",
+       "0",
+       "-",
+       "0",
+       "0.0",
+       "-",
+       "available"
+      ]
+     ],
+     "total": false
+    }
+   ],
+   "id": "02",
+   "file": "02-cage-and-batch-performance.pdf",
+   "title": "Cage and Batch Performance Report",
+   "question": "Which cages need attention, and why?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "note",
+     "html": "This report explains the ratios; it does not present them as verified results. Biomass is book fish x sampled ABW (sample sizes 100-500). Mortality weight is not deducted, and ABW measurement error moves the ratio materially (+/-5 g ABW on a 40 g fish is a 12% swing in biomass)."
+    },
+    {
+     "t": "h",
+     "text": "Active grow-out (grow-out cages)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Batch",
+      "Feed kg (window)",
+      "Opening biomass kg",
+      "Closing biomass kg",
+      "Harvest kg",
+      "Biomass gain kg",
+      "eFCR window",
+      "Feed kg (cumulative)",
+      "eFCR cumulative",
+      "Reading / flag"
+     ],
+     "rows": [
+      [
+       "02.26aK",
+       "1,705",
+       "2,424",
+       "3,081",
+       "0",
+       "657.2",
+       "2.59",
+       "5,404",
+       "1.79",
+       "High (>2.2): check sample size, stock loss and feed records"
+      ],
+      [
+       "02.26b",
+       "670",
+       "1,734",
+       "2,241",
+       "1.9",
+       "508.3",
+       "1.32",
+       "3,015",
+       "1.36",
+       "OK - indicative"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "h",
+     "text": "Nursing / small fish"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Batch",
+      "Feed kg (window)",
+      "Opening biomass kg",
+      "Closing biomass kg",
+      "Harvest kg",
+      "Biomass gain kg",
+      "eFCR window",
+      "Feed kg (cumulative)",
+      "eFCR cumulative",
+      "Reading / flag"
+     ],
+     "rows": [
+      [
+       "03.26aK",
+       "927",
+       "1,285",
+       "1,927",
+       "0",
+       "642.6",
+       "1.44",
+       "2,478",
+       "1.30",
+       "OK - indicative"
+      ],
+      [
+       "03.26b",
+       "243",
+       "437",
+       "345",
+       "206.2",
+       "114.6",
+       "2.12",
+       "936",
+       "1.85",
+       "OK - indicative"
+      ],
+      [
+       "03.26c",
+       "748",
+       "1,049",
+       "1,553",
+       "0",
+       "503.6",
+       "1.48",
+       "2,129",
+       "1.39",
+       "OK - indicative"
+      ],
+      [
+       "05.26aK",
+       "586",
+       "801",
+       "1,194",
+       "0",
+       "393.4",
+       "1.49",
+       "1,638",
+       "1.46",
+       "OK - indicative"
+      ],
+      [
+       "05.26cK",
+       "551",
+       "754",
+       "1,022",
+       "0",
+       "267.9",
+       "2.06",
+       "1,650",
+       "1.74",
+       "OK - indicative"
+      ],
+      [
+       "06.26a",
+       "457",
+       "559",
+       "908",
+       "0",
+       "349.3",
+       "1.31",
+       "982",
+       "1.17",
+       "OK - indicative"
+      ],
+      [
+       "07.26a",
+       "514",
+       "352",
+       "654",
+       "0",
+       "301.2",
+       "1.71",
+       "911",
+       "1.72",
+       "OK - indicative"
+      ],
+      [
+       "07.26b",
+       "222",
+       "155",
+       "326",
+       "0",
+       "170.5",
+       "1.30",
+       "348",
+       "1.32",
+       "OK - indicative"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "h",
+     "text": "Newly stocked / insufficient data"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Batch",
+      "Feed kg (window)",
+      "Opening biomass kg",
+      "Closing biomass kg",
+      "Harvest kg",
+      "Biomass gain kg",
+      "eFCR window",
+      "Feed kg (cumulative)",
+      "eFCR cumulative",
+      "Reading / flag"
+     ],
+     "rows": [
+      [
+       "02.26cK",
+       "2,017",
+       "-",
+       "3,902",
+       "0",
+       "-",
+       "-",
+       "7,339",
+       "-",
+       "Negative cage balances and an 11,259-fish unaccounted loss"
+      ],
+      [
+       "05.26b",
+       "260",
+       "-",
+       "542",
+       "0",
+       "-",
+       "-",
+       "802",
+       "-",
+       "Opening sample missing or stale (2B: sample 2026-07-23 (31 d old))"
+      ],
+      [
+       "08.26",
+       "96",
+       "-",
+       "129",
+       "0.1",
+       "-",
+       "-",
+       "106",
+       "-",
+       "Stocked/restocked in or just before the window; no opening sample"
+      ],
+      [
+       "09.26a",
+       "19",
+       "-",
+       "30",
+       "0",
+       "-",
+       "-",
+       "19",
+       "-",
+       "Stocked/restocked in or just before the window; no opening sample"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "h",
+     "text": "How to read the ratios"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Situation",
+      "Cause shown by the data",
+      "Batches"
+     ],
+     "rows": [
+      [
+       "High eFCR with large deaths",
+       "Feed went to fish that later died or were lost; ratio overstated",
+       "02.26cK (2,024 deaths + 11,259 unaccounted loss) - not computed"
+      ],
+      [
+       "High eFCR, small sample",
+       "Closing ABW from n=100 fish; 5 g error swings the ratio",
+       "02.26aK (2.59, n=100 at close)"
+      ],
+      [
+       "Low eFCR (< 1.4)",
+       "Possible under-recorded feed or over-weighted sample; not credible until verified",
+       "02.26b (1.32), 07.26b (1.30), 06.26a (1.31)"
+      ],
+      [
+       "No ratio possible",
+       "Missing opening sample, restocking in window, or new batch",
+       "05.26b, 08.26, 09.26a"
+      ],
+      [
+       "Harvest in window",
+       "Harvest kg is added back to biomass gain; harvest records for small batches are mostly samples/culls",
+       "03.26b (1,742 fish, 206 kg), 08.26 (20 fish)"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "small",
+     "text": "Plan model v2 expects a biological FCR rising from 1.239 to 1.881 over 1-400 g, calibrated to a harvest eFCR of 1.7. Broodstock and completed-batch groups are empty: no batch is recorded as broodstock and no 2026 batch has been closed."
+    }
+   ],
+   "id": "03",
+   "file": "03-feed-efficiency-and-fcr-explanation.pdf",
+   "title": "Feed Efficiency and FCR Explanation Report",
+   "question": "Is poor FCR a feeding problem, stock loss or a data issue?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "16 / 16",
+       "cages sampled on 23 Sep"
+      ],
+      [
+       "15 of 16",
+       "cages below plan ABW"
+      ],
+      [
+       "14",
+       "cages with a quality flag"
+      ],
+      [
+       "n = 100-500",
+       "sample size range"
+      ],
+      [
+       "Not recorded",
+       "size distribution / sex"
+      ]
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Actual ABW against the versioned growth curve (plan model tanganyika-planning-v2)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Batch",
+      "Cage",
+      "Samples (MM-DD)",
+      "Sample n",
+      "Prev ABW g",
+      "Latest ABW g",
+      "Gain g",
+      "SGR %/day",
+      "Plan ABW g 22 Sep",
+      "vs plan",
+      "Plan days to 400 g",
+      "Naive days at recent SGR",
+      "Quality flags"
+     ],
+     "rows": [
+      [
+       "02.26aK",
+       "G1.D",
+       "08-23 to 09-23",
+       "125/100",
+       "65.2",
+       "82.9",
+       "17.7",
+       "0.77",
+       "107.5",
+       "-23%",
+       "131",
+       "203",
+       "small sample (n<150); below plan by >15%"
+      ],
+      [
+       "02.26b",
+       "2C",
+       "09-03 to 09-23",
+       "100/100",
+       "112.3",
+       "132.1",
+       "19.8",
+       "0.81",
+       "146.2",
+       "-10%",
+       "109",
+       "136",
+       "small sample (n<150)"
+      ],
+      [
+       "02.26b",
+       "2D",
+       "09-03 to 09-23",
+       "50/100",
+       "184.6",
+       "222.1",
+       "37.5",
+       "0.92",
+       "226.7",
+       "-2%",
+       "71",
+       "64",
+       "small sample (n<150)"
+      ],
+      [
+       "02.26cK",
+       "G1.A",
+       "09-04 to 09-23",
+       "125/250",
+       "52.0",
+       "63.0",
+       "11.0",
+       "1.01",
+       "84.5",
+       "-25%",
+       "146",
+       "183",
+       "below plan by >15%; prior ABW from cage 1C before transfer"
+      ],
+      [
+       "03.26aK",
+       "1A",
+       "08-23 to 09-23",
+       "250/250",
+       "35.2",
+       "47.2",
+       "12.0",
+       "0.95",
+       "64.7",
+       "-27%",
+       "161",
+       "226",
+       "below plan by >15%"
+      ],
+      [
+       "03.26aK",
+       "1E",
+       "08-23 to 09-23",
+       "250/250",
+       "35.3",
+       "54.5",
+       "19.2",
+       "1.40",
+       "64.9",
+       "-16%",
+       "161",
+       "142",
+       "below plan by >15%"
+      ],
+      [
+       "03.26b",
+       "3D",
+       "09-11 to 09-23",
+       "60/125",
+       "111.1",
+       "116.4",
+       "5.3",
+       "0.39",
+       "130.1",
+       "-11%",
+       "118",
+       "318",
+       "small sample (n<150)"
+      ],
+      [
+       "03.26c",
+       "1D",
+       "08-23 to 09-23",
+       "125/250",
+       "64.8",
+       "96.0",
+       "31.2",
+       "1.27",
+       "107.0",
+       "-10%",
+       "131",
+       "113",
+       "-"
+      ],
+      [
+       "05.26aK",
+       "3A",
+       "08-23 to 09-23",
+       "250/250",
+       "31.5",
+       "47.0",
+       "15.5",
+       "1.29",
+       "59.0",
+       "-20%",
+       "166",
+       "166",
+       "below plan by >15%"
+      ],
+      [
+       "05.26b",
+       "2B",
+       "07-23 to 09-23",
+       "247/250",
+       "17.7",
+       "41.7",
+       "24.0",
+       "1.38",
+       "67.9",
+       "-39%",
+       "158",
+       "164",
+       "62-day interval; below plan by >15%"
+      ],
+      [
+       "05.26cK",
+       "3B",
+       "08-23 to 09-23",
+       "250/250",
+       "25.3",
+       "34.3",
+       "9.0",
+       "0.98",
+       "49.3",
+       "-30%",
+       "175",
+       "250",
+       "below plan by >15%"
+      ],
+      [
+       "06.26a",
+       "3C",
+       "08-23 to 09-23",
+       "250/500",
+       "13.6",
+       "22.1",
+       "8.5",
+       "1.57",
+       "29.5",
+       "-25%",
+       "199",
+       "185",
+       "fast gain - check outlier; below plan by >15%"
+      ],
+      [
+       "07.26a",
+       "3E",
+       "08-23 to 09-23",
+       "500/500",
+       "6.2",
+       "11.5",
+       "5.3",
+       "1.99",
+       "15.3",
+       "-25%",
+       "225",
+       "178",
+       "below plan by >15%"
+      ],
+      [
+       "07.26b",
+       "3F",
+       "08-23 to 09-23",
+       "500/500",
+       "5.0",
+       "10.5",
+       "5.5",
+       "2.39",
+       "12.9",
+       "-19%",
+       "231",
+       "152",
+       "below plan by >15%"
+      ],
+      [
+       "08.26",
+       "1F",
+       "09-23",
+       "500",
+       "-",
+       "6.5",
+       "-",
+       "-",
+       "8.1",
+       "-20%",
+       "246",
+       "-",
+       "below plan by >15%"
+      ],
+      [
+       "09.26a",
+       "2A",
+       "09-23",
+       "500",
+       "-",
+       "5.4",
+       "-",
+       "-",
+       "5.3",
+       "2%",
+       "259",
+       "-",
+       "-"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "small",
+     "text": "SGR = ln(ABW2/ABW1) / days x 100. Plan ABW is the model's starting weight for each cage in draft plan rev 6 (snapshot 22 Sep). 'Naive days' extrapolates the latest SGR to 400 g and ignores slowing growth, so it is a lower bound. Individual fish weights are not stored, so size distribution and outlier fish cannot be assessed; outlier flags are based on the batch-level gain only."
+    },
+    {
+     "t": "h",
+     "text": "Cohort comparison by source and age"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Source",
+      "Stocking month",
+      "Cages",
+      "Book fish",
+      "Fish-weighted ABW g",
+      "Mean SGR %/day"
+     ],
+     "rows": [
+      [
+       "Kipili Farm",
+       "2026-02",
+       "2",
+       "99,101",
+       "70.5",
+       "0.77"
+      ],
+      [
+       "Kimbwela Hatchery",
+       "2026-02",
+       "2",
+       "13,971",
+       "160.4",
+       "0.87"
+      ],
+      [
+       "Kipili Farm",
+       "2026-03",
+       "2",
+       "36,397",
+       "53.0",
+       "1.17"
+      ],
+      [
+       "Kimbwela Hatchery",
+       "2026-03",
+       "2",
+       "19,137",
+       "99.2",
+       "0.83"
+      ],
+      [
+       "Kimbwela Hatchery",
+       "2026-05",
+       "2",
+       "38,405",
+       "45.2",
+       "1.34"
+      ],
+      [
+       "Kipili Farm",
+       "2026-05",
+       "1",
+       "29,796",
+       "34.3",
+       "0.98"
+      ],
+      [
+       "Kimbwela Hatchery",
+       "2026-06",
+       "1",
+       "41,104",
+       "22.1",
+       "1.57"
+      ],
+      [
+       "Kimbwela Hatchery",
+       "2026-07",
+       "2",
+       "87,872",
+       "11.1",
+       "2.19"
+      ],
+      [
+       "Kimbwela Hatchery",
+       "2026-08",
+       "1",
+       "19,803",
+       "6.5",
+       "-"
+      ],
+      [
+       "Kimbwela Hatchery",
+       "2026-09",
+       "1",
+       "5,612",
+       "5.4",
+       "-"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "note",
+     "html": "<b>Lagging batches:</b> 05.26b / 2B (41.7 g, 39% below plan), 05.26cK / 3B (30% below) and 03.26aK / 1A (27% below) are furthest behind the model; 2A is the only cage at or above plan. G1.A (02.26cK) grew from 52.0 g (cage 1C, 4 Sep) to 63.0 g, but only 59.7 to 63.0 g (+5%) in the last 12 days, alongside the large post-transfer mortality in that cage. Sex composition is not recorded; cohorts are compared by supplier and stocking month only."
+    }
+   ],
+   "id": "04",
+   "file": "04-growth-against-target-and-sampling-quality.pdf",
+   "title": "Growth Against Target and Sampling Quality Report",
+   "question": "Which batches are genuinely growing slowly?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "15",
+       "transfer events (Jun-Sep)"
+      ],
+      [
+       "150,581",
+       "fish moved"
+      ],
+      [
+       "11,259",
+       "fish booked lost on 28 Aug"
+      ],
+      [
+       "3,021",
+       "deaths in 7 d after Jul-29 transfer into G1.D"
+      ],
+      [
+       "Not recorded",
+       "handling time / water quality"
+      ]
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Transfer and grading events (2026-06-01 to 2026-09-23)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Date",
+      "Type",
+      "Batch",
+      "From",
+      "To",
+      "Fish",
+      "Biomass kg",
+      "ABW g",
+      "Deaths same day",
+      "Deaths next 7 d",
+      "7-d % of fish moved",
+      "Operational note"
+     ],
+     "rows": [
+      [
+       "2026-06-23",
+       "transfer",
+       "03.26b",
+       "1C",
+       "3D",
+       "4,770",
+       "220",
+       "46.2",
+       "0",
+       "2",
+       "0.0%",
+       "-"
+      ],
+      [
+       "2026-06-24",
+       "density thinning",
+       "02.26cK",
+       "1B",
+       "1C",
+       "37,000",
+       "888",
+       "24.0",
+       "0",
+       "78",
+       "0.2%",
+       "-"
+      ],
+      [
+       "2026-07-20",
+       "transfer",
+       "02.26aK",
+       "1F",
+       "G1.D",
+       "10,825",
+       "464",
+       "42.9",
+       "0",
+       "88",
+       "0.8%",
+       "Partial transfer"
+      ],
+      [
+       "2026-07-27",
+       "transfer",
+       "02.26aK",
+       "1F",
+       "G1.D",
+       "10,097",
+       "452",
+       "44.8",
+       "29",
+       "2,375",
+       "23.5%",
+       "Partial transfer"
+      ],
+      [
+       "2026-07-28",
+       "transfer",
+       "02.26aK",
+       "1F",
+       "G1.D",
+       "12,168",
+       "548",
+       "45.1",
+       "15",
+       "2,900",
+       "23.8%",
+       "Partial transfer"
+      ],
+      [
+       "2026-07-29",
+       "transfer",
+       "02.26aK",
+       "1F",
+       "G1.D",
+       "7,353",
+       "333",
+       "45.3",
+       "17",
+       "3,021",
+       "41.1%",
+       "Final transfer; 1F left empty"
+      ],
+      [
+       "2026-08-21",
+       "grading",
+       "02.26b",
+       "2C",
+       "2D",
+       "4,434",
+       "832",
+       "187.7",
+       "0",
+       "0",
+       "0.0%",
+       "-"
+      ],
+      [
+       "2026-08-26",
+       "transfer",
+       "02.26cK",
+       "1B",
+       "G1.A",
+       "7,473",
+       "386",
+       "51.7",
+       "0",
+       "1,200",
+       "16.1%",
+       "-"
+      ],
+      [
+       "2026-08-27",
+       "transfer",
+       "02.26cK",
+       "1B",
+       "G1.A",
+       "7,061",
+       "422",
+       "59.7",
+       "0",
+       "1,448",
+       "20.5%",
+       "-"
+      ],
+      [
+       "2026-08-28",
+       "transfer",
+       "02.26cK",
+       "1B",
+       "G1.A",
+       "12,191",
+       "728",
+       "59.7",
+       "0",
+       "1,514",
+       "12.4%",
+       "Count/ABW aligned 2026-09-01"
+      ],
+      [
+       "2026-08-28",
+       "external out",
+       "02.26cK",
+       "1B",
+       "EXTERNAL (lost / unaccounted)",
+       "11,259",
+       "674",
+       "59.9",
+       "-",
+       "-",
+       "-",
+       "Reconciliation entry added 2026-09-01, not via app form"
+      ],
+      [
+       "2026-09-04",
+       "transfer",
+       "02.26cK",
+       "1C",
+       "G1.A",
+       "6,367",
+       "332",
+       "52.2",
+       "66",
+       "51",
+       "0.8%",
+       "-"
+      ],
+      [
+       "2026-09-05",
+       "transfer",
+       "02.26cK",
+       "1C",
+       "G1.A",
+       "8,977",
+       "467",
+       "52.0",
+       "16",
+       "112",
+       "1.2%",
+       "-"
+      ],
+      [
+       "2026-09-06",
+       "transfer",
+       "02.26cK",
+       "1C",
+       "G1.A",
+       "7,140",
+       "372",
+       "52.1",
+       "11",
+       "159",
+       "2.2%",
+       "-"
+      ],
+      [
+       "2026-09-10",
+       "transfer",
+       "02.26cK",
+       "1C",
+       "G1.A",
+       "9,502",
+       "489",
+       "51.4",
+       "4",
+       "388",
+       "4.1%",
+       "Partial transfer"
+      ],
+      [
+       "2026-09-11",
+       "transfer",
+       "02.26cK",
+       "1C",
+       "G1.A",
+       "5,223",
+       "270",
+       "51.7",
+       "5",
+       "408",
+       "7.8%",
+       "Final transfer"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "small",
+     "text": "Source/destination counts and biomass are as entered; before/after counts per cage are not stored on the transfer record. Deaths are recorded mortality in the destination cage for that batch on the transfer date and the 7 days after. Consecutive transfers into the same cage have overlapping windows (e.g. 27-29 Jul, 26-28 Aug), so the 7-day figures are cumulative, not additive."
+    },
+    {
+     "t": "h",
+     "text": "Campaign summary"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Campaign",
+      "Fish moved",
+      "Deaths (7 d)",
+      "% moved",
+      "Reading"
+     ],
+     "rows": [
+      [
+       "1C to 3D, 23 Jun (03.26b)",
+       "4,770",
+       "2",
+       "0.04%",
+       "Single transfer, 46 g fish - negligible loss"
+      ],
+      [
+       "1B to 1C, 24 Jun (02.26cK)",
+       "37,000",
+       "78",
+       "0.21%",
+       "Density thinning of 24 g fish - low loss"
+      ],
+      [
+       "1F to G1.D, 20-29 Jul (02.26aK)",
+       "40,443",
+       "3,021 after final",
+       "7.5%",
+       "Four partial moves at 43-45 g; losses jumped to 2,375-3,021 per 7-day window after 27-29 Jul"
+      ],
+      [
+       "2C to 2D grading, 21 Aug (02.26b)",
+       "4,434",
+       "0 recorded",
+       "0.0%",
+       "Single graded move of 188 g fish - no recorded loss"
+      ],
+      [
+       "1B to G1.A, 26-28 Aug (02.26cK)",
+       "26,725",
+       "1,514 after final",
+       "5.7%",
+       "Three moves at 52-60 g; plus 11,259 fish booked unaccounted the same day"
+      ],
+      [
+       "1C to G1.A, 4-11 Sep (02.26cK)",
+       "37,209",
+       "408 after final",
+       "1.1%",
+       "Five moves at 51-52 g; far lower loss than the August campaign"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "note",
+     "html": "<b>What reduces losses:</b> single-day moves of 24-47 g fish (Jun) and the 188 g grading lost almost nothing; multi-day partial transfers into the big circular cages (G1.D in July, G1.A in August) lost 5.7-7.5% within a week. The September 1C to G1.A campaign used the same cage and fish size as August but lost 1.1% - the difference (handling, water, feed withdrawal) is not captured. Water quality measurements and handling duration are not recorded in this database (water_quality_measurement has 0 rows), so the cause of the improvement cannot be quantified yet."
+    }
+   ],
+   "id": "05",
+   "file": "05-transfer-and-grading-outcomes.pdf",
+   "title": "Transfer and Grading Outcome Report",
+   "question": "Which transfer practices reduce losses?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "391,198",
+       "Book fish (23 Sep)"
+      ],
+      [
+       "17,854 kg",
+       "Book biomass"
+      ],
+      [
+       "150,000",
+       "planned fish stocked per month (plan target)"
+      ],
+      [
+       "3",
+       "cages free (1B, 1C, 2E)"
+      ],
+      [
+       "10",
+       "stockings planned by 25 Dec"
+      ]
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Stock profile by weight class"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Weight class",
+      "Cages",
+      "Fish",
+      "Biomass kg"
+     ],
+     "rows": [
+      [
+       "< 10 g",
+       "1F, 2A",
+       "25,415",
+       "159"
+      ],
+      [
+       "10-30 g",
+       "3C, 3E, 3F",
+       "128,976",
+       "1,888"
+      ],
+      [
+       "30-70 g",
+       "1A, 1E, 2B, 3A, 3B, G1.A",
+       "166,536",
+       "8,588"
+      ],
+      [
+       "70-150 g",
+       "1D, 2C, 3D, G1.D",
+       "65,882",
+       "6,244"
+      ],
+      [
+       "150-250 g",
+       "2D",
+       "4,389",
+       "975"
+      ],
+      [
+       "250-400 g",
+       "-",
+       "0",
+       "0"
+      ],
+      [
+       "> 400 g",
+       "-",
+       "0",
+       "0"
+      ],
+      [
+       "TOTAL",
+       "",
+       "391,198",
+       "17,854"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "chart",
+     "title": "Book fish by weight class (latest sample ABW per cage)",
+     "cats": [
+      "< 10 g",
+      "10-30 g",
+      "30-70 g",
+      "70-150 g",
+      "150-250 g",
+      "250-400 g",
+      "> 400 g"
+     ],
+     "series": [
+      {
+       "name": "Fish",
+       "data": [
+        25415.0,
+        128976.0,
+        166536.0,
+        65882.0,
+        4389.0,
+        0.0,
+        0.0
+       ]
+      }
+     ]
+    },
+    {
+     "t": "small",
+     "text": "Target stock profile by weight class is not stored in the database; actual weight classes are shown with the plan's monthly stocking target (150,000 fish/month) as the only target. 82% of fish are below 70 g and none are above 250 g."
+    },
+    {
+     "t": "h",
+     "text": "Stocking pipeline (draft plan rev 6, model v2)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Planned stocking date",
+      "Fish",
+      "Cumulative fish",
+      "Supplier / hatchery",
+      "Delivery confirmed"
+     ],
+     "rows": [
+      [
+       "2026-09-25",
+       "80,000",
+       "80,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-10-01",
+       "50,000",
+       "130,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-10-15",
+       "50,000",
+       "180,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-10-25",
+       "50,000",
+       "230,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-11-01",
+       "50,000",
+       "280,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-11-15",
+       "50,000",
+       "330,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-11-25",
+       "50,000",
+       "380,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-12-01",
+       "50,000",
+       "430,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-12-15",
+       "50,000",
+       "480,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ],
+      [
+       "2026-12-25",
+       "50,000",
+       "530,000",
+       "Not assigned in plan",
+       "Not recorded"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "h",
+     "text": "Capacity check"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Item",
+      "Value"
+     ],
+     "rows": [
+      [
+       "Cages free today",
+       "3 x 125 m3 (1B and 1C nursing, 2E grow-out); G1.A (750 m3) and G1.D (790 m3) are occupied"
+      ],
+      [
+       "Planned stockings by 25 Dec 2026",
+       "10 batches / 530,000 fish (80,000 on 25 Sep, then 50,000 on 1, 15 and 25 of each month)"
+      ],
+      [
+       "Cages released by planned harvests before 25 Dec",
+       "1 (2D, baseline harvest 2 Dec 2026)"
+      ],
+      [
+       "Shortfall without batch combining or cage additions",
+       "6 batches (10 planned minus 3 free cages minus 1 released)"
+      ],
+      [
+       "Plan limitation",
+       "The plan projects growth and mortality only; it does not assign cages, so cage shortfalls are not shown by the model"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "h",
+     "text": "Projected live stock (plan baseline, model v2)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Month",
+      "Planned stocking fish",
+      "Live fish end of month",
+      "Live biomass kg",
+      "Harvest fish",
+      "Harvest kg"
+     ],
+     "rows": [
+      [
+       "2026-09",
+       "80,000",
+       "466,373",
+       "25,807",
+       "0",
+       "0"
+      ],
+      [
+       "2026-10",
+       "150,000",
+       "592,199",
+       "40,587",
+       "0",
+       "0"
+      ],
+      [
+       "2026-11",
+       "150,000",
+       "713,298",
+       "58,904",
+       "0",
+       "0"
+      ],
+      [
+       "2026-12",
+       "150,000",
+       "822,028",
+       "79,994",
+       "4,091",
+       "1,643"
+      ],
+      [
+       "2027-01",
+       "150,000",
+       "918,975",
+       "101,825",
+       "58,011",
+       "23,306"
+      ],
+      [
+       "2027-02",
+       "150,000",
+       "919,237",
+       "80,223",
+       "64,616",
+       "25,927"
+      ],
+      [
+       "2027-03",
+       "150,000",
+       "948,368",
+       "73,433",
+       "77,516",
+       "31,082"
+      ],
+      [
+       "2027-04",
+       "150,000",
+       "1,020,979",
+       "86,545",
+       "33,650",
+       "13,512"
+      ],
+      [
+       "2027-05",
+       "150,000",
+       "1,041,621",
+       "83,189",
+       "82,756",
+       "33,228"
+      ],
+      [
+       "2027-06",
+       "150,000",
+       "1,140,592",
+       "115,282",
+       "4,070",
+       "1,630"
+      ],
+      [
+       "2027-07",
+       "150,000",
+       "1,186,048",
+       "134,807",
+       "86,421",
+       "34,738"
+      ],
+      [
+       "2027-08",
+       "150,000",
+       "1,185,166",
+       "135,649",
+       "99,716",
+       "40,083"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "note",
+     "html": "Plan live fish at end of Sep (466,373) include the 80,000 planned on 25 Sep. The plan starts from model-estimated weights that are above the measured ABW in 15 of 16 cages, so projected biomass is overstated until it is re-anchored."
+    }
+   ],
+   "id": "06",
+   "file": "06-stock-profile-and-stocking-pipeline.pdf",
+   "title": "Stock Profile and Stocking Pipeline Report",
+   "question": "Will today's stocking produce a continuous future harvest?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "4,389 fish / 975 kg",
+       "available now at > 150 g (2D, 222 g)"
+      ],
+      [
+       "3 harvests",
+       "3D sold 2,487 fish at 110-134 g in Sep"
+      ],
+      [
+       "50,876 kg",
+       "baseline Dec-Feb supply (existing stock)"
+      ],
+      [
+       "130,329 kg",
+       "baseline harvest of existing stock at 400 g"
+      ],
+      [
+       "Not recorded",
+       "broodstock / reserved stock"
+      ]
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Existing stock - harvest date by scenario"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Batch",
+      "Cage",
+      "ABW now g",
+      "Baseline date (400 g)",
+      "Baseline kg",
+      "Early date (250 g)",
+      "Early kg",
+      "Delay days",
+      "Delayed date"
+     ],
+     "rows": [
+      [
+       "02.26aK",
+       "G1.D",
+       "82.9",
+       "2027-01-31",
+       "13,104",
+       "2026-12-01",
+       "8,677",
+       "34",
+       "2027-03-06"
+      ],
+      [
+       "02.26b",
+       "2C",
+       "132.1",
+       "2027-01-09",
+       "3,451",
+       "2026-11-09",
+       "2,285",
+       "12",
+       "2027-01-21"
+      ],
+      [
+       "02.26b",
+       "2D",
+       "222.1",
+       "2026-12-02",
+       "1,643",
+       "2026-10-02",
+       "1,087",
+       "2",
+       "2026-12-04"
+      ],
+      [
+       "02.26cK",
+       "G1.A",
+       "63.0",
+       "2027-02-15",
+       "21,488",
+       "2026-12-17",
+       "14,340",
+       "29",
+       "2027-03-16"
+      ],
+      [
+       "03.26aK",
+       "1A",
+       "47.2",
+       "2027-03-02",
+       "2,625",
+       "2027-01-01",
+       "1,751",
+       "33",
+       "2027-04-04"
+      ],
+      [
+       "03.26aK",
+       "1E",
+       "54.5",
+       "2027-03-02",
+       "9,807",
+       "2027-01-01",
+       "6,544",
+       "12",
+       "2027-03-14"
+      ],
+      [
+       "03.26b",
+       "3D",
+       "116.4",
+       "2027-01-18",
+       "1,060",
+       "2026-11-18",
+       "702",
+       "29",
+       "2027-02-16"
+      ],
+      [
+       "03.26c",
+       "1D",
+       "96.0",
+       "2027-01-31",
+       "5,691",
+       "2026-12-02",
+       "3,796",
+       "9",
+       "2027-02-09"
+      ],
+      [
+       "05.26aK",
+       "3A",
+       "47.0",
+       "2027-03-07",
+       "8,632",
+       "2027-01-06",
+       "5,758",
+       "18",
+       "2027-03-25"
+      ],
+      [
+       "05.26b",
+       "2B",
+       "41.7",
+       "2027-02-27",
+       "4,439",
+       "2026-12-29",
+       "2,958",
+       "35",
+       "2027-04-03"
+      ],
+      [
+       "05.26cK",
+       "3B",
+       "34.3",
+       "2027-03-16",
+       "10,018",
+       "2027-01-15",
+       "6,677",
+       "37",
+       "2027-04-22"
+      ],
+      [
+       "06.26a",
+       "3C",
+       "22.1",
+       "2027-04-09",
+       "13,512",
+       "2027-02-07",
+       "8,943",
+       "18",
+       "2027-04-27"
+      ],
+      [
+       "07.26a",
+       "3E",
+       "11.5",
+       "2027-05-05",
+       "17,754",
+       "2027-03-05",
+       "11,756",
+       "14",
+       "2027-05-19"
+      ],
+      [
+       "07.26b",
+       "3F",
+       "10.5",
+       "2027-05-11",
+       "9,564",
+       "2027-03-12",
+       "6,381",
+       "9",
+       "2027-05-20"
+      ],
+      [
+       "09.26a",
+       "2A",
+       "5.4",
+       "2027-06-08",
+       "1,630",
+       "2027-04-09",
+       "1,087",
+       "0",
+       "2027-06-08"
+      ],
+      [
+       "08.26",
+       "1F",
+       "6.5",
+       "2027-05-26",
+       "5,911",
+       "2027-03-27",
+       "3,940",
+       "60",
+       "2027-07-25"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "small",
+     "text": "Baseline = draft plan rev 6 (model v2, harvest at 400 g). Early sale = first date the model reaches 250 g (the cycle target on older batches); fish weigh 250 g, so biomass is lower than at 400 g. Delayed growth = baseline shifted by the time each cage needs to grow from its measured ABW to the plan's assumed ABW at its latest measured SGR (capped at 90 days; 60 days where no usable growth rate). These are scenarios, not forecasts."
+    },
+    {
+     "t": "h",
+     "text": "Harvestable biomass by month, existing stock only (kg)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Month",
+      "Baseline (400 g)",
+      "Early sale (250 g)",
+      "Delayed growth (400 g, later)"
+     ],
+     "rows": [
+      [
+       "2026-10",
+       "0",
+       "1,087",
+       "0"
+      ],
+      [
+       "2026-11",
+       "0",
+       "2,987",
+       "0"
+      ],
+      [
+       "2026-12",
+       "1,643",
+       "29,771",
+       "1,643"
+      ],
+      [
+       "2027-01",
+       "23,306",
+       "20,730",
+       "3,451"
+      ],
+      [
+       "2027-02",
+       "25,927",
+       "8,943",
+       "6,751"
+      ],
+      [
+       "2027-03",
+       "31,082",
+       "22,077",
+       "53,031"
+      ],
+      [
+       "2027-04",
+       "13,512",
+       "1,087",
+       "30,594"
+      ],
+      [
+       "2027-05",
+       "33,229",
+       "0",
+       "27,318"
+      ],
+      [
+       "2027-06",
+       "1,630",
+       "0",
+       "1,630"
+      ],
+      [
+       "TOTAL",
+       "130,329",
+       "86,682",
+       "124,418"
+      ]
+     ],
+     "total": true
+    },
+    {
+     "t": "chart",
+     "title": "Harvest kg by month: baseline, early sale, delayed growth",
+     "cats": [
+      "2026-10",
+      "2026-11",
+      "2026-12",
+      "2027-01",
+      "2027-02",
+      "2027-03",
+      "2027-04",
+      "2027-05",
+      "2027-06"
+     ],
+     "series": [
+      {
+       "name": "Baseline (400 g)",
+       "data": [
+        0.0,
+        0.0,
+        1643.0,
+        23306.0,
+        25927.0,
+        31082.0,
+        13512.0,
+        33229.0,
+        1630.0
+       ]
+      },
+      {
+       "name": "Early sale (250 g)",
+       "data": [
+        1087.0,
+        2987.0,
+        29771.0,
+        20730.0,
+        8943.0,
+        22077.0,
+        1087.0,
+        0.0,
+        0.0
+       ]
+      },
+      {
+       "name": "Delayed growth",
+       "data": [
+        0.0,
+        0.0,
+        1643.0,
+        3451.0,
+        6751.0,
+        53031.0,
+        30594.0,
+        27318.0,
+        1630.0
+       ]
+      }
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Sellable now vs December-February supply"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Question",
+      "Answer from recorded data and the plan"
+     ],
+     "rows": [
+      [
+       "What can be sold today?",
+       "2D holds 4,389 fish at 222 g (about 975 kg). 2C (132 g, 9,582 fish) and 3D (116 g, 2,964 fish; already being partially harvested at 110-134 g) are the next largest."
+      ],
+      [
+       "Does selling early undermine Dec-Feb supply?",
+       "Baseline Dec-Feb supply is 50,876 kg (1,643 / 23,306 / 25,927 kg). Early sale at 250 g brings 29,771 kg into Dec and leaves Feb at 8,943 kg; Dec-Feb totals 59,444 kg, but the existing stock yields 86,682 kg instead of 130,329 kg (33% less) because the fish are sold smaller."
+      ],
+      [
+       "How exposed is the plan to slow growth?",
+       "Measured ABW is below plan in 15 of 16 cages. If each cage needs the extra time estimated above, Dec-Feb supply falls to 11,845 kg (77% below baseline) and the weight moves into Mar-May 2027."
+      ],
+      [
+       "Reserved broodstock",
+       "Not recorded: no stock-purpose field. Broodstock to keep back must be set before any sale."
+      ],
+      [
+       "Planned partial harvests",
+       "Only recorded partial harvests exist (3D: 753, 989, 745 fish on 16, 19 and 29 Sep); no future partial harvest is planned in the draft."
+      ]
+     ],
+     "total": false
+    }
+   ],
+   "id": "07",
+   "file": "07-harvest-availability-and-scenarios.pdf",
+   "title": "Harvest Availability and Scenario Report",
+   "question": "Which fish can we sell now without undermining December-February supply?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "9,014 kg",
+       "fed 24 Aug-23 Sep (recorded)"
+      ],
+      [
+       "19,475 kg",
+       "model-implied next 30 days"
+      ],
+      [
+       "0.46x",
+       "observed / model feed ratio"
+      ],
+      [
+       "0 kg",
+       "incoming orders recorded"
+      ],
+      [
+       "30-90 days",
+       "supplier lead times"
+      ]
+     ]
+    },
+    {
+     "t": "note",
+     "html": "<b>Why forecasts differ:</b> the plan's weekly feed is derived as model growth gain x the model's biological FCR (1.239 to 1.881). It starts from model ABWs that exceed measured ABWs, so it asks for about 2.2x the feed the farm actually fed last month. The 'slower' scenario scales the model to the observed pace; 'faster' adds 15% for growth catching up."
+    },
+    {
+     "t": "h",
+     "text": "Weekly feed requirement, base scenario (kg) by pellet size"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Week starting",
+      "Total",
+      "0.5-1.0 mm",
+      "1.0-1.5 mm",
+      "2 mm",
+      "3 mm",
+      "4 mm"
+     ],
+     "rows": [
+      [
+       "2026-09-24",
+       "3,999",
+       "34",
+       "110",
+       "280",
+       "2,317",
+       "1,258"
+      ],
+      [
+       "2026-10-01",
+       "4,363",
+       "65",
+       "63",
+       "389",
+       "1,834",
+       "2,012"
+      ],
+      [
+       "2026-10-08",
+       "4,718",
+       "78",
+       "60",
+       "461",
+       "1,709",
+       "2,410"
+      ],
+      [
+       "2026-10-15",
+       "5,097",
+       "115",
+       "16",
+       "425",
+       "1,513",
+       "3,028"
+      ],
+      [
+       "2026-10-22",
+       "5,483",
+       "155",
+       "10",
+       "171",
+       "1,353",
+       "3,794"
+      ],
+      [
+       "2026-10-29",
+       "5,890",
+       "212",
+       "0",
+       "120",
+       "1,256",
+       "4,302"
+      ],
+      [
+       "2026-11-05",
+       "6,301",
+       "272",
+       "0",
+       "102",
+       "1,214",
+       "4,713"
+      ],
+      [
+       "2026-11-12",
+       "6,717",
+       "339",
+       "0",
+       "28",
+       "1,417",
+       "4,934"
+      ],
+      [
+       "2026-11-19",
+       "7,145",
+       "280",
+       "142",
+       "17",
+       "1,475",
+       "5,231"
+      ],
+      [
+       "2026-11-26",
+       "7,591",
+       "232",
+       "297",
+       "0",
+       "1,101",
+       "5,962"
+      ],
+      [
+       "2026-12-03",
+       "7,906",
+       "301",
+       "346",
+       "0",
+       "1,200",
+       "6,059"
+      ],
+      [
+       "2026-12-10",
+       "8,348",
+       "262",
+       "317",
+       "187",
+       "1,301",
+       "6,281"
+      ],
+      [
+       "2026-12-17",
+       "8,809",
+       "279",
+       "202",
+       "436",
+       "1,068",
+       "6,824"
+      ],
+      [
+       "2026-12-24",
+       "9,273",
+       "247",
+       "315",
+       "521",
+       "446",
+       "7,744"
+      ],
+      [
+       "2026-12-31",
+       "9,748",
+       "275",
+       "270",
+       "731",
+       "293",
+       "8,180"
+      ],
+      [
+       "2027-01-07",
+       "10,052",
+       "282",
+       "277",
+       "553",
+       "569",
+       "8,371"
+      ],
+      [
+       "16 weeks",
+       "111,440",
+       "3,428",
+       "2,425",
+       "4,421",
+       "20,066",
+       "81,103"
+      ]
+     ],
+     "total": true
+    },
+    {
+     "t": "chart",
+     "title": "Base weekly feed requirement (kg), plan model v2",
+     "cats": [
+      "09-24",
+      "10-01",
+      "10-08",
+      "10-15",
+      "10-22",
+      "10-29",
+      "11-05",
+      "11-12",
+      "11-19",
+      "11-26",
+      "12-03",
+      "12-10",
+      "12-17",
+      "12-24",
+      "12-31",
+      "01-07"
+     ],
+     "series": [
+      {
+       "name": "Feed kg",
+       "data": [
+        3999.0,
+        4363.0,
+        4718.0,
+        5097.0,
+        5483.0,
+        5890.0,
+        6301.0,
+        6717.0,
+        7145.0,
+        7591.0,
+        7906.0,
+        8348.0,
+        8809.0,
+        9273.0,
+        9748.0,
+        10052.0
+       ]
+      }
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Stock cover and run-out by pellet size"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Pellet",
+      "Stock lines",
+      "Book stock kg (23 Sep)",
+      "16-wk base need kg",
+      "Run-out: slower",
+      "Run-out: base",
+      "Run-out: faster"
+     ],
+     "rows": [
+      [
+       "0.5-1.0mm",
+       "ft36, ft37",
+       "2,700",
+       "3,428",
+       "> 16 wk",
+       "2026-12-26",
+       "2026-12-17"
+      ],
+      [
+       "1.0-1.5mm",
+       "ft17",
+       "1,817",
+       "2,425",
+       "> 16 wk",
+       "2026-12-29",
+       "2026-12-24"
+      ],
+      [
+       "2mm",
+       "ft38, ft21, ft18",
+       "1,045",
+       "4,421",
+       "2026-12-18",
+       "2026-10-13",
+       "2026-10-11"
+      ],
+      [
+       "3mm",
+       "ft39, ft19, ft22",
+       "7,325",
+       "20,066",
+       "2026-12-06",
+       "2026-10-21",
+       "2026-10-17"
+      ],
+      [
+       "4mm",
+       "ft40, ft23, ft20",
+       "11,730",
+       "81,103",
+       "2026-11-17",
+       "2026-10-27",
+       "2026-10-24"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "small",
+     "text": "Book stock is the feed_inventory_movement ledger to 23 Sep; negative lines are floored at 0. 4.5 mm Aller feed (ft23) is counted with 4 mm. Last physical stock count: 28 Aug (26 days earlier). No incoming deliveries are recorded (feed_incoming_delivery is empty)."
+    },
+    {
+     "t": "h",
+     "text": "Purchasing: order-by dates (run-out minus supplier lead time)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Pellet",
+      "Scenario",
+      "Run-out",
+      "Order by (De Heus Tanzania, 30 d)",
+      "Order by (De Heus Uganda, 60 d)",
+      "Order by (Aller Aqua, 90 d)"
+     ],
+     "rows": [
+      [
+       "2mm",
+       "Slower (observed pace)",
+       "2026-12-18",
+       "2026-11-18",
+       "2026-10-19",
+       "2026-09-19 LATE"
+      ],
+      [
+       "2mm",
+       "Base (plan model v2)",
+       "2026-10-13",
+       "2026-09-13 LATE",
+       "2026-08-14 LATE",
+       "2026-07-15 LATE"
+      ],
+      [
+       "2mm",
+       "Faster (+15%)",
+       "2026-10-11",
+       "2026-09-11 LATE",
+       "2026-08-12 LATE",
+       "2026-07-13 LATE"
+      ],
+      [
+       "3mm",
+       "Slower (observed pace)",
+       "2026-12-06",
+       "2026-11-06",
+       "2026-10-07",
+       "2026-09-07 LATE"
+      ],
+      [
+       "3mm",
+       "Base (plan model v2)",
+       "2026-10-21",
+       "2026-09-21 LATE",
+       "2026-08-22 LATE",
+       "2026-07-23 LATE"
+      ],
+      [
+       "3mm",
+       "Faster (+15%)",
+       "2026-10-17",
+       "2026-09-17 LATE",
+       "2026-08-18 LATE",
+       "2026-07-19 LATE"
+      ],
+      [
+       "4mm",
+       "Slower (observed pace)",
+       "2026-11-17",
+       "2026-10-18",
+       "2026-09-18 LATE",
+       "2026-08-19 LATE"
+      ],
+      [
+       "4mm",
+       "Base (plan model v2)",
+       "2026-10-27",
+       "2026-09-27 LATE",
+       "2026-08-28 LATE",
+       "2026-07-29 LATE"
+      ],
+      [
+       "4mm",
+       "Faster (+15%)",
+       "2026-10-24",
+       "2026-09-24 LATE",
+       "2026-08-25 LATE",
+       "2026-07-26 LATE"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "small",
+     "text": "Minimum order 25,000 kg (one 25 t container). Lead times from feed_supplier_purchasing_policy; which supplier delivers the Koudijs lines is not recorded, so all three are shown. LATE = order-by date is before the 1 Oct extract date."
+    },
+    {
+     "t": "note",
+     "html": "<b>Action:</b> 2 mm feed (Koudijs, 1,045 kg) runs out first - mid-October on the plan's base requirement, mid-December at the pace actually fed. On the base plan an order with any listed lead time is already late, so bridge with the 1.0-1.5 mm Aller stock only for the smallest fish and confirm real consumption this week. 3 mm and 4 mm cover lasts into late October to December depending on the scenario; each reorder is a 25 t minimum."
+    },
+    {
+     "t": "h",
+     "text": "Inventory snapshot"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Feed",
+      "Supplier",
+      "Line",
+      "Book kg 23 Sep",
+      "Last count",
+      "Counted kg",
+      "Book at count",
+      "Used 24 Aug-23 Sep"
+     ],
+     "rows": [
+      [
+       "ft17",
+       "Aller Aqua",
+       "0.9-1.6mm 44% CP",
+       "1,817",
+       "2026-08-28",
+       "2,525",
+       "2,515",
+       "818"
+      ],
+      [
+       "ft18",
+       "Aller Aqua",
+       "2mm 36% CP",
+       "0",
+       "2026-07-31",
+       "0",
+       "1,780",
+       "0"
+      ],
+      [
+       "ft19",
+       "Aller Aqua",
+       "3mm 32% CP",
+       "0",
+       "2026-08-28",
+       "0",
+       "1,545",
+       "585"
+      ],
+      [
+       "ft20",
+       "Aller Aqua",
+       "4.5mm 30% CP",
+       "0",
+       "2026-08-28",
+       "0",
+       "1,687",
+       "0"
+      ],
+      [
+       "ft21",
+       "Aller Aqua",
+       "2mm 40% CP",
+       "-60",
+       "2026-08-28",
+       "725",
+       "520",
+       "1,309"
+      ],
+      [
+       "ft22",
+       "Aller Aqua",
+       "3mm 36% CP",
+       "0",
+       "2026-08-28",
+       "0",
+       "30",
+       "0"
+      ],
+      [
+       "ft23",
+       "Aller Aqua",
+       "4.5mm 34% CP",
+       "2,480",
+       "2026-08-28",
+       "2,775",
+       "3,093",
+       "365"
+      ],
+      [
+       "ft36",
+       "Aller Aqua",
+       "0.5mm 44% CP",
+       "1,200",
+       "2026-08-28",
+       "1,200",
+       "1,183",
+       "7"
+      ],
+      [
+       "ft37",
+       "Aller Aqua",
+       "0.5-1.0mm 44% CP",
+       "1,500",
+       "2026-08-28",
+       "1,500",
+       "1,500",
+       "0"
+      ],
+      [
+       "ft38",
+       "Koudijs",
+       "2mm 37% CP",
+       "1,045",
+       "2026-08-28",
+       "2,675",
+       "2,669",
+       "1,630"
+      ],
+      [
+       "ft39",
+       "Koudijs",
+       "3mm 32% CP",
+       "7,325",
+       "2026-08-28",
+       "11,625",
+       "12,000",
+       "4,300"
+      ],
+      [
+       "ft40",
+       "Koudijs",
+       "4mm 32% CP",
+       "9,250",
+       "2026-08-28",
+       "9,250",
+       "9,300",
+       "0"
+      ]
+     ],
+     "total": false
+    }
+   ],
+   "id": "08",
+   "file": "08-feed-requirement-and-purchasing.pdf",
+   "title": "Feed Requirement and Purchasing Report",
+   "question": "How much feed should we order, and when?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "19",
+       "active cages"
+      ],
+      [
+       "16",
+       "occupied"
+      ],
+      [
+       "3",
+       "available (1B, 1C, 2E)"
+      ],
+      [
+       "12.5 kg/m3",
+       "highest density (1E)"
+      ],
+      [
+       "0",
+       "batch combinations on record"
+      ]
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Current occupancy and density (23 Sep)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Cage",
+      "Stage",
+      "Volume m3",
+      "Batch",
+      "Origin",
+      "Fish",
+      "ABW g",
+      "Biomass kg",
+      "kg/m3",
+      "Transfer readiness"
+     ],
+     "rows": [
+      [
+       "1A",
+       "nursing",
+       "125",
+       "03.26aK",
+       "Kipili",
+       "7,690",
+       "47.2",
+       "363",
+       "2.9",
+       "No"
+      ],
+      [
+       "1D",
+       "nursing",
+       "125",
+       "03.26c",
+       "Kimbwela",
+       "16,173",
+       "96.0",
+       "1,553",
+       "12.4",
+       "No"
+      ],
+      [
+       "1E",
+       "nursing",
+       "125",
+       "03.26aK",
+       "Kipili",
+       "28,707",
+       "54.5",
+       "1,565",
+       "12.5",
+       "No"
+      ],
+      [
+       "1F",
+       "nursing",
+       "125",
+       "08.26",
+       "Kimbwela",
+       "19,803",
+       "6.5",
+       "129",
+       "1.0",
+       "No"
+      ],
+      [
+       "2A",
+       "nursing",
+       "125",
+       "09.26a",
+       "Kimbwela",
+       "5,612",
+       "5.4",
+       "30",
+       "0.2",
+       "No"
+      ],
+      [
+       "2B",
+       "nursing",
+       "125",
+       "05.26b",
+       "Kimbwela",
+       "12,996",
+       "41.7",
+       "542",
+       "4.3",
+       "No"
+      ],
+      [
+       "2C",
+       "grow-out",
+       "125",
+       "02.26b",
+       "Kimbwela",
+       "9,582",
+       "132.1",
+       "1,266",
+       "10.1",
+       "Approaching"
+      ],
+      [
+       "2D",
+       "grow-out",
+       "125",
+       "02.26b",
+       "Kimbwela",
+       "4,389",
+       "222.1",
+       "975",
+       "7.8",
+       "Ready (>150 g)"
+      ],
+      [
+       "3A",
+       "nursing",
+       "125",
+       "05.26aK",
+       "Kimbwela",
+       "25,409",
+       "47.0",
+       "1,194",
+       "9.6",
+       "No"
+      ],
+      [
+       "3B",
+       "nursing",
+       "125",
+       "05.26cK",
+       "Kipili",
+       "29,796",
+       "34.3",
+       "1,022",
+       "8.2",
+       "No"
+      ],
+      [
+       "3C",
+       "nursing",
+       "125",
+       "06.26a",
+       "Kimbwela",
+       "41,104",
+       "22.1",
+       "908",
+       "7.3",
+       "No"
+      ],
+      [
+       "3D",
+       "nursing",
+       "125",
+       "03.26b",
+       "Kimbwela",
+       "2,964",
+       "116.4",
+       "345",
+       "2.8",
+       "Approaching"
+      ],
+      [
+       "3E",
+       "nursing",
+       "125",
+       "07.26a",
+       "Kimbwela",
+       "56,839",
+       "11.5",
+       "654",
+       "5.2",
+       "No"
+      ],
+      [
+       "3F",
+       "nursing",
+       "125",
+       "07.26b",
+       "Kimbwela",
+       "31,033",
+       "10.5",
+       "326",
+       "2.6",
+       "No"
+      ],
+      [
+       "G1.A",
+       "grow-out",
+       "750",
+       "02.26cK",
+       "Kipili",
+       "61,938",
+       "63.0",
+       "3,902",
+       "5.2",
+       "No"
+      ],
+      [
+       "G1.D",
+       "grow-out",
+       "790",
+       "02.26aK",
+       "Kipili",
+       "37,163",
+       "82.9",
+       "3,081",
+       "3.9",
+       "No"
+      ],
+      [
+       "1B",
+       "nursing",
+       "125",
+       "-",
+       "-",
+       "0",
+       "-",
+       "0",
+       "0.0",
+       "Available"
+      ],
+      [
+       "1C",
+       "nursing",
+       "125",
+       "-",
+       "-",
+       "0",
+       "-",
+       "0",
+       "0.0",
+       "Available"
+      ],
+      [
+       "2E",
+       "grow-out",
+       "125",
+       "-",
+       "-",
+       "0",
+       "-",
+       "0",
+       "0.0",
+       "Available"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "small",
+     "text": "Usable volume = recorded system volume; net-pen depth and oxygen limits are not applied. Density is biomass / volume. A farm density ceiling is not recorded, so no cage is flagged as overstocked; the plan's own limit is not defined."
+    },
+    {
+     "t": "h",
+     "text": "Proposed combinations (similar ABW, same stage, compatible origin first)"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Cages (ABW, fish)",
+      "Batches",
+      "Origins",
+      "Combined load",
+      "Comment"
+     ],
+     "rows": [
+      [
+       "1D (96.0 g, 16,173) + 3D (116.4 g, 2,964)",
+       "03.26c + 03.26b",
+       "Kimbwela + Kimbwela",
+       "19,137 fish / 1,898 kg in one 125 m3 cage = 15.2 kg/m3",
+       "Frees 1 cage; both are 96-116 g. 3D is already being harvested at 110-134 g."
+      ],
+      [
+       "1A (47.2 g, 7,690) + 2B (41.7 g, 12,996)",
+       "03.26aK + 05.26b",
+       "Kipili + Kimbwela",
+       "20,686 fish / 905 kg in one 125 m3 cage = 7.2 kg/m3",
+       "Frees 1 cage; mixes origins - keep both batch IDs with fish counts so comparisons remain possible."
+      ],
+      [
+       "3A (47.0 g, 25,409) + 1E (54.5 g, 28,707)",
+       "05.26aK + 03.26aK",
+       "Kimbwela + Kipili",
+       "54,116 fish / 2,759 kg in one 125 m3 cage = 22.1 kg/m3",
+       "Too dense for a 125 m3 cage; only workable in G1.D / G1.A volume."
+      ],
+      [
+       "2C (132 g, 9,582) + 2D (222 g, 4,389)",
+       "02.26b + 02.26b",
+       "Same batch",
+       "13,971 fish / 2,241 kg in one 125 m3 cage = 17.9 kg/m3",
+       "ABW differs by 68%; regrade first, do not combine as-is."
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "note",
+     "html": "<b>Preserving batch contribution:</b> the database has batch_combination and batch_combination_component tables, with a derived batch and per-component fish counts (none created yet). Combine through that route (not by re-labelling) so each source batch's share survives for performance comparison. Mixed cages should be sampled by origin before the next monthly close."
+    },
+    {
+     "t": "h",
+     "text": "Cycle records that no longer match cages"
+    },
+    {
+     "t": "table",
+     "head": [
+      "Cage",
+      "Cycle batch still 'ongoing'",
+      "Where the fish are now",
+      "Issue"
+     ],
+     "rows": [
+      [
+       "1B",
+       "02.26cK (cycle 13)",
+       "G1.A",
+       "Cage is 'available' but cycle open"
+      ],
+      [
+       "1C",
+       "03.26b (cycle 14)",
+       "3D",
+       "Cage is 'available' but cycle open; 02.26cK also moved through 1C"
+      ],
+      [
+       "2B",
+       "02.26aK (cycle 10) and 05.26b (cycle 24)",
+       "G1.D and 2B",
+       "Two ongoing cycles in one cage"
+      ]
+     ],
+     "total": false
+    }
+   ],
+   "id": "09",
+   "file": "09-cage-allocation-and-batch-mixing.pdf",
+   "title": "Cage Allocation and Batch-Mixing Report",
+   "question": "How do we fill finishing cages while keeping meaningful comparisons?"
+  },
+  {
+   "blocks": [
+    {
+     "t": "kpis",
+     "items": [
+      [
+       "16",
+       "exceptions"
+      ],
+      [
+       "4",
+       "high"
+      ],
+      [
+       "10",
+       "medium"
+      ],
+      [
+       "2",
+       "low / info"
+      ],
+      [
+       "No",
+       "numbers ready for sign-off"
+      ]
+     ]
+    },
+    {
+     "t": "h",
+     "text": "Exceptions register"
+    },
+    {
+     "t": "table",
+     "head": [
+      "#",
+      "Type",
+      "Severity",
+      "Detail",
+      "Owner (suggested role)",
+      "Status"
+     ],
+     "rows": [
+      [
+       "1",
+       "Conflicting count",
+       "High",
+       "02.26cK: 1B -1,008, 1C -749 and 1A -11 book fish; reconciliation rows record confirmed 0 but ledger not adjusted",
+       "Farm manager",
+       "Open"
+      ],
+      [
+       "2",
+       "Unexplained loss",
+       "High",
+       "02.26cK: 11,259 fish (673.8 kg) booked 'lost / unaccounted' on 28 Aug, entered 1 Sep outside the app form",
+       "Farm manager",
+       "Open"
+      ],
+      [
+       "3",
+       "Unbalanced transfer",
+       "High",
+       "02.26cK transferred 37,209 fish out of 1C into G1.A; 1C held 36,460 (749 more fish out than in)",
+       "Data lead",
+       "Open"
+      ],
+      [
+       "4",
+       "Forecast on obsolete assumption",
+       "High",
+       "Plan rev 6 starts 15 of 16 cages above measured ABW (up to 39%); model feed is 2.2x what was fed",
+       "Production planner",
+       "Open"
+      ],
+      [
+       "5",
+       "Post-transfer mortality",
+       "Medium",
+       "02.26cK recorded 2,024 deaths in the window (2.8% of opening), the most of any batch, after the 1B/1C to G1.A transfers",
+       "Farm manager",
+       "Monitoring"
+      ],
+      [
+       "6",
+       "Overdue / missing sample",
+       "Medium",
+       "05.26b / 2B: no 23 Aug sample (latest 23 Jul); 08.26 and 09.26a: no opening sample; 1B: last sample 14 Aug (30 fish)",
+       "Sampling lead",
+       "Open"
+      ],
+      [
+       "7",
+       "Small sample",
+       "Medium",
+       "n < 150 at close: G1.D (100), 2C (100), 2D (100), 3D (125)",
+       "Sampling lead",
+       "Open"
+      ],
+      [
+       "8",
+       "Unusual ABW change",
+       "Medium",
+       "2D 184.6 to 222.1 g in 20 days (n = 50 then 100); 2C 112.3 to 132.1 g in the same 20 days; G1.A 59.7 to 63.0 g in 12 days",
+       "Sampling lead",
+       "Open"
+      ],
+      [
+       "9",
+       "Invalid / implausible harvest rows",
+       "Medium",
+       "03.26aK 13 Apr: 1,565 fish at 1.0 g/fish; 06.26a 17 Jun: 15 fish 0.025 kg; 08.26 22 Sep: 20 fish at 6.8 g - culls or samples coded as harvest",
+       "Data lead",
+       "Open"
+      ],
+      [
+       "10",
+       "Batch stocked above delivery",
+       "Medium",
+       "08.26: stocked 19,861 vs delivered 18,254 (+1,607 on a second stocking record after 23 Aug)",
+       "Data lead",
+       "Open"
+      ],
+      [
+       "11",
+       "Planned stocking not recorded",
+       "Medium",
+       "80,000 fish planned for 25 Sep (and 50,000 for 1 Oct) have no stocking record; the latest stocking record is 4 Sep (data to 29 Sep)",
+       "Production planner",
+       "Open"
+      ],
+      [
+       "12",
+       "Invalid FCR",
+       "Medium",
+       "02.26cK, 05.26b, 08.26, 09.26a cannot support a ratio; eFCR on 02.26aK is 2.59 with n=100",
+       "Production planner",
+       "Open"
+      ],
+      [
+       "13",
+       "Feed inventory conflict",
+       "Medium",
+       "Aller 2 mm 40% CP is -60.5 kg book; four Aller lines show 0 kg counted but 5,041 kg book; last count 28 Aug",
+       "Feed store",
+       "Open"
+      ],
+      [
+       "14",
+       "Cycle records out of step",
+       "Medium",
+       "Cycles still ongoing in 1B, 1C and two in 2B though fish moved; cage statuses 'available'",
+       "Data lead",
+       "Open"
+      ],
+      [
+       "15",
+       "Missing feed records",
+       "Low",
+       "09.26a fed on 19 of 20 days since stocking; all other batches fed all 31 days",
+       "Feed store",
+       "Open"
+      ],
+      [
+       "16",
+       "Missing data classes",
+       "Info",
+       "No water quality rows, no physical count rows, no handling-time or stock-purpose fields",
+       "Farm manager",
+       "Open"
+      ]
+     ],
+     "total": false
+    },
+    {
+     "t": "note",
+     "html": "<b>Can management trust this month's numbers?</b> Deaths, feed fed and harvest kg are recorded totals and reconcile to the source tables. Closing fish counts, biomass and FCR should not be treated as certified until the 02.26cK count, the 11,259-fish loss and the sampling gaps are resolved. Owners are suggested roles, not assigned people."
+    },
+    {
+     "t": "small",
+     "text": "Comparison note: batch names match the Tanlake Samaki monthly report, but counts differ for the same date (for example 02.26b opening 14,081 here against 11,021 in the Tanlake report). This database is a separate dataset; do not mix the two when reconciling."
+    }
+   ],
+   "id": "10",
+   "file": "10-data-exceptions-and-monthly-close.pdf",
+   "title": "Data Exceptions and Monthly Close Report",
+   "question": "Can management trust this month's numbers?"
+  }
+ ]
+}

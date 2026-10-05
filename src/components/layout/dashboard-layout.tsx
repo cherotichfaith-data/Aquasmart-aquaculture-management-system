@@ -83,10 +83,19 @@ export default function DashboardLayout({
   const farmRoleQuery = useActiveFarmRole(headerDataOverrides?.role ? null : farmId)
   const farmRole = (headerDataOverrides?.role ?? farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const allowDataEntry = canAccessDataEntry(farmRole)
+  // The active farm is stored in a cookie, so a matching ?farmId=<uuid> is just noise in the address bar.
+  useEffect(() => {
+    if (!farmId || typeof window === "undefined") return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get("farmId") !== farmId) return
+    url.searchParams.delete("farmId")
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+  }, [farmId, searchParams])
   // Data Entry already opens straight into this exact picker -- a floating
   // trigger on top of it would just duplicate what's already on screen.
   const isDataEntryRoute = stripDashboardPath(pathname) === DATA_ENTRY_PATH
-  const showMobileQuickEntry = allowDataEntry && !isDataEntryRoute
+  const isReportsRoute = stripDashboardPath(pathname).startsWith("/reports")
+  const showMobileQuickEntry = allowDataEntry && !isDataEntryRoute && !isReportsRoute
 
   useEffect(() => {
     const applyResponsiveSidebarState = () => {

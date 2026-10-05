@@ -127,7 +127,8 @@ export function canAccessDataEntry(role: AquasmartRole) {
   )
 }
 
-const CONTEXT_CARRY_KEYS = ["farmId", "system", "cage", "date", "batch", "stage"] as const
+// farmId is deliberately not carried: the active farm lives in a cookie, so it never needs to show in the address bar.
+const CONTEXT_CARRY_KEYS = ["system", "cage", "date", "batch", "stage"] as const
 
 /**
  * Appends the current farm/system/cage/date/batch/stage query params (when

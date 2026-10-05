@@ -1,22 +1,19 @@
 "use client"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent } from "react"
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import {
   Bell,
   Droplets,
   Fish,
   FlaskConical,
-  LogOut,
   Menu as MenuIcon,
   PackageOpen,
   PlusCircle,
-  Settings,
   X,
 } from "lucide-react"
 import { useNotifications } from "@/components/notifications/notifications-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 import { getHeaderPageMeta, getHeaderPageTimeConfig } from "@/components/layout/header-config"
-import { Avatar } from "@/components/app-ui/avatar"
 import { Button } from "@/components/app-ui/button"
 import { Menu, MenuItem } from "@/components/app-ui/menu"
 import { Separator } from "@/components/app-ui/separator"
@@ -30,7 +27,7 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useSharedFilters } from "@/lib/hooks/app/use-shared-filters"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
 import { useTimePeriodBounds } from "@/lib/hooks/app/use-time-period-bounds"
-import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
+import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath } from "@/lib/app-entry"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { formatStableDateTime } from "@/lib/analytics-format"
@@ -207,26 +204,24 @@ export default function Header({
   onMenuClick: () => void
   showToolbar?: boolean
 }) {
-  const { user, role, signOut } = useAuth()
+  const { role } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const appPathname = stripDashboardPath(pathname)
+  const isReportsPage = appPathname.startsWith("/reports")
   const searchParams = useSearchParams()
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const activeFarmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
   const { notifications, markAllRead, markRead, dismiss, activeAlerts } = useNotifications()
-  const [signingOut, setSigningOut] = useState(false)
   const [isCondensed, setIsCondensed] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null)
-  const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null)
   const [addDataAnchor, setAddDataAnchor] = useState<HTMLElement | null>(null)
   const [notifTab, setNotifTab] = useState<"alerts" | "recent">("alerts")
 
   const pageMeta = getHeaderPageMeta(appPathname, searchParams.get("tab"))
   const pageTimeConfig = useMemo(() => getHeaderPageTimeConfig(appPathname), [appPathname])
   const resolvedRole = (roleOverride ?? activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
-  const resolvedUser = user ?? null
   // The persistent "cage empty" condition is now owned by activeAlerts; drop it
   // from the point-in-time history list so it isn't shown twice.
   const historyNotifications = useMemo(
@@ -245,7 +240,6 @@ export default function Header({
   // Active alerts are standing conditions (empty cage, mortality spiking) that
   // stay until resolved, so they always count toward the bell badge.
   const bellBadgeCount = historyUnreadCount + activeAlerts.length
-  const canAccessSettings = resolvedRole === "admin" || resolvedRole === "farm_manager"
   const allowDataEntry = canAccessDataEntry(resolvedRole)
   // Available from every page the shared header renders on, not just the
   // dashboard -- logging a reading shouldn't require navigating back first.
@@ -488,59 +482,6 @@ export default function Header({
     handleStageChange("all")
   }, [handleStageChange, pageTimeConfig.showStageFilter, selectedStage])
 
-  const handleSignOut = async () => {
-    if (signingOut) return
-    setSigningOut(true)
-    try {
-      await signOut()
-    } finally {
-      setSigningOut(false)
-    }
-  }
-
-  const formatRole = (value: string | null) => {
-    if (!value) return ""
-    return value
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-  }
-
-  // Auth state resolves client-side only (see AuthProvider), so the very first
-  // client render can already have `user` populated while the server render
-  // never does. Gate the initial-dependent render behind a mounted flag so
-  // both the server HTML and the client's first hydration pass agree (both
-  // render nothing), avoiding a hydration mismatch on the avatar text node.
-  const hasMounted = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  )
-
-  const userInitial = useMemo(() => {
-    if (!hasMounted) return ""
-
-    const nameCandidate = [
-      resolvedUser?.user_metadata?.first_name,
-      resolvedUser?.user_metadata?.full_name,
-      resolvedUser?.user_metadata?.name,
-      resolvedUser?.email,
-    ].find((value): value is string => typeof value === "string" && value.trim().length > 0)
-
-    const firstToken = nameCandidate?.trim().split(/[\s@._-]+/).find(Boolean) ?? ""
-    return firstToken.charAt(0).toUpperCase() || ""
-  }, [hasMounted, resolvedUser?.email, resolvedUser?.user_metadata])
-
-  const displayName = useMemo(() => {
-    return (
-      [resolvedUser?.user_metadata?.full_name, resolvedUser?.user_metadata?.name, resolvedUser?.user_metadata?.first_name].find(
-        (value): value is string => typeof value === "string" && value.trim().length > 0,
-      ) ??
-      resolvedUser?.email ??
-      null
-    )
-  }, [resolvedUser?.email, resolvedUser?.user_metadata])
-
   useEffect(() => {
     if (typeof window === "undefined") return
 
@@ -560,7 +501,6 @@ export default function Header({
   useEffect(() => {
     setMobileFiltersOpen(false)
     setNotificationsAnchor(null)
-    setUserMenuAnchor(null)
     setAddDataAnchor(null)
   }, [pathname, searchParams])
 
@@ -603,7 +543,7 @@ export default function Header({
         )}
       >
         <div className={cn("grid", showToolbar ? "gap-3" : "gap-0")}>
-          <div className="flex flex-nowrap items-center justify-between gap-2">
+          <div className={cn("flex flex-nowrap items-center justify-between gap-2", isReportsPage && "md:hidden")}>
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <button
                 type="button"
@@ -613,7 +553,7 @@ export default function Header({
               >
                 <MenuIcon size={20} />
               </button>
-              {pageMeta ? (
+              {pageMeta && !isReportsPage ? (
                 <div className="min-w-0">
                   <h1
                     className={cn(
@@ -623,11 +563,11 @@ export default function Header({
                   >
                     {pageMeta.title}
                   </h1>
-                  <p className="mt-1 block text-xs font-medium text-muted-foreground">{timeWindowSummary}</p>
+                  {isReportsPage ? null : <p className="mt-1 block text-xs font-medium text-muted-foreground">{appPathname.startsWith("/production") ? timeWindowSummary.replace("All History", "Cycle to date") : timeWindowSummary}</p>}
                 </div>
               ) : null}
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-1.5 rounded-full">
+            <div className={cn("flex flex-wrap items-center justify-end gap-1.5 rounded-full", isReportsPage && "hidden")}>
               <Tooltip content="Notifications">
                 <button
                   type="button"
@@ -640,15 +580,6 @@ export default function Header({
                       {bellBadgeCount > 9 ? "9+" : bellBadgeCount}
                     </span>
                   ) : null}
-                </button>
-              </Tooltip>
-              <Tooltip content="Account">
-                <button
-                  type="button"
-                  onClick={openMenu(setUserMenuAnchor)}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-0.5 hover:bg-accent"
-                >
-                  <Avatar className="size-[34px]">{userInitial}</Avatar>
                 </button>
               </Tooltip>
             </div>
@@ -701,10 +632,11 @@ export default function Header({
                         onCustomRangeChange={handleCustomRangeChange}
                         variant="compact"
                         periods={timePeriodOptions}
+                        customLabels={appPathname.startsWith("/production") ? { "all history": "Cycle to date" } : undefined}
                       />
                     </div>
                   ) : null}
-                  {showAddData ? (
+                  {showAddData && !isReportsPage ? (
                     <Button
                       variant="default"
                       onClick={openMenu(setAddDataAnchor)}
@@ -818,34 +750,6 @@ export default function Header({
             ))
           )}
         </div>
-      </Menu>
-
-      <Menu anchorEl={userMenuAnchor} open={Boolean(userMenuAnchor)} onClose={() => setUserMenuAnchor(null)} className="mt-1 w-60">
-        <div className="px-4 py-3">
-          <p className="text-sm font-bold">{displayName}</p>
-          {resolvedUser?.email && displayName !== resolvedUser.email ? (
-            <p className="mt-1 block text-xs text-muted-foreground">{resolvedUser.email}</p>
-          ) : null}
-          {resolvedRole ? <p className="mt-0.5 block text-xs text-muted-foreground">{formatRole(resolvedRole)}</p> : null}
-        </div>
-        <Separator />
-        {canAccessSettings ? (
-          <MenuItem href={toDashboardPath("/settings")} onClick={() => setUserMenuAnchor(null)}>
-            <Settings size={16} />
-            Settings
-          </MenuItem>
-        ) : null}
-        <MenuItem
-          onClick={async () => {
-            setUserMenuAnchor(null)
-            await handleSignOut()
-          }}
-          disabled={signingOut}
-          destructive
-        >
-          <LogOut size={16} />
-          {signingOut ? "Logging out..." : "Log out"}
-        </MenuItem>
       </Menu>
 
       <Menu anchorEl={addDataAnchor} open={Boolean(addDataAnchor)} onClose={() => setAddDataAnchor(null)} className="mt-1 w-60">

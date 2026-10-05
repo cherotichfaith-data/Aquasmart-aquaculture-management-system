@@ -26,7 +26,8 @@ export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
     if (pathname.startsWith("/production")) {
       return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: false, showStageFilter: false, showSystemFilter: false }
     }
-    return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
+    // Reports: the monthly report pack is farm-wide, so only the time period filter applies.
+    return { defaultPeriod: "month", scope: "production", useSystemBounds: false, showBatchFilter: false, showStageFilter: false, showSystemFilter: false, showTimePeriod: false }
   }
   if (pathname.startsWith("/batches")) {
     return {
@@ -88,8 +89,8 @@ export const getHeaderPageMeta = (pathname: string, tab: string | null): PageMet
   }
   if (pathname.startsWith("/reports")) {
     return {
-      title: "Reports",
-      description: "Exports, compliance, and period summaries without inferring fake production dates.",
+      title: "Monthly reports",
+      description: "Ten month-end management reports for the farm.",
     }
   }
   if (pathname.startsWith("/actions")) {

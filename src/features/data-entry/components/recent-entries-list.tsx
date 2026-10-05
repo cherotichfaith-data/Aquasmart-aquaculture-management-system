@@ -519,6 +519,6 @@ export function RecentEntriesList(props: RecentEntriesListProps) {
     }))
   }
 
-  return <><EntriesSection cards={cards} pendingCount={pendingCount} scopeLabel={scopeLabel} /><Link className="mt-3 inline-block text-sm underline" href={`/approvals?farmId=${encodeURIComponent(props.farmId ?? "")}`}>View submissions and review status</Link></>
+  return <><EntriesSection cards={cards} pendingCount={pendingCount} scopeLabel={scopeLabel} /><Link className="mt-3 inline-block text-sm underline" href="/approvals">View submissions and review status</Link></>
 }
 

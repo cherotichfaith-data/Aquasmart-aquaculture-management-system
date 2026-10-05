@@ -1,6 +1,7 @@
 import type React from "react"
 import { Suspense } from "react"
 import type { Metadata } from "next"
+import { IBM_Plex_Sans, Manrope } from "next/font/google"
 import { AuthProvider } from "@/components/providers"
 import { SyncProvider } from "@/components/offline/sync-provider"
 import { FarmOnboardingGate } from "@/components/providers/farm-onboarding-gate"
@@ -8,6 +9,10 @@ import { ToastProvider } from "@/components/shared/toast-provider"
 import { NotificationsProvider } from "@/components/notifications/notifications-provider"
 import { ReactQueryProvider } from "@/lib/react-query-provider"
 import "./globals.css"
+
+// The daily planner's typefaces: IBM Plex Sans for text, Manrope for headings.
+const plexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-plex", display: "swap" })
+const manrope = Manrope({ subsets: ["latin"], weight: ["400", "600", "700", "800"], variable: "--font-manrope", display: "swap" })
 
 // Resolve the canonical site URL from configuration only -- explicit env first,
 // then the values Vercel injects automatically, and finally the local dev
@@ -67,7 +72,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${plexSans.variable} ${manrope.variable}`}>
       <head />
       <body className={`font-sans antialiased`}>
         <ReactQueryProvider>

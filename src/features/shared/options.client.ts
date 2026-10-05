@@ -139,15 +139,17 @@ export async function getFingerlingSupplierOptions(params?: {
     .order("company_name", { ascending: true })
   if (params?.signal) query = query.abortSignal(params.signal)
 
-  const result = await resolveClientReadQuery<FingerlingSupplierTableRow>({
-    tag: "getFingerlingSupplierOptions",
-    query,
-    signal: params?.signal,
-    quietWhen: isQuietTableError,
-  })
-  if (result.status !== "success") return result
+  // Not resolveClientReadQuery: it turns auth/permission failures into an empty list, which the batch
+  // form shows as "No suppliers found". Surface them so the form can show the error and offer a retry.
+  const { data, error } = await query
+  if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return empty<FingerlingSupplierRow>()
+    return toQueryError<FingerlingSupplierRow>("getFingerlingSupplierOptions", error)
+  }
 
-  return toQuerySuccess<FingerlingSupplierRow>(normalizeFingerlingSupplierOptions(result.data))
+  return toQuerySuccess<FingerlingSupplierRow>(
+    normalizeFingerlingSupplierOptions(data as FingerlingSupplierTableRow[] | null),
+  )
 }
 
 export async function getFarmOptions(params?: {
