@@ -2086,6 +2086,33 @@ export type Database = {
         Args: { p_id: number; p_payload: Json }
         Returns: Json
       }
+      api_analytics_outlook: {
+        Args: {
+          p_as_of?: string
+          p_farm_id: string
+          p_month: string
+          p_months_back?: number
+          p_months_forward?: number
+          p_plan_months?: number
+          p_planned_abw_g?: number
+          p_planned_fish?: number
+          p_scenario?: string
+          p_sections?: string[]
+          p_target_g?: number
+        }
+        Returns: Json
+      }
+      api_analytics_performance: {
+        Args: {
+          p_farm_id: string
+          p_month: string
+          p_period_end?: string
+          p_period_start?: string
+          p_scenario?: string
+          p_sections?: string[]
+        }
+        Returns: Json
+      }
       api_batch_growth_trend: {
         Args: {
           p_batch_ids: number[]

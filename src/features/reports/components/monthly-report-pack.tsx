@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
+import Link from "next/link"
 import pack from "@/features/reports/monthly/tanganyika-blue-2026-09.json"
 import { FilterPopover } from "@/components/shared/filter-popover"
 import "@/features/reports/monthly/monthly-reports.css"
@@ -16,6 +17,9 @@ type Block =
 type MonthlyReport = { id: string; file: string; title: string; question: string; blocks: Block[] }
 
 const REPORTS = pack.reports as MonthlyReport[]
+// These fixed snapshots overlap live workbook-based views in Analytics.
+const ARCHIVED_REPORT_IDS = new Set(["02", "06"])
+const ROUTINE_REPORTS = REPORTS.filter(report => !ARCHIVED_REPORT_IDS.has(report.id))
 const PDF_BASE = "/reports/tanganyika-blue-2026-09"
 // The pack is a fixed snapshot of one farm's data, so it is only shown for that farm.
 const PACK_FARM = /tanganyika|tanlake/i
@@ -141,25 +145,49 @@ const PACK_START = "2026-08-23"
 const PACK_END = "2026-09-23"
 
 export default function MonthlyReports({
+  farmId,
   farmName,
   dateFrom,
   dateTo,
   filterSlot,
 }: {
+  farmId?: string | null
   farmName?: string | null
   dateFrom?: string | null
   dateTo?: string | null
   /** The period filter; shown directly under the report picker (or on its own when no report is in view). */
   filterSlot?: ReactNode
 }) {
-  const [active, setActive] = useState(0)
-  const report = REPORTS[active]
+  const [active, setActive] = useState(ROUTINE_REPORTS[0].id)
+  const [showArchived, setShowArchived] = useState(false)
+  const availableReports = showArchived ? REPORTS : ROUTINE_REPORTS
+  const report = availableReports.find(item => item.id === active) ?? availableReports[0]
+  const analyticsHref = (view: string) => {
+    const params = new URLSearchParams({ report: view })
+    if (farmId) params.set("farmId", farmId)
+    if (dateFrom && dateTo) { params.set("from", dateFrom); params.set("to", dateTo) }
+    return `/analytics?${params.toString()}`
+  }
+  const liveReports = (
+      <section className="planner-card">
+        <h2>Production analysis</h2>
+        <p className="planner-note">Use the live workbook-based views for batch performance, growth, cage performance and farm planning.</p>
+        <nav aria-label="Live production reports" className="flex flex-wrap gap-4 text-sm underline">
+          <Link href={analyticsHref("batches")}>Batch performance</Link>
+          <Link href={analyticsHref("growth")}>Growth analysis</Link>
+          <Link href={analyticsHref("cages")}>Cage performance</Link>
+          <Link href={analyticsHref("outlook")}>Stock profile</Link>
+          <Link href={analyticsHref("planning")}>Biomass forecast and forward planning</Link>
+        </nav>
+      </section>
+  )
   const hasRange = Boolean(dateFrom && dateTo)
   const overlaps = !hasRange || (dateFrom! <= PACK_END && dateTo! >= PACK_START)
 
   if (!farmName || !PACK_FARM.test(farmName)) {
     return (
       <div className="tb-monthly">
+        {liveReports}
         <section className="planner-card">
           <p className="planner-note">
             The monthly reports (23 Aug to 23 Sep 2026) are a snapshot for {pack.meta.farm}. Select that farm to view them.
@@ -172,6 +200,7 @@ export default function MonthlyReports({
   if (!overlaps) {
     return (
       <div className="tb-monthly">
+        {liveReports}
         {filterSlot}
         <section className="planner-card">
           <h2>No report for this period</h2>
@@ -188,6 +217,8 @@ export default function MonthlyReports({
 
   return (
     <div className="tb-monthly">
+      {liveReports}
+      <p className="rpt-small">Historical review: 23 Aug–23 Sep 2026. The reports below are fixed snapshots, including their PDF downloads.</p>
       <div className="rpt-titlebar">
         <h2>{report.title}</h2>
         <div className="rpt-actions">
@@ -207,16 +238,24 @@ export default function MonthlyReports({
       <div className="rpt-filters">
         <div className="rpt-filter-report">
           <FilterPopover
-            value={String(active)}
-            options={REPORTS.map((r, i) => ({ value: String(i), label: `${Number(r.id)} · ${r.title.replace(/ Report$/, "")}` }))}
+            value={report.id}
+            options={availableReports.map((r) => ({ value: r.id, label: `${r.title.replace(/ Report$/, "")}${ARCHIVED_REPORT_IDS.has(r.id) ? " (archived)" : ""}` }))}
             placeholder="Select report"
-            onChange={(v) => setActive(Number(v))}
+            onChange={setActive}
             searchable={false}
             className="w-full"
           />
         </div>
       </div>
 
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={showArchived} onChange={event => {
+          const checked = event.target.checked
+          setShowArchived(checked)
+          if (!checked && ARCHIVED_REPORT_IDS.has(active)) setActive(ROUTINE_REPORTS[0].id)
+        }} />
+        Include archived batch-performance and stock-profile snapshots
+      </label>
       <section className="planner-card">
         <p className="rpt-question">{report.question}</p>
         {report.blocks.map((b, i) => {

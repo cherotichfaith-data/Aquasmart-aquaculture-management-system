@@ -24,6 +24,7 @@ export type KpiRpcName =
   | "api_latest_water_quality_status"
   | "api_water_quality_trend"
   | "api_water_quality_index"
+  | "api_analytics_performance"
 
 /**
  * Option RPCs (replacing PostgREST option views where possible).

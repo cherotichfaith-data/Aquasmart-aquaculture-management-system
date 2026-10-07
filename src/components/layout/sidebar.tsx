@@ -17,7 +17,6 @@ import { Skeleton } from "@/components/app-ui/skeleton"
 import { Tooltip } from "@/components/app-ui/tooltip"
 import { cn } from "@/lib/utils"
 import {
-  Activity,
   BarChart3,
   Fish,
   LayoutDashboard,
@@ -47,7 +46,7 @@ const ALL_NAV_SECTIONS = [
     items: [
       { name: "Feed", href: toDashboardPath("/feed"), icon: Fish },
       { name: "Production", href: toDashboardPath("/production"), icon: BarChart3 },
-      { name: "Reports", href: toDashboardPath("/reports"), icon: Activity },
+      { name: "Analytics", href: toDashboardPath("/analytics"), icon: BarChart3 },
     ],
   },
   {
@@ -70,7 +69,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
-    toDashboardPath("/reports"),
+    toDashboardPath("/analytics"),
     DATA_ENTRY_PATH,
     toDashboardPath("/settings"),
     "/users",
@@ -81,7 +80,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
-    toDashboardPath("/reports"),
+    toDashboardPath("/analytics"),
     DATA_ENTRY_PATH,
     toDashboardPath("/settings"),
   ]),
@@ -95,14 +94,14 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
-    toDashboardPath("/reports"),
+    toDashboardPath("/analytics"),
   ]),
   viewer: new Set([
     toDashboardPath("/"),
     toDashboardPath("/systems"),
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
-    toDashboardPath("/reports"),
+    toDashboardPath("/analytics"),
   ]),
 }
 
