@@ -22,7 +22,7 @@ export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
   if (pathname.startsWith("/feed")) {
     return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
   }
-  if (pathname.startsWith("/production") || pathname.startsWith("/reports")) {
+  if (pathname.startsWith("/production") || pathname.startsWith("/reports") || pathname.startsWith("/analytics")) {
     if (pathname.startsWith("/production")) {
       return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: false, showStageFilter: false, showSystemFilter: false }
     }
@@ -91,6 +91,15 @@ export const getHeaderPageMeta = (pathname: string, tab: string | null): PageMet
     return {
       title: "Monthly reports",
       description: "Ten month-end management reports for the farm.",
+    }
+  }
+  if (pathname.startsWith("/analytics/inputs")) {
+    return { title: "Production inputs" }
+  }
+  if (pathname.startsWith("/analytics")) {
+    return {
+      title: "Analytics",
+      description: "Month-end batch, harvest and feed analytics for the farm.",
     }
   }
   if (pathname.startsWith("/actions")) {

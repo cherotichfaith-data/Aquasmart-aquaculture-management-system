@@ -35,6 +35,7 @@ const STANDALONE_FEATURE_PREFIXES = [
   "/feed",
   "/production",
   "/reports",
+  "/analytics",
   "/settings",
   "/actions",
   "/users",
@@ -98,7 +99,7 @@ export function resolveAppEntryPath(role: AquasmartRole) {
   if (role === "admin" || role === "farm_manager") return DASHBOARD_ROOT
   if (role === "system_operator") return `${DATA_ENTRY_PATH}?type=feeding`
   if (role === "data_analyst") return toDashboardPath("/production")
-  if (role === "viewer") return toDashboardPath("/reports")
+  if (role === "viewer") return toDashboardPath("/analytics")
   return DASHBOARD_ROOT
 }
 

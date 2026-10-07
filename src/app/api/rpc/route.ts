@@ -20,6 +20,7 @@ const ALLOWED_RPC_NAMES = new Set<RpcProxyName>([
   "api_latest_water_quality_status",
   "api_water_quality_trend",
   "api_water_quality_index",
+  "api_analytics_performance",
   "api_batch_system_ids",
   "api_farm_options_rpc",
   "api_system_options_rpc",

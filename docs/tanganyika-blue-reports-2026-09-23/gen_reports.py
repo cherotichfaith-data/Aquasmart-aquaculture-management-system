@@ -297,26 +297,18 @@ def r2():
                                                                        "Feed fed in window"),
                    (n0(sum(D.LED[b][3] for b in D.BATCHES)), "Deaths in window")]))
     s.append(h2("Batch performance"))
+    # The batch table is the live Detailed Batch Report (public.api_analytics_batch_report), month end figures.
     rows = []
-    for b in D.BATCHES:
-        L = D.LED[b]
-        sup = D.ORIGIN[b][0]
-        denom = L[0] + L[1]
-        mort = L[3] / denom * 100 if denom else None
-        gain, ef, why = efcr_window(b)
-        abw = batch_abw(b)
-        opening_abw = B_OPEN[b] * 1000 / sum(c[2] for c in D.CAGE_OPEN if c[1] == b and c[2] > 0 and c[5]) if b in B_OPEN and b not in B_OPEN_MISS else None
-        rows.append([b, sup.split()[0], D.ORIGIN[b][1], str(culture_days(b)), stage_label(b),
-                     n0(CLOSE_FISH_BY_BATCH[b]), n1(abw), n0(B_CLOSE[b]), n1(opening_abw),
-                     n1(gain) if gain else "-", n0(L[9]), pct(mort, 2),
-                     n2(ef) if ef else "-", "250 g" if b in ("02.26aK", "02.26b", "02.26cK", "03.26aK", "03.26b", "03.26c") else "400 g (plan)"])
-    s.append(table(["Batch", "Origin", "Stocked", "Days", "Stage", "Fish", "ABW g", "Biomass kg", "Open ABW g",
-                    "Gain kg", "Feed kg", "Mort %", "eFCR*", "Target"], rows,
-                   [0.07, 0.07, 0.08, 0.04, 0.08, 0.08, 0.06, 0.08, 0.07, 0.07, 0.07, 0.07, 0.06, 0.1]))
-    s.append(small("Stage: Grow-out = grow-out cages, Nursing = nursing cages. Broodstock and reserved stock are not recorded "
-                   "anywhere in the data. Mort % = deaths in window / (opening + stocked). *eFCR = feed in window / "
-                   "(closing biomass - opening biomass + harvested kg); indicative, from book counts x sampled ABW, not verified counts. "
-                   "Target: production_cycle.target_weight_g (250 g on older cycles) or the plan's 400 g where no cycle target is set."))
+    for (b, date_in, age, stock_end, abw, h_no, h_kg, h_abw, bio, corr, mort, loss, growth, feed, ef, acc, _stocked) in D.DETAILED_BATCH_REPORT:
+        rows.append([b, d(date_in).strftime("%d %b %y") if date_in else "-", n0(age), n0(stock_end), n1(abw), n0(h_no), n1(h_kg), n1(h_abw),
+                     n1(bio), n0(corr), n0(mort), pct(loss, 2), n1(growth), n1(feed), n2(ef), n2(acc)])
+    s.append(table(["Batch ID", "Date in", "Age (days)", "Stock end no.", "ABW g", "Harvest no.", "Harvest kg", "Harvest ABW g",
+                    "Biomass kg", "Cage corrections", "Mortality", "Stock loss %", "Growth kg", "Feed used kg", "eFCR", "Acc. eFCR"], rows,
+                   [0.07, 0.065, 0.045, 0.065, 0.05, 0.055, 0.06, 0.06, 0.065, 0.065, 0.06, 0.06, 0.065, 0.065, 0.05, 0.055],
+                   bold_last=True))
+    s.append(small(f"Detailed Batch Report, {D.DETAILED_BATCH_PERIOD} (the same table the app shows for that period). Stock, ABW and biomass are "
+                   "as at the end of the period; mortality, cage corrections, harvest, growth and feed are for the period; accumulated eFCR runs "
+                   "from stocking. Cage corrections are fish removed outside the farm (e.g. the 28 Aug 1B reconciliation loss on 02.26cK)."))
     s.append(h2("Target variance (plan model v2 vs latest measured ABW)"))
     rows = []
     for c in D.CAGE_CLOSE:

@@ -33,10 +33,9 @@ export function buildDashboardSystemColumns(params: {
 
   const waterQualityHref = (systemId: number) => {
     const query = new URLSearchParams()
-    query.set("tab", "water-quality")
     query.set("system", String(systemId))
     if (timePeriod) query.set("date", toTimePeriodUrlValue(timePeriod))
-    return `/reports?${query.toString()}`
+    return `/systems?${query.toString()}`
   }
 
   const metricValue = (value: number | null | undefined, decimals: number) =>
