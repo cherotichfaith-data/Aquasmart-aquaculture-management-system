@@ -32,6 +32,12 @@ export function parseAnalyticsPeriod(
   searchParams: Record<string, string | string[] | undefined>,
   today = new Date(),
 ): AnalyticsPeriod {
+  if (searchParams.report === "harvests") {
+    const selected = typeof searchParams.month === "string" && MONTH_PARAM.test(searchParams.month) ? searchParams.month : null
+    const base = selected ?? today.toLocaleDateString("en-CA", { timeZone: "Africa/Nairobi", year: "numeric", month: "2-digit" })
+    const [year, month] = base.split("-").map(Number)
+    return { from: base + "-01", to: base + "-" + String(lastDayOfMonth(year, month)).padStart(2, "0"), month: base + "-01" }
+  }
   const from = typeof searchParams.from === "string" ? searchParams.from : ""
   const to = typeof searchParams.to === "string" ? searchParams.to : ""
   if (searchParams.period !== "custom") {
@@ -70,11 +76,11 @@ export function parseForwardPlanInputs(searchParams: Record<string, string | str
 }
 
 /** The dropdown views (`?report=`); each only loads the sections it shows. */
-export type AnalyticsView = "outlook" | "batches" | "growth" | "cages" | "planning"
+export type AnalyticsView = "outlook" | "batches" | "growth" | "cages" | "planning" | "harvests"
 
 export function parseAnalyticsView(raw: string | string[] | undefined): AnalyticsView {
   if (raw === "forecast") return "planning"
-  return raw === "outlook" || raw === "batches" || raw === "growth" || raw === "cages" || raw === "planning" ? raw : "outlook"
+  return raw === "outlook" || raw === "batches" || raw === "growth" || raw === "cages" || raw === "planning" || raw === "harvests" ? raw : "outlook"
 }
 
 const SECTIONS_BY_VIEW: Record<AnalyticsView, { performance: string[]; outlook: string[] }> = {
@@ -82,7 +88,8 @@ const SECTIONS_BY_VIEW: Record<AnalyticsView, { performance: string[]; outlook: 
   planning: { performance: [], outlook: ["farm_forecast", "forward_plan"] },
   batches: { performance: ["batches"], outlook: [] },
   growth: { performance: ["growth_by_batch", "abw_points", "growth_curve"], outlook: [] },
-  cages: { performance: ["cage_harvests", "feed_vs_expected"], outlook: [] },
+  harvests: { performance: ["cage_harvests", "batch_harvests"], outlook: [] },
+  cages: { performance: ["feed_vs_expected"], outlook: [] },
 }
 
 export async function getAnalyticsReportData(params: {
@@ -97,6 +104,7 @@ export async function getAnalyticsReportData(params: {
     periodStart: params.period.from,
     periodEnd: params.period.to,
     batches: [],
+    batchHarvests: [],
     cageHarvests: [],
     feedVsExpected: [],
     growthByBatch: [],
@@ -112,7 +120,7 @@ export async function getAnalyticsReportData(params: {
 
   const supabase = createAccessTokenClient(params.accessToken)
   let period = params.period
-  if (!period.growthCustom) {
+  if (params.view !== "harvests" && !period.growthCustom) {
     const cycles = await supabase
       .from("production_cycle")
       .select("cycle_start, fingerling_batch!inner(farm_id)")
@@ -126,7 +134,7 @@ export async function getAnalyticsReportData(params: {
       logSbError("analytics:cyclePeriod", cycles.error)
       return { ...empty, error: "The cycle reporting period could not be loaded. Try again shortly." }
     }
-    period = { ...period, from: cycles.data?.cycle_start ?? period.to }
+    period = { ...period, from: cycles.data?.cycle_start ?? period.month }
   }
   // Forecast and forward plan are monthly and anchored to the month holding the period end;
   // the three period reports use the exact from/to dates.
@@ -171,6 +179,7 @@ export async function getAnalyticsReportData(params: {
     periodStart: period.from,
     periodEnd: period.to,
     batches: perf?.batches ?? [],
+    batchHarvests: perf?.batch_harvests ?? [],
     cageHarvests: perf?.cage_harvests ?? [],
     feedVsExpected: perf?.feed_vs_expected ?? [],
     growthByBatch: perf?.growth_by_batch ?? [],

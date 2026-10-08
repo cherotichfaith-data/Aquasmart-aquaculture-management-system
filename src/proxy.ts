@@ -11,6 +11,7 @@ import {
   isWorkspaceSelectionRoute,
   mapDashboardPathToStandalone,
   sanitizeNextPath,
+  stripDashboardPath,
 } from "@/lib/app-entry"
 import {
   parseCustomPeriodUrlValue,
@@ -143,6 +144,8 @@ function buildAuthCallbackRedirect(request: NextRequest) {
 function buildLegacyTimePeriodRedirect(request: NextRequest) {
   const legacyPeriod = request.nextUrl.searchParams.get("period")
   if (!legacyPeriod) return null
+  // Analytics owns cycle/custom report scope; it is not the legacy dashboard date key.
+  if (stripDashboardPath(request.nextUrl.pathname) === "/analytics" && (legacyPeriod === "cycle" || legacyPeriod === "custom")) return null
 
   const redirectUrl = request.nextUrl.clone()
   const normalizedCustomRange = parseCustomPeriodUrlValue(legacyPeriod)
