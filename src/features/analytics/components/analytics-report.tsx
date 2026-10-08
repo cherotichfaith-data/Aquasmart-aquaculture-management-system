@@ -70,23 +70,28 @@ function Section({ title, note, noteAsInfo = false, infoLabel, children }: { tit
 
 
 const HARVEST_COLUMNS: Column<CageHarvestRow>[] = [
-  { label: "Cage", cell: (r) => r.cage_name },
+  { label: "Unit", cell: (r) => r.unit ?? DASH },
+  { label: "Cage", cell: (r) => r.cage_name ?? DASH },
   { label: "Batch ID", cell: (r) => r.batch_name },
   { label: "Harvest completed", cell: (r) => dateText(r.harvest_date) },
   { label: "Original stock date", cell: (r) => dateText(r.original_stock_date) },
   { label: "Age (days)", cell: (r) => num(r.age_days), numeric: true },
   { label: "Production number stocked", cell: (r) => num(r.total_stocked), numeric: true },
   { label: "Mortalities", cell: (r) => num(r.mortalities), numeric: true },
-  { label: "Mortality (%)", cell: (r) => pct(r.mortality_pct), numeric: true },
+  { label: "Mortality (%)", cell: (r) => pct(r.mortality_pct, 2), numeric: true },
   { label: "Cage corrections", cell: (r) => num(r.cage_corrections), numeric: true },
-  { label: "Cage correction (%)", cell: (r) => pct(r.cage_correction_pct), numeric: true },
-  { label: "Survival (%)", cell: (r) => pct(r.survival_pct), numeric: true },
+  { label: "Cage correction (%)", cell: (r) => pct(r.cage_correction_pct, 2), numeric: true },
+  { label: "Survival (%)", cell: (r) => pct(r.survival_pct, 2), numeric: true },
   { label: "Harvest no.", cell: (r) => num(r.harvest_number), numeric: true },
-  { label: "Harvest (kg)", cell: (r) => num(r.harvest_kg, 1), numeric: true },
+  { label: "Harvest (kg)", cell: (r) => num(r.harvest_kg, 2), numeric: true },
   { label: "Harvest ABW (g)", cell: (r) => num(r.harvest_abw_g, 1), numeric: true },
-  { label: "Feed fed (kg)", cell: (r) => num(r.feed_kg), numeric: true },
+  { label: "Feed fed (kg)", cell: (r) => num(r.feed_kg, 2), numeric: true },
   { label: "eFCR", cell: (r) => num(r.efcr, 2), numeric: true },
 ]
+
+const BATCH_HARVEST_COLUMNS = HARVEST_COLUMNS.filter((column) => column.label !== "Unit" && column.label !== "Cage")
+
+const HARVEST_METHOD_NOTE = "Stocked excludes count corrections. Corrections are signed count adjustments; correction and mortality percentages use original stock. Survival is harvested fish divided by original estimated stock and may exceed 100%; it is not a measured biological survival rate. eFCR uses recorded feed divided by harvested biomass plus productive transfers out minus input biomass; escapes and count-only adjustments are excluded from biomass. Age runs from original stocking to final harvest. Missing weights leave eFCR blank."
 
 const FEED_COLUMNS: Column<FeedVsExpectedRow>[] = [
   { label: "Cage", cell: (r) => r.cage_name },
@@ -242,9 +247,10 @@ function StockingPlanForm({
 // Related reports share a view: the dropdown picks a view, not a single report.
 const REPORT_OPTIONS = [
   { value: "outlook", label: "Stock profile" },
-  { value: "batches", label: "Batch performance: batch report" },
+  { value: "batches", label: "Batch performance" },
   { value: "growth", label: "Growth analysis" },
-  { value: "cages", label: "Cage performance: feed vs expectation and harvest" },
+  { value: "cages", label: "Cage performance: feed vs expectation" },
+  { value: "harvests", label: "Harvest reports" },
   { value: "planning", label: "Biomass forecast and forward planning" },
 ] as const
 
@@ -302,7 +308,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
     [pathname, router, searchParams],
   )
 
-  const label = cycleToDate ? "Cycle to date" : periodLabel(data.periodStart, data.periodEnd)
+  const label = report === "harvests" ? monthLabel(data.month) : cycleToDate ? "Cycle to date" : periodLabel(data.periodStart, data.periodEnd)
   // Oldest batch first, so legend colours stay stable as new batches are added.
   const growthBatchNames = Array.from(new Set(data.growthByBatch.map((b) => b.batch_name))).reverse()
   const forecastLabel = monthLabel(data.month)
@@ -323,7 +329,24 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
             />
           </div>
           <div className="w-full sm:w-[240px]">
-            <TimePeriodSelector
+            {report === "harvests" ? (
+              <input
+                type="month"
+                aria-label="Harvest month"
+                value={data.month.slice(0, 7)}
+                onInput={(event) => {
+                  const month = event.currentTarget.value
+                  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return
+                  const params = new URLSearchParams(searchParams.toString())
+                  params.set("month", month)
+                  params.delete("period")
+                  params.delete("from")
+                  params.delete("to")
+                  router.replace(pathname + "?" + params.toString())
+                }}
+                className="h-10 w-full rounded-full border border-border bg-background px-4 text-sm"
+              />
+            ) : <TimePeriodSelector
               selectedPeriod="all history"
               periods={["all history"]}
               customLabels={{ "all history": "Cycle to date" }}
@@ -331,7 +354,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
               customRange={cycleToDate ? null : { start: data.periodStart, end: data.periodEnd }}
               onCustomRangeChange={onCustomRangeChange}
               variant="compact"
-            />
+            />}
           </div>
         </div>
       </div>
@@ -438,10 +461,11 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
         </Section>
       ) : null}
 
-      {show("cages") ? (
+      {show("harvests") ? (
         <Section
           title={`Cage Harvest Report - ${label}`}
-          note="Cages with a harvest in the selected period and recorded zero stock at period-end. Figures cover that batch in that cage through its last harvest. Transfers alone do not qualify as completed harvests. Missing or unresolved metrics display a dash."
+          note={`Cages with a harvest in the selected period and a reconciled zero balance at their last harvest. Figures cover only the batch in that cage. Unit is the recorded cage unit. ${HARVEST_METHOD_NOTE}`}
+          noteAsInfo
         >
           <ReportTable
             columns={HARVEST_COLUMNS}
@@ -451,6 +475,12 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           />
         </Section>
       ) : null}
+      {show("harvests") ? (
+        <Section title={`Batch Harvest Report - ${label}`} note={`Completed batches harvested in the selected period. Figures cover all cages from stocking through final harvest. ${HARVEST_METHOD_NOTE}`} noteAsInfo>
+          <ReportTable columns={BATCH_HARVEST_COLUMNS} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No fully harvested batches are confirmed for this period." />
+        </Section>
+      ) : null}
+
     </div>
   )
 }
