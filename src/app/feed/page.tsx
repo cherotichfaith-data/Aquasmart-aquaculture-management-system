@@ -1,27 +1,23 @@
 import { Suspense } from "react"
-import PageClient from "./page.client"
-import { requireInitialFarmId } from "@/features/farm/queries.server"
-import { getFeedPageInitialData, parseFeedPageFilters } from "@/features/feed/queries.server"
+import FeedPageClient from "./page.client"
+import { resolveInitialFarmId } from "@/features/farm/queries.server"
+import { getServerFarmRole } from "@/features/farm/role.server"
+import { parseFeedDashboardFilters } from "@/features/feed/queries.server"
+import { requireUserContext } from "@/lib/supabase/require-user"
 
 type SearchParams = Record<string, string | string[] | undefined>
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams?: Promise<SearchParams>
-}) {
+export default async function Page({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const resolvedSearchParams = (await searchParams) ?? {}
+  const { user, accessToken } = await requireUserContext("/feed")
   const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
-  const initialFilters = parseFeedPageFilters(resolvedSearchParams)
-  const { farmId } = await requireInitialFarmId(searchFarmId)
-  const initialData = await getFeedPageInitialData({
-    farmId,
-    filters: initialFilters,
-  })
+  const initialFilters = parseFeedDashboardFilters(resolvedSearchParams)
+  const { farmId, farmName } = await resolveInitialFarmId(searchFarmId)
+  const role = await getServerFarmRole({ farmId, userId: user.id, accessToken })
 
   return (
     <Suspense fallback={null}>
-      <PageClient initialFarmId={farmId} initialFilters={initialFilters} initialData={initialData} />
+      <FeedPageClient initialFarmId={farmId} initialFarmName={farmName} initialFarmRole={role} initialFilters={initialFilters} />
     </Suspense>
   )
 }

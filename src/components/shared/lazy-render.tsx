@@ -15,14 +15,11 @@ export function LazyRender({
   rootMargin?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
+  const supportsIntersectionObserver = typeof IntersectionObserver !== "undefined"
+  const [visible, setVisible] = useState(!supportsIntersectionObserver)
 
   useEffect(() => {
-    if (visible || !ref.current) return
-    if (typeof IntersectionObserver === "undefined") {
-      setVisible(true)
-      return
-    }
+    if (visible || !ref.current || !supportsIntersectionObserver) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -34,7 +31,7 @@ export function LazyRender({
     )
     observer.observe(ref.current)
     return () => observer.disconnect()
-  }, [rootMargin, visible])
+  }, [rootMargin, supportsIntersectionObserver, visible])
 
   return (
     <div ref={ref} className={className}>

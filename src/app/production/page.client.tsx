@@ -1,174 +1,409 @@
 "use client"
 
-import { Suspense, useMemo } from "react"
-import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { useCallback, useMemo, useTransition } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { useAnalyticsPageBootstrap } from "@/lib/hooks/app/use-analytics-page-bootstrap"
-import { useProductionSummary } from "@/lib/hooks/use-production"
-import { useDailyFishInventory } from "@/lib/hooks/use-inventory"
-import { useSystemOptions } from "@/lib/hooks/use-options"
-import { useBatchSystemIds } from "@/lib/hooks/use-reports"
-import { getErrorMessage, getQueryResultError } from "@/lib/utils/query-result"
-import { PRODUCTION_METRICS, parseProductionMetric } from "@/components/production/metrics"
-import { ProductionSections } from "./_components/production-sections"
-import { buildProductionChartRows } from "./_lib/production-page"
+import { Button } from "@/components/app-ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
+import { DataTable } from "@/components/shared/data-table"
+import { EmptyState } from "@/components/shared/data-states"
+import TimePeriodSelector from "@/components/shared/time-period-selector"
+import ProductionChart from "@/features/production/components/production-chart"
+import ProductionMetricFilter from "@/features/production/components/metrics-filter"
+import ProductionCompareFilter from "@/features/production/components/compare-filter"
+import ProductionScopeFilter from "@/features/production/components/scope-filter"
+import { parseProductionCompareMetric, parseProductionMetric, type ProductionMetric } from "@/features/production/components/metrics"
+import { buildProductionTableColumns } from "@/features/production/components/production-table-columns"
+import { buildProductionDailyMetricRows, buildProductionMetricRows } from "@/features/production/lib/production-page"
+import { buildProductionPeriodViewRows } from "@/features/production/period-view"
+import type { ProductionPageInitialData, ProductionPageFilters } from "@/features/production/queries.server"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
+import { formatCustomRangeLabel, parseCustomPeriodUrlValue, TIME_PERIOD_LABELS, type TimePeriod } from "@/lib/time-period"
+import { downloadCsv } from "@/lib/utils/report-export"
+import { cn } from "@/lib/utils"
 
-function ProductionContent() {
+const PRODUCTION_DATE_TYPES: TimePeriod[] = [
+  "day",
+  "week",
+  "2 weeks",
+  "month",
+  "quarter",
+  "6 months",
+  "year",
+  "all history",
+]
+
+function ProductionPeriodFilter({
+  selectedPeriod,
+  startTransition,
+}: {
+  selectedPeriod: TimePeriod
+  /** See ProductionMetricFilter's `startTransition` prop for why this exists. */
+  startTransition?: (callback: () => void) => void
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const {
-    farmId,
-    selectedBatch,
-    selectedSystem,
-    selectedStage,
-    dateFrom,
-    dateTo,
-    boundsReady: hasBounds,
-  } = useAnalyticsPageBootstrap()
+  const customRange = useMemo(() => parseCustomPeriodUrlValue(searchParams.get("date")), [searchParams])
 
-  const filterParam = searchParams.get("filter")
+  const handleChange = (value: TimePeriod) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("date", value)
+    const navigate = () => router.replace(`${pathname}?${params.toString()}`)
+    if (startTransition) startTransition(navigate)
+    else navigate()
+  }
 
-  const metricFilter = parseProductionMetric(filterParam)
-  const metricMeta = PRODUCTION_METRICS[metricFilter]
-  const systemId = selectedSystem !== "all" ? Number(selectedSystem) : undefined
-  const batchId = selectedBatch !== "all" ? Number(selectedBatch) : undefined
-
-  const dateRange = useMemo(() => {
-    return { startDate: hasBounds ? (dateFrom ?? "") : "", endDate: hasBounds ? (dateTo ?? "") : "" }
-  }, [dateFrom, dateTo, hasBounds])
-  const rangeEnabled = hasBounds
-
-  const systemOptionsQuery = useSystemOptions({
-    farmId,
-    stage: selectedStage,
-    activeOnly: false,
-  })
-  const batchSystemIdsQuery = useBatchSystemIds({
-    batchId: Number.isFinite(batchId) ? batchId : undefined,
-  })
-
-  const productionSummaryQuery = useProductionSummary({
-    farmId,
-    systemId: Number.isFinite(systemId) ? systemId : undefined,
-    stage: selectedStage !== "all" ? selectedStage : undefined,
-    dateFrom: dateRange.startDate || undefined,
-    dateTo: dateRange.endDate || undefined,
-    limit: 2500,
-    enabled: rangeEnabled,
-  })
-
-  const inventoryEnabled = metricMeta.source === "inventory"
-  const inventoryQuery = useDailyFishInventory({
-    farmId,
-    systemId: Number.isFinite(systemId) ? systemId : undefined,
-    dateFrom: dateRange.startDate || undefined,
-    dateTo: dateRange.endDate || undefined,
-    limit: 5000,
-    orderAsc: true,
-    enabled: inventoryEnabled && rangeEnabled,
-  })
-
-  const stageSystemIds = useMemo(() => {
-    if (selectedStage === "all") return null
-    if (systemOptionsQuery.data?.status !== "success") return null
-    const ids = systemOptionsQuery.data.data
-      .map((row) => row.id)
-      .filter((id): id is number => typeof id === "number")
-    return ids
-  }, [selectedStage, systemOptionsQuery.data])
-
-  const batchSystemIds = useMemo(() => {
-    if (selectedBatch === "all") return null
-    if (batchSystemIdsQuery.data?.status !== "success") return null
-    const ids = batchSystemIdsQuery.data.data
-      .map((row) => row.system_id)
-      .filter((id): id is number => typeof id === "number")
-    return ids
-  }, [batchSystemIdsQuery.data, selectedBatch])
-
-  const scopedSystemIds = useMemo(() => {
-    if (selectedSystem !== "all") return null
-    if (!stageSystemIds && !batchSystemIds) return null
-    const stageSet = stageSystemIds ? new Set(stageSystemIds) : null
-    if (batchSystemIds) {
-      if (!stageSet) return new Set(batchSystemIds)
-      return new Set(batchSystemIds.filter((id) => stageSet.has(id)))
-    }
-    return stageSet
-  }, [batchSystemIds, selectedSystem, stageSystemIds])
-
-  const productionRowsRaw =
-    productionSummaryQuery.data?.status === "success" ? productionSummaryQuery.data.data : []
-  const inventoryRowsRaw =
-    inventoryQuery.data?.status === "success" ? inventoryQuery.data.data : []
-
-  const productionRows = useMemo(() => {
-    let rows = productionRowsRaw
-    if (scopedSystemIds) {
-      rows = rows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id))
-    }
-    return rows
-  }, [productionRowsRaw, scopedSystemIds])
-
-  const inventoryRows = useMemo(() => {
-    let rows = inventoryRowsRaw
-    if (scopedSystemIds) {
-      rows = rows.filter((row) => row.system_id != null && scopedSystemIds.has(row.system_id))
-    }
-    return rows
-  }, [inventoryRowsRaw, scopedSystemIds])
-
-  const formattedChartRows = useMemo(
-    () => buildProductionChartRows({ metricFilter, productionRows, inventoryRows }),
-    [inventoryRows, metricFilter, productionRows],
-  )
-
-  const tableRows = useMemo(() => {
-    const sorted = [...productionRows].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
-    return sorted
-  }, [productionRows])
-
-  const summaryError = getErrorMessage(productionSummaryQuery.error) ?? getQueryResultError(productionSummaryQuery.data)
-  const inventoryError =
-    inventoryEnabled ? getErrorMessage(inventoryQuery.error) ?? getQueryResultError(inventoryQuery.data) : null
-  const chartError = metricMeta.source === "inventory" ? inventoryError : summaryError
-  const chartUpdatedAt =
-    metricMeta.source === "inventory"
-      ? Math.max(inventoryQuery.dataUpdatedAt ?? 0, productionSummaryQuery.dataUpdatedAt ?? 0)
-      : productionSummaryQuery.dataUpdatedAt
-  const tableUpdatedAt = productionSummaryQuery.dataUpdatedAt
+  const handleCustomRangeChange = (range: { start: string; end: string }) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("date", `custom_${range.start}_${range.end}`)
+    const navigate = () => router.replace(`${pathname}?${params.toString()}`)
+    if (startTransition) startTransition(navigate)
+    else navigate()
+  }
 
   return (
-    <ProductionSections
-      systemId={Number.isFinite(systemId) ? systemId : undefined}
-      startDate={dateRange.startDate || null}
-      endDate={dateRange.endDate || null}
-      formattedChartRows={formattedChartRows}
-      metricFilter={metricFilter}
-      inventoryEnabled={inventoryEnabled}
-      chartLoading={metricMeta.source === "inventory" ? inventoryQuery.isLoading : productionSummaryQuery.isLoading}
-      chartFetching={metricMeta.source === "inventory" ? inventoryQuery.isFetching : productionSummaryQuery.isFetching}
-      chartUpdatedAt={chartUpdatedAt}
-      chartError={chartError}
-      onRetryChart={() => {
-        productionSummaryQuery.refetch()
-        if (inventoryEnabled) inventoryQuery.refetch()
-      }}
-      tableRows={tableRows}
-      tableLoading={productionSummaryQuery.isLoading}
-      tableFetching={productionSummaryQuery.isFetching}
-      tableUpdatedAt={tableUpdatedAt}
-      summaryError={summaryError}
-      onRetryTable={() => productionSummaryQuery.refetch()}
-    />
+    <div className="min-w-[190px] shrink-0">
+      <TimePeriodSelector
+        selectedPeriod={selectedPeriod}
+        onPeriodChange={handleChange}
+        label={null}
+        customRange={customRange}
+        onCustomRangeChange={handleCustomRangeChange}
+        variant="compact"
+        periods={PRODUCTION_DATE_TYPES}
+        customLabels={{ "all history": "Cycle to date" }}
+      />
+    </div>
   )
 }
 
-export default function ProductionPage() {
+export default function ProductionPageClient({
+  initialFarmId,
+  initialFarmName,
+  initialFarmRole,
+  initialFilters,
+  initialData,
+  initialBatchOptions,
+}: {
+  initialFarmId?: string | null
+  initialFarmName?: string | null
+  initialFarmRole?: string | null
+  initialFilters: ProductionPageFilters
+  initialData: ProductionPageInitialData
+  initialBatchOptions?: BatchOptionItem[]
+}) {
+  const searchParams = useSearchParams()
+  // Filter changes (period/system/metric/compare) all write to the URL and
+  // re-render this page from the server with fresh initialData -- there's no
+  // client-side query to key a loading state off. Wrapping those navigations
+  // in a transition gives the chart/table something real to show instead of
+  // a hardcoded isLoading={false} that goes stale the moment a filter is
+  // clicked.
+  const [isPending, startTransition] = useTransition()
+  const metric = parseProductionMetric(searchParams.get("filter"))
+  const compareMetric = parseProductionCompareMetric(searchParams.get("compare"), metric)
+  const allSystems = useMemo<SystemOption[]>(
+    () => (initialData.systems.status === "success" ? initialData.systems.data : []),
+    [initialData.systems],
+  )
+  const selectedSystemParam = searchParams.get("system") ?? searchParams.get("cage") ?? "all"
+  const resolvedSelectedSystemId = initialData.systemId ?? null
+  // "Batches" mode: the whole page reports per batch -- consolidated chart line
+  // and a records table rolled up by batch (with a "Batch" column) rather than
+  // by cage.
+  const scopeMode: "cage" | "batch" =
+    searchParams.get("scope") === "batch" || searchParams.get("batch") ? "batch" : "cage"
+  // No specific cage picked -> the chart shows a consolidated line instead of a
+  // single cage.
+  const isConsolidated = selectedSystemParam === "all"
+  const summaryRows = useMemo(
+    () => (initialData.productionSummary.status === "success" ? initialData.productionSummary.data : []),
+    [initialData.productionSummary],
+  )
+  const dailyTrendRows = useMemo(
+    () => (initialData.dailyTrend.status === "success" ? initialData.dailyTrend.data : []),
+    [initialData.dailyTrend],
+  )
+  const volumeBySystemId = useMemo(
+    () => new Map((initialData.enrichment.volumeRows ?? []).map((row) => [row.id, row.volume ?? 0])),
+    [initialData.enrichment.volumeRows],
+  )
+  const totalScopedVolumeM3 = useMemo(
+    () => (initialData.enrichment.volumeRows ?? []).reduce((sum, row) => sum + (row.volume ?? 0), 0),
+    [initialData.enrichment.volumeRows],
+  )
+  const growthBySystemDate = useMemo(
+    () =>
+      new Map(
+        (initialData.enrichment.growthTrendRows ?? []).map((row) => [
+          `${row.system_id}|${row.sample_date}`,
+          { adgGDay: row.adg_g_day, sgrPctDay: row.sgr_pct_day },
+        ]),
+      ),
+    [initialData.enrichment.growthTrendRows],
+  )
+  const feedTypeBySystemDate = useMemo(
+    () =>
+      new Map(
+        (initialData.enrichment.feedingRecords ?? [])
+          .filter((row) => typeof row.system_id === "number" && typeof row.date === "string")
+          .map((row) => [`${row.system_id}|${row.date}`, row.feed_type?.feed_line ?? null]),
+      ),
+    [initialData.enrichment.feedingRecords],
+  )
+  // Per-cage rows: always drive the records table (and the single-cage daily
+  // metric chart) from these.
+  const viewRows = useMemo(
+    () =>
+      buildProductionPeriodViewRows({
+        productionRows: summaryRows,
+        consolidate: false,
+        volumeBySystemId,
+        growthBySystemDate,
+        feedTypeBySystemDate,
+        totalScopedVolumeM3,
+      }),
+    [feedTypeBySystemDate, growthBySystemDate, summaryRows, totalScopedVolumeM3, volumeBySystemId],
+  )
+  // Chart rows: one consolidated series per date when no single cage is picked,
+  // otherwise the same per-cage rows.
+  const chartViewRows = useMemo(
+    () =>
+      isConsolidated
+        ? buildProductionPeriodViewRows({
+            productionRows: summaryRows,
+            consolidate: "farm",
+            volumeBySystemId,
+            growthBySystemDate,
+            feedTypeBySystemDate,
+            totalScopedVolumeM3,
+          })
+        : viewRows,
+    [isConsolidated, viewRows, summaryRows, volumeBySystemId, growthBySystemDate, feedTypeBySystemDate, totalScopedVolumeM3],
+  )
+  // In an "All cages" / "All batches" view the records table lists the periodic
+  // recorded events -- one row per sampling / stocking / transfer date -- rather
+  // than the carried-forward "today" snapshot every cage emits (which just
+  // stacks a wall of same-date rows). A single cage still shows its full
+  // timeline including that live row.
+  const periodicSummaryRows = useMemo(() => {
+    // Data-repair stand-in batches (INFERRED-*, BATCH-<n>) have their identity
+    // stripped server-side, so nothing to filter for names here.
+    // Per cage: prefer the recorded sampling/stocking/transfer rows; keep the
+    // live "current" row only for cages that have nothing else in the window,
+    // so every stocked cage still shows up.
+    const bySystem = new Map<number | string, typeof summaryRows>()
+    for (const row of summaryRows) {
+      const key = row.system_id ?? "unassigned"
+      const bucket = bySystem.get(key)
+      if (bucket) bucket.push(row)
+      else bySystem.set(key, [row])
+    }
+    const out: typeof summaryRows = []
+    for (const rows of bySystem.values()) {
+      const events = rows.filter((row) => row.activity !== "current")
+      out.push(...(events.length > 0 ? events : rows))
+    }
+    return out
+  }, [summaryRows])
+  // Records table rows: rolled up by batch in "Batches" mode, per cage otherwise.
+  const tableViewRows = useMemo(() => {
+    if (scopeMode === "batch") {
+      return buildProductionPeriodViewRows({
+        // Cages whose batch identity was stripped (data-repair stand-ins) carry
+        // no batch -- keep them out of the by-batch rollup entirely.
+        productionRows: periodicSummaryRows.filter((row) => row.batch_id != null),
+        consolidate: "batch",
+        volumeBySystemId,
+        growthBySystemDate,
+        feedTypeBySystemDate,
+        totalScopedVolumeM3,
+      })
+    }
+    if (isConsolidated) {
+      return buildProductionPeriodViewRows({
+        productionRows: periodicSummaryRows,
+        consolidate: false,
+        volumeBySystemId,
+        growthBySystemDate,
+        feedTypeBySystemDate,
+        totalScopedVolumeM3,
+      })
+    }
+    return viewRows
+  }, [
+    scopeMode,
+    isConsolidated,
+    viewRows,
+    periodicSummaryRows,
+    volumeBySystemId,
+    growthBySystemDate,
+    feedTypeBySystemDate,
+    totalScopedVolumeM3,
+  ])
+  const buildRowsForMetric = useCallback(
+    (targetMetric: ProductionMetric) => {
+      // The per-day trend RPC drops the cage id, so it can only be trusted for
+      // a single cage -- consolidated views read the period-view rows instead.
+      if (
+        !isConsolidated &&
+        (targetMetric === "abw" || targetMetric === "mortality" || targetMetric === "feeding" || targetMetric === "density") &&
+        dailyTrendRows.length > 0
+      ) {
+        return buildProductionDailyMetricRows(dailyTrendRows, targetMetric, viewRows)
+      }
+      return buildProductionMetricRows(chartViewRows, targetMetric)
+    },
+    [isConsolidated, dailyTrendRows, viewRows, chartViewRows],
+  )
+  const chartRows = useMemo(() => buildRowsForMetric(metric), [buildRowsForMetric, metric])
+  const compareChartRows = useMemo(
+    () => (compareMetric ? buildRowsForMetric(compareMetric) : []),
+    [buildRowsForMetric, compareMetric],
+  )
+  const markers = useMemo(() => initialData.markers ?? [], [initialData.markers])
+  const tableRows = useMemo(
+    () => [...tableViewRows].sort((left, right) => String(right.date).localeCompare(String(left.date))),
+    [tableViewRows],
+  )
+  const tableColumns = useMemo(
+    () => buildProductionTableColumns(scopeMode === "batch" ? "Batch" : "System"),
+    [scopeMode],
+  )
+  const selectedSystemLabel = useMemo(() => {
+    // Look up against the unfiltered list so a system that's since emptied
+    // out still resolves its label correctly when viewed via a direct link.
+    const match = allSystems.find((system) => system.id === resolvedSelectedSystemId)
+    return match ? formatCageLabel(match) : null
+  }, [allSystems, resolvedSelectedSystemId])
+  const periodLabel = useMemo(() => {
+    if (!initialData.bounds.start || !initialData.bounds.end) return null
+    const rangeLabel = initialFilters.customTimeRange
+      ? formatCustomRangeLabel(initialFilters.customTimeRange)
+      : initialFilters.timePeriod === "all history"
+        ? "Cycle to date"
+        : TIME_PERIOD_LABELS[initialFilters.timePeriod]
+    if (scopeMode === "batch") {
+      return `${rangeLabel} · ${initialData.batchName ?? "All batches"}`
+    }
+    if (selectedSystemLabel) return `${rangeLabel} · ${selectedSystemLabel}`
+    return isConsolidated ? `${rangeLabel} · All cages` : rangeLabel
+  }, [
+    initialData.batchName,
+    initialData.bounds.end,
+    initialData.bounds.start,
+    initialFilters.customTimeRange,
+    initialFilters.timePeriod,
+    isConsolidated,
+    scopeMode,
+    selectedSystemLabel,
+  ])
+  const addDataHref = resolvedSelectedSystemId != null ? `/data-entry?system=${resolvedSelectedSystemId}` : "/data-entry"
+  const downloadRecords = useCallback(() => {
+    downloadCsv({
+      filename: `production-records-${selectedSystemLabel ?? (scopeMode === "batch" ? "batches" : "cages")}.csv`,
+      headers: [
+        "Date",
+        scopeMode === "batch" ? "Batch" : "System",
+        "Number of fish",
+        "Total weight (kg)",
+        "ABW (g)",
+        "Biomass increase (kg)",
+        "Feed amount (kg)",
+        "eFCR periodic",
+        "Daily mortality rate (%)",
+      ],
+      rows: tableRows.map((row) => [
+        row.date,
+        row.systemName,
+        row.numberOfFish,
+        row.biomassKg,
+        row.abwG,
+        row.growthKg,
+        row.feedPeriodKg,
+        row.periodEfcr,
+        row.mortalityRatePct,
+      ]),
+    })
+  }, [scopeMode, selectedSystemLabel, tableRows])
+
   return (
-    <DashboardLayout>
-      <Suspense fallback={<div>Loading...</div>}>
-        <ProductionContent />
-      </Suspense>
+    <DashboardLayout
+      hideHeader
+      initialFarmId={initialFarmId}
+      initialFarmName={initialFarmName}
+      headerDataOverrides={{ role: initialFarmRole ?? null }}
+    >
+      <div className="page-shell">
+        {allSystems.length === 0 ? (
+          <EmptyState
+            title="No systems available"
+            description="Please add a system to view production data."
+          />
+        ) : (
+          <>
+            <section className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Production</h1>
+              <div className="flex flex-wrap gap-2">
+                <ProductionPeriodFilter selectedPeriod={initialFilters.timePeriod} startTransition={startTransition} />
+                <Button asChild variant="secondary" className="h-10 px-4">
+                  <Link href={addDataHref}>Add data</Link>
+                </Button>
+                <Button type="button" className="h-10 px-4" onClick={downloadRecords}>Download</Button>
+              </div>
+            </section>
+
+            <div className="flex flex-wrap items-end gap-2">
+              <ProductionScopeFilter
+                initialFarmId={initialFarmId}
+                fallbackBatches={initialBatchOptions}
+                fallbackSystems={initialData.systems.status === "success" ? initialData.systems.data : undefined}
+                startTransition={startTransition}
+              />
+              <div className="w-[200px] shrink-0 md:w-[210px]">
+                <ProductionMetricFilter className="production-select" startTransition={startTransition} />
+              </div>
+              <ProductionCompareFilter
+                primaryMetric={metric}
+                compareMetric={compareMetric}
+                startTransition={startTransition}
+              />
+            </div>
+
+            <ProductionChart
+              metric={metric}
+              rows={chartRows}
+              compareMetric={compareMetric}
+              compareRows={compareChartRows}
+              markers={markers}
+              periodLabel={periodLabel}
+              isLoading={isPending}
+              onRetry={undefined}
+            />
+
+            <Card className="production-records-card rounded-2xl">
+              <CardHeader className="pb-1">
+                <CardTitle>Production records</CardTitle>
+              </CardHeader>
+              <CardContent className={cn("pt-2 transition-opacity duration-200", isPending && "opacity-50")}>
+                <DataTable
+                  columns={tableColumns}
+                  data={tableRows}
+                  rowKey={(row) => row.rowId}
+                  emptyMessage="No production data available for the selected system and date range."
+                  initialSorting={[{ id: "date", desc: true }]}
+                  shellClassName="production-records-table"
+                  tableClassName="md:min-w-[860px]"
+                  priorityColumnIds={["date", "system", "biomassKg"]}
+                />
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
     </DashboardLayout>
   )
 }

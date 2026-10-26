@@ -1,7 +1,10 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useToast } from "@/lib/hooks/app/use-toast"
+import { hasPendingSyncMeta } from "@/lib/offline/result"
+import { hasPendingApproval } from "@/lib/approvals"
 import {
   addOptimisticActivity,
   addOptimisticRecentEntry,
@@ -25,6 +28,7 @@ type WriteThroughMutationConfig<TPayload, TResult> = {
 
 export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughMutationConfig<TPayload, TResult>) {
   const queryClient = useQueryClient()
+  const { farmId } = useActiveFarm()
   const { toast } = useToast()
 
   return useMutation({
@@ -44,6 +48,7 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
       }
 
       const previous = addOptimisticRecentEntry(queryClient, {
+        farmId,
         key: config.recentEntryKey,
         entry: optimistic,
       })
@@ -51,15 +56,30 @@ export function useWriteThroughMutation<TPayload, TResult>(config: WriteThroughM
       return { previous }
     },
     onSuccess: async (result, payload) => {
-      await config.invalidate?.({ queryClient, payload, result })
-      toast({ title: "Success", description: config.successMessage })
+      const pendingSync = hasPendingSyncMeta(result) && Boolean(result.meta.pendingSync)
+      const pendingApproval = hasPendingApproval(result)
+
+      if (!pendingSync) {
+        void queryClient.invalidateQueries({ queryKey: ["entry-history", farmId] })
+        void Promise.resolve(config.invalidate?.({ queryClient, payload, result })).catch((error) => {
+          console.error("dataEntry:invalidate", error)
+        })
+      }
+
+      toast({
+        variant: pendingSync ? "warning" : "success",
+        title: pendingSync ? "Saved offline" : pendingApproval ? "Submitted for approval" : "Record saved",
+        description: pendingSync ? "Saved locally; it will be submitted for approval when synced." : pendingApproval ? "A farm manager can review this entry in Approvals." : config.successMessage,
+        duration: 10000,
+      })
     },
-    onError: (error: any, _payload, context) => {
+    onError: (error: unknown, _payload, context) => {
       restoreRecentEntries(queryClient, context?.previous)
+      const message = error instanceof Error ? error.message : config.errorMessage
       toast({
         variant: "destructive",
         title: "Error",
-        description: error?.message ?? config.errorMessage,
+        description: message,
       })
     },
   })

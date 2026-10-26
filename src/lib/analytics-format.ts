@@ -4,6 +4,9 @@ type NumberFormatOptions = {
   fallback?: string
 }
 
+const STABLE_LOCALE = "en-US"
+const STABLE_TIME_ZONE = "UTC"
+
 const parseDateInput = (value: string | number, dateOnly: boolean) => {
   const raw = String(value)
   const parsed =
@@ -33,18 +36,16 @@ export const formatDateOnly = (
   return new Intl.DateTimeFormat(undefined, options).format(parsed)
 }
 
-export const formatDateTimeValue = (value: string | null | undefined, fallback = "--") => {
-  if (!value) return fallback
-  const parsed = parseDateInput(value, false)
-  if (!parsed) return value
-  return new Intl.DateTimeFormat(undefined, {
+export const formatStableDateTime = (value: string | number | Date, options?: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat(STABLE_LOCALE, {
+    timeZone: STABLE_TIME_ZONE,
     year: "numeric",
     month: "short",
     day: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
-  }).format(parsed)
-}
+    ...options,
+  }).format(new Date(value))
 
 export const formatNumberValue = (
   value: number | null | undefined,
@@ -68,7 +69,7 @@ export const formatUnitValue = (
   return base === fallback ? fallback : `${base} ${unit}`
 }
 
-export const scaleFractionToPercent = (value: number | null | undefined) =>
+const scaleFractionToPercent = (value: number | null | undefined) =>
   value == null || Number.isNaN(value) || !Number.isFinite(value) ? null : value * 100
 
 export const formatPercentRateValue = (
@@ -81,41 +82,9 @@ export const formatPercentRateValue = (
   return formatUnitValue(scaled, decimals, unit, fallback)
 }
 
-export const formatRateValue = (
-  value: number | null | undefined,
-  decimals = 4,
-  unit = "rate/day",
-  fallback = "--",
-) => {
-  const base = formatNumberValue(value, { decimals, fallback })
-  return base === fallback ? fallback : `${base} ${unit}`
-}
-
 export const formatAsOfDate = (value: string | null | undefined) =>
   value ? formatDateOnly(value, value, { year: "numeric", month: "short", day: "2-digit" }) : null
 
 export const formatCompactDate = (value: string) =>
   formatDateOnly(value, value, { month: "short", day: "numeric" })
 
-export const formatProductionPeriod = (
-  start: string | null | undefined,
-  end: string | null | undefined,
-  ongoing = false,
-) => {
-  if (!start && !end) return null
-  const formattedStart = formatAsOfDate(start)
-  const formattedEnd = formatAsOfDate(end)
-  if (formattedStart && formattedEnd) {
-    return formattedStart === formattedEnd ? formattedStart : `${formattedStart} to ${formattedEnd}`
-  }
-  if (formattedStart && ongoing) return `${formattedStart} to Ongoing`
-  return formattedStart ?? formattedEnd
-}
-
-export const timelineSourceLabel = (source: string | null | undefined) => {
-  if (source === "cycle_closed") return "Cycle"
-  if (source === "cycle_ongoing") return "Cycle"
-  if (source === "planned_cycle") return "Planned cycle"
-  if (source === "observed_activity") return "Observed activity"
-  return null
-}

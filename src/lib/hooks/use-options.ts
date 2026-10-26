@@ -1,123 +1,107 @@
 "use client"
 
+import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/cache/query-keys"
-import type { Database, Enums } from "@/lib/types/database"
-import type { QueryResult } from "@/lib/supabase-client"
+import type { Enums } from "@/lib/types/database"
 import { useAuth } from "@/components/providers/auth-provider"
-import type { SystemOption } from "@/lib/system-options"
+import { useStockedSystemIds } from "@/lib/hooks/use-stocked-system-ids"
 import {
   getBatchOptions,
   getFarmOptions,
-  getFeedSupplierOptions,
-  getFeedTypeOptions,
   getFingerlingSupplierOptions,
   getAppConfig,
-  getSystemVolumes,
   getSystemOptions,
-} from "@/lib/api/options"
+} from "@/features/shared/options.client"
 
 export function useSystemOptions(params?: {
   farmId?: string | null
   stage?: Enums<"system_growth_stage"> | "all"
   activeOnly?: boolean
   enabled?: boolean
-  initialData?: QueryResult<SystemOption>
+  /**
+   * When true, cages with no live fish right now (fully harvested or
+   * transferred out, and never-stocked cages) are left out of the result.
+   * Use this for report/production filters and overview tables -- leave it
+   * off for data-entry cage pickers like Stocking, which need to see empty
+   * cages so they can be restocked.
+   */
+  stockedOnly?: boolean
 }) {
-  const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(params?.farmId) && (params?.enabled ?? true)
-  return useQuery({
-    queryKey: queryKeys.options.systems(params),
-    queryFn: ({ signal }) => getSystemOptions({ ...params, signal }),
+  const { session, user, isLoading: authLoading } = useAuth()
+  const enabled =
+    !authLoading && (Boolean(session) || Boolean(user)) && Boolean(params?.farmId) && (params?.enabled ?? true)
+  const query = useQuery({
+    queryKey: queryKeys.options.systems({ ...params, userId: user?.id }),
+    queryFn: ({ signal }) => getSystemOptions({ ...params, accessToken: session?.access_token, signal }),
     enabled,
     staleTime: 5 * 60_000,
-    initialData: params?.initialData,
-    initialDataUpdatedAt: params?.initialData ? 0 : undefined,
+    refetchOnMount: "always",
   })
+  const stockedSystems = useStockedSystemIds(params?.farmId, {
+    enabled: enabled && Boolean(params?.stockedOnly),
+  })
+
+  return useMemo(() => {
+    if (!params?.stockedOnly || query.data?.status !== "success") return query
+    if (!stockedSystems.query.isSuccess) return query
+    // `cage_status` is trigger-maintained and can lag or sit NULL on farms whose
+    // history was imported outside the app. If it reports *nothing* stocked while
+    // active cages exist, treat the signal as unavailable rather than filtering
+    // the whole list away (which strands every dropdown on its "All ..." row).
+    if (stockedSystems.stockedIds.size === 0 && query.data.data.length > 0) return query
+    return {
+      ...query,
+      data: {
+        ...query.data,
+        data: query.data.data.filter((system) => stockedSystems.stockedIds.has(system.id)),
+      },
+    }
+  }, [query, params?.stockedOnly, stockedSystems])
 }
 
 export function useBatchOptions(params?: {
   farmId?: string | null
-  initialData?: QueryResult<Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]>
+  activeOnly?: boolean
 }) {
-  const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(params?.farmId)
+  const { session, user, isLoading: authLoading } = useAuth()
+  const enabled = !authLoading && (Boolean(session) || Boolean(user)) && Boolean(params?.farmId)
   return useQuery({
-    queryKey: queryKeys.options.batches(params?.farmId),
-    queryFn: ({ signal }) => getBatchOptions({ ...params, signal }),
+    queryKey: queryKeys.options.batches({ ...params, userId: user?.id }),
+    queryFn: ({ signal }) => getBatchOptions({ ...params, accessToken: session?.access_token, signal }),
     enabled,
-    staleTime: 5 * 60_000,
-    initialData: params?.initialData,
-    initialDataUpdatedAt: params?.initialData ? 0 : undefined,
-  })
-}
-
-export function useFeedTypeOptions(params?: {
-  initialData?: QueryResult<Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number]>
-}) {
-  const { session, user } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.options.feeds(user?.id),
-    queryFn: ({ signal }) => getFeedTypeOptions({ signal }),
-    enabled: Boolean(session),
-    staleTime: 5 * 60_000,
-    initialData: params?.initialData,
-    initialDataUpdatedAt: params?.initialData ? 0 : undefined,
-  })
-}
-
-export function useFeedSupplierOptions(params?: { enabled?: boolean }) {
-  const { session, user } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.options.feedSuppliers(user?.id),
-    queryFn: ({ signal }) => getFeedSupplierOptions({ signal }),
-    enabled: Boolean(session) && (params?.enabled ?? true),
-    staleTime: 5 * 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   })
 }
 
 export function useFingerlingSupplierOptions(params?: { enabled?: boolean }) {
-  const { session, user } = useAuth()
+  const { session, user, isLoading: authLoading } = useAuth()
   return useQuery({
     queryKey: queryKeys.options.fingerlingSuppliers(user?.id),
     queryFn: ({ signal }) => getFingerlingSupplierOptions({ signal }),
-    enabled: Boolean(session) && (params?.enabled ?? true),
+    enabled: !authLoading && (Boolean(session) || Boolean(user)) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
   })
 }
 
 export function useFarmOptions(params?: { enabled?: boolean }) {
-  const { session, user } = useAuth()
+  const { session, user, isLoading: authLoading } = useAuth()
   return useQuery({
     queryKey: queryKeys.options.farms(user?.id),
     queryFn: ({ signal }) => getFarmOptions({ signal }),
-    enabled: Boolean(session) && (params?.enabled ?? true),
-    staleTime: 5 * 60_000,
-  })
-}
-
-export function useSystemVolumes(params?: {
-  farmId?: string | null
-  stage?: Enums<"system_growth_stage"> | "all"
-  activeOnly?: boolean
-}) {
-  const { session } = useAuth()
-  const enabled = Boolean(session) && Boolean(params?.farmId)
-  return useQuery({
-    queryKey: queryKeys.options.systemVolumes(params),
-    queryFn: ({ signal }) => getSystemVolumes({ ...params, signal }),
-    enabled,
+    enabled: !authLoading && Boolean(session) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
   })
 }
 
 export function useAppConfig(params?: { keys?: string[]; enabled?: boolean }) {
-  const { session, user } = useAuth()
+  const { session, user, isLoading: authLoading } = useAuth()
   const keys = params?.keys ?? []
   return useQuery({
     queryKey: queryKeys.appConfig(keys, user?.id),
     queryFn: ({ signal }) => getAppConfig({ keys, signal }),
-    enabled: Boolean(session) && keys.length > 0 && (params?.enabled ?? true),
+    enabled: !authLoading && (Boolean(session) || Boolean(user)) && keys.length > 0 && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
   })
 }

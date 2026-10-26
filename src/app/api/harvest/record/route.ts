@@ -1,19 +1,19 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { inventoryWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { getSystemFarmId, requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { Constants } from "@/lib/types/database"
 
 const harvestSchema = z.object({
   system_id: z.number().int().positive(),
   batch_id: z.number().int().positive().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  number_of_fish_harvest: z.number().min(0),
-  total_weight_harvest: z.number().min(0),
-  type_of_harvest: z.enum(["partial", "final"]),
-  abw: z.number().min(0),
+  number_of_fish_harvest: z.number().int().positive(),
+  total_weight_harvest: z.number().positive(),
+  type_of_harvest: z.enum(Constants.public.Enums.type_of_harvest),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -40,30 +40,9 @@ export async function POST(request: Request) {
     number_of_fish_harvest: payload.number_of_fish_harvest,
     total_weight_harvest: payload.total_weight_harvest,
     type_of_harvest: payload.type_of_harvest,
-    abw: payload.abw,
+    local_id: payload.local_id ?? null,
+    synced_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase.from("fish_harvest").insert(insertPayload).select().single()
-
-  if (error || !data) {
-    logSbError("harvest:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record harvest." }, { status })
-  }
-
-  revalidateWriteTags(
-    inventoryWriteTags({ farmId: systemScope.farmId, systemId: payload.system_id, includeProduction: true }),
-  )
-
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: systemScope.farmId,
-        systemId: payload.system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "harvest", systemScope.farmId, insertPayload)
 }

@@ -1,262 +1,286 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Loader2 } from "lucide-react"
+import Link from "next/link"
+import { useMemo, useState, type SetStateAction } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Building2, CheckCircle2, UserRound } from "lucide-react"
+import { OnboardingShell } from "@/components/onboarding/onboarding-shell"
 import { useAuth } from "@/components/providers/auth-provider"
-import { DEFAULT_SETTINGS, formatError, type SettingsFormState } from "@/app/settings/settings-utils"
+import { completeOnboardingProfileAction } from "@/features/onboarding/mutations.server"
+import type { OnboardingPageInitialData } from "@/features/onboarding/queries.server"
+import {
+  AQUASMART_ROLE_OPTIONS,
+  ONBOARDING_CREATE_WORKSPACE_PATH,
+  normalizeRole,
+  resolveAppEntryPath,
+  sanitizeNextPath,
+  type AquasmartRole,
+} from "@/lib/app-entry"
+import { queryKeys } from "@/lib/cache/query-keys"
 
-const deriveOwnerName = (email?: string | null) => {
-  const localPart = String(email ?? "").split("@")[0]?.trim()
-  if (!localPart) return ""
+const inputCls =
+  "w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
 
-  return localPart
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ")
+type MembershipState = {
+  farmId: string | null
+  role: AquasmartRole
+  source: "active" | "invite" | "none"
 }
 
-const buildInitialSettings = (email?: string | null): SettingsFormState => ({
-  ...DEFAULT_SETTINGS,
-  farmName: "",
-  location: "",
-  owner: deriveOwnerName(email) || "",
-  email: email ?? "",
-  phone: "",
-  role: "admin",
-})
+type OnboardingDraftState = {
+  sourceToken: symbol
+  fullName: string
+  role: Exclude<AquasmartRole, null>
+  membership: MembershipState
+}
 
 export default function OnboardingPageClient() {
-  const { user } = useAuth()
-  const [settings, setSettings] = useState<SettingsFormState>(() => buildInitialSettings())
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-
-  const welcomeName = useMemo(() => deriveOwnerName(user?.email) || "there", [user?.email])
-
-  useEffect(() => {
-    setSettings((prev) => ({
-      ...prev,
-      owner: prev.owner.trim() ? prev.owner : deriveOwnerName(user?.email),
-      email: prev.email.trim() ? prev.email : (user?.email ?? ""),
-    }))
-  }, [user?.email])
-
-  const handleChange = (field: keyof SettingsFormState, value: string | number) => {
-    setSettings((prev) => ({ ...prev, [field]: value as never }))
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
+  const { user, refreshProfile } = useAuth()
+  const linkedFarmId =
+    typeof searchParams.get("farmId") === "string" && (searchParams.get("farmId") ?? "").trim().length > 0
+      ? searchParams.get("farmId")
+      : null
+  const onboardingState = queryClient.getQueryData<OnboardingPageInitialData>(
+    queryKeys.onboarding.state(user?.id ?? null, linkedFarmId),
+  )
+  const initialFullName = onboardingState?.fullName ?? ""
+  const initialRole = (() => {
+    const seededRole = normalizeRole(onboardingState?.membership.role)
+    return seededRole && seededRole !== "admin" ? seededRole : "system_operator"
+  })()
+  const initialMembership: MembershipState = {
+    farmId: onboardingState?.membership.farmId ?? linkedFarmId,
+    role: normalizeRole(onboardingState?.membership.role),
+    source: onboardingState?.membership.source ?? "none",
   }
+  const sourceSignature = [
+    user?.id ?? "",
+    linkedFarmId ?? "",
+    initialFullName,
+    initialMembership.farmId ?? "",
+    initialMembership.role ?? "",
+    initialMembership.source,
+    initialRole,
+  ].join("|")
+  const currentSourceToken = useMemo(() => Symbol(sourceSignature), [sourceSignature])
+  const [draft, setDraft] = useState<OnboardingDraftState>(() => ({
+    sourceToken: currentSourceToken,
+    fullName: initialFullName,
+    role: initialRole,
+    membership: initialMembership,
+  }))
+  const resolvedDraft = draft.sourceToken === currentSourceToken
+    ? draft
+    : {
+        sourceToken: currentSourceToken,
+        fullName: initialFullName,
+        role: initialRole,
+        membership: initialMembership,
+      }
+  const updateDraft = <Key extends "fullName" | "role" | "membership">(
+    key: Key,
+    value: SetStateAction<OnboardingDraftState[Key]>,
+  ) => {
+    setDraft((current) => {
+      const base = current.sourceToken === currentSourceToken
+        ? current
+        : {
+            sourceToken: currentSourceToken,
+            fullName: initialFullName,
+            role: initialRole,
+            membership: initialMembership,
+          }
+      const previousValue = base[key]
+      const nextValue =
+        typeof value === "function"
+          ? (value as (previous: OnboardingDraftState[Key]) => OnboardingDraftState[Key])(previousValue)
+          : value
+
+      return {
+        ...base,
+        sourceToken: currentSourceToken,
+        [key]: nextValue,
+      }
+    })
+  }
+  const fullName = resolvedDraft.fullName
+  const role = resolvedDraft.role
+  const membership = resolvedDraft.membership
+  const [isSaving, setIsSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null)
+  const assignedRole = membership.role
+  const effectiveRole = (assignedRole ?? role) as Exclude<AquasmartRole, null>
+  const canChooseRole = !assignedRole
+  const nextPath = sanitizeNextPath(searchParams.get("next"), resolveAppEntryPath(effectiveRole))
+  const createWorkspaceHref = `${ONBOARDING_CREATE_WORKSPACE_PATH}?next=${encodeURIComponent(nextPath)}`
+
+  const displayEmail = user?.email?.trim() || onboardingState?.displayEmail || ""
+  const effectiveNoticeMessage = noticeMessage ?? onboardingState?.notice ?? null
 
   const handleSubmit = async () => {
+    const trimmedFullName = fullName.trim()
+    if (trimmedFullName.length < 2) {
+      setErrorMessage("Enter your full name to continue.")
+      return
+    }
+
     setIsSaving(true)
-    setErrorMsg(null)
+    setErrorMessage(null)
+    setNoticeMessage(null)
 
     try {
-      const response = await fetch("/api/onboarding/bootstrap", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          farmName: settings.farmName,
-          location: settings.location,
-          owner: settings.owner,
-          email: settings.email,
-          phone: settings.phone,
-          lowDoThreshold: settings.lowDoThreshold,
-          highAmmoniaThreshold: settings.highAmmoniaThreshold,
-          highMortalityThreshold: settings.highMortalityThreshold,
-        }),
+      const selectedRole = (assignedRole ?? role) as Exclude<AquasmartRole, null>
+
+      const result = await completeOnboardingProfileAction({
+        fullName: trimmedFullName,
+        role: selectedRole,
       })
 
-      const result = (await response.json()) as {
-        error?: string
-        farmId?: string
+      const currentUserId = user?.id ?? null
+      const farmId = result?.farmId ?? membership.farmId ?? null
+
+      await refreshProfile()
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("profile-updated"))
+        window.dispatchEvent(new Event("farm-memberships-updated"))
+        if (farmId && currentUserId) {
+          window.localStorage.setItem(`aquasmart:${currentUserId}:activeFarmId`, farmId)
+          window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId } }))
+        }
       }
 
-      if (!response.ok || !result.farmId) {
-        throw new Error(result.error || "Unable to create your farm workspace.")
+      if (!result?.membershipAssigned || !farmId) {
+        setNoticeMessage(
+          result?.notice ?? "Profile saved. Create a workspace or ask your farm admin for an invite before continuing.",
+        )
+        setIsSaving(false)
+        return
       }
 
-      if (typeof window !== "undefined" && user?.id) {
-        window.localStorage.setItem(`aquasmart:${user.id}:activeFarmId`, result.farmId)
-        window.dispatchEvent(new CustomEvent("farm-updated", { detail: { farmId: result.farmId } }))
-      }
-
-      window.location.assign("/")
+      router.replace(resolveAppEntryPath(result.role))
     } catch (error) {
-      setErrorMsg(formatError(error))
+      setErrorMessage(error instanceof Error ? error.message : "Unable to complete onboarding.")
       setIsSaving(false)
       return
     }
+
+    setIsSaving(false)
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.18),_transparent_35%),linear-gradient(180deg,_hsl(var(--background)),_color-mix(in_srgb,_hsl(var(--background))_88%,_white))] px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 lg:flex-row">
-        <section className="lg:w-[38%]">
-          <div className="rounded-[2rem] border border-border/70 bg-card/85 p-8 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary/80">Workspace Setup</p>
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground">
-              Build your first farm workspace
-            </h1>
-            <p className="mt-4 text-base leading-7 text-muted-foreground">
-              {welcomeName}, this creates your tenant, assigns you as the first admin, and applies the default alert thresholds so the operational screens are usable immediately.
+    <OnboardingShell
+      title="Welcome"
+      description="Use onboarding as the single place to confirm your profile, accept assigned access, or create a new farm workspace."
+    >
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="rounded-4xl border border-border/70 bg-card/95 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">Your account details</h2>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Signed in as <span className="font-medium text-foreground">{displayEmail || "Unknown user"}</span>
             </p>
-
-            <div className="mt-8 space-y-4 rounded-[1.5rem] border border-border/60 bg-background/70 p-5">
-              <div>
-                <p className="text-sm font-semibold text-foreground">What happens next</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  After setup you can add systems, batches, feed references, and start capturing live farm data.
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Account role</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  The first user becomes the farm admin automatically. Team invites can be added later.
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Baseline thresholds</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  These defaults seed water-quality and mortality alerts. You can refine them in Settings after onboarding.
-                </p>
-              </div>
-            </div>
           </div>
-        </section>
 
-        <section className="lg:flex-1">
-          <div className="rounded-[2rem] border border-border/70 bg-card/92 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
-            <div className="mb-8">
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground">Farm details</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Enter the minimum information required to provision a clean, isolated farm workspace.
-              </p>
+          {errorMessage ? (
+            <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-strong">
+              {errorMessage}
             </div>
+          ) : null}
 
-            {errorMsg ? (
-              <div className="mb-6 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
-                {errorMsg}
+          {effectiveNoticeMessage ? (
+            <div className="mt-5 rounded-xl border border-border/70 bg-background/80 px-4 py-3 text-sm text-muted-foreground">
+              {effectiveNoticeMessage}
+            </div>
+          ) : null}
+
+          <div className="mt-8 space-y-5">
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-foreground">Full name</span>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(event) => updateDraft("fullName", event.target.value)}
+                placeholder="Enter your full name"
+                className={inputCls}
+                autoComplete="name"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-foreground">Role</span>
+              <select
+                value={effectiveRole}
+                onChange={(event) => updateDraft("role", event.target.value as Exclude<AquasmartRole, null>)}
+                disabled={!canChooseRole}
+                className={inputCls}
+              >
+                {assignedRole === "admin" ? <option value="admin">Admin</option> : null}
+                {AQUASMART_ROLE_OPTIONS.filter((option) => option.value !== "admin").map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={isSaving}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-70"
+            >
+              {isSaving ? "Saving profile..." : membership.source === "invite" ? "Accept role and continue" : "Continue"}
+            </button>
+
+            {membership.source === "none" ? (
+              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+                <p className="text-sm font-medium text-foreground">Need a farm workspace?</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Join an existing farm with an admin invite, or create a new workspace if you are setting one up for the first time.
+                </p>
+                <Link
+                  href={createWorkspaceHref}
+                  className="mt-4 inline-flex items-center justify-center rounded-xl border border-border/70 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent"
+                >
+                  Create new workspace
+                </Link>
               </div>
             ) : null}
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Farm name</span>
-                <input
-                  type="text"
-                  value={settings.farmName}
-                  onChange={(event) => handleChange("farmName", event.target.value)}
-                  placeholder="e.g. Lake Harvest Farm"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Location</span>
-                <input
-                  type="text"
-                  value={settings.location}
-                  onChange={(event) => handleChange("location", event.target.value)}
-                  placeholder="e.g. Kisumu, Kenya"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Owner name</span>
-                <input
-                  type="text"
-                  value={settings.owner}
-                  onChange={(event) => handleChange("owner", event.target.value)}
-                  placeholder="e.g. Jane Otieno"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Contact email</span>
-                <input
-                  type="email"
-                  value={settings.email}
-                  onChange={(event) => handleChange("email", event.target.value)}
-                  placeholder="e.g. ops@farm.com"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-foreground/90">Phone</span>
-                <input
-                  type="tel"
-                  value={settings.phone}
-                  onChange={(event) => handleChange("phone", event.target.value)}
-                  placeholder="Optional"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-            </div>
-
-            <div className="mt-10">
-              <h3 className="text-lg font-semibold text-foreground">Default alerts</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                These become the first farm-level thresholds and can be tuned later from Settings.
-              </p>
-            </div>
-
-            <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">Low DO alert (mg/L)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.lowDoThreshold}
-                  onChange={(event) => handleChange("lowDoThreshold", Number.parseFloat(event.target.value || "0"))}
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">High ammonia alert (mg/L)</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={settings.highAmmoniaThreshold}
-                  onChange={(event) => handleChange("highAmmoniaThreshold", Number.parseFloat(event.target.value || "0"))}
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground/90">High mortality alert threshold (%/day)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.highMortalityThreshold}
-                  onChange={(event) => handleChange("highMortalityThreshold", Number.parseFloat(event.target.value || "0"))}
-                  className="w-full rounded-xl border border-input bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-            </div>
-
-            <div className="mt-10 flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                This action creates your farm workspace and assigns this account as the first admin.
-              </p>
-              <button
-                type="button"
-                onClick={() => void handleSubmit()}
-                disabled={isSaving}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {isSaving ? "Creating workspace..." : "Create Farm Workspace"}
-              </button>
-            </div>
           </div>
         </section>
+
+        <aside className="space-y-4">
+          <div className="rounded-4xl border border-border/70 bg-card/92 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
+            <h3 className="text-base font-semibold text-foreground">Your onboarding state</h3>
+            <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
+              <div className="flex items-start gap-3">
+                <UserRound className="mt-0.5 h-4 w-4 text-primary" />
+                <span>Profile collection always starts here with your name and role.</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                <span>
+                  {membership.source === "invite"
+                    ? "Your role was assigned by invitation and will be applied when you continue."
+                    : membership.source === "active"
+                      ? "You already have farm access. This step just confirms your profile."
+                      : "You do not have farm membership yet, so you can create a workspace or wait for an invite."}
+                </span>
+              </div>
+              <div className="flex items-start gap-3">
+                <Building2 className="mt-0.5 h-4 w-4 text-primary" />
+                <span>Multi-farm users continue through workspace selection after onboarding when needed.</span>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
-    </main>
+    </OnboardingShell>
   )
 }

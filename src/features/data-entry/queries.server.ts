@@ -1,0 +1,87 @@
+import { runServerReadThrough } from "@/lib/cache/server"
+import { cacheTags } from "@/lib/cache/tags"
+import { toQuerySuccess } from "@/lib/supabase/query-transport"
+import { createAccessTokenClient } from "@/lib/supabase/server"
+import { getScopedSystemOptions } from "@/features/shared/scoped-analytics.server"
+import { listBatchOptionRows, listFeedTypeOptionRows } from "@/features/shared/query-seed.server"
+import { emptyRecentEntries, listRecentEntries } from "@/features/shared/queries.server"
+import { logSbError } from "@/lib/supabase/log"
+
+type DataEntrySupabaseClient = ReturnType<typeof createAccessTokenClient>
+
+async function getSystems(supabase: DataEntrySupabaseClient, farmId: string) {
+  const systems = await getScopedSystemOptions(supabase, farmId, "all")
+  return toQuerySuccess(systems.filter((row) => row.is_active !== false))
+}
+
+async function getBatches(supabase: DataEntrySupabaseClient, farmId: string) {
+  return toQuerySuccess(await listBatchOptionRows(supabase, { farmId }))
+}
+
+async function getFeedTypes(supabase: DataEntrySupabaseClient, farmId: string) {
+  return toQuerySuccess(await listFeedTypeOptionRows(supabase, { farmId }))
+}
+
+async function safePrefetchWithTimeout<T>(
+  tag: string,
+  fallback: T,
+  loader: () => Promise<T>,
+  timeoutMs: number,
+) {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+
+  try {
+    const loaderPromise = loader().catch((error) => {
+      logSbError(tag, error)
+      return fallback
+    })
+
+    const timeoutPromise = new Promise<T>((resolve) => {
+      timeoutHandle = setTimeout(() => {
+        logSbError(`${tag}:timeout`, new Error(`Timed out after ${timeoutMs}ms`))
+        resolve(fallback)
+      }, timeoutMs)
+    })
+
+    return await Promise.race([loaderPromise, timeoutPromise])
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle)
+  }
+}
+
+export async function getDataEntryPrefetch({
+  farmId,
+  userId,
+  accessToken,
+}: {
+  farmId: string
+  userId: string
+  accessToken: string
+}) {
+  return runServerReadThrough({
+    keyParts: ["data-entry-page", "active-batches-v4", userId, farmId],
+    tags: [
+      cacheTags.farm(farmId),
+      cacheTags.systems(farmId),
+      cacheTags.batchOptions(farmId),
+      cacheTags.feedTypes(),
+      cacheTags.reports(farmId, "recent-entries"),
+    ],
+    loader: async () => {
+      const supabase = createAccessTokenClient(accessToken)
+      const [systems, batches, feedTypes, recentEntries] = await Promise.all([
+        getSystems(supabase, farmId),
+        getBatches(supabase, farmId),
+        getFeedTypes(supabase, farmId),
+        safePrefetchWithTimeout(
+          "data-entry:prefetch:recentEntries",
+          emptyRecentEntries(),
+          () => listRecentEntries(supabase, farmId),
+          3000,
+        ),
+      ])
+
+      return { systems, batches, feedTypes, recentEntries }
+    },
+  })
+}

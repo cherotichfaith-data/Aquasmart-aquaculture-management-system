@@ -1,20 +1,20 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { inventoryWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { getSystemFarmId, requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { Constants } from "@/lib/types/database"
 
 const stockingSchema = z.object({
   system_id: z.number().int().positive(),
   batch_id: z.number().int().positive(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  number_of_fish_stocking: z.number().positive(),
+  number_of_fish_stocking: z.number().int("Stocking count must be a whole number.").positive(),
   total_weight_stocking: z.number().positive(),
-  abw: z.number().min(0),
   notes: z.string().max(500).nullable().optional(),
-  type_of_stocking: z.enum(["empty", "already_stocked"]),
+  type_of_stocking: z.enum(Constants.public.Enums.type_of_stocking),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -41,31 +41,10 @@ export async function POST(request: Request) {
     number_of_fish_stocking: payload.number_of_fish_stocking,
     total_weight_stocking: payload.total_weight_stocking,
     type_of_stocking: payload.type_of_stocking,
-    abw: payload.abw,
     notes: payload.notes?.trim() ? payload.notes.trim() : null,
+    local_id: payload.local_id ?? null,
+    synced_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase.from("fish_stocking").insert(insertPayload).select().single()
-
-  if (error || !data) {
-    logSbError("stocking:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record stocking." }, { status })
-  }
-
-  revalidateWriteTags(
-    inventoryWriteTags({ farmId: systemScope.farmId, systemId: payload.system_id, includeProduction: true }),
-  )
-
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: systemScope.farmId,
-        systemId: payload.system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "stocking", systemScope.farmId, insertPayload)
 }

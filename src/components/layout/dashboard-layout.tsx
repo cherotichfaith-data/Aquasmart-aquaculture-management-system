@@ -1,28 +1,122 @@
 "use client"
 
 import type React from "react"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { Menu } from "lucide-react"
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState, type SetStateAction } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Button } from "@/components/app-ui/button"
+import { Dialog } from "@/components/app-ui/dialog"
+import { cn } from "@/lib/utils"
+import { SyncStatusBar } from "@/components/offline/sync-status-bar"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
+import { canAccessDataEntry, WORKSPACE_SELECT_PATH, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
 import Header from "./header"
-import Sidebar from "./sidebar"
-import { ShortcutsHelp } from "@/components/shared/shortcuts-help"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import MobileQuickEntry from "./mobile-quick-entry"
+import Sidebar, { DASHBOARD_SIDEBAR_COLLAPSED_WIDTH, DASHBOARD_SIDEBAR_WIDTH } from "./sidebar"
+import type { TimeBounds } from "@/lib/time-period"
+type HeaderDataOverrides = {
+  role?: string | null
+  timeBounds?: TimeBounds
+  timeWindowSummary?: string
+}
 
 export default function DashboardLayout({
   children,
   hideHeader = false,
   showHeaderToolbar = true,
+  initialFarmId,
+  initialFarmName,
+  headerDataOverrides,
 }: {
   children: React.ReactNode
   hideHeader?: boolean
   showHeaderToolbar?: boolean
+  initialFarmId?: string | null
+  initialFarmName?: string | null
+  headerDataOverrides?: HeaderDataOverrides
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [commandOpen, setCommandOpen] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const routeKey = `${pathname}?${searchParams.toString()}`
+  // Viewport width and the collapsed-sidebar preference are only knowable in
+  // the browser (window size, localStorage), so the server always renders the
+  // same "desktop, expanded" defaults below. Reading them here instead would
+  // make the client's first render diverge from that server-rendered HTML and
+  // fail hydration -- the real values are applied client-side in the mount
+  // effect right after, once the DOM is already attached.
+  const [isDesktop, setIsDesktop] = useState(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const routeToken = useMemo(() => Symbol(routeKey), [routeKey])
+  const [mobileSidebarDraft, setMobileSidebarDraft] = useState(() => ({
+    sourceToken: routeToken,
+    value: false,
+  }))
+  const [commandDraft, setCommandDraft] = useState(() => ({
+    sourceToken: routeToken,
+    value: false,
+  }))
+  const setMobileSidebarOpen = useCallback((value: SetStateAction<boolean>) => {
+    setMobileSidebarDraft((current) => {
+      const previousValue = current.sourceToken === routeToken ? current.value : false
+      const nextValue = typeof value === "function" ? value(previousValue) : value
+      return {
+        sourceToken: routeToken,
+        value: nextValue,
+      }
+    })
+  }, [routeToken])
+  const setCommandOpen = useCallback((value: SetStateAction<boolean>) => {
+    setCommandDraft((current) => {
+      const previousValue = current.sourceToken === routeToken ? current.value : false
+      const nextValue = typeof value === "function" ? value(previousValue) : value
+      return {
+        sourceToken: routeToken,
+        value: nextValue,
+      }
+    })
+  }, [routeToken])
+  const commandOpen = commandDraft.sourceToken === routeToken ? commandDraft.value : false
+  const mobileSidebarOpen = mobileSidebarDraft.sourceToken === routeToken ? mobileSidebarDraft.value : false
+  const { farmId, farm } = useActiveFarm({ initialFarmId, initialFarmName })
+  const farmRoleQuery = useActiveFarmRole(headerDataOverrides?.role ? null : farmId)
+  const farmRole = (headerDataOverrides?.role ?? farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
+  const allowDataEntry = canAccessDataEntry(farmRole)
+  // The active farm is stored in a cookie, so a matching ?farmId=<uuid> is just noise in the address bar.
+  useEffect(() => {
+    if (!farmId || typeof window === "undefined") return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get("farmId") !== farmId) return
+    url.searchParams.delete("farmId")
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+  }, [farmId, searchParams])
+  // Data Entry already opens straight into this exact picker -- a floating
+  // trigger on top of it would just duplicate what's already on screen.
+  const isDataEntryRoute = stripDashboardPath(pathname) === DATA_ENTRY_PATH
+  const isReportsRoute = stripDashboardPath(pathname).startsWith("/reports")
+  const showMobileQuickEntry = allowDataEntry && !isDataEntryRoute && !isReportsRoute
+
+  useEffect(() => {
+    const applyResponsiveSidebarState = () => {
+      setIsDesktop(window.innerWidth >= 768)
+    }
+    // Apply once on mount to correct the SSR-safe defaults above now that
+    // window/localStorage are actually available, then keep isDesktop in
+    // sync with the viewport from here on.
+    applyResponsiveSidebarState()
+    const stored = window.localStorage.getItem("dashboard:sidebar-collapsed")
+    if (stored === "true") {
+      setSidebarCollapsed(true)
+    } else if (stored === "false") {
+      setSidebarCollapsed(false)
+    } else {
+      setSidebarCollapsed(window.innerWidth < 1280)
+    }
+    window.addEventListener("resize", applyResponsiveSidebarState)
+    return () => window.removeEventListener("resize", applyResponsiveSidebarState)
+  }, [])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -44,77 +138,143 @@ export default function DashboardLayout({
         return
       }
       if (key === "n") {
+        if (!allowDataEntry) return
         event.preventDefault()
-        router.push("/data-entry")
+        router.push(DATA_ENTRY_PATH)
         return
       }
       if (key === "f" && event.shiftKey) {
+        if (!allowDataEntry) return
         event.preventDefault()
-        router.push("/data-entry?type=feeding")
+        router.push(`${DATA_ENTRY_PATH}?type=feeding`)
         return
       }
       if (key === "s" && event.shiftKey) {
+        if (!allowDataEntry) return
         event.preventDefault()
-        router.push("/data-entry?type=sampling")
+        router.push(`${DATA_ENTRY_PATH}?type=sampling`)
       }
     }
 
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [router])
+  }, [allowDataEntry, router, setCommandOpen])
+
+  const desktopOffset = sidebarCollapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH
 
   return (
-    <div className="relative flex min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Sidebar
-        open={sidebarOpen}
+        initialFarmId={initialFarmId}
+        initialFarmName={initialFarmName}
+        roleOverride={headerDataOverrides?.role ?? null}
+        open={mobileSidebarOpen}
         collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onCollapseToggle={() => setSidebarCollapsed((prev) => !prev)}
+        onToggle={() => {
+          if (!isDesktop) {
+            setMobileSidebarOpen((prev) => !prev)
+          }
+        }}
+        onCollapseToggle={() =>
+          setSidebarCollapsed((prev) => {
+            const next = !prev
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem("dashboard:sidebar-collapsed", String(next))
+            }
+            return next
+          })
+        }
       />
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        {hideHeader ? null : (
-          <Header
-            onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-            showToolbar={showHeaderToolbar}
-          />
+      <div
+        id="app-scroll-root"
+        className="flex min-h-screen flex-col overflow-x-hidden transition-[margin-left] duration-300 md:ml-[var(--dashboard-offset)]"
+        style={{ "--dashboard-offset": `${desktopOffset}px` } as React.CSSProperties}
+      >
+        {hideHeader ? (
+          <>
+            <header className="flex items-center gap-3 border-b bg-background px-3 py-2 md:hidden">
+              <Button variant="ghost" size="icon" aria-label="Open navigation" aria-expanded={mobileSidebarOpen} onClick={() => setMobileSidebarOpen((open) => !open)}><Menu className="size-5" /></Button>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{farm?.name ?? initialFarmName ?? "Farm workspace"}</span>
+              <Link className="text-sm underline" href={WORKSPACE_SELECT_PATH}>Switch farm</Link>
+            </header>
+            <SyncStatusBar />
+          </>
+        ) : (
+          <>
+            <Header
+              initialFarmId={initialFarmId}
+              initialFarmName={initialFarmName}
+              roleOverride={headerDataOverrides?.role ?? null}
+              timeBoundsOverride={headerDataOverrides?.timeBounds}
+              timeWindowSummaryOverride={headerDataOverrides?.timeWindowSummary}
+              onMenuClick={() => {
+                if (!isDesktop) {
+                  setMobileSidebarOpen((prev) => !prev)
+                }
+              }}
+              showToolbar={showHeaderToolbar}
+            />
+            <SyncStatusBar />
+          </>
         )}
         <main
-          className={
-            hideHeader
-              ? "flex-1 overflow-x-hidden px-3 pb-8 pt-3 sm:px-4 md:px-6 md:pb-10 md:pt-4 lg:px-10 animate-in fade-in-0 duration-300"
-              : showHeaderToolbar
-                ? "flex-1 overflow-x-hidden px-3 pb-8 pt-4 sm:px-4 md:px-6 md:pb-10 md:pt-5 lg:px-10 animate-in fade-in-0 duration-300"
-                : "flex-1 overflow-x-hidden px-3 pb-8 pt-0 sm:px-4 md:px-6 md:pb-10 md:pt-0 lg:px-10 animate-in fade-in-0 duration-300"
-          }
+          className={cn(
+            "flex-1 overflow-x-hidden px-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 md:px-8 md:pb-16 lg:px-12",
+            hideHeader ? "pt-2 md:pt-3" : showHeaderToolbar ? "pt-2 md:pt-3" : "pt-0",
+          )}
         >
-          <div className="mx-auto w-full max-w-[1720px]">{children}</div>
+          <div className="mx-auto w-full max-w-[1640px]">{children}</div>
         </main>
       </div>
-      <ShortcutsHelp />
-      <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
-        <DialogContent className="rounded-[1.5rem] border-border/80 bg-card/95 backdrop-blur-xl">
-          <DialogHeader>
-            <DialogTitle>Quick Actions</DialogTitle>
-            <DialogDescription>Jump straight to common tasks.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2">
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/"); }}>
-              Go to Dashboard
-            </Button>
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry"); }}>
-              New Data Entry
-            </Button>
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry?type=feeding"); }}>
-              Record Feeding
-            </Button>
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/data-entry?type=sampling"); }}>
-              Record Sampling
-            </Button>
-            <Button variant="outline" onClick={() => { setCommandOpen(false); router.push("/water-quality"); }}>
-              Water Quality Dashboard
-            </Button>
-          </div>
-        </DialogContent>
+      {showMobileQuickEntry ? <MobileQuickEntry /> : null}
+      <Dialog
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        title="Quick Actions"
+        description="Jump straight to common tasks."
+      >
+        <div className="grid gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCommandOpen(false)
+              router.push(toDashboardPath("/"))
+            }}
+          >
+            Go to Dashboard
+          </Button>
+          {allowDataEntry ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCommandOpen(false)
+                  router.push(DATA_ENTRY_PATH)
+                }}
+              >
+                New Data Entry
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCommandOpen(false)
+                  router.push(`${DATA_ENTRY_PATH}?type=feeding`)
+                }}
+              >
+                Record Feeding
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCommandOpen(false)
+                  router.push(`${DATA_ENTRY_PATH}?type=sampling`)
+                }}
+              >
+                Record Sampling
+              </Button>
+            </>
+          ) : null}
+        </div>
       </Dialog>
     </div>
   )

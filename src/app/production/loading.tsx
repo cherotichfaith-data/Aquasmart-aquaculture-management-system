@@ -1,14 +1,11 @@
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@/components/app-ui/skeleton"
 
 export default function PageLoading() {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <Skeleton key={i} className="h-32" />
-        ))}
-      </div>
-      <Skeleton className="h-64" />
+    <div className="flex flex-col gap-5 p-4 md:p-6">
+      <Skeleton className="h-10 w-[440px] max-w-full" />
+      <Skeleton className="h-[340px] rounded-2xl" />
+      <Skeleton className="h-[240px] rounded-2xl" />
     </div>
   )
 }

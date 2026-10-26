@@ -1,21 +1,76 @@
 import { Suspense } from "react"
-import DataEntryPageClient from "@/app/data-entry/page.client"
-import { Metadata } from "next"
-import { requireUser } from "@/lib/supabase/require-user"
-import { requireInitialFarmId } from "@/features/farm/queries.server"
+import { redirect } from "next/navigation"
+import type { Metadata } from "next"
+import DataEntryPageClient from "./page.client"
+import { getDataEntryPrefetch } from "@/features/data-entry/queries.server"
+import { resolveInitialFarmId } from "@/features/farm/queries.server"
+import { WORKSPACE_SELECT_PATH, canAccessDataEntry } from "@/lib/app-entry"
+import { logSbError } from "@/lib/supabase/log"
+import { requireUserContext } from "@/lib/supabase/require-user"
+import { createAccessTokenClient } from "@/lib/supabase/server"
 
 export const metadata: Metadata = {
-    title: "Data Capture - AquaSmart",
-    description: "Record daily farm events",
+  title: "Data Capture - SUSTAIN Aquasmart",
+  description: "Record daily farm events",
 }
 
-export default async function DataEntryPage() {
-  await requireUser()
-  await requireInitialFarmId()
+type SearchParams = Record<string, string | string[] | undefined>
+
+export default async function DataEntryPage({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>
+}) {
+  const resolvedSearchParams = (await searchParams) ?? {}
+  const routeSearchParams = new URLSearchParams()
+
+  Object.entries(resolvedSearchParams).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      routeSearchParams.set(key, value)
+    }
+  })
+
+  const currentPath = `/data-entry${routeSearchParams.size > 0 ? `?${routeSearchParams.toString()}` : ""}`
+
+  const { user, accessToken } = await requireUserContext(currentPath)
+  const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
+  const { farmId, farmName } = await resolveInitialFarmId(searchFarmId)
+
+  if (!farmId) {
+    redirect(`${WORKSPACE_SELECT_PATH}?next=${encodeURIComponent(currentPath)}`)
+  }
+
+  const supabase = createAccessTokenClient(accessToken)
+  const { data: membership, error } = await supabase
+    .from("farm_user")
+    .select("role")
+    .eq("farm_id", farmId)
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (error) {
+    logSbError("data-entry:page:getFarmRole", error)
+  }
+
+  const role = (membership?.role ?? null) as Parameters<typeof canAccessDataEntry>[0]
+  if (!canAccessDataEntry(role)) {
+    redirect("/unauthorized")
+  }
+
+  const prefetch = await getDataEntryPrefetch({ farmId, userId: user.id, accessToken })
 
   return (
     <Suspense fallback={null}>
-      <DataEntryPageClient />
-        </Suspense>
-    )
+      <DataEntryPageClient
+        key={currentPath}
+        initialFarmId={farmId}
+        initialFarmName={farmName}
+        initialFarmRole={role}
+        initialSystems={prefetch.systems.data ?? []}
+        initialBatches={prefetch.batches.data ?? []}
+        initialFeeds={prefetch.feedTypes.data ?? []}
+        initialRecentEntries={prefetch.recentEntries}
+      />
+    </Suspense>
+  )
 }

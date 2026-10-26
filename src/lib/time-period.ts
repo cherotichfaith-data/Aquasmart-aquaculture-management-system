@@ -1,7 +1,10 @@
-import type { Database, Enums } from "@/lib/types/database"
+import { Constants, type Database, type Enums } from "@/lib/types/database"
+import { toRpcDate, toRpcSystemId } from "@/lib/rpc-params"
+import { fetchRpc } from "@/lib/supabase/query-transport"
 
 export type BaseTimePeriod = Enums<"time_period">
-export type TimePeriod = BaseTimePeriod | "all history"
+export type DateType = BaseTimePeriod | "all history"
+export type TimePeriod = DateType
 export type AnalyticsTimeScope =
   | "dashboard"
   | "inventory"
@@ -10,28 +13,13 @@ export type AnalyticsTimeScope =
   | "feeding"
   | "feed_inventory"
 
-export const TIME_PERIODS: TimePeriod[] = [
-  "day",
-  "week",
-  "2 weeks",
-  "month",
-  "quarter",
-  "6 months",
-  "year",
-  "all history",
-]
+export const BASE_TIME_PERIODS = Constants.public.Enums.time_period
 
-export const TIME_PERIOD_DAY_COUNTS: Record<BaseTimePeriod, number> = {
-  day: 1,
-  week: 7,
-  "2 weeks": 14,
-  month: 30,
-  quarter: 90,
-  "6 months": 180,
-  year: 365,
-}
+export const DATE_TYPES: DateType[] = [...BASE_TIME_PERIODS, "all history"]
+export const TIME_PERIODS: TimePeriod[] = DATE_TYPES
 
-export const DEFAULT_TIME_PERIOD: TimePeriod = "2 weeks"
+export const DEFAULT_DATE_TYPE: DateType = "month"
+export const DEFAULT_TIME_PERIOD: TimePeriod = DEFAULT_DATE_TYPE
 
 export type TimeBounds = {
   start: string | null
@@ -46,27 +34,8 @@ export type TimeBounds = {
   isTruncated?: boolean | null
 }
 
-type TimePeriodBoundsRpc = Extract<
-  Database["public"]["Functions"]["api_time_period_bounds"],
-  { Args: { p_scope?: string } }
->
-type TimePeriodBoundsRpcArgs = TimePeriodBoundsRpc["Args"]
-type TimePeriodBoundsRpcRow = TimePeriodBoundsRpc["Returns"][number]
-type TimePeriodBoundsRpcResult = {
-  data: TimePeriodBoundsRpcRow | null
-  error: unknown
-}
-type TimePeriodBoundsRpcQuery = PromiseLike<TimePeriodBoundsRpcResult> & {
-  abortSignal?: (signal: AbortSignal) => TimePeriodBoundsRpcQuery
-}
-type RpcClient = {
-  rpc: (fn: "api_time_period_bounds", args: TimePeriodBoundsRpcArgs) => {
-    maybeSingle: () => TimePeriodBoundsRpcQuery
-  }
-}
-
-export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
-  day: "Today",
+export const DATE_TYPE_LABELS: Record<DateType, string> = {
+  day: "Day",
   week: "Week",
   "2 weeks": "2 Weeks",
   month: "Month",
@@ -75,129 +44,164 @@ export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
   year: "Year",
   "all history": "All History",
 }
+export const TIME_PERIOD_LABELS: Record<TimePeriod, string> = DATE_TYPE_LABELS
 
-export const isTimePeriod = (value: unknown): value is TimePeriod =>
-  typeof value === "string" && TIME_PERIODS.includes(value as TimePeriod)
+// URL slug === the internal DateType value itself (space-separated, e.g. "2 weeks"),
+// matching aquasmart-main's convention. URLSearchParams encodes/decodes the spaces
+// automatically, so no separate slug table is needed for the current form.
+export const DATE_TYPE_URL_VALUES: Record<DateType, string> = {
+  day: "day",
+  week: "week",
+  "2 weeks": "2 weeks",
+  month: "month",
+  quarter: "quarter",
+  "6 months": "6 months",
+  year: "year",
+  "all history": "all history",
+}
+const DATE_TYPES_BY_URL_VALUE = new Map(
+  Object.entries(DATE_TYPE_URL_VALUES).map(([dateType, urlValue]) => [urlValue, dateType as DateType]),
+)
 
-export const isBaseTimePeriod = (value: unknown): value is BaseTimePeriod =>
-  value !== "all history" && isTimePeriod(value)
-
-export const resolveTimePeriod = (value: unknown, fallback: TimePeriod = DEFAULT_TIME_PERIOD): TimePeriod =>
-  isTimePeriod(value) ? value : fallback
-
-const DAY_MS = 86_400_000
-
-const parseUtcDate = (value: string) => {
-  const [year, month, day] = value.split("-").map(Number)
-  return new Date(Date.UTC(year, (month || 1) - 1, day || 1))
+// Pre-alignment hyphenated slugs (e.g. "2-weeks", "all-history") — accepted so links
+// shared before this change still resolve correctly.
+const LEGACY_URL_VALUES: Record<string, DateType> = {
+  "2-weeks": "2 weeks",
+  "6-months": "6 months",
+  "all-history": "all history",
 }
 
-const formatUtcDate = (value: Date) => value.toISOString().slice(0, 10)
-
-export function countTimeRangeDays(startDate?: string | null, endDate?: string | null) {
-  if (!startDate || !endDate) return null
-  const start = parseUtcDate(startDate)
-  const end = parseUtcDate(endDate)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-    return null
-  }
-  return Math.floor((end.getTime() - start.getTime()) / DAY_MS) + 1
+export function toDateTypeUrlValue(value: DateType) {
+  return DATE_TYPE_URL_VALUES[value] ?? value
 }
+export const toTimePeriodUrlValue = toDateTypeUrlValue
 
-export function buildTimeBoundsFromAvailableRange(params: {
-  timePeriod: TimePeriod
-  availableFromDate: string | null | undefined
-  latestAvailableDate: string | null | undefined
-  anchorScope?: string | null
-}): TimeBounds {
-  const availableFromDate = params.availableFromDate ?? null
-  const latestAvailableDate = params.latestAvailableDate ?? null
-
-  if (!availableFromDate || !latestAvailableDate || availableFromDate > latestAvailableDate) {
-    return {
-      start: null,
-      end: null,
-      anchorScope: params.anchorScope ?? null,
-      latestAvailableDate,
-      availableFromDate,
-      requestedDays: params.timePeriod === "all history" ? null : TIME_PERIOD_DAY_COUNTS[params.timePeriod],
-      availableDays: null,
-      resolvedDays: null,
-      stalenessDays: null,
-      isTruncated: false,
-    }
-  }
-
-  const availableStartDate = parseUtcDate(availableFromDate)
-  const latestDate = parseUtcDate(latestAvailableDate)
-  const availableDays = Math.floor((latestDate.getTime() - availableStartDate.getTime()) / DAY_MS) + 1
-  const requestedDays = params.timePeriod === "all history" ? availableDays : TIME_PERIOD_DAY_COUNTS[params.timePeriod]
-  const resolvedStartDate =
-    params.timePeriod === "all history" ? availableStartDate : new Date(latestDate.getTime() - (requestedDays - 1) * DAY_MS)
-  const resolvedStart = formatUtcDate(resolvedStartDate)
-  const start = params.timePeriod === "all history" ? availableFromDate : resolvedStart < availableFromDate ? availableFromDate : resolvedStart
-  const resolvedDays = Math.floor((latestDate.getTime() - parseUtcDate(start).getTime()) / DAY_MS) + 1
-  const today = new Date()
-  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
-  const stalenessDays = Math.max(0, Math.floor((todayUtc.getTime() - latestDate.getTime()) / DAY_MS))
-
-  return {
-    start,
-    end: latestAvailableDate,
-    anchorScope: params.anchorScope ?? null,
-    latestAvailableDate,
-    availableFromDate,
-    requestedDays,
-    availableDays,
-    resolvedDays,
-    stalenessDays,
-    isTruncated: params.timePeriod === "all history" ? false : start > resolvedStart,
-  }
-}
-
-const withAbortSignal = (query: TimePeriodBoundsRpcQuery, signal?: AbortSignal): TimePeriodBoundsRpcQuery => {
-  if (!signal || typeof query.abortSignal !== "function") return query
-  return query.abortSignal(signal)
-}
-
-export async function fetchTimePeriodBounds(
-  supabase: RpcClient,
-  params: {
-    farmId: string
-    timePeriod: TimePeriod
-    scope?: AnalyticsTimeScope
-    anchorDate?: string | null
-    signal?: AbortSignal
-  },
-): Promise<TimeBounds> {
-  const rpcTimePeriod: BaseTimePeriod = params.timePeriod === "all history" ? "day" : params.timePeriod
-  const query = withAbortSignal(
-    supabase
-      .rpc("api_time_period_bounds", {
-        p_farm_id: params.farmId,
-        p_time_period: rpcTimePeriod,
-        p_anchor_date: params.anchorDate ?? undefined,
-        p_scope: params.scope ?? "dashboard",
-      })
-      .maybeSingle(),
-    params.signal,
+export function parseDateTypeUrlValue(value: unknown): DateType | null {
+  if (typeof value !== "string") return null
+  const normalized = value.trim().toLowerCase()
+  if (normalized === "6months") return "6 months"
+  if (normalized === "2weeks") return "2 weeks"
+  if (normalized === "allhistory") return "all history"
+  return (
+    DATE_TYPES_BY_URL_VALUE.get(normalized) ?? LEGACY_URL_VALUES[normalized] ?? (isDateType(normalized) ? normalized : null)
   )
+}
+export const parseTimePeriodUrlValue = parseDateTypeUrlValue
 
-  const { data, error } = await query
-  if (error) {
-    return { start: null, end: null }
+export const isDateType = (value: unknown): value is DateType =>
+  typeof value === "string" && DATE_TYPES.includes(value as DateType)
+export const isTimePeriod = isDateType
+
+export const resolveDateType = (value: unknown, fallback: DateType = DEFAULT_DATE_TYPE): DateType =>
+  parseDateTypeUrlValue(value) ?? fallback
+export const resolveTimePeriod = resolveDateType
+
+/**
+ * Custom date range (aquasmart-main / v2 design): encoded in the same URL
+ * param as presets, as `custom_YYYY-MM-DD_YYYY-MM-DD`. These are explicit
+ * user-chosen dates — no window derivation happens client-side.
+ */
+export type CustomTimeRange = { start: string; end: string }
+
+const CUSTOM_PERIOD_RE = /^custom_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/
+
+export function parseCustomPeriodUrlValue(value: unknown): CustomTimeRange | null {
+  if (typeof value !== "string") return null
+  const match = value.trim().match(CUSTOM_PERIOD_RE)
+  if (!match) return null
+  const [, start, end] = match
+  if (!parseDateOnly(start) || !parseDateOnly(end)) return null
+  return start <= end ? { start, end } : { start: end, end: start }
+}
+
+export function toCustomPeriodUrlValue(range: CustomTimeRange): string {
+  return `custom_${range.start}_${range.end}`
+}
+
+export function formatCustomRangeLabel(range: CustomTimeRange): string {
+  return formatResolvedDateRange(range.start, range.end) ?? `${range.start} - ${range.end}`
+}
+
+const DATE_TYPE_DAY_COUNTS: Record<BaseTimePeriod, number> = {
+  day: 1,
+  week: 7,
+  "2 weeks": 14,
+  month: 30,
+  quarter: 90,
+  "6 months": 180,
+  year: 365,
+}
+
+export function getDateTypeDays(value: DateType): number | null {
+  if (value === "all history") return null
+  return DATE_TYPE_DAY_COUNTS[value]
+}
+export function getAvailableDateTypes(maxDaysSinceStart?: number | null): DateType[] {
+  if (maxDaysSinceStart == null || !Number.isFinite(maxDaysSinceStart) || maxDaysSinceStart <= 0) {
+    return DATE_TYPES
   }
 
-  const row = data as TimePeriodBoundsRpcRow | null
-  if (params.timePeriod === "all history") {
-    return buildTimeBoundsFromAvailableRange({
-      timePeriod: params.timePeriod,
-      availableFromDate: row?.available_from_date ?? null,
-      latestAvailableDate: row?.latest_available_date ?? null,
-      anchorScope: row?.anchor_scope ?? null,
-    })
+  return DATE_TYPES.filter((dateType) => {
+    const days = getDateTypeDays(dateType)
+    return days == null || days <= maxDaysSinceStart
+  })
+}
+export const getAvailableTimePeriods = getAvailableDateTypes
+
+function parseDateOnly(value: string | null | undefined) {
+  if (!value) return null
+  const parsed = new Date(`${value}T00:00:00`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function formatRangeDate(value: Date, includeYear: boolean) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(includeYear ? { year: "numeric" } : {}),
+  }).format(value)
+}
+
+export function formatResolvedDateRange(start: string | null | undefined, end: string | null | undefined) {
+  const startDate = parseDateOnly(start)
+  const endDate = parseDateOnly(end)
+  if (!startDate || !endDate) return null
+  if (startDate.getTime() === endDate.getTime()) {
+    return formatRangeDate(endDate, true)
   }
 
+  const sameYear = startDate.getFullYear() === endDate.getFullYear()
+  return `${formatRangeDate(startDate, !sameYear)} - ${formatRangeDate(endDate, true)}`
+}
+
+export function formatResolvedTimeWindow(
+  timePeriod: DateType,
+  start: string | null | undefined,
+  end: string | null | undefined,
+) {
+  const label = DATE_TYPE_LABELS[timePeriod]
+  const range = formatResolvedDateRange(start, end)
+  return range ? `${range} (${label})` : label
+}
+
+type TimePeriodBoundsRpc = Database["public"]["Functions"]["api_time_period_bounds_scoped"]
+type TimePeriodBoundsRpcRow = TimePeriodBoundsRpc["Returns"][number]
+
+type TimePeriodBoundsRpcQuery = PromiseLike<{
+  data: TimePeriodBoundsRpcRow[] | null
+  error: unknown
+}> & {
+  abortSignal?: (signal: AbortSignal) => TimePeriodBoundsRpcQuery
+}
+
+type TimePeriodBoundsRpcClient = {
+  rpc: (
+    name: "api_time_period_bounds_scoped",
+    args: TimePeriodBoundsRpc["Args"] & { p_batch_id?: number },
+  ) => TimePeriodBoundsRpcQuery
+}
+
+function mapTimeBoundsRow(row: TimePeriodBoundsRpcRow | null | undefined): TimeBounds {
   return {
     start: row?.input_start_date ?? null,
     end: row?.input_end_date ?? null,
@@ -210,4 +214,101 @@ export async function fetchTimePeriodBounds(
     stalenessDays: row?.staleness_days ?? null,
     isTruncated: row?.is_truncated ?? null,
   }
+}
+
+export function customRangeToBounds(range: CustomTimeRange): TimeBounds {
+  const start = parseDateOnly(range.start)
+  const end = parseDateOnly(range.end)
+  const days =
+    start && end ? Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1 : null
+  return {
+    start: range.start,
+    end: range.end,
+    anchorScope: "custom",
+    latestAvailableDate: null,
+    availableFromDate: null,
+    requestedDays: days,
+    availableDays: days,
+    resolvedDays: days,
+    stalenessDays: null,
+    isTruncated: false,
+  }
+}
+
+export async function fetchTimePeriodBounds(
+  supabase: unknown,
+  params: {
+    farmId: string
+    timePeriod: DateType
+    /** Explicit custom range wins over the preset — no RPC round-trip needed. */
+    customRange?: CustomTimeRange | null
+    scope?: AnalyticsTimeScope
+    anchorDate?: string | null
+    systemId?: number | null
+    batchId?: number | null
+    signal?: AbortSignal
+  },
+): Promise<TimeBounds> {
+  if (params.customRange) {
+    return customRangeToBounds(params.customRange)
+  }
+
+  const client = supabase as TimePeriodBoundsRpcClient
+  let query = client.rpc("api_time_period_bounds_scoped", {
+    p_farm_id: params.farmId,
+    p_time_period: params.timePeriod,
+    p_scope: params.scope ?? "dashboard",
+    p_anchor_date: toRpcDate(params.anchorDate),
+    p_system_id: toRpcSystemId(params.systemId),
+    p_batch_id: params.batchId ?? undefined,
+  } as TimePeriodBoundsRpc["Args"] & { p_batch_id?: number; p_anchor_date?: string | null; p_system_id: number | null })
+  if (params.signal && typeof query.abortSignal === "function") {
+    query = query.abortSignal(params.signal)
+  }
+
+  const { data, error } = await query
+  if (params.signal?.aborted) return { start: null, end: null }
+  if (error) return { start: null, end: null }
+
+  return mapTimeBoundsRow(data?.[0])
+}
+
+/**
+ * Client-side counterpart to fetchTimePeriodBounds(). Goes through the
+ * authenticated /api/rpc proxy, which resolves bounds via the one shared
+ * server resolver (features/shared/time-bounds.server) -- cached, tagged, and
+ * the exact same code path every server prefetch uses. The proxy returns the
+ * already-mapped TimeBounds, so there is nothing to map here.
+ */
+export async function fetchTimePeriodBoundsClient(params: {
+  farmId: string
+  timePeriod: DateType
+  customRange?: CustomTimeRange | null
+  scope?: AnalyticsTimeScope
+  anchorDate?: string | null
+  systemId?: number | null
+  batchId?: number | null
+  signal?: AbortSignal
+}): Promise<TimeBounds> {
+  if (params.customRange) {
+    return customRangeToBounds(params.customRange)
+  }
+
+  const result = await fetchRpc<TimeBounds>(
+    "fetchTimePeriodBoundsClient",
+    "api_time_period_bounds_scoped",
+    {
+      p_farm_id: params.farmId,
+      p_time_period: params.timePeriod,
+      p_scope: params.scope ?? "dashboard",
+      p_anchor_date: toRpcDate(params.anchorDate),
+      p_system_id: toRpcSystemId(params.systemId),
+      p_batch_id: params.batchId ?? undefined,
+    },
+    params.signal,
+  )
+
+  if (params.signal?.aborted || result.status === "error") return { start: null, end: null }
+
+  return result.data[0] ?? { start: null, end: null }
 }

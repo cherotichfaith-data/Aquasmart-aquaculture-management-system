@@ -1,0 +1,98 @@
+import { NextResponse } from "next/server"
+import { z } from "zod"
+import { cacheTags } from "@/lib/cache/tags"
+import { apiRateLimits } from "@/lib/server/rate-limit"
+import { requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { createClient } from "@/lib/supabase/server"
+import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { GROWTH_STAGE_VALUES } from "@/lib/stage-filter"
+import { FORM_SYSTEM_TYPES } from "@/lib/system-types"
+
+const systemSchema = z.object({
+  farm_id: z.string().uuid(),
+  commissioned_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  unit: z.string().max(120).nullable().optional(),
+  name: z.string().min(1).max(120),
+  type: z.enum(FORM_SYSTEM_TYPES),
+  growth_stage: z.enum(GROWTH_STAGE_VALUES),
+  volume: z.number().min(0).nullable().optional(),
+  depth: z.number().min(0).nullable().optional(),
+  is_active: z.boolean().optional(),
+})
+
+function isDuplicateSystemNameError(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const dbError = error as { code?: string; message?: string; details?: string }
+  return (
+    dbError.code === "23505" &&
+    /system_active_name_farm_unique|system_name_farm_unique|farm_id, name|duplicate key/i.test(
+      `${dbError.message ?? ""}\n${dbError.details ?? ""}`,
+    )
+  )
+}
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const auth = await requireRateLimitedRouteUser(supabase, request, "system:record", apiRateLimits.mutation)
+  if ("response" in auth) return auth.response
+
+  let payload: z.infer<typeof systemSchema>
+  try {
+    payload = systemSchema.parse(await request.json())
+  } catch (error) {
+    const message =
+      error instanceof z.ZodError ? error.issues[0]?.message ?? "Invalid system payload." : "Invalid request body."
+    return NextResponse.json({ error: message }, { status: 400 })
+  }
+
+  const { data, error } = await supabase
+    .from("system")
+    .insert({
+      farm_id: payload.farm_id,
+      name: payload.name,
+      type: payload.type,
+      growth_stage: payload.growth_stage,
+      commissioned_at: payload.commissioned_at ?? null,
+      unit: payload.unit?.trim() ? payload.unit.trim() : null,
+      is_active: payload.is_active ?? true,
+      cage_status: "available",
+      volume: payload.volume ?? null,
+      depth: payload.depth ?? null,
+    })
+    .select()
+    .single()
+
+  if (error || !data) {
+    logSbError("system:record:insert", error)
+    if (isDuplicateSystemNameError(error)) {
+      // 422, not 409: the offline sync layer (src/lib/offline/sync.ts) treats HTTP 409
+      // specifically as "already synced via local_id retry" and marks the record synced
+      // without surfacing an error. A duplicate-name conflict is a real validation failure,
+      // not an idempotent-retry no-op, so it must use a status the sync layer treats as an
+      // actual error -- otherwise a queued offline system record that collides with an
+      // existing name would silently vanish as if it had been created.
+      return NextResponse.json({ error: `A system named "${payload.name}" already exists in this farm.` }, { status: 422 })
+    }
+    const status = isSbPermissionDenied(error) ? 403 : 500
+    return NextResponse.json({ error: "Unable to create system." }, { status })
+  }
+
+  revalidateWriteTags([
+    cacheTags.farm(payload.farm_id),
+    cacheTags.systems(payload.farm_id),
+    cacheTags.dashboard(payload.farm_id),
+    cacheTags.reports(payload.farm_id, "recent-entries"),
+  ])
+
+  return NextResponse.json(
+    {
+      data,
+      meta: {
+        farmId: payload.farm_id,
+        systemId: data.id,
+        date: data.created_at,
+      },
+    },
+    { status: 201 },
+  )
+}

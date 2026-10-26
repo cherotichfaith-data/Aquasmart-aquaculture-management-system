@@ -8,14 +8,25 @@ export const queryKeys = {
       farmId?: string | null
       stage?: string | null
       activeOnly?: boolean
+      userId?: string | null
     }) {
-      return ["options", "systems", farmToken(params?.farmId), params?.stage ?? "all", params?.activeOnly ?? false] as const
+      return [
+        "options",
+        "systems",
+        params?.userId ?? "anon",
+        farmToken(params?.farmId),
+        params?.stage ?? "all",
+        params?.activeOnly ?? true,
+      ] as const
     },
-    batches(farmId?: string | null) {
-      return ["options", "batches", farmToken(farmId)] as const
-    },
-    feeds(userId?: string | null) {
-      return ["options", "feeds", userId ?? "anon"] as const
+    batches(params?: { farmId?: string | null; activeOnly?: boolean; userId?: string | null }) {
+      return [
+        "options",
+        "batches",
+        params?.userId ?? "anon",
+        farmToken(params?.farmId),
+        params?.activeOnly ?? true,
+      ] as const
     },
     feedSuppliers(userId?: string | null) {
       return ["options", "feed-suppliers", userId ?? "anon"] as const
@@ -40,53 +51,94 @@ export const queryKeys = {
       ] as const
     },
   },
-  inventory: {
-    daily(params?: {
+  production: {
+    summary(params?: {
       farmId?: string | null
       systemId?: number
+      stage?: string | null
       dateFrom?: string
       dateTo?: string
       limit?: number
-      cursorDate?: string
-      orderAsc?: boolean
     }) {
       return [
-        "inventory",
-        "daily",
+        "production",
+        "summary",
         farmToken(params?.farmId),
         numberToken(params?.systemId),
+        params?.stage ?? "all",
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),
         params?.limit ?? 50,
-        stringToken(params?.cursorDate),
-        params?.orderAsc ?? false,
+      ] as const
+    },
+    periodView(params: {
+      farmId?: string | null
+      stage?: string
+      batch?: string
+      system?: string
+      timePeriod?: string
+      dateFrom?: string | null
+      dateTo?: string | null
+      scopedSystemIds?: number[] | null
+      consolidate?: boolean
+    }) {
+      return [
+        "production",
+        "period-view",
+        farmToken(params.farmId),
+        params.stage,
+        params.batch ?? "all",
+        params.system ?? "all",
+        params.timePeriod ?? "month",
+        stringToken(params.dateFrom),
+        stringToken(params.dateTo),
+        params.scopedSystemIds?.join(",") ?? "all-systems",
+        params.consolidate ?? false,
+      ] as const
+    },
+    summaryMetrics(params: {
+      farmId?: string | null
+      stage: string
+      batch?: string
+      system?: string
+      timePeriod?: string
+      dateFrom?: string | null
+      dateTo?: string | null
+      scopedSystemIds?: number[] | null
+    }) {
+      return [
+        "production",
+        "summary-metrics",
+        farmToken(params.farmId),
+        params.stage,
+        params.batch ?? "all",
+        params.system ?? "all",
+        params.timePeriod ?? "month",
+        stringToken(params.dateFrom),
+        stringToken(params.dateTo),
+        params.scopedSystemIds?.join(",") ?? "all-systems",
+      ] as const
+    },
+  },
+  feedManagement: {
+    // Single key: every /feed section now comes from one api_feed_dashboard call.
+    dashboard(params?: {
+      farmId?: string | null
+      systemIds?: number[] | null
+      dateFrom?: string | null
+      dateTo?: string | null
+    }) {
+      return [
+        "feed-management",
+        "dashboard",
+        farmToken(params?.farmId),
+        params?.systemIds?.join(",") ?? "all-systems",
+        stringToken(params?.dateFrom),
+        stringToken(params?.dateTo),
       ] as const
     },
   },
   reports: {
-    farmKpisToday(farmId?: string | null) {
-      return ["reports", "farm-kpis-today", farmToken(farmId)] as const
-    },
-    runningStock(farmId?: string | null) {
-      return ["reports", "running-stock", farmToken(farmId)] as const
-    },
-    feedPlans(params?: {
-      farmId?: string | null
-      systemIds?: number[]
-      batchId?: number
-      dateFrom?: string
-      dateTo?: string
-    }) {
-      return [
-        "reports",
-        "feed-plans",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        numberToken(params?.batchId),
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
     feedingRecords(params?: {
       farmId?: string | null
       systemId?: number
@@ -103,6 +155,97 @@ export const queryKeys = {
         numberToken(params?.systemId),
         params?.systemIds?.join(",") ?? "all-systems",
         numberToken(params?.batchId),
+        stringToken(params?.dateFrom),
+        stringToken(params?.dateTo),
+        params?.limit ?? 100,
+      ] as const
+    },
+    feedingActivity(params?: {
+      farmId?: string | null
+      systemId?: number
+      systemIds?: number[]
+      batchId?: number
+      dateFrom?: string
+      dateTo?: string
+      limit?: number
+    }) {
+      return [
+        "reports",
+        "feeding-activity",
+        farmToken(params?.farmId),
+        numberToken(params?.systemId),
+        params?.systemIds?.join(",") ?? "all-systems",
+        numberToken(params?.batchId),
+        stringToken(params?.dateFrom),
+        stringToken(params?.dateTo),
+        params?.limit ?? 100,
+      ] as const
+    },
+    feedingSummary(params?: {
+      farmId?: string | null
+      systemId?: number
+      batchId?: number
+      dateFrom?: string
+      dateTo?: string
+    }) {
+      return [
+        "reports",
+        "feeding-summary",
+        farmToken(params?.farmId),
+        numberToken(params?.systemId),
+        numberToken(params?.batchId),
+        stringToken(params?.dateFrom),
+        stringToken(params?.dateTo),
+      ] as const
+    },
+    performanceSummary(params?: {
+      farmId?: string | null
+      systemId?: number
+      stage?: string | null
+      dateFrom?: string
+      dateTo?: string
+    }) {
+      return [
+        "reports",
+        "performance-summary",
+        farmToken(params?.farmId),
+        numberToken(params?.systemId),
+        params?.stage ?? "all",
+        stringToken(params?.dateFrom),
+        stringToken(params?.dateTo),
+      ] as const
+    },
+    feedingBreakdown(params?: {
+      farmId?: string | null
+      systemId?: number
+      batchId?: number
+      dateFrom?: string
+      dateTo?: string
+    }) {
+      return [
+        "reports",
+        "feeding-breakdown",
+        farmToken(params?.farmId),
+        numberToken(params?.systemId),
+        numberToken(params?.batchId),
+        stringToken(params?.dateFrom),
+        stringToken(params?.dateTo),
+      ] as const
+    },
+    performanceRecords(params?: {
+      farmId?: string | null
+      systemId?: number
+      stage?: string | null
+      dateFrom?: string
+      dateTo?: string
+      limit?: number
+    }) {
+      return [
+        "reports",
+        "performance-records",
+        farmToken(params?.farmId),
+        numberToken(params?.systemId),
+        params?.stage ?? "all",
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),
         params?.limit ?? 100,
@@ -153,24 +296,8 @@ export const queryKeys = {
         params?.limit ?? 100,
       ] as const
     },
-    fcrTrend(params?: {
-      farmId?: string | null
-      systemIds?: number[]
-      dateFrom?: string
-      dateTo?: string
-      days?: number
-    }) {
-      return [
-        "reports",
-        "fcr-trend",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-        params?.days ?? 180,
-      ] as const
-    },
     growthTrend(params?: {
+      farmId?: string | null
       systemIds?: number[]
       dateFrom?: string
       dateTo?: string
@@ -179,27 +306,17 @@ export const queryKeys = {
       return [
         "reports",
         "growth-trend",
+        farmToken(params?.farmId),
         params?.systemIds?.join(",") ?? "",
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),
         params?.days ?? 180,
       ] as const
     },
-    survivalTrendScoped(params?: {
-      systemIds?: number[]
-      dateFrom?: string
-      dateTo?: string
-    }) {
-      return [
-        "reports",
-        "survival-trend-scoped",
-        params?.systemIds?.join(",") ?? "",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
     transfer(params?: {
       farmId?: string | null
+      systemId?: number
+      systemIds?: number[]
       batchId?: number
       dateFrom?: string
       dateTo?: string
@@ -209,6 +326,8 @@ export const queryKeys = {
         "reports",
         "transfer",
         farmToken(params?.farmId),
+        numberToken(params?.systemId),
+        params?.systemIds?.join(",") ?? "all-systems",
         numberToken(params?.batchId),
         stringToken(params?.dateFrom),
         stringToken(params?.dateTo),
@@ -240,57 +359,117 @@ export const queryKeys = {
       return ["reports", "batch-system-ids", farmToken(params?.farmId), numberToken(params?.batchId)] as const
     },
   },
-  mortality: {
-    events(params?: {
+  waterQuality: {
+    latestStatus(params?: { farmId?: string | null; systemId?: number | null }) {
+      return ["wq", "latest_status", farmToken(params?.farmId), params?.systemId ?? null] as const
+    },
+    measurements(params?: {
       farmId?: string | null
-      systemId?: number
-      batchId?: number
-      dateFrom?: string
-      dateTo?: string
-      limit?: number
+      systemId?: number | null
+      dateFrom?: string | null
+      dateTo?: string | null
+      waterDepth?: number | null
+      parameterName?: string | null
+      limit?: number | null
+      latestFirst?: boolean | null
     }) {
       return [
-        "mortality-events",
+        "wq",
+        "measurements",
         farmToken(params?.farmId),
-        numberToken(params?.systemId),
-        numberToken(params?.batchId),
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-        params?.limit ?? 100,
+        params?.systemId ?? null,
+        params?.dateFrom ?? null,
+        params?.dateTo ?? null,
+        params?.waterDepth ?? null,
+        params?.parameterName ?? null,
+        params?.limit ?? null,
+        params?.latestFirst ?? false,
       ] as const
     },
-    alertLog(params?: {
+    dailyRating(params?: {
       farmId?: string | null
-      systemId?: number
-      severity?: string
-      ruleCodes?: string[]
-      unacknowledgedOnly?: boolean
-      limit?: number
+      systemId?: number | null
+      dateFrom?: string | null
+      dateTo?: string | null
+      limit?: number | null
     }) {
       return [
-        "alert-log",
+        "wq",
+        "daily_rating",
         farmToken(params?.farmId),
-        numberToken(params?.systemId),
-        params?.severity ?? "all",
-        params?.ruleCodes?.join(",") ?? "all-rules",
-        params?.unacknowledgedOnly ?? false,
-        params?.limit ?? 50,
+        params?.systemId ?? null,
+        params?.dateFrom ?? null,
+        params?.dateTo ?? null,
+        params?.limit ?? null,
       ] as const
     },
-    survivalTrend(params: {
-      systemId?: number
-      dateFrom?: string
-      dateTo?: string
-    }) {
-      return [
-        "survival-trend",
-        numberToken(params.systemId),
-        stringToken(params.dateFrom),
-        stringToken(params.dateTo),
-      ] as const
+    thresholds(farmId?: string | null) {
+      return ["wq", "thresholds", farmToken(farmId)] as const
     },
   },
   dashboard: {
+    /** Single-call dashboard payload (api_dashboard RPC). */
+    payload(params: {
+      farmId?: string | null
+      timePeriod?: string
+      /** `custom_YYYY-MM-DD_YYYY-MM-DD` url token when a custom range is active. */
+      custom?: string | null
+      systemId?: number | null
+      batchId?: number | null
+      stage?: string | null
+      /** Batches-view toggle: must vary the key so switching views refetches with `batches` populated. */
+      includeBatches?: boolean
+    }) {
+      return [
+        "dashboard",
+        "payload",
+        farmToken(params.farmId),
+        params.custom ?? params.timePeriod ?? "month",
+        numberToken(params.systemId),
+        numberToken(params.batchId),
+        params.stage ?? "all",
+        params.includeBatches ?? false,
+      ] as const
+    },
+      systems(params?: {
+        farmId?: string | null
+        stage?: string | null
+        systemId?: number | null
+        systemIds?: number[] | null
+        dateFrom?: string | null
+        dateTo?: string | null
+      }) {
+        return [
+          "dashboard",
+          "systems",
+          farmToken(params?.farmId),
+          params?.stage ?? "all",
+          numberToken(params?.systemId),
+          params?.systemIds?.join(",") ?? "all-systems",
+          stringToken(params?.dateFrom),
+          stringToken(params?.dateTo),
+        ] as const
+      },
+      batches(params?: {
+        farmId?: string | null
+        stage?: string | null
+        batchIds?: number[] | null
+        dateFrom?: string | null
+        dateTo?: string | null
+      }) {
+        return [
+          "dashboard",
+          "batches",
+          farmToken(params?.farmId),
+          params?.stage ?? "all",
+          params?.batchIds?.join(",") ?? "all-batches",
+          stringToken(params?.dateFrom),
+          stringToken(params?.dateTo),
+        ] as const
+      },
+      systemsOverview(farmId?: string | null) {
+        return ["systems-overview", farmToken(farmId)] as const
+      },
     systemsTable(params: {
       farmId?: string | null
       stage: string
@@ -300,6 +479,7 @@ export const queryKeys = {
       dateFrom?: string | null
       dateTo?: string | null
       includeIncomplete?: boolean
+      scopedSystemIds?: number[] | null
     }) {
       return [
         "systems-table",
@@ -307,10 +487,11 @@ export const queryKeys = {
         params.stage,
         params.batch ?? "all",
         params.system ?? "all",
-        params.timePeriod ?? "2 weeks",
+        params.timePeriod ?? "month",
         stringToken(params.dateFrom),
         stringToken(params.dateTo),
         params.includeIncomplete ?? false,
+        params.scopedSystemIds?.join(",") ?? "all-systems",
       ] as const
     },
     kpiOverview(params: {
@@ -321,6 +502,7 @@ export const queryKeys = {
       system?: string
       dateFrom?: string | null
       dateTo?: string | null
+      scopedSystemIds?: number[] | null
     }) {
       return [
         "kpi-overview",
@@ -331,6 +513,7 @@ export const queryKeys = {
         params.system ?? "all",
         stringToken(params.dateFrom),
         stringToken(params.dateTo),
+        params.scopedSystemIds?.join(",") ?? "all-systems",
       ] as const
     },
     recommendedActions(params: {
@@ -341,6 +524,7 @@ export const queryKeys = {
       timePeriod?: string
       dateFrom?: string | null
       dateTo?: string | null
+      scopedSystemIds?: number[] | null
     }) {
       return [
         "recommended-actions",
@@ -348,29 +532,10 @@ export const queryKeys = {
         params.stage ?? "all",
         params.batch ?? "all",
         params.system ?? "all",
-        params.timePeriod ?? "2 weeks",
+        params.timePeriod ?? "month",
         stringToken(params.dateFrom),
         stringToken(params.dateTo),
-      ] as const
-    },
-    productionSummaryMetrics(params: {
-      farmId?: string | null
-      stage: string
-      batch?: string
-      system?: string
-      timePeriod?: string
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "production-summary-metrics",
-        farmToken(params.farmId),
-        params.stage,
-        params.batch ?? "all",
-        params.system ?? "all",
-        params.timePeriod ?? "2 weeks",
-        stringToken(params.dateFrom),
-        stringToken(params.dateTo),
+        params.scopedSystemIds?.join(",") ?? "all-systems",
       ] as const
     },
     productionTrend(params: {
@@ -381,6 +546,7 @@ export const queryKeys = {
       timePeriod: string
       dateFrom?: string | null
       dateTo?: string | null
+      scopedSystemIds?: number[] | null
     }) {
       return [
         "production-trend",
@@ -391,11 +557,24 @@ export const queryKeys = {
         params.timePeriod,
         stringToken(params.dateFrom),
         stringToken(params.dateTo),
+        params.scopedSystemIds?.join(",") ?? "all-systems",
       ] as const
+    },
+  },
+  settings: {
+    load(userId?: string | null, farmId?: string | null, thresholdDenied = false) {
+      return ["settings", "load", userId ?? "anon", farmId ?? "no-farm", thresholdDenied] as const
+    },
+    members(farmId?: string | null) {
+      return ["settings", "members", farmToken(farmId)] as const
+    },
+    pendingInvites(farmId?: string | null) {
+      return ["settings", "pending-invites", farmToken(farmId)] as const
     },
   },
   activity: {
     recentActivities(params?: {
+      farmId?: string | null
       tableName?: string
       changeType?: string
       dateFrom?: string
@@ -404,11 +583,28 @@ export const queryKeys = {
     }) {
       return [
         "recent-activities",
+        farmToken(params?.farmId),
         params?.tableName ?? "all",
         params?.changeType ?? "all",
         params?.dateFrom ?? "all",
         params?.dateTo ?? "all",
         params?.limit ?? 5,
+      ] as const
+    },
+  },
+  onboarding: {
+    state(userId?: string | null, linkedFarmId?: string | null) {
+      return ["onboarding", "state", userId ?? "anon", linkedFarmId ?? "none"] as const
+    },
+  },
+  analytics: {
+    recommendedActions(params: { farmId?: string | null; systemId?: number; systemIds?: number[] | null }) {
+      return [
+        "analytics",
+        "recommended-actions",
+        farmToken(params.farmId),
+        numberToken(params.systemId),
+        params.systemIds?.join(",") ?? "all-systems",
       ] as const
     },
   },
@@ -418,7 +614,22 @@ export const queryKeys = {
   farmUserRole(farmId?: string | null, userId?: string | null) {
     return ["farm-user-role", farmToken(farmId), userId ?? "anon"] as const
   },
-  timePeriodBounds(params: { farmId?: string | null; timePeriod: string; systemId?: number | null }) {
-    return ["time-period-bounds", farmToken(params.farmId), params.timePeriod, numberToken(params.systemId)] as const
+  timePeriodBounds(params: {
+    farmId?: string | null
+    timePeriod: string
+    /** `custom_YYYY-MM-DD_YYYY-MM-DD` url token when a custom range is active. */
+    custom?: string | null
+    systemId?: number | null
+    batchId?: number | null
+    scope?: string | null
+  }) {
+    return [
+      "time-period-bounds",
+      farmToken(params.farmId),
+      params.custom ?? params.timePeriod,
+      numberToken(params.systemId),
+      numberToken(params.batchId),
+      params.scope ?? "dashboard",
+    ] as const
   },
 }

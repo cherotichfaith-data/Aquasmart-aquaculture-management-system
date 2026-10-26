@@ -50,7 +50,6 @@ function asSbErrorLike(err: unknown): SbErrorLike {
 }
 
 export function logSbError(tag: string, err: unknown) {
-  if (tag === "getDashboardConsolidated") return
   if (!err) return
   const safeErr = asSbErrorLike(err)
   if (
@@ -92,12 +91,75 @@ export function isSbAuthMissing(err: unknown) {
 export function isSbNetworkError(err: unknown) {
   const safeErr = asSbErrorLike(err)
   const message = String(safeErr.message ?? "")
+  const details = String(safeErr.details ?? "")
+  const haystack = `${message}\n${details}`
   return (
-    /fetch failed/i.test(message) ||
-    /getaddrinfo/i.test(message) ||
-    /enotfound/i.test(message) ||
-    /connect timeout/i.test(message) ||
-    /und_err_connect_timeout/i.test(message) ||
+    (typeof safeErr.status === "number" && safeErr.status >= 500 && safeErr.status < 600) ||
+    /fetch failed/i.test(haystack) ||
+    /getaddrinfo/i.test(haystack) ||
+    /enotfound/i.test(haystack) ||
+    /connect timeout/i.test(haystack) ||
+    /und_err_connect_timeout/i.test(haystack) ||
+    /bad gateway/i.test(haystack) ||
+    /gateway timeout/i.test(haystack) ||
+    /service unavailable/i.test(haystack) ||
+    /cloudflare/i.test(haystack) ||
     safeErr.name === "AuthRetryableFetchError"
+  )
+}
+
+export function isSbInvalidRefreshToken(err: unknown) {
+  const safeErr = asSbErrorLike(err)
+  const message = String(safeErr.message ?? "")
+  return (
+    safeErr.code === "refresh_token_not_found" ||
+    /invalid refresh token/i.test(message) ||
+    /refresh token not found/i.test(message)
+  )
+}
+
+export function isSbFlowStateNotFound(err: unknown) {
+  const safeErr = asSbErrorLike(err)
+  const message = String(safeErr.message ?? "")
+  return safeErr.code === "flow_state_not_found" || /flow state/i.test(message)
+}
+
+export function isSbRateLimitError(err: unknown) {
+  const safeErr = asSbErrorLike(err)
+  const message = String(safeErr.message ?? "")
+  return (
+    safeErr.status === 429 ||
+    safeErr.code === "over_email_send_rate_limit" ||
+    /rate limit/i.test(message)
+  )
+}
+
+export function isSbMissingFunction(err: unknown, functionName?: string) {
+  const safeErr = asSbErrorLike(err)
+  const message = String(safeErr.message ?? "")
+  const details = String(safeErr.details ?? "")
+  const haystack = `${message}\n${details}`
+
+  if (safeErr.code === "PGRST202" || safeErr.status === 404) {
+    if (!functionName) return true
+    return haystack.toLowerCase().includes(functionName.toLowerCase())
+  }
+
+  if (/could not find the function/i.test(haystack) || /schema cache/i.test(haystack)) {
+    if (!functionName) return true
+    return haystack.toLowerCase().includes(functionName.toLowerCase())
+  }
+
+  return false
+}
+
+export function isSbFunctionResultTypeMismatch(err: unknown) {
+  const safeErr = asSbErrorLike(err)
+  const message = String(safeErr.message ?? "")
+  const details = String(safeErr.details ?? "")
+  return (
+    safeErr.code === "42804" &&
+    (/structure of query does not match function result type/i.test(message) ||
+      /returned type .* does not match expected type/i.test(details))
   )
 }

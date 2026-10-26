@@ -1,8 +1,7 @@
 "use client"
 
 import type { QueryClient } from "@tanstack/react-query"
-
-const RECENT_ENTRIES_KEY = ["reports", "recent-entries"]
+import { queryKeys } from "@/lib/cache/query-keys"
 
 export function addOptimisticActivity(
   queryClient: QueryClient,
@@ -16,10 +15,12 @@ export function addOptimisticActivity(
     change_time: new Date().toISOString(),
   }
 
-  queryClient.setQueriesData({ queryKey: ["recent-activities"] }, (old: any) => {
-    if (!old || old.status !== "success") return old
-    const next = [optimistic, ...(old.data ?? [])].slice(0, 10)
-    return { ...old, data: next }
+  queryClient.setQueriesData({ queryKey: ["recent-activities"] }, (old: unknown) => {
+    if (!old || typeof old !== "object") return old
+    const o = old as { status?: string; data?: unknown[] }
+    if (o.status !== "success") return old
+    const next = [optimistic, ...(o.data ?? [])].slice(0, 10)
+    return { ...o, data: next }
   })
 }
 
@@ -30,34 +31,42 @@ export type RecentEntriesKey =
   | "transfer"
   | "harvest"
   | "water_quality"
-  | "incoming_feed"
+  | "feed_inventory"
   | "stocking"
   | "systems"
 
 type RecentEntriesPayload = {
   status: "success" | "error"
-  data: any[]
+  data: Record<string, unknown>[]
   error?: string
 }
 
 type RecentEntriesCache = Partial<Record<RecentEntriesKey, RecentEntriesPayload>>
 
+export type RecentEntriesSnapshot = {
+  queryKey: ReturnType<typeof queryKeys.reports.recentEntries>
+  data: unknown
+}
+
 export function addOptimisticRecentEntry(
   queryClient: QueryClient,
-  params: { key: RecentEntriesKey; entry: Record<string, unknown> },
-) {
-  const previous = queryClient.getQueryData(RECENT_ENTRIES_KEY)
-  queryClient.setQueriesData({ queryKey: RECENT_ENTRIES_KEY }, (old: RecentEntriesCache | undefined) => {
+  params: { farmId?: string | null; key: RecentEntriesKey; entry: Record<string, unknown> },
+): RecentEntriesSnapshot | undefined {
+  if (!params.farmId) return undefined
+
+  const queryKey = queryKeys.reports.recentEntries(params.farmId)
+  const previous = queryClient.getQueryData(queryKey)
+  queryClient.setQueryData(queryKey, (old: RecentEntriesCache | undefined) => {
     if (!old) return old
     const current = old[params.key]
     if (!current || current.status !== "success") return old
     const next = [{ ...params.entry }, ...(current.data ?? [])].slice(0, 5)
     return { ...old, [params.key]: { ...current, data: next } }
   })
-  return previous
+  return { queryKey, data: previous }
 }
 
-export function restoreRecentEntries(queryClient: QueryClient, previous: unknown) {
-  if (!previous) return
-  queryClient.setQueryData(RECENT_ENTRIES_KEY, previous)
+export function restoreRecentEntries(queryClient: QueryClient, snapshot: RecentEntriesSnapshot | undefined) {
+  if (!snapshot) return
+  queryClient.setQueryData(snapshot.queryKey, snapshot.data)
 }

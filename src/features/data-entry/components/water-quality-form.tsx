@@ -1,0 +1,503 @@
+"use client"
+
+import { entryQuarterHour } from "@/lib/entry-time"
+import { findWaterQualityDuplicate } from "./water-quality-duplicate"
+import { useEffect, useMemo, useState } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import { Button } from "@/components/app-ui/button"
+import { Loader2 } from "lucide-react"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/app-ui/form"
+import { Input } from "@/components/app-ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
+import type { Database } from "@/lib/types/database"
+import { formatCageLabel, type SystemOption } from "@/lib/system-options"
+import { createClient } from "@/lib/supabase/client"
+import { useSystemOptions } from "@/lib/hooks/use-options"
+import { useRecordWaterQuality, useWaterQualityMeasurements } from "@/features/water-quality/hooks"
+import { logSbError } from "@/lib/supabase/log"
+import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
+import { InfoStat } from "./form-support"
+import { toIsoDate, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import {
+  usePendingLatestEntries,
+  type LatestEntrySummary,
+} from "./latest-entry-guard"
+import { SelectionChips } from "./selection-info"
+import { useEntrySequence } from "./entry-sequence"
+import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
+
+const optionalNumber = z.preprocess(
+  (value) => (value === "" || value == null ? undefined : Number(value)),
+  z.number().optional(),
+)
+
+const formSchema = z.object({
+  system_id: z.string().min(1, "System is required"),
+  date: z.string().min(1, "Date is required"),
+  time: z.string().min(1, "Time is required"),
+  location_reference: z.string().optional(),
+  water_depth: z.coerce.number().min(0, "Depth must be positive"),
+  temperature: optionalNumber,
+  dissolved_oxygen: optionalNumber.refine((v) => v == null || v >= 0, "DO cannot be negative"),
+  pH: optionalNumber.refine((v) => v == null || (v >= 0 && v <= 14), "pH must be between 0 and 14"),
+  total_ammonia: optionalNumber.refine((v) => v == null || v >= 0, "Concentration cannot be negative"),
+  no2: optionalNumber.refine((v) => v == null || v >= 0, "Concentration cannot be negative"),
+  no3: optionalNumber.refine((v) => v == null || v >= 0, "Concentration cannot be negative"),
+})
+
+type MeasurementParameter =
+  Database["public"]["Tables"]["water_quality_measurement"]["Row"]["parameter_name"]
+
+
+export function WaterQualityForm({
+  farmId,
+  systems,
+  defaultSystemId = null,
+  onSystemChange,
+}: {
+  farmId: string | null
+  systems: SystemOption[]
+  defaultSystemId?: number | null
+  onSystemChange?: (systemId: number | null) => void
+}) {
+  const mutation = useRecordWaterQuality()
+  const supabase = useMemo(() => createClient(), [])
+  const [doStatus, setDoStatus] = useState<"idle" | "checking" | "ready" | "unavailable">("idle")
+  const [doClassification, setDoClassification] = useState<Database["public"]["Enums"]["water_quality_rating"] | null>(null)
+
+  const allSystemsQuery = useSystemOptions({ farmId, activeOnly: false, enabled: Boolean(farmId) })
+  const allSystems = allSystemsQuery.data?.status === "success" ? allSystemsQuery.data.data : []
+  const lakeReferenceSystem = allSystems.find((system) => system.label?.toLowerCase().includes("lake reference")) ?? null
+  const selectableSystems = useMemo(() => {
+    const activeIds = new Set(systems.map((system) => system.id))
+    if (lakeReferenceSystem && !activeIds.has(lakeReferenceSystem.id)) {
+      return [...systems, lakeReferenceSystem]
+    }
+    return systems
+  }, [lakeReferenceSystem, systems])
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    mode: "onBlur",
+    defaultValues: {
+      date: toIsoDate(new Date()),
+      system_id: defaultSystemId ? String(defaultSystemId) : "",
+      time: entryQuarterHour(new Date()),
+      location_reference: "",
+      water_depth: 1,
+      temperature: undefined,
+      dissolved_oxygen: undefined,
+      pH: undefined,
+      total_ammonia: undefined,
+      no2: undefined,
+      no3: undefined,
+    },
+  })
+  const sequence = useEntrySequence(form, systems)
+
+  const selectedSystemValue = form.watch("system_id")
+  const selectedSystemId = Number(selectedSystemValue)
+  const selectedDate = form.watch("date")
+  const rawDoValue = form.watch("dissolved_oxygen")
+  const doValue = rawDoValue == null || String(rawDoValue).trim() === "" ? null : Number(rawDoValue)
+  const selectedTime = form.watch("time")
+  const selectedDepth = form.watch("water_depth")
+  const selectedDepthValue =
+    typeof selectedDepth === "number" && Number.isFinite(selectedDepth)
+      ? selectedDepth
+      : Number(selectedDepth)
+  const selectedSystem =
+    selectableSystems.find((system) => String(system.id) === selectedSystemValue) ?? null
+  const isLakeReference = selectedSystem?.label?.toLowerCase().includes("lake reference") ?? false
+  const hasValidSystemId = Number.isFinite(selectedSystemId) && selectedSystemId > 0
+
+  useEffect(() => {
+    onSystemChange?.(hasValidSystemId ? selectedSystemId : null)
+  }, [hasValidSystemId, onSystemChange, selectedSystemId])
+
+  const duplicateQuery = useWaterQualityMeasurements({
+    farmId,
+    systemId: hasValidSystemId ? selectedSystemId : undefined,
+    dateFrom: selectedDate || undefined,
+    dateTo: selectedDate || undefined,
+    waterDepth:
+      Number.isFinite(selectedDepthValue) && selectedDepthValue >= 0
+        ? selectedDepthValue
+        : undefined,
+    limit: 100,
+    requireSystem: true,
+    enabled:
+      hasValidSystemId &&
+      Boolean(selectedDate) &&
+      Number.isFinite(selectedDepthValue) &&
+      selectedDepthValue >= 0,
+  })
+  const pendingEntries = usePendingLatestEntries("water_quality", hasValidSystemId ? selectedSystemId : null)
+
+  useEffect(() => {
+    let active = true
+
+    async function classifyDo() {
+      if (typeof doValue !== "number" || Number.isNaN(doValue)) {
+        if (active) { setDoClassification(null); setDoStatus("idle") }
+        return
+      }
+
+      if (active) setDoStatus("checking")
+      const { data: framework, error: frameworkError } = await supabase
+        .from("water_quality_framework")
+        .select("parameter_optimal, parameter_acceptable, parameter_critical, parameter_lethal")
+        .eq("parameter_name", "dissolved_oxygen")
+        .maybeSingle()
+
+      if (frameworkError || !framework) {
+        if (active) { setDoClassification(null); setDoStatus("unavailable") }
+        return
+      }
+
+      const { data, error } = await supabase.rpc("classify_water_quality_measurement", {
+        p_parameter_value: doValue,
+        p_optimal: framework.parameter_optimal,
+        p_acceptable: framework.parameter_acceptable,
+        p_critical: framework.parameter_critical,
+        p_lethal: framework.parameter_lethal,
+      })
+
+      if (!active) return
+      if (error) { setDoStatus("unavailable"); return }
+      setDoStatus("ready")
+      setDoClassification(data?.[0]?.measurement_rating ?? null)
+    }
+
+    setDoClassification(null)
+    const timer = setTimeout(() => void classifyDo(), 300)
+
+    return () => {
+      clearTimeout(timer)
+      active = false
+    }
+  }, [doValue, supabase])
+
+  const duplicateServerEntries = (duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []).map<LatestEntrySummary>((row) => ({
+    key: `water-quality-duplicate-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
+    date: row.date ?? "",
+    createdAt: row.created_at ?? null,
+    summary: `${row.parameter_name ?? "Parameter"}: ${row.parameter_value ?? ""}`,
+    details: [],
+    metadata: {
+      waterDepth: row.water_depth ?? null,
+      time: row.time?.slice(0, 5) ?? null,
+      parameterName: row.parameter_name ?? null,
+    },
+    duplicateMessage:
+      row.water_depth != null
+        ? `${row.parameter_name} already has a reading at ${row.time?.slice(0, 5)} on ${row.date}, ${row.water_depth} m deep.`
+        : `A water quality entry already exists for this cage on ${row.date}.`,
+  }))
+  const duplicateEntry = findWaterQualityDuplicate([...duplicateServerEntries, ...pendingEntries], form.watch())
+
+  const doTone =
+    doClassification === "lethal"
+      ? "critical"
+      : doClassification === "critical"
+        ? "warning"
+        : doClassification === "optimal"
+          ? "success"
+          : "default"
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      if (duplicateEntry) {
+        form.setError("water_depth", {
+          message: `This parameter already has a reading at ${values.time} on ${values.date}, ${values.water_depth} m deep. Change the time or remove the repeated parameter.`,
+        })
+        return
+      }
+
+      if (isLakeReference && !values.location_reference?.trim()) {
+        form.setError("location_reference", {
+          message: "Location / reference is required for LAKE measurements",
+        })
+        return
+      }
+
+      const resolvedFarmId = requireActiveFarmId(farmId)
+      const systemId = parseRequiredNumericId(values.system_id, "System")
+      const measurements: Array<{
+        parameter_name: MeasurementParameter
+        parameter_value: number
+      }> = []
+
+      if (typeof values.temperature === "number") measurements.push({ parameter_name: "temperature", parameter_value: values.temperature })
+      if (typeof values.dissolved_oxygen === "number") measurements.push({ parameter_name: "dissolved_oxygen", parameter_value: values.dissolved_oxygen })
+      if (typeof values.pH === "number") measurements.push({ parameter_name: "pH", parameter_value: values.pH })
+      if (typeof values.total_ammonia === "number") measurements.push({ parameter_name: "ammonia", parameter_value: values.total_ammonia })
+      if (typeof values.no2 === "number") measurements.push({ parameter_name: "nitrite", parameter_value: values.no2 })
+      if (typeof values.no3 === "number") measurements.push({ parameter_name: "nitrate", parameter_value: values.no3 })
+
+      if (measurements.length === 0) {
+        throw new Error("Enter at least one water quality measurement.")
+      }
+
+      const payload = measurements.map((measurement) => ({
+        farm_id: resolvedFarmId,
+        system_id: systemId,
+        date: values.date,
+        time: values.time,
+        measured_at: `${values.date}T${values.time}:00`,
+        water_depth: values.water_depth,
+        parameter_name: measurement.parameter_name,
+        parameter_value: measurement.parameter_value,
+        location_reference: values.location_reference?.trim() ? values.location_reference.trim() : null,
+      }))
+
+      await mutation.mutateAsync(payload)
+      sequence.reset({
+        date: values.date,
+        system_id: values.system_id,
+        time: values.time,
+        location_reference: isLakeReference ? values.location_reference : "",
+        water_depth: values.water_depth,
+        temperature: undefined,
+        dissolved_oxygen: undefined,
+        pH: undefined,
+        total_ammonia: undefined,
+        no2: undefined,
+        no3: undefined,
+      })
+    } catch (error) {
+      logSbError("dataEntry:waterQuality:submit", error)
+      reportDataEntrySubmitError(error, "Failed to record water quality data.")
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="data-entry-status">
+        <OfflineSaveBadge result={mutation.data} />
+      </div>
+
+      {selectedTime < "12:00" ? (
+        <div className="data-entry-callout-alert border-warning/40 bg-warning/10 text-warning-foreground">
+          Morning reading selected. Remember to return for the PM measurement as well.
+        </div>
+      ) : null}
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="water_quality" savedResult={mutation.data} />
+          <ExistingEntryNotice message={duplicateEntry?.duplicateMessage ?? (duplicateEntry ? "An entry already exists for this date. Review it before submitting another record." : null)} farmId={farmId} />
+          <FormSection title="Reading details">
+            <SelectionChips systems={selectableSystems} systemId={selectedSystemId} />
+
+            <FieldGrid>
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
+                    <FormControl>
+                      <Input aria-required={true} type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Time <span aria-hidden="true">*</span></FormLabel>
+                    <FormControl>
+                      <Input aria-required={true} type="time" step="900" {...field} />
+                    </FormControl>
+                    <FormDescription>Uses this device&apos;s clock. If you&apos;re away from the farm&apos;s timezone, set your device to local time first.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="system_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>System / Cage <span aria-hidden="true">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
+                          <SelectValue placeholder="Select system" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {selectableSystems.map((system) => (
+                          <SelectItem key={system.id} value={String(system.id)}>
+                            {formatCageLabel(system)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="water_depth"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Water Depth (m) <span aria-hidden="true">*</span></FormLabel>
+                    <FormControl>
+                      <Input aria-required={true} type="number" step="0.1" inputMode="decimal" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="location_reference"
+                render={({ field }) => (
+                  <FormItem className="data-entry-field-wide">
+                    <FormLabel>{isLakeReference ? "Location / Reference" : "Location / Reference (Optional)"}</FormLabel>
+                    <FormControl>
+                      <Input aria-required={isLakeReference}
+                        {...field}
+                        placeholder={isLakeReference ? "Lake edge, 20m from cage line" : "Optional reference note"}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
+          </FormSection>
+
+          <FormSection title="Measurements" description="Enter at least one measurement. Leave unmeasured parameters blank; zero is a recorded measurement.">
+            <FieldGrid>
+              <FormField
+                control={form.control}
+                name="temperature"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Temperature (C)</FormLabel>
+                    <FormControl>
+                      <Input aria-required={false} type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dissolved_oxygen"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>DO (mg/L)</FormLabel>
+                    <FormControl>
+                      <Input aria-required={false} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormDescription>Checked against the farm&apos;s dissolved-oxygen thresholds once you finish typing.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="pH"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>pH</FormLabel>
+                    <FormControl>
+                      <Input aria-required={false} type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormDescription>Standard scale from 0 to 14.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="total_ammonia"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ammonia (mg/L)</FormLabel>
+                    <FormControl>
+                      <Input aria-required={false} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="no2"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nitrite (mg/L)</FormLabel>
+                    <FormControl>
+                      <Input aria-required={false} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="no3"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nitrate (mg/L)</FormLabel>
+                    <FormControl>
+                      <Input aria-required={false} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
+
+            {doStatus === "checking" && <p role="status" className="text-sm text-muted-foreground">Checking dissolved oxygen rating…</p>}
+            {doStatus === "unavailable" && <p role="status" className="text-sm text-muted-foreground">Rating unavailable. The reading can still be recorded.</p>}
+            {doClassification ? (
+              <InfoStat
+                label="DO Rating"
+                tone={doTone}
+                value={doClassification.replace("_", " ")}
+              />
+            ) : null}
+          </FormSection>
+
+          <FormActions>
+            {sequence.next && <Button type="submit" variant="outline" disabled={form.formState.isSubmitting || mutation.isPending} onClick={() => sequence.requestNext(true)}>Save &amp; next cage</Button>}
+            <Button
+              type="submit"
+              onClick={() => sequence.requestNext(false)}
+              className="min-h-11 rounded-lg px-5"
+              disabled={form.formState.isSubmitting || mutation.isPending}
+            >
+              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Water Quality
+            </Button>
+          </FormActions>
+        </form>
+      </Form>
+    </div>
+  )
+}

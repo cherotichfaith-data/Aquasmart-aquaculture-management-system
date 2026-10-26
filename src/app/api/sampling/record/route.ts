@@ -1,20 +1,24 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { inventoryWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { getSystemFarmId, requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 
 const samplingSchema = z.object({
   system_id: z.number().int().positive(),
   batch_id: z.number().int().positive().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  number_of_fish_sampling: z.number().positive(),
+  number_of_fish_sampling: z.number().int("Sample count must be a whole number.").positive(),
   total_weight_sampling: z.number().positive(),
-  abw: z.number().min(0),
   notes: z.string().max(500).nullable().optional(),
+  local_id: z.string().max(128).optional(),
 })
+
+const normalizeSamplingWeightKg = (totalWeight: number, sampleCount: number) => {
+  if (sampleCount <= 0) return totalWeight
+  return totalWeight / sampleCount > 20 ? totalWeight / 1000 : totalWeight
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -38,32 +42,11 @@ export async function POST(request: Request) {
     batch_id: payload.batch_id ?? null,
     date: payload.date,
     number_of_fish_sampling: payload.number_of_fish_sampling,
-    total_weight_sampling: payload.total_weight_sampling,
-    abw: payload.abw,
+    total_weight_sampling: normalizeSamplingWeightKg(payload.total_weight_sampling, payload.number_of_fish_sampling),
     notes: payload.notes?.trim() ? payload.notes.trim() : null,
+    local_id: payload.local_id ?? null,
+    synced_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase.from("fish_sampling_weight").insert(insertPayload).select().single()
-
-  if (error || !data) {
-    logSbError("sampling:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record sampling." }, { status })
-  }
-
-  revalidateWriteTags(
-    inventoryWriteTags({ farmId: systemScope.farmId, systemId: payload.system_id, includeProduction: true }),
-  )
-
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: systemScope.farmId,
-        systemId: payload.system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "sampling", systemScope.farmId, insertPayload)
 }

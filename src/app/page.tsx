@@ -1,14 +1,12 @@
+import { redirect } from "next/navigation"
 import type { Metadata } from "next"
-import RootPageClient from "./page.client"
-import { createClient } from "@/lib/supabase/server"
-import { requireInitialFarmId } from "@/features/farm/queries.server"
-import { getDashboardPageInitialData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
-import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import LandingPage from "@/components/marketing/landing-page"
+import { WORKSPACE_SELECT_PATH } from "@/lib/app-entry"
 
 export const metadata: Metadata = {
-  title: "AquaSmart | Aquaculture Management Software",
+  title: "SUSTAIN Aquasmart | Aquaculture Management Software",
   description:
-    "AquaSmart is aquaculture management software for fish farms with KPI dashboards, feed tracking, mortality records, water quality monitoring, inventory control, and reporting.",
+    "SUSTAIN Aquasmart is aquaculture management software for fish farms with KPI dashboards, feed tracking, mortality records, water quality monitoring, inventory control, and reporting.",
   keywords: [
     "aquaculture management software",
     "fish farm management",
@@ -23,27 +21,27 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "AquaSmart | Aquaculture Management Software",
+    title: "SUSTAIN Aquasmart | Aquaculture Management Software",
     description:
       "Manage aquaculture operations with real-time KPIs, feed control, mortality tracking, and water quality monitoring.",
     url: "/",
-    siteName: "AquaSmart",
+    siteName: "SUSTAIN Aquasmart",
     type: "website",
     images: [
       {
-        url: "/use this.png",
-        width: 60,
-        height: 60,
-        alt: "AquaSmart logo",
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "SUSTAIN Aquasmart",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AquaSmart | Aquaculture Management Software",
+    title: "SUSTAIN Aquasmart | Aquaculture Management Software",
     description:
       "Aquaculture management software for KPI monitoring, feed tracking, water quality, inventory, and reporting.",
-    images: ["/use this.png"],
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -58,37 +56,26 @@ export default async function Page({
 }: {
   searchParams?: Promise<SearchParams>
 }) {
-  const supabase = await createClient()
-  let user = null
-
-  try {
-    const result = await supabase.auth.getUser()
-    user = result.data.user
-  } catch (error) {
-    if (!isSbNetworkError(error)) {
-      logSbError("app:page:getUser", error)
-    }
-  }
-
-  if (!user) {
-    return <RootPageClient initialView="landing" />
-  }
-
   const resolvedSearchParams = (await searchParams) ?? {}
-  const searchFarmId = typeof resolvedSearchParams.farmId === "string" ? resolvedSearchParams.farmId : null
-  const initialFilters = parseDashboardPageFilters(resolvedSearchParams)
-  const { farmId } = await requireInitialFarmId(searchFarmId)
-  const initialData = await getDashboardPageInitialData({
-    farmId,
-    filters: initialFilters,
+  const callbackParams = new URLSearchParams()
+
+  Object.entries(resolvedSearchParams).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      callbackParams.set(key, value)
+    }
   })
 
-  return (
-    <RootPageClient
-      initialView="dashboard"
-      initialFarmId={farmId}
-      initialFilters={initialFilters}
-      initialData={initialData}
-    />
-  )
+  if (
+    callbackParams.has("code") ||
+    callbackParams.has("access_token") ||
+    callbackParams.has("refresh_token") ||
+    callbackParams.has("error")
+  ) {
+    if (!callbackParams.has("next")) {
+      callbackParams.set("next", WORKSPACE_SELECT_PATH)
+    }
+    redirect(`/auth/callback?${callbackParams.toString()}`)
+  }
+
+  return <LandingPage />
 }

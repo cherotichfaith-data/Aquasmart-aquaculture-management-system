@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 import { AlertTriangle } from "lucide-react"
 
 export default function PageError({
@@ -24,3 +24,4 @@ export default function PageError({
     </div>
   )
 }
+

@@ -1,10 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import type { Enums } from "@/lib/types/database"
 import { DEFAULT_TIME_PERIOD, isTimePeriod, type TimePeriod } from "@/lib/time-period"
+import { GROWTH_STAGE_VALUES, normalizeStageFilter, type StageFilter } from "@/lib/stage-filter"
 
-export type StageFilter = "all" | Enums<"system_growth_stage">
 export type { TimePeriod } from "@/lib/time-period"
 
 export type SharedFiltersState = {
@@ -16,7 +15,6 @@ export type SharedFiltersState = {
 
 const STORAGE_KEY = "aquasmart:shared-filters:v1"
 const EVENT_NAME = "aquasmart:shared-filters"
-const STAGES: StageFilter[] = ["all", "nursing", "grow_out"]
 
 const hasMeaningfulInitialValues = (
   initialValues: Partial<SharedFiltersState> | undefined,
@@ -30,17 +28,35 @@ const hasMeaningfulInitialValues = (
         (initialValues.timePeriod !== undefined && initialValues.timePeriod !== defaultTimePeriod)),
   )
 
-const isStage = (value: unknown): value is StageFilter =>
-  typeof value === "string" && STAGES.includes(value as StageFilter)
+const isStage = (value: unknown): value is StageFilter => {
+  if (typeof value !== "string") return false
+  return value === "all" || GROWTH_STAGE_VALUES.includes(value as (typeof GROWTH_STAGE_VALUES)[number])
+}
 
 export function useSharedFilters(
   defaultTimePeriod: TimePeriod = DEFAULT_TIME_PERIOD,
   initialValues?: Partial<SharedFiltersState>,
+  options?: {
+    authoritativeInitialValues?: boolean
+    resetKey?: string | null
+    urlValues?: Partial<Record<keyof SharedFiltersState, string>>
+    urlKeys?: Partial<Record<keyof SharedFiltersState, string>>
+  },
 ) {
-  const hasInitialValues = hasMeaningfulInitialValues(initialValues, defaultTimePeriod)
+  void options
+
+  const initialStage = normalizeStageFilter(initialValues?.selectedStage)
+  const hasInitialValues = hasMeaningfulInitialValues(
+    initialValues
+      ? {
+          ...initialValues,
+          selectedStage: initialStage,
+        }
+      : undefined,
+    defaultTimePeriod,
+  )
   const initialBatch = initialValues?.selectedBatch ?? "all"
   const initialSystem = initialValues?.selectedSystem ?? "all"
-  const initialStage = initialValues?.selectedStage ?? "all"
   const initialPeriod = initialValues?.timePeriod ?? defaultTimePeriod
   const initialDefaultPeriod = useRef(defaultTimePeriod)
   const instanceId = useRef(`shared-filters-${Math.random().toString(36).slice(2)}`)
@@ -53,6 +69,7 @@ export function useSharedFilters(
 
   useEffect(() => {
     if (typeof window === "undefined") return
+
     const fallbackPeriod = initialDefaultPeriod.current
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
@@ -72,10 +89,10 @@ export function useSharedFilters(
     } finally {
       if (!hasInitialValues && typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search)
-        const paramSystem = params.get("system")
+        const paramSystem = params.get("cage") ?? params.get("system")
         const paramBatch = params.get("batch")
         const paramStage = params.get("stage")
-        const paramPeriod = params.get("period")
+        const paramPeriod = params.get("date")
 
         if (paramSystem) setSelectedSystem(paramSystem)
         if (paramBatch) setSelectedBatch(paramBatch)
@@ -88,35 +105,48 @@ export function useSharedFilters(
 
   useEffect(() => {
     if (!hasInitialValues) return
+
     suppressEmit.current = true
     setSelectedBatch(initialBatch)
     setSelectedSystem(initialSystem)
     setSelectedStage(initialStage)
     setTimePeriod(initialPeriod)
     setHydrated(true)
-  }, [hasInitialValues, initialBatch, initialPeriod, initialStage, initialSystem])
+  }, [hasInitialValues, initialBatch, initialPeriod, initialStage, initialSystem, options?.resetKey])
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return
+
     const payload: SharedFiltersState = {
       selectedBatch,
       selectedSystem,
       selectedStage,
       timePeriod,
     }
+
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
     if (suppressEmit.current) {
       suppressEmit.current = false
       return
     }
-    window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { sourceId: instanceId.current, state: payload } }))
+
+    window.dispatchEvent(
+      new CustomEvent(EVENT_NAME, {
+        detail: {
+          sourceId: instanceId.current,
+          state: payload,
+        },
+      }),
+    )
   }, [hydrated, selectedBatch, selectedStage, selectedSystem, timePeriod])
 
   useEffect(() => {
     if (typeof window === "undefined") return
+
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ sourceId: string; state: SharedFiltersState }>).detail
       if (!detail || detail.sourceId === instanceId.current) return
+
       const next = detail.state
       suppressEmit.current = true
       setSelectedBatch(next.selectedBatch)
@@ -125,6 +155,7 @@ export function useSharedFilters(
       setTimePeriod(next.timePeriod)
       setHydrated(true)
     }
+
     window.addEventListener(EVENT_NAME, handler as EventListener)
     return () => window.removeEventListener(EVENT_NAME, handler as EventListener)
   }, [])
@@ -140,4 +171,3 @@ export function useSharedFilters(
     setTimePeriod,
   }
 }
-

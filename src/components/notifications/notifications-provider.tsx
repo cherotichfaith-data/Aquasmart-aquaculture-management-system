@@ -1,21 +1,30 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { Button } from "@/components/app-ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useStockedSystemIds } from "@/lib/hooks/use-stocked-system-ids"
+import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/lib/hooks/app/use-toast"
-import { ToastAction } from "@/components/ui/toast"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { DATA_ENTRY_PATH, isOnboardingRoute, isPublicRoute, toDashboardPath } from "@/lib/app-entry"
+import { formatNumberValue } from "@/lib/analytics-format"
 import type { Tables } from "@/lib/types/database"
+import type { RecommendedActionRow } from "@/lib/types/insights"
+import { formatCageLabel } from "@/lib/system-options"
 
 type AlertThresholdRow = Tables<"alert_threshold">
 type WaterQualityRow = Tables<"water_quality_measurement">
-type DailyInventoryRow = Tables<"daily_fish_inventory_table">
+type MortalityRow = Tables<"fish_mortality">
+type HarvestRow = Tables<"fish_harvest">
+type TransferRow = Tables<"fish_transfer">
+type StockingRow = Tables<"fish_stocking">
 
-type NotificationKind = "water_quality" | "mortality"
+type NotificationKind = "water_quality" | "mortality" | "cage_empty"
 type NotificationSeverity = "warning" | "critical"
 
 export type AlertNotification = {
@@ -31,20 +40,92 @@ export type AlertNotification = {
   actionLabel?: string
 }
 
+/**
+ * A live, state-derived alert. Unlike `AlertNotification` (a browser-stored log
+ * of things that fired while the app was open), these are recomputed from the
+ * database on an interval: an entry stays for exactly as long as its condition
+ * holds (cage empty, mortality spiking, water quality bad) and disappears on
+ * its own once resolved. They cannot be dismissed or cleared.
+ */
+export type ActiveAlert = {
+  id: string
+  systemId: number | null
+  systemName: string
+  title: string
+  description: string
+  severity: NotificationSeverity
+  kind: NotificationKind
+  href?: string
+}
+
 type NotificationsContextValue = {
   notifications: AlertNotification[]
   unreadCount: number
   markAllRead: () => void
   markRead: (id: string) => void
+  dismiss: (id: string) => void
   clearAll: () => void
+  activeAlerts: ActiveAlert[]
+  activeAlertsLoading: boolean
+}
+
+const ACTIVE_ALERT_REFETCH_MS = 60_000
+
+function mapRecommendedActionRow(row: RecommendedActionRow): ActiveAlert {
+  const systemId = typeof row.system_id === "number" ? row.system_id : null
+  const systemName = row.system_name?.trim() || "Farm"
+  const metric = row.metric_name?.trim() || "signal"
+  const severity: NotificationSeverity = row.severity === "critical" ? "critical" : "warning"
+  const value = typeof row.current_value === "number" && Number.isFinite(row.current_value) ? row.current_value : null
+  const unit = row.unit?.trim() ? row.unit.trim() : ""
+
+  if (metric === "cage_empty") {
+    return {
+      id: `cage_empty:${systemId ?? systemName}`,
+      systemId,
+      systemName,
+      title: `${systemName} is empty`,
+      description: "No fish remaining — the cage is available for restocking.",
+      severity: "warning",
+      kind: "cage_empty",
+      href: systemId != null ? `${DATA_ENTRY_PATH}?type=stocking&system=${systemId}` : DATA_ENTRY_PATH,
+    }
+  }
+
+  if (metric === "mortality_rate") {
+    const threshold = typeof row.threshold_high === "number" ? row.threshold_high : null
+    return {
+      id: `mortality_rate:${systemId ?? systemName}`,
+      systemId,
+      systemName,
+      title: `${systemName}: mortality rate high`,
+      description:
+        value != null
+          ? `Mortality rate is ${value}%/day${threshold != null ? ` (threshold ${threshold}%/day)` : ""}.`
+          : "Mortality rate is above the alert threshold.",
+      severity,
+      kind: "mortality",
+      href: systemId != null ? `${toDashboardPath("/reports")}?tab=mortality&system=${systemId}` : toDashboardPath("/reports"),
+    }
+  }
+
+  // Water-quality parameter (dissolved_oxygen, ammonia, ...) or generic.
+  const label = metric.replace(/_/g, " ")
+  return {
+    id: `${metric}:${systemId ?? systemName}`,
+    systemId,
+    systemName,
+    title: `${systemName}: water quality`,
+    description: value != null ? `${label} is ${value}${unit ? ` ${unit}` : ""}.` : `${label} needs attention.`,
+    severity,
+    kind: "water_quality",
+    href: systemId != null ? `${toDashboardPath("/reports")}?tab=water-quality&system=${systemId}` : toDashboardPath("/reports"),
+  }
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined)
 
 const MAX_NOTIFICATIONS = 50
-
-const formatNumber = (value: number, decimals = 2) => Number(value.toFixed(decimals))
-const formatPercent = (value: number, decimals = 2) => formatNumber(value * 100, decimals)
 
 const isAbortLikeError = (err: unknown): boolean => {
   if (!err) return false
@@ -56,8 +137,10 @@ const isAbortLikeError = (err: unknown): boolean => {
 
 const buildSystemLabel = (systemMap: Record<number, string>, systemId?: number) => {
   if (!systemId) return "System"
-  return systemMap[systemId] ?? `System ${systemId}`
+  return systemMap[systemId] ?? "Missing cage name"
 }
+
+const hasMissingSystemName = (system: { name?: string | null }) => !system.name?.trim()
 
 const resolveThreshold = (thresholds: AlertThresholdRow[], systemId?: number | null) => {
   if (!thresholds.length) return null
@@ -72,46 +155,70 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const supabase = useMemo(() => createClient(), [])
   const queryClient = useQueryClient()
   const router = useRouter()
-  const { farmId } = useActiveFarm()
-  const { profile, session } = useAuth()
+  const pathname = usePathname()
+  // A farm is only "entered" once the user is on an in-farm screen. On the
+  // login/landing and onboarding routes (including the workspace selector)
+  // `useActiveFarm` still resolves a default farm, but the user hasn't picked
+  // one yet -- so farm-scoped pop notifications (e.g. "cage empty") must not
+  // fire there. They fire once the user is actually inside a farm's dashboard.
+  const inFarmWorkspace = Boolean(pathname) && !isPublicRoute(pathname) && !isOnboardingRoute(pathname)
+  const { farmId: liveFarmId } = useActiveFarm()
+  const { profile, session, user } = useAuth()
   const { toast } = useToast()
-  const [notifications, setNotifications] = useState<AlertNotification[]>([])
+  const userId = user?.id ?? null
   const seenIds = useRef<Set<string>>(new Set())
+  // useActiveFarm() can briefly report `null` while it's re-deriving (e.g. a
+  // stray loading/auth blip), even once a real farm has already been
+  // resolved. Latching onto the last non-null value keeps the notification
+  // storage key (and everything gated on farmId below) from bouncing back to
+  // the farm-less default and losing sight of already-saved notifications.
+  const lastKnownFarmIdRef = useRef<string | null>(null)
+  if (liveFarmId) lastKnownFarmIdRef.current = liveFarmId
+  const farmId = liveFarmId ?? lastKnownFarmIdRef.current
   const storageKey = farmId ? `aqua_alert_history_${farmId}` : "aqua_alert_history"
+  const currentStorageToken = useMemo(() => Symbol(storageKey), [storageKey])
+  const readStoredNotifications = useCallback(() => {
+    if (typeof window === "undefined") return [] as AlertNotification[]
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) return []
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed
+        .filter((item): item is AlertNotification => Boolean(item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string"))
+        .slice(0, MAX_NOTIFICATIONS)
+    } catch {
+      return []
+    }
+  }, [storageKey])
+  const [notificationsDraft, setNotificationsDraft] = useState(() => ({
+    sourceToken: currentStorageToken,
+    value: readStoredNotifications(),
+  }))
+  const notifications =
+    notificationsDraft.sourceToken === currentStorageToken
+      ? notificationsDraft.value
+      : readStoredNotifications()
+  const setNotifications = useCallback((value: SetStateAction<AlertNotification[]>) => {
+    setNotificationsDraft((current) => {
+      const previousValue =
+        current.sourceToken === currentStorageToken ? current.value : readStoredNotifications()
+      const nextValue = typeof value === "function" ? value(previousValue) : value
+      return {
+        sourceToken: currentStorageToken,
+        value: nextValue,
+      }
+    })
+  }, [currentStorageToken, readStoredNotifications])
 
   const notificationsEnabled = profile?.notifications_enabled ?? true
-  const systemsQuery = useQuery({
-    queryKey: ["notifications", "systems", farmId ?? "none"],
-    enabled: Boolean(session) && Boolean(farmId),
-    staleTime: 60_000,
-    queryFn: async ({ signal }) => {
-      let query = supabase
-        .rpc("api_dashboard_systems", {
-          p_farm_id: farmId!,
-          p_stage: undefined,
-          p_system_id: undefined,
-          p_start_date: undefined,
-          p_end_date: undefined,
-        })
-      if (signal) query = query.abortSignal(signal)
-      const { data, error } = await query
-
-      if (error) {
-        if (!signal?.aborted && !isAbortLikeError(error) && !isSbPermissionDenied(error)) {
-          logSbError("notifications:systems", error)
-        }
-        return [] as Array<{ id: number; label: string | null }>
-      }
-
-      const mapped = ((data ?? []) as Array<{ system_id: number | null; system_name: string | null }>)
-        .filter((row) => typeof row.system_id === "number")
-        .map((row) => ({
-          id: row.system_id as number,
-          label: row.system_name,
-        }))
-      return mapped
-    },
-  })
+  // Same cage list the shared header filter uses -- react-query dedupes the
+  // fetch instead of this provider running its own `select id, name`.
+  const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
+  const systemRows = useMemo(
+    () => (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
+    [systemsQuery.data],
+  )
   const thresholdsQuery = useQuery({
     queryKey: ["notifications", "thresholds", farmId ?? "none"],
     enabled: Boolean(session) && Boolean(farmId),
@@ -120,10 +227,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       let query = supabase
         .from("alert_threshold")
         .select("*")
-        .eq("farm_id", farmId!)
+        .or(`farm_id.eq.${farmId!},scope.eq.default`)
       if (signal) query = query.abortSignal(signal)
       const { data, error } = await query
-
       if (error) {
         if (!signal?.aborted && !isAbortLikeError(error) && !isSbPermissionDenied(error)) {
           logSbError("notifications:thresholds", error)
@@ -135,14 +241,47 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     },
   })
 
-  const thresholds = thresholdsQuery.data ?? []
+  const activeAlertsQuery = useQuery({
+    queryKey: ["notifications", "active-alerts", farmId ?? "none"],
+    enabled: Boolean(session) && Boolean(farmId),
+    staleTime: 30_000,
+    refetchInterval: ACTIVE_ALERT_REFETCH_MS,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("api_recommended_actions", {
+        p_farm_id: farmId!,
+      })
+      if (error) {
+        if (!isSbPermissionDenied(error) && !isAbortLikeError(error)) {
+          logSbError("notifications:activeAlerts", error)
+        }
+        return [] as ActiveAlert[]
+      }
+      const rows = (data ?? []) as RecommendedActionRow[]
+      const deduped = new Map<string, ActiveAlert>()
+      for (const row of rows) {
+        const mapped = mapRecommendedActionRow(row)
+        if (!deduped.has(mapped.id)) deduped.set(mapped.id, mapped)
+      }
+      return Array.from(deduped.values()).sort((left, right) => {
+        if (left.severity !== right.severity) return left.severity === "critical" ? -1 : 1
+        return left.systemName.localeCompare(right.systemName) || left.title.localeCompare(right.title)
+      })
+    },
+  })
+  const activeAlerts = useMemo(() => activeAlertsQuery.data ?? [], [activeAlertsQuery.data])
+  const invalidateActiveAlerts = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["notifications", "active-alerts", farmId ?? "none"] })
+  }, [farmId, queryClient])
+
+  const thresholds = useMemo(() => thresholdsQuery.data ?? [], [thresholdsQuery.data])
   const systemMap = useMemo(() => {
     const map: Record<number, string> = {}
-    ;(systemsQuery.data ?? []).forEach((row) => {
-      map[row.id] = row.label ?? `System ${row.id}`
+    systemRows.forEach((row) => {
+      map[row.id] = formatCageLabel(row)
     })
     return map
-  }, [systemsQuery.data])
+  }, [systemRows])
 
   const addNotification = useCallback(
     (notification: AlertNotification) => {
@@ -160,56 +299,103 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           description: notification.description,
           variant: notification.severity === "critical" ? "destructive" : "default",
           action: notification.href ? (
-            <ToastAction altText={notification.actionLabel ?? "View details"} onClick={() => router.push(notification.href!)}>
+            <Button size="sm" variant="ghost" className="text-inherit hover:bg-white/15" onClick={() => router.push(notification.href!)}>
               {notification.actionLabel ?? "View"}
-            </ToastAction>
+            </Button>
           ) : undefined,
         })
       }
     },
-    [notificationsEnabled, router, toast],
+    [notificationsEnabled, router, setNotifications, toast],
   )
 
   const markAllRead = useCallback(() => {
     setNotifications((prev) => prev.map((item) => ({ ...item, read: true })))
-  }, [])
+  }, [setNotifications])
 
   const markRead = useCallback((id: string) => {
     setNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item)),
     )
-  }, [])
+  }, [setNotifications])
+
+  const dismiss = useCallback((id: string) => {
+    // Drop a single history entry. Its id stays in seenIds so the same
+    // point-in-time event doesn't immediately re-add itself this session.
+    setNotifications((prev) => prev.filter((item) => item.id !== id))
+  }, [setNotifications])
 
   const clearAll = useCallback(() => {
     setNotifications([])
     seenIds.current.clear()
-  }, [])
+  }, [setNotifications])
 
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications])
 
-  const systemsLoaded = systemsQuery.isSuccess
+  const systemsLoaded = systemsQuery.data?.status === "success"
   const thresholdsLoaded = thresholdsQuery.isSuccess
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const raw = window.localStorage.getItem(storageKey)
-      if (!raw) {
-        setNotifications([])
-        seenIds.current.clear()
-        return
-      }
-      const parsed = JSON.parse(raw) as AlertNotification[]
-      if (!Array.isArray(parsed)) return
-      const normalized = parsed
-        .filter((item) => item && typeof item.id === "string")
-        .slice(0, MAX_NOTIFICATIONS)
-      setNotifications(normalized)
-      seenIds.current = new Set(normalized.map((item) => item.id))
-    } catch {
-      // Ignore malformed local history.
-    }
-  }, [storageKey])
+    if (!session || !farmId || !systemsLoaded || !inFarmWorkspace) return
+
+    systemRows.forEach((system) => {
+      if (!hasMissingSystemName({ name: system.name })) return
+
+      addNotification({
+        id: `system-missing-name-${system.id}`,
+        title: "Cage Name Missing",
+        description: "An active cage is missing its name. Update system setup before recording more farm activity.",
+        createdAt: new Date().toISOString(),
+        systemId: system.id,
+        kind: "water_quality",
+        severity: "warning",
+        read: false,
+        href: DATA_ENTRY_PATH + "?type=system",
+        actionLabel: "Update",
+      })
+    })
+  }, [addNotification, farmId, inFarmWorkspace, session, systemsLoaded, systemRows])
+
+  // The harvest/transfer realtime listener below only catches a cage going
+  // empty *after* this page is open and subscribed -- it can't see a cage
+  // that was already empty before that (e.g. emptied out yesterday, or
+  // before this feature shipped). This reconciles against the live
+  // "currently stocked" set on every load/refresh so an already-empty cage
+  // still shows up here, using a stable per-system id so it doesn't re-fire
+  // on every render once seen.
+  const { stockedIds: currentlyStockedIds, query: stockedSystemsQuery } = useStockedSystemIds(farmId, {
+    enabled: Boolean(session) && Boolean(farmId),
+  })
+  useEffect(() => {
+    if (!session || !farmId || !systemsLoaded || !stockedSystemsQuery.isSuccess || !inFarmWorkspace) return
+
+    systemRows.forEach((system) => {
+      if (currentlyStockedIds.has(system.id)) return
+
+      addNotification({
+        id: `cage-empty-current-${system.id}`,
+        title: "Cage Now Empty",
+        description: `${buildSystemLabel(systemMap, system.id)} has no fish remaining and is now available for restocking.`,
+        createdAt: new Date().toISOString(),
+        systemId: system.id,
+        kind: "cage_empty",
+        severity: "warning",
+        read: false,
+        href: `${DATA_ENTRY_PATH}?type=stocking&system=${system.id}`,
+        actionLabel: "Restock cage",
+      })
+    })
+  }, [addNotification, currentlyStockedIds, farmId, inFarmWorkspace, session, stockedSystemsQuery.isSuccess, systemMap, systemsLoaded, systemRows])
+
+  useEffect(() => {
+    setNotifications((prev) =>
+      prev.filter((item) => !(item.kind === "cage_empty" && item.systemId != null && currentlyStockedIds.has(item.systemId))),
+    )
+  }, [currentlyStockedIds, setNotifications])
+
+  useEffect(() => {
+    seenIds.current = new Set(notifications.map((item) => item.id))
+  }, [notifications])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -221,7 +407,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [notifications, storageKey])
 
   useEffect(() => {
-    if (!farmId || !session) return
+    if (!farmId || !session || !userId) return
 
     const thresholdChannel = supabase
       .channel(`alerts-thresholds-${farmId}`)
@@ -233,24 +419,48 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         },
       )
       .subscribe()
+    const userSettingsChannel = supabase
+      .channel(`alerts-user-settings-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_settings", filter: `user_id=eq.${userId}` },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ["notifications", "thresholds", farmId] })
+        },
+      )
+      .subscribe()
 
     return () => {
       supabase.removeChannel(thresholdChannel)
+      supabase.removeChannel(userSettingsChannel)
     }
-  }, [farmId, queryClient, session, supabase])
+  }, [farmId, queryClient, session, supabase, userId])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
+
+    // Only subscribe to system_ids that belong to this farm.
+    // water_quality_measurement has no direct farm_id column, so we filter by
+    // the known set of system IDs instead.
+    const farmSystemIds = systemRows.map((s) => s.id)
+    if (!farmSystemIds.length) return
 
     const qualityChannel = supabase
       .channel(`alerts-water-quality-${farmId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "water_quality_measurement" },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "water_quality_measurement",
+          filter: `system_id=in.(${farmSystemIds.join(",")})`,
+        },
         (payload) => {
           const row = payload.new as WaterQualityRow
           if (!row?.system_id) return
           if (!systemMap[row.system_id]) return
+
+          invalidateActiveAlerts()
 
           const threshold = resolveThreshold(thresholds, row.system_id)
           if (!threshold) return
@@ -261,16 +471,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               addNotification({
                 id: `wq-do-${row.id}`,
                 title: "Low Dissolved Oxygen",
-                description: `${systemLabel} DO is ${formatNumber(row.parameter_value)} mg/L (threshold ${formatNumber(
+                description: `${systemLabel} DO is ${formatNumberValue(row.parameter_value, { decimals: 2, minimumDecimals: 2, fallback: "0" })} mg/L (threshold ${formatNumberValue(
                   threshold.low_do_threshold,
+                  { decimals: 2, minimumDecimals: 2, fallback: "0" },
                 )}).`,
                 createdAt: row.created_at ?? new Date().toISOString(),
                 systemId: row.system_id,
                 kind: "water_quality",
                 severity: "critical",
                 read: false,
-                href: `/water-quality?system=${row.system_id}`,
-                actionLabel: "View water quality",
+                href: `${toDashboardPath("/systems")}?system=${row.system_id}`,
+                actionLabel: "View cage",
               })
             }
           }
@@ -280,16 +491,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               addNotification({
                 id: `wq-ammonia-${row.id}`,
                 title: "High Ammonia Detected",
-                description: `${systemLabel} ammonia is ${formatNumber(row.parameter_value)} mg/L (threshold ${formatNumber(
+                description: `${systemLabel} ammonia is ${formatNumberValue(row.parameter_value, { decimals: 2, minimumDecimals: 2, fallback: "0" })} mg/L (threshold ${formatNumberValue(
                   threshold.high_ammonia_threshold,
+                  { decimals: 2, minimumDecimals: 2, fallback: "0" },
                 )}).`,
                 createdAt: row.created_at ?? new Date().toISOString(),
                 systemId: row.system_id,
                 kind: "water_quality",
                 severity: "critical",
                 read: false,
-                href: `/water-quality?system=${row.system_id}`,
-                actionLabel: "View water quality",
+                href: `${toDashboardPath("/systems")}?system=${row.system_id}`,
+                actionLabel: "View cage",
               })
             }
           }
@@ -300,43 +512,52 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(qualityChannel)
     }
-  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, thresholdsLoaded, thresholds])
+  }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemRows, thresholdsLoaded, thresholds])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
+
+    const farmSystemIds = systemRows.map((s) => s.id)
+    if (!farmSystemIds.length) return
 
     const mortalityChannel = supabase
       .channel(`alerts-mortality-${farmId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "daily_fish_inventory_table" },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "fish_mortality",
+          filter: `system_id=in.(${farmSystemIds.join(",")})`,
+        },
         (payload) => {
-          const row = payload.new as DailyInventoryRow
+          const row = payload.new as MortalityRow
           if (!row?.system_id) return
           if (!systemMap[row.system_id]) return
+
+          invalidateActiveAlerts()
 
           const threshold = resolveThreshold(thresholds, row.system_id)
           if (!threshold) return
 
           const systemLabel = buildSystemLabel(systemMap, row.system_id)
-          if (threshold.high_mortality_threshold != null && row.mortality_rate != null) {
-            const mortalityPercent = row.mortality_rate * 100
-            if (mortalityPercent > threshold.high_mortality_threshold) {
+          if (row.is_mass_mortality || row.number_of_fish_mortality > 0) {
               addNotification({
                 id: `mortality-${row.id}`,
-                title: "High Mortality Rate",
-                description: `${systemLabel} mortality is ${formatPercent(row.mortality_rate)}%/day (threshold ${formatNumber(
-                  threshold.high_mortality_threshold,
-                )}%/day).`,
-                createdAt: row.inventory_date ?? new Date().toISOString(),
+                title: row.is_mass_mortality ? "Mass Mortality Recorded" : "Mortality Recorded",
+                description: `${systemLabel} recorded ${formatNumberValue(row.number_of_fish_mortality, {
+                  decimals: 0,
+                  minimumDecimals: 0,
+                  fallback: "0",
+                })} mortality event(s).`,
+                createdAt: row.created_at ?? new Date().toISOString(),
                 systemId: row.system_id,
                 kind: "mortality",
-                severity: "critical",
+                severity: row.is_mass_mortality ? "critical" : "warning",
                 read: false,
-                href: `/reports?tab=mortality&system=${row.system_id}`,
+                href: `${toDashboardPath("/reports")}?tab=mortality&system=${row.system_id}`,
                 actionLabel: "View mortality",
               })
-            }
           }
         },
       )
@@ -345,11 +566,142 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(mortalityChannel)
     }
-  }, [addNotification, farmId, session, supabase, systemMap, systemsLoaded, thresholdsLoaded, thresholds])
+  }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemRows, thresholdsLoaded, thresholds])
+
+  // Fires a "cage now empty" pop notification the moment a harvest or transfer
+  // brings a cage's live fish count to zero, and refreshes the cached
+  // "currently stocked" system lists (dashboard tables, report/production
+  // filters) so the now-empty cage drops out of them right away.
+  useEffect(() => {
+    if (!session || !farmId || !systemsLoaded) return
+
+    const farmSystemIds = systemRows.map((s) => s.id)
+    if (!farmSystemIds.length) return
+
+    const notifyIfEmptied = async (systemId: number, sourceId: string) => {
+      if (!systemMap[systemId]) return
+      invalidateActiveAlerts()
+      const { data: fishCount, error } = await supabase.rpc("current_fish_count", { p_system_id: systemId })
+      if (error) {
+        logSbError("notifications:cageEmpty", error)
+        return
+      }
+      if ((fishCount ?? 0) > 0) return
+
+      const systemLabel = buildSystemLabel(systemMap, systemId)
+      addNotification({
+        id: `cage-empty-${sourceId}`,
+        title: "Cage Now Empty",
+        description: `${systemLabel} has no fish remaining and is now available for restocking.`,
+        createdAt: new Date().toISOString(),
+        systemId,
+        kind: "cage_empty",
+        severity: "warning",
+        read: false,
+        href: `${DATA_ENTRY_PATH}?type=stocking&system=${systemId}`,
+        actionLabel: "Restock cage",
+      })
+
+      void queryClient.invalidateQueries({ queryKey: ["stocked-systems", farmId] })
+      void queryClient.invalidateQueries({
+        predicate: ({ queryKey }) =>
+          String(queryKey[0]) === "dashboard" && String(queryKey[1]) === "systems" && String(queryKey[2]) === farmId,
+      })
+    }
+
+    const harvestChannel = supabase
+      .channel(`alerts-cage-empty-harvest-${farmId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "fish_harvest",
+          filter: `system_id=in.(${farmSystemIds.join(",")})`,
+        },
+        (payload) => {
+          const row = payload.new as HarvestRow
+          if (!row?.system_id) return
+          void notifyIfEmptied(row.system_id, `harvest-${row.id}`)
+        },
+      )
+      .subscribe()
+
+    const transferChannel = supabase
+      .channel(`alerts-cage-empty-transfer-${farmId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "fish_transfer",
+          filter: `origin_system_id=in.(${farmSystemIds.join(",")})`,
+        },
+        (payload) => {
+          const row = payload.new as TransferRow
+          if (!row?.origin_system_id) return
+          void notifyIfEmptied(row.origin_system_id, `transfer-${row.id}`)
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(harvestChannel)
+      supabase.removeChannel(transferChannel)
+    }
+  }, [addNotification, farmId, invalidateActiveAlerts, queryClient, session, supabase, systemMap, systemsLoaded, systemRows])
+
+  useEffect(() => {
+    if (!session || !farmId || !systemsLoaded) return
+
+    const farmSystemIds = systemRows.map((s) => s.id)
+    if (!farmSystemIds.length) return
+
+    const stockingChannel = supabase
+      .channel(`alerts-restocked-${farmId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "fish_stocking",
+          filter: `system_id=in.(${farmSystemIds.join(",")})`,
+        },
+        (payload) => {
+          const row = payload.new as StockingRow
+          if (!row?.system_id) return
+
+          invalidateActiveAlerts()
+          void queryClient.invalidateQueries({ queryKey: ["stocked-systems", farmId] })
+          void queryClient.invalidateQueries({
+            predicate: ({ queryKey }) =>
+              String(queryKey[0]) === "dashboard" && String(queryKey[1]) === "systems" && String(queryKey[2]) === farmId,
+          })
+
+          setNotifications((prev) =>
+            prev.filter((item) => !(item.kind === "cage_empty" && item.systemId === row.system_id)),
+          )
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(stockingChannel)
+    }
+  }, [farmId, invalidateActiveAlerts, queryClient, session, setNotifications, supabase, systemsLoaded, systemRows])
 
   const value = useMemo(
-    () => ({ notifications, unreadCount, markAllRead, markRead, clearAll }),
-    [clearAll, markAllRead, markRead, notifications, unreadCount],
+    () => ({
+      notifications,
+      unreadCount,
+      markAllRead,
+      markRead,
+      dismiss,
+      clearAll,
+      activeAlerts,
+      activeAlertsLoading: activeAlertsQuery.isLoading,
+    }),
+    [activeAlerts, activeAlertsQuery.isLoading, clearAll, dismiss, markAllRead, markRead, notifications, unreadCount],
   )
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>

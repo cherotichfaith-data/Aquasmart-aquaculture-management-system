@@ -1,22 +1,22 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { inventoryWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { getSystemFarmIds, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { getSystemFarmIds, requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
+import { UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 
 const transferSchema = z.object({
   origin_system_id: z.number().int().positive(),
   target_system_id: z.number().int().positive().nullable().optional(),
   external_target_name: z.string().max(200).nullable().optional(),
-  transfer_type: z.enum(["transfer", "grading", "density_thinning", "broodstock", "count_check", "external_out"]),
+  transfer_type: z.enum(UI_TRANSFER_TYPES),
   batch_id: z.number().int().positive().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  number_of_fish_transfer: z.number().positive(),
+  number_of_fish_transfer: z.number().int("Transfer count must be a whole number.").positive(),
   total_weight_transfer: z.number().positive(),
-  abw: z.number().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
+  local_id: z.string().max(128).optional(),
 })
 
 export async function POST(request: Request) {
@@ -42,41 +42,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Origin system is unavailable." }, { status: 404 })
   }
 
-  const { data, error } = await supabase
-    .from("fish_transfer")
-    .insert({
-      ...payload,
-      target_system_id: payload.target_system_id ?? null,
-      batch_id: payload.batch_id ?? null,
-      abw: payload.abw ?? null,
-      external_target_name: payload.external_target_name?.trim() ? payload.external_target_name.trim() : null,
-      notes: payload.notes?.trim() ? payload.notes.trim() : null,
-    })
-    .select()
-    .single()
+  const externalTargetName = payload.external_target_name?.trim() ? payload.external_target_name.trim() : null
+  const isExternalOut = payload.transfer_type === "external_out"
 
-  if (error || !data) {
-    logSbError("transfer:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record transfer." }, { status })
+  if (isExternalOut && !externalTargetName) {
+    return NextResponse.json({ error: "External destination is required." }, { status: 400 })
   }
 
-  const revalidateFarmIds = new Set(systemScope.farmIdsBySystemId.values())
-  revalidateFarmIds.forEach((farmId) => {
-    revalidateWriteTags(
-      inventoryWriteTags({ farmId, systemId: payload.origin_system_id, includeProduction: true }),
-    )
-  })
+  if (!isExternalOut && !payload.target_system_id) {
+    return NextResponse.json({ error: "Destination system is required." }, { status: 400 })
+  }
 
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: originFarmId,
-        systemId: payload.origin_system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  if (!isExternalOut && payload.target_system_id === payload.origin_system_id) {
+    return NextResponse.json({ error: "Origin and destination cannot be the same." }, { status: 400 })
+  }
+
+  return submitApprovalResponse(supabase, "transfer", originFarmId, {
+    ...payload,
+    target_system_id: isExternalOut ? null : payload.target_system_id,
+    external_target_name: isExternalOut ? externalTargetName : null,
+  })
 }

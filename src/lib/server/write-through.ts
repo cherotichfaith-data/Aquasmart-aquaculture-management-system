@@ -1,49 +1,35 @@
 import { revalidateTag } from "next/cache"
 import { NextResponse } from "next/server"
-import type { User } from "@supabase/supabase-js"
-import { enforceUserRateLimit, type ApiRateLimitPolicy } from "@/lib/server/rate-limit"
+import { requireApiUser, requireRateLimitedApiUser } from "@/lib/server/auth"
+import type { ApiRateLimitPolicy } from "@/lib/server/rate-limit"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { createClient } from "@/lib/supabase/server"
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 
-export async function requireRouteUser(
-  supabase: ServerSupabaseClient,
-  tag: string,
-): Promise<{ user: User } | { response: NextResponse }> {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    if (error) {
-      logSbError(`${tag}:getUser`, error)
-    }
-    return { response: NextResponse.json({ error: "Unauthorized." }, { status: 401 }) }
-  }
-
-  return { user }
+/**
+ * Thin compatibility wrappers around the consolidated auth helper
+ * (src/lib/server/auth.ts). The `supabase` parameter is accepted but no
+ * longer used -- requireApiUser resolves its own verified client -- so every
+ * existing call site here keeps working unchanged. Prefer importing
+ * requireApiUser / requireRateLimitedApiUser directly in new routes.
+ *
+ * This used to be two different auth strategies in this file alone
+ * (requireRouteUser via a verified supabase.auth.getUser() call, and
+ * requireSessionRouteUser via an unverified local JWT decode). Only the
+ * verified strategy survived the consolidation -- see auth.ts for why.
+ */
+export async function requireRouteUser(_supabase: ServerSupabaseClient, tag: string) {
+  return requireApiUser(tag)
 }
 
 export async function requireRateLimitedRouteUser(
-  supabase: ServerSupabaseClient,
+  _supabase: ServerSupabaseClient,
   request: Request,
   tag: string,
   policy: ApiRateLimitPolicy,
-): Promise<{ user: User } | { response: NextResponse }> {
-  const auth = await requireRouteUser(supabase, tag)
-  if ("response" in auth) return auth
-
-  const rateLimit = await enforceUserRateLimit({
-    request,
-    tag,
-    userId: auth.user.id,
-    policy,
-  })
-  if (rateLimit.response) return { response: rateLimit.response }
-
-  return auth
+) {
+  return requireRateLimitedApiUser(request, tag, policy)
 }
 
 export async function getSystemFarmId(

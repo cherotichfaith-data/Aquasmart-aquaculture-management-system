@@ -1,21 +1,48 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
-import { revalidateTag } from "next/cache"
 import { z } from "zod"
-import { feedingWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
 import { requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 
-const feedingSchema = z.object({
-  system_id: z.number().int().positive(),
-  batch_id: z.number().int().positive().nullable().optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  feed_type_id: z.number().int().positive(),
-  feeding_amount: z.number().positive(),
-  feeding_response: z.enum(["very_good", "good", "fair", "bad"]),
-  notes: z.string().max(500).nullable().optional(),
-})
+const feedingSchema = z
+  .object({
+    system_id: z.number().int().positive(),
+    batch_id: z.number().int().positive().nullable().optional(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    feed_type_id: z.number().int().positive().nullable().optional(),
+    feeding_amount: z.number().min(0),
+    feeding_response: z.number().int().min(1).max(5).nullable().optional(),
+    notes: z.string().max(500).nullable().optional(),
+    local_id: z.string().max(128).optional(),
+  })
+  .superRefine((payload, ctx) => {
+    if (payload.feeding_amount > 0) {
+      if (!payload.feed_type_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["feed_type_id"],
+          message: "Feed type is required when feed was given.",
+        })
+      }
+      if (!payload.feeding_response) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["feeding_response"],
+          message: "Feeding response is required when feed was given.",
+        })
+      }
+    }
+
+    if (payload.feeding_amount === 0 && !payload.notes?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["notes"],
+        message: "Add a comment explaining why feeding was not done.",
+      })
+    }
+  })
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -47,39 +74,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Selected system is unavailable." }, { status: 404 })
   }
 
-  const { data: row, error: insertError } = await supabase
-    .from("feeding_record")
-    .insert({
-      system_id: payload.system_id,
-      batch_id: payload.batch_id ?? null,
-      date: payload.date,
-      feed_type_id: payload.feed_type_id,
-      feeding_amount: payload.feeding_amount,
-      feeding_response: payload.feeding_response,
-      notes: payload.notes?.trim() ? payload.notes.trim() : null,
-    })
-    .select()
-    .single()
-
-  if (insertError || !row) {
-    logSbError("feeding:record:insert", insertError)
-    const status = isSbPermissionDenied(insertError) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record the feeding event." }, { status })
-  }
-
-  feedingWriteTags({ farmId: systemRow.farm_id, systemId: payload.system_id }).forEach((tag) =>
-    revalidateTag(tag, "max"),
-  )
-
-  return NextResponse.json(
-    {
-      data: row,
-      meta: {
-        farmId: systemRow.farm_id,
-        systemId: payload.system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "feeding", systemRow.farm_id, payload)
 }

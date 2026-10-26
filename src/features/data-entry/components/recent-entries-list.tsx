@@ -1,0 +1,524 @@
+"use client"
+
+import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
+import { createClient } from "@/lib/supabase/client"
+import { useWaterQualityMeasurements } from "@/features/water-quality/hooks"
+import { useLiveQuery } from "dexie-react-hooks"
+import { format } from "date-fns"
+import { Clock3, Loader2 } from "lucide-react"
+import { Badge } from "@/components/app-ui/badge"
+import { offlineDB } from "@/lib/offline/db"
+import { formatGrowthStage } from "@/lib/stage-filter"
+import { createSystemLabelResolver, type SystemOption } from "@/lib/system-options"
+import type { Tables } from "@/lib/types/database"
+import {
+  useFeedingRecords,
+  useHarvests,
+  useMortalityData,
+  useSamplingData,
+  useStockingData,
+  useTransferData,
+} from "@/features/reports/hooks"
+
+type PendingMeta = {
+  status?: "pending"
+  localId?: string
+}
+
+type SystemEntryRow = Pick<Tables<"system">, "id" | "commissioned_at" | "name" | "type" | "growth_stage" | "created_at"> & {
+  unit?: string | null
+} & PendingMeta
+
+type MortalityRow = Pick<Tables<"fish_mortality">, "id" | "date" | "system_id" | "number_of_fish_mortality" | "created_at"> & PendingMeta
+type FeedingRow = Omit<
+  Pick<Tables<"feeding_record">, "id" | "date" | "system_id" | "feed_type_id" | "feeding_amount" | "created_at">,
+  "feed_type_id"
+> & {
+  feed_type_id: number | null
+} & PendingMeta
+type SamplingRow = Omit<
+  Pick<Tables<"fish_sampling_weight">, "id" | "date" | "system_id" | "number_of_fish_sampling" | "abw" | "created_at">,
+  "abw"
+> & {
+  abw: number | null
+} & PendingMeta
+type TransferRow = Pick<Tables<"fish_transfer">, "id" | "date" | "origin_system_id" | "target_system_id" | "external_target_name" | "number_of_fish_transfer" | "created_at"> & PendingMeta
+type HarvestRow = Pick<Tables<"fish_harvest">, "id" | "date" | "system_id" | "type_of_harvest" | "total_weight_harvest" | "created_at"> & PendingMeta
+type WaterQualityRow = Pick<Tables<"water_quality_measurement">, "id" | "date" | "system_id" | "parameter_name" | "parameter_value" | "time" | "water_depth" | "created_at"> & PendingMeta
+type FeedInventoryRow = Pick<
+  Tables<"feed_inventory">,
+  | "id"
+  | "inventory_date"
+  | "feed_type_id"
+  | "bag_weight"
+  | "amount_of_bags"
+  | "opened_bags"
+  | "snapshot_kg"
+  | "created_at"
+> & {
+  feed_type_label?: string | null
+} &
+  PendingMeta
+type StockingRow = Pick<Tables<"fish_stocking">, "id" | "date" | "system_id" | "number_of_fish_stocking" | "type_of_stocking" | "created_at"> & PendingMeta
+
+type FeedTypeOption = { id: number; label?: string | null; feed_line?: string | null }
+
+type RecentEntriesListProps = (
+  | { type: "mortality"; data: MortalityRow[] }
+  | { type: "feeding"; data: FeedingRow[] }
+  | { type: "sampling"; data: SamplingRow[] }
+  | { type: "transfer"; data: TransferRow[] }
+  | { type: "harvest"; data: HarvestRow[] }
+  | { type: "water_quality"; data: WaterQualityRow[] }
+  | { type: "feed_inventory"; data: FeedInventoryRow[] }
+  | { type: "stocking"; data: StockingRow[] }
+  | { type: "system"; data: SystemEntryRow[] }
+) & { systems: SystemOption[]; feeds?: FeedTypeOption[]; activeSystemId?: number | null; farmId?: string | null }
+
+type CageKeyed = { system_id?: number | null; origin_system_id?: number | null; target_system_id?: number | null }
+
+type RecentCard = {
+  key: string
+  title: string
+  subtitle: string
+  meta: string
+  pending?: boolean
+  details: Array<{ label: string; value: string }>
+}
+
+const formatCreatedAt = (createdAt: string | null) =>
+  createdAt ? format(new Date(createdAt), "MMM d, HH:mm") : "-"
+
+const formatDate = (date: string | null) => date ?? "N/A"
+
+const PendingIcon = ({ pending }: { pending?: boolean }) =>
+  pending ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null
+
+function toCreatedAt(createdAtLocal: number) {
+  return new Date(createdAtLocal).toISOString()
+}
+
+function usePendingOfflineEntries(type: RecentEntriesListProps["type"], farmId?: string | null) {
+  return (
+    useLiveQuery(async () => {
+      switch (type) {
+        case "feeding": {
+          const rows = await offlineDB.feeding.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
+          return rows
+            .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
+            .map<FeedingRow>((row) => ({
+              id: 0,
+              localId: row.localId,
+              status: "pending",
+              date: row.date,
+              system_id: row.systemId,
+              feed_type_id: row.feedTypeId ?? null,
+              feeding_amount: row.feedingAmount,
+              created_at: toCreatedAt(row.createdAtLocal),
+            }))
+        }
+        case "mortality": {
+          const rows = await offlineDB.mortality.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
+          return rows
+            .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
+            .map<MortalityRow>((row) => ({
+              id: 0,
+              localId: row.localId,
+              status: "pending",
+              date: row.date,
+              system_id: row.systemId,
+              number_of_fish_mortality: row.numberOfFishMortality,
+              created_at: toCreatedAt(row.createdAtLocal),
+            }))
+        }
+        case "sampling": {
+          const rows = await offlineDB.sampling.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
+          return rows
+            .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
+            .map<SamplingRow>((row) => ({
+              id: 0,
+              localId: row.localId,
+              status: "pending",
+              date: row.date,
+              system_id: row.systemId,
+              number_of_fish_sampling: row.numberOfFishSampling,
+              abw: null,
+              created_at: toCreatedAt(row.createdAtLocal),
+            }))
+        }
+        case "transfer": {
+          const rows = await offlineDB.transfer.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
+          return rows
+            .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
+            .map<TransferRow>((row) => ({
+              id: 0,
+              localId: row.localId,
+              status: "pending",
+              date: row.date,
+              origin_system_id: row.originSystemId,
+              target_system_id: row.targetSystemId ?? row.originSystemId,
+              external_target_name: row.externalTargetName ?? null,
+              number_of_fish_transfer: row.numberOfFishTransfer,
+              created_at: toCreatedAt(row.createdAtLocal),
+            }))
+        }
+        case "harvest": {
+          const rows = await offlineDB.harvest.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
+          return rows
+            .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
+            .map<HarvestRow>((row) => ({
+              id: 0,
+              localId: row.localId,
+              status: "pending",
+              date: row.date,
+              system_id: row.systemId,
+              type_of_harvest: row.typeOfHarvest,
+              total_weight_harvest: row.totalWeightHarvest,
+              created_at: toCreatedAt(row.createdAtLocal),
+            }))
+        }
+        case "water_quality": {
+          const rows = await offlineDB.waterQuality.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
+          return rows
+            .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
+            .map<WaterQualityRow>((row) => ({
+              id: 0,
+              localId: row.localId,
+              status: "pending",
+              date: row.date,
+              system_id: row.systemId,
+              parameter_name: row.parameterName,
+              parameter_value: row.parameterValue,
+              time: row.time,
+              water_depth: row.waterDepth,
+              created_at: toCreatedAt(row.createdAtLocal),
+            }))
+        }
+        case "stocking": {
+          const rows = await offlineDB.stocking.where("syncStatus").equals("pending").and((row) => Boolean(farmId) && row.farmId === farmId).toArray()
+          return rows
+            .sort((left, right) => right.createdAtLocal - left.createdAtLocal)
+            .map<StockingRow>((row) => ({
+              id: 0,
+              localId: row.localId,
+              status: "pending",
+              date: row.date,
+              system_id: row.systemId,
+              number_of_fish_stocking: row.numberOfFishStocking,
+              type_of_stocking: row.typeOfStocking,
+              created_at: toCreatedAt(row.createdAtLocal),
+            }))
+        }
+        default:
+          return []
+      }
+    }, [type, farmId]) ?? []
+  )
+}
+
+function mergeRecentEntriesByPrimaryDate<T extends { created_at: string | null; status?: "pending" }>(
+  serverRows: T[],
+  pendingRows: T[],
+  getPrimaryDate: (row: T) => string | null | undefined,
+) {
+  const hasLivePendingRows = serverRows.some((row) => row.status === "pending")
+  const combined = hasLivePendingRows ? serverRows : [...pendingRows, ...serverRows]
+
+  return [...combined]
+    .sort((left, right) => {
+      const dateCompare = String(getPrimaryDate(right) ?? "").localeCompare(String(getPrimaryDate(left) ?? ""))
+      if (dateCompare !== 0) return dateCompare
+      return new Date(right.created_at ?? 0).getTime() - new Date(left.created_at ?? 0).getTime()
+    })
+    .slice(0, 3)
+}
+
+function scopeToCage<T extends CageKeyed>(rows: readonly T[], systemId: number | null): T[] {
+  if (systemId == null) return rows as T[]
+  return rows.filter(
+    (row) =>
+      row.system_id === systemId ||
+      row.origin_system_id === systemId ||
+      row.target_system_id === systemId,
+  )
+}
+
+/**
+ * When a cage is picked in the form, pull that cage's own recent history for the
+ * active entry type (not just whatever fell inside the farm-wide prefetch window).
+ * Returns null while there is no cage or the type has no scoped source, so the
+ * caller falls back to the (client-filtered) prefetch.
+ */
+function useScopedRecentRows(
+  type: RecentEntriesListProps["type"],
+  systemId: number | null,
+  farmId: string | null | undefined,
+) {
+  const sid = systemId ?? undefined
+  const on = (target: string) => Boolean(farmId) && type === target
+  const feeding = useFeedingRecords({ farmId, systemId: sid, limit: 5, enabled: on("feeding") })
+  const mortality = useMortalityData({ farmId, systemId: sid, limit: 5, enabled: on("mortality") })
+  const sampling = useSamplingData({ farmId, systemId: sid, limit: 5, enabled: on("sampling") })
+  const stocking = useStockingData({ farmId, systemId: sid, limit: 5, enabled: on("stocking") })
+  const harvest = useHarvests({ farmId, systemId: sid, limit: 5, enabled: on("harvest") })
+  const transfer = useTransferData({ farmId, systemId: sid, limit: 5, enabled: on("transfer") })
+
+  const farmHistory = useQuery({
+    queryKey: ["entry-history", farmId, type],
+    enabled: Boolean(farmId) && (type === "system" || type === "feed_inventory"),
+    queryFn: async () => {
+      const client = createClient()
+      const result = type === "system"
+        ? await client.from("system").select("*").eq("farm_id", farmId!).order("commissioned_at", { ascending: false }).order("id", { ascending: false }).limit(5)
+        : await client.from("feed_inventory").select("*").eq("farm_id", farmId!).order("inventory_date", { ascending: false }).order("id", { ascending: false }).limit(5)
+      if (result.error) throw result.error
+      return { status: "success", data: result.data }
+    },
+    staleTime: 30000,
+  })
+  const waterQuality = useWaterQualityMeasurements({ farmId, systemId: sid, limit: 12, enabled: on("water_quality"), latestFirst: true })
+  const pick = (result: { data?: unknown; isPending: boolean; error: unknown; refetch: () => unknown }) => {
+    const payload = result.data as { status?: string; data?: unknown[] } | undefined
+    return { rows: payload?.status === "success" ? payload.data ?? [] : [], loading: result.isPending, error: Boolean(result.error) || (payload != null && payload.status !== "success"), retry: result.refetch }
+  }
+  switch (type) {
+    case "feeding":
+      return pick(feeding)
+    case "mortality":
+      return pick(mortality)
+    case "sampling":
+      return pick(sampling)
+    case "stocking":
+      return pick(stocking)
+    case "harvest":
+      return pick(harvest)
+    case "system":
+    case "feed_inventory":
+      return pick(farmHistory)
+    case "water_quality":
+      return pick(waterQuality)
+    case "transfer":
+      return pick(transfer)
+    default:
+      return null
+  }
+}
+
+function EntriesSection({
+  cards,
+  pendingCount,
+  scopeLabel,
+}: {
+  cards: RecentCard[]
+  pendingCount: number
+  scopeLabel?: string | null
+}) {
+  return (
+    <div className="data-entry-recent-panel">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <h2 className="text-sm font-semibold text-foreground">
+          {scopeLabel ? `Recent Entries · ${scopeLabel}` : "Recent Entries"}
+        </h2>
+        {pendingCount > 0 ? (
+          <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning-foreground">
+              <Clock3 className="h-3 w-3" />
+              {pendingCount} queued
+          </Badge>
+        ) : null}
+      </div>
+
+      {cards.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border/70 bg-background/70 px-3 py-4 text-sm text-muted-foreground">
+          {scopeLabel ? `No recent entries for ${scopeLabel}.` : "No recent entries found."}
+        </div>
+      ) : (
+        <div className="data-entry-recent-list">
+          {cards.map((card) => (
+            <article key={card.key} className={`data-entry-recent-item ${card.pending ? "opacity-70" : ""}`}>
+              <div className="data-entry-recent-item-header">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <PendingIcon pending={card.pending} />
+                    <h3 className="data-entry-recent-item-title">{card.title}</h3>
+                    <span className="text-xs text-muted-foreground">{card.pending ? "Queued offline" : "Recorded"}</span>
+                  </div>
+                  <p className="data-entry-recent-item-subtitle">{card.subtitle}</p>
+                </div>
+                <span className="data-entry-recent-meta">{card.meta}</span>
+              </div>
+              <div className="data-entry-recent-grid">
+                {card.details.map((detail) => (
+                  <div key={`${card.key}-${detail.label}`} className="data-entry-recent-detail">
+                    <span className="data-entry-recent-detail-label">{detail.label}</span>
+                    <span className="data-entry-recent-detail-value">{detail.value}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function RecentEntriesList(props: RecentEntriesListProps) {
+  const { data, type, systems, feeds } = props
+  const allPendingEntries = usePendingOfflineEntries(type, props.farmId)
+  const pendingEntries = scopeToCage(allPendingEntries as CageKeyed[], props.activeSystemId ?? null)
+  const formatSystemName = createSystemLabelResolver(systems)
+
+  const activeSystemId = props.activeSystemId ?? null
+  // Only scope entry types that carry a cage; feed inventory and system setup are farm-level.
+  const scopedSystemId = type === "feed_inventory" || type === "system" ? null : activeSystemId
+  const scopeLabel = scopedSystemId != null ? formatSystemName(scopedSystemId) : null
+  const recentQuery = useScopedRecentRows(type, scopedSystemId, props.farmId)
+  const scopedRows = recentQuery?.rows ?? null
+  if (recentQuery?.loading) return <p role="status" className="p-4 text-sm text-muted-foreground">Loading recent entries…</p>
+  if (recentQuery?.error) return <div role="alert" className="p-4 text-sm"><p>Unable to load recent entries.</p><button type="button" className="mt-2 underline" onClick={() => recentQuery.retry()}>Retry</button></div>
+  const formatFeedTypeName = (feedTypeId: number | null | undefined) => {
+    if (feedTypeId == null) return "Not selected"
+    const feedType = feeds?.find((item) => item.id === feedTypeId)
+    return feedType?.label ?? feedType?.feed_line ?? "Not recorded"
+  }
+
+  let cards: RecentCard[] = []
+  let pendingCount = 0
+
+  if (type === "mortality") {
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as MortalityRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as MortalityRow[], scopedSystemId), (row) => row.date)
+    pendingCount = (pendingEntries as MortalityRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Dead Fish", value: String(row.number_of_fish_mortality) },
+      ],
+    }))
+  } else if (type === "feeding") {
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as FeedingRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as FeedingRow[], scopedSystemId), (row) => row.date)
+    pendingCount = (pendingEntries as FeedingRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Feed Type", value: formatFeedTypeName(row.feed_type_id) },
+        { label: "Amount", value: `${row.feeding_amount} kg` },
+      ],
+    }))
+  } else if (type === "sampling") {
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as SamplingRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as SamplingRow[], scopedSystemId), (row) => row.date)
+    pendingCount = (pendingEntries as SamplingRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Sampled", value: String(row.number_of_fish_sampling) },
+        { label: "ABW", value: row.abw != null ? `${row.abw} g` : "-" },
+      ],
+    }))
+  } else if (type === "transfer") {
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as TransferRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as TransferRow[], scopedSystemId), (row) => row.date)
+    pendingCount = (pendingEntries as TransferRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.origin_system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Origin", value: formatSystemName(row.origin_system_id) },
+        { label: "Destination", value: row.external_target_name?.trim() || formatSystemName(row.target_system_id) },
+        { label: "Count", value: String(row.number_of_fish_transfer) },
+      ],
+    }))
+  } else if (type === "harvest") {
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as HarvestRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as HarvestRow[], scopedSystemId), (row) => row.date)
+    pendingCount = (pendingEntries as HarvestRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Harvest", value: String(row.type_of_harvest) },
+        { label: "Weight", value: `${row.total_weight_harvest} kg` },
+      ],
+    }))
+  } else if (type === "water_quality") {
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as WaterQualityRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as WaterQualityRow[], scopedSystemId), (row) => row.date)
+    pendingCount = (pendingEntries as WaterQualityRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Parameter", value: String(row.parameter_name).replaceAll("_", " ") },
+        { label: "Value", value: `${row.parameter_value} ${row.parameter_name === "temperature" ? "°C" : row.parameter_name === "pH" ? "pH" : "mg/L"}` },
+        { label: "Time", value: row.time?.slice(0, 5) ?? "—" },
+        { label: "Depth", value: `${row.water_depth ?? "—"} m` },
+      ],
+    }))
+  } else if (type === "feed_inventory") {
+    const feedInventoryPendingEntries = pendingEntries as unknown as FeedInventoryRow[]
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as FeedInventoryRow[] | null) ?? data, feedInventoryPendingEntries, (row) => row.inventory_date)
+    pendingCount = feedInventoryPendingEntries.length
+    cards = rows.map((row, index) => {
+      return {
+        key: String(row.localId ?? row.id ?? index),
+        title: row.feed_type_label?.trim() || formatFeedTypeName(row.feed_type_id),
+        subtitle: formatDate(row.inventory_date),
+        meta: formatCreatedAt(row.created_at),
+        pending: row.status === "pending",
+        details: [
+          { label: "Closed Bags", value: String(row.amount_of_bags ?? 0) },
+          { label: "Open Feed", value: `${row.opened_bags ?? 0} g` },
+          { label: "Total", value: row.snapshot_kg != null ? `${row.snapshot_kg.toFixed(2)} kg` : "-" },
+        ],
+      }
+    })
+  } else if (type === "stocking") {
+    const rows = mergeRecentEntriesByPrimaryDate((scopedRows as StockingRow[] | null) ?? scopeToCage(data, scopedSystemId), scopeToCage(pendingEntries as StockingRow[], scopedSystemId), (row) => row.date)
+    pendingCount = (pendingEntries as StockingRow[]).length
+    cards = rows.map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: formatSystemName(row.system_id),
+      subtitle: formatDate(row.date),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Count", value: String(row.number_of_fish_stocking) },
+        { label: "Type", value: String(row.type_of_stocking) },
+      ],
+    }))
+  } else {
+    cards = ((scopedRows as SystemEntryRow[] | null) ?? data).slice(0, 5).map((row, index) => ({
+      key: String(row.localId ?? row.id ?? index),
+      title: row.name,
+      subtitle: formatDate(row.commissioned_at),
+      meta: formatCreatedAt(row.created_at),
+      pending: row.status === "pending",
+      details: [
+        { label: "Unit", value: row.unit ?? "-" },
+        { label: "Type", value: row.type },
+        { label: "Stage", value: formatGrowthStage(row.growth_stage) },
+      ],
+    }))
+  }
+
+  return <><EntriesSection cards={cards} pendingCount={pendingCount} scopeLabel={scopeLabel} /><Link className="mt-3 inline-block text-sm underline" href="/approvals">View submissions and review status</Link></>
+}
+

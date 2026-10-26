@@ -3,7 +3,8 @@ import { cacheTags } from "@/lib/cache/tags"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import type { Database } from "@/lib/types/database"
-import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
+import { ACTIVE_FARM_COOKIE, normalizeContextValue } from "@/lib/context"
 
 export type FarmOption = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
 
@@ -26,30 +27,19 @@ export async function listFarmOptions(): Promise<FarmOption[]> {
 }
 
 export async function resolveInitialFarmId(searchFarmId?: string | null) {
+  await requireUserContext()
   const farms = await listFarmOptions()
   const farmIds = new Set(farms.map((farm) => farm.id))
-  const farmId = searchFarmId && farmIds.has(searchFarmId) ? searchFarmId : (farms[0]?.id ?? null)
+  const cookieStore = await cookies()
+  const cookieFarmId = normalizeContextValue(cookieStore.get(ACTIVE_FARM_COOKIE)?.value)
+  const requestedFarmId = normalizeContextValue(searchFarmId) ?? cookieFarmId
+  const farmId = requestedFarmId && farmIds.has(requestedFarmId) ? requestedFarmId : null
+  const farm = farmId ? farms.find((row) => row.id === farmId) ?? null : null
 
   return {
     farmId,
+    farmName: farm?.label ?? null,
     farms,
   }
 }
 
-export async function requireInitialFarmId(searchFarmId?: string | null) {
-  const context = await resolveInitialFarmId(searchFarmId)
-
-  if (!context.farmId) {
-    redirect("/onboarding")
-  }
-
-  return context
-}
-
-export async function redirectIfFarmExists() {
-  const { farmId } = await resolveInitialFarmId()
-
-  if (farmId) {
-    redirect("/")
-  }
-}

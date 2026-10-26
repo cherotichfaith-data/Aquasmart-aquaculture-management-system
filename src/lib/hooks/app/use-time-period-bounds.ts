@@ -1,72 +1,60 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { useMemo } from "react"
 import { queryKeys } from "@/lib/cache/query-keys"
-import { createClient } from "@/lib/supabase/client"
 import {
-  buildTimeBoundsFromAvailableRange,
-  fetchTimePeriodBounds,
+  fetchTimePeriodBoundsClient,
+  toCustomPeriodUrlValue,
+  type AnalyticsTimeScope,
+  type CustomTimeRange,
   type TimeBounds,
   type TimePeriod,
 } from "@/lib/time-period"
-import { useSystemTimelineBounds } from "@/lib/hooks/use-system-timeline"
-import { resolveSystemTimelineWindow } from "@/lib/system-timeline-window"
 
 export function useTimePeriodBounds(params: {
   farmId?: string | null
   timePeriod: TimePeriod
+  customRange?: CustomTimeRange | null
   systemId?: number
+  batchId?: number
+  scope?: AnalyticsTimeScope
   enabled?: boolean
-  initialData?: TimeBounds
 }) {
-  const supabase = useMemo(() => createClient(), [])
   const enabled = Boolean(params.farmId) && (params.enabled ?? true)
-  const systemTimelineQuery = useSystemTimelineBounds({
-    farmId: params.farmId,
-    systemId: params.systemId,
-    enabled: enabled && Boolean(params.systemId),
-  })
   const query = useQuery({
-    queryKey: queryKeys.timePeriodBounds(params),
+    queryKey: queryKeys.timePeriodBounds({
+      ...params,
+      custom: params.customRange ? toCustomPeriodUrlValue(params.customRange) : null,
+    }),
     queryFn: ({ signal }) =>
       !params.farmId
         ? Promise.resolve<TimeBounds>({ start: null, end: null })
-        : fetchTimePeriodBounds(supabase, {
+        : fetchTimePeriodBoundsClient({
             farmId: params.farmId,
             timePeriod: params.timePeriod,
-            scope: "dashboard",
+            customRange: params.customRange,
+            scope: params.scope ?? "dashboard",
+            systemId: params.systemId,
+            batchId: params.batchId,
             signal,
           }),
     enabled,
+    // Bounds only shift when the farm's latest data date advances or the
+    // period selector changes (the period is in the query key). Data-entry
+    // writes already invalidate `time-period-bounds` via invalidateAfterWrite,
+    // so a real staleTime just stops every analytics-page navigation from
+    // re-running the 200-line bounds RPC.
     staleTime: 5 * 60_000,
-    initialData: params.initialData,
-    initialDataUpdatedAt: params.initialData ? 0 : undefined,
+    gcTime: 30 * 60_000,
   })
 
-  const resolvedBounds = useMemo(() => {
-    const baseBounds = query.data ?? params.initialData ?? { start: null, end: null }
-    if (!params.systemId) return baseBounds
-
-    const timelineRow =
-      systemTimelineQuery.data?.status === "success" ? (systemTimelineQuery.data.data[0] ?? null) : null
-    const timeline = resolveSystemTimelineWindow(timelineRow)
-    if (!timeline?.fullStart || !timeline.fullEnd) return baseBounds
-
-    return buildTimeBoundsFromAvailableRange({
-      timePeriod: params.timePeriod,
-      availableFromDate: timeline.fullStart,
-      latestAvailableDate: timeline.fullEnd,
-      anchorScope: "selected_system",
-    })
-  }, [params.initialData, params.systemId, params.timePeriod, query.data, systemTimelineQuery.data])
-
-  const start = resolvedBounds.start ?? null
-  const end = resolvedBounds.end ?? null
+  const bounds = query.data ?? { start: null, end: null }
+  const start = bounds.start ?? null
+  const end = bounds.end ?? null
 
   return {
     ...query,
-    data: resolvedBounds,
+    data: bounds,
     start,
     end,
     hasBounds: Boolean(start && end),

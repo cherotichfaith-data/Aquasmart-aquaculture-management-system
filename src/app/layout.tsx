@@ -1,37 +1,68 @@
 import type React from "react"
+import { Suspense } from "react"
 import type { Metadata } from "next"
-import { AuthProvider, ThemeProvider, QueryProvider } from "@/components/providers"
+import { IBM_Plex_Sans, Manrope } from "next/font/google"
+import { AuthProvider } from "@/components/providers"
+import { SyncProvider } from "@/components/offline/sync-provider"
 import { FarmOnboardingGate } from "@/components/providers/farm-onboarding-gate"
 import { ToastProvider } from "@/components/shared/toast-provider"
 import { NotificationsProvider } from "@/components/notifications/notifications-provider"
+import { ReactQueryProvider } from "@/lib/react-query-provider"
 import "./globals.css"
 
+// The daily planner's typefaces: IBM Plex Sans for text, Manrope for headings.
+const plexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-plex", display: "swap" })
+const manrope = Manrope({ subsets: ["latin"], weight: ["400", "600", "700", "800"], variable: "--font-manrope", display: "swap" })
+
+// Resolve the canonical site URL from configuration only -- explicit env first,
+// then the values Vercel injects automatically, and finally the local dev
+// origin. No production/brand URL is hard-coded; set NEXT_PUBLIC_APP_URL to
+// override.
+function resolveMetadataBase() {
+  const LOCAL_ORIGIN = "http://localhost:3000"
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||
+    process.env.VERCEL_URL?.trim() ||
+    LOCAL_ORIGIN
+
+  const normalized = /^https?:\/\//i.test(configured) ? configured : `https://${configured}`
+
+  try {
+    return new URL(normalized)
+  } catch {
+    return new URL(LOCAL_ORIGIN)
+  }
+}
+
 export const metadata: Metadata = {
-  title: "Aquasmart - Aquaculture Management Dashboard",
+  title: "SUSTAIN Aquasmart - Aquaculture Management Dashboard",
   description: "Real-time monitoring and management system for aquaculture farm operations",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://aquasmart.app"),
+  metadataBase: resolveMetadataBase(),
   openGraph: {
-    title: "Aquasmart - Aquaculture Management Dashboard",
+    title: "SUSTAIN Aquasmart - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
     type: "website",
     images: [
       {
-        url: "/use this.png",
-        width: 60,
-        height: 60,
-        alt: "AquaSmart logo",
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "SUSTAIN Aquasmart",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Aquasmart - Aquaculture Management Dashboard",
+    title: "SUSTAIN Aquasmart - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
-    images: ["/use this.png"],
+    images: ["/og-image.png"],
   },
+  manifest: "/manifest.json",
   icons: {
-    icon: "/use this.png",
-    apple: "/use this.png",
+    icon: "/icon.png",
+    apple: "/icon.png",
   },
 }
 
@@ -41,20 +72,22 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${plexSans.variable} ${manrope.variable}`}>
       <head />
       <body className={`font-sans antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ReactQueryProvider>
           <AuthProvider>
-            <QueryProvider>
+            <SyncProvider>
               <ToastProvider>
                 <NotificationsProvider>
-                  <FarmOnboardingGate>{children}</FarmOnboardingGate>
+                  <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                    <FarmOnboardingGate>{children}</FarmOnboardingGate>
+                  </Suspense>
                 </NotificationsProvider>
               </ToastProvider>
-            </QueryProvider>
+            </SyncProvider>
           </AuthProvider>
-        </ThemeProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   )

@@ -12,10 +12,9 @@ import {
   Droplets,
   Fish,
   FlaskConical,
-  Waves,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/app-ui/button"
 
 const navItems = [
   { label: "Platform", href: "#platform" },
@@ -53,16 +52,16 @@ const modules = [
       "Watch pond and tank conditions in real time and surface threshold breaches before they become production losses.",
     metric: "92%",
     metricLabel: "systems within target range",
-    imageSrc: "https://upload.wikimedia.org/wikipedia/commons/2/2b/Aquaculture_Tank.jpg",
+    imageSrc: "/Multi-region-aquaculture-scaled.webp",
   },
   {
     category: "FEED CONTROL",
     title: "Feeding Operations",
     description:
-      "Connect feed plans, actual issue records, and performance outcomes so operators can act before waste compounds.",
+      "Connect feed issue records, stock movement, and performance outcomes so operators can act before waste compounds.",
     metric: "1.42",
     metricLabel: "rolling eFCR",
-    imageSrc: "https://upload.wikimedia.org/wikipedia/commons/1/1e/Burundi_-_Lake_Tanganyika_fisheries.jpg",
+    imageSrc: "/tanga_tilapia4.jpg",
   },
   {
     category: "STOCK HEALTH",
@@ -71,7 +70,7 @@ const modules = [
       "Record abnormal events, suspected causes, and interventions in one structured timeline instead of scattered notes.",
     metric: "14d",
     metricLabel: "trend window",
-    imageSrc: "https://upload.wikimedia.org/wikipedia/commons/3/3f/Tilapia_fish_%2C.jpg",
+    imageSrc: "/cage mapping.png",
   },
   {
     category: "MANAGEMENT VIEW",
@@ -80,7 +79,7 @@ const modules = [
       "Give managers a clear view of biomass, survival, feed efficiency, and operational pressure across the farm.",
     metric: "24/7",
     metricLabel: "operational visibility",
-    imageSrc: "https://upload.wikimedia.org/wikipedia/commons/0/0c/Lake_tanganyika.jpg",
+    imageSrc: "/Multi-region-aquaculture-scaled.webp",
   },
 ]
 
@@ -135,19 +134,24 @@ export default function LandingPage() {
             priority
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(5,18,24,0.78)_0%,rgba(8,25,33,0.66)_42%,rgba(16,63,75,0.54)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,var(--brand-hero-from)_0%,var(--brand-hero-mid)_42%,var(--brand-hero-to)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-primary)_42%,black)_0%,color-mix(in_srgb,var(--color-primary)_12%,transparent)_46%,transparent_100%)]" />
         </div>
 
         <header className="absolute inset-x-0 top-0 z-20 px-4 pt-5 md:px-6">
-          <div className="container mx-auto flex items-center justify-between gap-8 py-2 text-white">
+          <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 py-2 text-white">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                <Waves className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">AquaSmart</p>
-                <p className="text-xs text-white/70">Aquaculture management software</p>
-              </div>
+              <Image
+                src="/sustain-aquasmart-wordmark-white.png"
+                alt="SUSTAIN Aquasmart"
+                width={1200}
+                height={131}
+                className="h-8 w-auto shrink-0"
+                priority
+              />
+              <p className="hidden border-l border-white/20 pl-3 text-xs text-white/70 sm:block">
+                Aquaculture management software
+              </p>
             </div>
 
             <nav className="hidden items-center gap-8 text-sm font-medium tracking-[0.08em] text-white/82 md:flex">
@@ -165,55 +169,69 @@ export default function LandingPage() {
 
             <Button
               variant="ghost"
-              className="hidden rounded-full bg-white/10 px-6 text-white hover:bg-white/18 hover:text-white md:inline-flex"
+              className="ml-auto h-9 rounded-full bg-white/10 px-4 text-sm text-white hover:bg-white/18 hover:text-white sm:px-5 md:ml-0 md:h-10 md:px-6"
               onClick={() => router.push("/auth")}
             >
               Sign In
             </Button>
+
           </div>
         </header>
 
-        <div className="relative z-10 flex min-h-[calc(100vh-84px)] items-center px-4 py-20 md:px-6 md:py-24">
+        <div className="relative z-10 flex min-h-[calc(100svh-84px)] items-center px-4 py-20 md:min-h-[calc(100vh-84px)] md:px-6 md:py-24">
           <div className="container mx-auto">
-            <div className="flex flex-col items-center justify-between gap-16 md:flex-row">
+            <div className="flex flex-col items-center justify-between gap-12 md:flex-row md:gap-16">
               <div className="max-w-2xl text-center text-white md:text-left">
                 <div className="mb-8 inline-flex rounded-full border border-primary/50 bg-white/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/92">
                   SMART FARM MANAGEMENT MADE PRACTICAL
                 </div>
 
-                <h1 className="max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.02] tracking-[-0.04em] md:text-6xl lg:text-[4.5rem]">
-                  Making aquaculture operations smarter with
-                  <br />
-                  <span className="text-primary">AquaSmart</span>
+                <h1 className="max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-5xl md:text-6xl lg:text-[4.5rem]">
+                  Making aquaculture operations smarter
+                  <span className="block md:inline"> with </span>
+                  <span className="text-primary">SUSTAIN Aquasmart</span>
                 </h1>
 
-                <p className="mt-7 max-w-2xl text-base leading-8 text-white/84 md:text-[1.05rem]">
+                <p className="mt-7 max-w-2xl text-sm leading-7 text-white/84 sm:text-base sm:leading-8 md:text-[1.05rem]">
                   Monitor water quality, feeding, biomass, health, and reporting from one modern platform designed for
                   real fish farm workflows.
                 </p>
 
                 <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center md:justify-start">
-                  <Button className="rounded-full px-8 text-base" size="lg" onClick={() => scrollToId("platform")}>
-                    Explore Platform
+                  <Button
+                    className="w-full rounded-full px-8 text-base sm:w-auto"
+                    size="lg"
+                    onClick={() => router.push("/auth?mode=signup")}
+                  >
+                    Get started
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="lg"
-                    className="rounded-full border-white/35 bg-transparent px-8 text-base text-white hover:bg-white/10 hover:text-white"
-                    onClick={() => scrollToId("modules")}
+                    className="w-full rounded-full border-white/35 bg-transparent px-8 text-base text-white hover:bg-white/10 hover:text-white sm:w-auto"
+                    onClick={() => router.push("/auth")}
                   >
-                    View Modules
+                    Sign in
                   </Button>
                 </div>
               </div>
 
               <div className="hidden w-[220px] md:flex lg:mr-20 lg:w-[270px]">
-                <div className="relative w-full rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(5,20,27,0.96),rgba(10,35,43,0.94))] p-3 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.7)]">
-                  <div className="overflow-hidden rounded-[22px] bg-[linear-gradient(180deg,#0c2530,#123443)]">
-                    <div className="flex items-center justify-between bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
-                      <span>AquaSmart Live</span>
-                      <span>Online</span>
+                <div className="relative w-full rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,var(--brand-panel-from),var(--brand-panel-to))] p-3 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.7)]">
+                  <div className="overflow-hidden rounded-[22px] bg-[linear-gradient(180deg,var(--brand-panel-shell-from),var(--brand-panel-shell-to))]">
+                    <div className="flex items-center justify-between gap-2 bg-primary px-4 py-3 text-primary-foreground">
+                      <Image
+                        src="/sustain-aquasmart-wordmark-white.png"
+                        alt="SUSTAIN Aquasmart"
+                        width={1200}
+                        height={131}
+                        className="h-3.5 w-auto"
+                      />
+                      <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        Live
+                      </span>
                     </div>
 
                     <div className="space-y-3 p-3">
@@ -229,7 +247,7 @@ export default function LandingPage() {
                           {[34, 48, 42, 62, 70, 78].map((height) => (
                             <div
                               key={height}
-                              className="w-full rounded-t-full bg-gradient-to-t from-chart-3 to-chart-2"
+                              className="w-full rounded-t-full bg-gradient-to-t from-[var(--color-primary-hover)] to-primary"
                               style={{ height: `${height}px` }}
                             />
                           ))}
@@ -250,7 +268,7 @@ export default function LandingPage() {
 
       <section
         id="platform"
-        className="bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_74%,white),color-mix(in_srgb,var(--secondary)_68%,white))] py-20 md:py-28"
+        className="bg-[linear-gradient(180deg,var(--background)_0%,color-mix(in_srgb,var(--color-primary)_8%,var(--background))_100%)] py-20 md:py-28"
       >
         <div className="container mx-auto px-4 md:px-6">
           <div className="mx-auto mb-5 w-fit rounded-full bg-card px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground shadow-sm">
@@ -263,7 +281,7 @@ export default function LandingPage() {
           </h2>
 
           <div className="mt-16 flex flex-col items-center justify-center gap-14 md:flex-row md:gap-16">
-            <div className="space-y-6">
+            <div className="w-full space-y-6">
               {capabilities.slice(0, 2).map((item) => {
                 const Icon = item.icon
                 return (
@@ -280,7 +298,7 @@ export default function LandingPage() {
               })}
             </div>
 
-            <div className="w-full max-w-[320px]">
+            <div className="w-full max-w-[320px] self-center">
               <div className="overflow-hidden rounded-[30px] border border-border/80 bg-card shadow-[0_22px_55px_-36px_rgba(15,23,32,0.45)]">
                 <div className="relative aspect-[4/5] overflow-hidden">
                   <video
@@ -294,12 +312,12 @@ export default function LandingPage() {
                   >
                     <source src="/fish video.mp4" type="video/mp4" />
                   </video>
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,22,28,0.04),rgba(7,22,28,0.52))]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--brand-media-overlay-from),var(--brand-media-overlay-to))]" />
                 </div>
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="w-full space-y-6">
               {capabilities.slice(2).map((item) => {
                 const Icon = item.icon
                 return (
@@ -321,7 +339,7 @@ export default function LandingPage() {
 
       <section
         id="modules"
-        className="relative overflow-hidden bg-[linear-gradient(180deg,#102b36_0%,#133845_100%)] py-20 md:py-28"
+        className="relative overflow-hidden bg-[linear-gradient(180deg,var(--brand-section-from)_0%,var(--brand-section-to)_100%)] py-20 md:py-28"
       >
         <div className="container mx-auto px-4 md:px-6">
           <div className="space-y-8">
@@ -337,7 +355,7 @@ export default function LandingPage() {
             <div className="relative">
               <div
                 ref={carouselRef}
-                className="flex snap-x snap-mandatory gap-8 overflow-x-auto pb-4 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 scroll-smooth md:gap-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 onMouseEnter={() => {
                   isCarouselPausedRef.current = true
                 }}
@@ -348,11 +366,11 @@ export default function LandingPage() {
                 {modules.map((module) => (
                   <article
                     key={module.title}
-                    className="min-w-[320px] snap-start rounded-[30px] bg-card p-6 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.45)] md:min-w-[390px]"
+                    className="min-w-[min(100%,18.5rem)] snap-start rounded-[30px] bg-card p-5 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.45)] sm:min-w-[320px] sm:p-6 md:min-w-[390px]"
                   >
                     <div className="relative h-52 overflow-hidden rounded-[24px]">
                       <Image src={module.imageSrc} alt={module.title} fill className="object-cover" />
-                      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,18,24,0.1),rgba(7,18,24,0.72))]" />
+                      <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--brand-card-image-overlay-from),var(--brand-card-image-overlay-to))]" />
                       <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-card/90 p-4 backdrop-blur-sm">
                         <span className="text-xs font-semibold tracking-[0.18em] text-muted-foreground">
                           {module.category}
@@ -396,9 +414,18 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="bg-[linear-gradient(180deg,#112833_0%,#0c1d26_100%)] px-4 py-16 text-sm text-white/60 md:px-6 md:py-18">
+      <footer className="bg-[linear-gradient(180deg,var(--brand-footer-from)_0%,var(--brand-footer-to)_100%)] px-4 py-16 text-sm text-white/60 md:px-6 md:py-18">
         <div className="container mx-auto flex flex-col gap-4 border-t border-white/10 pt-6 md:flex-row md:items-center md:justify-between">
-          <p>&copy; 2026 AquaSmart. Aquaculture operations and analytics platform.</p>
+          <div className="flex flex-col items-start gap-2">
+            <Image
+              src="/sustain-aquasmart-wordmark-white.png"
+              alt="SUSTAIN Aquasmart"
+              width={1200}
+              height={131}
+              className="h-7 w-auto opacity-90"
+            />
+            <p>&copy; 2026 SUSTAIN Aquasmart. Aquaculture operations and analytics platform.</p>
+          </div>
           <div className="flex flex-wrap gap-4 self-start md:self-auto">
             {navItems.map((item) => (
               <button

@@ -1,0 +1,324 @@
+import { createAccessTokenClient } from "@/lib/supabase/server"
+import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
+import type { GrowthTrendRow } from "@/features/shared/queries.server"
+import { listBatchOptionRows } from "@/features/shared/query-seed.server"
+import type { Database } from "@/lib/types/database"
+import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
+import { normalizeStageFilter } from "@/lib/stage-filter"
+import { parseCustomPeriodUrlValue, resolveTimePeriod, type TimeBounds } from "@/lib/time-period"
+import type { RecommendedActionRow } from "@/lib/types/insights"
+import type {
+  BatchStockingInfo,
+  BatchesPageFilters,
+  BatchesPageInitialData,
+  BatchesSummaryRow,
+  DashboardBatchRpcRow,
+} from "./types"
+
+type ServerClient = ReturnType<typeof createAccessTokenClient>
+
+function isSbStatementTimeout(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: unknown }).code === "57014",
+  )
+}
+
+async function withNetworkFallback<T>(
+  tag: string,
+  fallback: T,
+  loader: () => Promise<T>,
+  options?: { allowMissingObject?: boolean },
+): Promise<T> {
+  try {
+    return await loader()
+  } catch (error) {
+    if (options?.allowMissingObject && isMissingObjectError(error)) {
+      return fallback
+    }
+    if (!isSbNetworkError(error) && !isSbStatementTimeout(error)) throw error
+    logSbError(tag, error)
+    return fallback
+  }
+}
+
+/**
+ * The batch and stage filters are read from the same `batch` / `stage` params
+ * the rest of the app uses. The shared `date` time-period param is honoured
+ * too -- the lineage table and every chart/KPI here are scoped to the resolved
+ * window, so the header's time-period selector drives them. With no `date`
+ * param present we default to "all history" -- this page's original view.
+ */
+export function parseBatchesPageFilters(
+  searchParams?: Record<string, string | string[] | undefined>,
+): BatchesPageFilters {
+  const selectedStageRaw = searchParams?.stage
+  const selectedBatchRaw = searchParams?.batch
+  const timePeriodRaw = searchParams?.date
+
+  return {
+    selectedStage: normalizeStageFilter(selectedStageRaw),
+    selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",
+    timePeriod: resolveTimePeriod(timePeriodRaw, "all history"),
+    customTimeRange: parseCustomPeriodUrlValue(timePeriodRaw),
+  }
+}
+
+async function getTimeBounds(
+  accessToken: string,
+  farmId: string,
+  timePeriod: BatchesPageFilters["timePeriod"],
+  batchId?: number,
+  customTimeRange?: BatchesPageFilters["customTimeRange"],
+): Promise<TimeBounds> {
+  return withNetworkFallback(
+    "batches:getTimeBounds",
+    {
+      start: null,
+      end: null,
+      anchorScope: null,
+      latestAvailableDate: null,
+      availableFromDate: null,
+      requestedDays: 0,
+      availableDays: 0,
+      resolvedDays: 0,
+      isTruncated: false,
+      stalenessDays: null,
+    },
+    // Never scopes to a single system, but a selected batch narrows the window
+    // to that batch's own data so the header's resolved range matches the page.
+    () =>
+      resolveScopedTimeBounds(accessToken, {
+        farmId,
+        timePeriod,
+        scope: "dashboard",
+        batchId,
+        customRange: customTimeRange,
+      }),
+  )
+}
+
+async function getDashboardBatchRows(
+  supabase: ServerClient,
+  params: {
+    farmId: string
+    stage?: BatchesPageFilters["selectedStage"]
+    batchId?: number
+    dateFrom?: string
+    dateTo?: string
+  },
+): Promise<DashboardBatchRpcRow[]> {
+  const { data, error } = await supabase.rpc("api_dashboard_batches", {
+    p_farm_id: params.farmId,
+    p_batch_ids: params.batchId != null ? [params.batchId] : undefined,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+    p_start_date: params.dateFrom ?? undefined,
+    p_end_date: params.dateTo ?? undefined,
+  })
+  if (error) throw error
+  return (data ?? []) as DashboardBatchRpcRow[]
+}
+
+async function getAlertRows(supabase: ServerClient, farmId: string): Promise<RecommendedActionRow[]> {
+  const { data, error } = await supabase.rpc("api_recommended_actions", { p_farm_id: farmId })
+  if (error) return []
+  return (data ?? []) as RecommendedActionRow[]
+}
+
+/**
+ * Farm-wide KPI totals for the header cards. Every figure (stocked, live,
+ * biomass, weighted survival %, feed-weighted cumulative eFCR) is computed in
+ * SQL -- the page never sums rows itself. Not time-scoped: /batches shows the
+ * full picture for every ongoing batch.
+ */
+async function getBatchesSummary(
+  supabase: ServerClient,
+  params: { farmId: string; stage?: BatchesPageFilters["selectedStage"] },
+): Promise<BatchesSummaryRow | null> {
+  const { data, error } = await supabase.rpc("api_batches_summary", {
+    p_farm_id: params.farmId,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+  })
+  if (error) return null
+  return ((data ?? [])[0] as BatchesSummaryRow | undefined) ?? null
+}
+
+async function getStockingByBatchId(
+  supabase: ServerClient,
+  params: { farmId: string; batchIds: number[] },
+): Promise<Record<number, BatchStockingInfo>> {
+  if (params.batchIds.length === 0) return {}
+
+  const batchOptions = await withNetworkFallback(
+    "batches:listBatchOptionRows",
+    [],
+    () => listBatchOptionRows(supabase, { farmId: params.farmId, activeOnly: false }),
+    { allowMissingObject: true },
+  )
+  const bySelectedId = new Map(batchOptions.filter((row) => params.batchIds.includes(row.id)).map((row) => [row.id, row]))
+
+  const supplierIds = Array.from(
+    new Set(Array.from(bySelectedId.values()).map((row) => row.supplier_id).filter((id): id is number => id != null)),
+  )
+  const supplierNameById = new Map<number, string>()
+  if (supplierIds.length > 0) {
+    const { data, error } = await supabase.from("fingerling_supplier").select("id, company_name").in("id", supplierIds)
+    if (!error) {
+      for (const supplier of data ?? []) {
+        supplierNameById.set(supplier.id, supplier.company_name)
+      }
+    }
+  }
+
+  const result: Record<number, BatchStockingInfo> = {}
+  for (const batchId of params.batchIds) {
+    const option = bySelectedId.get(batchId)
+    result[batchId] = {
+      dateOfDelivery: option?.date_of_delivery ?? null,
+      numberOfFish: option?.number_of_fish ?? null,
+      abw: option?.abw ?? null,
+      supplierName: option?.supplier_id != null ? supplierNameById.get(option.supplier_id) ?? null : null,
+    }
+  }
+  return result
+}
+
+type BatchGrowthTrendRpcRow = Database["public"]["Functions"]["api_batch_growth_trend"]["Returns"][number]
+
+/**
+ * A batch's full-cycle ABW/eFCR series -- from stocking, through every cage its
+ * fish moved through. Selects by the batch's own production cycle (via
+ * api_batch_growth_trend), so a cage the batch has since left / a cage's earlier
+ * tenant never leaks in.
+ */
+async function listBatchGrowthTrend(
+  supabase: ServerClient,
+  params: { farmId: string; batchIds: number[]; dateFrom: string; dateTo: string },
+): Promise<GrowthTrendRow[]> {
+  if (params.batchIds.length === 0) return []
+  const { data, error } = await supabase.rpc("api_batch_growth_trend", {
+    p_farm_id: params.farmId,
+    p_batch_ids: params.batchIds,
+    p_start_date: params.dateFrom,
+    p_end_date: params.dateTo,
+  })
+  if (error) return []
+  return ((data ?? []) as BatchGrowthTrendRpcRow[]).map<GrowthTrendRow>((row) => ({
+    system_id: row.system_id ?? 0,
+    cycle_id: row.cycle_id ?? null,
+    sample_date: row.date,
+    activity: row.activity,
+    abw_g: row.average_body_weight,
+    fish_count: row.number_of_fish_inventory,
+    adg_g_day: row.agr,
+    sgr_pct_day: row.sgr,
+    efcr_period: row.efcr_period,
+    days_interval: row.days_in_period,
+    weight_gain_g: row.biomass_increase_period,
+    age_days: null,
+    expected_abw_g: row.target_weight_g,
+    growth_deviation_pct: null,
+  }))
+}
+
+async function getCycleIdToBatchId(
+  supabase: ServerClient,
+  batchIds: number[],
+): Promise<Record<number, number>> {
+  if (batchIds.length === 0) return {}
+  const { data, error } = await supabase
+    .from("production_cycle")
+    .select("cycle_id, batch_id")
+    .in("batch_id", batchIds)
+  if (error) return {}
+  const map: Record<number, number> = {}
+  for (const row of (data ?? []) as Array<{ cycle_id: number | null; batch_id: number | null }>) {
+    if (typeof row.cycle_id === "number" && typeof row.batch_id === "number") map[row.cycle_id] = row.batch_id
+  }
+  return map
+}
+
+function buildEmptyBatchesPageInitialData(): BatchesPageInitialData {
+  return {
+    bounds: { start: null, end: null },
+    batches: toQuerySuccess([]),
+    growthSeries: [],
+    alerts: [],
+    cycleIdToBatchId: {},
+    stockingByBatchId: {},
+    summary: null,
+  }
+}
+
+async function loadBatchesPageInitialData(
+  supabase: ServerClient,
+  params: { farmId: string | null; filters: BatchesPageFilters; accessToken: string },
+): Promise<BatchesPageInitialData> {
+  if (!params.farmId) return buildEmptyBatchesPageInitialData()
+  const farmId = params.farmId
+
+  const selectedBatchId =
+    params.filters.selectedBatch !== "all" && Number.isFinite(Number(params.filters.selectedBatch))
+      ? Number(params.filters.selectedBatch)
+      : undefined
+
+  const bounds = await getTimeBounds(
+    params.accessToken,
+    farmId,
+    params.filters.timePeriod,
+    selectedBatchId,
+    params.filters.customTimeRange,
+  )
+  if (!bounds.start || !bounds.end) {
+    return { ...buildEmptyBatchesPageInitialData(), bounds }
+  }
+  const dateFrom = bounds.start
+  const dateTo = bounds.end
+
+  const batchRows = await withNetworkFallback(
+    "batches:getDashboardBatchRows",
+    [] as DashboardBatchRpcRow[],
+    () =>
+      getDashboardBatchRows(supabase, {
+        farmId,
+        stage: params.filters.selectedStage,
+        batchId: selectedBatchId,
+        dateFrom,
+        dateTo,
+      }),
+    { allowMissingObject: true },
+  )
+
+  const batchIds = batchRows.map((row) => row.batch_id)
+
+  const [growthSeries, alerts, stockingByBatchId, cycleIdToBatchId, summary] = await Promise.all([
+    batchIds.length
+      ? listBatchGrowthTrend(supabase, { farmId, batchIds, dateFrom, dateTo })
+      : Promise.resolve([]),
+    getAlertRows(supabase, farmId),
+    getStockingByBatchId(supabase, { farmId, batchIds }),
+    getCycleIdToBatchId(supabase, batchIds),
+    getBatchesSummary(supabase, { farmId, stage: params.filters.selectedStage }),
+  ])
+
+  return {
+    bounds,
+    batches: toQuerySuccess(batchRows),
+    growthSeries,
+    alerts,
+    cycleIdToBatchId,
+    stockingByBatchId,
+    summary,
+  }
+}
+
+export async function getBatchesPageInitialData(params: {
+  farmId: string | null
+  filters: BatchesPageFilters
+  accessToken: string
+}): Promise<BatchesPageInitialData> {
+  return loadBatchesPageInitialData(createAccessTokenClient(params.accessToken), params)
+}

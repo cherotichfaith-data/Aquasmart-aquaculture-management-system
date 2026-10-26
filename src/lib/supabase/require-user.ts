@@ -1,67 +1,30 @@
+import type { User } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
+import { sanitizeNextPath } from "@/lib/app-entry"
+import { resolveServerUser } from "@/lib/server/auth"
 
-export async function requireUser() {
-  const supabase = await createClient()
-  let user = null
-  let error: unknown = null
-
-  try {
-    const result = await supabase.auth.getUser()
-    user = result.data.user
-    error = result.error
-  } catch (caught) {
-    error = caught
-  }
-
-  if (error || !user) {
-    if (error && !isSbNetworkError(error)) {
-      logSbError("requireUser", error)
-    }
-    redirect("/auth")
-  }
-
-  return user
+function redirectToAuth(nextPath?: string | null): never {
+  const safeNextPath = sanitizeNextPath(nextPath, "/dashboard")
+  redirect(`/auth?next=${encodeURIComponent(safeNextPath)}`)
 }
 
-export async function requireUserContext() {
-  const supabase = await createClient()
-  let user = null
-  let authError: unknown = null
+/**
+ * Server Components / pages: resolves the current user via
+ * resolveServerUser() (verified against Supabase's auth server) and redirects
+ * to /auth if there isn't one. See src/lib/server/auth.ts for why this no
+ * longer decodes the session cookie locally.
+ */
+export async function requireUserContext(nextPath?: string | null) {
+  const result = await resolveServerUser("page:requireUserContext")
 
-  try {
-    const result = await supabase.auth.getUser()
-    user = result.data.user
-    authError = result.error
-  } catch (caught) {
-    authError = caught
+  if (!result.ok) {
+    redirectToAuth(nextPath)
   }
 
-  if (authError || !user) {
-    if (authError && !isSbNetworkError(authError)) {
-      logSbError("requireUserContext:getUser", authError)
-    }
-    redirect("/auth")
-  }
+  return { user: result.user, accessToken: result.accessToken }
+}
 
-  let accessToken: string | null = null
-  let sessionError: unknown = null
-
-  try {
-    const result = await supabase.auth.getSession()
-    accessToken = result.data.session?.access_token ?? null
-    sessionError = result.error
-  } catch (caught) {
-    sessionError = caught
-  }
-
-  if (sessionError || !accessToken) {
-    if (sessionError && !isSbNetworkError(sessionError)) {
-      logSbError("requireUserContext:getSession", sessionError)
-    }
-    redirect("/auth")
-  }
-
-  return { user, accessToken }
+export async function requireUser(nextPath?: string | null): Promise<User> {
+  const { user } = await requireUserContext(nextPath)
+  return user
 }

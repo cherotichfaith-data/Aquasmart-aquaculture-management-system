@@ -1,22 +1,28 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { feedInventoryWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 
 const feedInventorySchema = z.object({
+  local_id: z.string().max(128).optional(),
   farm_id: z.string().uuid(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  snapshot_time: z.string().regex(/^\d{2}:\d{2}$/),
+  inventory_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  inventory_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
   feed_type_id: z.number().int().positive(),
-  bag_weight_kg: z.number().positive(),
-  number_of_bags: z.number().int().min(0),
-  open_bags_kg: z.number().min(0),
-  notes: z.string().max(500).nullable().optional(),
+  bag_weight: z.number().finite().positive(),
+  amount_of_bags: z.number().finite().min(0),
+  opened_bags: z.number().int().min(0).nullable().optional(),
+  comments: z.string().trim().max(500).nullable().optional(),
 })
 
+/**
+ * Feed inventory submits to the approval queue like every other record route
+ * (see src/lib/offline/sync.ts and src/lib/server/approvals.ts). It relies on RLS
+ * ("feed_inventory: insert write roles") for farm/role scoping, matching every
+ * other record route in this API.
+ */
 export async function POST(request: Request) {
   const supabase = await createClient()
   const auth = await requireRateLimitedRouteUser(supabase, request, "feed-inventory:record", apiRateLimits.mutation)
@@ -31,35 +37,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
-  const insertPayload = {
-    farm_id: payload.farm_id,
-    date: payload.date,
-    snapshot_time: payload.snapshot_time,
-    feed_type_id: payload.feed_type_id,
-    bag_weight_kg: payload.bag_weight_kg,
-    number_of_bags: payload.number_of_bags,
-    open_bags_kg: payload.open_bags_kg,
-    notes: payload.notes?.trim() ? payload.notes.trim() : null,
-  }
-
-  const { data, error } = await supabase.from("feed_inventory_snapshot").insert(insertPayload).select().single()
-
-  if (error || !data) {
-    logSbError("feed-inventory:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record feed inventory snapshot." }, { status })
-  }
-
-  revalidateWriteTags(feedInventoryWriteTags({ farmId: payload.farm_id }))
-
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: payload.farm_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "feed_inventory", payload.farm_id, payload)
 }

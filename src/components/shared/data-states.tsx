@@ -1,10 +1,9 @@
-﻿"use client"
+"use client"
 
 import type React from "react"
-import { AlertTriangle, Inbox, RefreshCw } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { formatDistanceToNow } from "date-fns"
+import { AlertTriangle, Inbox } from "lucide-react"
+import { Button } from "@/components/app-ui/button"
+import { cn } from "@/lib/utils"
 
 export function DataFetchingBadge({
   isFetching,
@@ -13,19 +12,11 @@ export function DataFetchingBadge({
   isFetching: boolean
   isLoading?: boolean
 }) {
-  if (!isFetching || isLoading) return null
-  return (
-    <Badge variant="secondary" className="gap-1 rounded-full bg-background/70 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] shadow-[0_12px_28px_-24px_rgba(15,23,32,0.3)] animate-pulse">
-      <RefreshCw className="h-3 w-3 animate-spin" />
-      Refreshing
-    </Badge>
-  )
+  return isFetching && !isLoading ? <span role="status" className="text-xs text-muted-foreground">Updating…</span> : null
 }
 
 export function DataUpdatedAt({ updatedAt }: { updatedAt?: number | null }) {
-  if (!updatedAt) return null
-  const label = formatDistanceToNow(updatedAt, { addSuffix: true })
-  return <span className="text-[11px] font-medium tracking-[0.02em] text-muted-foreground">Updated {label}</span>
+  return updatedAt ? <time suppressHydrationWarning dateTime={new Date(updatedAt).toISOString()} className="text-xs text-muted-foreground">Updated {new Date(updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time> : null
 }
 
 export function DataErrorState({
@@ -38,23 +29,20 @@ export function DataErrorState({
   onRetry?: () => void
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-destructive/40 bg-destructive/5 p-5 text-sm text-destructive shadow-sm">
-      <div className="flex items-center gap-2 font-semibold">
-        <AlertTriangle className="h-4 w-4" />
-        <span>{title}</span>
+    <div
+      role="alert"
+      className="flex items-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--color-destructive)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_6%,transparent)] px-3.5 py-3"
+    >
+      <AlertTriangle size={16} className="mt-0.5 shrink-0 text-destructive" />
+      <div className="w-full min-w-0">
+        <p className="text-sm font-bold text-foreground">{title}</p>
+        <p className="mt-0.75 text-xs text-[color-mix(in_srgb,var(--color-destructive)_70%,black)]">{description}</p>
+        {onRetry ? (
+          <Button type="button" variant="outline" size="sm" onClick={onRetry} className="mt-1.5 rounded-lg border-destructive/40 text-destructive-strong hover:bg-destructive/10">
+            Try Again
+          </Button>
+        ) : null}
       </div>
-      <p className="mt-2 text-xs text-destructive/90">{description}</p>
-      {onRetry ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onRetry}
-          className="mt-3 border-destructive/40 text-destructive hover:bg-destructive/10"
-        >
-          Try Again
-        </Button>
-      ) : null}
     </div>
   )
 }
@@ -64,19 +52,26 @@ export function EmptyState({
   description,
   icon: Icon = Inbox,
   action,
+  className,
 }: {
   title: string
   description?: string
   icon?: React.ComponentType<{ className?: string }>
   action?: React.ReactNode
+  className?: string
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-dashed border-border bg-muted/20 p-6 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+    <div
+      className={cn(
+        "rounded-xl border border-dashed border-border bg-[color-mix(in_srgb,var(--color-foreground)_3%,transparent)] p-6 text-center",
+        className,
+      )}
+    >
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
-      <h3 className="mt-3 text-sm font-semibold text-foreground">{title}</h3>
-      {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
+      <p className="mt-3 text-sm font-bold text-foreground">{title}</p>
+      {description ? <p className="mt-1 block text-xs text-muted-foreground">{description}</p> : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   )

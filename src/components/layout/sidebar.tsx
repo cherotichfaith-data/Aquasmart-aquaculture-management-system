@@ -1,300 +1,459 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
+import { useMemo, useState, useSyncExternalStore } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
+import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
+import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
+import { DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath, withCurrentSearchContext } from "@/lib/app-entry"
+import { Avatar } from "@/components/app-ui/avatar"
+import { Button } from "@/components/app-ui/button"
+import { Menu, MenuItem } from "@/components/app-ui/menu"
+import { Separator } from "@/components/app-ui/separator"
+import { Sheet } from "@/components/app-ui/sheet"
+import { Skeleton } from "@/components/app-ui/skeleton"
+import { Tooltip } from "@/components/app-ui/tooltip"
+import { cn } from "@/lib/utils"
 import {
-  Activity,
-  AlertTriangle,
   BarChart3,
-  Droplets,
   Fish,
   LayoutDashboard,
   LogOut,
-  Settings,
-  TestTube,
-  X,
+  Menu as MenuIcon,
   PlusCircle,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronDown,
+  Settings,
+  Rows3,
+  Users,
+  X,
 } from "lucide-react"
 
-const navigationSections = [
+export const DASHBOARD_SIDEBAR_WIDTH = 248
+export const DASHBOARD_SIDEBAR_COLLAPSED_WIDTH = 88
+
+const ALL_NAV_SECTIONS = [
   {
     title: "Operate",
     items: [
-      { name: "Dashboard", href: "/", icon: LayoutDashboard },
-      { name: "Feed", href: "/feed", icon: Fish },
-      { name: "Growth", href: "/sampling", icon: TestTube },
-      { name: "Mortality", href: "/mortality", icon: AlertTriangle },
-      { name: "Water Quality", href: "/water-quality", icon: Droplets },
+      { name: "Dashboard", href: toDashboardPath("/"), icon: LayoutDashboard },
+      { name: "Cages", href: toDashboardPath("/systems"), icon: Rows3 },
+      { name: "Batches", href: toDashboardPath("/batches"), icon: Fish },
     ],
   },
   {
     title: "Analyze",
     items: [
-      { name: "Production", href: "/production", icon: BarChart3 },
-      { name: "Reports", href: "/reports", icon: Activity },
+      { name: "Feed", href: toDashboardPath("/feed"), icon: Fish },
+      { name: "Production", href: toDashboardPath("/production"), icon: BarChart3 },
+      { name: "Analytics", href: toDashboardPath("/analytics"), icon: BarChart3 },
     ],
   },
   {
     title: "Capture",
-    items: [{ name: "Data Capture", href: "/data-entry", icon: PlusCircle }],
+    items: [{ name: "Data Entry", href: DATA_ENTRY_PATH, icon: PlusCircle }],
   },
   {
     title: "Configure",
-    items: [{ name: "Settings", href: "/settings", icon: Settings }],
+    items: [
+      { name: "Settings", href: toDashboardPath("/settings"), icon: Settings },
+      { name: "Users", href: "/users", icon: Users },
+    ],
   },
-]
+] as const
+
+const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
+  admin: new Set([
+    toDashboardPath("/"),
+    toDashboardPath("/systems"),
+    toDashboardPath("/batches"),
+    toDashboardPath("/feed"),
+    toDashboardPath("/production"),
+    toDashboardPath("/analytics"),
+    DATA_ENTRY_PATH,
+    toDashboardPath("/settings"),
+    "/users",
+  ]),
+  farm_manager: new Set([
+    toDashboardPath("/"),
+    toDashboardPath("/systems"),
+    toDashboardPath("/batches"),
+    toDashboardPath("/feed"),
+    toDashboardPath("/production"),
+    toDashboardPath("/analytics"),
+    DATA_ENTRY_PATH,
+    toDashboardPath("/settings"),
+  ]),
+  system_operator: new Set([
+    DATA_ENTRY_PATH,
+    toDashboardPath("/systems"),
+  ]),
+  data_analyst: new Set([
+    toDashboardPath("/"),
+    toDashboardPath("/systems"),
+    toDashboardPath("/batches"),
+    toDashboardPath("/feed"),
+    toDashboardPath("/production"),
+    toDashboardPath("/analytics"),
+  ]),
+  viewer: new Set([
+    toDashboardPath("/"),
+    toDashboardPath("/systems"),
+    toDashboardPath("/batches"),
+    toDashboardPath("/feed"),
+    toDashboardPath("/analytics"),
+  ]),
+}
+
+const ROLE_ITEM_LABELS: Record<string, Record<string, string>> = {
+  system_operator: { [DATA_ENTRY_PATH]: "Data Entry" },
+}
+
+const ROLE_ITEM_HREFS: Record<string, Record<string, string>> = {
+  system_operator: { [DATA_ENTRY_PATH]: `${DATA_ENTRY_PATH}?type=feeding` },
+}
+
+function getVisibleSections(role: string | null | undefined) {
+  const allowed = role ? (ROLE_ALLOWED_ROUTES[role] ?? null) : null
+  if (!allowed) return []
+  return ALL_NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => allowed.has(item.href)),
+  })).filter((section) => section.items.length > 0)
+}
+
+function resolveItemLabel(role: string | null | undefined, href: string, defaultName: string) {
+  if (!role) return defaultName
+  return ROLE_ITEM_LABELS[role]?.[href] ?? defaultName
+}
+
+function resolveItemHref(role: string | null | undefined, href: string) {
+  if (!role) return href
+  return ROLE_ITEM_HREFS[role]?.[href] ?? href
+}
+
+type SidebarContentProps = {
+  collapsed: boolean
+  onClose: () => void
+  onCollapseToggle: () => void
+  mobile: boolean
+  initialFarmId?: string | null
+  initialFarmName?: string | null
+  roleOverride?: string | null
+}
+
+function LogoBlock({
+  collapsed,
+  mobile,
+  onClose,
+  onCollapseToggle,
+}: {
+  collapsed: boolean
+  mobile: boolean
+  onClose: () => void
+  onCollapseToggle: () => void
+}) {
+  return (
+    <div className={cn("flex min-h-[72px] items-center justify-between py-3", collapsed && !mobile ? "px-3" : "px-5")}>
+      <div className="min-w-0 flex-1">
+        <Link
+          href={toDashboardPath("/")}
+          className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90"
+          onClick={mobile ? onClose : undefined}
+        >
+          {!collapsed || mobile ? (
+            <Image
+              src="/sustain-aquasmart-wordmark-white.png"
+              alt="SUSTAIN Aquasmart"
+              width={1200}
+              height={131}
+              className="h-auto w-auto max-h-6 max-w-[168px] object-contain object-left"
+              priority
+            />
+          ) : (
+            <Image src="/icon.png" alt="SUSTAIN Aquasmart logo" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg" priority />
+          )}
+        </Link>
+      </div>
+      {mobile ? (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close navigation"
+          className="inline-flex size-9 items-center justify-center rounded-full text-[color:var(--color-sidebar-foreground)] transition-colors hover:bg-white/10"
+        >
+          <X size={18} />
+        </button>
+      ) : (
+        <Tooltip content={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+          <button
+            type="button"
+            onClick={onCollapseToggle}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="inline-flex size-9 items-center justify-center rounded-full text-[color:var(--color-sidebar-foreground)] transition-colors hover:bg-white/10"
+          >
+            <MenuIcon size={18} />
+          </button>
+        </Tooltip>
+      )}
+    </div>
+  )
+}
+
+function SidebarContent({
+  collapsed,
+  onClose,
+  onCollapseToggle,
+  mobile,
+  initialFarmId,
+  initialFarmName,
+  roleOverride,
+}: SidebarContentProps) {
+  const pathname = usePathname()
+  const appPathname = stripDashboardPath(pathname)
+  const searchParams = useSearchParams()
+  const { signOut, user } = useAuth()
+  const { farm, farmId } = useActiveFarm({ initialFarmId, initialFarmName })
+  const farmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
+  const farmRole = roleOverride ?? farmRoleQuery.data ?? null
+  const isRoleLoading = roleOverride == null && farmRoleQuery.isLoading
+  const navigationSections = useMemo(() => getVisibleSections(farmRole), [farmRole])
+  const [signingOut, setSigningOut] = useState(false)
+  const [accountAnchor, setAccountAnchor] = useState<HTMLElement | null>(null)
+  // Auth resolves in the browser only; render the initial after mount so server and client HTML agree.
+  const hasMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
+  const displayName =
+    [user?.user_metadata?.full_name, user?.user_metadata?.name, user?.user_metadata?.first_name].find(
+      (value): value is string => typeof value === "string" && value.trim().length > 0,
+    ) ??
+    user?.email ??
+    null
+  const userInitial = hasMounted
+    ? ([user?.user_metadata?.first_name, user?.user_metadata?.full_name, user?.user_metadata?.name, user?.email]
+        .find((value): value is string => typeof value === "string" && value.trim().length > 0)
+        ?.trim()
+        .split(/[\s@._-]+/)
+        .find(Boolean)
+        ?.charAt(0)
+        .toUpperCase() ?? "")
+    : ""
+  const roleLabel = farmRole
+    ? farmRole
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    : ""
+  const canAccessSettings = farmRole === "admin" || farmRole === "farm_manager"
+
+  const farmName = farm?.name ?? initialFarmName ?? null
+  // Navigation should carry the user's working context between sections.
+  // Without this, opening Production from another section removes `system`
+  // and Production falls back to the lowest database ID (Cage 2B here).
+  const withCurrentContext = (href: string) => withCurrentSearchContext(href, searchParams)
+
+  const closeAfterNavigate = () => {
+    if (mobile) {
+      onClose()
+    }
+  }
+
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-y-auto overflow-x-hidden border-r [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{
+        borderColor: "var(--color-sidebar-border)",
+        backgroundColor: "var(--color-sidebar)",
+        color: "var(--color-sidebar-foreground)",
+      }}
+    >
+      <LogoBlock collapsed={collapsed} mobile={mobile} onClose={onClose} onCollapseToggle={onCollapseToggle} />
+      {farmId && farmName && (!collapsed || mobile) ? (
+        <div className="px-4 py-3">
+          <div
+            title={farmName}
+            className="flex items-center gap-2 rounded-xl border px-3 py-2.5"
+            style={{
+              borderColor: "var(--color-sidebar-border)",
+              backgroundColor: "color-mix(in srgb, var(--color-sidebar-accent) 82%, white 18%)",
+            }}
+          >
+            <span aria-hidden className="size-2 shrink-0 rounded-full bg-primary" />
+            <span className="text-sm font-semibold">Farm:</span>
+            <span className="min-w-0 truncate text-sm">{farmName}</span>
+          </div>
+        </div>
+      ) : null}
+      <div className="flex-1 px-2.5 py-3">
+        {isRoleLoading ? (
+          <div className="grid gap-1.5 px-1">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-11 rounded-2xl" />
+            ))}
+          </div>
+        ) : (
+          navigationSections.map((section) => (
+            <div key={section.title} className="mb-5">
+              {!collapsed || mobile ? (
+                <span className="block px-2.5 pb-1 font-mono text-tag uppercase tracking-[0.08em] opacity-80" style={{ color: "var(--color-sidebar-accent-foreground)" }}>
+                  {section.title}
+                </span>
+              ) : null}
+              <div className="grid gap-1">
+                {section.items.map((item) => {
+                  const resolvedHref = resolveItemHref(farmRole, item.href)
+                  const contextualHref = withCurrentContext(resolvedHref)
+                  const resolvedLabel = resolveItemLabel(farmRole, item.href, item.name)
+                  const itemBasePath = stripDashboardPath(item.href)
+                  const resolvedBasePath = stripDashboardPath(resolvedHref.split("?")[0] ?? resolvedHref)
+                  const isActive =
+                    appPathname === itemBasePath ||
+                    appPathname === resolvedBasePath ||
+                    (itemBasePath !== "/" && appPathname.startsWith(`${itemBasePath}/`))
+                  const Icon = item.icon
+
+                  const link = (
+                    <Link
+                      href={contextualHref}
+                      aria-label={resolvedLabel}
+                      aria-current={isActive ? "page" : undefined}
+                      onClick={closeAfterNavigate}
+                      className={cn(
+                        "flex min-h-12 items-center gap-3 rounded-2xl text-current no-underline transition-colors hover:bg-white/10",
+                        collapsed && !mobile ? "justify-center px-3" : "px-3.5",
+                        isActive && "bg-white/15",
+                      )}
+                    >
+                      <Icon size={18} />
+                      {!collapsed || mobile ? <span className="truncate text-sm font-semibold">{resolvedLabel}</span> : null}
+                    </Link>
+                  )
+
+                  return (
+                    <Tooltip
+                      key={item.href}
+                      content={collapsed && !mobile ? resolvedLabel : undefined}
+                      side="right"
+                      disabled={!collapsed || mobile}
+                      wrapperClassName="flex w-full [&>*]:w-full"
+                    >
+                      {link}
+                    </Tooltip>
+                  )
+                })}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="grid gap-1 p-3">
+        <button
+          type="button"
+          onClick={(event) => setAccountAnchor(event.currentTarget)}
+          aria-label="Account"
+          title={displayName ?? "Account"}
+          className={cn(
+            "inline-flex min-h-12 w-full items-center gap-3 rounded-2xl hover:bg-white/10",
+            collapsed && !mobile ? "justify-center px-3" : "justify-start px-3.5",
+          )}
+        >
+          <Avatar className="size-[30px] shrink-0">{userInitial}</Avatar>
+          {!collapsed || mobile ? <span className="min-w-0 truncate text-sm font-semibold">{displayName ?? "Account"}</span> : null}
+        </button>
+        <Button
+          variant="ghost"
+          disabled={signingOut}
+          onClick={async () => {
+            if (signingOut) return
+            setSigningOut(true)
+            try {
+              await signOut()
+            } finally {
+              setSigningOut(false)
+            }
+          }}
+          className={cn(
+            "min-h-12 gap-3 rounded-2xl text-current hover:bg-white/10",
+            collapsed && !mobile ? "w-full justify-center px-3" : "w-full justify-start px-3.5",
+          )}
+        >
+          {collapsed && !mobile ? <span className="sr-only">Log out</span> : null}<LogOut size={16} aria-hidden />
+          {!collapsed || mobile ? (signingOut ? "Logging out..." : "Log out") : null}
+        </Button>
+      </div>
+      <Menu anchorEl={accountAnchor} open={Boolean(accountAnchor)} onClose={() => setAccountAnchor(null)} side="top" align="start" className="mb-1 w-60">
+        <div className="px-4 py-3">
+          <p className="text-sm font-bold">{displayName}</p>
+          {user?.email && displayName !== user.email ? <p className="mt-1 block text-xs text-muted-foreground">{user.email}</p> : null}
+          {roleLabel ? <p className="mt-0.5 block text-xs text-muted-foreground">{roleLabel}</p> : null}
+        </div>
+        {canAccessSettings ? (
+          <>
+            <Separator />
+            <MenuItem href={toDashboardPath("/settings")} onClick={() => setAccountAnchor(null)}>
+              <Settings size={16} />
+              Settings
+            </MenuItem>
+          </>
+        ) : null}
+      </Menu>
+    </div>
+  )
+}
 
 export default function Sidebar({
+  initialFarmId,
+  initialFarmName,
+  roleOverride,
   open,
   collapsed,
   onToggle,
   onCollapseToggle,
 }: {
+  initialFarmId?: string | null
+  initialFarmName?: string | null
+  roleOverride?: string | null
   open: boolean
   collapsed: boolean
   onToggle: () => void
   onCollapseToggle: () => void
 }) {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const { signOut } = useAuth()
-  const [signingOut, setSigningOut] = useState(false)
-  const [waterQualityOpen, setWaterQualityOpen] = useState(pathname.startsWith("/water-quality"))
-
-  const waterQualityActive = pathname === "/water-quality"
-  const tabParam = searchParams.get("tab")
-  const overviewActive = waterQualityActive && (!tabParam || tabParam === "overview")
-  const parameterActive = waterQualityActive && tabParam === "parameter"
-  const alertsActive = waterQualityActive && tabParam === "alerts"
-  const sensorsActive = waterQualityActive && tabParam === "sensors"
-  const environmentActive = waterQualityActive && tabParam === "environment"
-  const depthProfileActive = waterQualityActive && tabParam === "depth"
-
-  useEffect(() => {
-    if (waterQualityActive) setWaterQualityOpen(true)
-  }, [waterQualityActive])
-
-  const handleMobileNavigate = () => {
-    if (typeof window !== "undefined" && window.innerWidth < 768 && open) {
-      onToggle()
-    }
-  }
-
   return (
     <>
-      {open && <div className="fixed inset-0 bg-black/50 md:hidden z-30" onClick={onToggle} />}
-
-      <aside
-        className={`fixed md:sticky top-0 left-0 h-screen bg-sidebar shadow-[0_26px_60px_-38px_rgba(15,23,32,0.6)] transform transition-[width,transform] duration-300 z-40 flex flex-col ${collapsed ? "md:w-24" : "md:w-72"} w-[min(88vw,20rem)] md:w-72 ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-          }`}
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg, rgba(255,255,255,0.02), transparent 18%), radial-gradient(circle at top right, rgba(94,234,212,0.12), transparent 28%)",
-        }}
+      <Sheet
+        open={open}
+        onClose={onToggle}
+        side="left"
+        containerClassName="md:hidden"
+        className="w-[min(248px,calc(100vw-48px))]"
       >
-        <div className="flex items-center justify-between px-4 py-4 md:hidden">
-          <div>
-            <h1 className="font-semibold text-lg text-sidebar-foreground">AQ</h1>
-            <p className="text-xs text-sidebar-foreground/65">Aquasmart navigation</p>
-          </div>
-          <button onClick={onToggle} className="rounded-xl p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="hidden px-4 py-5 md:flex md:flex-col md:items-stretch md:gap-4">
-          <div className="flex items-center">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary shadow-sm">
-            <span className="text-sidebar-primary-foreground font-semibold">AQ</span>
-            </div>
-            {!collapsed && (
-              <div className="ml-3">
-                <p className="font-semibold leading-none text-sidebar-foreground">Aquasmart</p>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={onCollapseToggle}
-              className="ml-auto rounded-xl p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
-        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 md:px-4 md:py-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          {navigationSections.map((section) => (
-            <div key={section.title} className="space-y-2">
-              {!collapsed ? (
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">
-                  {section.title}
-                </p>
-              ) : null}
-              <div className="space-y-2">
-                {section.items.map((item) => {
-            if (item.href === "/water-quality") {
-              const Icon = item.icon
-              if (collapsed) {
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={handleMobileNavigate}
-                    className={`flex items-center justify-center rounded-2xl px-3 py-3 transition-colors ${waterQualityActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      }`}
-                    title={item.name}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </Link>
-                )
-              }
-
-              return (
-                <div key={item.href}>
-                  <div
-                    className={`flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors ${waterQualityActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      }`}
-                  >
-                    <Link href={item.href} onClick={handleMobileNavigate} className="flex items-center gap-3 flex-1">
-                      <Icon className="h-4 w-4" />
-                      <span className="text-sm font-medium">{item.name}</span>
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        setWaterQualityOpen((prev) => !prev)
-                      }}
-                      className="rounded-xl p-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      aria-label={waterQualityOpen ? "Collapse water quality menu" : "Expand water quality menu"}
-                    >
-                      <ChevronDown className={`h-4 w-4 transition-transform ${waterQualityOpen ? "rotate-180" : ""}`} />
-                    </button>
-                  </div>
-                  {waterQualityOpen && (
-                    <div className="ml-7 mt-2 space-y-1">
-                      <Link
-                        href="/water-quality"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${overviewActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Overview
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=parameter"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${parameterActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Parameter Analysis
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=environment"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${environmentActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Environmental Indicators
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=depth"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${depthProfileActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Stratification Analysis
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=alerts"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${alertsActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Alerts
-                      </Link>
-                      <Link
-                        href="/water-quality?tab=sensors"
-                        onClick={handleMobileNavigate}
-                        className={`block rounded-xl px-3 py-2 text-xs font-medium transition-colors ${sensorsActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          }`}
-                      >
-                        Sensor Activity
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )
-            }
-
-            const isActive = pathname === item.href
-            const Icon = item.icon
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={handleMobileNavigate}
-                className={`flex items-center rounded-2xl px-3 py-3 transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                title={collapsed ? item.name : undefined}
-              >
-                <Icon className="h-4 w-4" />
-                {!collapsed && <span className="text-sm font-medium">{item.name}</span>}
-              </Link>
-            )
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
-
-        <div className="p-4">
-          <button
-            onClick={async () => {
-              if (signingOut) return
-              setSigningOut(true)
-              try {
-                await signOut()
-              } finally {
-                router.push("/auth")
-                setSigningOut(false)
-              }
-            }}
-            className={`flex w-full items-center rounded-2xl px-3 py-3 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-60 ${collapsed ? "justify-center" : "gap-3"}`}
-            disabled={signingOut}
-            title={collapsed ? "Log out" : undefined}
-          >
-            <LogOut className="h-4 w-4" />
-            {!collapsed && <span className="text-sm font-medium">{signingOut ? "Logging out..." : "Log out"}</span>}
-          </button>
-        </div>
-      </aside>
+        <SidebarContent
+          initialFarmId={initialFarmId}
+          initialFarmName={initialFarmName}
+          roleOverride={roleOverride}
+          collapsed={false}
+          onClose={onToggle}
+          onCollapseToggle={onCollapseToggle}
+          mobile
+        />
+      </Sheet>
+      <div
+        className="fixed left-0 top-0 z-40 hidden h-screen transition-[width] duration-300 md:block"
+        style={{ width: collapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH }}
+      >
+        <SidebarContent
+          initialFarmId={initialFarmId}
+          initialFarmName={initialFarmName}
+          roleOverride={roleOverride}
+          collapsed={collapsed}
+          onClose={onToggle}
+          onCollapseToggle={onCollapseToggle}
+          mobile={false}
+        />
+      </div>
     </>
   )
 }
