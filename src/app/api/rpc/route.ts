@@ -14,6 +14,7 @@ const ALLOWED_RPC_NAMES = new Set<RpcProxyName>([
   "api_dashboard_systems",
   "api_recent_activity_feed",
   "api_time_period_bounds_scoped",
+  "api_growth_standard_curve",
   "api_feed_dashboard",
   "api_production_summary",
   "api_recommended_actions",
