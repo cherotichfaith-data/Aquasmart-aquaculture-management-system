@@ -15,7 +15,6 @@ import {
   type GrowthScenario,
 } from "@/features/analytics/types"
 import { FilterPopover } from "@/components/shared/filter-popover"
-import TimePeriodSelector from "@/components/shared/time-period-selector"
 import BatchReportTable from "./batch-report-table"
 import StockProfileChart, { classLabel } from "./stock-profile-chart"
 import { AbwAgeChart, GrowthByBatchChart, SelectedBatchAbwChart } from "./growth-charts"
@@ -24,13 +23,6 @@ import "@/features/reports/monthly/monthly-reports.css"
 
 function dayLabel(date: string) {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
-}
-
-/** "September 2026" for a whole calendar month, otherwise "23 Aug 2026 to 23 Sep 2026". */
-function periodLabel(from: string, to: string) {
-  const lastDay = new Date(Date.UTC(Number(to.slice(0, 4)), Number(to.slice(5, 7)), 0)).getUTCDate()
-  const wholeMonth = from.slice(0, 7) === to.slice(0, 7) && from.endsWith("-01") && Number(to.slice(8, 10)) === lastDay
-  return wholeMonth ? monthLabel(from) : `${dayLabel(from)} to ${dayLabel(to)}`
 }
 
 function monthLabel(month: string) {
@@ -266,22 +258,13 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const report = parseReportKey(searchParams.get("report"))
-  const cycleToDate = searchParams.get("period") !== "custom"
+  const cycleToDate = data.periodMode === "cycle"
   const show = (key: ReportKey) => report === key
 
-  const onCustomRangeChange = (range: { start: string; end: string }) => {
+  const onPeriodChange = (mode: string) => {
     const params = new URLSearchParams(searchParams.toString())
-    params.delete("month")
-    params.set("period", "custom")
-    params.set("from", range.start)
-    params.set("to", range.end)
-    router.replace(`${pathname}?${params.toString()}`)
-  }
-
-  const onCycleToDate = () => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("period", "cycle")
-    params.delete("month")
+    params.set("period", mode === "cycle" ? "cycle" : "month")
+    params.set("month", data.month.slice(0, 7))
     params.delete("from")
     params.delete("to")
     router.replace(`${pathname}?${params.toString()}`)
@@ -308,7 +291,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
     [pathname, router, searchParams],
   )
 
-  const label = report === "harvests" ? monthLabel(data.month) : cycleToDate ? "Cycle to date" : periodLabel(data.periodStart, data.periodEnd)
+  const label = cycleToDate ? `Cycle to date — ${monthLabel(data.month)}` : monthLabel(data.month)
   // Oldest batch first, so legend colours stay stable as new batches are added.
   const growthBatchNames = Array.from(new Set(data.growthByBatch.map((b) => b.batch_name))).reverse()
   const forecastLabel = monthLabel(data.month)
@@ -329,35 +312,37 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
             />
           </div>
           <div className="w-full sm:w-[240px]">
-            {report === "harvests" ? (
+            <FilterPopover
+              value={cycleToDate ? "cycle" : "month"}
+              options={[{ value: "month", label: "Monthly" }, { value: "cycle", label: "Cycle to date" }]}
+              placeholder="Select date type"
+              onChange={onPeriodChange}
+              searchable={false}
+              className="w-full"
+            />
+          </div>
+          <div className="w-full sm:w-[200px]">
               <input
                 type="month"
-                aria-label="Harvest month"
+                aria-label="Reporting month"
                 value={data.month.slice(0, 7)}
                 onInput={(event) => {
                   const month = event.currentTarget.value
                   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return
                   const params = new URLSearchParams(searchParams.toString())
                   params.set("month", month)
-                  params.delete("period")
+                  params.set("period", cycleToDate ? "cycle" : "month")
                   params.delete("from")
                   params.delete("to")
                   router.replace(pathname + "?" + params.toString())
                 }}
                 className="h-10 w-full rounded-full border border-border bg-background px-4 text-sm"
               />
-            ) : <TimePeriodSelector
-              selectedPeriod="all history"
-              periods={["all history"]}
-              customLabels={{ "all history": "Cycle to date" }}
-              onPeriodChange={onCycleToDate}
-              customRange={cycleToDate ? null : { start: data.periodStart, end: data.periodEnd }}
-              onCustomRangeChange={onCustomRangeChange}
-              variant="compact"
-            />}
           </div>
         </div>
       </div>
+
+      <p className="rpt-small">{cycleToDate ? "Cycle to date" : "Monthly activity"}: {dayLabel(data.periodStart)} to {dayLabel(data.periodEnd)}. Stock and weight use the latest available records through this date.</p>
 
       {data.error ? <p className="rpt-note">{data.error}</p> : null}
 
