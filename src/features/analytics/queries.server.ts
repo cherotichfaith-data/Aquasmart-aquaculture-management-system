@@ -10,55 +10,8 @@ import {
 } from "./types"
 
 const DEFAULT_PLANNED_STOCKING = 125_000
-const MONTH_PARAM = /^(\d{4})-(0[1-9]|1[0-2])$/
-
-const DATE_PARAM = /^\d{4}-\d{2}-\d{2}$/
-
-function isRealDate(value: string) {
-  return DATE_PARAM.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
-}
-
-function lastDayOfMonth(year: number, month: number) {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate()
-}
-
-export type AnalyticsPeriod = { from: string; to: string; month: string; growthCustom?: boolean }
-
-/**
- * The reporting period. `?from=YYYY-MM-DD&to=YYYY-MM-DD` is used exactly; otherwise `?month=YYYY-MM`
- * (the whole month), defaulting to the current month. `month` is the first day of the month holding `to`.
- */
-export function parseAnalyticsPeriod(
-  searchParams: Record<string, string | string[] | undefined>,
-  today = new Date(),
-): AnalyticsPeriod {
-  if (searchParams.report === "harvests") {
-    const selected = typeof searchParams.month === "string" && MONTH_PARAM.test(searchParams.month) ? searchParams.month : null
-    const base = selected ?? today.toLocaleDateString("en-CA", { timeZone: "Africa/Nairobi", year: "numeric", month: "2-digit" })
-    const [year, month] = base.split("-").map(Number)
-    return { from: base + "-01", to: base + "-" + String(lastDayOfMonth(year, month)).padStart(2, "0"), month: base + "-01" }
-  }
-  const from = typeof searchParams.from === "string" ? searchParams.from : ""
-  const to = typeof searchParams.to === "string" ? searchParams.to : ""
-  if (searchParams.period !== "custom") {
-    // Default to the current cycle through today; only Custom uses URL dates.
-    const end = today.toISOString().slice(0, 10)
-    return { from: end, to: end, month: `${end.slice(0, 7)}-01` }
-  }
-  if (isRealDate(from) && isRealDate(to)) {
-    const [start, end] = from <= to ? [from, to] : [to, from]
-    return { from: start, to: end, month: `${end.slice(0, 7)}-01`, growthCustom: searchParams.period === "custom" }
-  }
-  const monthParam = typeof searchParams.month === "string" && MONTH_PARAM.test(searchParams.month) ? searchParams.month : null
-  const base = monthParam ?? `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`
-  const [y, m] = base.split("-").map(Number)
-  return {
-    from: `${base}-01`,
-    to: `${base}-${String(lastDayOfMonth(y, m)).padStart(2, "0")}`,
-    month: `${base}-01`,
-    growthCustom: searchParams.period === "custom",
-  }
-}
+import type { AnalyticsPeriod } from "./report-period"
+export { parseAnalyticsPeriod, type AnalyticsPeriod } from "./report-period"
 
 /** `?stocking=150000&stockingAbw=2`: the planned monthly juvenile stocking behind the forward plan. */
 export function parseForwardPlanInputs(searchParams: Record<string, string | string[] | undefined>): ForwardPlanInputs {
@@ -101,6 +54,7 @@ export async function getAnalyticsReportData(params: {
 }): Promise<AnalyticsReportData> {
   const empty: AnalyticsReportData = {
     month: params.period.month,
+    periodMode: params.period.mode,
     periodStart: params.period.from,
     periodEnd: params.period.to,
     batches: [],
@@ -120,7 +74,7 @@ export async function getAnalyticsReportData(params: {
 
   const supabase = createAccessTokenClient(params.accessToken)
   let period = params.period
-  if (params.view !== "harvests" && !period.growthCustom) {
+  if (period.mode === "cycle") {
     const cycles = await supabase
       .from("production_cycle")
       .select("cycle_start, fingerling_batch!inner(farm_id)")
@@ -155,7 +109,7 @@ export async function getAnalyticsReportData(params: {
     needs.performance.length > 0
       ? supabase.rpc("api_analytics_performance", {
           ...periodArgs,
-          p_sections: period.growthCustom ? [...needs.performance, "growth_custom"] : needs.performance,
+          p_sections: period.mode === "month" ? [...needs.performance, "growth_custom"] : needs.performance,
           p_scenario: params.forwardPlanInputs.scenario,
         })
       : Promise.resolve(null),
@@ -176,6 +130,7 @@ export async function getAnalyticsReportData(params: {
 
   return {
     month: period.month,
+    periodMode: period.mode,
     periodStart: period.from,
     periodEnd: period.to,
     batches: perf?.batches ?? [],

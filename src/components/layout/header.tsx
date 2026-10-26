@@ -194,6 +194,7 @@ export default function Header({
   initialFarmName,
   roleOverride,
   timeBoundsOverride,
+  timeWindowSummaryOverride,
   onMenuClick,
   showToolbar = true,
 }: {
@@ -201,6 +202,7 @@ export default function Header({
   initialFarmName?: string | null
   roleOverride?: string | null
   timeBoundsOverride?: TimeBounds
+  timeWindowSummaryOverride?: string
   onMenuClick: () => void
   showToolbar?: boolean
 }) {
@@ -335,10 +337,10 @@ export default function Header({
   const resolvedTimeBounds = timeBoundsOverride ?? timeWindowBoundsQuery.data
   const timeWindowSummary = useMemo(
     () =>
-      customTimeRange
+      timeWindowSummaryOverride ?? (customTimeRange
         ? `${formatCustomRangeLabel(customTimeRange)} (Custom)`
-        : formatResolvedTimeWindow(timePeriod, resolvedTimeBounds.start, resolvedTimeBounds.end),
-    [customTimeRange, resolvedTimeBounds.end, resolvedTimeBounds.start, timePeriod],
+        : formatResolvedTimeWindow(timePeriod, resolvedTimeBounds.start, resolvedTimeBounds.end)),
+    [timeWindowSummaryOverride, customTimeRange, resolvedTimeBounds.end, resolvedTimeBounds.start, timePeriod],
   )
 
   const selectedBatchAgeDays = useMemo(() => {
