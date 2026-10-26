@@ -258,7 +258,7 @@ export default function UsersPageClient({
         </div>
 
         {pageError ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-strong">
             {pageError}
           </div>
         ) : null}
@@ -269,7 +269,7 @@ export default function UsersPageClient({
           </div>
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
           <section className="rounded-3xl border border-border/70 bg-card p-6 shadow-sm">
             <div className="mb-5 flex items-start gap-3">
               <div className="rounded-2xl bg-primary/10 p-3 text-primary">
@@ -446,7 +446,7 @@ export default function UsersPageClient({
                             type="button"
                             onClick={() => void handleRemove(member)}
                             disabled={removingUserId === member.user_id}
-                            className="inline-flex items-center justify-center rounded-xl border border-destructive/30 px-4 py-2.5 text-sm font-medium text-destructive transition hover:bg-destructive/10 disabled:opacity-60"
+                            className="inline-flex items-center justify-center rounded-xl border border-destructive/30 px-4 py-2.5 text-sm font-medium text-destructive-strong transition hover:bg-destructive/10 disabled:opacity-60"
                           >
                             {removingUserId === member.user_id ? "Removing..." : "Remove"}
                           </button>

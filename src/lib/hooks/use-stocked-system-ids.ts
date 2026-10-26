@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/auth-provider"
 import { createClient } from "@/lib/supabase/client"
+import { selectOccupiedSystemIds } from "@/features/shared/occupied-systems"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 
 /**
@@ -23,36 +24,19 @@ export function useStockedSystemIds(farmId: string | null | undefined, options?:
     enabled,
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
-      let request = supabase
-        .from("system")
-        .select("id, cage_status")
-        .eq("farm_id", farmId!)
-        .eq("is_active", true)
-
-      if (signal) request = request.abortSignal(signal)
-
-      const { data, error } = await request
-
-      if (error) {
+      try {
+        const ids = await selectOccupiedSystemIds(supabase, farmId!, { signal })
+        return Array.from(ids)
+      } catch (error) {
         if (!signal?.aborted && !isSbPermissionDenied(error)) {
           logSbError("stockedSystems:list", error)
         }
-        return [] as Array<{ id: number | null; cage_status: string | null }>
+        return [] as number[]
       }
-
-      return (data ?? []) as Array<{ id: number | null; cage_status: string | null }>
     },
   })
 
-  const stockedIds = useMemo(() => {
-    const rows = query.data ?? []
-    return new Set(
-      rows
-        .filter((row) => row.cage_status === "occupied")
-        .map((row) => row.id)
-        .filter((id): id is number => typeof id === "number"),
-    )
-  }, [query.data])
+  const stockedIds = useMemo(() => new Set(query.data ?? []), [query.data])
 
   return { stockedIds, isLoading: query.isLoading, query }
 }

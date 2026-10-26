@@ -9,9 +9,8 @@ import { DataErrorState } from "@/components/shared/data-states"
 import type { BatchStockingInfo, DashboardBatchRpcRow } from "@/features/batches/types"
 import { formatDateOnly, formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatGrowthStage } from "@/lib/stage-filter"
-import { toTimePeriodUrlValue, type TimePeriod } from "@/lib/time-period"
 import { isFiniteNumber } from "@/features/dashboard/lib/table-cells"
-import { buildBatchLineageColumns } from "./batch-lineage-table-columns"
+import { buildBatchLineageColumns, shortSourceName } from "./batch-lineage-table-columns"
 
 interface BatchLineageTableProps {
   rows: DashboardBatchRpcRow[]
@@ -19,7 +18,6 @@ interface BatchLineageTableProps {
   isError?: boolean
   errorMessage?: string | null
   onRetry?: () => void
-  timePeriod?: TimePeriod
   showHeader?: boolean
 }
 
@@ -32,20 +30,13 @@ export default function BatchLineageTable({
   isError = false,
   errorMessage,
   onRetry,
-  timePeriod = "all history",
   showHeader = true,
 }: BatchLineageTableProps) {
   const router = useRouter()
-  const columns = useMemo(
-    () => buildBatchLineageColumns({ timePeriod, stockingByBatchId }),
-    [timePeriod, stockingByBatchId],
-  )
+  const columns = useMemo(() => buildBatchLineageColumns({ stockingByBatchId }), [stockingByBatchId])
 
   const openProductionPage = (batchId: number) => {
-    const params = new URLSearchParams()
-    params.set("batch", String(batchId))
-    if (timePeriod) params.set("date", toTimePeriodUrlValue(timePeriod))
-    router.push(`/production?${params.toString()}`)
+    router.push(`/production?batch=${batchId}`)
   }
 
   if (isError) {
@@ -73,9 +64,10 @@ export default function BatchLineageTable({
           onRowClick={(row) => openProductionPage(row.batch_id)}
           emptyMessage="No batches found."
           initialSorting={[{ id: "batch", desc: false }]}
-          shellClassName="production-records-table max-h-[560px]"
-          tableClassName="min-w-[1320px] table-fixed"
+          shellClassName="production-records-table"
+          tableClassName="w-full min-w-[820px] table-fixed"
           headerVariant="plain"
+          pagination={{ pageSize: 25 }}
           renderMobileCard={(row) => <BatchCardBody row={row} stockingByBatchId={stockingByBatchId} />}
         />
       </CardContent>
@@ -92,11 +84,6 @@ function BatchCardBody({
 }) {
   const title = row.batch_name?.trim() || `Batch #${row.batch_id}`
   const stocking = stockingByBatchId[row.batch_id]
-  const stockedCount = stocking?.numberOfFish
-  const survivalRate =
-    isFiniteNumber(stockedCount) && stockedCount > 0 && isFiniteNumber(row.fish_end)
-      ? (row.fish_end / stockedCount) * 100
-      : null
 
   return (
     <>
@@ -105,15 +92,16 @@ function BatchCardBody({
         <Badge variant="secondary">{formatGrowthStage(row.growth_stage)}</Badge>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        {stocking?.supplierName ?? "Unknown source"} · {formatDateOnly(stocking?.dateOfDelivery, "no stock date")}
+        {shortSourceName(stocking?.supplierName)} · {formatDateOnly(stocking?.dateOfDelivery, "no stock date")}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        <MobileMetric label="Qty Stocked" value={formatNumberValue(stocking?.numberOfFish)} />
+        <MobileMetric label="Qty Stocked" value={formatNumberValue(row.total_stocked)} />
         <MobileMetric label="Live Count" value={formatNumberValue(row.fish_end)} />
         <MobileMetric label="ABW at Stock" value={formatUnitValue(stocking?.abw ?? null, 2, "g")} />
         <MobileMetric label="Current ABW" value={formatUnitValue(row.abw, 1, "g")} />
         <MobileMetric label="eFCR" value={formatNumberValue(row.efcr, { decimals: 2 })} />
-        <MobileMetric label="Survival Rate" value={formatPercent(survivalRate, 1)} />
+        <MobileMetric label="Acc eFCR" value={formatNumberValue(row.efcr_acc, { decimals: 2 })} />
+        <MobileMetric label="Survival Rate" value={formatPercent(row.survival_pct, 1)} />
         <MobileMetric label="Mortality" value={formatPercent(row.mortality_rate)} />
       </div>
     </>

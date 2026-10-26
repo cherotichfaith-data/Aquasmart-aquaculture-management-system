@@ -3,18 +3,20 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useMemo, useState, useSyncExternalStore } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath, withCurrentSearchContext } from "@/lib/app-entry"
+import { Avatar } from "@/components/app-ui/avatar"
 import { Button } from "@/components/app-ui/button"
+import { Menu, MenuItem } from "@/components/app-ui/menu"
+import { Separator } from "@/components/app-ui/separator"
 import { Sheet } from "@/components/app-ui/sheet"
 import { Skeleton } from "@/components/app-ui/skeleton"
 import { Tooltip } from "@/components/app-ui/tooltip"
 import { cn } from "@/lib/utils"
 import {
-  Activity,
   BarChart3,
   Fish,
   LayoutDashboard,
@@ -44,7 +46,7 @@ const ALL_NAV_SECTIONS = [
     items: [
       { name: "Feed", href: toDashboardPath("/feed"), icon: Fish },
       { name: "Production", href: toDashboardPath("/production"), icon: BarChart3 },
-      { name: "Reports", href: toDashboardPath("/reports"), icon: Activity },
+      { name: "Analytics", href: toDashboardPath("/analytics"), icon: BarChart3 },
     ],
   },
   {
@@ -67,7 +69,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
-    toDashboardPath("/reports"),
+    toDashboardPath("/analytics"),
     DATA_ENTRY_PATH,
     toDashboardPath("/settings"),
     "/users",
@@ -78,7 +80,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
-    toDashboardPath("/reports"),
+    toDashboardPath("/analytics"),
     DATA_ENTRY_PATH,
     toDashboardPath("/settings"),
   ]),
@@ -92,14 +94,14 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
-    toDashboardPath("/reports"),
+    toDashboardPath("/analytics"),
   ]),
   viewer: new Set([
     toDashboardPath("/"),
     toDashboardPath("/systems"),
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
-    toDashboardPath("/reports"),
+    toDashboardPath("/analytics"),
   ]),
 }
 
@@ -159,10 +161,18 @@ function LogoBlock({
           className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90"
           onClick={mobile ? onClose : undefined}
         >
-          <Image src="/use this.png" alt="SUSTAIN Aquasmart logo" width={36} height={36} className="h-9 w-9 shrink-0" priority />
           {!collapsed || mobile ? (
-            <span className="text-lg font-bold text-[color:var(--color-sidebar-foreground)]">SUSTAIN Aquasmart</span>
-          ) : null}
+            <Image
+              src="/sustain-aquasmart-wordmark-white.png"
+              alt="SUSTAIN Aquasmart"
+              width={1200}
+              height={131}
+              className="h-auto w-auto max-h-6 max-w-[168px] object-contain object-left"
+              priority
+            />
+          ) : (
+            <Image src="/icon.png" alt="SUSTAIN Aquasmart logo" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg" priority />
+          )}
         </Link>
       </div>
       {mobile ? (
@@ -202,13 +212,42 @@ function SidebarContent({
   const pathname = usePathname()
   const appPathname = stripDashboardPath(pathname)
   const searchParams = useSearchParams()
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
   const { farm, farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const farmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
   const farmRole = roleOverride ?? farmRoleQuery.data ?? null
   const isRoleLoading = roleOverride == null && farmRoleQuery.isLoading
   const navigationSections = useMemo(() => getVisibleSections(farmRole), [farmRole])
   const [signingOut, setSigningOut] = useState(false)
+  const [accountAnchor, setAccountAnchor] = useState<HTMLElement | null>(null)
+  // Auth resolves in the browser only; render the initial after mount so server and client HTML agree.
+  const hasMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
+  const displayName =
+    [user?.user_metadata?.full_name, user?.user_metadata?.name, user?.user_metadata?.first_name].find(
+      (value): value is string => typeof value === "string" && value.trim().length > 0,
+    ) ??
+    user?.email ??
+    null
+  const userInitial = hasMounted
+    ? ([user?.user_metadata?.first_name, user?.user_metadata?.full_name, user?.user_metadata?.name, user?.email]
+        .find((value): value is string => typeof value === "string" && value.trim().length > 0)
+        ?.trim()
+        .split(/[\s@._-]+/)
+        .find(Boolean)
+        ?.charAt(0)
+        .toUpperCase() ?? "")
+    : ""
+  const roleLabel = farmRole
+    ? farmRole
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    : ""
+  const canAccessSettings = farmRole === "admin" || farmRole === "farm_manager"
 
   const farmName = farm?.name ?? initialFarmName ?? null
   // Navigation should carry the user's working context between sections.
@@ -279,6 +318,8 @@ function SidebarContent({
                   const link = (
                     <Link
                       href={contextualHref}
+                      aria-label={resolvedLabel}
+                      aria-current={isActive ? "page" : undefined}
                       onClick={closeAfterNavigate}
                       className={cn(
                         "flex min-h-12 items-center gap-3 rounded-2xl text-current no-underline transition-colors hover:bg-white/10",
@@ -308,7 +349,20 @@ function SidebarContent({
           ))
         )}
       </div>
-      <div className="p-3">
+      <div className="grid gap-1 p-3">
+        <button
+          type="button"
+          onClick={(event) => setAccountAnchor(event.currentTarget)}
+          aria-label="Account"
+          title={displayName ?? "Account"}
+          className={cn(
+            "inline-flex min-h-12 w-full items-center gap-3 rounded-2xl hover:bg-white/10",
+            collapsed && !mobile ? "justify-center px-3" : "justify-start px-3.5",
+          )}
+        >
+          <Avatar className="size-[30px] shrink-0">{userInitial}</Avatar>
+          {!collapsed || mobile ? <span className="min-w-0 truncate text-sm font-semibold">{displayName ?? "Account"}</span> : null}
+        </button>
         <Button
           variant="ghost"
           disabled={signingOut}
@@ -322,14 +376,30 @@ function SidebarContent({
             }
           }}
           className={cn(
-            "min-h-12 w-full gap-3 rounded-2xl text-current hover:bg-white/10",
-            collapsed && !mobile ? "justify-center px-3" : "justify-start px-3.5",
+            "min-h-12 gap-3 rounded-2xl text-current hover:bg-white/10",
+            collapsed && !mobile ? "w-full justify-center px-3" : "w-full justify-start px-3.5",
           )}
         >
-          <LogOut size={16} />
+          {collapsed && !mobile ? <span className="sr-only">Log out</span> : null}<LogOut size={16} aria-hidden />
           {!collapsed || mobile ? (signingOut ? "Logging out..." : "Log out") : null}
         </Button>
       </div>
+      <Menu anchorEl={accountAnchor} open={Boolean(accountAnchor)} onClose={() => setAccountAnchor(null)} side="top" align="start" className="mb-1 w-60">
+        <div className="px-4 py-3">
+          <p className="text-sm font-bold">{displayName}</p>
+          {user?.email && displayName !== user.email ? <p className="mt-1 block text-xs text-muted-foreground">{user.email}</p> : null}
+          {roleLabel ? <p className="mt-0.5 block text-xs text-muted-foreground">{roleLabel}</p> : null}
+        </div>
+        {canAccessSettings ? (
+          <>
+            <Separator />
+            <MenuItem href={toDashboardPath("/settings")} onClick={() => setAccountAnchor(null)}>
+              <Settings size={16} />
+              Settings
+            </MenuItem>
+          </>
+        ) : null}
+      </Menu>
     </div>
   )
 }

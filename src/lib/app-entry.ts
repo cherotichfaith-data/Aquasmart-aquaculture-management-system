@@ -31,9 +31,11 @@ export const ONBOARDING_CREATE_WORKSPACE_PATH = "/onboarding/create-workspace"
 export const WORKSPACE_SELECT_PATH = "/onboarding/select-workspace"
 
 const STANDALONE_FEATURE_PREFIXES = [
+  "/approvals",
   "/feed",
   "/production",
   "/reports",
+  "/analytics",
   "/settings",
   "/actions",
   "/users",
@@ -97,7 +99,7 @@ export function resolveAppEntryPath(role: AquasmartRole) {
   if (role === "admin" || role === "farm_manager") return DASHBOARD_ROOT
   if (role === "system_operator") return `${DATA_ENTRY_PATH}?type=feeding`
   if (role === "data_analyst") return toDashboardPath("/production")
-  if (role === "viewer") return toDashboardPath("/reports")
+  if (role === "viewer") return toDashboardPath("/analytics")
   return DASHBOARD_ROOT
 }
 
@@ -126,7 +128,8 @@ export function canAccessDataEntry(role: AquasmartRole) {
   )
 }
 
-const CONTEXT_CARRY_KEYS = ["farmId", "system", "cage", "date", "batch", "stage"] as const
+// farmId is deliberately not carried: the active farm lives in a cookie, so it never needs to show in the address bar.
+const CONTEXT_CARRY_KEYS = ["system", "cage", "date", "batch", "stage"] as const
 
 /**
  * Appends the current farm/system/cage/date/batch/stage query params (when

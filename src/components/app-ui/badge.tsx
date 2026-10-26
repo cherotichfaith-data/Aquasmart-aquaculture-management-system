@@ -21,9 +21,9 @@ const badgeVariants = ({
     // positive/neutral/negative read off the app's semantic tokens (same
     // colors as alerts and KPI status) instead of one-off Tailwind hues, so
     // a brand color change updates badges automatically.
-    variant === "positive" && "border-transparent bg-success/15 text-success",
+    variant === "positive" && "border-transparent bg-success/15 text-success-foreground",
     variant === "neutral" && "border-transparent bg-muted text-muted-foreground",
-    variant === "negative" && "border-transparent bg-destructive/12 text-destructive",
+    variant === "negative" && "border-transparent bg-destructive/12 text-destructive-strong",
     className,
   )
 

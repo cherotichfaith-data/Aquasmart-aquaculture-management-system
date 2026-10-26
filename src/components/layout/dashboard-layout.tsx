@@ -1,6 +1,8 @@
 "use client"
 
 import type React from "react"
+import { Menu } from "lucide-react"
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState, type SetStateAction } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/app-ui/button"
@@ -9,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { SyncStatusBar } from "@/components/offline/sync-status-bar"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
-import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
+import { canAccessDataEntry, WORKSPACE_SELECT_PATH, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
 import Header from "./header"
 import MobileQuickEntry from "./mobile-quick-entry"
 import Sidebar, { DASHBOARD_SIDEBAR_COLLAPSED_WIDTH, DASHBOARD_SIDEBAR_WIDTH } from "./sidebar"
@@ -17,6 +19,7 @@ import type { TimeBounds } from "@/lib/time-period"
 type HeaderDataOverrides = {
   role?: string | null
   timeBounds?: TimeBounds
+  timeWindowSummary?: string
 }
 
 export default function DashboardLayout({
@@ -77,14 +80,23 @@ export default function DashboardLayout({
   }, [routeToken])
   const commandOpen = commandDraft.sourceToken === routeToken ? commandDraft.value : false
   const mobileSidebarOpen = mobileSidebarDraft.sourceToken === routeToken ? mobileSidebarDraft.value : false
-  const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
+  const { farmId, farm } = useActiveFarm({ initialFarmId, initialFarmName })
   const farmRoleQuery = useActiveFarmRole(headerDataOverrides?.role ? null : farmId)
   const farmRole = (headerDataOverrides?.role ?? farmRoleQuery.data ?? null) as Parameters<typeof canAccessDataEntry>[0]
   const allowDataEntry = canAccessDataEntry(farmRole)
+  // The active farm is stored in a cookie, so a matching ?farmId=<uuid> is just noise in the address bar.
+  useEffect(() => {
+    if (!farmId || typeof window === "undefined") return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get("farmId") !== farmId) return
+    url.searchParams.delete("farmId")
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+  }, [farmId, searchParams])
   // Data Entry already opens straight into this exact picker -- a floating
   // trigger on top of it would just duplicate what's already on screen.
   const isDataEntryRoute = stripDashboardPath(pathname) === DATA_ENTRY_PATH
-  const showMobileQuickEntry = allowDataEntry && !isDataEntryRoute
+  const isReportsRoute = stripDashboardPath(pathname).startsWith("/reports")
+  const showMobileQuickEntry = allowDataEntry && !isDataEntryRoute && !isReportsRoute
 
   useEffect(() => {
     const applyResponsiveSidebarState = () => {
@@ -179,7 +191,14 @@ export default function DashboardLayout({
         style={{ "--dashboard-offset": `${desktopOffset}px` } as React.CSSProperties}
       >
         {hideHeader ? (
-          <SyncStatusBar />
+          <>
+            <header className="flex items-center gap-3 border-b bg-background px-3 py-2 md:hidden">
+              <Button variant="ghost" size="icon" aria-label="Open navigation" aria-expanded={mobileSidebarOpen} onClick={() => setMobileSidebarOpen((open) => !open)}><Menu className="size-5" /></Button>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{farm?.name ?? initialFarmName ?? "Farm workspace"}</span>
+              <Link className="text-sm underline" href={WORKSPACE_SELECT_PATH}>Switch farm</Link>
+            </header>
+            <SyncStatusBar />
+          </>
         ) : (
           <>
             <Header
@@ -187,6 +206,7 @@ export default function DashboardLayout({
               initialFarmName={initialFarmName}
               roleOverride={headerDataOverrides?.role ?? null}
               timeBoundsOverride={headerDataOverrides?.timeBounds}
+              timeWindowSummaryOverride={headerDataOverrides?.timeWindowSummary}
               onMenuClick={() => {
                 if (!isDesktop) {
                   setMobileSidebarOpen((prev) => !prev)

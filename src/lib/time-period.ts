@@ -275,11 +275,10 @@ export async function fetchTimePeriodBounds(
 
 /**
  * Client-side counterpart to fetchTimePeriodBounds(). Goes through the
- * authenticated /api/rpc proxy (src/lib/supabase/query-transport.ts) instead
- * of calling supabase.rpc(...) directly with a browser client -- this is the
- * one chosen client-read transport, so no feature (dashboard, production,
- * reports, feed, water-quality, or anything else that needs time bounds)
- * calls the RPC straight from the browser.
+ * authenticated /api/rpc proxy, which resolves bounds via the one shared
+ * server resolver (features/shared/time-bounds.server) -- cached, tagged, and
+ * the exact same code path every server prefetch uses. The proxy returns the
+ * already-mapped TimeBounds, so there is nothing to map here.
  */
 export async function fetchTimePeriodBoundsClient(params: {
   farmId: string
@@ -295,7 +294,7 @@ export async function fetchTimePeriodBoundsClient(params: {
     return customRangeToBounds(params.customRange)
   }
 
-  const result = await fetchRpc<TimePeriodBoundsRpcRow>(
+  const result = await fetchRpc<TimeBounds>(
     "fetchTimePeriodBoundsClient",
     "api_time_period_bounds_scoped",
     {
@@ -311,5 +310,5 @@ export async function fetchTimePeriodBoundsClient(params: {
 
   if (params.signal?.aborted || result.status === "error") return { start: null, end: null }
 
-  return mapTimeBoundsRow(result.data[0])
+  return result.data[0] ?? { start: null, end: null }
 }

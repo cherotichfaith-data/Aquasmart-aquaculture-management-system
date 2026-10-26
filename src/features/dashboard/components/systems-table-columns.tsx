@@ -12,8 +12,6 @@ import {
   SeverityValue,
   WaterQualityFlagsCell,
   formatLastDate,
-  formatSampleAgeText,
-  isEfcrOutlier,
   isFiniteNumber,
   isMortalityCritical,
 } from "@/features/dashboard/lib/table-cells"
@@ -21,10 +19,9 @@ import {
 const identityDotColor = (systemId: number) => `var(--chart-${(Math.abs(systemId) % 5) + 1})`
 
 export function buildDashboardSystemColumns(params: {
-  farmMedianEfcr: number | null
   timePeriod?: TimePeriod
 }): Array<ColumnDef<DashboardSystemRow, unknown>> {
-  const { farmMedianEfcr, timePeriod } = params
+  const { timePeriod } = params
 
   const productionHref = (systemId: number, filter?: ProductionMetric) => {
     const query = new URLSearchParams()
@@ -36,10 +33,9 @@ export function buildDashboardSystemColumns(params: {
 
   const waterQualityHref = (systemId: number) => {
     const query = new URLSearchParams()
-    query.set("tab", "water-quality")
     query.set("system", String(systemId))
     if (timePeriod) query.set("date", toTimePeriodUrlValue(timePeriod))
-    return `/reports?${query.toString()}`
+    return `/systems?${query.toString()}`
   }
 
   const metricValue = (value: number | null | undefined, decimals: number) =>
@@ -64,7 +60,7 @@ export function buildDashboardSystemColumns(params: {
               style={{ backgroundColor: identityDotColor(data.system_id) }}
             />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold leading-5 text-foreground">{title}</span>
+              <span title={title} className="block truncate text-sm font-semibold leading-5 text-foreground">{title}</span>
             </span>
           </span>
         )
@@ -76,7 +72,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.efcr ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "110px" },
+      meta: { width: "110px", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.efcr, 2)
@@ -84,10 +80,15 @@ export function buildDashboardSystemColumns(params: {
         return (
           <MetricCell
             href={productionHref(data.system_id, "efcr")}
-            value={<SeverityValue value={value} active={isEfcrOutlier(data, farmMedianEfcr)} />}
+            value={value}
             arrow={data.efcr_arrow}
             invertArrow
-            subtext={formatLastDate(data.efcr_latest_date)}
+            // eFCR is only as current as the biomass it's measured against, so
+            // its freshness tracks the last known ABW (latest sampling or
+            // stocking) -- the same date the ABW column shows -- not the daily
+            // production-summary date, which would look misleadingly fresh.
+            subtext={formatLastDate(data.abw_latest_date)}
+            align="right"
           />
         )
       },
@@ -98,7 +99,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.abw ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "120px", unit: "g" },
+      meta: { width: "120px", unit: "g", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.abw, 1)
@@ -108,7 +109,8 @@ export function buildDashboardSystemColumns(params: {
             href={productionHref(data.system_id, "abw")}
             value={value}
             arrow={data.abw_arrow}
-            subtext={formatSampleAgeText(data.sample_age_days)}
+            subtext={formatLastDate(data.abw_latest_date)}
+            align="right"
           />
         )
       },
@@ -119,7 +121,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.feeding_rate ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "120px", unit: "%" },
+      meta: { width: "120px", unit: "%", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.feeding_rate, 2)
@@ -130,6 +132,7 @@ export function buildDashboardSystemColumns(params: {
             value={value}
             arrow={data.feeding_rate_arrow}
             subtext={formatLastDate(data.feeding_rate_latest_date)}
+            align="right"
           />
         )
       },
@@ -140,7 +143,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.mortality_rate ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "140px", unit: "%" },
+      meta: { width: "140px", unit: "%", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.mortality_rate, 2)
@@ -152,6 +155,7 @@ export function buildDashboardSystemColumns(params: {
             arrow={data.mortality_rate_arrow}
             invertArrow
             subtext={formatLastDate(data.mortality_rate_latest_date)}
+            align="right"
           />
         )
       },
@@ -162,7 +166,7 @@ export function buildDashboardSystemColumns(params: {
       accessorFn: (row) => row.biomass_density ?? undefined,
       sortUndefined: "last",
       sortDescFirst: true,
-      meta: { width: "120px", unit: "kg/m3" },
+      meta: { width: "120px", unit: "kg/m3", align: "right" },
       cell: ({ row }) => {
         const data = row.original
         const value = metricValue(data.biomass_density, 1)
@@ -174,6 +178,7 @@ export function buildDashboardSystemColumns(params: {
             arrow={data.biomass_density_arrow}
             neutralArrow
             subtext={formatLastDate(data.biomass_density_latest_date)}
+            align="right"
           />
         )
       },
@@ -188,7 +193,7 @@ export function buildDashboardSystemColumns(params: {
       cell: ({ row }) => (
         <MetricCell
           href={waterQualityHref(row.original.system_id)}
-          value={<WaterQualityFlagsCell row={row.original} farmMedianEfcr={farmMedianEfcr} size="table" />}
+          value={<WaterQualityFlagsCell row={row.original} size="table" />}
         />
       ),
     },

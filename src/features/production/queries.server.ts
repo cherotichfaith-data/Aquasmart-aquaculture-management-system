@@ -4,9 +4,11 @@ import { requireUserContext } from "@/lib/supabase/require-user"
 import {
   getScopedBatchSystems,
   getScopedSystemOptions,
-  getScopedTimeBounds,
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
+import { selectSystemCohortStarts } from "@/features/shared/cohort"
+import { selectOccupiedSystemIds } from "@/features/shared/occupied-systems"
 import type { ProductionDailyTrendRow, ProductionSummaryRpcRow } from "@/features/production/types"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
@@ -222,19 +224,23 @@ export function parseProductionPageFilters(
   const selectedSystemRaw = searchParams?.cage ?? searchParams?.system
   const selectedStageRaw = searchParams?.stage
   const dateRaw = searchParams?.date
+  const hasScope =
+    (typeof selectedBatchRaw === "string" && selectedBatchRaw !== "all") ||
+    (typeof selectedSystemRaw === "string" && selectedSystemRaw !== "all")
 
   return {
     selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",
     selectedSystem: typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all",
     selectedStage: normalizeStageFilter(selectedStageRaw),
-    timePeriod: resolveTimePeriod(dateRaw, DEFAULT_TIME_PERIOD),
+    // A single batch or cage defaults to its whole cycle ("Cycle to date"); the farm-wide view stays on a month.
+    timePeriod: resolveTimePeriod(dateRaw, hasScope ? "all history" : DEFAULT_TIME_PERIOD),
     customTimeRange: parseCustomPeriodUrlValue(dateRaw),
   }
 }
 
 async function loadProductionPageInitialData(
   supabase: ReturnType<typeof createAccessTokenClient>,
-  params: { farmId: string | null; filters: ProductionPageFilters },
+  params: { farmId: string | null; filters: ProductionPageFilters; accessToken: string },
 ): Promise<ProductionPageInitialData> {
   const empty: ProductionPageInitialData = {
     bounds: { start: null, end: null },
@@ -286,15 +292,14 @@ async function loadProductionPageInitialData(
       : []
   const scopedCycleIds = batchId != null ? new Set(batchCycles.map((cycle) => cycle.cycle_id)) : null
   const systemId = resolvedSystemId ?? undefined
-  const bounds = await getScopedTimeBounds(
-    supabase,
-    params.farmId,
-    params.filters.timePeriod,
-    "production",
+  const bounds = await resolveScopedTimeBounds(params.accessToken, {
+    farmId: params.farmId,
+    timePeriod: params.filters.timePeriod,
+    scope: "production",
     systemId,
     batchId,
-    params.filters.customTimeRange,
-  )
+    customRange: params.filters.customTimeRange,
+  })
 
   if (!bounds.start || !bounds.end) {
     return {
@@ -318,6 +323,7 @@ async function loadProductionPageInitialData(
     dateFrom,
     dateTo,
     limit: 2500,
+    skipCohortClamp: batchId != null && resolvedSystemId == null,
   })).filter((row) => {
     if (scopedSystemIds.length === 0) return false
     if (row.system_id == null || !scopedSystemIds.includes(row.system_id)) return false
@@ -347,7 +353,9 @@ async function loadProductionPageInitialData(
           dateTo,
         }),
     resolvedSystemId == null
-      ? Promise.resolve<ProductionChartMarker[]>([])
+      ? batchId != null
+        ? listBatchChartMarkersServer(supabase, { batchId, dateFrom, dateTo })
+        : Promise.resolve<ProductionChartMarker[]>([])
       : listProductionChartMarkersServer(supabase, {
           farmId: params.farmId,
           systemId: resolvedSystemId,
@@ -455,6 +463,116 @@ async function listProductionChartMarkersServer(
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+/**
+ * Chart events for a whole batch: its stockings, transfers and harvests across every cage it has used.
+ * Read straight from the event tables by batch id, so (unlike the farm-wide activity feed used for a single
+ * cage) a long history is never cut off by a row limit.
+ */
+async function listBatchChartMarkersServer(
+  supabase: ReturnType<typeof createAccessTokenClient>,
+  params: { batchId: number; dateFrom: string; dateTo: string },
+): Promise<ProductionChartMarker[]> {
+  const range = <T extends { gte: (c: string, v: string) => T; lte: (c: string, v: string) => T }>(query: T) =>
+    query.gte("date", params.dateFrom).lte("date", params.dateTo)
+
+  const [stocking, transfers, harvests] = await Promise.all([
+    withTimeout(
+      (async () => {
+        const { data } = await range(
+          supabase.from("fish_stocking").select("date, notes, number_of_fish_stocking, system_id").eq("batch_id", params.batchId),
+        )
+        return data ?? []
+      })(),
+      4000,
+      [],
+    ),
+    withTimeout(
+      (async () => {
+        const { data } = await range(
+          supabase
+            .from("fish_transfer")
+            .select("date, notes, number_of_fish_transfer, transfer_type, origin_system_id, target_system_id")
+            .eq("batch_id", params.batchId),
+        )
+        return data ?? []
+      })(),
+      4000,
+      [],
+    ),
+    withTimeout(
+      (async () => {
+        const { data } = await range(
+          supabase.from("fish_harvest").select("date, number_of_fish_harvest, system_id").eq("batch_id", params.batchId),
+        )
+        return data ?? []
+      })(),
+      4000,
+      [],
+    ),
+  ])
+
+  const systemIds = Array.from(
+    new Set(
+      [
+        ...stocking.map((row) => row.system_id),
+        ...transfers.flatMap((row) => [row.origin_system_id, row.target_system_id]),
+        ...harvests.map((row) => row.system_id),
+      ].filter((id): id is number => typeof id === "number"),
+    ),
+  )
+  const nameById = new Map<number, string>()
+  if (systemIds.length > 0) {
+    const { data } = await supabase.from("system").select("id, name").in("id", systemIds)
+    for (const row of (data ?? []) as Array<{ id: number; name: string | null }>) nameById.set(row.id, row.name ?? `Cage ${row.id}`)
+  }
+  const cage = (id: number | null | undefined) => (id != null ? nameById.get(id) ?? `Cage ${id}` : "outside")
+  const fish = (value: number | null | undefined) => (typeof value === "number" ? ` ${value.toLocaleString("en-US")} fish` : "")
+
+  const markers: ProductionChartMarker[] = [
+    ...stocking.map((row) => ({
+      date: String(row.date).slice(0, 10),
+      type: "stocking" as const,
+      label: `Stocking in ${cage(row.system_id)}${fish(row.number_of_fish_stocking) ? ` -${fish(row.number_of_fish_stocking)}` : ""}`,
+      notes: row.notes ?? null,
+    })),
+    ...transfers.map((row) => ({
+      date: String(row.date).slice(0, 10),
+      type: "transfer" as const,
+      label: `${row.transfer_type === "grading" ? "Grading" : "Transfer"} ${cage(row.origin_system_id)} to ${cage(row.target_system_id)}${
+        fish(row.number_of_fish_transfer) ? ` -${fish(row.number_of_fish_transfer)}` : ""
+      }`,
+      notes: row.notes ?? null,
+    })),
+    ...harvests.map((row) => ({
+      date: String(row.date).slice(0, 10),
+      type: "harvest" as const,
+      label: `Harvest in ${cage(row.system_id)}${fish(row.number_of_fish_harvest) ? ` -${fish(row.number_of_fish_harvest)}` : ""}`,
+      notes: null,
+    })),
+  ]
+  return markers.sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/**
+ * Biomass gained in a period once fish moved in or out of the cage are accounted for.
+ *
+ * The summary's raw `biomass_increase_over_period` is just closing biomass minus opening biomass, so a
+ * period in which fish were harvested or transferred out reads as a loss (e.g. -178 kg on a day 206 kg was
+ * harvested). Its `efcr_period` is already computed against the movement-adjusted gain, so that gain is
+ * feed / eFCR whenever an eFCR exists. A cage's first boundary in a cycle (eFCR 0) has no prior period and
+ * contributes nothing. Any other row falls back to the raw figure.
+ */
+function movementAdjustedBiomassIncrease(row: {
+  biomass_increase_over_period: number | null
+  feed_over_period: number | null
+  efcr_period: number | null
+}) {
+  const { efcr_period: efcr, feed_over_period: feed, biomass_increase_over_period: raw } = row
+  if (efcr === 0) return 0
+  if (typeof efcr === "number" && efcr > 0 && typeof feed === "number" && feed > 0) return feed / efcr
+  return raw
+}
+
 async function listProductionSummaryRowsDirectServer(
   supabase: ReturnType<typeof createAccessTokenClient>,
   params: {
@@ -464,6 +582,12 @@ async function listProductionSummaryRowsDirectServer(
     dateFrom: string
     dateTo: string
     limit?: number
+    /**
+     * Batch views keep a batch's whole history, including cages it has since left (which now hold other
+     * batches). Their rows are kept or dropped by the batch's own cycle ids later, so the per-cage
+     * "current occupant" cutoff must not apply.
+     */
+    skipCohortClamp?: boolean
   },
 ): Promise<ProductionSummaryRpcRow[]> {
   if (params.systemIds.length === 0) return []
@@ -505,7 +629,7 @@ async function listProductionSummaryRowsDirectServer(
     .gte("date", params.dateFrom)
     .lte("date", params.dateTo)
 
-  const [summaryResult, dailyFactsResult, cycleResult, systemResult] = await Promise.all([
+  const [summaryResult, dailyFactsResult, cycleResult, systemResult, cohortStartBySystem] = await Promise.all([
     summaryQuery.order("date", { ascending: false }).order("system_id", { ascending: false }),
     analyticsClient
       .from("daily_system_facts")
@@ -522,6 +646,7 @@ async function listProductionSummaryRowsDirectServer(
       .select("id, name, growth_stage")
       .eq("farm_id", params.farmId)
       .in("id", params.systemIds),
+    selectSystemCohortStarts(supabase, params.farmId).catch(() => new Map<number, string>()),
   ])
 
   if (summaryResult.error || dailyFactsResult.error || cycleResult.error || systemResult.error) {
@@ -572,16 +697,23 @@ async function listProductionSummaryRowsDirectServer(
       if (typeof cycle.cycle_id === "number") cyclesById.set(cycle.cycle_id, cycle)
     }
   }
-  const batchIds = Array.from(
+  // Only currently-active batches -- those with an ongoing production cycle --
+  // get a name here. Closed historical batches resolve to no batch at all,
+  // matching the batch selector and every other surface.
+  const activeBatchIds = Array.from(
     new Set(
       Array.from(cyclesById.values())
+        .filter((cycle) => cycle.ongoing_cycle === true)
         .map((cycle) => cycle.batch_id)
         .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
     ),
   )
   const batchNameById = new Map<number, string>()
-  if (batchIds.length > 0) {
-    const { data: batchRows } = await supabase.from("fingerling_batch").select("id, name").in("id", batchIds)
+  if (activeBatchIds.length > 0) {
+    const { data: batchRows } = await supabase
+      .from("fingerling_batch")
+      .select("id, name")
+      .in("id", activeBatchIds)
     for (const batch of (batchRows ?? []) as Array<{ id: number; name: string | null }>) {
       if (typeof batch.id === "number") {
         batchNameById.set(batch.id, batch.name?.trim() || `Batch ${batch.id}`)
@@ -594,21 +726,34 @@ async function listProductionSummaryRowsDirectServer(
       .map((row) => [`${row.system_id}|${row.inventory_date}`, row]),
   )
 
+  // Rows dated before a cage's current cohort start belong to a previous
+  // occupant and are dropped so the page never shows a prior cycle's
+  // performance -- same cutoff api_production_summary applies, via the shared
+  // api_system_cohort_starts RPC (this path reads the MV directly).
   let rows: ProductionSummaryRpcRow[] = ((summaryResult.data ?? []) as unknown as AnalyticsProductionSummaryRow[])
-    .filter((row) => typeof row.system_id === "number" && allowedSystemIds.has(row.system_id))
+    .filter((row) => {
+      if (typeof row.system_id !== "number" || !allowedSystemIds.has(row.system_id)) return false
+      if (params.skipCohortClamp) return true
+      const cohortStart = cohortStartBySystem.get(row.system_id)
+      return !(cohortStart && typeof row.date === "string" && row.date < cohortStart)
+    })
     .map((row) => {
       const cycle = row.cycle_id != null ? cyclesById.get(row.cycle_id) : null
       const system = row.system_id != null ? systemsById.get(row.system_id) : null
       const dailyFact = row.system_id != null ? dailyFactsBySystemDate.get(`${row.system_id}|${row.date}`) : null
 
-      const batchId = cycle?.batch_id ?? null
+      // A closed batch never made it into batchNameById, so its cages
+      // resolve to no batch.
+      const resolvedBatchId = cycle?.batch_id ?? null
+      const batchName = resolvedBatchId != null ? batchNameById.get(resolvedBatchId) ?? null : null
+      const batchId = batchName != null ? resolvedBatchId : null
 
       return {
         cycle_id: row.cycle_id,
         system_id: row.system_id,
         system_name: system?.name ?? null,
         batch_id: batchId,
-        batch_name: batchId != null ? batchNameById.get(batchId) ?? null : null,
+        batch_name: batchName,
         growth_stage: system?.growth_stage ?? null,
         ongoing_cycle: cycle?.ongoing_cycle ?? null,
         cycle_start: cycle?.cycle_start ?? null,
@@ -628,7 +773,7 @@ async function listProductionSummaryRowsDirectServer(
         number_of_fish_transfer_out: row.transfers_out_over_period,
         number_of_fish_harvested: row.harvest_fish_over_period,
         total_weight_harvested: row.harvest_weight_kg_over_period,
-        biomass_increase_period: row.biomass_increase_over_period,
+        biomass_increase_period: movementAdjustedBiomassIncrease(row),
         feeding_rate_on_date: dailyFact?.feeding_rate ?? null,
         efcr_period: row.efcr_period,
         sgr: row.sgr,
@@ -711,19 +856,11 @@ async function listOccupiedSystemIdsServer(
   supabase: ReturnType<typeof createAccessTokenClient>,
   farmId: string,
 ): Promise<Set<number>> {
-  const { data, error } = await supabase
-    .from("system")
-    .select("id")
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
-    .eq("cage_status", "occupied")
-
-  if (error) return new Set()
-  return new Set(
-    ((data ?? []) as Array<{ id: number | null }>)
-      .map((row) => row.id)
-      .filter((id): id is number => typeof id === "number" && Number.isFinite(id)),
-  )
+  try {
+    return await selectOccupiedSystemIds(supabase, farmId)
+  } catch {
+    return new Set()
+  }
 }
 
 async function listProductionCyclesForBatchServer(
@@ -809,6 +946,6 @@ export async function getProductionPageInitialData(params: {
 }) {
   const { accessToken } = await requireUserContext()
 
-  return loadProductionPageInitialData(createAccessTokenClient(accessToken), params)
+  return loadProductionPageInitialData(createAccessTokenClient(accessToken), { ...params, accessToken })
 }
 // structure refactor: transport moved to lib/supabase/query-transport

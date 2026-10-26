@@ -1,21 +1,19 @@
 "use client"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent } from "react"
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import {
   Bell,
   Droplets,
   Fish,
   FlaskConical,
-  LogOut,
   Menu as MenuIcon,
+  PackageOpen,
   PlusCircle,
-  Settings,
   X,
 } from "lucide-react"
 import { useNotifications } from "@/components/notifications/notifications-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 import { getHeaderPageMeta, getHeaderPageTimeConfig } from "@/components/layout/header-config"
-import { Avatar } from "@/components/app-ui/avatar"
 import { Button } from "@/components/app-ui/button"
 import { Menu, MenuItem } from "@/components/app-ui/menu"
 import { Separator } from "@/components/app-ui/separator"
@@ -29,7 +27,7 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useSharedFilters } from "@/lib/hooks/app/use-shared-filters"
 import type { SharedFiltersState } from "@/lib/hooks/app/use-shared-filters"
 import { useTimePeriodBounds } from "@/lib/hooks/app/use-time-period-bounds"
-import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
+import { canAccessDataEntry, DATA_ENTRY_PATH, stripDashboardPath } from "@/lib/app-entry"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import { formatStableDateTime } from "@/lib/analytics-format"
@@ -45,6 +43,118 @@ import {
   type CustomTimeRange,
   type TimeBounds,
 } from "@/lib/time-period"
+
+// Leading icon per alert kind (water quality / mortality / empty cage), so the
+// notification list is scannable by type at a glance instead of reading titles.
+function notificationIcon(kind: string) {
+  if (kind === "water_quality") return Droplets
+  if (kind === "mortality") return Fish
+  if (kind === "cage_empty") return PackageOpen
+  return Bell
+}
+
+// Icon-circle tint by severity, using the accessible destructive/warning tokens.
+// A read history item drops to muted so unread entries stand out.
+function notificationTint(severity: string, read?: boolean) {
+  if (read) return "bg-muted text-muted-foreground"
+  if (severity === "critical") return "bg-destructive/10 text-destructive-strong"
+  return "bg-warning/15 text-warning-foreground"
+}
+
+// Relative time for recent alerts ("6 min ago"); falls back to the absolute
+// stamp once an item is more than a week old.
+function formatRelativeTime(iso: string) {
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return ""
+  const diffMs = Date.now() - then
+  if (diffMs < 60_000) return "just now"
+  const minutes = Math.floor(diffMs / 60_000)
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} d ago`
+  return formatStableDateTime(iso)
+}
+
+// Human category label for a notification kind, shown in each row's meta line.
+function notificationCategory(kind: string) {
+  if (kind === "water_quality") return "Water quality"
+  if (kind === "mortality") return "Mortality"
+  if (kind === "cage_empty") return "Empty cage"
+  return "Alert"
+}
+
+type NotifIcon = ReturnType<typeof notificationIcon>
+
+// One notification row: tinted icon box, title, description, a "time · category"
+// meta line, an optional dismiss (X) and an unread dot -- the PropXYZ layout.
+function NotificationRow({
+  Icon,
+  tint,
+  title,
+  description,
+  time,
+  category,
+  unread,
+  onClick,
+  onDismiss,
+}: {
+  Icon: NotifIcon
+  tint: string
+  title: string
+  description: string
+  time?: string
+  category: string
+  unread?: boolean
+  onClick?: () => void
+  onDismiss?: () => void
+}) {
+  return (
+    <div className="flex items-start gap-3 border-t border-border/60 px-4 py-3 first:border-t-0">
+      <span className={cn("mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg", tint)}>
+        <Icon size={17} aria-hidden />
+      </span>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!onClick}
+        className="min-w-0 flex-1 text-left disabled:cursor-default"
+      >
+        <span className="block text-sm font-semibold text-foreground">{title}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{description}</span>
+        <span className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          {time ? (
+            <>
+              <span>{time}</span>
+              <span aria-hidden className="inline-block size-1 rounded-full bg-current opacity-50" />
+            </>
+          ) : null}
+          <span>{category}</span>
+        </span>
+      </button>
+      <div className="flex shrink-0 flex-col items-center gap-2 pt-0.5">
+        {onDismiss ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss notification"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X size={15} />
+          </button>
+        ) : (
+          <span className="size-[15px]" aria-hidden />
+        )}
+        {unread ? <span aria-hidden className="size-2 rounded-full bg-primary" /> : null}
+      </div>
+    </div>
+  )
+}
+
+function NotificationEmpty({ text }: { text: string }) {
+  return <p className="px-4 py-10 text-center text-sm text-muted-foreground">{text}</p>
+}
 
 const normalizeBatchDisplayLabel = (label: string | null | undefined) => {
   const trimmed = label?.trim() ?? ""
@@ -84,6 +194,7 @@ export default function Header({
   initialFarmName,
   roleOverride,
   timeBoundsOverride,
+  timeWindowSummaryOverride,
   onMenuClick,
   showToolbar = true,
 }: {
@@ -91,39 +202,46 @@ export default function Header({
   initialFarmName?: string | null
   roleOverride?: string | null
   timeBoundsOverride?: TimeBounds
+  timeWindowSummaryOverride?: string
   onMenuClick: () => void
   showToolbar?: boolean
 }) {
-  const { user, role, signOut } = useAuth()
+  const { role } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const appPathname = stripDashboardPath(pathname)
+  const isReportsPage = appPathname.startsWith("/reports")
   const searchParams = useSearchParams()
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const activeFarmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
-  const { notifications, unreadCount, markAllRead, markRead, clearAll, activeAlerts } = useNotifications()
-  const [signingOut, setSigningOut] = useState(false)
+  const { notifications, markAllRead, markRead, dismiss, activeAlerts } = useNotifications()
   const [isCondensed, setIsCondensed] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null)
-  const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null)
   const [addDataAnchor, setAddDataAnchor] = useState<HTMLElement | null>(null)
+  const [notifTab, setNotifTab] = useState<"alerts" | "recent">("alerts")
 
   const pageMeta = getHeaderPageMeta(appPathname, searchParams.get("tab"))
   const pageTimeConfig = useMemo(() => getHeaderPageTimeConfig(appPathname), [appPathname])
   const resolvedRole = (roleOverride ?? activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
-  const resolvedUser = user ?? null
-  const resolvedUnreadCount = unreadCount ?? 0
-  // Active alerts are standing conditions (empty cage, mortality spiking) that
-  // stay until resolved, so they always count toward the bell badge.
-  const bellBadgeCount = resolvedUnreadCount + activeAlerts.length
   // The persistent "cage empty" condition is now owned by activeAlerts; drop it
   // from the point-in-time history list so it isn't shown twice.
   const historyNotifications = useMemo(
     () => notifications.filter((note) => note.kind !== "cage_empty"),
     [notifications],
   )
-  const canAccessSettings = resolvedRole === "admin" || resolvedRole === "farm_manager"
+  // Unread count for the discrete event log only. cage_empty rows are excluded
+  // because that condition is already surfaced by activeAlerts (and the
+  // always-on banner) -- counting the raw unreadCount double-counts it and,
+  // since cage_empty rows are hidden from the list below, leaves a phantom the
+  // user can never open to clear, so the badge looks permanently stuck.
+  const historyUnreadCount = useMemo(
+    () => historyNotifications.filter((note) => !note.read).length,
+    [historyNotifications],
+  )
+  // Active alerts are standing conditions (empty cage, mortality spiking) that
+  // stay until resolved, so they always count toward the bell badge.
+  const bellBadgeCount = historyUnreadCount + activeAlerts.length
   const allowDataEntry = canAccessDataEntry(resolvedRole)
   // Available from every page the shared header renders on, not just the
   // dashboard -- logging a reading shouldn't require navigating back first.
@@ -219,10 +337,10 @@ export default function Header({
   const resolvedTimeBounds = timeBoundsOverride ?? timeWindowBoundsQuery.data
   const timeWindowSummary = useMemo(
     () =>
-      customTimeRange
+      timeWindowSummaryOverride ?? (customTimeRange
         ? `${formatCustomRangeLabel(customTimeRange)} (Custom)`
-        : formatResolvedTimeWindow(timePeriod, resolvedTimeBounds.start, resolvedTimeBounds.end),
-    [customTimeRange, resolvedTimeBounds.end, resolvedTimeBounds.start, timePeriod],
+        : formatResolvedTimeWindow(timePeriod, resolvedTimeBounds.start, resolvedTimeBounds.end)),
+    [timeWindowSummaryOverride, customTimeRange, resolvedTimeBounds.end, resolvedTimeBounds.start, timePeriod],
   )
 
   const selectedBatchAgeDays = useMemo(() => {
@@ -366,75 +484,18 @@ export default function Header({
     handleStageChange("all")
   }, [handleStageChange, pageTimeConfig.showStageFilter, selectedStage])
 
-  const handleSignOut = async () => {
-    if (signingOut) return
-    setSigningOut(true)
-    try {
-      await signOut()
-    } finally {
-      setSigningOut(false)
-    }
-  }
-
-  const formatRole = (value: string | null) => {
-    if (!value) return ""
-    return value
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-  }
-
-  // Auth state resolves client-side only (see AuthProvider), so the very first
-  // client render can already have `user` populated while the server render
-  // never does. Gate the initial-dependent render behind a mounted flag so
-  // both the server HTML and the client's first hydration pass agree (both
-  // render nothing), avoiding a hydration mismatch on the avatar text node.
-  const hasMounted = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  )
-
-  const userInitial = useMemo(() => {
-    if (!hasMounted) return ""
-
-    const nameCandidate = [
-      resolvedUser?.user_metadata?.first_name,
-      resolvedUser?.user_metadata?.full_name,
-      resolvedUser?.user_metadata?.name,
-      resolvedUser?.email,
-    ].find((value): value is string => typeof value === "string" && value.trim().length > 0)
-
-    const firstToken = nameCandidate?.trim().split(/[\s@._-]+/).find(Boolean) ?? ""
-    return firstToken.charAt(0).toUpperCase() || ""
-  }, [hasMounted, resolvedUser?.email, resolvedUser?.user_metadata])
-
-  const displayName = useMemo(() => {
-    return (
-      [resolvedUser?.user_metadata?.full_name, resolvedUser?.user_metadata?.name, resolvedUser?.user_metadata?.first_name].find(
-        (value): value is string => typeof value === "string" && value.trim().length > 0,
-      ) ??
-      resolvedUser?.email ??
-      null
-    )
-  }, [resolvedUser?.email, resolvedUser?.user_metadata])
-
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const scrollRoot = document.getElementById("app-scroll-root")
+    // #app-scroll-root (dashboard-layout.tsx) is min-h-screen with no
+    // overflow-y of its own, so the page actually scrolls at the window
+    // level, not inside that div -- listen there directly instead of on an
+    // element that never emits a scroll event.
     const handleScroll = () => {
-      const scrollTop = scrollRoot instanceof HTMLElement ? scrollRoot.scrollTop : window.scrollY
-      setIsCondensed(scrollTop > 72)
+      setIsCondensed(window.scrollY > 72)
     }
 
     handleScroll()
-
-    if (scrollRoot instanceof HTMLElement) {
-      scrollRoot.addEventListener("scroll", handleScroll, { passive: true })
-      return () => scrollRoot.removeEventListener("scroll", handleScroll)
-    }
-
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
@@ -442,9 +503,14 @@ export default function Header({
   useEffect(() => {
     setMobileFiltersOpen(false)
     setNotificationsAnchor(null)
-    setUserMenuAnchor(null)
     setAddDataAnchor(null)
   }, [pathname, searchParams])
+
+  // When the bell panel opens, land on whichever tab actually has something.
+  useEffect(() => {
+    if (notificationsAnchor) setNotifTab(activeAlerts.length > 0 ? "alerts" : "recent")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationsAnchor])
 
   const openMenu = (setter: (element: HTMLElement | null) => void) => (event: MouseEvent<HTMLElement>) => {
     setter(event.currentTarget)
@@ -466,15 +532,20 @@ export default function Header({
   }
 
   return (
-    <header className="relative px-3 pt-1.5 sm:px-6 sm:pt-2 md:px-8 md:pt-3 lg:px-12">
+    <header
+      className={cn(
+        "sticky top-0 z-30 border-b bg-background px-3 pt-1.5 transition-colors duration-300 sm:px-6 sm:pt-2 md:px-8 md:pt-3 lg:px-12",
+        isCondensed ? "border-border" : "border-transparent",
+      )}
+    >
       <div
         className={cn(
-          "mx-auto max-w-[1640px] px-4 transition-[padding] duration-300 md:px-8",
+          "mx-auto max-w-[1640px] transition-[padding] duration-300",
           isCondensed ? "py-2" : "py-2.5",
         )}
       >
         <div className={cn("grid", showToolbar ? "gap-3" : "gap-0")}>
-          <div className="flex flex-nowrap items-center justify-between gap-2">
+          <div className={cn("flex flex-nowrap items-center justify-between gap-2", isReportsPage && "md:hidden")}>
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <button
                 type="button"
@@ -484,7 +555,7 @@ export default function Header({
               >
                 <MenuIcon size={20} />
               </button>
-              {pageMeta ? (
+              {pageMeta && !isReportsPage ? (
                 <div className="min-w-0">
                   <h1
                     className={cn(
@@ -494,18 +565,15 @@ export default function Header({
                   >
                     {pageMeta.title}
                   </h1>
-                  <p className="mt-1 block text-xs font-medium text-muted-foreground">{timeWindowSummary}</p>
+                  {isReportsPage ? null : <p className="mt-1 block text-xs font-medium text-muted-foreground">{appPathname.startsWith("/production") ? timeWindowSummary.replace("All History", "Cycle to date") : timeWindowSummary}</p>}
                 </div>
               ) : null}
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-1.5 rounded-full">
+            <div className={cn("flex flex-wrap items-center justify-end gap-1.5 rounded-full", isReportsPage && "hidden")}>
               <Tooltip content="Notifications">
                 <button
                   type="button"
-                  onClick={openMenu((value) => {
-                    if (value) markAllRead()
-                    setNotificationsAnchor(value)
-                  })}
+                  onClick={openMenu(setNotificationsAnchor)}
                   className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
                   <Bell size={18} />
@@ -516,23 +584,14 @@ export default function Header({
                   ) : null}
                 </button>
               </Tooltip>
-              <Tooltip content="Account">
-                <button
-                  type="button"
-                  onClick={openMenu(setUserMenuAnchor)}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-0.5 hover:bg-accent"
-                >
-                  <Avatar className="size-[34px]">{userInitial}</Avatar>
-                </button>
-              </Tooltip>
             </div>
           </div>
 
           {showToolbar ? (
             <div className="grid gap-2">
               <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-                  <div className="hidden min-w-0 flex-1 md:block">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <div className="hidden min-w-0 md:flex md:flex-wrap md:items-center md:gap-2">
                     <FarmSelector
                       initialFarmId={initialFarmId}
                       selectedBatch={selectedBatch}
@@ -564,19 +623,22 @@ export default function Header({
                     </Button>
                   </div>
                 </div>
-                <div className="flex w-full flex-col gap-2 md:ml-auto md:w-auto md:flex-row md:items-center md:justify-end">
-                  <div className="w-full shrink-0 md:w-[170px]">
-                    <TimePeriodSelector
-                      selectedPeriod={timePeriod}
-                      onPeriodChange={handleTimePeriodChange}
-                      label={undefined}
-                      customRange={customTimeRange}
-                      onCustomRangeChange={handleCustomRangeChange}
-                      variant="compact"
-                      periods={timePeriodOptions}
-                    />
-                  </div>
-                  {showAddData ? (
+                <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+                  {pageTimeConfig.showTimePeriod !== false ? (
+                    <div className="w-full shrink-0 md:w-[170px]">
+                      <TimePeriodSelector
+                        selectedPeriod={timePeriod}
+                        onPeriodChange={handleTimePeriodChange}
+                        label={undefined}
+                        customRange={customTimeRange}
+                        onCustomRangeChange={handleCustomRangeChange}
+                        variant="compact"
+                        periods={timePeriodOptions}
+                        customLabels={appPathname.startsWith("/production") ? { "all history": "Cycle to date" } : undefined}
+                      />
+                    </div>
+                  ) : null}
+                  {showAddData && !isReportsPage ? (
                     <Button
                       variant="default"
                       onClick={openMenu(setAddDataAnchor)}
@@ -604,101 +666,92 @@ export default function Header({
         </div>
       </div>
 
-      <Menu anchorEl={notificationsAnchor} open={Boolean(notificationsAnchor)} onClose={() => setNotificationsAnchor(null)} className="mt-1 w-[calc(100vw-24px)] sm:w-[340px]">
-        <div className="px-4 py-3">
-          <p className="text-sm font-bold">Notifications</p>
-        </div>
-        <Separator />
-        <div className="max-h-96 overflow-y-auto py-1">
-          {activeAlerts.length > 0 ? (
-            <>
-              <p className="px-4 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Needs attention · {activeAlerts.length}
-              </p>
-              {activeAlerts.map((alert) => (
-                <button
-                  key={alert.id}
-                  type="button"
-                  onClick={() => {
-                    if (alert.href) router.push(alert.href)
-                    setNotificationsAnchor(null)
-                  }}
-                  className={cn(
-                    "mx-1 my-0.5 block w-[calc(100%-0.5rem)] rounded-lg border px-3 py-2.5 text-left transition-colors",
-                    alert.severity === "critical"
-                      ? "border-destructive/40 bg-destructive/8"
-                      : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]",
-                  )}
-                >
-                  <p className="text-sm font-bold">{alert.title}</p>
-                  <p className="mt-1 block text-xs text-muted-foreground">{alert.description}</p>
-                </button>
-              ))}
-              {historyNotifications.length > 0 ? (
-                <p className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Recent</p>
-              ) : null}
-            </>
+      <Menu anchorEl={notificationsAnchor} open={Boolean(notificationsAnchor)} onClose={() => setNotificationsAnchor(null)} className="mt-1 w-[calc(100vw-24px)] p-0 sm:w-[400px]">
+        <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-3.5">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Notifications</p>
+            {bellBadgeCount > 0 ? (
+              <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-bold text-primary">{bellBadgeCount} New</span>
+            ) : null}
+          </div>
+          {historyUnreadCount > 0 ? (
+            <button type="button" onClick={markAllRead} className="text-xs font-semibold text-primary hover:underline">
+              Mark all read
+            </button>
           ) : null}
-          {activeAlerts.length === 0 && historyNotifications.length === 0 ? (
-            <div className="px-4 py-6">
-              <p className="text-center text-sm text-muted-foreground">No New Notifications</p>
-            </div>
+        </div>
+        <div role="tablist" aria-label="Notifications" className="flex items-center gap-5 border-b border-border px-4">
+          {(
+            [
+              ["alerts", "Alerts"],
+              ["recent", "Recent"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={notifTab === key}
+              onClick={() => setNotifTab(key)}
+              className={cn(
+                "-mb-px border-b-2 pb-2 pt-1 text-sm font-semibold transition-colors",
+                notifTab === key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="max-h-[26rem] overflow-y-auto">
+          {notifTab === "alerts" ? (
+            activeAlerts.length === 0 ? (
+              <NotificationEmpty text="No active alerts — everything is within range." />
+            ) : (
+              activeAlerts.map((alert) => (
+                <NotificationRow
+                  key={alert.id}
+                  Icon={notificationIcon(alert.kind)}
+                  tint={notificationTint(alert.severity)}
+                  title={alert.title}
+                  description={alert.description}
+                  category={notificationCategory(alert.kind)}
+                  unread
+                  onClick={
+                    alert.href
+                      ? () => {
+                          router.push(alert.href!)
+                          setNotificationsAnchor(null)
+                        }
+                      : undefined
+                  }
+                />
+              ))
+            )
+          ) : historyNotifications.length === 0 ? (
+            <NotificationEmpty text="No recent notifications." />
           ) : (
             historyNotifications.map((note) => (
-              <button
+              <NotificationRow
                 key={note.id}
-                type="button"
-                onClick={() => markRead(note.id)}
-                className={cn(
-                  "mx-1 my-0.5 block w-[calc(100%-0.5rem)] rounded-lg border px-3 py-2.5 text-left transition-colors",
-                  note.read
-                    ? "border-[color-mix(in_srgb,var(--color-border)_50%,transparent)]"
-                    : "border-[color-mix(in_srgb,var(--color-primary)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_5%,transparent)]",
-                )}
-              >
-                <p className="text-sm font-bold">{note.title}</p>
-                <p className="mt-1 block text-xs text-muted-foreground">{note.description}</p>
-                <p className="mt-2 block text-xs text-muted-foreground">{formatStableDateTime(note.createdAt)}</p>
-              </button>
+                Icon={notificationIcon(note.kind)}
+                tint={notificationTint(note.severity, note.read)}
+                title={note.title}
+                description={note.description}
+                time={formatRelativeTime(note.createdAt)}
+                category={notificationCategory(note.kind)}
+                unread={!note.read}
+                onClick={() => {
+                  markRead(note.id)
+                  if (note.href) {
+                    router.push(note.href)
+                    setNotificationsAnchor(null)
+                  }
+                }}
+                onDismiss={() => dismiss(note.id)}
+              />
             ))
           )}
         </div>
-        {historyNotifications.length > 0 ? (
-          <>
-            <Separator />
-            <MenuItem onClick={clearAll} className="mx-1 justify-center font-bold">
-              Clear recent
-            </MenuItem>
-          </>
-        ) : null}
-      </Menu>
-
-      <Menu anchorEl={userMenuAnchor} open={Boolean(userMenuAnchor)} onClose={() => setUserMenuAnchor(null)} className="mt-1 w-60">
-        <div className="px-4 py-3">
-          <p className="text-sm font-bold">{displayName}</p>
-          {resolvedUser?.email && displayName !== resolvedUser.email ? (
-            <p className="mt-1 block text-xs text-muted-foreground">{resolvedUser.email}</p>
-          ) : null}
-          {resolvedRole ? <p className="mt-0.5 block text-xs text-muted-foreground">{formatRole(resolvedRole)}</p> : null}
-        </div>
-        <Separator />
-        {canAccessSettings ? (
-          <MenuItem href={toDashboardPath("/settings")} onClick={() => setUserMenuAnchor(null)}>
-            <Settings size={16} />
-            Settings
-          </MenuItem>
-        ) : null}
-        <MenuItem
-          onClick={async () => {
-            setUserMenuAnchor(null)
-            await handleSignOut()
-          }}
-          disabled={signingOut}
-          destructive
-        >
-          <LogOut size={16} />
-          {signingOut ? "Logging out..." : "Log out"}
-        </MenuItem>
       </Menu>
 
       <Menu anchorEl={addDataAnchor} open={Boolean(addDataAnchor)} onClose={() => setAddDataAnchor(null)} className="mt-1 w-60">

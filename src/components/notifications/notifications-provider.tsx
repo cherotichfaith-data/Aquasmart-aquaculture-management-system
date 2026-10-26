@@ -7,10 +7,11 @@ import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useStockedSystemIds } from "@/lib/hooks/use-stocked-system-ids"
+import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/lib/hooks/app/use-toast"
-import { useRouter } from "next/navigation"
-import { DATA_ENTRY_PATH, toDashboardPath } from "@/lib/app-entry"
+import { usePathname, useRouter } from "next/navigation"
+import { DATA_ENTRY_PATH, isOnboardingRoute, isPublicRoute, toDashboardPath } from "@/lib/app-entry"
 import { formatNumberValue } from "@/lib/analytics-format"
 import type { Tables } from "@/lib/types/database"
 import type { RecommendedActionRow } from "@/lib/types/insights"
@@ -19,7 +20,6 @@ import { formatCageLabel } from "@/lib/system-options"
 type AlertThresholdRow = Tables<"alert_threshold">
 type WaterQualityRow = Tables<"water_quality_measurement">
 type MortalityRow = Tables<"fish_mortality">
-type SystemRow = Tables<"system">
 type HarvestRow = Tables<"fish_harvest">
 type TransferRow = Tables<"fish_transfer">
 type StockingRow = Tables<"fish_stocking">
@@ -63,6 +63,7 @@ type NotificationsContextValue = {
   unreadCount: number
   markAllRead: () => void
   markRead: (id: string) => void
+  dismiss: (id: string) => void
   clearAll: () => void
   activeAlerts: ActiveAlert[]
   activeAlertsLoading: boolean
@@ -159,6 +160,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const supabase = useMemo(() => createClient(), [])
   const queryClient = useQueryClient()
   const router = useRouter()
+  const pathname = usePathname()
+  // A farm is only "entered" once the user is on an in-farm screen. On the
+  // login/landing and onboarding routes (including the workspace selector)
+  // `useActiveFarm` still resolves a default farm, but the user hasn't picked
+  // one yet -- so farm-scoped pop notifications (e.g. "cage empty") must not
+  // fire there. They fire once the user is actually inside a farm's dashboard.
+  const inFarmWorkspace = Boolean(pathname) && !isPublicRoute(pathname) && !isOnboardingRoute(pathname)
   const { farmId: liveFarmId } = useActiveFarm()
   const { profile, session, user } = useAuth()
   const { toast } = useToast()
@@ -209,36 +217,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [currentStorageToken, readStoredNotifications])
 
   const notificationsEnabled = profile?.notifications_enabled ?? true
-  const systemsQuery = useQuery({
-    queryKey: ["notifications", "systems", farmId ?? "none"],
-    enabled: Boolean(session) && Boolean(farmId),
-    staleTime: 60_000,
-    queryFn: async ({ signal }) => {
-      let query = supabase
-        .from("system")
-        .select("id, name")
-        .eq("farm_id", farmId!)
-        .eq("is_active", true)
-        .order("name", { ascending: true })
-      if (signal) query = query.abortSignal(signal)
-      const { data, error } = await query
-
-      if (error) {
-        if (!signal?.aborted && !isAbortLikeError(error) && !isSbPermissionDenied(error)) {
-          logSbError("notifications:systems", error)
-        }
-        return [] as Array<{ id: number; label: string | null }>
-      }
-
-      const mapped = ((data ?? []) as Pick<SystemRow, "id" | "name">[])
-        .filter((row) => typeof row.id === "number")
-        .map((row) => ({
-          id: row.id,
-          label: row.name,
-        }))
-      return mapped
-    },
-  })
+  // Same cage list the shared header filter uses -- react-query dedupes the
+  // fetch instead of this provider running its own `select id, name`.
+  const systemsQuery = useSystemOptions(farmId ? { farmId, activeOnly: true } : undefined)
+  const systemRows = useMemo(
+    () => (systemsQuery.data?.status === "success" ? systemsQuery.data.data : []),
+    [systemsQuery.data],
+  )
   const thresholdsQuery = useQuery({
     queryKey: ["notifications", "thresholds", farmId ?? "none"],
     enabled: Boolean(session) && Boolean(farmId),
@@ -298,11 +283,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const thresholds = useMemo(() => thresholdsQuery.data ?? [], [thresholdsQuery.data])
   const systemMap = useMemo(() => {
     const map: Record<number, string> = {}
-    ;(systemsQuery.data ?? []).forEach((row) => {
-      map[row.id] = formatCageLabel({ id: row.id, label: row.label, unit: null })
+    systemRows.forEach((row) => {
+      map[row.id] = formatCageLabel(row)
     })
     return map
-  }, [systemsQuery.data])
+  }, [systemRows])
 
   const addNotification = useCallback(
     (notification: AlertNotification) => {
@@ -340,6 +325,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     )
   }, [setNotifications])
 
+  const dismiss = useCallback((id: string) => {
+    // Drop a single history entry. Its id stays in seenIds so the same
+    // point-in-time event doesn't immediately re-add itself this session.
+    setNotifications((prev) => prev.filter((item) => item.id !== id))
+  }, [setNotifications])
+
   const clearAll = useCallback(() => {
     setNotifications([])
     seenIds.current.clear()
@@ -347,14 +338,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications])
 
-  const systemsLoaded = systemsQuery.isSuccess
+  const systemsLoaded = systemsQuery.data?.status === "success"
   const thresholdsLoaded = thresholdsQuery.isSuccess
 
   useEffect(() => {
-    if (!session || !farmId || !systemsLoaded) return
+    if (!session || !farmId || !systemsLoaded || !inFarmWorkspace) return
 
-    ;(systemsQuery.data ?? []).forEach((system) => {
-      if (!hasMissingSystemName({ name: system.label })) return
+    systemRows.forEach((system) => {
+      if (!hasMissingSystemName({ name: system.name })) return
 
       addNotification({
         id: `system-missing-name-${system.id}`,
@@ -369,7 +360,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         actionLabel: "Update",
       })
     })
-  }, [addNotification, farmId, session, systemsLoaded, systemsQuery.data])
+  }, [addNotification, farmId, inFarmWorkspace, session, systemsLoaded, systemRows])
 
   // The harvest/transfer realtime listener below only catches a cage going
   // empty *after* this page is open and subscribed -- it can't see a cage
@@ -382,9 +373,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     enabled: Boolean(session) && Boolean(farmId),
   })
   useEffect(() => {
-    if (!session || !farmId || !systemsLoaded || !stockedSystemsQuery.isSuccess) return
+    if (!session || !farmId || !systemsLoaded || !stockedSystemsQuery.isSuccess || !inFarmWorkspace) return
 
-    ;(systemsQuery.data ?? []).forEach((system) => {
+    systemRows.forEach((system) => {
       if (currentlyStockedIds.has(system.id)) return
 
       addNotification({
@@ -400,7 +391,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         actionLabel: "Restock cage",
       })
     })
-  }, [addNotification, currentlyStockedIds, farmId, session, stockedSystemsQuery.isSuccess, systemMap, systemsLoaded, systemsQuery.data])
+  }, [addNotification, currentlyStockedIds, farmId, inFarmWorkspace, session, stockedSystemsQuery.isSuccess, systemMap, systemsLoaded, systemRows])
 
   useEffect(() => {
     setNotifications((prev) =>
@@ -457,7 +448,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     // Only subscribe to system_ids that belong to this farm.
     // water_quality_measurement has no direct farm_id column, so we filter by
     // the known set of system IDs instead.
-    const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
+    const farmSystemIds = systemRows.map((s) => s.id)
     if (!farmSystemIds.length) return
 
     const qualityChannel = supabase
@@ -527,12 +518,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(qualityChannel)
     }
-  }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
+  }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemRows, thresholdsLoaded, thresholds])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded || !thresholdsLoaded || !thresholds.length) return
 
-    const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
+    const farmSystemIds = systemRows.map((s) => s.id)
     if (!farmSystemIds.length) return
 
     const mortalityChannel = supabase
@@ -581,7 +572,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(mortalityChannel)
     }
-  }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemsQuery.data, thresholdsLoaded, thresholds])
+  }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemRows, thresholdsLoaded, thresholds])
 
   // Fires a "cage now empty" pop notification the moment a harvest or transfer
   // brings a cage's live fish count to zero, and refreshes the cached
@@ -590,7 +581,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded) return
 
-    const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
+    const farmSystemIds = systemRows.map((s) => s.id)
     if (!farmSystemIds.length) return
 
     const notifyIfEmptied = async (systemId: number, sourceId: string) => {
@@ -664,12 +655,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       supabase.removeChannel(harvestChannel)
       supabase.removeChannel(transferChannel)
     }
-  }, [addNotification, farmId, invalidateActiveAlerts, queryClient, session, supabase, systemMap, systemsLoaded, systemsQuery.data])
+  }, [addNotification, farmId, invalidateActiveAlerts, queryClient, session, supabase, systemMap, systemsLoaded, systemRows])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded) return
 
-    const farmSystemIds = (systemsQuery.data ?? []).map((s) => s.id)
+    const farmSystemIds = systemRows.map((s) => s.id)
     if (!farmSystemIds.length) return
 
     const stockingChannel = supabase
@@ -703,7 +694,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(stockingChannel)
     }
-  }, [farmId, invalidateActiveAlerts, queryClient, session, setNotifications, supabase, systemsLoaded, systemsQuery.data])
+  }, [farmId, invalidateActiveAlerts, queryClient, session, setNotifications, supabase, systemsLoaded, systemRows])
 
   const value = useMemo(
     () => ({
@@ -711,11 +702,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       unreadCount,
       markAllRead,
       markRead,
+      dismiss,
       clearAll,
       activeAlerts,
       activeAlertsLoading: activeAlertsQuery.isLoading,
     }),
-    [activeAlerts, activeAlertsQuery.isLoading, clearAll, markAllRead, markRead, notifications, unreadCount],
+    [activeAlerts, activeAlertsQuery.isLoading, clearAll, dismiss, markAllRead, markRead, notifications, unreadCount],
   )
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>

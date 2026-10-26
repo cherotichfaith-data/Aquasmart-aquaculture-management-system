@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -37,13 +38,14 @@ import {
   toIsoDate,
 } from "./form-utils"
 import {
-  LatestEntryGuard,
-  pickLatestEntryByRecordDate,
-  pickSameDayEntry,
+  pickSameDayEntryByMetadata,
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
-import { SelectedBatchSupplierInfo, SelectedSystemInfo } from "./selection-info"
+import { SelectionChips } from "./selection-info"
+import { useEntrySequence } from "./entry-sequence"
+import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 type FeedingInsertOverride = Database["public"]["Tables"]["feeding_record"]["Insert"] & {
   farm_id?: string | null
@@ -59,7 +61,7 @@ const formSchema = z
     unit: z.string().min(1, "Cage unit is required"),
     system_id: z.string().min(1, "Cage number is required"),
     feed_id: z.string().optional(),
-    amount_kg: z.coerce.number().min(0, "Amount cannot be negative"),
+    amount_kg: z.preprocess((value) => value === "" ? undefined : value, z.coerce.number({ invalid_type_error: "Enter the feed amount, including 0 when no feed was given" }).min(0, "Amount cannot be negative")),
     feeding_response: z.string().optional(),
     notes: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
   })
@@ -110,10 +112,12 @@ function toFeedingEntrySummary(row: {
   date?: string | null
   feeding_amount?: number | null
   feeding_response?: number | null
+  feed_type_id?: number | null
   notes?: string | null
   feed_type?: { feed_line?: string | null } | null
 }, keyPrefix: string): LatestEntrySummary {
   const amount = row.feeding_amount ?? 0
+  const feedLabel = row.feed_type?.feed_line || "Not recorded"
   return {
     key: `${keyPrefix}-${row.id ?? row.created_at ?? row.date ?? "entry"}`,
     date: row.date ?? "",
@@ -123,9 +127,16 @@ function toFeedingEntrySummary(row: {
       amount === 0
         ? [{ label: "Reason", value: row.notes?.trim() || "No reason recorded" }]
         : [
-            { label: "Feed Type", value: row.feed_type?.feed_line || "Not recorded" },
+            { label: "Feed Type", value: feedLabel },
             { label: "Response", value: row.feeding_response != null ? `Level ${row.feeding_response}` : "Not recorded" },
           ],
+    metadata: {
+      feedTypeId: row.feed_type_id ?? 0,
+    },
+    duplicateMessage:
+      row.feed_type_id != null
+        ? `A feeding entry already exists for this cage on ${row.date ?? ""} with ${feedLabel}.`
+        : `A feeding entry already exists for this cage on ${row.date ?? ""}.`,
   }
 }
 
@@ -149,19 +160,25 @@ export function FeedingForm({
     defaultValues: {
       date: toIsoDate(new Date()),
       unit: defaultUnit,
-      amount_kg: 0,
+      amount_kg: undefined,
       system_id: defaultSystemId ? String(defaultSystemId) : "",
       feed_id: OPTIONAL_SELECT_VALUE,
       feeding_response: OPTIONAL_SELECT_VALUE,
       notes: "",
     },
   })
+  const sequence = useEntrySequence(form, systems)
   const defaultSystemValue = defaultSystemId ? String(defaultSystemId) : ""
 
   const selectedUnit = useWatch({ control: form.control, name: "unit" })
   const selectedSystemValue = useWatch({ control: form.control, name: "system_id" })
   const selectedSystemId = Number(selectedSystemValue)
+  const selectedAmount = useWatch({ control: form.control, name: "amount_kg" })
   const selectedDate = useWatch({ control: form.control, name: "date" })
+  const selectedFeedValue = useWatch({ control: form.control, name: "feed_id" })
+  const selectedFeedTypeId = parseOptionalNumericId(selectedFeedValue) ?? 0
+  const selectedFeedLabel =
+    feeds.find((feed) => String(feed.id) === selectedFeedValue)?.label ?? null
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
   const feedOptions = feeds
@@ -187,7 +204,7 @@ export function FeedingForm({
   }, [defaultSystemId, defaultSystemValue, form, systems])
 
   useEffect(() => {
-    if (!selectedUnit) return
+    if (!selectedUnit || form.getValues("unit") !== selectedUnit) return
     const currentValue = form.getValues("system_id")
     if (!currentValue) return
     const existsInUnit = systemsForUnit.some((system) => String(system.id) === currentValue)
@@ -219,26 +236,26 @@ export function FeedingForm({
     limit: 20,
     enabled: Boolean(selectedDate) && hasValidSystemId,
   })
-  const latestEntryQuery = useFeedingRecords({
-    farmId,
-    systemId: hasValidSystemId ? selectedSystemId : undefined,
-    limit: 1,
-    enabled: hasValidSystemId,
-  })
   const pendingEntries = usePendingLatestEntries("feeding", hasValidSystemId ? selectedSystemId : null, feeds)
 
   const existingDailyRecords = duplicateQuery.data?.status === "success" ? duplicateQuery.data.data : []
-  const latestServerRecords = latestEntryQuery.data?.status === "success" ? latestEntryQuery.data.data : []
 
-  const latestServerEntries = latestServerRecords.map((row) => toFeedingEntrySummary(row, "feeding"))
   const duplicateServerEntries = existingDailyRecords.map((row) => toFeedingEntrySummary(row, "feeding-duplicate"))
-  const latestEntry = pickLatestEntryByRecordDate([...latestServerEntries, ...pendingEntries])
-  const duplicateEntry = pickSameDayEntry([...duplicateServerEntries, ...pendingEntries], selectedDate)
+  const duplicateEntry = pickSameDayEntryByMetadata([...duplicateServerEntries, ...pendingEntries], {
+    date: selectedDate,
+    metadataKey: "feedTypeId",
+    metadataValue: selectedFeedTypeId,
+  })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       if (duplicateEntry) {
-        form.setError("date", { message: `A feeding entry already exists for ${values.date}.` })
+        const feedLabel = selectedFeedLabel ?? (selectedFeedTypeId ? "this feed type" : null)
+        form.setError("feed_id", {
+          message: feedLabel
+            ? `A feeding entry with ${feedLabel} already exists for ${values.date}. Pick a different feed type to add a supplemental entry.`
+            : `A feeding entry already exists for ${values.date}.`,
+        })
         return
       }
 
@@ -247,8 +264,6 @@ export function FeedingForm({
       const feedTypeId = parseOptionalNumericId(values.feed_id)
       const feedingResponse = parseOptionalNumericId(values.feeding_response) as FeedingResponseLevel | undefined
       const batchId = resolvedBatchId
-      const existingTotal = existingDailyRecords.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
-      const dailyTotal = existingTotal + values.amount_kg
       const payload = {
         farm_id: resolvedFarmId,
         system_id: systemId,
@@ -260,14 +275,14 @@ export function FeedingForm({
         notes: values.notes?.trim() ? values.notes.trim() : null,
       } as FeedingInsertOverride
 
-      await mutation.mutateAsync(payload)
+      const result = await mutation.mutateAsync(payload)
       setSubmissionSummary(
-        `Saved for ${formatCageLabel(selectedSystem)}. Daily total: ${dailyTotal.toFixed(2)} kg.`,
+        `Submission saved for ${formatCageLabel(selectedSystem)}: ${values.amount_kg.toFixed(2)} kg.${"pendingApproval" in result.meta && result.meta.pendingApproval ? " Official totals update after manager approval." : ""}`,
       )
-      form.reset({
-        date: toIsoDate(new Date()),
+      sequence.reset({
+        date: values.date,
         unit: values.unit,
-        amount_kg: 0,
+        amount_kg: undefined,
         system_id: values.system_id,
         feed_id: values.feed_id,
         feeding_response: values.feeding_response,
@@ -280,44 +295,43 @@ export function FeedingForm({
   }
 
   return (
-    <div>
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Record Feeding</h2>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <div className="space-y-6">
-        <LatestEntryGuard
-          latestEntry={latestEntry}
-          duplicateEntry={duplicateEntry}
-          itemLabel="feeding"
-          isLoading={latestEntryQuery.isLoading}
-        />
-        {submissionSummary ? (
-          <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success">
-            {submissionSummary}
-          </div>
-        ) : null}
-        {feedOptions.length === 0 ? (
-          <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning">
-            No feed types are available for this farm yet.
-          </div>
-        ) : null}
+      {submissionSummary ? (
+        <div className="data-entry-callout-alert rounded-md border border-success/40 bg-success/10 text-sm text-success-foreground">
+          {submissionSummary}
+        </div>
+      ) : null}
+      {feedOptions.length === 0 ? (
+        <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning-foreground">
+          No feed types are available for this farm yet.
+        </div>
+      ) : null}
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
-            <div className="data-entry-secondary-grid">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="feeding" savedResult={mutation.data} />
+          <ExistingEntryNotice message={duplicateEntry?.duplicateMessage ?? (duplicateEntry ? "An entry already exists for this date. Review it before submitting another record." : null)} farmId={farmId} />
+          <FormSection title="Record feeding" description="Date, unit, cage and amount are required. When feed is given, select its type and response. For zero feed, explain why in Notes.">
+            <SelectionChips
+              systems={systems}
+              systemId={selectedSystemId}
+              batches={batches}
+              batchId={resolvedBatchId}
+            />
+
+            <FieldGrid>
               <FormField
                 control={form.control}
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                        <Input type="date" className="max-w-xs" {...field} />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -329,7 +343,7 @@ export function FeedingForm({
                 name="unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Unit</FormLabel>
+                    <FormLabel>Cage Unit <span aria-hidden="true">*</span></FormLabel>
                     <Select
                       onValueChange={(value) => {
                         field.onChange(value)
@@ -338,7 +352,7 @@ export function FeedingForm({
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger className="max-w-xs">
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -360,10 +374,10 @@ export function FeedingForm({
                 name="system_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cage Number</FormLabel>
+                    <FormLabel>Cage Number <span aria-hidden="true">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedUnit}>
                       <FormControl>
-                        <SelectTrigger className="max-w-xs">
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder={selectedUnit ? "Select cage" : "Select unit first"} />
                         </SelectTrigger>
                       </FormControl>
@@ -388,7 +402,7 @@ export function FeedingForm({
                     <FormLabel>Feed Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="max-w-xs">
+                        <SelectTrigger aria-required={Number(selectedAmount) > 0} ref={field.ref} onBlur={field.onBlur} name={field.name}>
                           <SelectValue placeholder="Select feed" />
                         </SelectTrigger>
                       </FormControl>
@@ -405,87 +419,85 @@ export function FeedingForm({
                   </FormItem>
                 )}
               />
-            </div>
 
-            <div className="data-entry-secondary-grid">
-              <SelectedSystemInfo systems={systems} systemId={selectedSystemId} />
-              <SelectedBatchSupplierInfo batches={batches} batchId={resolvedBatchId} />
-            </div>
-
-            <div className="data-entry-secondary-grid">
               <FormField
                 control={form.control}
                 name="amount_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount (kg)</FormLabel>
+                    <FormLabel>Feeding Amount (kg) <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                        <Input type="number" step="0.01" className="max-w-xs" {...field} />
+                      <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="feeding_response"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Feeding Response</FormLabel>
-                  <Select onValueChange={field.onChange} value={String(field.value)}>
+              <FormField
+                control={form.control}
+                name="feeding_response"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Feeding Response</FormLabel>
+                    <Select onValueChange={field.onChange} value={String(field.value)}>
+                      <FormControl>
+                        <SelectTrigger aria-required={Number(selectedAmount) > 0} ref={field.ref} onBlur={field.onBlur} name={field.name}>
+                          <SelectValue placeholder="Select response" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={OPTIONAL_SELECT_VALUE}>Not recorded</SelectItem>
+                        {FEEDING_RESPONSE_LEVELS.map((option) => (
+                          <SelectItem key={option.level} value={String(option.level)}>
+                            Level {option.level} - {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem className="data-entry-field-wide">
+                    <FormLabel>Notes{selectedAmount != null && Number(selectedAmount) === 0 ? "" : " (optional)"}</FormLabel>
                     <FormControl>
-                      <SelectTrigger className="max-w-xs">
-                        <SelectValue placeholder="Select response" />
-                      </SelectTrigger>
+                      <textarea aria-required={selectedAmount != null && Number(selectedAmount) === 0}
+                        {...field}
+                        rows={2}
+                        className="data-entry-textarea"
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value={OPTIONAL_SELECT_VALUE}>Not recorded</SelectItem>
-                      {FEEDING_RESPONSE_LEVELS.map((option) => (
-                        <SelectItem key={option.level} value={String(option.level)}>
-                          Level {option.level} - {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormDescription>
+                      Feed behaviour, weather, missed appetite, or any exception.
+                      {selectedAmount != null && Number(selectedAmount) === 0 ? " Required when no feed was given." : null}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
+          </FormSection>
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Comments</FormLabel>
-                  <FormControl>
-                    <textarea
-                      {...field}
-                      rows={3}
-                      className="data-entry-textarea"
-                      placeholder="Feed behaviour, weather, missed appetite, or any exception."
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end pt-1">
-              <Button
-                type="submit"
-                className="min-h-11 rounded-lg px-5"
-                disabled={form.formState.isSubmitting || mutation.isPending || Boolean(duplicateEntry)}
-              >
-                {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Record Feeding
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </div>
+          <FormActions>
+            {sequence.next && <Button type="submit" variant="outline" disabled={form.formState.isSubmitting || mutation.isPending} onClick={() => sequence.requestNext(true)}>Save &amp; next cage</Button>}
+            <Button
+              type="submit"
+              onClick={() => sequence.requestNext(false)}
+              className="min-h-11 rounded-lg px-5"
+              disabled={form.formState.isSubmitting || mutation.isPending}
+            >
+              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Feeding
+            </Button>
+          </FormActions>
+        </form>
+      </Form>
     </div>
   )
 }

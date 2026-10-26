@@ -4,7 +4,6 @@ import type { ReactNode } from "react"
 
 import type { DashboardPageInitialData, DashboardPageInitialFilters } from "@/features/dashboard/types"
 
-import AlertUpdateBanner from "./alert-update-banner"
 import KPIOverview from "./kpi-overview"
 import PlannedActivitiesTimeline from "./planned-activities-timeline"
 import SystemsTable from "./systems-table"
@@ -61,7 +60,6 @@ export default function DashboardPage({
   return (
     <div className="page-shell">
       <section>
-        <AlertUpdateBanner farmId={farmId} alerts={initialData.recommendedActions} />
         <SectionLabel title="Core Performance Overview" />
         <KPIOverview
           metrics={initialData.kpiOverview.metrics}

@@ -1,17 +1,18 @@
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
-import { getScopedTimeBounds } from "@/features/shared/scoped-analytics.server"
-import { listGrowthTrend, listMortalityData } from "@/features/shared/queries.server"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
+import type { GrowthTrendRow } from "@/features/shared/queries.server"
 import { listBatchOptionRows } from "@/features/shared/query-seed.server"
+import type { Database } from "@/lib/types/database"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { parseCustomPeriodUrlValue, resolveTimePeriod, type TimeBounds } from "@/lib/time-period"
 import type { RecommendedActionRow } from "@/lib/types/insights"
 import type {
-  BatchMortalityTotal,
   BatchStockingInfo,
   BatchesPageFilters,
   BatchesPageInitialData,
+  BatchesSummaryRow,
   DashboardBatchRpcRow,
 } from "./types"
 
@@ -67,7 +68,7 @@ export function parseBatchesPageFilters(
 }
 
 async function getTimeBounds(
-  supabase: ServerClient,
+  accessToken: string,
   farmId: string,
   timePeriod: BatchesPageFilters["timePeriod"],
   batchId?: number,
@@ -89,7 +90,14 @@ async function getTimeBounds(
     },
     // Never scopes to a single system, but a selected batch narrows the window
     // to that batch's own data so the header's resolved range matches the page.
-    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", undefined, batchId, customTimeRange),
+    () =>
+      resolveScopedTimeBounds(accessToken, {
+        farmId,
+        timePeriod,
+        scope: "dashboard",
+        batchId,
+        customRange: customTimeRange,
+      }),
   )
 }
 
@@ -118,6 +126,24 @@ async function getAlertRows(supabase: ServerClient, farmId: string): Promise<Rec
   const { data, error } = await supabase.rpc("api_recommended_actions", { p_farm_id: farmId })
   if (error) return []
   return (data ?? []) as RecommendedActionRow[]
+}
+
+/**
+ * Farm-wide KPI totals for the header cards. Every figure (stocked, live,
+ * biomass, weighted survival %, feed-weighted cumulative eFCR) is computed in
+ * SQL -- the page never sums rows itself. Not time-scoped: /batches shows the
+ * full picture for every ongoing batch.
+ */
+async function getBatchesSummary(
+  supabase: ServerClient,
+  params: { farmId: string; stage?: BatchesPageFilters["selectedStage"] },
+): Promise<BatchesSummaryRow | null> {
+  const { data, error } = await supabase.rpc("api_batches_summary", {
+    p_farm_id: params.farmId,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+  })
+  if (error) return null
+  return ((data ?? [])[0] as BatchesSummaryRow | undefined) ?? null
 }
 
 async function getStockingByBatchId(
@@ -160,26 +186,57 @@ async function getStockingByBatchId(
   return result
 }
 
-function bucketMortalityByBatch(
-  rows: Array<{ system_id: number | null; number_of_fish_mortality: number | null }>,
-  systemIdToBatchId: Record<number, number>,
-): BatchMortalityTotal[] {
-  const totals = new Map<number, number>()
-  for (const row of rows) {
-    if (typeof row.system_id !== "number") continue
-    const batchId = systemIdToBatchId[row.system_id]
-    if (batchId == null) continue
-    totals.set(batchId, (totals.get(batchId) ?? 0) + (row.number_of_fish_mortality ?? 0))
-  }
-  return Array.from(totals.entries()).map(([batch_id, total]) => ({ batch_id, total }))
+type BatchGrowthTrendRpcRow = Database["public"]["Functions"]["api_batch_growth_trend"]["Returns"][number]
+
+/**
+ * A batch's full-cycle ABW/eFCR series -- from stocking, through every cage its
+ * fish moved through. Selects by the batch's own production cycle (via
+ * api_batch_growth_trend), so a cage the batch has since left / a cage's earlier
+ * tenant never leaks in.
+ */
+async function listBatchGrowthTrend(
+  supabase: ServerClient,
+  params: { farmId: string; batchIds: number[]; dateFrom: string; dateTo: string },
+): Promise<GrowthTrendRow[]> {
+  if (params.batchIds.length === 0) return []
+  const { data, error } = await supabase.rpc("api_batch_growth_trend", {
+    p_farm_id: params.farmId,
+    p_batch_ids: params.batchIds,
+    p_start_date: params.dateFrom,
+    p_end_date: params.dateTo,
+  })
+  if (error) return []
+  return ((data ?? []) as BatchGrowthTrendRpcRow[]).map<GrowthTrendRow>((row) => ({
+    system_id: row.system_id ?? 0,
+    cycle_id: row.cycle_id ?? null,
+    sample_date: row.date,
+    activity: row.activity,
+    abw_g: row.average_body_weight,
+    fish_count: row.number_of_fish_inventory,
+    adg_g_day: row.agr,
+    sgr_pct_day: row.sgr,
+    efcr_period: row.efcr_period,
+    days_interval: row.days_in_period,
+    weight_gain_g: row.biomass_increase_period,
+    age_days: null,
+    expected_abw_g: row.target_weight_g,
+    growth_deviation_pct: null,
+  }))
 }
 
-function buildSystemIdToBatchId(batches: DashboardBatchRpcRow[]): Record<number, number> {
+async function getCycleIdToBatchId(
+  supabase: ServerClient,
+  batchIds: number[],
+): Promise<Record<number, number>> {
+  if (batchIds.length === 0) return {}
+  const { data, error } = await supabase
+    .from("production_cycle")
+    .select("cycle_id, batch_id")
+    .in("batch_id", batchIds)
+  if (error) return {}
   const map: Record<number, number> = {}
-  for (const batch of batches) {
-    for (const systemId of batch.system_ids ?? []) {
-      if (typeof systemId === "number") map[systemId] = batch.batch_id
-    }
+  for (const row of (data ?? []) as Array<{ cycle_id: number | null; batch_id: number | null }>) {
+    if (typeof row.cycle_id === "number" && typeof row.batch_id === "number") map[row.cycle_id] = row.batch_id
   }
   return map
 }
@@ -189,16 +246,16 @@ function buildEmptyBatchesPageInitialData(): BatchesPageInitialData {
     bounds: { start: null, end: null },
     batches: toQuerySuccess([]),
     growthSeries: [],
-    mortalityByBatch: [],
     alerts: [],
-    systemIdToBatchId: {},
+    cycleIdToBatchId: {},
     stockingByBatchId: {},
+    summary: null,
   }
 }
 
 async function loadBatchesPageInitialData(
   supabase: ServerClient,
-  params: { farmId: string | null; filters: BatchesPageFilters },
+  params: { farmId: string | null; filters: BatchesPageFilters; accessToken: string },
 ): Promise<BatchesPageInitialData> {
   if (!params.farmId) return buildEmptyBatchesPageInitialData()
   const farmId = params.farmId
@@ -209,7 +266,7 @@ async function loadBatchesPageInitialData(
       : undefined
 
   const bounds = await getTimeBounds(
-    supabase,
+    params.accessToken,
     farmId,
     params.filters.timePeriod,
     selectedBatchId,
@@ -235,29 +292,26 @@ async function loadBatchesPageInitialData(
     { allowMissingObject: true },
   )
 
-  const systemIdToBatchId = buildSystemIdToBatchId(batchRows)
-  const allSystemIds = Array.from(new Set(Object.keys(systemIdToBatchId).map(Number)))
   const batchIds = batchRows.map((row) => row.batch_id)
 
-  const [growthSeries, mortalityRows, alerts, stockingByBatchId] = await Promise.all([
-    allSystemIds.length
-      ? listGrowthTrend(supabase, { farmId, systemIds: allSystemIds, dateFrom, dateTo })
-      : Promise.resolve([]),
-    allSystemIds.length
-      ? listMortalityData(supabase, { farmId, systemIds: allSystemIds, dateFrom, dateTo })
+  const [growthSeries, alerts, stockingByBatchId, cycleIdToBatchId, summary] = await Promise.all([
+    batchIds.length
+      ? listBatchGrowthTrend(supabase, { farmId, batchIds, dateFrom, dateTo })
       : Promise.resolve([]),
     getAlertRows(supabase, farmId),
     getStockingByBatchId(supabase, { farmId, batchIds }),
+    getCycleIdToBatchId(supabase, batchIds),
+    getBatchesSummary(supabase, { farmId, stage: params.filters.selectedStage }),
   ])
 
   return {
     bounds,
     batches: toQuerySuccess(batchRows),
     growthSeries,
-    mortalityByBatch: bucketMortalityByBatch(mortalityRows, systemIdToBatchId),
     alerts,
-    systemIdToBatchId,
+    cycleIdToBatchId,
     stockingByBatchId,
+    summary,
   }
 }
 

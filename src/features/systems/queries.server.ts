@@ -2,10 +2,11 @@ import { createAccessTokenClient } from "@/lib/supabase/server"
 import { parseCustomPeriodUrlValue, resolveTimePeriod } from "@/lib/time-period"
 import { loadSystemsTableData, parseDashboardPageFilters } from "@/features/dashboard/queries.server"
 import type { DashboardPageInitialFilters } from "@/features/dashboard/types"
-import { listGrowthTrend, listMortalityData } from "@/features/shared/queries.server"
+import { filterRowsToCohort, selectSystemCohortStarts } from "@/features/shared/cohort"
+import { listGrowthTrend } from "@/features/shared/queries.server"
 import { listBatchOptionRows, listWaterQualityTrendRows } from "@/features/shared/query-seed.server"
 import type { RecommendedActionRow } from "@/lib/types/insights"
-import type { CageMortalityTotal, SystemsPageInitialData, WaterQualityMonthlyPoint } from "./types"
+import type { SystemsPageInitialData, SystemsSummaryRow, WaterQualityMonthlyPoint } from "./types"
 
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 
@@ -57,21 +58,35 @@ function bucketWaterQualityMonthly(
     }))
 }
 
-function sumMortalityByCage(
-  rows: Array<{ system_id: number | null; number_of_fish_mortality: number | null }>,
-): CageMortalityTotal[] {
-  const totals = new Map<number, number>()
-  for (const row of rows) {
-    if (typeof row.system_id !== "number") continue
-    totals.set(row.system_id, (totals.get(row.system_id) ?? 0) + (row.number_of_fish_mortality ?? 0))
-  }
-  return Array.from(totals.entries()).map(([system_id, total]) => ({ system_id, total }))
-}
-
 async function getAlertRows(supabase: ServerClient, farmId: string): Promise<RecommendedActionRow[]> {
   const { data, error } = await supabase.rpc("api_recommended_actions", { p_farm_id: farmId })
   if (error) return []
   return (data ?? []) as RecommendedActionRow[]
+}
+
+/**
+ * Farm-wide KPI totals for the header cards -- live fish, active-cage count,
+ * biomass, feed-weighted eFCR, latest-month dissolved O2. All computed in SQL
+ * (api_systems_summary) over the same window and stage the table uses, so the
+ * cards never sum rows in the browser.
+ */
+async function getSystemsSummary(
+  supabase: ServerClient,
+  params: {
+    farmId: string
+    stage?: DashboardPageInitialFilters["selectedStage"]
+    dateFrom?: string
+    dateTo?: string
+  },
+): Promise<SystemsSummaryRow | null> {
+  const { data, error } = await supabase.rpc("api_systems_summary", {
+    p_farm_id: params.farmId,
+    p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
+    p_start_date: params.dateFrom ?? undefined,
+    p_end_date: params.dateTo ?? undefined,
+  })
+  if (error) return null
+  return ((data ?? [])[0] as SystemsSummaryRow | undefined) ?? null
 }
 
 async function getCohortBySystemId(supabase: ServerClient, farmId: string): Promise<Record<number, string | null>> {
@@ -96,9 +111,16 @@ export async function getSystemsPageInitialData(params: {
   const { bounds, systemOptions, batchSystems, systemsTable } = await loadSystemsTableData(supabase, {
     farmId: params.farmId,
     filters: params.filters,
+    accessToken: params.accessToken,
   })
 
-  const empty = { growthSeries: [], mortalityByCage: [], waterQualityMonthly: [], alerts: [], cohortBySystemId: {} }
+  const empty = {
+    growthSeries: [],
+    waterQualityMonthly: [],
+    alerts: [],
+    cohortBySystemId: {},
+    summary: null,
+  }
   if (!params.farmId || !bounds.start || !bounds.end) {
     return { bounds, systemOptions, batchSystems, systemsTable, ...empty }
   }
@@ -109,16 +131,27 @@ export async function getSystemsPageInitialData(params: {
     .filter((row) => (row.fish_end ?? 0) > 0)
     .map((row) => row.system_id)
 
-  const [growthSeries, mortalityRows, waterQualityRows, alerts, cohortBySystemId] = await Promise.all([
+  const [
+    growthSeries,
+    waterQualityRows,
+    alerts,
+    cohortBySystemId,
+    cohortStartBySystem,
+    summary,
+  ] = await Promise.all([
     stockedSystemIds.length
       ? listGrowthTrend(supabase, { farmId, systemIds: stockedSystemIds, dateFrom, dateTo })
-      : Promise.resolve([]),
-    stockedSystemIds.length
-      ? listMortalityData(supabase, { farmId, systemIds: stockedSystemIds, dateFrom, dateTo })
       : Promise.resolve([]),
     listWaterQualityTrendRows(supabase, { farmId, dateFrom, dateTo }),
     getAlertRows(supabase, farmId),
     getCohortBySystemId(supabase, farmId),
+    selectSystemCohortStarts(supabase, farmId).catch(() => new Map<number, string>()),
+    getSystemsSummary(supabase, {
+      farmId,
+      stage: params.filters.selectedStage,
+      dateFrom: dateFrom ?? undefined,
+      dateTo: dateTo ?? undefined,
+    }),
   ])
 
   return {
@@ -126,10 +159,13 @@ export async function getSystemsPageInitialData(params: {
     systemOptions,
     batchSystems,
     systemsTable,
-    growthSeries,
-    mortalityByCage: sumMortalityByCage(mortalityRows),
+    // This page is per-cage: growth trend and mortality both get scoped to each
+    // cage's current cohort. (api_production_summary itself is left unscoped --
+    // the batches page reads it per-system to build a batch's full-cycle trend.)
+    growthSeries: filterRowsToCohort(growthSeries, cohortStartBySystem, (row) => row.sample_date),
     waterQualityMonthly: bucketWaterQualityMonthly(waterQualityRows),
     alerts,
     cohortBySystemId,
+    summary,
   }
 }

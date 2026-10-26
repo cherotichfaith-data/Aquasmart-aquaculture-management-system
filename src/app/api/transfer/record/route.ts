@@ -1,10 +1,9 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { inventoryWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { getSystemFarmIds, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { getSystemFarmIds, requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { UI_TRANSFER_TYPES } from "@/lib/transfer-types"
 
 const transferSchema = z.object({
@@ -58,44 +57,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Origin and destination cannot be the same." }, { status: 400 })
   }
 
-  const { data, error } = await supabase
-    .from("fish_transfer")
-    .upsert({
-      ...payload,
-      target_system_id: isExternalOut ? null : payload.target_system_id,
-      batch_id: payload.batch_id ?? null,
-      external_target_name: isExternalOut ? externalTargetName : null,
-      notes: payload.notes?.trim() ? payload.notes.trim() : null,
-      local_id: payload.local_id ?? null,
-      synced_at: new Date().toISOString(),
-    }, {
-      onConflict: "local_id",
-    })
-    .select()
-    .maybeSingle()
-
-  if (error || !data) {
-    logSbError("transfer:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record transfer." }, { status })
-  }
-
-  const revalidateFarmIds = new Set(systemScope.farmIdsBySystemId.values())
-  revalidateFarmIds.forEach((farmId) => {
-    revalidateWriteTags(
-      inventoryWriteTags({ farmId, systemId: payload.origin_system_id, includeProduction: true }),
-    )
+  return submitApprovalResponse(supabase, "transfer", originFarmId, {
+    ...payload,
+    target_system_id: isExternalOut ? null : payload.target_system_id,
+    external_target_name: isExternalOut ? externalTargetName : null,
   })
-
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: originFarmId,
-        systemId: payload.origin_system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
 }

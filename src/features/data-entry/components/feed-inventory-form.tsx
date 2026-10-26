@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -19,15 +20,17 @@ import { useRecordFeedInventorySnapshot } from "@/features/feed/hooks"
 import type { Database } from "@/lib/types/database"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
-import { InfoPanel, InfoStat } from "./form-support"
-import { parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import { InfoStat } from "./form-support"
+import { toIsoDate, parseRequiredNumericId, reportDataEntrySubmitError, requireActiveFarmId } from "./form-utils"
+import { EntryDraft } from "./entry-draft"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 const formSchema = z.object({
   inventory_date: z.string().min(1, "Date is required"),
   inventory_time: z.string().min(1, "Time is required"),
   feed_id: z.string().min(1, "Feed type is required"),
   bag_weight_kg: z.coerce.number().min(0.01, "Bag weight must be positive"),
-  number_of_bags: z.coerce.number().finite().min(0, "Amount of bags cannot be negative"),
+  number_of_bags: z.coerce.number().finite().int("Count unopened whole bags; enter loose feed separately in grams").min(0, "Amount of bags cannot be negative"),
   opened_bags: z.coerce.number().int().min(0, "Open feed cannot be negative"),
   comments: z.string().max(500, "Comments must be 500 characters or fewer").optional(),
 })
@@ -45,7 +48,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
     resolver: zodResolver(formSchema),
     mode: "onBlur",
     defaultValues: {
-      inventory_date: new Date().toISOString().split("T")[0],
+      inventory_date: toIsoDate(new Date()),
       inventory_time: "16:00",
       feed_id: "",
       bag_weight_kg: 25,
@@ -83,7 +86,7 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
       })
 
       form.reset({
-        inventory_date: new Date().toISOString().split("T")[0],
+        inventory_date: values.inventory_date,
         inventory_time: values.inventory_time,
         feed_id: values.feed_id,
         bag_weight_kg: values.bag_weight_kg,
@@ -106,154 +109,153 @@ export function FeedInventoryForm({ feeds, farmId }: FeedInventoryFormProps) {
   }
 
   return (
-    <div>
-      <div className="data-entry-form-intro">
-        <h2 className="text-xl font-semibold tracking-tight">Feed Inventory</h2>
-        <p className="text-sm text-muted-foreground">Record current feed stock by feed type, including bagged and open-bag quantities.</p>
-      </div>
-
+    <div className="space-y-4">
       <div className="data-entry-status">
         <OfflineSaveBadge result={mutation.data} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
-        <div className="space-y-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-3.5">
-              <div className="grid grid-cols-1 gap-4">
-                <FormField
-                  control={form.control}
-                  name="inventory_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" className="max-w-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="inventory_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" className="max-w-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-              </div>
-
-                <FormField
-                  control={form.control}
-                  name="feed_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Feed Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="max-w-xs">
-                            <SelectValue placeholder="Select feed" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {feedInventoryFeeds.map((feed) => (
-                            <SelectItem key={feed.id} value={String(feed.id)}>
-                              {feed.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="data-entry-compact-grid sm:grid-cols-2 lg:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="bag_weight_kg"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bag Weight (kg)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" className="max-w-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="number_of_bags"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Amount of Bags</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" className="max-w-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="opened_bags"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Open Feed (g)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="1" className="max-w-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="feed_inventory" savedResult={mutation.data} />
+          <FormSection title="Record feed inventory" description="Count unopened whole bags and weigh loose feed separately in grams. All fields except comments are required.">
+            <FieldGrid>
               <FormField
                 control={form.control}
-                name="comments"
+                name="inventory_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Comments</FormLabel>
+                    <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
                     <FormControl>
-                      <textarea
-                        {...field}
-                        rows={3}
-                        className="data-entry-textarea"
-                        placeholder="Stock count note, adjustment reason, or storage observation."
-                      />
+                      <Input aria-required={true} type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="flex justify-end pt-1">
-                <Button type="submit" className="min-h-11 rounded-lg px-5" disabled={form.formState.isSubmitting || mutation.isPending}>
-                  {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Record Feed Inventory
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </div>
 
-        <InfoPanel title="Snapshot Totals">
-          <InfoStat label="Bag Weight" value={`${Number.isFinite(bagWeightKg) ? bagWeightKg : 0} kg`} />
-          <InfoStat label="Closed Bags" value={`${Number.isFinite(numberOfBags) ? numberOfBags : 0}`} />
-          <InfoStat label="Open Feed" tone="success" value={`${Number.isFinite(openedBags) ? openedBags : 0} g`} />
-        </InfoPanel>
-      </div>
+              <FormField
+                control={form.control}
+                name="inventory_time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Time <span aria-hidden="true">*</span></FormLabel>
+                    <FormControl>
+                      <Input aria-required={true} type="time" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="feed_id"
+                render={({ field }) => (
+                  <FormItem className="data-entry-field-wide">
+                    <FormLabel>Feed Type <span aria-hidden="true">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
+                          <SelectValue placeholder="Select feed" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {feedInventoryFeeds.map((feed) => (
+                          <SelectItem key={feed.id} value={String(feed.id)}>
+                            {feed.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bag_weight_kg"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bag Weight (kg) <span aria-hidden="true">*</span></FormLabel>
+                    <FormControl>
+                      <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="number_of_bags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount of Bags <span aria-hidden="true">*</span></FormLabel>
+                    <FormControl>
+                      <Input aria-required={true} type="number" step="0.01" inputMode="decimal" {...field} />
+                    </FormControl>
+                    <FormDescription>Whole unopened bags only -- record any partial or loose feed as Loose Feed (g) below.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="opened_bags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Loose Feed (g) <span aria-hidden="true">*</span></FormLabel>
+                    <FormControl>
+                      <Input aria-required={true} type="number" step="1" inputMode="numeric" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="comments"
+                render={({ field }) => (
+                  <FormItem className="data-entry-field-wide">
+                    <FormLabel>Comments (optional)</FormLabel>
+                    <FormControl>
+                      <textarea aria-required={false}
+                        {...field}
+                        rows={2}
+                        className="data-entry-textarea"
+                      />
+                    </FormControl>
+                    <FormDescription>Stock count note, adjustment reason, or storage observation.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGrid>
+          </FormSection>
+
+          <FormSection title="Snapshot totals">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <InfoStat label="Bag Weight" value={`${Number.isFinite(bagWeightKg) ? bagWeightKg : 0} kg`} />
+              <InfoStat label="Unopened Bags" value={`${Number.isFinite(numberOfBags) ? numberOfBags : 0}`} />
+              <InfoStat label="Open Feed" tone="success" value={`${Number.isFinite(openedBags) ? openedBags : 0} g`} />
+            </div>
+          </FormSection>
+
+          <FormActions>
+            <Button
+              type="submit"
+              className="min-h-11 rounded-lg px-5"
+              disabled={form.formState.isSubmitting || mutation.isPending}
+            >
+              {(form.formState.isSubmitting || mutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Feed Inventory
+            </Button>
+          </FormActions>
+        </form>
+      </Form>
     </div>
   )
 }
-

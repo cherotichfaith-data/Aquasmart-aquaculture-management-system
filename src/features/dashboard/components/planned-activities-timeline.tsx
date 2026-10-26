@@ -229,7 +229,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
               <Plus className="size-4" />
               {isSaving ? "Saving..." : "Add to planner"}
             </Button>
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? <p className="text-sm text-destructive-strong">{error}</p> : null}
           </div>
         </div>
 

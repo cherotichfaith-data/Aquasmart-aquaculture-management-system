@@ -180,7 +180,7 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="batch-name">Batch Number / Name</Label>
-          <Input id="batch-name" value={batchName} onChange={(event) => setBatchName(event.target.value)} placeholder="e.g. Batch 2026-05-A" />
+          <Input id="batch-name" value={batchName} onChange={(event) => setBatchName(event.target.value)} placeholder="Batch 2026-05-A" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="batch-date">Date of Delivery</Label>
@@ -214,7 +214,7 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
               ))}
             </SelectContent>
           </Select>
-          {suppliersError ? <p className="text-xs text-destructive">{suppliersError}</p> : null}
+          {suppliersError ? <p className="text-xs text-destructive-strong">{suppliersError}</p> : null}
           {!suppliersQuery.isLoading && suppliers.length === 0 ? (
             <p className="text-xs text-muted-foreground">No fingerling suppliers were found.</p>
           ) : null}
@@ -259,7 +259,7 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive-strong">{error}</p> : null}
 
       <Button type="button" onClick={handleCreateBatch} disabled={createBatch.isPending || suppliers.length === 0}>
         {createBatch.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

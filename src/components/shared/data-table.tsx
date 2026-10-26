@@ -1,17 +1,22 @@
 "use client"
 
 import { useState, type KeyboardEvent, type ReactNode } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import {
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type PaginationState,
   type RowData,
   type SortingState,
 } from "@tanstack/react-table"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/app-ui/table"
 import { ResponsiveRecordList } from "@/components/shared/responsive-record-list"
+import { Button } from "@/components/app-ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
 import { cn } from "@/lib/utils"
 
 /**
@@ -59,6 +64,16 @@ type DataTableProps<TRow> = {
    * Ignored when `renderMobileCard` is set.
    */
   priorityColumnIds?: string[]
+  /**
+   * Opt-in pagination (EUI table guidance: default 25 rows, a small set of
+   * rows-per-page options, always show a result count, avoid infinite
+   * scroll/an unpaginated scroll box). Omit to keep a table's current
+   * unpaginated behavior unchanged.
+   */
+  pagination?: {
+    pageSize?: number
+    pageSizeOptions?: number[]
+  }
 }
 
 // Design-guide header: 12px/600 muted labels on a transparent row with a
@@ -77,8 +92,11 @@ export function DataTable<TRow>({
   headerVariant = "default",
   renderMobileCard,
   priorityColumnIds,
+  pagination,
 }: DataTableProps<TRow>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
+  const defaultPageSize = pagination?.pageSize ?? 25
+  const [paginationState, setPaginationState] = useState<PaginationState>({ pageIndex: 0, pageSize: defaultPageSize })
   const isPriorityColumn = (id: string) => !priorityColumnIds || priorityColumnIds.includes(id)
 
   // TanStack Table intentionally returns non-memoizable functions; suppress the React Compiler library warning locally.
@@ -86,10 +104,12 @@ export function DataTable<TRow>({
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: { sorting, ...(pagination ? { pagination: paginationState } : {}) },
     onSortingChange: setSorting,
+    onPaginationChange: pagination ? setPaginationState : undefined,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: pagination ? getPaginationRowModel() : undefined,
     getRowId: (row) => String(rowKey(row)),
   })
 
@@ -206,19 +226,151 @@ export function DataTable<TRow>({
     </div>
   )
 
-  if (!renderMobileCard) return table_
+  const pageSizeOptions = pagination?.pageSizeOptions ?? [10, 25, 50]
+  const paginationControls = pagination ? (
+    <DataTablePagination table={table} totalRows={data.length} pageSizeOptions={pageSizeOptions} />
+  ) : null
+  const mobileData = pagination ? table.getRowModel().rows.map((row) => row.original) : data
+
+  if (!renderMobileCard) {
+    return (
+      <>
+        {table_}
+        {paginationControls}
+      </>
+    )
+  }
 
   return (
     <>
       <ResponsiveRecordList
         className="md:hidden"
-        data={data}
+        data={mobileData}
         rowKey={rowKey}
         renderCard={renderMobileCard}
         onRowClick={onRowClick}
         emptyMessage={emptyMessage}
       />
-      <div className="hidden md:block">{table_}</div>
+      <div className="md:hidden">{paginationControls}</div>
+      <div className="hidden md:block">
+        {table_}
+        {paginationControls}
+      </div>
     </>
+  )
+}
+
+type PageItem = { type: "page"; value: number } | { type: "gap"; key: string }
+
+/**
+ * Windowed page list for numbered pagination: always show the first and last
+ * page plus the current page and its immediate neighbours, collapsing the gaps
+ * to an ellipsis so a long batch history stays one jumpable row instead of a
+ * strip of dozens of buttons. Returns every page unwindowed at 7 or fewer.
+ */
+function buildPageItems(currentPage: number, pageCount: number): PageItem[] {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, index) => ({ type: "page", value: index + 1 }))
+  }
+  const shown = [1, pageCount, currentPage, currentPage - 1, currentPage + 1]
+    .filter((page) => page >= 1 && page <= pageCount)
+    .sort((a, b) => a - b)
+  const unique = [...new Set(shown)]
+  const items: PageItem[] = []
+  let previous = 0
+  for (const page of unique) {
+    if (page - previous > 1) items.push({ type: "gap", key: `gap-${previous}-${page}` })
+    items.push({ type: "page", value: page })
+    previous = page
+  }
+  return items
+}
+
+function DataTablePagination<TRow>({
+  table,
+  totalRows,
+  pageSizeOptions,
+}: {
+  table: ReturnType<typeof useReactTable<TRow>>
+  totalRows: number
+  pageSizeOptions: number[]
+}) {
+  const { pageIndex, pageSize } = table.getState().pagination
+  const pageCount = table.getPageCount()
+  const currentPage = pageIndex + 1
+  const firstRow = totalRows === 0 ? 0 : pageIndex * pageSize + 1
+  const lastRow = Math.min(totalRows, (pageIndex + 1) * pageSize)
+  const showPageSizeSelect = pageSizeOptions.length > 1 && totalRows > Math.min(...pageSizeOptions)
+
+  // Nothing to page through -- a bar of disabled controls and "Page 1 of 1"
+  // is noise, not information.
+  if (pageCount <= 1 && !showPageSizeSelect) return null
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 px-1 py-3 text-sm text-muted-foreground">
+      <span>
+        {totalRows === 0 ? "No results" : `Showing ${firstRow}–${lastRow} of ${totalRows}`}
+      </span>
+      <div className="flex items-center gap-3">
+        {showPageSizeSelect ? (
+          <label className="flex items-center gap-1.5">
+            <span className="whitespace-nowrap">Rows per page</span>
+            <Select value={String(pageSize)} onValueChange={(value) => table.setPageSize(Number(value))}>
+              <SelectTrigger className="h-8 w-[80px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pageSizeOptions.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+        ) : null}
+        <nav aria-label="Pagination" className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            aria-label="Previous page"
+            disabled={!table.getCanPreviousPage()}
+            onClick={() => table.previousPage()}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          {buildPageItems(currentPage, pageCount).map((item) =>
+            item.type === "gap" ? (
+              <span key={item.key} aria-hidden className="px-1.5 text-muted-foreground">
+                …
+              </span>
+            ) : (
+              <Button
+                key={item.value}
+                type="button"
+                variant={item.value === currentPage ? "default" : "ghost"}
+                size="icon-sm"
+                aria-label={`Page ${item.value}`}
+                aria-current={item.value === currentPage ? "page" : undefined}
+                onClick={() => table.setPageIndex(item.value - 1)}
+              >
+                {item.value}
+              </Button>
+            ),
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            aria-label="Next page"
+            disabled={!table.getCanNextPage()}
+            onClick={() => table.nextPage()}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </nav>
+      </div>
+    </div>
   )
 }

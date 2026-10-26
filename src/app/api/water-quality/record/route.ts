@@ -1,10 +1,9 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { waterQualityWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
-import { getSystemFarmId, requireRateLimitedRouteUser, revalidateWriteTags } from "@/lib/server/write-through"
+import { getSystemFarmId, requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
-import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { recordWaterQualityRowsInputSchema } from "@/features/water-quality/schemas"
 
 export async function POST(request: Request) {
@@ -37,31 +36,5 @@ export async function POST(request: Request) {
     synced_at: new Date().toISOString(),
   }))
 
-  const { data, error } = await supabase
-    .from("water_quality_measurement")
-    // Water-quality writes are operator-initiated inserts. Using DO NOTHING for
-    // local_id conflicts preserves idempotency for offline sync without
-    // requiring UPDATE RLS privileges on this table.
-    .upsert(normalized, { onConflict: "local_id", ignoreDuplicates: true })
-    .select()
-
-  if (error || !data) {
-    logSbError("water-quality:record:insert", error)
-    const status = isSbPermissionDenied(error) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record water quality data." }, { status })
-  }
-
-  revalidateWriteTags(waterQualityWriteTags({ farmId: systemScope.farmId }))
-
-  return NextResponse.json(
-    {
-      data,
-      meta: {
-        farmId: systemScope.farmId,
-        systemId: payload[0]!.system_id,
-        date: payload[0]!.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "water_quality", systemScope.farmId, normalized)
 }

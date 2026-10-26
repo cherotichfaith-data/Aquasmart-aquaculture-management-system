@@ -85,11 +85,11 @@ export function FilterPopover({
       >
         <span className="min-w-0 flex-1">
           {showLabel ? (
-            <span className="block truncate text-tag uppercase leading-tight tracking-[0.08em] text-muted-foreground">
+            <span title={resolvedLabel} className="block truncate text-tag uppercase leading-tight tracking-[0.08em] text-muted-foreground">
               {resolvedLabel}
             </span>
           ) : null}
-          <span className={cn("block truncate text-sm font-semibold text-foreground", showLabel && "mt-0.5")}>
+          <span title={selectedOption?.label ?? placeholder} className={cn("block truncate text-sm font-semibold text-foreground", showLabel && "mt-0.5")}>
             {selectedOption?.label ?? placeholder}
           </span>
         </span>
@@ -149,9 +149,9 @@ export function FilterPopover({
                       <Check size={13} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-foreground">{option.label}</span>
+                      <span title={option.label} className="block truncate text-sm font-semibold text-foreground">{option.label}</span>
                       {option.description ? (
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{option.description}</span>
+                        <span title={option.description} className="mt-0.5 block truncate text-xs text-muted-foreground">{option.description}</span>
                       ) : null}
                     </span>
                   </button>

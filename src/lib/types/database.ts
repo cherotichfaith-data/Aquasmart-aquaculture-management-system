@@ -14,6 +14,17 @@ export type Database = {
   }
   public: {
     Tables: {
+      production_pending_entry: {
+        Row: {
+          id: number; farm_id: string; entry_type: string; system_id: number | null;
+          event_date: string; payload: Json; local_id: string; status: string;
+          submitted_by: string; submitted_at: string; reviewed_by: string | null;
+          reviewed_at: string | null; review_reason: string | null; official_record_id: number | null;
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       _affected_systems: {
         Row: {
           min_affected_date: string
@@ -224,6 +235,78 @@ export type Database = {
         Update: {
           key?: string
           value?: string
+        }
+        Relationships: []
+      }
+      daily_report: {
+        Row: {
+          any_feed_waste: string | null
+          cage_checker: string | null
+          created_at: string
+          day_status: string | null
+          farm_name: string | null
+          high_mortality_cages: string | null
+          lake_condition: string | null
+          max_feed_waste_score: number
+          mortalities_collected: string | null
+          mortality_normal: string | null
+          payload: Json
+          report_date: string
+          saved_at: string | null
+          supervisor: string | null
+          synced_at: string
+          time_first_checked: string | null
+          time_last_checked: string | null
+          tomorrow_schedule: string | null
+          total_dead_fish: number
+          updated_at: string
+          week_tasks: string | null
+        }
+        Insert: {
+          any_feed_waste?: string | null
+          cage_checker?: string | null
+          created_at?: string
+          day_status?: string | null
+          farm_name?: string | null
+          high_mortality_cages?: string | null
+          lake_condition?: string | null
+          max_feed_waste_score?: number
+          mortalities_collected?: string | null
+          mortality_normal?: string | null
+          payload: Json
+          report_date: string
+          saved_at?: string | null
+          supervisor?: string | null
+          synced_at?: string
+          time_first_checked?: string | null
+          time_last_checked?: string | null
+          tomorrow_schedule?: string | null
+          total_dead_fish?: number
+          updated_at?: string
+          week_tasks?: string | null
+        }
+        Update: {
+          any_feed_waste?: string | null
+          cage_checker?: string | null
+          created_at?: string
+          day_status?: string | null
+          farm_name?: string | null
+          high_mortality_cages?: string | null
+          lake_condition?: string | null
+          max_feed_waste_score?: number
+          mortalities_collected?: string | null
+          mortality_normal?: string | null
+          payload?: Json
+          report_date?: string
+          saved_at?: string | null
+          supervisor?: string | null
+          synced_at?: string
+          time_first_checked?: string | null
+          time_last_checked?: string | null
+          tomorrow_schedule?: string | null
+          total_dead_fish?: number
+          updated_at?: string
+          week_tasks?: string | null
         }
         Relationships: []
       }
@@ -1941,12 +2024,137 @@ export type Database = {
           },
         ]
       }
+      daily_report_area_status: {
+        Row: {
+          area: string | null
+          comment: string | null
+          report_date: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
+      daily_report_checklist_item: {
+        Row: {
+          answer: string | null
+          check: string | null
+          checklist: string | null
+          details: string | null
+          report_date: string | null
+        }
+        Relationships: []
+      }
+      daily_report_feed_waste: {
+        Row: {
+          cages_affected: string | null
+          corrective_action: string | null
+          likely_cause: string | null
+          report_date: string | null
+          score: number | null
+        }
+        Relationships: []
+      }
+      daily_report_issue: {
+        Row: {
+          action: string | null
+          actioned: boolean | null
+          cage_area: string | null
+          issue: string | null
+          report_date: string | null
+        }
+        Relationships: []
+      }
+      daily_report_tomorrow_action: {
+        Row: {
+          action: string | null
+          assigned: boolean | null
+          report_date: string | null
+          responsible_person: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      submit_production_entries: {
+        Args: { p_type: string; p_farm_id: string; p_payloads: Json }
+        Returns: Json
+      }
+      review_production_entries: {
+        Args: { p_farm_id: string; p_ids: number[]; p_decision: string; p_reason?: string | null }
+        Returns: Json
+      }
+      update_pending_entry: {
+        Args: { p_id: number; p_payload: Json }
+        Returns: Json
+      }
+      api_analytics_outlook: {
+        Args: {
+          p_as_of?: string
+          p_farm_id: string
+          p_month: string
+          p_months_back?: number
+          p_months_forward?: number
+          p_plan_months?: number
+          p_planned_abw_g?: number
+          p_planned_fish?: number
+          p_scenario?: string
+          p_sections?: string[]
+          p_target_g?: number
+        }
+        Returns: Json
+      }
+      api_analytics_performance: {
+        Args: {
+          p_farm_id: string
+          p_month: string
+          p_period_end?: string
+          p_period_start?: string
+          p_scenario?: string
+          p_sections?: string[]
+        }
+        Returns: Json
+      }
+      api_batch_growth_trend: {
+        Args: {
+          p_batch_ids: number[]
+          p_end_date?: string
+          p_farm_id: string
+          p_start_date?: string
+        }
+        Returns: {
+          activity: string
+          agr: number
+          average_body_weight: number
+          batch_id: number
+          biomass_increase_period: number
+          cycle_id: number
+          date: string
+          days_in_period: number
+          efcr_period: number
+          number_of_fish_inventory: number
+          sgr: number
+          system_id: number
+          target_weight_g: number
+        }[]
+      }
       api_batch_system_ids: {
         Args: { p_batch_id: number }
         Returns: {
           system_id: number
+        }[]
+      }
+      api_batches_summary: {
+        Args: {
+          p_farm_id: string
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
+        }
+        Returns: {
+          active_batches: number
+          overall_efcr: number
+          overall_sgr: number
+          survival_pct: number
+          total_biomass_kg: number
+          total_live: number
+          total_stocked: number
         }[]
       }
       api_dashboard_batches: {
@@ -1972,6 +2180,7 @@ export type Database = {
           biomass_end: number
           cycle_day: number
           efcr: number
+          efcr_acc: number
           efcr_arrow: string
           efcr_latest_date: string
           feed_total: number
@@ -1991,10 +2200,12 @@ export type Database = {
           sampling_end_date: string
           sgr: number
           sgr_arrow: string
+          survival_pct: number
           system_count: number
           system_ids: number[]
           target_weight_g: number
           target_weight_progress_pct: number
+          total_stocked: number
           water_quality_arrow: string
           water_quality_latest_date: string
           water_quality_rating_average: string
@@ -2119,34 +2330,14 @@ export type Database = {
           updated_at: string
         }[]
       }
-      api_feed_dashboard_kpis: {
+      api_feed_dashboard: {
         Args: {
           p_end_date?: string
           p_farm_id: string
           p_start_date?: string
           p_system_ids?: number[]
         }
-        Returns: {
-          as_of_date: string
-          avg_feeding_rate_pct: number
-          feed_this_period_kg: number
-          feed_used_today_kg: number
-          overfeeding_systems: number
-          plan_vs_actual_pct: number
-          underfeeding_systems: number
-        }[]
-      }
-      api_feed_efcr_trend: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          date: string
-          efcr_period: number
-        }[]
+        Returns: Json
       }
       api_feed_inventory_feed_type_options_rpc: {
         Args: { p_date_to?: string; p_farm_id: string }
@@ -2160,37 +2351,6 @@ export type Database = {
           id: number
           label: string
           visibility_scope: string
-        }[]
-      }
-      api_feed_plan_vs_actual: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          actual_feed_kg: number
-          date: string
-          planned_feed_kg: number
-        }[]
-      }
-      api_feed_recommendations: {
-        Args: { p_date?: string; p_farm_id: string; p_system_ids?: number[] }
-        Returns: {
-          abw_g: number
-          abw_projected_g: number
-          adjusted_feed_kg: number
-          biomass_kg: number
-          confidence: string
-          feeding_rate_pct: number
-          model_version: string
-          phase_id: number
-          planned_feed_kg: number
-          recommendation_date: string
-          scenario: string
-          system_id: number
-          system_name: string
         }[]
       }
       api_feed_type_options_rpc: {
@@ -2207,63 +2367,6 @@ export type Database = {
           visibility_scope: string
         }[]
       }
-      api_feed_vs_biomass_gain: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          biomass_gain_kg: number
-          date: string
-          feed_kg: number
-          system_id: number
-          system_name: string
-        }[]
-      }
-      api_feeding_alerts: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          alert: string
-          date: string
-          recommendation: string
-          severity: string
-          system_id: number
-          system_name: string
-        }[]
-      }
-      api_feeding_rate_vs_target: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          actual_rate: number
-          date: string
-          feed_rate_max_pct: number
-          feed_rate_min_pct: number
-        }[]
-      }
-      api_feeding_response_distribution: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          count: number
-          feeding_response: number
-        }[]
-      }
       api_fingerling_batch_options_rpc: {
         Args: { p_active_only?: boolean; p_farm_id?: string }
         Returns: {
@@ -2275,6 +2378,7 @@ export type Database = {
           number_of_fish: number
           supplier_id: number
           system_id: number
+          system_ids: number[]
         }[]
       }
       api_growth_standard_curve: {
@@ -2406,6 +2510,13 @@ export type Database = {
           unit: string
         }[]
       }
+      api_system_cohort_starts: {
+        Args: { p_farm_id: string }
+        Returns: {
+          cohort_start: string
+          system_id: number
+        }[]
+      }
       api_system_daily_trend: {
         Args: {
           p_end_date?: string
@@ -2430,26 +2541,6 @@ export type Database = {
           number_of_fish: number
           system_id: number
           system_volume: number
-        }[]
-      }
-      api_system_feed_status: {
-        Args: {
-          p_end_date?: string
-          p_farm_id: string
-          p_start_date?: string
-          p_system_ids?: number[]
-        }
-        Returns: {
-          actual_feed_kg: number
-          biomass_kg: number
-          date: string
-          deviation_pct: number
-          efcr_period: number
-          feeding_rate_pct: number
-          planned_feed_kg: number
-          status: string
-          system_id: number
-          system_name: string
         }[]
       }
       api_system_options_rpc: {
@@ -2485,6 +2576,21 @@ export type Database = {
           resolved_start: string
           snapshot_as_of: string
           system_id: number
+        }[]
+      }
+      api_systems_summary: {
+        Args: {
+          p_end_date?: string
+          p_farm_id: string
+          p_stage?: Database["public"]["Enums"]["system_growth_stage"]
+          p_start_date?: string
+        }
+        Returns: {
+          active_cages: number
+          avg_dissolved_o2: number
+          overall_efcr: number
+          total_biomass_kg: number
+          total_live_fish: number
         }[]
       }
       api_time_period_bounds_scoped: {
@@ -2574,6 +2680,25 @@ export type Database = {
         }
       }
       current_fish_count: { Args: { p_system_id: number }; Returns: number }
+      digest_mortality: {
+        Args: { p_date: string }
+        Returns: {
+          cage: string
+          dead: number
+          live: number
+          per_1000: number
+        }[]
+      }
+      digest_mortality_range: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          cage: string
+          dead: number
+          live: number
+          per_1000: number
+          report_date: string
+        }[]
+      }
       enforce_api_rate_limit: {
         Args: {
           p_ip_address?: unknown
@@ -2808,12 +2933,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2837,11 +2962,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2862,11 +2987,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2887,11 +3012,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2904,11 +3029,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

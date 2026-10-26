@@ -35,7 +35,7 @@ function ToastItem({
   const { icon: Icon, className } = variantConfig[variant ?? "default"]
 
   React.useEffect(() => {
-    const timer = setTimeout(() => onOpenChange?.(false), duration ?? 5000)
+    const timer = setTimeout(() => onOpenChange?.(false), duration ?? 10000)
     return () => clearTimeout(timer)
   }, [duration, onOpenChange])
 
@@ -43,7 +43,7 @@ function ToastItem({
     <div
       role="status"
       className={cn(
-        "pointer-events-auto flex w-full min-w-[280px] items-start gap-2.5 rounded-xl border px-4 py-3 shadow-lg animate-in fade-in-0 slide-in-from-top-2 sm:min-w-[360px]",
+        "pointer-events-auto flex w-full min-w-[280px] items-start gap-2.5 rounded-xl border px-4 py-3 shadow-lg animate-in fade-in-0 slide-in-from-bottom-2 sm:min-w-[360px]",
         className,
       )}
     >
@@ -73,7 +73,7 @@ export function Toaster() {
   if (typeof document === "undefined" || toasts.length === 0) return null
 
   return createPortal(
-    <div className="pointer-events-none fixed right-4 top-4 z-[200] flex w-full max-w-sm flex-col gap-2.5">
+    <div className="pointer-events-none fixed right-4 bottom-4 z-[200] flex w-full max-w-sm flex-col gap-2.5">
       {toasts
         .filter((t) => t.open !== false)
         .map(({ id, title, description, action, variant, duration, onOpenChange }) => (

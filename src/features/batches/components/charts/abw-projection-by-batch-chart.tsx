@@ -47,18 +47,18 @@ function diffDays(from: string, to: string): number {
  */
 export default function AbwProjectionByBatchChart({
   growthSeries,
-  systemIdToBatchId,
+  cycleIdToBatchId,
   batchLabels,
 }: {
   growthSeries: GrowthTrendRow[]
-  systemIdToBatchId: Record<number, number>
+  cycleIdToBatchId: Record<number, number>
   batchLabels: Record<number, string>
 }) {
   const palette = getChartPalette()
   const samplingRows = useMemo(() => growthSeries.filter((row) => row.activity === "sampling"), [growthSeries])
   const batchPoints = useMemo(
-    () => aggregateGrowthByBatch(samplingRows, systemIdToBatchId),
-    [samplingRows, systemIdToBatchId],
+    () => aggregateGrowthByBatch(samplingRows, cycleIdToBatchId),
+    [samplingRows, cycleIdToBatchId],
   )
   const historicalDomain = useMemo(
     () => buildSharedDateDomain(batchPoints.map((point) => point.sample_date)),

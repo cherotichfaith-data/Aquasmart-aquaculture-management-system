@@ -3,7 +3,7 @@
 import type { MouseEvent, ReactNode } from "react"
 import Link from "next/link"
 import { ArrowDown, ArrowRight, ArrowUp, Clock, TriangleAlert, type LucideIcon } from "lucide-react"
-import { formatNumberValue } from "@/lib/analytics-format"
+import { formatDateOnly, formatNumberValue } from "@/lib/analytics-format"
 import type { DashboardSystemRow } from "@/features/dashboard/types"
 
 /**
@@ -62,25 +62,23 @@ export function ArrowBadge({
   )
 }
 
-/** Relative "freshness" text for a metric's latest date. */
+/**
+ * The latest date a metric has data for, e.g. "Sep 15". The year is added
+ * only when it isn't the current year, so recent metrics stay compact while
+ * older data is still unambiguous.
+ */
 export function formatLastDate(value: string | null | undefined): string | null {
   if (!value) return null
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const diffDays = Math.round((today.getTime() - parsed.getTime()) / 86_400_000)
-  if (diffDays <= 0) return "Today"
-  if (diffDays === 1) return "Yesterday"
-  if (diffDays < 60) return `${diffDays} days ago`
-  return value
-}
-
-export function formatSampleAgeText(value: number | null | undefined): string {
-  if (!isFiniteNumber(value)) return "No sample"
-  if (value === 0) return "Today"
-  if (value === 1) return "Yesterday"
-  return `${formatNumberValue(value)}d ago`
+  const includeYear = parsed.getFullYear() !== new Date().getFullYear()
+  return formatDateOnly(
+    value,
+    value,
+    includeYear
+      ? { year: "numeric", month: "short", day: "numeric" }
+      : { month: "short", day: "numeric" },
+  )
 }
 
 export const NoData = () => <span className="text-sm text-muted-foreground">--</span>
@@ -97,6 +95,7 @@ export function MetricCell({
   invertArrow,
   neutralArrow,
   subtext,
+  align = "left",
 }: {
   href?: string
   value: ReactNode
@@ -104,18 +103,19 @@ export function MetricCell({
   invertArrow?: boolean
   neutralArrow?: boolean
   subtext?: string | null
+  align?: "left" | "right"
 }) {
   const body = (
-    <>
+    <span className={`flex flex-col ${align === "right" ? "items-end" : "items-start"}`}>
       <span className="flex items-center gap-1.5">
         <span className="text-sm leading-5 text-foreground">{value}</span>
         {arrow !== undefined ? <ArrowBadge arrow={arrow} invert={invertArrow} neutral={neutralArrow} /> : null}
       </span>
-      {subtext ? <span className="mt-0.5 block text-[10px] leading-3 text-muted-foreground">{subtext}</span> : null}
-    </>
+      {subtext ? <span className="mt-0.5 text-[10px] leading-3 text-muted-foreground">{subtext}</span> : null}
+    </span>
   )
 
-  if (!href) return <span className="block">{body}</span>
+  if (!href) return body
 
   return (
     <Link
@@ -145,9 +145,9 @@ export function waterQualityLabel(value: string | null | undefined) {
 
 export function ratingToneClass(value: string | null | undefined) {
   const normalized = normalizeWaterQuality(value)
-  if (normalized === "optimal") return "bg-success/15 text-success"
-  if (normalized === "acceptable") return "bg-warning/15 text-warning"
-  if (normalized === "critical" || normalized === "lethal") return "bg-destructive/15 text-destructive"
+  if (normalized === "optimal") return "bg-success/15 text-success-foreground"
+  if (normalized === "acceptable") return "bg-warning/15 text-warning-foreground"
+  if (normalized === "critical" || normalized === "lethal") return "bg-destructive/15 text-destructive-strong"
   return "bg-muted text-muted-foreground"
 }
 
@@ -185,16 +185,6 @@ export function median(values: number[]): number | null {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
-/** eFCR more than 3x the farm median -- shared by the flag icon, the eFCR
- * cell's severity chip, and the Cages page's status derivation, so the
- * threshold lives in exactly one place. */
-export function isEfcrOutlier(
-  row: Pick<DashboardSystemRow, "efcr">,
-  farmMedianEfcr: number | null,
-): boolean {
-  return isFiniteNumber(row.efcr) && isFiniteNumber(farmMedianEfcr) && farmMedianEfcr > 0 && row.efcr > farmMedianEfcr * 3
-}
-
 /** Daily mortality rate is both rising and above 1% -- same threshold the
  * Cages page's status column already uses, now shared so the mortality
  * cell's severity chip can't quietly drift from it. */
@@ -224,15 +214,14 @@ export function SeverityValue({
   tone?: "negative" | "warning"
 }) {
   if (!active) return <>{value}</>
-  const toneClass = tone === "warning" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"
+  const toneClass = tone === "warning" ? "bg-warning/10 text-warning-foreground" : "bg-destructive/10 text-destructive-strong"
   return <span className={`rounded-md px-1.5 py-0.5 font-semibold ${toneClass}`}>{value}</span>
 }
 
-export function buildSystemFlags(row: DashboardSystemRow, farmMedianEfcr: number | null): SystemFlag[] {
+export function buildSystemFlags(row: DashboardSystemRow): SystemFlag[] {
   const staleSample = (row.sample_age_days ?? 0) > 30
   const wqBreach =
     isFiniteNumber(row.water_quality_rating_numeric_average) && row.water_quality_rating_numeric_average <= 1
-  const efcrOutlier = isEfcrOutlier(row, farmMedianEfcr)
 
   return [
     staleSample
@@ -251,27 +240,17 @@ export function buildSystemFlags(row: DashboardSystemRow, farmMedianEfcr: number
           className: "bg-destructive/15 text-destructive",
         }
       : null,
-    efcrOutlier
-      ? {
-          key: "efcr-outlier",
-          title: "eFCR is above 3x the farm median.",
-          icon: TriangleAlert,
-          className: "bg-destructive/15 text-destructive",
-        }
-      : null,
   ].filter(Boolean) as SystemFlag[]
 }
 
 export function WaterQualityFlagsCell({
   row,
-  farmMedianEfcr,
   size = "table",
 }: {
   row: DashboardSystemRow
-  farmMedianEfcr: number | null
   size?: "table" | "card"
 }) {
-  const flags = buildSystemFlags(row, farmMedianEfcr)
+  const flags = buildSystemFlags(row)
   const showWaterQuality = hasWaterQualityData(row.water_quality_rating_average)
   const thresholdFlag = flags.find((flag) => flag.key === "wq-breach") ?? null
   const displayFlags = showWaterQuality ? flags.filter((flag) => flag.key !== "wq-breach") : flags

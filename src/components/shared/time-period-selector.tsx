@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { CalendarDays } from "lucide-react"
 import { FilterPopover } from "@/components/shared/filter-popover"
 import { Button } from "@/components/app-ui/button"
 import { Dialog } from "@/components/app-ui/dialog"
@@ -28,6 +29,10 @@ interface TimePeriodSelectorProps {
   periods?: TimePeriod[]
   customLabels?: Partial<Record<TimePeriod, string>>
   disabled?: boolean
+  /** One calendar control, no preset periods: a single button that opens the From/To date picker. */
+  calendarOnly?: boolean
+  /** Text on the calendar button while no custom range is chosen (e.g. the resolved window). */
+  calendarLabel?: string
 }
 
 export default function TimePeriodSelector({
@@ -40,8 +45,10 @@ export default function TimePeriodSelector({
   periods = TIME_PERIODS,
   customLabels,
   disabled = false,
+  calendarOnly = false,
+  calendarLabel,
 }: TimePeriodSelectorProps) {
-  const allowCustom = Boolean(onCustomRangeChange)
+  const allowCustom = Boolean(onCustomRangeChange) || calendarOnly
   const [dialogOpen, setDialogOpen] = useState(false)
   const [draftStart, setDraftStart] = useState(customRange?.start ?? "")
   const [draftEnd, setDraftEnd] = useState(customRange?.end ?? "")
@@ -71,6 +78,12 @@ export default function TimePeriodSelector({
     onPeriodChange(value as TimePeriod)
   }
 
+  const openCalendar = () => {
+    setDraftStart(customRange?.start ?? "")
+    setDraftEnd(customRange?.end ?? "")
+    setDialogOpen(true)
+  }
+
   const handleApplyCustomRange = () => {
     if (!draftStart || !draftEnd || !onCustomRangeChange) return
     const [start, end] = draftStart <= draftEnd ? [draftStart, draftEnd] : [draftEnd, draftStart]
@@ -80,17 +93,33 @@ export default function TimePeriodSelector({
 
   return (
     <>
-      <FilterPopover
-        label={label ?? undefined}
-        value={customRange ? CUSTOM_OPTION_VALUE : selectedPeriod}
-        options={options}
-        placeholder="Select date type"
-        onChange={handleChange}
-        disabled={disabled}
-        searchable={false}
-        className={cn("w-full", variant === "compact" ? "sm:min-w-0" : "sm:min-w-[170px]")}
-        contentClassName="sm:w-[352px]"
-      />
+      {calendarOnly ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={openCalendar}
+          disabled={disabled}
+          aria-label="Choose dates"
+          className="h-10 w-full justify-start gap-2 rounded-lg px-3 font-medium"
+        >
+          <CalendarDays size={16} aria-hidden />
+          <span className="truncate">
+            {customRange ? formatCustomRangeLabel(customRange) : (calendarLabel ?? "Select dates")}
+          </span>
+        </Button>
+      ) : (
+        <FilterPopover
+          label={label ?? undefined}
+          value={customRange ? CUSTOM_OPTION_VALUE : selectedPeriod}
+          options={options}
+          placeholder="Select date type"
+          onChange={handleChange}
+          disabled={disabled}
+          searchable={false}
+          className={cn("w-full", variant === "compact" ? "sm:min-w-0" : "sm:min-w-[170px]")}
+          contentClassName="sm:w-[352px]"
+        />
+      )}
 
       {allowCustom ? (
         <Dialog

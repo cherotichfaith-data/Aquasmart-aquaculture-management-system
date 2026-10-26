@@ -1,7 +1,6 @@
+import { submitApprovalResponse } from "@/lib/server/approvals"
 import { NextResponse } from "next/server"
-import { revalidateTag } from "next/cache"
 import { z } from "zod"
-import { feedingWriteTags } from "@/lib/cache/tags"
 import { apiRateLimits } from "@/lib/server/rate-limit"
 import { requireRateLimitedRouteUser } from "@/lib/server/write-through"
 import { createClient } from "@/lib/supabase/server"
@@ -75,43 +74,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Selected system is unavailable." }, { status: 404 })
   }
 
-  const { data: row, error: insertError } = await supabase
-    .from("feeding_record")
-    .upsert({
-      system_id: payload.system_id,
-      batch_id: payload.batch_id ?? null,
-      date: payload.date,
-      feed_type_id: payload.feed_type_id ?? null,
-      feeding_amount: payload.feeding_amount,
-      feeding_response: payload.feeding_response ?? null,
-      notes: payload.notes?.trim() ? payload.notes.trim() : null,
-      local_id: payload.local_id ?? null,
-      synced_at: new Date().toISOString(),
-    }, {
-      onConflict: "local_id",
-    })
-    .select()
-    .maybeSingle()
-
-  if (insertError || !row) {
-    logSbError("feeding:record:insert", insertError)
-    const status = isSbPermissionDenied(insertError) ? 403 : 500
-    return NextResponse.json({ error: "Unable to record the feeding event." }, { status })
-  }
-
-  feedingWriteTags({ farmId: systemRow.farm_id, systemId: payload.system_id }).forEach((tag) =>
-    revalidateTag(tag, "max"),
-  )
-
-  return NextResponse.json(
-    {
-      data: row,
-      meta: {
-        farmId: systemRow.farm_id,
-        systemId: payload.system_id,
-        date: payload.date,
-      },
-    },
-    { status: 201 },
-  )
+  return submitApprovalResponse(supabase, "feeding", systemRow.farm_id, payload)
 }

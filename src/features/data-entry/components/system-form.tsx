@@ -23,6 +23,9 @@ import { GROWTH_STAGE_VALUES, formatGrowthStage } from "@/lib/stage-filter"
 import { buildPersistedSystemName, formatSystemOptionLabel } from "@/lib/system-options"
 import { FORM_SYSTEM_TYPES, FORM_SYSTEM_TYPE_OPTIONS } from "@/lib/system-types"
 import type { Database } from "@/lib/types/database"
+import { toIsoDate } from "./form-utils"
+import { EntryDraft } from "./entry-draft"
+import { FieldGrid, FormActions, FormSection } from "./form-layout"
 
 type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
     unit?: string | null
@@ -30,7 +33,7 @@ type SystemInsertWithUnit = Database["public"]["Tables"]["system"]["Insert"] & {
 type SystemFormValues = z.infer<typeof formSchema>
 const DEFAULT_GROWTH_STAGE = GROWTH_STAGE_VALUES[0]
 
-const getTodayDateValue = () => new Date().toISOString().slice(0, 10)
+const getTodayDateValue = () => toIsoDate(new Date())
 
 const formSchema = z.object({
     commissioned_at: z.string().min(1, "Date is required"),
@@ -38,8 +41,8 @@ const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
     type: z.enum(FORM_SYSTEM_TYPES),
     growth_stage: z.enum(GROWTH_STAGE_VALUES),
-    volume: z.coerce.number().min(0).optional(),
-    depth: z.coerce.number().min(0).optional(),
+    volume: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().min(0).optional()),
+    depth: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().min(0).optional()),
 })
 
 export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }) {
@@ -56,8 +59,8 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
             name: "",
             type: "rectangular_cage",
             growth_stage: DEFAULT_GROWTH_STAGE,
-            volume: 0,
-            depth: 0,
+            volume: undefined,
+            depth: undefined,
         },
     })
     const unitValue = useWatch({ control: form.control, name: "unit" })
@@ -96,164 +99,158 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
         createSystem.mutate(payload, {
             onSuccess: () => {
                 form.reset({
-                    commissioned_at: getTodayDateValue(),
+                    commissioned_at: values.commissioned_at,
                     unit: "",
                     name: "",
                     type: "rectangular_cage",
                     growth_stage: DEFAULT_GROWTH_STAGE,
-                    volume: 0,
-                    depth: 0,
+                    volume: undefined,
+                    depth: undefined,
                 })
             },
         })
     }
 
     return (
-        <div>
-            <div className="data-entry-form-intro">
-                <h2 className="text-xl font-semibold tracking-tight">Add New System</h2>
-                <p className="text-sm text-muted-foreground">Register a new cage, pond, or tank.</p>
-            </div>
+        <div className="space-y-4">
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3.5 max-w-2xl">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <FormField
-                            control={form.control}
-                            name="commissioned_at"
-                            render={({ field }) => (
-                                <FormItem className="flex h-full flex-col">
-                                    <FormLabel>Date</FormLabel>
-                                    <FormControl>
-                                        <Input type="date" className="max-w-xs" {...field} />
-                                    </FormControl>
-                                    <FormDescription className="min-h-[2rem]">
-                                        Commissioning date for this system.
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <EntryDraft farmId={farmId ?? null} kind="system" savedResult={createSystem.data} />
+                    <FormSection title="Add new system" description="Register a new cage, pond, or tank.">
+                        <FieldGrid>
+                            <FormField
+                                control={form.control}
+                                name="commissioned_at"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Date <span aria-hidden="true">*</span></FormLabel>
+                                        <FormControl>
+                                            <Input aria-required={true} type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormDescription>Commissioning date for this system.</FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <FormField
-                            control={form.control}
-                            name="unit"
-                            render={({ field }) => (
-                                <FormItem className="flex h-full flex-col">
-                                    <FormLabel>Cage Unit</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="e.g. G1" className="max-w-xs" {...field} />
-                                    </FormControl>
-                                    <FormDescription className="min-h-[2rem]">
-                                        This appears first in the cage name, for example `G1` in `G1A`.
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
+                            <FormField
+                                control={form.control}
+                                name="unit"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Cage Unit <span aria-hidden="true">*</span></FormLabel>
+                                        <FormControl>
+                                            <Input aria-required={true} placeholder="G1" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormDescription>Appears first in the cage name, e.g. `G1` in `G1A`.</FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                    <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Cage Number</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="e.g. A" className="max-w-xs" {...field} />
-                                </FormControl>
-                                <FormDescription>This appears after the unit, for example `A` in `G1A`.</FormDescription>
-                                <FormMessage />
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Cage Number <span aria-hidden="true">*</span></FormLabel>
+                                        <FormControl>
+                                            <Input aria-required={true} placeholder="A" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormDescription>Appears after the unit, e.g. `A` in `G1A`.</FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormItem className="data-entry-field-wide">
+                                <FormLabel>Displayed cage name</FormLabel>
+                                <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-sm font-medium text-foreground">
+                                    {cageNamePreview}
+                                </div>
                             </FormItem>
-                        )}
-                    />
 
-                    <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-sm">
-                        <span className="text-muted-foreground">Displayed cage name: </span>
-                        <span className="font-medium text-foreground">{cageNamePreview}</span>
-                    </div>
+                            <FormField
+                                control={form.control}
+                                name="type"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Type <span aria-hidden="true">*</span></FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                                            <FormControl>
+                                                <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
+                                                    <SelectValue placeholder="Select type" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {FORM_SYSTEM_TYPE_OPTIONS.map((type) => (
+                                                    <SelectItem key={type.value} value={type.value}>
+                                                        {type.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <FormField
-                            control={form.control}
-                            name="type"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Type</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormField
+                                control={form.control}
+                                name="growth_stage"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Growth Stage <span aria-hidden="true">*</span></FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                                            <FormControl>
+                                                <SelectTrigger aria-required={true} ref={field.ref} onBlur={field.onBlur} name={field.name}>
+                                                    <SelectValue placeholder="Select stage" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {GROWTH_STAGE_VALUES.map((stage) => (
+                                                    <SelectItem key={stage} value={stage}>
+                                                        {formatGrowthStage(stage)}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="depth"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Depth (m, optional)</FormLabel>
                                         <FormControl>
-                                            <SelectTrigger className="max-w-xs">
-                                                <SelectValue placeholder="Select type" />
-                                            </SelectTrigger>
+                                            <Input aria-required={false} type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
                                         </FormControl>
-                                        <SelectContent>
-                                            {FORM_SYSTEM_TYPE_OPTIONS.map((type) => (
-                                                <SelectItem key={type.value} value={type.value}>
-                                                    {type.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <FormField
-                            control={form.control}
-                            name="growth_stage"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Growth Stage</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormField
+                                control={form.control}
+                                name="volume"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Volume (m³, optional)</FormLabel>
                                         <FormControl>
-                                            <SelectTrigger className="max-w-xs">
-                                                <SelectValue placeholder="Select stage" />
-                                            </SelectTrigger>
+                                            <Input aria-required={false} type="number" step="0.1" inputMode="decimal" {...field} value={field.value ?? ""} />
                                         </FormControl>
-                                        <SelectContent>
-                                            {GROWTH_STAGE_VALUES.map((stage) => (
-                                                <SelectItem key={stage} value={stage}>
-                                                    {formatGrowthStage(stage)}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </FieldGrid>
+                    </FormSection>
 
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <FormField
-                            control={form.control}
-                            name="depth"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Depth (m)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.1" className="max-w-xs" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="volume"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Volume (m3)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.1" className="max-w-xs" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
-
-                    <div className="flex justify-end pt-1">
+                    <FormActions>
                         <Button
                             type="submit"
                             className="min-h-11 rounded-lg px-5"
@@ -262,12 +259,9 @@ export function SystemForm({ farmId: initialFarmId }: { farmId?: string | null }
                             {createSystem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Record System
                         </Button>
-                    </div>
+                    </FormActions>
                 </form>
             </Form>
         </div>
     )
 }
-
-
-

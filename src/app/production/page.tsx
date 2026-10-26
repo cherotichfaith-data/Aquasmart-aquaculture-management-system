@@ -2,6 +2,7 @@ import PageClient from "./page.client"
 import { resolveInitialFarmId } from "@/features/farm/queries.server"
 import { cleanScopedFilterState } from "@/features/shared/scoped-analytics.server"
 import { getProductionPageInitialData, parseProductionPageFilters } from "@/features/production/queries.server"
+import { listBatchOptionRows } from "@/features/shared/query-seed.server"
 import { logSbError } from "@/lib/supabase/log"
 import { requireUserContext } from "@/lib/supabase/require-user"
 import { createAccessTokenClient } from "@/lib/supabase/server"
@@ -49,6 +50,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     role = membership?.role ?? null
   }
 
+  // Seeds the batch dropdown so it never depends on a browser-side lookup finishing (it can stall or fail).
+  const batchOptions = farmId
+    ? await listBatchOptionRows(createAccessTokenClient(accessToken), { farmId, activeOnly: false })
+    : []
   const initialData = await getProductionPageInitialData({ farmId, filters: initialFilters })
   const effectiveFilters =
     initialData.systems.status === "success"
@@ -62,6 +67,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
       initialFarmRole={role}
       initialFilters={effectiveFilters}
       initialData={initialData}
+      initialBatchOptions={batchOptions}
     />
   )
 }

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 const barClassName = "flex items-center border-b px-4 py-2"
 
 const severityClassName = {
-  error: "border-destructive/30 bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-destructive",
+  error: "border-destructive/30 bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-destructive-strong",
   info: "border-info/30 bg-[color-mix(in_srgb,var(--color-info)_8%,transparent)] text-info",
   warning: "border-warning/30 bg-[color-mix(in_srgb,var(--color-warning)_8%,transparent)] text-[color:var(--warning-foreground)]",
   success: "border-success/30 bg-[color-mix(in_srgb,var(--color-success)_8%,transparent)] text-[color:var(--success-foreground)]",

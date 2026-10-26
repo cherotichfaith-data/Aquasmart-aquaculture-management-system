@@ -121,7 +121,8 @@ export const queryKeys = {
     },
   },
   feedManagement: {
-    kpis(params?: {
+    // Single key: every /feed section now comes from one api_feed_dashboard call.
+    dashboard(params?: {
       farmId?: string | null
       systemIds?: number[] | null
       dateFrom?: string | null
@@ -129,112 +130,7 @@ export const queryKeys = {
     }) {
       return [
         "feed-management",
-        "kpis",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
-    planVsActual(params?: {
-      farmId?: string | null
-      systemIds?: number[] | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "feed-management",
-        "plan-vs-actual",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
-    systemStatus(params?: {
-      farmId?: string | null
-      systemIds?: number[] | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "feed-management",
-        "system-status",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
-    efcrTrend(params?: {
-      farmId?: string | null
-      systemIds?: number[] | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "feed-management",
-        "efcr-trend",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
-    feedingRateVsTarget(params?: {
-      farmId?: string | null
-      systemIds?: number[] | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "feed-management",
-        "feeding-rate-vs-target",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
-    feedingResponse(params?: {
-      farmId?: string | null
-      systemIds?: number[] | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "feed-management",
-        "feeding-response",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
-    feedVsBiomassGain(params?: {
-      farmId?: string | null
-      systemIds?: number[] | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "feed-management",
-        "feed-vs-biomass-gain",
-        farmToken(params?.farmId),
-        params?.systemIds?.join(",") ?? "all-systems",
-        stringToken(params?.dateFrom),
-        stringToken(params?.dateTo),
-      ] as const
-    },
-    alerts(params?: {
-      farmId?: string | null
-      systemIds?: number[] | null
-      dateFrom?: string | null
-      dateTo?: string | null
-    }) {
-      return [
-        "feed-management",
-        "alerts",
+        "dashboard",
         farmToken(params?.farmId),
         params?.systemIds?.join(",") ?? "all-systems",
         stringToken(params?.dateFrom),

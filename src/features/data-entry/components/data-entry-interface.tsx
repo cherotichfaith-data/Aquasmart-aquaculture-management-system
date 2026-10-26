@@ -1,7 +1,7 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
+import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MortalityForm } from "./mortality-form"
 import { FeedingForm } from "./feeding-form"
@@ -15,7 +15,7 @@ import { SystemForm } from "./system-form"
 import { RecentEntriesList } from "./recent-entries-list"
 import type { Database, Tables } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
-import { DATA_ENTRY_PATH } from "@/lib/app-entry"
+import { DataEntryNavigation } from "./data-entry-navigation"
 import type { BatchOptionItem } from "@/features/shared/batch-options"
 
 type DataEntryTabId =
@@ -88,13 +88,6 @@ function getRecentEntriesForTab(recentEntries: RecentEntriesByTab, tab: DataEntr
     }
 }
 
-function buildDataEntryTabHref(tabId: DataEntryTabId, defaultSystemId?: number | null, defaultBatchId?: number | null) {
-    const params = new URLSearchParams({ type: tabId })
-    if (defaultSystemId) params.set("system", String(defaultSystemId))
-    if (defaultBatchId) params.set("batch", String(defaultBatchId))
-    return `${DATA_ENTRY_PATH}?${params.toString()}`
-}
-
 export function DataEntryInterface({
     farmId,
     farmRole = null,
@@ -131,6 +124,8 @@ export function DataEntryInterface({
     useEffect(() => {
         setLiveSystemId(defaultSystemId)
     }, [defaultSystemId])
+
+    const [asideOpen, setAsideOpen] = useState(false)
 
     if (isRestrictedTab) {
         return (
@@ -228,52 +223,33 @@ export function DataEntryInterface({
     return (
         <div className="data-entry-layout data-entry-board">
             <div className="data-entry-header">
-                <div className="min-w-0">
-                    <h1 className="text-xl font-semibold leading-tight tracking-tight text-foreground">
-                        Data Entry
-                    </h1>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        {activeItem?.label ?? "Farm"} records
-                    </p>
-                </div>
-                <p className="data-entry-required-note">
-                    Required fields must be completed before saving.
+                <h1 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                    Data Entry
+                </h1>
+                <p className="data-entry-required-note ml-auto hidden md:block">
+                    * Required. Conditional requirements are explained in each form.
                 </p>
             </div>
 
-            <div className="data-entry-tabs-shell">
-                <div className="relative overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <div className="data-entry-tabs-list" role="tablist" aria-label="Data entry forms">
-                        {visibleSidebarItems.map((item) => {
-                            const isActive = activeTab === item.id
-                            return (
-                                <Link
-                                    key={item.id}
-                                    href={buildDataEntryTabHref(item.id, liveSystemId, defaultBatchId)}
-                                    className={cn(
-                                        "data-entry-tab",
-                                        isActive
-                                            ? "data-entry-tab-active"
-                                            : "data-entry-tab-idle"
-                                    )}
-                                    aria-selected={isActive}
-                                    role="tab"
-                                >
-                                    <span>{item.label}</span>
-                                </Link>
-                            )
-                        })}
-                    </div>
-                    <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-muted/50 to-transparent" />
-                </div>
-            </div>
+            <DataEntryNavigation active={activeTab} farmId={farmId} role={farmRole} systemId={liveSystemId} batchId={defaultBatchId} />
 
             <div className="data-entry-workspace">
-                <main className="data-entry-canvas min-w-0">
+                <section className="data-entry-canvas min-w-0" aria-label="Entry form">
                     {form}
-                </main>
-                <aside className="min-w-0">
-                    <RecentEntriesList {...recentEntryProps} systems={systems} feeds={feeds} />
+                </section>
+                <aside className="data-entry-aside min-w-0">
+                    <button
+                        type="button"
+                        className="data-entry-aside-toggle xl:hidden"
+                        onClick={() => setAsideOpen((open) => !open)}
+                        aria-expanded={asideOpen}
+                    >
+                        <span>Recent {(activeItem?.label ?? "").toLowerCase()} entries</span>
+                        <ChevronDown className={cn("h-4 w-4 transition-transform", asideOpen && "rotate-180")} />
+                    </button>
+                    <div className={cn("data-entry-aside-body", !asideOpen && "hidden xl:block")}>
+                        <RecentEntriesList {...recentEntryProps} systems={systems} feeds={feeds} farmId={farmId} activeSystemId={liveSystemId} />
+                    </div>
                 </aside>
             </div>
         </div>

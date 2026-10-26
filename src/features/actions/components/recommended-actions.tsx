@@ -140,7 +140,7 @@ export default function RecommendedActions({
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-primary">{action.title}</p>
+                    <p title={action.title} className="truncate text-sm font-semibold text-primary">{action.title}</p>
                     <p className="mt-1 text-sm text-foreground">{action.description}</p>
                     <p className="mt-2 text-xs text-muted-foreground">Due: {action.due}</p>
                   </div>

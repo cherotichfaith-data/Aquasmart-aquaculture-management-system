@@ -9,19 +9,17 @@ import AbwGrowthByBatchChart from "@/features/batches/components/charts/abw-grow
 import MortalityByBatchChart from "@/features/batches/components/charts/mortality-by-batch-chart"
 import EfcrByPeriodBatchChart from "@/features/batches/components/charts/efcr-by-period-batch-chart"
 import AbwProjectionByBatchChart from "@/features/batches/components/charts/abw-projection-by-batch-chart"
-import type { BatchesPageFilters, BatchesPageInitialData } from "@/features/batches/types"
+import type { BatchesPageInitialData } from "@/features/batches/types"
 
 export default function BatchesPageClient({
   initialFarmId,
   initialFarmName,
   initialFarmRole,
-  initialFilters,
   initialData,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
   initialFarmRole?: string | null
-  initialFilters: BatchesPageFilters
   initialData: BatchesPageInitialData
 }) {
   const rows = useMemo(
@@ -46,34 +44,33 @@ export default function BatchesPageClient({
       <div className="page-shell">
         <CommandCentreBanner alerts={initialData.alerts} />
 
-        <BatchesKpis batches={rows} stockingByBatchId={initialData.stockingByBatchId} />
+        <BatchesKpis summary={initialData.summary} />
 
         <BatchLineageTable
           rows={rows}
           stockingByBatchId={initialData.stockingByBatchId}
           isError={isError}
           errorMessage={errorMessage}
-          timePeriod={initialFilters.timePeriod}
           showHeader
         />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <AbwGrowthByBatchChart
             growthSeries={initialData.growthSeries}
-            systemIdToBatchId={initialData.systemIdToBatchId}
+            cycleIdToBatchId={initialData.cycleIdToBatchId}
             batchLabels={batchLabels}
           />
-          <MortalityByBatchChart mortalityByBatch={initialData.mortalityByBatch} batchLabels={batchLabels} />
+          <MortalityByBatchChart rows={rows} batchLabels={batchLabels} />
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <EfcrByPeriodBatchChart
             growthSeries={initialData.growthSeries}
-            systemIdToBatchId={initialData.systemIdToBatchId}
+            cycleIdToBatchId={initialData.cycleIdToBatchId}
             batchLabels={batchLabels}
           />
           <AbwProjectionByBatchChart
             growthSeries={initialData.growthSeries}
-            systemIdToBatchId={initialData.systemIdToBatchId}
+            cycleIdToBatchId={initialData.cycleIdToBatchId}
             batchLabels={batchLabels}
           />
         </div>

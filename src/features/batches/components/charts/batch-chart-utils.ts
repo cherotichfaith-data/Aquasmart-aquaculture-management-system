@@ -20,11 +20,11 @@ export type BatchGrowthPoint = {
  */
 export function aggregateGrowthByBatch(
   rows: GrowthTrendRow[],
-  systemIdToBatchId: Record<number, number>,
+  cycleIdToBatchId: Record<number, number>,
 ): BatchGrowthPoint[] {
   const groups = new Map<string, GrowthTrendRow[]>()
   for (const row of rows) {
-    const batchId = systemIdToBatchId[row.system_id]
+    const batchId = row.cycle_id != null ? cycleIdToBatchId[row.cycle_id] : undefined
     if (batchId == null) continue
     const key = `${batchId}|${row.sample_date}`
     if (!groups.has(key)) groups.set(key, [])

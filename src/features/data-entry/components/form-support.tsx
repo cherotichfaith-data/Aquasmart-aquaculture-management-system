@@ -4,23 +4,6 @@ import type { ReactNode } from "react"
 import type { SystemOption } from "@/lib/system-options"
 import { cn } from "@/lib/utils"
 
-export function InfoPanel({
-  title,
-  children,
-  className,
-}: {
-  title: string
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <div className={cn("data-entry-context-panel p-4", className)}>
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      <div className="mt-3 space-y-3">{children}</div>
-    </div>
-  )
-}
-
 export function InfoStat({
   label,
   value,

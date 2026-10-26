@@ -72,7 +72,7 @@ export function GoogleSignInButton({ nextPath, label = "Continue with Google", c
         {isLoading ? "Redirecting to Google..." : label}
       </button>
       {error ? (
-        <div className="rounded-[12px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+        <div className="rounded-[12px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-strong" role="alert">
           {error}
         </div>
       ) : null}

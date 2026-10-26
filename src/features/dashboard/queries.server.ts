@@ -5,20 +5,19 @@ import { isSbNetworkError, logSbError } from "@/lib/supabase/log"
 import {
   getScopedBatchSystems,
   getScopedSystemOptions,
-  getScopedTimeBounds,
 } from "@/features/shared/scoped-analytics.server"
+import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
 import type {
   DashboardPageInitialData,
   DashboardPageInitialFilters,
 } from "./types"
-import type { RecommendedActionRow } from "@/lib/types/insights"
 import { isMissingObjectError, toQuerySuccess } from "@/lib/supabase/query-transport"
 import { normalizeStageFilter } from "@/lib/stage-filter"
 import { resolveSystemIdFromFilterValue } from "@/lib/system-options"
 import { parseCustomPeriodUrlValue, resolveTimePeriod } from "@/lib/time-period"
-import { buildKpiOverviewFromRpc, mergeRecommendedActionRows } from "./analytics-rpc-shared"
+import { buildKpiOverviewFromRpc } from "./analytics-rpc-shared"
 import { listDashboardSystemsRows, listWaterQualityMeasurementRows } from "@/features/shared/query-seed.server"
-import { toRpcDate, toRpcSystemId, toRpcSystemIds } from "@/lib/rpc-params"
+import { toRpcDate, toRpcSystemIds } from "@/lib/rpc-params"
 
 type ServerClient = ReturnType<typeof createAccessTokenClient>
 type DashboardConsolidatedRow = Database["public"]["Functions"]["api_dashboard_consolidated"]["Returns"][number]
@@ -74,7 +73,7 @@ export function parseDashboardPageFilters(
 }
 
 async function getTimeBounds(
-  supabase: ServerClient,
+  accessToken: string,
   farmId: string,
   timePeriod: DashboardPageInitialFilters["timePeriod"],
   systemId?: number,
@@ -95,7 +94,15 @@ async function getTimeBounds(
       isTruncated: false,
       stalenessDays: null,
     },
-    () => getScopedTimeBounds(supabase, farmId, timePeriod, "dashboard", systemId, batchId, customTimeRange),
+    () =>
+      resolveScopedTimeBounds(accessToken, {
+        farmId,
+        timePeriod,
+        scope: "dashboard",
+        systemId,
+        batchId,
+        customRange: customTimeRange,
+      }),
   )
 }
 
@@ -135,29 +142,6 @@ async function getDashboardConsolidatedRows(
   return (data ?? []) as DashboardConsolidatedRow[]
 }
 
-async function getRecommendedActionRows(
-  supabase: ServerClient,
-  params: { farmId: string; systemId?: number; systemIds?: number[] },
-): Promise<RecommendedActionRow[]> {
-  const { data, error } = await supabase.rpc("api_recommended_actions", {
-    p_farm_id: params.farmId,
-    p_system_id: toRpcSystemId(params.systemId),
-  } as Database["public"]["Functions"]["api_recommended_actions"]["Args"] & { p_system_id: number | null })
-
-  if (error) {
-    throw error
-  }
-
-  const rows = (data ?? []) as RecommendedActionRow[]
-  const scopedSystemIds =
-    params.systemIds?.filter((systemId): systemId is number => typeof systemId === "number" && Number.isFinite(systemId)) ?? null
-  if (!scopedSystemIds || scopedSystemIds.length === 0) return rows
-
-  return rows.filter(
-    (row) => typeof row === "object" && row !== null && "system_id" in row && scopedSystemIds.includes((row as { system_id: number }).system_id),
-  )
-}
-
 function buildKpiOverview(params: {
   scopedSystemIds: number[]
   consolidatedRows: DashboardConsolidatedRow[]
@@ -195,7 +179,6 @@ function buildEmptyDashboardPageInitialData(): DashboardPageInitialData {
     kpiOverview: { metrics: [], dateBounds: { start: null, end: null } },
     systemsTable: { rows: [], meta: { reason: "Missing time bounds", start: null, end: null } },
     waterQualityMeasurements: toQuerySuccess([]),
-    recommendedActions: [],
   }
 }
 
@@ -204,6 +187,7 @@ async function loadDashboardPageInitialData(
   params: {
     farmId: string | null
     filters: DashboardPageInitialFilters
+    accessToken: string
   },
 ): Promise<DashboardPageInitialData> {
   const empty = buildEmptyDashboardPageInitialData()
@@ -222,7 +206,7 @@ async function loadDashboardPageInitialData(
       ? Number(params.filters.selectedBatch)
       : undefined
   const bounds = await getTimeBounds(
-    supabase,
+    params.accessToken,
     farmId,
     params.filters.timePeriod,
     selectedSystemId,
@@ -278,7 +262,7 @@ async function loadDashboardPageInitialData(
       : stageBatchScopedIds
 
   const singleSystemId = activeScopedSystemIds.length === 1 ? activeScopedSystemIds[0] : undefined
-  const [consolidatedRows, recommendedActionRows, waterQualityMeasurements, systemsTableRows] =
+  const [consolidatedRows, waterQualityMeasurements, systemsTableRows] =
     await Promise.all([
       withNetworkFallback(
         "dashboard:getDashboardConsolidatedRows",
@@ -292,19 +276,6 @@ async function loadDashboardPageInitialData(
             dateFrom: startDate,
             dateTo: endDate,
           }),
-        { allowMissingObject: true },
-      ),
-      withNetworkFallback<RecommendedActionRow[]>(
-        "dashboard:getRecommendedActionRows",
-        [],
-        async () => {
-          if (activeScopedSystemIds.length === 0) return []
-          return getRecommendedActionRows(supabase, {
-            farmId,
-            systemId: singleSystemId,
-            systemIds: activeScopedSystemIds,
-          })
-        },
         { allowMissingObject: true },
       ),
       withNetworkFallback("dashboard:getWaterQualityMeasurements", [], () =>
@@ -360,7 +331,6 @@ async function loadDashboardPageInitialData(
       },
     },
     waterQualityMeasurements: toQuerySuccess(waterQualityMeasurements),
-    recommendedActions: mergeRecommendedActionRows(recommendedActionRows),
   }
 }
 
@@ -384,6 +354,7 @@ export async function loadSystemsTableData(
   params: {
     farmId: string | null
     filters: DashboardPageInitialFilters
+    accessToken: string
   },
 ): Promise<{
   bounds: TimeBounds
@@ -424,7 +395,7 @@ export async function loadSystemsTableData(
       ? Number(params.filters.selectedBatch)
       : undefined
   const bounds = await getTimeBounds(
-    supabase,
+    params.accessToken,
     farmId,
     params.filters.timePeriod,
     selectedSystemId,

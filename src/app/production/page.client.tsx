@@ -18,17 +18,11 @@ import { buildProductionTableColumns } from "@/features/production/components/pr
 import { buildProductionDailyMetricRows, buildProductionMetricRows } from "@/features/production/lib/production-page"
 import { buildProductionPeriodViewRows } from "@/features/production/period-view"
 import type { ProductionPageInitialData, ProductionPageFilters } from "@/features/production/queries.server"
+import type { BatchOptionItem } from "@/features/shared/batch-options"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { formatCustomRangeLabel, parseCustomPeriodUrlValue, TIME_PERIOD_LABELS, type TimePeriod } from "@/lib/time-period"
 import { downloadCsv } from "@/lib/utils/report-export"
 import { cn } from "@/lib/utils"
-
-// Auto-generated stand-in batches from historical data reconstruction, e.g.
-// "INFERRED-C4-2025-10-18" or "BATCH-7-2024-11-26". Real farm batches follow the
-// farm's own codes (e.g. "02.26aK").
-const SYNTHETIC_BATCH_NAME_RE = /^\s*(INFERRED-|BATCH-\d)/i
-const isSyntheticBatchName = (name: string | null | undefined) =>
-  typeof name === "string" && SYNTHETIC_BATCH_NAME_RE.test(name)
 
 const PRODUCTION_DATE_TYPES: TimePeriod[] = [
   "day",
@@ -80,6 +74,7 @@ function ProductionPeriodFilter({
         onCustomRangeChange={handleCustomRangeChange}
         variant="compact"
         periods={PRODUCTION_DATE_TYPES}
+        customLabels={{ "all history": "Cycle to date" }}
       />
     </div>
   )
@@ -91,12 +86,14 @@ export default function ProductionPageClient({
   initialFarmRole,
   initialFilters,
   initialData,
+  initialBatchOptions,
 }: {
   initialFarmId?: string | null
   initialFarmName?: string | null
   initialFarmRole?: string | null
   initialFilters: ProductionPageFilters
   initialData: ProductionPageInitialData
+  initialBatchOptions?: BatchOptionItem[]
 }) {
   const searchParams = useSearchParams()
   // Filter changes (period/system/metric/compare) all write to the URL and
@@ -187,25 +184,19 @@ export default function ProductionPageClient({
         : viewRows,
     [isConsolidated, viewRows, summaryRows, volumeBySystemId, growthBySystemDate, feedTypeBySystemDate, totalScopedVolumeM3],
   )
-  // "All cages" / "All batches" with nothing else pinned.
-  const isAllScope = selectedSystemParam === "all" && !searchParams.get("batch")
   // In an "All cages" / "All batches" view the records table lists the periodic
   // recorded events -- one row per sampling / stocking / transfer date -- rather
   // than the carried-forward "today" snapshot every cage emits (which just
   // stacks a wall of same-date rows). A single cage still shows its full
   // timeline including that live row.
   const periodicSummaryRows = useMemo(() => {
-    // In the "All ..." view drop the data-repair placeholder batches
-    // (INFERRED-*, BATCH-<n>-*) -- they aren't real production batches. A
-    // specific cage or batch view keeps everything.
-    const scoped = isAllScope
-      ? summaryRows.filter((row) => !isSyntheticBatchName(row.batch_name))
-      : summaryRows
+    // Data-repair stand-in batches (INFERRED-*, BATCH-<n>) have their identity
+    // stripped server-side, so nothing to filter for names here.
     // Per cage: prefer the recorded sampling/stocking/transfer rows; keep the
     // live "current" row only for cages that have nothing else in the window,
     // so every stocked cage still shows up.
     const bySystem = new Map<number | string, typeof summaryRows>()
-    for (const row of scoped) {
+    for (const row of summaryRows) {
       const key = row.system_id ?? "unassigned"
       const bucket = bySystem.get(key)
       if (bucket) bucket.push(row)
@@ -217,12 +208,14 @@ export default function ProductionPageClient({
       out.push(...(events.length > 0 ? events : rows))
     }
     return out
-  }, [summaryRows, isAllScope])
+  }, [summaryRows])
   // Records table rows: rolled up by batch in "Batches" mode, per cage otherwise.
   const tableViewRows = useMemo(() => {
     if (scopeMode === "batch") {
       return buildProductionPeriodViewRows({
-        productionRows: periodicSummaryRows,
+        // Cages whose batch identity was stripped (data-repair stand-ins) carry
+        // no batch -- keep them out of the by-batch rollup entirely.
+        productionRows: periodicSummaryRows.filter((row) => row.batch_id != null),
         consolidate: "batch",
         volumeBySystemId,
         growthBySystemDate,
@@ -290,7 +283,9 @@ export default function ProductionPageClient({
     if (!initialData.bounds.start || !initialData.bounds.end) return null
     const rangeLabel = initialFilters.customTimeRange
       ? formatCustomRangeLabel(initialFilters.customTimeRange)
-      : TIME_PERIOD_LABELS[initialFilters.timePeriod]
+      : initialFilters.timePeriod === "all history"
+        ? "Cycle to date"
+        : TIME_PERIOD_LABELS[initialFilters.timePeriod]
     if (scopeMode === "batch") {
       return `${rangeLabel} · ${initialData.batchName ?? "All batches"}`
     }
@@ -364,6 +359,8 @@ export default function ProductionPageClient({
             <div className="flex flex-wrap items-end gap-2">
               <ProductionScopeFilter
                 initialFarmId={initialFarmId}
+                fallbackBatches={initialBatchOptions}
+                fallbackSystems={initialData.systems.status === "success" ? initialData.systems.data : undefined}
                 startTransition={startTransition}
               />
               <div className="w-[200px] shrink-0 md:w-[210px]">

@@ -103,8 +103,8 @@ function KPICardContent({
   }
 
   const toneStyles = {
-    positive: "text-success",
-    negative: "text-destructive",
+    positive: "text-success-foreground",
+    negative: "text-destructive-strong",
     neutral: "text-muted-foreground",
   }
 

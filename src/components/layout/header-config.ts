@@ -13,17 +13,21 @@ export type PageTimeConfig = {
   showBatchFilter: boolean
   showStageFilter: boolean
   showSystemFilter?: boolean
+  /** Batches page metrics are all sampling-anchored, so the period selector does
+   * nothing there -- hide it. Defaults to shown. */
+  showTimePeriod?: boolean
 }
 
 export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
   if (pathname.startsWith("/feed")) {
     return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
   }
-  if (pathname.startsWith("/production") || pathname.startsWith("/reports")) {
+  if (pathname.startsWith("/production") || pathname.startsWith("/reports") || pathname.startsWith("/analytics")) {
     if (pathname.startsWith("/production")) {
       return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: false, showStageFilter: false, showSystemFilter: false }
     }
-    return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
+    // Reports: the monthly report pack is farm-wide, so only the time period filter applies.
+    return { defaultPeriod: "month", scope: "production", useSystemBounds: false, showBatchFilter: false, showStageFilter: false, showSystemFilter: false, showTimePeriod: false }
   }
   if (pathname.startsWith("/batches")) {
     return {
@@ -33,6 +37,7 @@ export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
       showBatchFilter: true,
       showStageFilter: true,
       showSystemFilter: false,
+      showTimePeriod: false,
     }
   }
   if (pathname.startsWith("/systems")) {
@@ -84,8 +89,17 @@ export const getHeaderPageMeta = (pathname: string, tab: string | null): PageMet
   }
   if (pathname.startsWith("/reports")) {
     return {
-      title: "Reports",
-      description: "Exports, compliance, and period summaries without inferring fake production dates.",
+      title: "Monthly reports",
+      description: "Ten month-end management reports for the farm.",
+    }
+  }
+  if (pathname.startsWith("/analytics/inputs")) {
+    return { title: "Production inputs" }
+  }
+  if (pathname.startsWith("/analytics")) {
+    return {
+      title: "Analytics",
+      description: "Month-end batch, harvest and feed analytics for the farm.",
     }
   }
   if (pathname.startsWith("/actions")) {

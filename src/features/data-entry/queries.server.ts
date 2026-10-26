@@ -22,15 +22,6 @@ async function getFeedTypes(supabase: DataEntrySupabaseClient, farmId: string) {
   return toQuerySuccess(await listFeedTypeOptionRows(supabase, { farmId }))
 }
 
-async function safePrefetch<T>(tag: string, fallback: T, loader: () => Promise<T>) {
-  try {
-    return await loader()
-  } catch (error) {
-    logSbError(tag, error)
-    return fallback
-  }
-}
-
 async function safePrefetchWithTimeout<T>(
   tag: string,
   fallback: T,
@@ -68,7 +59,7 @@ export async function getDataEntryPrefetch({
   accessToken: string
 }) {
   return runServerReadThrough({
-    keyParts: ["data-entry-page", "active-batches-v3", userId, farmId],
+    keyParts: ["data-entry-page", "active-batches-v4", userId, farmId],
     tags: [
       cacheTags.farm(farmId),
       cacheTags.systems(farmId),
@@ -79,9 +70,9 @@ export async function getDataEntryPrefetch({
     loader: async () => {
       const supabase = createAccessTokenClient(accessToken)
       const [systems, batches, feedTypes, recentEntries] = await Promise.all([
-        safePrefetch("data-entry:prefetch:systems", toQuerySuccess([]), () => getSystems(supabase, farmId)),
-        safePrefetch("data-entry:prefetch:batches", toQuerySuccess([]), () => getBatches(supabase, farmId)),
-        safePrefetch("data-entry:prefetch:feedTypes", toQuerySuccess([]), () => getFeedTypes(supabase, farmId)),
+        getSystems(supabase, farmId),
+        getBatches(supabase, farmId),
+        getFeedTypes(supabase, farmId),
         safePrefetchWithTimeout(
           "data-entry:prefetch:recentEntries",
           emptyRecentEntries(),

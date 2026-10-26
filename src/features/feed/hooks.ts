@@ -14,6 +14,7 @@ import {
 import { useWriteThroughMutation } from "@/lib/hooks/use-write-through-mutation"
 import { buildOfflinePendingResult } from "@/lib/offline/pending-result"
 import { hasPendingSyncMeta } from "@/lib/offline/result"
+import { hasPendingApproval } from "@/lib/approvals"
 import { useOfflineMutation } from "@/lib/offline/use-offline-mutation"
 import type { Tables } from "@/lib/types/database"
 import type { FeedInventorySnapshotInput } from "./mutations.server"
@@ -97,12 +98,17 @@ export function useRecordFeeding() {
       return { previous }
     },
     onSuccess: async ({ data, meta }) => {
+      if (hasPendingApproval({ meta })) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.reports.recentEntries(meta.farmId) })
+        toast({ variant: "success", title: "Submitted for approval", description: "A farm manager can review this feeding entry in Approvals." })
+        return
+      }
       if (hasPendingSyncMeta({ meta }) && meta.pendingSync) {
         toast({
           variant: "warning",
           title: "Saved offline",
           description: "Saved locally and queued for sync.",
-          duration: 7000,
+          duration: 10000,
         })
         return
       }
@@ -128,7 +134,7 @@ export function useRecordFeeding() {
         variant: "success",
         title: "Record saved",
         description: "Feeding event recorded.",
-        duration: 6000,
+        duration: 10000,
       })
     },
     onError: (error: unknown, _payload, context) => {

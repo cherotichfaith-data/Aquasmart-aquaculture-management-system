@@ -10,12 +10,7 @@ import { DataErrorState, DataFetchingBadge, DataUpdatedAt } from "@/components/s
 import type { TimePeriod } from "@/lib/time-period"
 import { toTimePeriodUrlValue } from "@/lib/time-period"
 import { buildDashboardSystemColumns } from "./systems-table-columns"
-import {
-  formatSampleAgeText,
-  isFiniteNumber,
-  median,
-  WaterQualityFlagsCell,
-} from "@/features/dashboard/lib/table-cells"
+import { formatLastDate, isFiniteNumber, WaterQualityFlagsCell } from "@/features/dashboard/lib/table-cells"
 import { formatNumberValue, formatUnitValue } from "@/lib/analytics-format"
 import { formatCageLabel } from "@/lib/system-options"
 
@@ -53,17 +48,12 @@ export default function SystemsTable({
   stage,
   batch = "all",
   timePeriod = "2 weeks",
-  farmId,
   showHeader = true,
   stalenessDays,
 }: SystemsTableProps) {
   const router = useRouter()
 
-  const farmMedianEfcr = useMemo(() => median(rows.map((row) => row.efcr).filter(isFiniteNumber)), [rows])
-  const columns = useMemo(
-    () => buildDashboardSystemColumns({ farmMedianEfcr, timePeriod }),
-    [farmMedianEfcr, timePeriod],
-  )
+  const columns = useMemo(() => buildDashboardSystemColumns({ timePeriod }), [timePeriod])
 
   const emptyMessage =
     emptyReason === "Missing time bounds"
@@ -75,7 +65,6 @@ export default function SystemsTable({
   const openProductionPage = (systemId: number) => {
     const params = new URLSearchParams()
     params.set("system", String(systemId))
-    if (farmId) params.set("farmId", farmId)
     if (batch && batch !== "all") params.set("batch", batch)
     if (stage && stage !== "all") params.set("stage", stage)
     if (timePeriod) params.set("date", toTimePeriodUrlValue(timePeriod))
@@ -93,9 +82,17 @@ export default function SystemsTable({
     )
   }
 
+  let asOfDate: string | null = null
+  if (stalenessDays != null && stalenessDays > 0) {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - stalenessDays)
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    asOfDate = formatLastDate(iso)
+  }
   const subtitle = [
     "Latest values per system in the selected period",
-    stalenessDays != null && stalenessDays > 0 ? `data as of ${stalenessDays}d ago` : null,
+    asOfDate ? `data as of ${asOfDate}` : null,
   ]
     .filter(Boolean)
     .join(" · ")
@@ -126,10 +123,11 @@ export default function SystemsTable({
             onRowClick={(row) => openProductionPage(row.system_id)}
             emptyMessage={emptyMessage}
             initialSorting={[{ id: "system", desc: false }]}
-            shellClassName="production-records-table dashboard-production-table max-h-[520px]"
+            shellClassName="production-records-table dashboard-production-table"
             tableClassName="min-w-[960px] table-fixed"
             headerVariant="plain"
-            renderMobileCard={(row) => <SystemCardBody row={row} farmMedianEfcr={farmMedianEfcr} />}
+            pagination={{ pageSize: 25 }}
+            renderMobileCard={(row) => <SystemCardBody row={row} />}
           />
         )}
       </CardContent>
@@ -137,7 +135,7 @@ export default function SystemsTable({
   )
 }
 
-function SystemCardBody({ row, farmMedianEfcr }: { row: DashboardSystemRow; farmMedianEfcr: number | null }) {
+function SystemCardBody({ row }: { row: DashboardSystemRow }) {
   const title = formatCageLabel({ id: row.system_id, label: row.system_name, unit: null })
 
   return (
@@ -151,7 +149,7 @@ function SystemCardBody({ row, farmMedianEfcr }: { row: DashboardSystemRow; farm
         <MobileMetric
           label="ABW"
           value={formatUnitValue(row.abw, 1, "g")}
-          subtext={formatSampleAgeText(row.sample_age_days)}
+          subtext={formatLastDate(row.abw_latest_date)}
         />
         <MobileMetric label="SGR" value={formatPercent(row.sgr, 2, "%/day")} />
         <MobileMetric label="Feed kg" value={formatUnitValue(row.feed_total, 1, "kg")} />
@@ -160,7 +158,7 @@ function SystemCardBody({ row, farmMedianEfcr }: { row: DashboardSystemRow; farm
         <MobileMetric label="Density" value={formatUnitValue(row.biomass_density, 2, "kg/m3")} />
         <div className="col-span-2 rounded-md bg-muted/45 px-2.5 py-2">
           <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">WQ / Flags</p>
-          <WaterQualityFlagsCell row={row} farmMedianEfcr={farmMedianEfcr} size="card" />
+          <WaterQualityFlagsCell row={row} size="card" />
         </div>
       </div>
     </>

@@ -1,6 +1,7 @@
 "use client"
 
 import { queryOptions, useQuery } from "@tanstack/react-query"
+import { hasPendingApproval } from "@/lib/approvals"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { queryKeys } from "@/lib/cache/query-keys"
@@ -226,6 +227,7 @@ export function useRecordWaterQuality() {
           systemId: firstMeta?.systemId ?? input[0]?.system_id ?? null,
           date: firstMeta?.date ?? input[0]?.date ?? new Date().toISOString().slice(0, 10),
           localIds,
+          pendingApproval: responses.some(hasPendingApproval),
         },
       }
     },

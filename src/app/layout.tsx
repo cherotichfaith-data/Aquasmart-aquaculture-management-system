@@ -1,6 +1,7 @@
 import type React from "react"
 import { Suspense } from "react"
 import type { Metadata } from "next"
+import { IBM_Plex_Sans, Manrope } from "next/font/google"
 import { AuthProvider } from "@/components/providers"
 import { SyncProvider } from "@/components/offline/sync-provider"
 import { FarmOnboardingGate } from "@/components/providers/farm-onboarding-gate"
@@ -8,6 +9,10 @@ import { ToastProvider } from "@/components/shared/toast-provider"
 import { NotificationsProvider } from "@/components/notifications/notifications-provider"
 import { ReactQueryProvider } from "@/lib/react-query-provider"
 import "./globals.css"
+
+// The daily planner's typefaces: IBM Plex Sans for text, Manrope for headings.
+const plexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-plex", display: "swap" })
+const manrope = Manrope({ subsets: ["latin"], weight: ["400", "600", "700", "800"], variable: "--font-manrope", display: "swap" })
 
 // Resolve the canonical site URL from configuration only -- explicit env first,
 // then the values Vercel injects automatically, and finally the local dev
@@ -41,10 +46,10 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/use this.png",
-        width: 60,
-        height: 60,
-        alt: "SUSTAIN Aquasmart logo",
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "SUSTAIN Aquasmart",
       },
     ],
   },
@@ -52,12 +57,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SUSTAIN Aquasmart - Aquaculture Management Dashboard",
     description: "Real-time monitoring and management system for aquaculture farm operations",
-    images: ["/use this.png"],
+    images: ["/og-image.png"],
   },
   manifest: "/manifest.json",
   icons: {
-    icon: "/use this.png",
-    apple: "/use this.png",
+    icon: "/icon.png",
+    apple: "/icon.png",
   },
 }
 
@@ -67,7 +72,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${plexSans.variable} ${manrope.variable}`}>
       <head />
       <body className={`font-sans antialiased`}>
         <ReactQueryProvider>

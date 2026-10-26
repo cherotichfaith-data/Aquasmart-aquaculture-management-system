@@ -308,7 +308,7 @@ function AlertThresholdsSection({
       step: "0.1",
       min: 0,
       max: 20,
-      placeholder: "e.g. 4.0",
+      placeholder: "4.0",
       hint: "Alert fires when DO drops below this value. Tilapia: 4.0 mg/L recommended.",
       value: settings.lowDoThreshold,
     },
@@ -318,7 +318,7 @@ function AlertThresholdsSection({
       step: "0.01",
       min: 0,
       max: 10,
-      placeholder: "e.g. 1.0",
+      placeholder: "1.0",
       hint: "Alert fires when TAN exceeds this value. Safe limit: < 0.5 mg/L; danger: > 1.0 mg/L.",
       value: settings.highAmmoniaThreshold,
     },
@@ -328,7 +328,7 @@ function AlertThresholdsSection({
       step: "0.01",
       min: 0,
       max: 100,
-      placeholder: "e.g. 0.5",
+      placeholder: "0.5",
       hint: "Alert fires when daily mortality rate exceeds this percentage. Healthy: < 0.1% / day.",
       value: settings.highMortalityThreshold,
     },
@@ -386,7 +386,7 @@ function SaveSettingsButton({
   return (
     <div className="flex items-center justify-end gap-4">
       {saved && (
-        <span className="flex items-center gap-1.5 text-sm font-medium text-success">
+        <span className="flex items-center gap-1.5 text-sm font-medium text-success-foreground">
           <CheckCircle2 size={16} className="shrink-0" />
           Settings saved
         </span>
@@ -597,13 +597,13 @@ export default function SettingsPage({
         {saved ? (
           <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 px-4 py-3">
             <Check className="shrink-0 text-success" size={18} />
-            <p className="text-sm font-medium text-success">Settings saved, changes are now active.</p>
+            <p className="text-sm font-medium text-success-foreground">Settings saved, changes are now active.</p>
           </div>
         ) : null}
         {errorMsg ? (
           <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
             <AlertCircle className="text-destructive" size={20} />
-            <p className="font-medium text-destructive">{errorMsg}</p>
+            <p className="font-medium text-destructive-strong">{errorMsg}</p>
           </div>
         ) : null}
         {missingFarmAssignment ? (
@@ -612,8 +612,8 @@ export default function SettingsPage({
               <AlertCircle className="mt-0.5 text-warning" size={20} />
               <div className="space-y-4">
                 <div>
-                  <p className="font-medium text-warning">Set up or join a farm first</p>
-                  <p className="mt-2 text-sm leading-6 text-warning/90">
+                  <p className="font-medium text-warning-foreground">Set up or join a farm first</p>
+                  <p className="mt-2 text-sm leading-6 text-warning-foreground/90">
                     Settings are only available after you have farm access.
                   </p>
                 </div>

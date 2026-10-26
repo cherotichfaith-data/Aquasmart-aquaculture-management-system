@@ -1,8 +1,6 @@
 "use client"
 
 import Image from "next/image"
-import { LogOut } from "lucide-react"
-import { useAuth } from "@/components/providers/auth-provider"
 
 export function OnboardingShell({
   title,
@@ -13,31 +11,21 @@ export function OnboardingShell({
   description: string
   children: React.ReactNode
 }) {
-  const { signOut } = useAuth()
-
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_78%,white),color-mix(in_srgb,var(--color-primary)_14%,white))] px-4 py-5 sm:px-5 lg:px-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-7">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-white/78">
-              <Image src="/use this.png" alt="SUSTAIN Aquasmart logo" width={28} height={28} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">SUSTAIN Aquasmart</p>
-              <p className="text-sm text-muted-foreground">Farm workspace setup</p>
-            </div>
+            <Image
+              src="/sustain-aquasmart-wordmark.png"
+              alt="SUSTAIN Aquasmart"
+              width={1200}
+              height={131}
+              className="h-8 w-auto"
+              priority
+            />
+            <p className="border-l border-primary/20 pl-3 text-sm text-muted-foreground">Farm workspace setup</p>
           </div>
-          <button
-            type="button"
-            onClick={async () => {
-              await signOut()
-            }}
-            className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-white/78 px-3 py-2 text-sm font-medium text-foreground transition hover:bg-primary/10"
-          >
-            <LogOut className="h-4 w-4" />
-            Log out
-          </button>
         </div>
 
         <div className="max-w-2xl">

@@ -3,8 +3,15 @@
 import { HardDriveDownload } from "lucide-react"
 import { hasPendingSyncMeta } from "@/lib/offline/result"
 import { Badge } from "@/components/app-ui/badge"
+import Link from "next/link"
+import { hasPendingApproval } from "@/lib/approvals"
 
 export function OfflineSaveBadge({ result }: { result: unknown }) {
+  if (hasPendingApproval(result)) {
+    return <div role="status" className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+      Submitted for manager approval. <Link href="/approvals" className="font-semibold underline">View submissions</Link>
+    </div>
+  }
   if (!hasPendingSyncMeta(result) || !result.meta.pendingSync) {
     return null
   }
