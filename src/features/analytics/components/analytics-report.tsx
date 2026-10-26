@@ -422,12 +422,18 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           note="Recorded growth against the growth model. Batches are placed on the model's age axis (days since stocking plus the model age at their stocking weight) so batches stocked at different sizes can be compared; the dashed lines are the model scenarios."
         >
           <GrowthByBatchChart rows={data.growthByBatch} cycleToDate={cycleToDate} />
-          <AbwAgeChart
-            title="ABW against age - batches up to 450 days on the model"
-            points={data.abwPoints}
-            curves={data.growthCurve}
-            batchNames={growthBatchNames.filter((n) => Math.max(0, ...data.abwPoints.filter((p) => p.batch_name === n).map((p) => p.model_age_days)) <= 450)}
-          />
+          <div className="grid gap-4 xl:grid-cols-2">
+            {(["below100", "from100"] as const).map((weightBand) => (
+              <AbwAgeChart
+                key={weightBand}
+                title={`Weight at age · ${weightBand === "below100" ? "Below 100 g" : "100 g and above"}`}
+                weightBand={weightBand}
+                points={data.abwPoints}
+                curves={data.growthCurve}
+                batchNames={growthBatchNames.filter((n) => Math.max(0, ...data.abwPoints.filter((p) => p.batch_name === n).map((p) => p.model_age_days)) <= 450)}
+              />
+            ))}
+          </div>
           <SelectedBatchAbwChart points={data.abwPoints} curves={data.growthCurve} batchNames={growthBatchNames} />
         </Section>
       ) : null}
