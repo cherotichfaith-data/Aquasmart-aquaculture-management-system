@@ -12,8 +12,6 @@ import {
   buildDefaultPlannedActivityDate,
   formatPlannedActivityDateLabel,
   getLocalDateIso,
-  getTomorrowDateIso,
-  isThisWeek,
 } from "@/features/dashboard/planned-activities"
 
 export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }) {
@@ -90,8 +88,9 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
   }, [upcomingActivities])
 
   const plannedCount = upcomingActivities.filter((activity) => activity.status === "planned").length
-  const tomorrowCount = upcomingActivities.filter((activity) => activity.scheduled_date === getTomorrowDateIso()).length
-  const thisWeekCount = upcomingActivities.filter((activity) => isThisWeek(activity.scheduled_date)).length
+  // Counted by plan window, the way the daily report groups them: tomorrow's actions, and the task list for the next 7 days.
+  const tomorrowCount = upcomingActivities.filter((activity) => activity.planning_window === "tomorrow").length
+  const nextSevenDaysCount = upcomingActivities.filter((activity) => activity.planning_window === "this_week").length
 
   function resetForm(nextWindow: PlannedActivity["planning_window"]) {
     setTitle("")
@@ -186,7 +185,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
       <CardHeader className="gap-4 md:flex md:flex-row md:items-start md:justify-between">
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">{tomorrowCount} tomorrow</Badge>
-          <Badge variant="outline">{thisWeekCount} this week</Badge>
+          <Badge variant="outline">{nextSevenDaysCount} next 7 days</Badge>
           <Badge variant={plannedCount > 0 ? "neutral" : "outline"}>{plannedCount} pending</Badge>
         </div>
         {canCreate ? (
@@ -222,7 +221,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="tomorrow">Tomorrow</option>
-                  <option value="this_week">This week</option>
+                  <option value="this_week">Next 7 days</option>
                 </select>
               </div>
               <div className="grid gap-2">
@@ -292,7 +291,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium text-foreground">{activity.title}</p>
                               <Badge variant={activity.planning_window === "tomorrow" ? "secondary" : "outline"}>
-                                {activity.planning_window === "tomorrow" ? "Tomorrow" : "This week"}
+                                {activity.planning_window === "tomorrow" ? "Tomorrow" : "Next 7 days"}
                               </Badge>
                               <Badge variant={activity.status === "done" ? "positive" : "neutral"}>
                                 {activity.status === "done" ? "Done" : "Planned"}
