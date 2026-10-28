@@ -28,9 +28,10 @@ export function useSystemOptions(params?: {
    */
   stockedOnly?: boolean
 }) {
-  const { session, user, isLoading: authLoading } = useAuth()
-  const enabled =
-    !authLoading && (Boolean(session) || Boolean(user)) && Boolean(params?.farmId) && (params?.enabled ?? true)
+  const { session, user } = useAuth()
+  // The lists are read on the server (cookie session), so they only need a farm -- not the browser's auth
+  // state to have finished loading.
+  const enabled = Boolean(params?.farmId) && (params?.enabled ?? true)
   const query = useQuery({
     queryKey: queryKeys.options.systems({ ...params, userId: user?.id }),
     queryFn: ({ signal }) => getSystemOptions({ ...params, accessToken: session?.access_token, signal }),
@@ -64,8 +65,8 @@ export function useBatchOptions(params?: {
   farmId?: string | null
   activeOnly?: boolean
 }) {
-  const { session, user, isLoading: authLoading } = useAuth()
-  const enabled = !authLoading && (Boolean(session) || Boolean(user)) && Boolean(params?.farmId)
+  const { session, user } = useAuth()
+  const enabled = Boolean(params?.farmId)
   return useQuery({
     queryKey: queryKeys.options.batches({ ...params, userId: user?.id }),
     queryFn: ({ signal }) => getBatchOptions({ ...params, accessToken: session?.access_token, signal }),

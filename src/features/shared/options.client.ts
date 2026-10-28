@@ -34,6 +34,33 @@ type OptionsRpcRow<Name extends OptionsRpcName> = Database["public"]["Functions"
 
 const empty = <T,>(): QueryResult<T> => toQuerySuccess<T>([])
 
+/**
+ * Cage/batch option lists are read on the server (`/api/options`, signed-in cookie session) first, so they
+ * do not depend on the browser's own auth state being ready. Returns null when the server read is
+ * unavailable, and the caller falls back to the direct browser read.
+ */
+async function fetchServerOptions<Row>(
+  kind: "systems" | "batches",
+  params: { farmId: string; activeOnly?: boolean; stage?: string },
+  signal?: AbortSignal,
+): Promise<Row[] | null> {
+  try {
+    const search = new URLSearchParams({ kind, farmId: params.farmId })
+    if (params.activeOnly != null) search.set("activeOnly", String(params.activeOnly))
+    if (params.stage && params.stage !== "all") search.set("stage", params.stage)
+    const response = await fetch(`/api/options?${search.toString()}`, {
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    })
+    if (!response.ok) return null
+    const body = (await response.json().catch(() => null)) as { status?: string; data?: Row[] } | null
+    return body?.status === "success" && Array.isArray(body.data) ? body.data : null
+  } catch {
+    return null
+  }
+}
+
 const isQuietTableError = (err: unknown): boolean =>
   isAbortLikeError(err) || isSbPermissionDenied(err) || isSbAuthMissing(err)
 
@@ -57,9 +84,31 @@ export async function getSystemOptions(params?: {
 }): Promise<QueryResult<SystemListItem>> {
   if (!params?.farmId) return empty<SystemListItem>()
 
-  // "api_system_options_rpc" is scoped by the same RLS the caller's own
-  // session already carries -- no server hop needed to enforce anything
-  // the database doesn't already enforce for a direct call.
+  type SystemOptionsRpcRow = OptionsRpcRow<"api_system_options_rpc">
+  const toListItems = (rows: SystemOptionsRpcRow[] | null): SystemListItem[] =>
+    (rows ?? []).map((row) => ({
+      cage_status: null,
+      farm_id: row.farm_id,
+      farm_name: row.farm_name ?? "",
+      growth_stage: row.growth_stage,
+      id: row.id,
+      is_active: row.is_active,
+      label: formatSystemOptionLabel({ id: row.id, name: row.name ?? null, unit: row.unit ?? null }),
+      name: row.name ?? null,
+      type: row.type,
+      unit: row.unit ?? null,
+    }))
+
+  // Primary source: the server reads the database with the signed-in cookie session, so the list never
+  // waits on (or gets stuck behind) the browser's own auth state.
+  const fromServer = await fetchServerOptions<SystemOptionsRpcRow>(
+    "systems",
+    { farmId: params.farmId, activeOnly: params.activeOnly ?? true, stage: params.stage },
+    params.signal,
+  )
+  if (fromServer) return toQuerySuccess<SystemListItem>(toListItems(fromServer))
+  if (params.signal?.aborted) return empty<SystemListItem>()
+
   const clientResult = await getClientOrError("getSystemOptions", {
     requireSession: true,
     accessToken: params.accessToken,
@@ -67,7 +116,6 @@ export async function getSystemOptions(params?: {
   if ("error" in clientResult) return clientResult.error
   const { supabase } = clientResult
 
-  type SystemOptionsRpcRow = OptionsRpcRow<"api_system_options_rpc">
   const rpcArgs = {
     p_farm_id: params.farmId,
     p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
@@ -87,19 +135,7 @@ export async function getSystemOptions(params?: {
     sourceRows = viaServer.data
   }
 
-  const rows: SystemListItem[] = (sourceRows ?? []).map((row) => ({
-    cage_status: null,
-    farm_id: row.farm_id,
-    farm_name: row.farm_name ?? "",
-    growth_stage: row.growth_stage,
-    id: row.id,
-    is_active: row.is_active,
-    label: formatSystemOptionLabel({ id: row.id, name: row.name ?? null, unit: row.unit ?? null }),
-    name: row.name ?? null,
-    type: row.type,
-    unit: row.unit ?? null,
-  }))
-  return toQuerySuccess<SystemListItem>(rows)
+  return toQuerySuccess<SystemListItem>(toListItems(sourceRows))
 }
 
 export async function getBatchOptions(params?: {
@@ -109,6 +145,15 @@ export async function getBatchOptions(params?: {
   signal?: AbortSignal
 }): Promise<QueryResult<BatchListItem>> {
   if (!params?.farmId) return empty<BatchListItem>()
+
+  // Primary source: the server reads the database with the signed-in cookie session (see getSystemOptions).
+  const fromServer = await fetchServerOptions<BatchListItem>(
+    "batches",
+    { farmId: params.farmId, activeOnly: params.activeOnly },
+    params.signal,
+  )
+  if (fromServer) return toQuerySuccess<BatchListItem>(fromServer)
+  if (params.signal?.aborted) return empty<BatchListItem>()
 
   const clientResult = await getClientOrError("getBatchOptions", {
     requireSession: true,
