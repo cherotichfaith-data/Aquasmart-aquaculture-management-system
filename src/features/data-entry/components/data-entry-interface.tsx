@@ -17,6 +17,7 @@ import type { Database, Tables } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 import { DataEntryNavigation } from "./data-entry-navigation"
 import type { BatchOptionItem } from "@/features/shared/batch-options"
+import type { FeedSupplierOptionRow, FingerlingSupplierOptionRow } from "@/features/shared/query-seed.server"
 
 type DataEntryTabId =
     | "feeding"
@@ -34,6 +35,8 @@ interface DataEntryInterfaceProps {
     farmRole?: Database["public"]["Tables"]["farm_user"]["Row"]["role"] | null
     systems: SystemOption[]
     feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
+    feedSuppliers?: FeedSupplierOptionRow[]
+    fingerlingSuppliers?: FingerlingSupplierOptionRow[]
     batches: BatchOptionItem[]
     recentEntries: {
         mortality: Tables<"fish_mortality">[]
@@ -93,6 +96,8 @@ export function DataEntryInterface({
     farmRole = null,
     systems,
     feeds,
+    feedSuppliers = [],
+    fingerlingSuppliers = [],
     batches,
     recentEntries,
     tab,
@@ -158,6 +163,8 @@ export function DataEntryInterface({
                         farmId={farmId}
                         systems={systems}
                         feeds={feeds}
+                        feedSuppliers={feedSuppliers}
+                        canCreateFeedType={farmRole === "admin" || farmRole === "farm_manager"}
                         batches={batches}
                         defaultSystemId={defaultSystemId}
                         onSystemChange={setLiveSystemId}
@@ -210,6 +217,7 @@ export function DataEntryInterface({
                         farmId={farmId}
                         systems={systems}
                         batches={batches}
+                        suppliers={fingerlingSuppliers}
                         defaultSystemId={defaultSystemId}
                         defaultBatchId={defaultBatchId}
                         onSystemChange={setLiveSystemId}

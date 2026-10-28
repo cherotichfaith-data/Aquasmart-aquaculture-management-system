@@ -98,6 +98,30 @@ export async function listFeedTypeOptionRows(
   return (data ?? []) as FeedTypeOptionRow[]
 }
 
+export type FeedSupplierOptionRow = Pick<Database["public"]["Tables"]["feed_supplier"]["Row"], "id" | "company_name">
+
+export async function listFeedSupplierRows(supabase: ServerClient): Promise<FeedSupplierOptionRow[]> {
+  const { data, error } = await supabase.from("feed_supplier").select("id, company_name").order("company_name", { ascending: true })
+  if (error) return []
+
+  return (data ?? []) as FeedSupplierOptionRow[]
+}
+
+export type FingerlingSupplierOptionRow = Pick<
+  Database["public"]["Tables"]["fingerling_supplier"]["Row"],
+  "id" | "company_name" | "location_country" | "location_city"
+>
+
+export async function listFingerlingSupplierRows(supabase: ServerClient): Promise<FingerlingSupplierOptionRow[]> {
+  const { data, error } = await supabase
+    .from("fingerling_supplier")
+    .select("id, company_name, location_country, location_city")
+    .order("company_name", { ascending: true })
+  if (error) return []
+
+  return (data ?? []) as FingerlingSupplierOptionRow[]
+}
+
 export async function listAlertThresholdRows(
   supabase: ServerClient,
   farmId: string,

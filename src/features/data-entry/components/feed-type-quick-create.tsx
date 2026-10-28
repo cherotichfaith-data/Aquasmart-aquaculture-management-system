@@ -6,7 +6,7 @@ import { Button } from "@/components/app-ui/button"
 import { Input } from "@/components/app-ui/input"
 import { Label } from "@/components/app-ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
-import { useFeedSupplierOptions } from "@/lib/hooks/use-options"
+import type { FeedSupplierOptionRow } from "@/features/shared/query-seed.server"
 import { useCreateFeedType } from "@/lib/hooks/use-reference-data"
 import { Constants, type Database } from "@/lib/types/database"
 
@@ -14,14 +14,14 @@ type FeedTypeOption = Database["public"]["Functions"]["api_feed_type_options_rpc
 
 interface FeedTypeQuickCreateProps {
   farmId: string | null
+  /** Feed suppliers already in the backend, loaded with the page. */
+  suppliers: FeedSupplierOptionRow[]
   onCreated?: (feed: FeedTypeOption) => void
 }
 
 /** Adds a feed type for this farm (e.g. a new pellet size) so it can be picked in the feeding and inventory forms. */
-export function FeedTypeQuickCreate({ farmId, onCreated }: FeedTypeQuickCreateProps) {
-  const suppliersQuery = useFeedSupplierOptions()
+export function FeedTypeQuickCreate({ farmId, suppliers, onCreated }: FeedTypeQuickCreateProps) {
   const createFeedType = useCreateFeedType()
-  const suppliers = suppliersQuery.data?.status === "success" ? suppliersQuery.data.data : []
 
   const [feedLine, setFeedLine] = useState("")
   const [supplierId, setSupplierId] = useState("")
@@ -84,9 +84,9 @@ export function FeedTypeQuickCreate({ farmId, onCreated }: FeedTypeQuickCreatePr
         </div>
         <div className="space-y-2">
           <Label>Supplier</Label>
-          <Select value={supplierId} onValueChange={setSupplierId} disabled={suppliersQuery.isLoading || suppliers.length === 0}>
+          <Select value={supplierId} onValueChange={setSupplierId} disabled={suppliers.length === 0}>
             <SelectTrigger>
-              <SelectValue placeholder={suppliersQuery.isLoading ? "Loading suppliers..." : suppliers.length === 0 ? "No suppliers found" : "Select supplier"} />
+              <SelectValue placeholder={suppliers.length === 0 ? "No suppliers found" : "Select supplier"} />
             </SelectTrigger>
             <SelectContent>
               {suppliers.map((supplier) => (

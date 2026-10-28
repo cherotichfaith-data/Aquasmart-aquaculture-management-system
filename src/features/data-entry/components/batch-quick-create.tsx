@@ -6,20 +6,17 @@ import { Button } from "@/components/app-ui/button"
 import { Input } from "@/components/app-ui/input"
 import { Label } from "@/components/app-ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/app-ui/select"
-import { useFingerlingSupplierOptions } from "@/lib/hooks/use-options"
+import type { FingerlingSupplierOptionRow } from "@/features/shared/query-seed.server"
 import { useCreateFingerlingBatch, useCreateFingerlingSupplier } from "@/lib/hooks/use-reference-data"
 import type { Database } from "@/lib/types/database"
 
-type FingerlingSupplierOption = Pick<
-  Database["public"]["Tables"]["fingerling_supplier"]["Row"],
-  "company_name" | "id" | "location_country"
-> & {
-  location_city: string
-}
+type FingerlingSupplierOption = FingerlingSupplierOptionRow
 
 interface BatchQuickCreateProps {
   farmId: string | null
   systemId?: number | null
+  /** Fingerling suppliers already in the database, loaded with the page. */
+  suppliers?: FingerlingSupplierOptionRow[]
   onCreated?: (
     batch: Database["public"]["Tables"]["fingerling_batch"]["Row"] & {
       supplier_name?: string | null
@@ -27,26 +24,18 @@ interface BatchQuickCreateProps {
   ) => void
 }
 
-export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQuickCreateProps) {
-  const suppliersQuery = useFingerlingSupplierOptions()
+export function BatchQuickCreate({ farmId, systemId = null, suppliers: loadedSuppliers = [], onCreated }: BatchQuickCreateProps) {
   const createBatch = useCreateFingerlingBatch()
   const createSupplier = useCreateFingerlingSupplier()
 
-  const suppliersError =
-    suppliersQuery.data?.status === "error"
-      ? suppliersQuery.data.error
-      : suppliersQuery.error instanceof Error
-        ? suppliersQuery.error.message
-        : null
   const [createdSuppliers, setCreatedSuppliers] = useState<FingerlingSupplierOption[]>([])
   const suppliers = useMemo(() => {
-    const loadedSuppliers = suppliersQuery.data?.status === "success" ? suppliersQuery.data.data : []
     const existingIds = new Set(loadedSuppliers.map((supplier) => supplier.id))
     return [
       ...createdSuppliers.filter((supplier) => !existingIds.has(supplier.id)),
       ...loadedSuppliers,
     ]
-  }, [createdSuppliers, suppliersQuery.data])
+  }, [createdSuppliers, loadedSuppliers])
 
   const [batchName, setBatchName] = useState("")
   const [dateOfDelivery, setDateOfDelivery] = useState(new Date().toISOString().split("T")[0])
@@ -86,7 +75,7 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
   const [supplierCountry, setSupplierCountry] = useState("")
   const [supplierCity, setSupplierCity] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const showSupplierEditor = showSupplierForm || (!suppliersQuery.isLoading && suppliers.length === 0)
+  const showSupplierEditor = showSupplierForm || suppliers.length === 0
 
   async function handleCreateSupplier() {
     if (!supplierName.trim() || !supplierCountry.trim()) {
@@ -106,7 +95,7 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
         id: created.data.id,
         company_name: created.data.company_name,
         location_country: created.data.location_country,
-        location_city: created.data.location_city ?? "",
+        location_city: created.data.location_city ?? null,
       }
 
       setCreatedSuppliers((current) => [option, ...current.filter((supplier) => supplier.id !== option.id)])
@@ -188,23 +177,9 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
         </div>
         <div className="space-y-2">
           <Label>Supplier</Label>
-          <Select
-            value={supplierId}
-            onValueChange={setSupplierId}
-            disabled={suppliersQuery.isLoading || Boolean(suppliersError) || suppliers.length === 0}
-          >
+          <Select value={supplierId} onValueChange={setSupplierId} disabled={suppliers.length === 0}>
             <SelectTrigger>
-              <SelectValue
-                placeholder={
-                  suppliersQuery.isLoading
-                    ? "Loading suppliers..."
-                    : suppliersError
-                      ? "Unable to load suppliers"
-                    : suppliers.length === 0
-                      ? "No suppliers found"
-                      : "Select supplier"
-                }
-              />
+              <SelectValue placeholder={suppliers.length === 0 ? "No suppliers found" : "Select supplier"} />
             </SelectTrigger>
             <SelectContent>
               {suppliers.map((supplier) => (
@@ -214,14 +189,8 @@ export function BatchQuickCreate({ farmId, systemId = null, onCreated }: BatchQu
               ))}
             </SelectContent>
           </Select>
-          {suppliersError ? <p className="text-xs text-destructive-strong">{suppliersError}</p> : null}
-          {!suppliersQuery.isLoading && suppliers.length === 0 ? (
+          {suppliers.length === 0 ? (
             <p className="text-xs text-muted-foreground">No fingerling suppliers were found.</p>
-          ) : null}
-          {suppliersError ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => suppliersQuery.refetch()}>
-              Retry suppliers
-            </Button>
           ) : null}
         </div>
         <div className="space-y-2">

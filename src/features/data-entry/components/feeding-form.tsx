@@ -25,6 +25,7 @@ import { formatCageLabel, type SystemOption } from "@/lib/system-options"
 import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { resolveBatchIdForSystem, type BatchOptionItem } from "@/features/shared/batch-options"
+import type { FeedSupplierOptionRow } from "@/features/shared/query-seed.server"
 import {
   findUnitForSystem,
   getSystemUnits,
@@ -101,6 +102,8 @@ interface FeedingFormProps {
   farmId: string | null
   systems: SystemOption[]
   feeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
+  feedSuppliers?: FeedSupplierOptionRow[]
+  canCreateFeedType?: boolean
   batches: BatchOptionItem[]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
@@ -145,6 +148,8 @@ export function FeedingForm({
   farmId,
   systems,
   feeds,
+  feedSuppliers = [],
+  canCreateFeedType = false,
   batches,
   defaultSystemId = null,
   onSystemChange,
@@ -317,14 +322,17 @@ export function FeedingForm({
         </div>
       ) : null}
 
-      <div className="flex justify-end">
-        <Button type="button" variant="outline" onClick={() => setShowFeedTypeCreate((current) => !current)}>
-          {showFeedTypeCreate ? "Hide feed type form" : "Add New Feed Type"}
-        </Button>
-      </div>
-      {showFeedTypeCreate ? (
+      {canCreateFeedType ? (
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" onClick={() => setShowFeedTypeCreate((current) => !current)}>
+            {showFeedTypeCreate ? "Hide feed type form" : "Add New Feed Type"}
+          </Button>
+        </div>
+      ) : null}
+      {canCreateFeedType && showFeedTypeCreate ? (
         <FeedTypeQuickCreate
           farmId={farmId}
+          suppliers={feedSuppliers}
           onCreated={(feed) => {
             setCreatedFeeds((current) => [feed, ...current.filter((item) => item.id !== feed.id)])
             form.setValue("feed_id", String(feed.id), { shouldValidate: true })
