@@ -20,6 +20,7 @@ import BatchReportTable from "./batch-report-table"
 import StockProfileChart, { classLabel } from "./stock-profile-chart"
 import { AbwAgeChart, GrowthByBatchChart, SelectedBatchAbwChart, StockLossChart } from "./growth-charts"
 import { DASH, ReportTable, dateText, num, pct, type Column } from "./report-table"
+import { CopyZoom } from "@/components/shared/copy-zoom"
 import "@/features/reports/monthly/monthly-reports.css"
 
 function dayLabel(date: string) {
@@ -367,29 +368,33 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           noteAsInfo
           note={`Fish in the cages at the end of the period, grouped by each cage's average weight, against the ideal if ${num(data.forwardPlanInputs.plannedFish)} juveniles were stocked every month and grown on the ${data.forwardPlanInputs.scenario} growth model.`}
         >
-          <StockProfileChart rows={data.stockProfile} />
-          <div className="plan-scroll">
-            <table className="plan-table">
-              <thead>
-                <tr>
-                  <th>Weight class (g)</th>
-                  <th>Ideal fish</th>
-                  <th>Recorded fish</th>
-                  <th>Cages</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.stockProfile.map((r) => (
-                  <tr key={r.class_no}>
-                    <td>{classLabel(r)}</td>
-                    <td className="n">{r.ideal_fish > 0 ? num(r.ideal_fish) : DASH}</td>
-                    <td className="n">{r.recorded_fish > 0 ? num(r.recorded_fish) : DASH}</td>
-                    <td>{r.cage_names?.length ? r.cage_names.join(", ") : DASH}</td>
+          <CopyZoom type="chart" name="Stock profile chart">
+            <StockProfileChart rows={data.stockProfile} />
+          </CopyZoom>
+          <CopyZoom type="table" name="Stock profile table">
+            <div className="plan-scroll">
+              <table className="plan-table">
+                <thead>
+                  <tr>
+                    <th>Weight class (g)</th>
+                    <th>Ideal fish</th>
+                    <th>Recorded fish</th>
+                    <th>Cages</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.stockProfile.map((r) => (
+                    <tr key={r.class_no}>
+                      <td>{classLabel(r)}</td>
+                      <td className="n">{r.ideal_fish > 0 ? num(r.ideal_fish) : DASH}</td>
+                      <td className="n">{r.recorded_fish > 0 ? num(r.recorded_fish) : DASH}</td>
+                      <td>{r.cage_names?.length ? r.cage_names.join(", ") : DASH}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CopyZoom>
         </Section>
       ) : null}
 
@@ -399,7 +404,9 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           noteAsInfo
           note="Forecast is what the farm should hold and harvest if every stocking followed the growth model (past months) and the forward plan (coming months). Recorded is from the farm's records. The growth scenario and stocking plan under Forward Planning drive it."
         >
-          <ForecastTable rows={data.farmForecast} />
+          <CopyZoom type="table" name="Biomass and harvest forecast">
+            <ForecastTable rows={data.farmForecast} />
+          </CopyZoom>
         </Section>
       ) : null}
 
@@ -416,12 +423,16 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
             scenario={data.forwardPlanInputs.scenario}
             onApply={onPlanApply}
           />
-          <ForwardPlanningTable rows={data.forwardPlan} />
+          <CopyZoom type="table" name="Forward planning">
+            <ForwardPlanningTable rows={data.forwardPlan} />
+          </CopyZoom>
         </Section>
       ) : null}
       {show("batches") ? (
         <Section title={`Stock Loss Analysis - ${label}`} note="Stock loss (%) per batch, as in the Detailed Batch Report.">
-          <StockLossChart rows={data.batches} />
+          <CopyZoom type="chart" name="Stock loss chart">
+            <StockLossChart rows={data.batches} />
+          </CopyZoom>
         </Section>
       ) : null}
 
@@ -431,7 +442,9 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           title={`Detailed Batch Report - ${label}`}
           note="Stock, ABW and biomass are as at the end of the period. Mortality, cage corrections, harvest, growth and feed are for the period; accumulated eFCR runs from stocking."
         >
-          <BatchReportTable rows={data.batches} />
+          <CopyZoom type="table" name="Detailed batch report">
+            <BatchReportTable rows={data.batches} />
+          </CopyZoom>
         </Section>
       ) : null}
 
@@ -442,14 +455,20 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           noteAsInfo
           note="Recorded growth against the growth model. Batches are placed on the model's age axis (days since stocking plus the model age at their stocking weight) so batches stocked at different sizes can be compared; the dashed lines are the model scenarios."
         >
-          <GrowthByBatchChart rows={data.growthByBatch} cycleToDate={cycleToDate} />
-          <AbwAgeChart
-            title="ABW against age - batches up to 450 days on the model"
-            points={data.abwPoints}
-            curves={data.growthCurve}
-            batchNames={growthBatchNames.filter((n) => Math.max(0, ...data.abwPoints.filter((p) => p.batch_name === n).map((p) => p.model_age_days)) <= 450)}
-          />
-          <SelectedBatchAbwChart points={data.abwPoints} curves={data.growthCurve} batchNames={growthBatchNames} />
+          <CopyZoom type="chart" name="Growth per batch chart">
+            <GrowthByBatchChart rows={data.growthByBatch} cycleToDate={cycleToDate} />
+          </CopyZoom>
+          <CopyZoom type="chart" name="ABW against age chart">
+            <AbwAgeChart
+              title="ABW against age - batches up to 450 days on the model"
+              points={data.abwPoints}
+              curves={data.growthCurve}
+              batchNames={growthBatchNames.filter((n) => Math.max(0, ...data.abwPoints.filter((p) => p.batch_name === n).map((p) => p.model_age_days)) <= 450)}
+            />
+          </CopyZoom>
+          <CopyZoom type="chart" name="Selected batch ABW chart">
+            <SelectedBatchAbwChart points={data.abwPoints} curves={data.growthCurve} batchNames={growthBatchNames} />
+          </CopyZoom>
         </Section>
       ) : null}
 
@@ -458,12 +477,14 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           title={`ABW Increase and Feed Fed vs Expectation - ${label}`}
           note="Expected feed uses the growth model feeding rates for each day's fish size and biomass."
         >
-          <ReportTable
-            columns={FEED_COLUMNS}
-            rows={data.feedVsExpected}
-            rowKey={(r) => String(r.system_id)}
-            emptyText="No cages with fish in this period."
-          />
+          <CopyZoom type="table" name="ABW increase and feed fed vs expectation">
+            <ReportTable
+              columns={FEED_COLUMNS}
+              rows={data.feedVsExpected}
+              rowKey={(r) => String(r.system_id)}
+              emptyText="No cages with fish in this period."
+            />
+          </CopyZoom>
         </Section>
       ) : null}
 
@@ -473,17 +494,21 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           note={`Cages with a harvest in the selected period and a reconciled zero balance at their last harvest. Figures cover only the batch in that cage. Unit is the recorded cage unit. ${HARVEST_METHOD_NOTE}`}
           noteAsInfo
         >
-          <ReportTable
-            columns={HARVEST_COLUMNS}
-            rows={data.cageHarvests}
-            rowKey={(r) => `${r.cycle_id}:${r.system_id}`}
-            emptyText="No fully harvested cages are confirmed for this period."
-          />
+          <CopyZoom type="table" name="Cage harvest report">
+            <ReportTable
+              columns={HARVEST_COLUMNS}
+              rows={data.cageHarvests}
+              rowKey={(r) => `${r.cycle_id}:${r.system_id}`}
+              emptyText="No fully harvested cages are confirmed for this period."
+            />
+          </CopyZoom>
         </Section>
       ) : null}
       {show("harvests") ? (
         <Section title={`Batch Harvest Report - ${label}`} note={`Completed batches harvested in the selected period. Figures cover all cages from stocking through final harvest. ${HARVEST_METHOD_NOTE}`} noteAsInfo>
-          <ReportTable columns={BATCH_HARVEST_COLUMNS} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No fully harvested batches are confirmed for this period." />
+          <CopyZoom type="table" name="Batch harvest report">
+            <ReportTable columns={BATCH_HARVEST_COLUMNS} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No fully harvested batches are confirmed for this period." />
+          </CopyZoom>
         </Section>
       ) : null}
 
