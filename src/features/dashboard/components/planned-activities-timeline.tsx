@@ -192,7 +192,8 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
       <CardHeader className="gap-4 md:flex md:flex-row md:items-start md:justify-between">
         <div className="flex flex-wrap gap-2">
           {todayCount > 0 ? <Badge variant="outline">{todayCount} today</Badge> : null}
-          <Badge variant="outline">{tomorrowCount} tomorrow</Badge>
+          {/* Only once today's report has planned tomorrow; at midnight those items become "today". */}
+          {tomorrowCount > 0 ? <Badge variant="outline">{tomorrowCount} tomorrow</Badge> : null}
           <Badge variant="outline">{nextSevenDaysCount} next 7 days</Badge>
           <Badge variant={plannedCount > 0 ? "neutral" : "outline"}>{plannedCount} pending</Badge>
         </div>
