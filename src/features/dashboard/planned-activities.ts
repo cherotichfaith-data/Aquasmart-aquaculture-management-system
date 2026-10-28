@@ -11,6 +11,8 @@ export type PlannedActivity = {
   planning_window: PlannedActivityWindow
   status: PlannedActivityStatus
   completed_at: string | null
+  /** 'daily_report' for activities imported from the daily planner reports; null when added by hand. */
+  source: string | null
   created_at: string
   updated_at: string
 }

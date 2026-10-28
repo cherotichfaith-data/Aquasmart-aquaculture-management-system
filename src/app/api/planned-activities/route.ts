@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiUser } from "@/lib/server/auth"
 import {
+  canCreatePlannedActivity,
   createPlannedActivity,
   listPlannedActivitiesForFarm,
 } from "@/features/dashboard/planned-activities.server"
@@ -25,8 +26,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const activities = await listPlannedActivitiesForFarm(farmId, auth.supabase)
-    return NextResponse.json({ data: activities })
+    const [activities, canCreate] = await Promise.all([
+      listPlannedActivitiesForFarm(farmId, auth.supabase),
+      canCreatePlannedActivity(farmId, auth.user.id, auth.supabase),
+    ])
+    return NextResponse.json({ data: activities, canCreate })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load planned activities."
     const status = /do not have access|unauthorized/i.test(message) ? 403 : 500
@@ -44,6 +48,10 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message ?? "Invalid request body." : "Invalid request body."
     return NextResponse.json({ error: message }, { status: 400 })
+  }
+
+  if (!(await canCreatePlannedActivity(payload.farmId, auth.user.id, auth.supabase))) {
+    return NextResponse.json({ error: "Only farm managers and admins can add one-off tasks." }, { status: 403 })
   }
 
   try {

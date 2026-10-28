@@ -58,6 +58,8 @@ export type Database = {
           notes: string
           planning_window: string
           scheduled_date: string
+          source: string | null
+          source_key: string | null
           status: string
           title: string
           updated_at: string
@@ -71,6 +73,8 @@ export type Database = {
           notes?: string
           planning_window: string
           scheduled_date: string
+          source?: string | null
+          source_key?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -84,6 +88,8 @@ export type Database = {
           notes?: string
           planning_window?: string
           scheduled_date?: string
+          source?: string | null
+          source_key?: string | null
           status?: string
           title?: string
           updated_at?: string

@@ -53,9 +53,26 @@ function mapPlannedActivityRow(row: PlannedActivityRow): PlannedActivity {
     planning_window: row.planning_window as PlannedActivityWindow,
     status: row.status as PlannedActivityStatus,
     completed_at: row.completed_at,
+    source: row.source ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
+}
+
+/** Hand-adding a one-off task is limited to farm managers and admins; routine work arrives from the daily reports. */
+export async function canCreatePlannedActivity(farmId: string, userId: string, supabase: AppSupabaseClient): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("farm_user")
+    .select("role")
+    .eq("farm_id", farmId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (error) {
+    logSbError("plannedActivities:role", error)
+    return false
+  }
+  return data?.role === "admin" || data?.role === "farm_manager"
 }
 
 /**
