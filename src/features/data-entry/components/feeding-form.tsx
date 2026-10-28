@@ -42,6 +42,7 @@ import {
   usePendingLatestEntries,
   type LatestEntrySummary,
 } from "./latest-entry-guard"
+import { FeedTypeQuickCreate } from "./feed-type-quick-create"
 import { SelectionChips } from "./selection-info"
 import { useEntrySequence } from "./entry-sequence"
 import { EntryDraft, ExistingEntryNotice } from "./entry-draft"
@@ -181,7 +182,12 @@ export function FeedingForm({
     feeds.find((feed) => String(feed.id) === selectedFeedValue)?.label ?? null
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? null
   const systemsForUnit = useMemo(() => getSystemsForUnit(systems, selectedUnit), [selectedUnit, systems])
-  const feedOptions = feeds
+  const [createdFeeds, setCreatedFeeds] = useState<FeedingFormProps["feeds"]>([])
+  const [showFeedTypeCreate, setShowFeedTypeCreate] = useState(false)
+  const feedOptions = useMemo(
+    () => [...createdFeeds.filter((created) => !feeds.some((feed) => feed.id === created.id)), ...feeds],
+    [createdFeeds, feeds],
+  )
   const resolvedBatchId = useMemo(
     () => resolveBatchIdForSystem(batches, selectedSystemId),
     [batches, selectedSystemId],
@@ -309,6 +315,22 @@ export function FeedingForm({
         <div className="data-entry-callout-alert rounded-md border border-warning/40 bg-warning/10 text-sm text-warning-foreground">
           No feed types are available for this farm yet.
         </div>
+      ) : null}
+
+      <div className="flex justify-end">
+        <Button type="button" variant="outline" onClick={() => setShowFeedTypeCreate((current) => !current)}>
+          {showFeedTypeCreate ? "Hide feed type form" : "Add New Feed Type"}
+        </Button>
+      </div>
+      {showFeedTypeCreate ? (
+        <FeedTypeQuickCreate
+          farmId={farmId}
+          onCreated={(feed) => {
+            setCreatedFeeds((current) => [feed, ...current.filter((item) => item.id !== feed.id)])
+            form.setValue("feed_id", String(feed.id), { shouldValidate: true })
+            setShowFeedTypeCreate(false)
+          }}
+        />
       ) : null}
 
       <Form {...form}>

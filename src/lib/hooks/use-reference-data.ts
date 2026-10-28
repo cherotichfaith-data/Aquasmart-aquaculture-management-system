@@ -2,6 +2,7 @@
 
 import { invalidateReferenceDataQueries } from "@/lib/cache/react-query"
 import {
+  createFeedTypeAction,
   createFingerlingBatchAction,
   createFingerlingSupplierAction,
 } from "@/features/farm/mutations.server"
@@ -14,6 +15,15 @@ export function useCreateFingerlingSupplier() {
       invalidateReferenceDataQueries(queryClient, { kind: "fingerling-suppliers" }),
     successMessage: "Fingerling supplier created.",
     errorMessage: "Failed to create fingerling supplier.",
+  })
+}
+
+export function useCreateFeedType() {
+  return useWriteThroughMutation({
+    mutationFn: createFeedTypeAction,
+    invalidate: ({ queryClient }) => invalidateReferenceDataQueries(queryClient, { kind: "feed-types" }),
+    successMessage: "Feed type created.",
+    errorMessage: "Failed to create feed type.",
   })
 }
 

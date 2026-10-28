@@ -2855,6 +2855,7 @@ export type Database = {
         | "0.5mm"
         | "0.5-1.0mm"
         | "0.9-1.6mm"
+        | "6mm"
       mortality_cause:
         | "unknown"
         | "hypoxia"
@@ -3074,6 +3075,7 @@ export const Constants = {
         "0.5mm",
         "0.5-1.0mm",
         "0.9-1.6mm",
+        "6mm",
       ],
       mortality_cause: [
         "unknown",
