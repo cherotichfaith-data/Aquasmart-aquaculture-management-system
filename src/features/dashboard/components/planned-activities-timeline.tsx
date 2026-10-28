@@ -27,6 +27,8 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
   const [date, setDate] = useState("")
   // Routine work arrives from the daily planner reports; the form is only for one-off tasks.
   const [showForm, setShowForm] = useState(false)
+  // Whether this user may add one-off tasks (farm managers and admins); decided by the server.
+  const [canCreate, setCanCreate] = useState(false)
 
   async function loadActivities(signal?: AbortSignal) {
     setIsLoading(true)
@@ -37,11 +39,14 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
         credentials: "include",
         signal,
       })
-      const payload = (await response.json().catch(() => null)) as { data?: PlannedActivity[]; error?: string } | null
+      const payload = (await response.json().catch(() => null)) as
+        | { data?: PlannedActivity[]; canCreate?: boolean; error?: string }
+        | null
       if (!response.ok) {
         throw new Error(payload?.error ?? "Unable to load planned activities.")
       }
       setActivities(payload?.data ?? [])
+      setCanCreate(payload?.canCreate === true)
     } catch (nextError) {
       if (signal?.aborted) return
       setError(nextError instanceof Error ? nextError.message : "Unable to load planned activities.")
@@ -184,13 +189,15 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
           <Badge variant="outline">{thisWeekCount} this week</Badge>
           <Badge variant={plannedCount > 0 ? "neutral" : "outline"}>{plannedCount} pending</Badge>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setShowForm((current) => !current)} aria-expanded={showForm}>
-          {showForm ? <X className="size-4" /> : <Plus className="size-4" />}
-          {showForm ? "Hide form" : "Add one-off task"}
-        </Button>
+        {canCreate ? (
+          <Button variant="outline" size="sm" onClick={() => setShowForm((current) => !current)} aria-expanded={showForm}>
+            {showForm ? <X className="size-4" /> : <Plus className="size-4" />}
+            {showForm ? "Hide form" : "Add one-off task"}
+          </Button>
+        ) : null}
       </CardHeader>
-      <CardContent className={showForm ? "grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" : "grid gap-6"}>
-        {showForm ? (
+      <CardContent className={canCreate && showForm ? "grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" : "grid gap-6"}>
+        {canCreate && showForm ? (
         <div className="rounded-xl border border-border/80 bg-muted/20 p-4">
           <div className="grid gap-3">
             <div className="grid gap-2">
@@ -255,7 +262,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
               <div className="text-sm text-muted-foreground">Loading activity planner...</div>
             ) : groupedActivities.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-sm text-muted-foreground">
-                No planned activities yet. Tomorrow&apos;s actions and the weekly task list from the daily planner reports appear here automatically; use &quot;Add one-off task&quot; for anything else.
+                No planned activities yet. Tomorrow&apos;s actions and the weekly task list from the daily planner reports appear here automatically{canCreate ? <>; use &quot;Add one-off task&quot; for anything else</> : null}.
               </div>
             ) : (
               <div className="space-y-5">
@@ -290,6 +297,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
                               <Badge variant={activity.status === "done" ? "positive" : "neutral"}>
                                 {activity.status === "done" ? "Done" : "Planned"}
                               </Badge>
+                              {activity.source === "daily_report" ? <Badge variant="outline">From daily report</Badge> : null}
                             </div>
                             {activity.notes ? (
                               <p className="text-sm leading-6 text-muted-foreground">{activity.notes}</p>
