@@ -3,6 +3,7 @@
 import type { Database, Enums } from "@/lib/types/database"
 import type { QueryResult } from "@/lib/supabase-client"
 import {
+  fetchRpc,
   getClientOrError,
   isAbortLikeError,
   queryOptionsRpc,
@@ -14,12 +15,13 @@ import {
 import type { SystemOption } from "@/lib/system-options"
 import { formatSystemOptionLabel } from "@/lib/system-options"
 import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
-import type { BatchOptionItem } from "@/features/shared/batch-options"
+import { attachResolvedSystemIdsToBatches, type BatchOptionItem } from "@/features/shared/batch-options"
 import { loadBatchOptionRows } from "@/features/shared/batch-options-source"
 
 type SystemListItem = SystemOption
 type BatchListItem = BatchOptionItem
 type FarmOptionRow = Database["public"]["Functions"]["api_farm_options_rpc"]["Returns"][number]
+type BatchOptionsRpcRow = Database["public"]["Functions"]["api_fingerling_batch_options_rpc"]["Returns"][number]
 type FingerlingSupplierTableRow = Pick<
   Database["public"]["Tables"]["fingerling_supplier"]["Row"],
   "company_name" | "id" | "location_city" | "location_country"
@@ -66,22 +68,26 @@ export async function getSystemOptions(params?: {
   const { supabase } = clientResult
 
   type SystemOptionsRpcRow = OptionsRpcRow<"api_system_options_rpc">
-  let query = queryOptionsRpc(supabase, "api_system_options_rpc", {
+  const rpcArgs = {
     p_farm_id: params.farmId,
     p_stage: params.stage && params.stage !== "all" ? params.stage : undefined,
     p_active_only: params.activeOnly ?? true,
-  })
+  }
+  let query = queryOptionsRpc(supabase, "api_system_options_rpc", rpcArgs)
   if (params.signal) query = query.abortSignal(params.signal)
 
-  const result = await resolveClientReadQuery<SystemOptionsRpcRow>({
-    tag: "getSystemOptions",
-    query,
-    signal: params.signal,
-    quietWhen: isQuietTableError,
-  })
-  if (result.status !== "success") return result
+  const { data, error } = await query
+  let sourceRows: SystemOptionsRpcRow[] | null = data as SystemOptionsRpcRow[] | null
+  if (error) {
+    if (params.signal?.aborted || isAbortLikeError(error)) return empty<SystemListItem>()
+    // The direct browser read failed (token not ready, expired session, permission). Never cache an empty
+    // list for that: read the same RPC through the server, which uses the signed-in cookie session.
+    const viaServer = await fetchRpc<SystemOptionsRpcRow>("getSystemOptions", "api_system_options_rpc", rpcArgs, params.signal)
+    if (viaServer.status !== "success") return viaServer
+    sourceRows = viaServer.data
+  }
 
-  const rows: SystemListItem[] = result.data.map((row) => ({
+  const rows: SystemListItem[] = (sourceRows ?? []).map((row) => ({
     cage_status: null,
     farm_id: row.farm_id,
     farm_name: row.farm_name ?? "",
@@ -121,8 +127,21 @@ export async function getBatchOptions(params?: {
     })
     return toQuerySuccess<BatchListItem>(rows)
   } catch (error) {
-    if (params.signal?.aborted || isQuietTableError(error)) return empty<BatchListItem>()
-    return toQueryError<BatchListItem>("getBatchOptions", error)
+    if (params.signal?.aborted || isAbortLikeError(error)) return empty<BatchListItem>()
+    // Direct browser read failed (token not ready, expired session, permission): read the same RPC through the
+    // server rather than caching an empty batch list.
+    const viaServer = await fetchRpc<BatchOptionsRpcRow>("getBatchOptions", "api_fingerling_batch_options_rpc", {
+      p_farm_id: params.farmId,
+      p_active_only: params.activeOnly ?? true,
+    }, params.signal)
+    if (viaServer.status !== "success") return toQueryError<BatchListItem>("getBatchOptions", error)
+    const rows = viaServer.data.filter((row) => Number.isFinite(row.id))
+    const batchSystemIds = new Map<number, number[]>()
+    for (const row of rows) {
+      const ids = (row.system_ids ?? []).map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)
+      batchSystemIds.set(row.id, ids.length ? ids : row.system_id != null ? [row.system_id] : [])
+    }
+    return toQuerySuccess<BatchListItem>(attachResolvedSystemIdsToBatches(rows, batchSystemIds, new Map()))
   }
 }
 
@@ -150,26 +169,6 @@ export async function getFingerlingSupplierOptions(params?: {
   return toQuerySuccess<FingerlingSupplierRow>(
     normalizeFingerlingSupplierOptions(data as FingerlingSupplierTableRow[] | null),
   )
-}
-
-export type FeedSupplierOption = Pick<Database["public"]["Tables"]["feed_supplier"]["Row"], "id" | "company_name">
-
-export async function getFeedSupplierOptions(params?: {
-  signal?: AbortSignal
-}): Promise<QueryResult<FeedSupplierOption>> {
-  const clientResult = await getClientOrError("getFeedSupplierOptions", { requireSession: true })
-  if ("error" in clientResult) return clientResult.error
-  const { supabase } = clientResult
-
-  let query = supabase.from("feed_supplier").select("id, company_name").order("company_name", { ascending: true })
-  if (params?.signal) query = query.abortSignal(params.signal)
-
-  const { data, error } = await query
-  if (error) {
-    if (params?.signal?.aborted || isAbortLikeError(error)) return empty<FeedSupplierOption>()
-    return toQueryError<FeedSupplierOption>("getFeedSupplierOptions", error)
-  }
-  return toQuerySuccess<FeedSupplierOption>((data ?? []) as FeedSupplierOption[])
 }
 
 export async function getFarmOptions(params?: {

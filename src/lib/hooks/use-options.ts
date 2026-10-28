@@ -9,7 +9,6 @@ import { useStockedSystemIds } from "@/lib/hooks/use-stocked-system-ids"
 import {
   getBatchOptions,
   getFarmOptions,
-  getFeedSupplierOptions,
   getFingerlingSupplierOptions,
   getAppConfig,
   getSystemOptions,
@@ -87,16 +86,6 @@ export function useFingerlingSupplierOptions(params?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.options.fingerlingSuppliers(user?.id),
     queryFn: ({ signal }) => getFingerlingSupplierOptions({ signal }),
-    enabled: !authLoading && (Boolean(session) || Boolean(user)) && (params?.enabled ?? true),
-    staleTime: 5 * 60_000,
-  })
-}
-
-export function useFeedSupplierOptions(params?: { enabled?: boolean }) {
-  const { session, user, isLoading: authLoading } = useAuth()
-  return useQuery({
-    queryKey: queryKeys.options.feedSuppliers(user?.id),
-    queryFn: ({ signal }) => getFeedSupplierOptions({ signal }),
     enabled: !authLoading && (Boolean(session) || Boolean(user)) && (params?.enabled ?? true),
     staleTime: 5 * 60_000,
   })

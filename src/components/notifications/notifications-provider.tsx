@@ -41,8 +41,8 @@ export type AlertNotification = {
 }
 
 /**
- * A live, state-derived alert. Unlike `AlertNotification` (a browser-stored log
- * of things that fired while the app was open), these are recomputed from the
+ * A live, state-derived alert. Unlike `AlertNotification` (a log of things that
+ * fired since this page opened, never saved in the browser), these are recomputed from the
  * database on an interval: an entry stays for exactly as long as its condition
  * holds (cage empty, mortality spiking, water quality bad) and disappears on
  * its own once resolved. They cannot be dismissed or cleared.
@@ -131,6 +131,7 @@ function mapRecommendedActionRow(row: RecommendedActionRow): ActiveAlert {
 const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined)
 
 const MAX_NOTIFICATIONS = 50
+const EMPTY_NOTIFICATIONS: AlertNotification[] = []
 
 const isAbortLikeError = (err: unknown): boolean => {
   if (!err) return false
@@ -180,41 +181,26 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const lastKnownFarmIdRef = useRef<string | null>(null)
   if (liveFarmId) lastKnownFarmIdRef.current = liveFarmId
   const farmId = liveFarmId ?? lastKnownFarmIdRef.current
-  const storageKey = farmId ? `aqua_alert_history_${farmId}` : "aqua_alert_history"
-  const currentStorageToken = useMemo(() => Symbol(storageKey), [storageKey])
-  const readStoredNotifications = useCallback(() => {
-    if (typeof window === "undefined") return [] as AlertNotification[]
-    try {
-      const raw = window.localStorage.getItem(storageKey)
-      if (!raw) return []
-      const parsed = JSON.parse(raw) as unknown
-      if (!Array.isArray(parsed)) return []
-      return parsed
-        .filter((item): item is AlertNotification => Boolean(item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string"))
-        .slice(0, MAX_NOTIFICATIONS)
-    } catch {
-      return []
-    }
-  }, [storageKey])
+  // Alerts are never persisted in the browser. What outlives a page load is the database-derived
+  // `activeAlerts` list below (and the cage-empty / missing-name reconciliation, which re-derives from the
+  // database on every load). `notifications` only holds live events seen since this page opened.
+  const currentFarmToken = useMemo(() => Symbol(farmId ?? "no-farm"), [farmId])
   const [notificationsDraft, setNotificationsDraft] = useState(() => ({
-    sourceToken: currentStorageToken,
-    value: readStoredNotifications(),
+    sourceToken: currentFarmToken,
+    value: [] as AlertNotification[],
   }))
   const notifications =
-    notificationsDraft.sourceToken === currentStorageToken
-      ? notificationsDraft.value
-      : readStoredNotifications()
+    notificationsDraft.sourceToken === currentFarmToken ? notificationsDraft.value : EMPTY_NOTIFICATIONS
   const setNotifications = useCallback((value: SetStateAction<AlertNotification[]>) => {
     setNotificationsDraft((current) => {
-      const previousValue =
-        current.sourceToken === currentStorageToken ? current.value : readStoredNotifications()
+      const previousValue = current.sourceToken === currentFarmToken ? current.value : EMPTY_NOTIFICATIONS
       const nextValue = typeof value === "function" ? value(previousValue) : value
       return {
-        sourceToken: currentStorageToken,
+        sourceToken: currentFarmToken,
         value: nextValue,
       }
     })
-  }, [currentStorageToken, readStoredNotifications])
+  }, [currentFarmToken])
 
   const notificationsEnabled = profile?.notifications_enabled ?? true
   // Same cage list the shared header filter uses -- react-query dedupes the
@@ -402,15 +388,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     seenIds.current = new Set(notifications.map((item) => item.id))
   }, [notifications])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(notifications.slice(0, MAX_NOTIFICATIONS)))
-    } catch {
-      // Ignore storage write errors.
-    }
-  }, [notifications, storageKey])
 
   useEffect(() => {
     if (!farmId || !session || !userId) return

@@ -7,6 +7,7 @@ import { DataEntryInterface } from "@/features/data-entry/components/data-entry-
 import { SystemForm } from "@/features/data-entry/components/system-form"
 import type { BatchOptionItem } from "@/features/shared/batch-options"
 import type { getDataEntryPrefetch } from "@/features/data-entry/queries.server"
+import type { FeedSupplierOptionRow, FingerlingSupplierOptionRow } from "@/features/shared/query-seed.server"
 import type { Database } from "@/lib/types/database"
 import type { SystemOption } from "@/lib/system-options"
 
@@ -41,6 +42,8 @@ export default function DataEntryPageClient({
   initialSystems,
   initialBatches,
   initialFeeds,
+  initialFeedSuppliers,
+  initialFingerlingSuppliers,
   initialRecentEntries,
 }: {
   initialFarmId?: string | null
@@ -49,6 +52,8 @@ export default function DataEntryPageClient({
   initialSystems: SystemOption[]
   initialBatches: BatchOptionItem[]
   initialFeeds: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number][]
+  initialFeedSuppliers: FeedSupplierOptionRow[]
+  initialFingerlingSuppliers: FingerlingSupplierOptionRow[]
   initialRecentEntries: Awaited<ReturnType<typeof getDataEntryPrefetch>>["recentEntries"]
 }) {
   const searchParams = useSearchParams()
@@ -114,6 +119,8 @@ export default function DataEntryPageClient({
             farmRole={initialFarmRole}
             systems={systems}
             feeds={feeds}
+            feedSuppliers={initialFeedSuppliers}
+            fingerlingSuppliers={initialFingerlingSuppliers}
             batches={batches}
             recentEntries={recentEntries}
             tab={tab}

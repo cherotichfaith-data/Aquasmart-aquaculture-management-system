@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import type { AbwPointRow, GrowthByBatchRow, GrowthCurveRow } from "@/features/analytics/types"
+import type { AbwPointRow, BatchReportRow, GrowthByBatchRow, GrowthCurveRow } from "@/features/analytics/types"
 
 const W = 900
 const H = 320
@@ -117,6 +117,56 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
         })}
         <text x={14} y={PAD.t + plotH / 2} textAnchor="middle" fontSize="11" fill="#6f746f" transform={`rotate(-90 14 ${PAD.t + plotH / 2})`}>
           Growth (kg)
+        </text>
+      </svg>
+    </figure>
+  )
+}
+
+/** Stock loss (%) per batch for the period, from the Detailed Batch Report rows. */
+export function StockLossChart({ rows }: { rows: BatchReportRow[] }) {
+  const data = rows.filter((r) => r.batch_id != null && r.stock_loss_pct != null)
+  if (data.length === 0) return <p className="planner-note">No stock loss data for this period.</p>
+
+  const top = niceTop(Math.max(...data.map((r) => r.stock_loss_pct ?? 0), 0))
+  const plotW = W - PAD.l - PAD.r
+  const plotH = H - PAD.t - PAD.b
+  const group = plotW / data.length
+  const bar = Math.min(34, group * 0.6)
+  const y = (v: number) => PAD.t + plotH - (v / top) * plotH
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => top * f)
+
+  return (
+    <figure className="rpt-chart">
+      <figcaption className="rpt-chart__title">Stock loss per batch (%)</figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Stock loss percentage per batch" className="rpt-chart__svg">
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke="#e6ddd0" />
+            <text x={PAD.l - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#6f746f">
+              {compact(t)}
+            </text>
+          </g>
+        ))}
+        {data.map((r, i) => {
+          const v = r.stock_loss_pct ?? 0
+          const cx = PAD.l + i * group + group / 2
+          return (
+            <g key={r.batch_id}>
+              <rect x={cx - bar / 2} y={y(v)} width={bar} height={y(0) - y(v)} rx="2" fill={RECORDED}>
+                <title>{`${r.batch_name} - stock loss ${v.toFixed(2)}%${r.mortality != null ? ` (${Math.round(r.mortality).toLocaleString()} mortalities)` : ""}`}</title>
+              </rect>
+              <text x={cx} y={y(v) - 4} textAnchor="middle" fontSize="10" fill="#232a25">
+                {v.toFixed(1)}
+              </text>
+              <text x={cx} y={H - PAD.b + 16} textAnchor="end" fontSize="11" fill="#232a25" transform={`rotate(-35 ${cx} ${H - PAD.b + 16})`}>
+                {r.batch_name}
+              </text>
+            </g>
+          )
+        })}
+        <text x={14} y={PAD.t + plotH / 2} textAnchor="middle" fontSize="11" fill="#6f746f" transform={`rotate(-90 14 ${PAD.t + plotH / 2})`}>
+          Stock loss (%)
         </text>
       </svg>
     </figure>

@@ -25,6 +25,7 @@ import { logSbError } from "@/lib/supabase/log"
 import { OfflineSaveBadge } from "@/components/offline/offline-save-badge"
 import { type BatchOptionItem } from "@/features/shared/batch-options"
 import { BatchQuickCreate } from "./batch-quick-create"
+import type { FingerlingSupplierOptionRow } from "@/features/shared/query-seed.server"
 import { DependencyBlocker } from "./dependency-blocker"
 import {
   findUnitForSystem,
@@ -76,12 +77,14 @@ interface StockingFormProps {
   farmId: string | null
   systems: SystemOption[]
   batches: BatchOptionItem[]
+  /** Fingerling suppliers loaded from the database with the page. */
+  suppliers?: FingerlingSupplierOptionRow[]
   defaultSystemId?: number | null
   defaultBatchId?: number | null
   onSystemChange?: (systemId: number | null) => void
 }
 
-export function StockingForm({ farmId, systems, batches, defaultSystemId = null, defaultBatchId = null, onSystemChange }: StockingFormProps) {
+export function StockingForm({ farmId, systems, batches, suppliers = [], defaultSystemId = null, defaultBatchId = null, onSystemChange }: StockingFormProps) {
   const mutation = useRecordStocking()
   const [showBatchCreate, setShowBatchCreate] = useState(false)
   const [createdBatches, setCreatedBatches] = useState<BatchOption[]>([])
@@ -298,7 +301,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
         </Form>
         {showBatchCreate ? (
           <div className="mt-4">
-            <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} onCreated={handleBatchCreated} />
+            <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} suppliers={suppliers} onCreated={handleBatchCreated} />
           </div>
         ) : null}
       </DependencyBlocker>
@@ -318,7 +321,7 @@ export function StockingForm({ farmId, systems, batches, defaultSystemId = null,
       </div>
 
       {showBatchCreate ? (
-        <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} onCreated={handleBatchCreated} />
+        <BatchQuickCreate farmId={farmId} systemId={selectedSystemIdForBatch} suppliers={suppliers} onCreated={handleBatchCreated} />
       ) : null}
 
       <Form {...form}>

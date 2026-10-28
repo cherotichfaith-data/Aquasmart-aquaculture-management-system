@@ -3,7 +3,12 @@ import { cacheTags } from "@/lib/cache/tags"
 import { toQuerySuccess } from "@/lib/supabase/query-transport"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { getScopedSystemOptions } from "@/features/shared/scoped-analytics.server"
-import { listBatchOptionRows, listFeedTypeOptionRows } from "@/features/shared/query-seed.server"
+import {
+  listBatchOptionRows,
+  listFeedSupplierRows,
+  listFeedTypeOptionRows,
+  listFingerlingSupplierRows,
+} from "@/features/shared/query-seed.server"
 import { emptyRecentEntries, listRecentEntries } from "@/features/shared/queries.server"
 import { logSbError } from "@/lib/supabase/log"
 
@@ -20,6 +25,14 @@ async function getBatches(supabase: DataEntrySupabaseClient, farmId: string) {
 
 async function getFeedTypes(supabase: DataEntrySupabaseClient, farmId: string) {
   return toQuerySuccess(await listFeedTypeOptionRows(supabase, { farmId }))
+}
+
+async function getFeedSuppliers(supabase: DataEntrySupabaseClient) {
+  return toQuerySuccess(await listFeedSupplierRows(supabase))
+}
+
+async function getFingerlingSuppliers(supabase: DataEntrySupabaseClient) {
+  return toQuerySuccess(await listFingerlingSupplierRows(supabase))
 }
 
 async function safePrefetchWithTimeout<T>(
@@ -59,20 +72,24 @@ export async function getDataEntryPrefetch({
   accessToken: string
 }) {
   return runServerReadThrough({
-    keyParts: ["data-entry-page", "active-batches-v4", userId, farmId],
+    keyParts: ["data-entry-page", "active-batches-v6", userId, farmId],
     tags: [
       cacheTags.farm(farmId),
       cacheTags.systems(farmId),
       cacheTags.batchOptions(farmId),
       cacheTags.feedTypes(),
+      cacheTags.feedSuppliers(),
+      cacheTags.fingerlingSuppliers(),
       cacheTags.reports(farmId, "recent-entries"),
     ],
     loader: async () => {
       const supabase = createAccessTokenClient(accessToken)
-      const [systems, batches, feedTypes, recentEntries] = await Promise.all([
+      const [systems, batches, feedTypes, feedSuppliers, fingerlingSuppliers, recentEntries] = await Promise.all([
         getSystems(supabase, farmId),
         getBatches(supabase, farmId),
         getFeedTypes(supabase, farmId),
+        getFeedSuppliers(supabase),
+        getFingerlingSuppliers(supabase),
         safePrefetchWithTimeout(
           "data-entry:prefetch:recentEntries",
           emptyRecentEntries(),
@@ -81,7 +98,7 @@ export async function getDataEntryPrefetch({
         ),
       ])
 
-      return { systems, batches, feedTypes, recentEntries }
+      return { systems, batches, feedTypes, feedSuppliers, fingerlingSuppliers, recentEntries }
     },
   })
 }

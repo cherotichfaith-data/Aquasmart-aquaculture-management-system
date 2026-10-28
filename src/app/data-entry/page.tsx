@@ -69,6 +69,8 @@ export default async function DataEntryPage({
         initialSystems={prefetch.systems.data ?? []}
         initialBatches={prefetch.batches.data ?? []}
         initialFeeds={prefetch.feedTypes.data ?? []}
+        initialFeedSuppliers={prefetch.feedSuppliers.data ?? []}
+        initialFingerlingSuppliers={prefetch.fingerlingSuppliers.data ?? []}
         initialRecentEntries={prefetch.recentEntries}
       />
     </Suspense>
