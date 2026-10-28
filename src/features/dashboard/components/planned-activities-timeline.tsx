@@ -12,6 +12,7 @@ import {
   buildDefaultPlannedActivityDate,
   formatPlannedActivityDateLabel,
   getLocalDateIso,
+  getRelativeDayLabel,
 } from "@/features/dashboard/planned-activities"
 
 export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }) {
@@ -88,8 +89,14 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
   }, [upcomingActivities])
 
   const plannedCount = upcomingActivities.filter((activity) => activity.status === "planned").length
-  // Counted by plan window, the way the daily report groups them: tomorrow's actions, and the task list for the next 7 days.
-  const tomorrowCount = upcomingActivities.filter((activity) => activity.planning_window === "tomorrow").length
+  // Day-by-day actions are labelled from today's date, so an action planned for "tomorrow" in yesterday's report
+  // reads "Today" once that day arrives. The task list for the next 7 days is counted as one group.
+  const todayCount = upcomingActivities.filter(
+    (activity) => activity.planning_window === "tomorrow" && getRelativeDayLabel(activity.scheduled_date) === "Today",
+  ).length
+  const tomorrowCount = upcomingActivities.filter(
+    (activity) => activity.planning_window === "tomorrow" && getRelativeDayLabel(activity.scheduled_date) === "Tomorrow",
+  ).length
   const nextSevenDaysCount = upcomingActivities.filter((activity) => activity.planning_window === "this_week").length
 
   function resetForm(nextWindow: PlannedActivity["planning_window"]) {
@@ -184,6 +191,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
     <Card>
       <CardHeader className="gap-4 md:flex md:flex-row md:items-start md:justify-between">
         <div className="flex flex-wrap gap-2">
+          {todayCount > 0 ? <Badge variant="outline">{todayCount} today</Badge> : null}
           <Badge variant="outline">{tomorrowCount} tomorrow</Badge>
           <Badge variant="outline">{nextSevenDaysCount} next 7 days</Badge>
           <Badge variant={plannedCount > 0 ? "neutral" : "outline"}>{plannedCount} pending</Badge>
@@ -270,6 +278,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
                     <div className="flex items-center gap-3">
                       <div className="h-px flex-1 bg-border/80" />
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {getRelativeDayLabel(groupDate) ? `${getRelativeDayLabel(groupDate)} · ` : ""}
                         {formatPlannedActivityDateLabel(groupDate)}
                       </div>
                       <div className="h-px flex-1 bg-border/80" />
@@ -291,13 +300,13 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium text-foreground">{activity.title}</p>
                               <Badge variant={activity.planning_window === "tomorrow" ? "secondary" : "outline"}>
-                                {activity.planning_window === "tomorrow" ? "Tomorrow" : "Next 7 days"}
+                                {activity.planning_window === "this_week"
+                                  ? "Next 7 days"
+                                  : getRelativeDayLabel(activity.scheduled_date) ?? formatPlannedActivityDateLabel(activity.scheduled_date)}
                               </Badge>
                               <Badge variant={activity.status === "done" ? "positive" : "neutral"}>
                                 {activity.status === "done" ? "Done" : "Planned"}
-                              </Badge>
-                              {activity.source === "daily_report" ? <Badge variant="outline">From daily report</Badge> : null}
-                            </div>
+                              </Badge>                            </div>
                             {activity.notes ? (
                               <p className="text-sm leading-6 text-muted-foreground">{activity.notes}</p>
                             ) : null}

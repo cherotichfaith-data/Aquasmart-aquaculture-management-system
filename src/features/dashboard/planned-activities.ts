@@ -48,6 +48,13 @@ export function formatPlannedActivityDateLabel(date: string) {
   }).format(parsed)
 }
 
+/** "Today" or "Tomorrow" when the date is that day on the viewer's calendar, otherwise null. */
+export function getRelativeDayLabel(date: string, now = new Date()): "Today" | "Tomorrow" | null {
+  if (date === getLocalDateIso(now)) return "Today"
+  if (date === getTomorrowDateIso(now)) return "Tomorrow"
+  return null
+}
+
 export function isThisWeek(date: string) {
   const parsed = new Date(`${date}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return false
