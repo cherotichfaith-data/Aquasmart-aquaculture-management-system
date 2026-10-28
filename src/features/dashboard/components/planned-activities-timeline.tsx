@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { CalendarDays, CheckCircle2, Clock3, Plus, Trash2 } from "lucide-react"
+import { CalendarDays, CheckCircle2, Clock3, Plus, Trash2, X } from "lucide-react"
 
 import { Badge } from "@/components/app-ui/badge"
 import { Button } from "@/components/app-ui/button"
@@ -25,6 +25,8 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
   const [notes, setNotes] = useState("")
   const [planningWindow, setPlanningWindow] = useState<PlannedActivity["planning_window"]>("tomorrow")
   const [date, setDate] = useState("")
+  // Routine work arrives from the daily planner reports; the form is only for one-off tasks.
+  const [showForm, setShowForm] = useState(false)
 
   async function loadActivities(signal?: AbortSignal) {
     setIsLoading(true)
@@ -124,6 +126,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
         }),
       )
       resetForm(planningWindow)
+      setShowForm(false)
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to create planned activity.")
     } finally {
@@ -181,8 +184,13 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
           <Badge variant="outline">{thisWeekCount} this week</Badge>
           <Badge variant={plannedCount > 0 ? "neutral" : "outline"}>{plannedCount} pending</Badge>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setShowForm((current) => !current)} aria-expanded={showForm}>
+          {showForm ? <X className="size-4" /> : <Plus className="size-4" />}
+          {showForm ? "Hide form" : "Add one-off task"}
+        </Button>
       </CardHeader>
-      <CardContent className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <CardContent className={showForm ? "grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" : "grid gap-6"}>
+        {showForm ? (
         <div className="rounded-xl border border-border/80 bg-muted/20 p-4">
           <div className="grid gap-3">
             <div className="grid gap-2">
@@ -229,9 +237,11 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
               <Plus className="size-4" />
               {isSaving ? "Saving..." : "Add to planner"}
             </Button>
-            {error ? <p className="text-sm text-destructive-strong">{error}</p> : null}
           </div>
         </div>
+        ) : null}
+
+        {error ? <p className="text-sm text-destructive-strong">{error}</p> : null}
 
         <div className="rounded-xl border border-border/80 bg-background">
           <div className="border-b border-border/80 px-4 py-4">
@@ -245,7 +255,7 @@ export default function PlannedActivitiesTimeline({ farmId }: { farmId: string }
               <div className="text-sm text-muted-foreground">Loading activity planner...</div>
             ) : groupedActivities.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-sm text-muted-foreground">
-                No planned activities yet. Add tomorrow&apos;s tasks or this week&apos;s work to fill the planner.
+                No planned activities yet. Tomorrow&apos;s actions and the weekly task list from the daily planner reports appear here automatically; use &quot;Add one-off task&quot; for anything else.
               </div>
             ) : (
               <div className="space-y-5">
