@@ -152,6 +152,26 @@ export async function getFingerlingSupplierOptions(params?: {
   )
 }
 
+export type FeedSupplierOption = Pick<Database["public"]["Tables"]["feed_supplier"]["Row"], "id" | "company_name">
+
+export async function getFeedSupplierOptions(params?: {
+  signal?: AbortSignal
+}): Promise<QueryResult<FeedSupplierOption>> {
+  const clientResult = await getClientOrError("getFeedSupplierOptions", { requireSession: true })
+  if ("error" in clientResult) return clientResult.error
+  const { supabase } = clientResult
+
+  let query = supabase.from("feed_supplier").select("id, company_name").order("company_name", { ascending: true })
+  if (params?.signal) query = query.abortSignal(params.signal)
+
+  const { data, error } = await query
+  if (error) {
+    if (params?.signal?.aborted || isAbortLikeError(error)) return empty<FeedSupplierOption>()
+    return toQueryError<FeedSupplierOption>("getFeedSupplierOptions", error)
+  }
+  return toQuerySuccess<FeedSupplierOption>((data ?? []) as FeedSupplierOption[])
+}
+
 export async function getFarmOptions(params?: {
   limit?: number
   signal?: AbortSignal

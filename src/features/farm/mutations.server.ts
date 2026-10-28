@@ -6,7 +6,7 @@ import { requireMutationActionUser } from "@/lib/server/mutation-actions"
 import { revalidateWriteTags } from "@/lib/server/write-through"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
-import type { Database } from "@/lib/types/database"
+import { Constants, type Database } from "@/lib/types/database"
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"]
 type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"]
@@ -33,6 +33,26 @@ const fingerlingBatchSchema = z.object({
   supplier_id: z.number().int().positive(),
   number_of_fish: z.number().finite().positive(),
   abw: z.number().finite().positive(),
+})
+
+export type FeedTypeInput = {
+  farm_id: string
+  feed_line: string
+  feed_supplier_id: number
+  feed_pellet_size: Database["public"]["Enums"]["feed_pellet_size"]
+  feed_category: Database["public"]["Enums"]["feed_category"]
+  crude_protein_percentage?: number | null
+  crude_fat_percentage?: number | null
+}
+
+const feedTypeSchema = z.object({
+  farm_id: z.string().uuid(),
+  feed_line: z.string().trim().min(1, "Feed name is required.").max(255),
+  feed_supplier_id: z.number().int().positive("Select a feed supplier."),
+  feed_pellet_size: z.enum(Constants.public.Enums.feed_pellet_size),
+  feed_category: z.enum(Constants.public.Enums.feed_category),
+  crude_protein_percentage: z.number().finite().min(0).max(100).nullable().optional(),
+  crude_fat_percentage: z.number().finite().min(0).max(100).nullable().optional(),
 })
 
 const farmWorkspaceSchema = z.object({
@@ -307,6 +327,68 @@ export async function createFingerlingSupplierAction(
   revalidateWriteTags([cacheTags.fingerlingSuppliers()])
 
   return { data }
+}
+
+/** Creates a farm-scoped feed type (visible only to this farm); farm managers and admins only, enforced by RLS. */
+export async function createFeedTypeAction(
+  payload: FeedTypeInput,
+): Promise<{ data: Database["public"]["Functions"]["api_feed_type_options_rpc"]["Returns"][number] }> {
+  const { supabase } = await requireMutationActionUser("feed-type:create")
+
+  let parsedPayload: z.infer<typeof feedTypeSchema>
+  try {
+    parsedPayload = feedTypeSchema.parse(payload)
+  } catch (error) {
+    throw new Error(
+      error instanceof z.ZodError ? error.issues[0]?.message ?? "Invalid feed type payload." : "Invalid request body.",
+    )
+  }
+
+  const toOption = (row: Row<"feed_type">) => ({
+    id: row.id,
+    farm_id: parsedPayload.farm_id,
+    feed_line: row.feed_line ?? "",
+    label: row.feed_line ?? "",
+    feed_category: row.feed_category,
+    feed_pellet_size: row.feed_pellet_size,
+    crude_protein_percentage: row.crude_protein_percentage ?? 0,
+    crude_fat_percentage: row.crude_fat_percentage ?? 0,
+    visibility_scope: "farm",
+  })
+
+  const { data: existing } = await supabase
+    .from("feed_type")
+    .select()
+    .eq("farm_id", parsedPayload.farm_id)
+    .ilike("feed_line", parsedPayload.feed_line.replace(/[\\%_]/g, "\\$&"))
+    .maybeSingle()
+  if (existing) return { data: toOption(existing) }
+
+  const { data, error } = await supabase
+    .from("feed_type")
+    .insert({
+      farm_id: parsedPayload.farm_id,
+      feed_line: parsedPayload.feed_line,
+      feed_supplier_id: parsedPayload.feed_supplier_id,
+      feed_pellet_size: parsedPayload.feed_pellet_size,
+      feed_category: parsedPayload.feed_category,
+      crude_protein_percentage: parsedPayload.crude_protein_percentage ?? null,
+      crude_fat_percentage: parsedPayload.crude_fat_percentage ?? null,
+    })
+    .select()
+    .single()
+
+  if (error || !data) {
+    logSbError("feed-type:create:insert", error)
+    if (isSbPermissionDenied(error)) {
+      throw new Error("Only farm managers and admins can add feed types.")
+    }
+    throw new Error("Unable to create feed type.")
+  }
+
+  revalidateWriteTags([cacheTags.feedTypes()])
+
+  return { data: toOption(data) }
 }
 
 export async function createFingerlingBatchAction(
