@@ -18,7 +18,7 @@ import { FilterPopover } from "@/components/shared/filter-popover"
 import TimePeriodSelector from "@/components/shared/time-period-selector"
 import BatchReportTable from "./batch-report-table"
 import StockProfileChart, { classLabel } from "./stock-profile-chart"
-import { AbwAgeChart, GrowthByBatchChart, SelectedBatchAbwChart } from "./growth-charts"
+import { AbwAgeChart, GrowthByBatchChart, SelectedBatchAbwChart, StockLossChart } from "./growth-charts"
 import { DASH, ReportTable, dateText, num, pct, type Column } from "./report-table"
 import "@/features/reports/monthly/monthly-reports.css"
 
@@ -419,6 +419,12 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           <ForwardPlanningTable rows={data.forwardPlan} />
         </Section>
       ) : null}
+      {show("batches") ? (
+        <Section title={`Stock Loss Analysis - ${label}`} note="Stock loss (%) per batch, as in the Detailed Batch Report.">
+          <StockLossChart rows={data.batches} />
+        </Section>
+      ) : null}
+
 
       {show("batches") ? (
         <Section
