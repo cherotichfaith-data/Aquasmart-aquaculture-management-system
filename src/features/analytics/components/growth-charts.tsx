@@ -183,37 +183,42 @@ export function AbwAgeChart({
   points,
   curves,
   batchNames,
+  weightBand,
 }: {
   title: string
   points: AbwPointRow[]
   curves: GrowthCurveRow[]
   /** Batches to draw, in legend order. */
   batchNames: string[]
+  weightBand?: "below100" | "from100"
 }) {
+  const W = weightBand ? 600 : 900
+  const inBand = (weight: number) => weightBand === "below100" ? weight < 100 : weightBand === "from100" ? weight >= 100 : true
   const series = useMemo(
     () =>
       batchNames.map((name, i) => ({
         name,
         color: BATCH_COLORS[i % BATCH_COLORS.length],
-        pts: points.filter((p) => p.batch_name === name).sort((a, b) => a.model_age_days - b.model_age_days),
+        pts: points.filter((p) => p.batch_name === name && (weightBand === "below100" ? p.abw_g < 100 : weightBand === "from100" ? p.abw_g >= 100 : true)).sort((a, b) => a.model_age_days - b.model_age_days),
       })),
-    [batchNames, points],
+    [batchNames, points, weightBand],
   )
   const drawn = series.filter((s) => s.pts.length > 0)
-  if (drawn.length === 0) return <p className="planner-note">No weight samples to plot for this selection.</p>
+  if (drawn.length === 0) return <figure className="rpt-chart"><figcaption className="rpt-chart__title">{title}</figcaption><p className="planner-note">No weight samples to plot for this selection.</p></figure>
 
   const maxAge = Math.max(...drawn.flatMap((s) => s.pts.map((p) => p.model_age_days)))
   const minAge = Math.min(...drawn.flatMap((s) => s.pts.map((p) => p.model_age_days)))
   const xMin = Math.max(0, Math.floor((minAge - 10) / 10) * 10)
   const xMax = Math.ceil((maxAge + 15) / 10) * 10
-  const curvesInRange = curves.filter((c) => c.day >= xMin && c.day <= xMax)
+  const curvesInRange = curves.filter((c) => c.day >= xMin && c.day <= xMax && inBand(c.abw_g))
   const maxAbw = Math.max(...drawn.flatMap((s) => s.pts.map((p) => p.abw_g)))
-  const yTop = niceTop(Math.max(maxAbw, ...curvesInRange.filter((c) => c.scenario === "slow").map((c) => c.abw_g)) * 1.05)
+  const yBottom = weightBand === "from100" ? 100 : 0
+  const yTop = weightBand === "below100" ? 100 : niceTop(Math.max(maxAbw, ...curvesInRange.filter((c) => c.scenario === "slow").map((c) => c.abw_g)) * 1.05)
   const plotW = W - PAD.l - PAD.r
   const plotH = H - PAD.t - PAD.b
   const x = (d: number) => PAD.l + ((d - xMin) / Math.max(xMax - xMin, 1)) * plotW
-  const y = (v: number) => PAD.t + plotH - (Math.min(v, yTop) / yTop) * plotH
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => yTop * f)
+  const y = (v: number) => PAD.t + plotH - ((Math.min(v, yTop) - yBottom) / (yTop - yBottom)) * plotH
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => yBottom + (yTop - yBottom) * f)
   const xTickCount = 6
   const xTicks = Array.from({ length: xTickCount + 1 }, (_, i) => Math.round(xMin + ((xMax - xMin) / xTickCount) * i))
 

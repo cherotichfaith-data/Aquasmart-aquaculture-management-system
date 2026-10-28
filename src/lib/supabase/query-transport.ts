@@ -16,6 +16,7 @@ type PublicFunctions = Database["public"]["Functions"]
 export type KpiRpcName =
   | "api_dashboard_consolidated"
   | "api_dashboard_systems"
+  | "api_growth_standard_curve"
   | "api_feed_dashboard"
   | "api_production_summary"
   | "api_recent_activity_feed"

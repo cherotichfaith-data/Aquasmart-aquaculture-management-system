@@ -19,6 +19,7 @@ import type { TimeBounds } from "@/lib/time-period"
 type HeaderDataOverrides = {
   role?: string | null
   timeBounds?: TimeBounds
+  timeWindowSummary?: string
 }
 
 export default function DashboardLayout({
@@ -205,6 +206,7 @@ export default function DashboardLayout({
               initialFarmName={initialFarmName}
               roleOverride={headerDataOverrides?.role ?? null}
               timeBoundsOverride={headerDataOverrides?.timeBounds}
+              timeWindowSummaryOverride={headerDataOverrides?.timeWindowSummary}
               onMenuClick={() => {
                 if (!isDesktop) {
                   setMobileSidebarOpen((prev) => !prev)

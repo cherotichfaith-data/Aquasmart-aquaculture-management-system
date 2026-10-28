@@ -136,6 +136,7 @@ export type AnalyticsReportData = {
   /** First day of the reporting month, YYYY-MM-01. */
   /** First day of the month containing the period end (anchors the forecast and forward plan). */
   month: string
+  periodMode: "month" | "cycle"
   /** Reporting period, YYYY-MM-DD, inclusive. */
   periodStart: string
   periodEnd: string
