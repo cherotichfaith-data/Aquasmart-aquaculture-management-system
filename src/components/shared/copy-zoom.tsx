@@ -33,6 +33,80 @@ function tableToClipboard(table: HTMLTableElement) {
   return { html: clone.outerHTML, text }
 }
 
+/**
+ * Draws the table as an image, the way it looks on screen (header shading, bold total rows, right-aligned
+ * numbers, grid lines). Chat apps, slides and image editors paste this; Excel and Word still get the real table.
+ */
+function tableToPng(table: HTMLTableElement): Promise<Blob> {
+  const rows = Array.from(table.rows).map((row) => ({
+    total: row.classList.contains("rpt-total"),
+    cells: Array.from(row.cells).map((cell) => ({
+      text: (cell.innerText || cell.textContent || "").replace(/\s+/g, " ").trim(),
+      header: cell.tagName === "TH",
+      number: cell.classList.contains("n"),
+    })),
+  }))
+  const columns = Math.max(1, ...rows.map((row) => row.cells.length))
+  const rowHeight = 26
+  const padding = 10
+  const normalFont = "12px Arial, sans-serif"
+  const boldFont = "600 12px Arial, sans-serif"
+
+  const measure = document.createElement("canvas").getContext("2d")
+  if (!measure) return Promise.reject(new Error("Table image could not be rendered."))
+  const widths = Array.from({ length: columns }, (_, col) =>
+    Math.max(
+      28,
+      ...rows.map((row) => {
+        const cell = row.cells[col]
+        if (!cell) return 0
+        measure.font = cell.header || row.total ? boldFont : normalFont
+        return Math.ceil(measure.measureText(cell.text).width) + padding * 2
+      }),
+    ),
+  )
+  const width = widths.reduce((sum, value) => sum + value, 0)
+  const height = rows.length * rowHeight
+
+  const scale = 2
+  const canvas = document.createElement("canvas")
+  canvas.width = width * scale
+  canvas.height = height * scale
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return Promise.reject(new Error("Table image could not be rendered."))
+  ctx.scale(scale, scale)
+  ctx.fillStyle = "#ffffff"
+  ctx.fillRect(0, 0, width, height)
+  ctx.textBaseline = "middle"
+
+  rows.forEach((row, rowIndex) => {
+    let x = 0
+    const y = rowIndex * rowHeight
+    row.cells.forEach((cell, col) => {
+      const w = widths[col]
+      if (cell.header) {
+        ctx.fillStyle = "#eef2f6"
+        ctx.fillRect(x, y, w, rowHeight)
+      } else if (row.total) {
+        ctx.fillStyle = "#f6f3ec"
+        ctx.fillRect(x, y, w, rowHeight)
+      }
+      ctx.strokeStyle = "#bbbbbb"
+      ctx.lineWidth = 1
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, rowHeight - 1)
+      ctx.fillStyle = "#232a25"
+      ctx.font = cell.header || row.total ? boldFont : normalFont
+      ctx.textAlign = cell.number && !cell.header ? "right" : "left"
+      ctx.fillText(cell.text, cell.number && !cell.header ? x + w - padding : x + padding, y + rowHeight / 2 + 1)
+      x += w
+    })
+  })
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Table image could not be created."))), "image/png")
+  })
+}
+
 function resolveCssVars(markup: string) {
   const root = getComputedStyle(document.documentElement)
   return markup.replace(/var\((--[\w-]+)(?:\s*,\s*([^)]+))?\)/g, (_all, name: string, fallback?: string) => {
@@ -160,28 +234,34 @@ export function CopyZoom({
         const table = root.querySelector("table")
         if (!table) throw new Error("No table to copy.")
         const { html, text } = tableToClipboard(table)
+        const textParts = {
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        }
         if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              "text/html": new Blob([html], { type: "text/html" }),
-              "text/plain": new Blob([text], { type: "text/plain" }),
-            }),
-          ])
+          // One clipboard entry in three forms: Excel/Word take the table, chat apps and slides take the picture
+          // of the table, anything else takes the tab-separated text.
+          try {
+            await navigator.clipboard.write([new ClipboardItem({ ...textParts, "image/png": tableToPng(table) })])
+          } catch {
+            await navigator.clipboard.write([new ClipboardItem(textParts)])
+          }
         } else {
           await navigator.clipboard.writeText(text)
         }
       } else {
         const figure = (root.querySelector("figure") as HTMLElement | null) ?? root
-        const blob = await chartToPng(figure)
         const filename = `${name.replace(/[^\w-]+/g, "_").toLowerCase() || "chart"}.png`
+        // The image is passed as a promise so the browser still treats the copy as a direct click.
+        const pngPromise = chartToPng(figure)
         if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
           try {
-            await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": pngPromise })])
           } catch {
-            downloadBlob(blob, filename)
+            downloadBlob(await pngPromise, filename)
           }
         } else {
-          downloadBlob(blob, filename)
+          downloadBlob(await pngPromise, filename)
         }
       }
       flash("copied")
