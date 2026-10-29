@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, type ReactNode } from "react"
-import { Check, Copy, RotateCcw, ZoomIn, ZoomOut } from "lucide-react"
+import { Check, Copy, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react"
 import { Button } from "@/components/app-ui/button"
 
 const MIN_ZOOM = 0.6
@@ -14,10 +14,14 @@ function tableToClipboard(table: HTMLTableElement) {
   const clone = table.cloneNode(true) as HTMLTableElement
   clone.setAttribute("style", "border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px")
   clone.querySelectorAll("th,td").forEach((cell) => {
-    const right = cell.classList.contains("n") ? "text-align:right;" : ""
+    const isNumber = cell.classList.contains("n")
+    const right = isNumber ? "text-align:right;" : ""
     const head = cell.tagName === "TH" ? "background:#eef2f6;font-weight:bold;text-align:left;" : ""
+    // Label cells (batch ids like 03.25, dates, cage names, headers) stay exactly as shown: without this, Excel
+    // turns "03.25" into the number 3.25 and dates into serial numbers.
+    const keepText = isNumber ? "" : 'mso-number-format:"\\@";'
     cell.removeAttribute("class")
-    cell.setAttribute("style", `border:1px solid #bbb;padding:4px 8px;${head}${right}`)
+    cell.setAttribute("style", `border:1px solid #bbb;padding:4px 8px;${head}${right}${keepText}`)
   })
   const text = Array.from(table.rows)
     .map((row) =>
@@ -191,10 +195,19 @@ export function CopyZoom({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-end gap-1.5" role="toolbar" aria-label={`${name} tools`}>
-        <Button type="button" variant="outline" size="sm" onClick={() => void handleCopy()} aria-label={`Copy ${name}`}>
-          {copyState === "copied" ? <Check className="size-4" /> : <Copy className="size-4" />}
-          {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : type === "table" ? "Copy table" : "Copy chart"}
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={() => void handleCopy()}
+          aria-label={`Copy ${name}`}
+          title={copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : `Copy ${type}`}
+        >
+          {copyState === "copied" ? <Check className="size-4" /> : copyState === "failed" ? <X className="size-4 text-destructive-strong" /> : <Copy className="size-4" />}
         </Button>
+        <span className="sr-only" aria-live="polite">
+          {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : ""}
+        </span>
         <Button type="button" variant="outline" size="icon-sm" onClick={() => setZoom((current) => clamp(current - ZOOM_STEP))} disabled={zoom <= MIN_ZOOM} aria-label="Zoom out">
           <ZoomOut className="size-4" />
         </Button>
