@@ -173,6 +173,48 @@ async function getStockingByBatchId(
     }
   }
 
+  const mixedBatchIds = Array.from(bySelectedId.values())
+    .filter((row) => row.supplier_id == null)
+    .map((row) => row.id)
+  const mixedSupplierNames = new Map<number, string>()
+  if (mixedBatchIds.length > 0) {
+    const untyped = supabase as unknown as {
+      from: (table: string) => {
+        select: (columns: string) => {
+          in: (column: string, values: number[]) => PromiseLike<{ data: Record<string, number>[] | null; error: unknown }>
+        }
+      }
+    }
+    const { data: sources } = await untyped
+      .from("fingerling_batch_source")
+      .select("target_batch_id, source_batch_id")
+      .in("target_batch_id", mixedBatchIds)
+    const sourceBatchIds = Array.from(new Set((sources ?? []).map((row) => row.source_batch_id)))
+    if (sourceBatchIds.length > 0) {
+      const { data: sourceBatches } = await supabase.from("fingerling_batch").select("id, supplier_id").in("id", sourceBatchIds)
+      const missingSupplierIds = Array.from(
+        new Set((sourceBatches ?? []).map((row) => row.supplier_id).filter((id): id is number => id != null && !supplierNameById.has(id))),
+      )
+      if (missingSupplierIds.length > 0) {
+        const { data: suppliers } = await supabase.from("fingerling_supplier").select("id, company_name").in("id", missingSupplierIds)
+        for (const supplier of suppliers ?? []) supplierNameById.set(supplier.id, supplier.company_name)
+      }
+      const supplierIdByBatchId = new Map((sourceBatches ?? []).map((row) => [row.id, row.supplier_id]))
+      for (const targetId of mixedBatchIds) {
+        const names = Array.from(
+          new Set(
+            (sources ?? [])
+              .filter((row) => row.target_batch_id === targetId)
+              .map((row) => supplierIdByBatchId.get(row.source_batch_id))
+              .map((supplierId) => (supplierId != null ? supplierNameById.get(supplierId) : undefined))
+              .filter((name): name is string => Boolean(name)),
+          ),
+        )
+        if (names.length > 0) mixedSupplierNames.set(targetId, names.join(", "))
+      }
+    }
+  }
+
   const result: Record<number, BatchStockingInfo> = {}
   for (const batchId of params.batchIds) {
     const option = bySelectedId.get(batchId)
@@ -180,7 +222,8 @@ async function getStockingByBatchId(
       dateOfDelivery: option?.date_of_delivery ?? null,
       numberOfFish: option?.number_of_fish ?? null,
       abw: option?.abw ?? null,
-      supplierName: option?.supplier_id != null ? supplierNameById.get(option.supplier_id) ?? null : null,
+      supplierName:
+        option?.supplier_id != null ? supplierNameById.get(option.supplier_id) ?? null : mixedSupplierNames.get(batchId) ?? null,
     }
   }
   return result
