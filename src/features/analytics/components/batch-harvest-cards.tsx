@@ -11,8 +11,9 @@ const PAD = { l: 48, r: 16, t: 14, b: 46 }
 const RECORDED = "#2a78d6"
 const HARVEST = "#eb6834"
 const SCENARIOS = ["slow", "main", "potential"] as const
-// Spreadsheet-style smoothed scatter: thin solid lines, no dashes.
+// Spreadsheet-style smoothed scatter: thin dotted model curves behind a solid recorded line.
 const MODEL_WIDTH = 1.25
+const MODEL_DASH = "0.5 4"
 const RECORDED_WIDTH = 1.75
 
 /** Smooth line through the points (monotone cubic, so it never overshoots between weights), like Excel's smoothed scatter. */
@@ -99,6 +100,7 @@ function HarvestCurveChart({ title, points, curves }: { title: string; points: H
             fill="none"
             stroke={CURVE_STYLE[s].color}
             strokeWidth={MODEL_WIDTH}
+            strokeDasharray={MODEL_DASH}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
