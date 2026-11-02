@@ -20,11 +20,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     ...(savedPlan?.data ? { stocking: String(savedPlan.data.planned_fish), stockingAbw: String(savedPlan.data.planned_abw_g), scenario: savedPlan.data.scenario } : {}),
     ...resolvedSearchParams,
   })
+  if (parseAnalyticsView(resolvedSearchParams.report) === "planning") forwardPlanInputs.scenario = "main"
   const data = await getAnalyticsReportData({
     farmId,
     period,
     accessToken,
     forwardPlanInputs,
+    planningParams: resolvedSearchParams,
     view: parseAnalyticsView(resolvedSearchParams.report),
   })
 

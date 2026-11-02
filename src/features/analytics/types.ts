@@ -23,6 +23,7 @@ export type BatchReportRow = {
 
 export type CageHarvestRow = {
   cycle_id: number
+  batch_id: number
   system_id: number | null
   unit: string | null
   harvest_date: string
@@ -108,6 +109,18 @@ export type AbwPointRow = {
 
 export type GrowthCurveRow = { scenario: string; day: number; abw_g: number }
 
+/** One weight on a harvested batch's history: stocking, a sampling, or a harvest day (cycle_id ties it to a batch harvest row). */
+export type HarvestPointRow = {
+  cycle_id: number
+  batch_id: number
+  batch_name: string
+  kind: "stocking" | "sampling" | "harvest"
+  date: string
+  age_days: number
+  model_age_days: number
+  abw_g: number
+}
+
 /** api_analytics_performance(...) result; a section is null when it was not requested. */
 export type PerformanceReports = {
   batches: BatchReportRow[] | null
@@ -142,6 +155,7 @@ export type AnalyticsReportData = {
   periodEnd: string
   batches: BatchReportRow[]
   batchHarvests: CageHarvestRow[]
+  batchHarvestPoints: HarvestPointRow[]
   cageHarvests: CageHarvestRow[]
   feedVsExpected: FeedVsExpectedRow[]
   growthByBatch: GrowthByBatchRow[]

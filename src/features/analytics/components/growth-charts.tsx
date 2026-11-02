@@ -10,24 +10,24 @@ const RECORDED = "var(--sidebar, #0f4c81)"
 const EXPECTED = "#e0a526"
 // Categorical palette (colour-blind friendly first, then extra hues) for the per-batch lines.
 const BATCH_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#7A5195", "#8C564B", "#2CA02C", "#17BECF", "#BCBD22", "#E377C2"]
-const CURVE_STYLE: Record<string, { color: string; dash: string; label: string }> = {
+export const CURVE_STYLE: Record<string, { color: string; dash: string; label: string }> = {
   slow: { color: "#6f746f", dash: "2 4", label: "Slow model" },
   main: { color: "#232a25", dash: "6 4", label: "Main model" },
   potential: { color: "#b45309", dash: "10 4", label: "Potential model" },
 }
 
-function compact(v: number) {
+export function compact(v: number) {
   if (Math.abs(v) >= 1000) return `${Math.round(v / 100) / 10}k`.replace(".0k", "k")
   return String(Math.round(v * 10) / 10).replace(/\.0$/, "")
 }
 
-function niceTop(max: number) {
+export function niceTop(max: number) {
   const m = Math.max(max, 1e-6)
   const step = Math.pow(10, Math.floor(Math.log10(m)))
   return Math.ceil(m / step) * step
 }
 
-function Legend({ items }: { items: { label: string; color: string; dash?: string; swatch?: "box" | "line" }[] }) {
+export function Legend({ items }: { items: { label: string; color: string; dash?: string; swatch?: "box" | "line" }[] }) {
   return (
     <div className="rpt-chart__legend">
       {items.map((i) => (

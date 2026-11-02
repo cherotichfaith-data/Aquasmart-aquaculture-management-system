@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { calculateFeed, planDays, validDate } from "@/features/analytics/feed-model"
 import type { FeedPlan, FeedSource } from "@/features/analytics/feed-types"
@@ -10,6 +10,25 @@ export default function FeedPlanner({farmId,start,end,asOf,today,sources,saved,c
  const router=useRouter()
  const [rows,setRows]=useState(()=> (saved?.rows??sources).map(s=>({...s,include:true,stock:String(s.stock_no),abw:s.abw_g==null?"":String(s.abw_g),sample:s.sampled_on??""})))
  const [dirty,setDirty]=useState(false),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState("")
+ const appliedSources=useRef(JSON.stringify(sources))
+ useEffect(()=>{
+  if(saved)return
+  const signature=JSON.stringify(sources)
+  if(signature===appliedSources.current)return
+  if(dirty||busy){setMessage("New source records are available. Load inputs to use them; your unsaved edits have been kept.");return}
+  appliedSources.current=signature
+  setRows(sources.map(s=>({...s,include:true,stock:String(s.stock_no),abw:s.abw_g==null?"":String(s.abw_g),sample:s.sampled_on??""})))
+  setConfirmed(false)
+  setMessage("Feed planning updated from the latest source records.")
+ },[sources,saved,dirty,busy])
+ useEffect(()=>{
+  if(saved)return
+  const refresh=()=>{if(document.visibilityState==="visible")router.refresh()}
+  const interval=window.setInterval(refresh,30000)
+  window.addEventListener("focus",refresh)
+  document.addEventListener("visibilitychange",refresh)
+  return()=>{window.clearInterval(interval);window.removeEventListener("focus",refresh);document.removeEventListener("visibilitychange",refresh)}
+ },[router,saved])
  const from=saved?.starts_on??start,to=saved?.ends_on??end,cutoff=saved?.source_as_of??asOf
  useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=""};const link=(e:MouseEvent)=>{if((e.target as HTMLElement).closest("a[href]")&&!window.confirm("Leave without saving this feed plan?")){e.preventDefault();e.stopPropagation()}};window.addEventListener("beforeunload",warn);document.addEventListener("click",link,true);return()=>{window.removeEventListener("beforeunload",warn);document.removeEventListener("click",link,true)}},[dirty])
  const results=rows.map((r,i)=>{if(saved)return saved.rows[i].result;try{return r.stock!==""&&r.abw!==""?calculateFeed(Number(r.stock),Number(r.abw),from,to):null}catch{return null}})
@@ -27,6 +46,7 @@ export default function FeedPlanner({farmId,start,end,asOf,today,sources,saved,c
     <button className="rounded-lg border px-4 py-2">Load inputs</button>
    </form>:<p>Saved plan · {from} to {to}</p>}
   </div>
+  {!saved?<p className="text-sm text-muted-foreground">Draft inputs update automatically from records through {cutoff}, every 30 seconds and when you return to this tab. Unsaved manual edits are kept.</p>:null}
   <section className="rounded-xl border bg-card p-5 space-y-4">
    <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Cage inputs</h2><details className="relative"><summary aria-label="About feed planning" className="cursor-pointer list-none rounded-full border px-2 text-sm">i</summary><div className="absolute left-0 top-8 z-20 w-80 rounded-xl border bg-background p-4 text-sm shadow-lg space-y-2"><p>TB model: starting weight selects a growth phase, mortality and eFCR. Expected feed equals net biomass gain × eFCR. Rates stay fixed for the period, matching the workbook’s normal feeding calculation.</p><p>Calendar months use the workbook’s monthly mortality. Custom periods scale survival on a 30-day basis. Average daily feed is a budgeting average, not a daily ration schedule.</p><p>Sources use the latest stocked cage and batch on or before the stock date. ABW is the latest measured sample for that cage/batch. Confirm missing or older values. Harvests, transfers and emergency rations during the plan are not forecast here.</p><p>Saving keeps the confirmed inputs and calculated results for this plan. Daily records and farm defaults are unchanged.</p></div></details></div><span className="text-sm text-muted-foreground">Model: TB</span></div>
    {rows.length===0?<p>No stocked cages were found on or before {cutoff}. Choose another stock date.</p>:<div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-muted"><tr>{["Use","Cage","Batch","Stock record","Sampled on","Starting fish","Starting ABW (g)","End fish","End ABW (g)","Feed (kg)","Avg/day (kg)"].map(h=><th key={h} className="whitespace-nowrap p-3 text-left">{h}</th>)}</tr></thead><tbody>{rows.map((r,i)=>{const x=results[i];return <tr key={`${r.system_id}:${r.batch_id}`} className={`border-b ${!r.include?"opacity-50":""}`}><td className="p-3"><input type="checkbox" aria-label={`Include ${r.cage_name} ${r.batch_name}`} checked={r.include} disabled={!!saved||busy} onChange={e=>change(i,"include",e.target.checked)}/></td><td className="p-3 font-medium whitespace-nowrap">{r.cage_name}</td><td className="p-3 whitespace-nowrap">{r.batch_name}</td><td className="p-3 whitespace-nowrap">{r.stock_date}</td><td className="p-2"><input aria-label={`Sampling date ${r.cage_name} ${r.batch_name}`} className="rounded-lg border bg-background p-2" type="date" max={cutoff} value={r.sample} disabled={!!saved||busy} onChange={e=>change(i,"sample",e.target.value)}/></td><td className="p-2"><input aria-label={`Starting fish ${r.cage_name} ${r.batch_name}`} title={`Database: ${r.stock_no} fish`} className={inputClass} type="number" min="0" max="10000000" step="1" value={r.stock} disabled={!!saved||busy} onChange={e=>change(i,"stock",e.target.value)}/></td><td className="p-2"><input aria-label={`Starting ABW ${r.cage_name} ${r.batch_name}`} title={`Measured: ${r.abw_g??"missing"} g`} className={inputClass} type="number" min="0.3" max="1000" step="any" value={r.abw} disabled={!!saved||busy} onChange={e=>change(i,"abw",e.target.value)}/></td>{[x?.end_fish,x?.end_abw_g,x?.feed_kg,x?.average_daily_kg].map((n,j)=><td key={j} className="p-3 text-right tabular-nums">{n==null?"—":fmt(n)}</td>)}</tr>})}</tbody></table></div>}

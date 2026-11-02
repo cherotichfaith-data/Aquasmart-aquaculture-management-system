@@ -1,3 +1,6 @@
+import { loadAutomaticFeedPlan } from "./automatic-feed-plan.server"
+import { addMonths } from "./automatic-feed-plan"
+import { buildHarvestPoints } from "./harvest-curve"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { logSbError } from "@/lib/supabase/log"
 import {
@@ -5,6 +8,7 @@ import {
   type AnalyticsReportData,
   type ForwardPlanInputs,
   type GrowthScenario,
+  type HarvestPointRow,
   type OutlookReports,
   type PerformanceReports,
 } from "./types"
@@ -41,7 +45,7 @@ const SECTIONS_BY_VIEW: Record<AnalyticsView, { performance: string[]; outlook: 
   planning: { performance: [], outlook: ["farm_forecast", "forward_plan"] },
   batches: { performance: ["batches"], outlook: [] },
   growth: { performance: ["growth_by_batch", "abw_points", "growth_curve"], outlook: [] },
-  harvests: { performance: ["cage_harvests", "batch_harvests"], outlook: [] },
+  harvests: { performance: ["cage_harvests", "batch_harvests", "growth_curve"], outlook: [] },
   cages: { performance: ["feed_vs_expected"], outlook: [] },
 }
 
@@ -51,6 +55,7 @@ export async function getAnalyticsReportData(params: {
   view: AnalyticsView
   accessToken: string
   forwardPlanInputs: ForwardPlanInputs
+  planningParams?: Record<string, string | string[] | undefined>
 }): Promise<AnalyticsReportData> {
   const empty: AnalyticsReportData = {
     month: params.period.month,
@@ -59,6 +64,7 @@ export async function getAnalyticsReportData(params: {
     periodEnd: params.period.to,
     batches: [],
     batchHarvests: [],
+    batchHarvestPoints: [],
     cageHarvests: [],
     feedVsExpected: [],
     growthByBatch: [],
@@ -128,6 +134,54 @@ export async function getAnalyticsReportData(params: {
   const perf = (performance?.data ?? null) as PerformanceReports | null
   const out = (outlook?.data ?? null) as OutlookReports | null
 
+  let batchHarvestPoints: HarvestPointRow[] = []
+  const harvestedBatches = perf?.batch_harvests ?? []
+  if (harvestedBatches.length > 0) {
+    const batchIds = harvestedBatches.map((r) => r.batch_id)
+    const [stocking, sampling, harvests] = await Promise.all([
+      supabase.from("fish_stocking").select("batch_id, date, number_of_fish_stocking, total_weight_stocking").in("batch_id", batchIds),
+      supabase.from("fish_sampling_weight").select("batch_id, date, number_of_fish_sampling, abw").in("batch_id", batchIds),
+      supabase.from("fish_harvest").select("batch_id, cycle_id, date, number_of_fish_harvest, total_weight_harvest").in("batch_id", batchIds),
+    ])
+    const readError = stocking.error ?? sampling.error ?? harvests.error
+    if (readError) logSbError("analytics:batchHarvestPoints", readError)
+    else {
+      batchHarvestPoints = buildHarvestPoints(
+        harvestedBatches,
+        stocking.data ?? [],
+        sampling.data ?? [],
+        harvests.data ?? [],
+        (perf?.growth_curve ?? []).filter((c) => c.scenario === params.forwardPlanInputs.scenario),
+      )
+    }
+  }
+
+  let forwardPlan = out?.forward_plan ?? []
+  let farmForecast = out?.farm_forecast ?? []
+  let planningIssues: string[] = []
+  if (params.view === "planning") {
+    try {
+      const planMonth = typeof params.planningParams?.planMonth === "string" ? params.planningParams.planMonth : addMonths(period.month, 1).slice(0, 7)
+      const automatic = await loadAutomaticFeedPlan(params.farmId, params.accessToken, {
+        ...params.planningParams,
+        month: planMonth,
+        stocking: String(params.forwardPlanInputs.plannedFish),
+        stockingAbw: String(params.forwardPlanInputs.plannedAbwG),
+      }, 12)
+      planningIssues = automatic.result.issues
+      forwardPlan = planningIssues.length ? [] : automatic.result.months.map(m => m.summary)
+      // Keep historical benchmark/recorded values, replace future forecasts with
+      // the same monthly engine and actual source records as the cage plan.
+      farmForecast = farmForecast.map(row => {
+        const projected = forwardPlan.find(m => m.month_start === row.month_start)
+        return projected ? { ...row, biomass_forecast_kg: projected.biomass_end_kg, harvest_forecast_kg: projected.harvest_kg } : row.month_start > period.month ? { ...row, biomass_forecast_kg: null, harvest_forecast_kg: null } : row
+      })
+    } catch (error) {
+      planningIssues = [error instanceof Error ? error.message : "Planning records could not be loaded."]
+      forwardPlan = []
+      farmForecast = farmForecast.filter(row => row.month_start <= period.month)
+    }
+  }
   return {
     month: period.month,
     periodMode: period.mode,
@@ -135,15 +189,16 @@ export async function getAnalyticsReportData(params: {
     periodEnd: period.to,
     batches: perf?.batches ?? [],
     batchHarvests: perf?.batch_harvests ?? [],
+    batchHarvestPoints,
     cageHarvests: perf?.cage_harvests ?? [],
     feedVsExpected: perf?.feed_vs_expected ?? [],
     growthByBatch: perf?.growth_by_batch ?? [],
     abwPoints: perf?.abw_points ?? [],
     growthCurve: perf?.growth_curve ?? [],
     stockProfile: out?.stock_profile ?? [],
-    farmForecast: out?.farm_forecast ?? [],
-    forwardPlan: out?.forward_plan ?? [],
+    farmForecast,
+    forwardPlan,
     forwardPlanInputs: params.forwardPlanInputs,
-    error: failed?.error ? "Some analytics could not be loaded. Try again shortly." : null,
+    error: planningIssues.length ? planningIssues.join(" ") : failed?.error ? "Some analytics could not be loaded. Try again shortly." : null,
   }
 }
