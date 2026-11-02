@@ -1,4 +1,5 @@
 "use client"
+import PlanningAutoRefresh from "./planning-auto-refresh"
 
 import { useCallback, useState, type ReactNode } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -6,7 +7,6 @@ import Link from "next/link"
 import { Info } from "lucide-react"
 import { Dialog } from "@/components/app-ui/dialog"
 import {
-  GROWTH_SCENARIOS,
   type AnalyticsReportData,
   type CageHarvestRow,
   type FarmForecastRow,
@@ -16,6 +16,8 @@ import {
 } from "@/features/analytics/types"
 import { FilterPopover } from "@/components/shared/filter-popover"
 import BatchReportTable from "./batch-report-table"
+import BatchHarvestCards from "./batch-harvest-cards"
+import { curvesByScenario, judgeBatchAgainstCurves, signedPct, verdictLabel, type HarvestCurveVerdict } from "@/features/analytics/harvest-curve"
 import StockProfileChart, { classLabel } from "./stock-profile-chart"
 import { AbwAgeChart, GrowthByBatchChart, SelectedBatchAbwChart, StockLossChart } from "./growth-charts"
 import { DASH, ReportTable, dateText, num, pct, type Column } from "./report-table"
@@ -187,7 +189,6 @@ function ForecastTable({ rows }: { rows: FarmForecastRow[] }) {
 function StockingPlanForm({
   fish,
   abw,
-  scenario,
   onApply,
 }: {
   fish: number
@@ -197,7 +198,7 @@ function StockingPlanForm({
 }) {
   const [fishText, setFishText] = useState(String(fish))
   const [abwText, setAbwText] = useState(String(abw))
-  const [scenarioValue, setScenarioValue] = useState<GrowthScenario>(scenario)
+  const scenarioValue: GrowthScenario = "main"
   const inputClass = "h-9 w-32 rounded-full border border-[#e6ddd0] bg-[#fffdf9] px-3 text-sm font-semibold"
   return (
     <form
@@ -215,21 +216,7 @@ function StockingPlanForm({
         Stocking ABW (g)
       </label>
       <input id="plan-abw" inputMode="decimal" value={abwText} onChange={(e) => setAbwText(e.target.value)} className={inputClass} />
-      <label className="rpt-small" htmlFor="plan-scenario">
-        Growth scenario
-      </label>
-      <select
-        id="plan-scenario"
-        value={scenarioValue}
-        onChange={(e) => setScenarioValue(e.target.value as GrowthScenario)}
-        className={inputClass}
-      >
-        {GROWTH_SCENARIOS.map((sc) => (
-          <option key={sc} value={sc}>
-            {sc}
-          </option>
-        ))}
-      </select>
+      <p className="rpt-small">TB monthly planning model</p>
       <button type="submit" className="btn btn--primary">
         Update plan
       </button>
@@ -295,7 +282,24 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
   const label = cycleToDate ? `Cycle to date — ${monthLabel(data.month)}` : monthLabel(data.month)
   // Oldest batch first, so legend colours stay stable as new batches are added.
   const growthBatchNames = Array.from(new Set(data.growthByBatch.map((b) => b.batch_name))).reverse()
+  const batchVerdicts = new Map<number, HarvestCurveVerdict>()
+  if (data.batchHarvests.length > 0) {
+    const curves = curvesByScenario(data.growthCurve)
+    for (const row of data.batchHarvests) {
+      batchVerdicts.set(row.cycle_id, judgeBatchAgainstCurves(data.batchHarvestPoints.filter((p) => p.cycle_id === row.cycle_id), curves))
+    }
+  }
+  const abwIndex = BATCH_HARVEST_COLUMNS.findIndex((column) => column.label === "Harvest ABW (g)")
+  const batchHarvestColumns: Column<CageHarvestRow>[] = [
+    ...BATCH_HARVEST_COLUMNS.slice(0, abwIndex + 1),
+    { label: "Followed curve", cell: (r) => { const v = batchVerdicts.get(r.cycle_id); return v ? verdictLabel(v) : DASH } },
+    { label: "ABW vs Main", cell: (r) => signedPct(batchVerdicts.get(r.cycle_id)?.finalVsMain ?? null, 0), numeric: true },
+    ...BATCH_HARVEST_COLUMNS.slice(abwIndex + 1),
+  ]
   const forecastLabel = monthLabel(data.month)
+  const monthlyPlanParams = new URLSearchParams(searchParams.toString())
+  monthlyPlanParams.set("month", data.forwardPlan[0]?.month_start.slice(0,7) ?? searchParams.get("planMonth") ?? "")
+  monthlyPlanParams.delete("report"); monthlyPlanParams.delete("period"); monthlyPlanParams.delete("from"); monthlyPlanParams.delete("to"); monthlyPlanParams.delete("planMonth")
 
   return (
     <div className="tb-monthly">
@@ -387,7 +391,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
         <Section
           title={`Farm-Wide Biomass and Harvest Forecast - as at ${forecastLabel}`}
           noteAsInfo
-          note="Forecast is what the farm should hold and harvest if every stocking followed the growth model (past months) and the forward plan (coming months). Recorded is from the farm's records. The growth scenario and stocking plan under Forward Planning drive it."
+          note="Historical forecast is a growth-model benchmark. Future forecast uses the same live records, stocking assumptions and harvest schedule as Feed planning. Recorded values come from production records."
         >
           <CopyZoom type="table" name="Biomass and harvest forecast">
             <ForecastTable rows={data.farmForecast} />
@@ -399,7 +403,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
         <Section
           title={`Forward Planning - from ${forecastLabel}`}
           noteAsInfo
-          note="Next 12 months. Every cage is grown from its current size along the growth model and harvested at the target weight; feed is biomass times the model feeding rate, split by pellet size from fish weight. Planned stocking is an assumption you set here. Slow and potential use main mortality assumptions unless their own benchmarks are configured. Update plan previews these choices; save farm defaults under Production inputs → Planning inputs."
+          note="Uses the same monthly TB feed calculation and live stock records as Feed planning. Weights and fish counts are projected from their recorded dates. Future stocking and target-weight harvests are assumptions; dated harvests can be adjusted in Feed planning. Pellet-size totals reconcile to total feed. Historical biomass benchmarks remain separate from the live forecast."
         >
           <StockingPlanForm
             key={`${data.forwardPlanInputs.plannedFish}-${data.forwardPlanInputs.plannedAbwG}-${data.forwardPlanInputs.scenario}`}
@@ -408,19 +412,13 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
             scenario={data.forwardPlanInputs.scenario}
             onApply={onPlanApply}
           />
+          <p className="rpt-small">Updated from production records automatically. <Link className="underline" href={`/analytics/inputs/feed-planning?${monthlyPlanParams.toString()}`}>Review cage inputs and adjust the monthly plan</Link></p>
+          <PlanningAutoRefresh farmId={searchParams.get("farmId")??""}/>
           <CopyZoom type="table" name="Forward planning">
             <ForwardPlanningTable rows={data.forwardPlan} />
           </CopyZoom>
         </Section>
       ) : null}
-      {show("batches") ? (
-        <Section title={`Stock Loss Analysis - ${label}`} note="Stock loss (%) per batch, as in the Detailed Batch Report.">
-          <CopyZoom type="chart" name="Stock loss chart">
-            <StockLossChart rows={data.batches} />
-          </CopyZoom>
-        </Section>
-      ) : null}
-
 
       {show("batches") ? (
         <Section
@@ -429,6 +427,14 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
         >
           <CopyZoom type="table" name="Detailed batch report">
             <BatchReportTable rows={data.batches} />
+          </CopyZoom>
+        </Section>
+      ) : null}
+
+      {show("batches") ? (
+        <Section title={`Stock Loss Analysis - ${label}`} note="Stock loss (%) per batch, as in the Detailed Batch Report.">
+          <CopyZoom type="chart" name="Stock loss chart">
+            <StockLossChart rows={data.batches} />
           </CopyZoom>
         </Section>
       ) : null}
@@ -494,10 +500,19 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           </CopyZoom>
         </Section>
       ) : null}
+      {show("harvests") && data.batchHarvests.length > 0 ? (
+        <Section
+          title={`Batch Harvest Curves - ${label}`}
+          note="Each batch's recorded weight from stocking to final harvest, drawn against the Slow, Main and Potential growth-model curves on the same model age axis. The batch is matched to the curve with the smallest average gap across its weights (stocking excluded). It needs at least 3 weights after stocking; fewer are not judged. The model curves are references only, so this is a comparison, not a recorded setting."
+          noteAsInfo
+        >
+          <BatchHarvestCards rows={data.batchHarvests} points={data.batchHarvestPoints} curves={data.growthCurve} />
+        </Section>
+      ) : null}
       {show("harvests") ? (
-        <Section title={`Batch Harvest Report - ${label}`} note={`Completed batches harvested in the selected period. Figures cover all cages from stocking through final harvest. ${HARVEST_METHOD_NOTE}`} noteAsInfo>
+        <Section title={`Batch Harvest Report - ${label}`} note={`Completed batches harvested in the selected period. Figures cover all cages from stocking through final harvest. Followed is the growth-model curve closest to the batch's weights; ABW vs Main compares the final harvest weight with the Main curve at the same model age. ${HARVEST_METHOD_NOTE}`} noteAsInfo>
           <CopyZoom type="table" name="Batch harvest report">
-            <ReportTable columns={BATCH_HARVEST_COLUMNS} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No fully harvested batches are confirmed for this period." />
+            <ReportTable columns={batchHarvestColumns} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No fully harvested batches are confirmed for this period." />
           </CopyZoom>
         </Section>
       ) : null}

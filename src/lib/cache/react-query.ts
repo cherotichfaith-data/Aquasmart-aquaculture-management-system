@@ -225,6 +225,12 @@ export async function invalidateAfterWrite(
     systemId?: number | null
   },
 ) {
+  // Refresh server-rendered planning as well as React Query reports, in this tab
+  // and other tabs. Storage is a signal only; it contains no production data.
+  if (typeof window !== "undefined" && ["feeding", "mortality", "sampling", "harvest", "transfer", "stocking", "system"].includes(params.type)) {
+    window.dispatchEvent(new CustomEvent("aquasmart:production-records", { detail: { farmId: params.farmId } }))
+    try { window.localStorage.setItem(`aquasmart:production-records:${params.farmId}`, String(Date.now())) } catch { /* Polling and focus refresh still work when storage is unavailable. */ }
+  }
   switch (params.type) {
     case "feeding":
       return invalidateFeedingWriteQueries(queryClient, { farmId: params.farmId, date: params.date })
