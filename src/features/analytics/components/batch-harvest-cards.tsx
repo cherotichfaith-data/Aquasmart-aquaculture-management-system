@@ -4,7 +4,6 @@ import { useMemo } from "react"
 import type { CageHarvestRow, GrowthCurveRow, HarvestPointRow } from "@/features/analytics/types"
 import { curvesByScenario, judgeBatchAgainstCurves, signedPct, verdictLabel, type HarvestCurveVerdict } from "@/features/analytics/harvest-curve"
 import { CURVE_STYLE, Legend, compact, niceTop } from "./growth-charts"
-import { dateText, num, pct } from "./report-table"
 
 const W = 640
 const H = 260
@@ -12,6 +11,30 @@ const PAD = { l: 48, r: 16, t: 14, b: 46 }
 const RECORDED = "#2a78d6"
 const HARVEST = "#eb6834"
 const SCENARIOS = ["slow", "main", "potential"] as const
+// Spreadsheet-style smoothed scatter: thin solid lines, no dashes.
+const MODEL_WIDTH = 1.25
+const RECORDED_WIDTH = 1.75
+
+/** Smooth line through the points (monotone cubic, so it never overshoots between weights), like Excel's smoothed scatter. */
+function smoothPath(pts: [number, number][]): string {
+  if (pts.length === 0) return ""
+  if (pts.length < 3) return pts.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px},${py}`).join(" ")
+  const dx = pts.slice(1).map((p, i) => p[0] - pts[i][0])
+  const slope = pts.slice(1).map((p, i) => (p[1] - pts[i][1]) / (dx[i] || 1))
+  const t = pts.map((_, i) => {
+    if (i === 0) return slope[0]
+    if (i === pts.length - 1) return slope[i - 1]
+    if (slope[i - 1] * slope[i] <= 0) return 0
+    return (3 * (dx[i - 1] + dx[i])) / ((2 * dx[i] + dx[i - 1]) / slope[i - 1] + (dx[i] + 2 * dx[i - 1]) / slope[i])
+  })
+  let d = `M${pts[0][0]},${pts[0][1]}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i]
+    const [x1, y1] = pts[i + 1]
+    d += ` C${x0 + dx[i] / 3},${y0 + (t[i] * dx[i]) / 3} ${x1 - dx[i] / 3},${y1 - (t[i + 1] * dx[i]) / 3} ${x1},${y1}`
+  }
+  return d
+}
 
 function modelAt(curve: GrowthCurveRow[], day: number) {
   const next = curve.findIndex((c) => c.day >= day)
@@ -48,7 +71,7 @@ function HarvestCurveChart({ title, points, curves }: { title: string; points: H
         items={[
           { label: "Recorded weight", color: RECORDED, swatch: "line" },
           { label: "Harvests", color: HARVEST },
-          ...SCENARIOS.map((s) => ({ label: CURVE_STYLE[s].label, color: CURVE_STYLE[s].color, dash: CURVE_STYLE[s].dash, swatch: "line" as const })),
+          ...SCENARIOS.map((s) => ({ label: CURVE_STYLE[s].label, color: CURVE_STYLE[s].color, swatch: "line" as const })),
         ]}
       />
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title} className="rpt-chart__svg">
@@ -66,21 +89,30 @@ function HarvestCurveChart({ title, points, curves }: { title: string; points: H
           </text>
         ))}
         {SCENARIOS.map((s) => (
-          <polyline
+          <path
             key={s}
-            points={curves[s]
-              .filter((c) => c.day >= xMin && c.day <= xMax && c.abw_g <= yTop)
-              .map((c) => `${x(c.day)},${y(c.abw_g)}`)
-              .join(" ")}
+            d={smoothPath(
+              curves[s]
+                .filter((c) => c.day >= xMin && c.day <= xMax && c.abw_g <= yTop)
+                .map((c): [number, number] => [x(c.day), y(c.abw_g)]),
+            )}
             fill="none"
             stroke={CURVE_STYLE[s].color}
-            strokeWidth="1.6"
-            strokeDasharray={CURVE_STYLE[s].dash}
+            strokeWidth={MODEL_WIDTH}
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         ))}
-        <polyline points={sorted.map((p) => `${x(p.model_age_days)},${y(p.abw_g)}`).join(" ")} fill="none" stroke={RECORDED} strokeWidth="2.2" strokeLinejoin="round" />
+        <path
+          d={smoothPath(recorded.map((p): [number, number] => [x(p.model_age_days), y(p.abw_g)]))}
+          fill="none"
+          stroke={RECORDED}
+          strokeWidth={RECORDED_WIDTH}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
         {recorded.map((p) => (
-          <circle key={`${p.kind}-${p.date}`} cx={x(p.model_age_days)} cy={y(p.abw_g)} r="3.6" fill={RECORDED} stroke="#fffdf9" strokeWidth="1.5">
+          <circle key={`${p.kind}-${p.date}`} cx={x(p.model_age_days)} cy={y(p.abw_g)} r="3" fill={RECORDED} stroke="#fffdf9" strokeWidth="1.5">
             <title>{`${p.date}: ${p.abw_g.toFixed(1)} g, ${p.age_days} days since stocking (model age ${p.model_age_days})`}</title>
           </circle>
         ))}
@@ -107,16 +139,6 @@ function verdictSentence(v: HarvestCurveVerdict) {
   return v.outside ? `${name} curve${vs}.` : `Closest to the ${name} curve (${signedPct(v.gap)} on average)${vs}.`
 }
 
-function Figure({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="rounded-lg bg-[#f6f1e8] px-3 py-2">
-      <div className="rpt-small">{label}</div>
-      <div className="text-lg font-semibold leading-tight">{value}</div>
-      {sub ? <div className="rpt-small">{sub}</div> : null}
-    </div>
-  )
-}
-
 export default function BatchHarvestCards({ rows, points, curves }: { rows: CageHarvestRow[]; points: HarvestPointRow[]; curves: GrowthCurveRow[] }) {
   const byScenario = useMemo(() => curvesByScenario(curves), [curves])
   if (rows.length === 0) return null
@@ -128,23 +150,11 @@ export default function BatchHarvestCards({ rows, points, curves }: { rows: Cage
         const title = `ABW against age - batch ${row.batch_name}`
         return (
           <article key={row.cycle_id} className="rounded-xl border border-[#e6ddd0] bg-[#fffdf9] p-3 grid gap-2">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <div>
-                <span className="font-semibold">{row.batch_name}</span>
-                <span className="rpt-small ml-2">
-                  Stocked {dateText(row.original_stock_date)} · final harvest {dateText(row.harvest_date)}
-                </span>
-              </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="rpt-small">{verdictSentence(verdict)}</p>
               <span className="rounded-full bg-[#f6f1e8] px-3 py-1 text-xs font-semibold">{verdict.closest ? `Followed: ${verdictLabel(verdict)}` : verdictLabel(verdict)}</span>
             </div>
-            <p className="rpt-small">{verdictSentence(verdict)}</p>
             {own.length > 0 ? <HarvestCurveChart title={title} points={own} curves={byScenario} /> : <p className="planner-note">No weights recorded for this batch.</p>}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Figure label="Harvest ABW" value={`${num(row.harvest_abw_g, 1)} g`} sub={verdict.finalMainAbwG ? `Main: ${num(verdict.finalMainAbwG, 1)} g` : undefined} />
-              <Figure label="Age at harvest" value={`${num(row.age_days)} d`} />
-              <Figure label="Survival" value={pct(row.survival_pct, 1)} sub={`Mortality ${pct(row.mortality_pct, 1)}`} />
-              <Figure label="eFCR" value={num(row.efcr, 2)} />
-            </div>
           </article>
         )
       })}
