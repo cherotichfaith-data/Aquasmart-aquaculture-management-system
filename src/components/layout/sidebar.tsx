@@ -18,6 +18,7 @@ import { Tooltip } from "@/components/app-ui/tooltip"
 import { cn } from "@/lib/utils"
 import {
   BarChart3,
+  MessageSquare,
   Fish,
   LayoutDashboard,
   LogOut,
@@ -47,6 +48,7 @@ const ALL_NAV_SECTIONS = [
       { name: "Feed", href: toDashboardPath("/feed"), icon: Fish },
       { name: "Production", href: toDashboardPath("/production"), icon: BarChart3 },
       { name: "Analytics", href: toDashboardPath("/analytics"), icon: BarChart3 },
+      { name: "Assistant", href: toDashboardPath("/assistant"), icon: MessageSquare },
     ],
   },
   {
@@ -70,6 +72,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
     toDashboardPath("/analytics"),
+    toDashboardPath("/assistant"),
     DATA_ENTRY_PATH,
     toDashboardPath("/settings"),
     "/users",
@@ -81,6 +84,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
     toDashboardPath("/analytics"),
+    toDashboardPath("/assistant"),
     DATA_ENTRY_PATH,
     toDashboardPath("/settings"),
   ]),
@@ -95,6 +99,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/feed"),
     toDashboardPath("/production"),
     toDashboardPath("/analytics"),
+    toDashboardPath("/assistant"),
   ]),
   viewer: new Set([
     toDashboardPath("/"),
@@ -102,6 +107,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, Set<string>> = {
     toDashboardPath("/batches"),
     toDashboardPath("/feed"),
     toDashboardPath("/analytics"),
+    toDashboardPath("/assistant"),
   ]),
 }
 

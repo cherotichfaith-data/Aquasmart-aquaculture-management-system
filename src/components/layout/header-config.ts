@@ -87,6 +87,9 @@ export const getHeaderPageMeta = (pathname: string, tab: string | null): PageMet
       description: "System-level production trends with snapshot-safe reporting across the selected period.",
     }
   }
+  if (pathname.startsWith("/assistant")) {
+    return { title: "Farm assistant", description: "Ask questions about your farm data. Runs on a local model." }
+  }
   if (pathname.startsWith("/reports")) {
     return {
       title: "Monthly reports",
