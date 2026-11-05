@@ -215,7 +215,7 @@ export default function ApprovalsClient({
   const entries = useMemo(() => query.data?.entries ?? [], [query.data?.entries])
   const counts = query.data?.counts
   const total = query.data?.total ?? 0
-  const bulkIds = entries.filter((entry) => entry.entry_type !== "feed_inventory").map((entry) => entry.id)
+  const bulkIds = entries.map((entry) => entry.id)
   const showChecks = canReview && status === "pending"
 
   const groups = useMemo(() => {
@@ -376,7 +376,7 @@ export default function ApprovalsClient({
               checked={bulkIds.length > 0 && bulkIds.every((id) => selected.includes(id))}
               onChange={(event) => setSelected(event.target.checked ? bulkIds : [])}
             />
-            Select all on this page (feed counts are reviewed individually)
+            Select all on this page
           </label>
         )}
 
@@ -393,7 +393,7 @@ export default function ApprovalsClient({
         ) : (
           groups.map(([groupType, rows]) => {
             const cols = columnsByType[groupType] ?? []
-            const groupBulkIds = groupType === "feed_inventory" ? [] : rows.map((entry) => entry.id)
+            const groupBulkIds = rows.map((entry) => entry.id)
             const groupAllSelected = groupBulkIds.length > 0 && groupBulkIds.every((id) => selected.includes(id))
             const span = (showChecks ? 1 : 0) + cols.length + 2
             return (
@@ -405,19 +405,17 @@ export default function ApprovalsClient({
                       <tr>
                         {showChecks && (
                           <th className="w-9">
-                            {groupType !== "feed_inventory" && (
-                              <input
-                                type="checkbox"
-                                aria-label={`Select all ${approvalTypes[groupType]} entries`}
-                                className="h-4 w-4 accent-primary"
-                                disabled={!!review || editId != null}
-                                checked={groupAllSelected}
-                                onChange={(event) => setSelected((ids) => {
-                                  const without = ids.filter((id) => !groupBulkIds.includes(id))
-                                  return event.target.checked ? [...without, ...groupBulkIds] : without
-                                })}
-                              />
-                            )}
+                            <input
+                              type="checkbox"
+                              aria-label={`Select all ${approvalTypes[groupType]} entries`}
+                              className="h-4 w-4 accent-primary"
+                              disabled={!!review || editId != null}
+                              checked={groupAllSelected}
+                              onChange={(event) => setSelected((ids) => {
+                                const without = ids.filter((id) => !groupBulkIds.includes(id))
+                                return event.target.checked ? [...without, ...groupBulkIds] : without
+                              })}
+                            />
                           </th>
                         )}
                         {cols.map((col) => (
@@ -433,16 +431,14 @@ export default function ApprovalsClient({
                           <tr className="align-middle transition-colors hover:bg-muted/30">
                             {showChecks && (
                               <td className="text-center">
-                                {groupType !== "feed_inventory" && (
-                                  <input
-                                    aria-label={`Select submission ${entry.id}`}
-                                    type="checkbox"
-                                    className="h-4 w-4 accent-primary"
-                                    disabled={!!review || editId != null}
-                                    checked={selected.includes(entry.id)}
-                                    onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))}
-                                  />
-                                )}
+                                <input
+                                  aria-label={`Select submission ${entry.id}`}
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-primary"
+                                  disabled={!!review || editId != null}
+                                  checked={selected.includes(entry.id)}
+                                  onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))}
+                                />
                               </td>
                             )}
                             {cols.map((col, index) => (
