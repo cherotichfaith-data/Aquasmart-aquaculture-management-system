@@ -1,4 +1,5 @@
 "use client"
+import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import {
@@ -9,6 +10,7 @@ import {
   Menu as MenuIcon,
   PackageOpen,
   PlusCircle,
+  Sparkles,
   X,
 } from "lucide-react"
 import { useNotifications } from "@/components/notifications/notifications-provider"
@@ -570,6 +572,13 @@ export default function Header({
               ) : null}
             </div>
             <div className={cn("flex flex-wrap items-center justify-end gap-1.5 rounded-full", isReportsPage && "hidden")}>
+              <Link
+                href="/assistant"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground hover:bg-accent"
+              >
+                <Sparkles size={16} />
+                Ask AI
+              </Link>
               <Tooltip content="Notifications">
                 <button
                   type="button"

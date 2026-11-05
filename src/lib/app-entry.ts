@@ -36,6 +36,7 @@ const STANDALONE_FEATURE_PREFIXES = [
   "/production",
   "/reports",
   "/analytics",
+  "/assistant",
   "/settings",
   "/actions",
   "/users",
