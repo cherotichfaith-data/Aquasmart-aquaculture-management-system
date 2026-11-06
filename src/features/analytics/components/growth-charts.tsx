@@ -9,7 +9,7 @@ const PAD = { l: 58, r: 16, t: 14, b: 54 }
 const RECORDED = "var(--sidebar, #0f4c81)"
 const EXPECTED = "#e0a526"
 // Categorical palette (colour-blind friendly first, then extra hues) for the per-batch lines.
-const BATCH_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#7A5195", "#8C564B", "#2CA02C", "#17BECF", "#BCBD22", "#E377C2"]
+export const BATCH_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#7A5195", "#8C564B", "#2CA02C", "#17BECF", "#BCBD22", "#E377C2"]
 export const CURVE_STYLE: Record<string, { color: string; dash: string; label: string }> = {
   slow: { color: "#6f746f", dash: "2 4", label: "Slow model" },
   main: { color: "#232a25", dash: "6 4", label: "Main model" },
@@ -37,7 +37,8 @@ export function Legend({ items }: { items: { label: string; color: string; dash?
               <line x1="0" x2="22" y1="4" y2="4" stroke={i.color} strokeWidth="2" strokeDasharray={i.dash} />
             </svg>
           ) : (
-            <i style={{ background: i.color }} />
+            // Stack the box above its label, like the line swatches (their <svg> is display:block).
+            <i style={{ background: i.color, display: "block", height: 8, marginRight: 0 }} />
           )}
           {i.label}
         </span>
