@@ -216,7 +216,7 @@ export default function Header({
   const searchParams = useSearchParams()
   const { farmId } = useActiveFarm({ initialFarmId, initialFarmName })
   const activeFarmRoleQuery = useActiveFarmRole(roleOverride ? null : farmId)
-  const { notifications, markAllRead, markRead, dismiss, activeAlerts } = useNotifications()
+  const { notifications, markAllRead, markRead, dismiss, activeAlerts, activeAlertsLoading } = useNotifications()
   const [isCondensed, setIsCondensed] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null)
@@ -508,10 +508,10 @@ export default function Header({
     setAddDataAnchor(null)
   }, [pathname, searchParams])
 
-  // When the bell panel opens, land on whichever tab actually has something.
+  // Always open on the standing alerts (database-derived, e.g. empty cages). They may still be loading
+  // right after a page refresh, so never pick the tab by whether the list is empty at that instant.
   useEffect(() => {
-    if (notificationsAnchor) setNotifTab(activeAlerts.length > 0 ? "alerts" : "recent")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (notificationsAnchor) setNotifTab("alerts")
   }, [notificationsAnchor])
 
   const openMenu = (setter: (element: HTMLElement | null) => void) => (event: MouseEvent<HTMLElement>) => {
@@ -714,7 +714,7 @@ export default function Header({
         <div className="max-h-[26rem] overflow-y-auto">
           {notifTab === "alerts" ? (
             activeAlerts.length === 0 ? (
-              <NotificationEmpty text="No active alerts — everything is within range." />
+              <NotificationEmpty text={activeAlertsLoading ? "Loading alerts…" : "No active alerts — everything is within range."} />
             ) : (
               activeAlerts.map((alert) => (
                 <NotificationRow
