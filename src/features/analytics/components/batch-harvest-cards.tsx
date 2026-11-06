@@ -1,41 +1,20 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { CageHarvestRow, GrowthCurveRow, HarvestPointRow } from "@/features/analytics/types"
 import { curvesByScenario, judgeBatchAgainstCurves, signedPct, verdictLabel, type HarvestCurveVerdict } from "@/features/analytics/harvest-curve"
-import { CURVE_STYLE, Legend, compact, niceTop } from "./growth-charts"
+import { BATCH_COLORS, CURVE_STYLE, Legend, compact, niceTop } from "./growth-charts"
 
-const W = 640
-const H = 260
-const PAD = { l: 48, r: 16, t: 14, b: 46 }
-const RECORDED = "#2a78d6"
+// Same geometry, colours and line styles as the growth-analysis charts (growth-charts.tsx).
+const W = 900
+const H = 320
+const PAD = { l: 58, r: 16, t: 14, b: 54 }
+const RECORDED = "#0072B2"
 const HARVEST = "#eb6834"
 const SCENARIOS = ["slow", "main", "potential"] as const
-// Spreadsheet-style smoothed scatter: thin dotted model curves behind a solid recorded line.
-const MODEL_WIDTH = 1.25
-const MODEL_DASH = "0.5 4"
-const RECORDED_WIDTH = 1.75
+const ALL = "all"
 
-/** Smooth line through the points (monotone cubic, so it never overshoots between weights), like Excel's smoothed scatter. */
-function smoothPath(pts: [number, number][]): string {
-  if (pts.length === 0) return ""
-  if (pts.length < 3) return pts.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px},${py}`).join(" ")
-  const dx = pts.slice(1).map((p, i) => p[0] - pts[i][0])
-  const slope = pts.slice(1).map((p, i) => (p[1] - pts[i][1]) / (dx[i] || 1))
-  const t = pts.map((_, i) => {
-    if (i === 0) return slope[0]
-    if (i === pts.length - 1) return slope[i - 1]
-    if (slope[i - 1] * slope[i] <= 0) return 0
-    return (3 * (dx[i - 1] + dx[i])) / ((2 * dx[i] + dx[i - 1]) / slope[i - 1] + (dx[i] + 2 * dx[i - 1]) / slope[i])
-  })
-  let d = `M${pts[0][0]},${pts[0][1]}`
-  for (let i = 0; i < pts.length - 1; i++) {
-    const [x0, y0] = pts[i]
-    const [x1, y1] = pts[i + 1]
-    d += ` C${x0 + dx[i] / 3},${y0 + (t[i] * dx[i]) / 3} ${x1 - dx[i] / 3},${y1 - (t[i + 1] * dx[i]) / 3} ${x1},${y1}`
-  }
-  return d
-}
+type Series = { key: string; name: string; color: string; harvestColor: string; points: HarvestPointRow[] }
 
 function modelAt(curve: GrowthCurveRow[], day: number) {
   const next = curve.findIndex((c) => c.day >= day)
@@ -45,17 +24,16 @@ function modelAt(curve: GrowthCurveRow[], day: number) {
   return a.abw_g + ((b.abw_g - a.abw_g) * (day - a.day)) / Math.max(b.day - a.day, 1)
 }
 
-function HarvestCurveChart({ title, points, curves }: { title: string; points: HarvestPointRow[]; curves: Record<(typeof SCENARIOS)[number], GrowthCurveRow[]> }) {
-  const sorted = useMemo(() => [...points].sort((a, b) => a.date.localeCompare(b.date)), [points])
-  const recorded = sorted.filter((p) => p.kind !== "harvest")
-  const harvests = sorted.filter((p) => p.kind === "harvest")
-  if (sorted.length === 0) return <p className="planner-note">No weights recorded for this batch.</p>
+/** One batch (blue line, orange harvest diamonds) or every closed batch at once (one colour per batch). */
+function HarvestCurveChart({ title, series, curves, multi }: { title: string; series: Series[]; curves: Record<(typeof SCENARIOS)[number], GrowthCurveRow[]>; multi: boolean }) {
+  const all = useMemo(() => series.flatMap((s) => s.points), [series])
+  if (all.length === 0) return <p className="planner-note">No weights recorded for this batch.</p>
 
-  const minAge = Math.min(...sorted.map((p) => p.model_age_days))
-  const maxAge = Math.max(...sorted.map((p) => p.model_age_days))
+  const minAge = Math.min(...all.map((p) => p.model_age_days))
+  const maxAge = Math.max(...all.map((p) => p.model_age_days))
   const xMin = Math.max(0, Math.floor((minAge - 10) / 10) * 10)
   const xMax = Math.ceil((maxAge + 15) / 10) * 10
-  const maxAbw = Math.max(...sorted.map((p) => p.abw_g))
+  const maxAbw = Math.max(...all.map((p) => p.abw_g))
   const mainEnd = modelAt(curves.main, xMax) ?? 0
   const yTop = niceTop(Math.max(maxAbw, mainEnd) * 1.1)
   const plotW = W - PAD.l - PAD.r
@@ -70,9 +48,13 @@ function HarvestCurveChart({ title, points, curves }: { title: string; points: H
       <figcaption className="rpt-chart__title">{title}</figcaption>
       <Legend
         items={[
-          { label: "Recorded weight", color: RECORDED, swatch: "line" },
-          { label: "Harvests", color: HARVEST },
-          ...SCENARIOS.map((s) => ({ label: CURVE_STYLE[s].label, color: CURVE_STYLE[s].color, swatch: "line" as const })),
+          ...(multi
+            ? series.map((s) => ({ label: s.name, color: s.color }))
+            : [
+                { label: "Recorded weight", color: RECORDED, swatch: "line" as const },
+                { label: "Harvests", color: HARVEST },
+              ]),
+          ...SCENARIOS.map((s) => ({ label: CURVE_STYLE[s].label, color: CURVE_STYLE[s].color, dash: CURVE_STYLE[s].dash, swatch: "line" as const })),
         ]}
       />
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title} className="rpt-chart__svg">
@@ -90,43 +72,42 @@ function HarvestCurveChart({ title, points, curves }: { title: string; points: H
           </text>
         ))}
         {SCENARIOS.map((s) => (
-          <path
+          <polyline
             key={s}
-            d={smoothPath(
-              curves[s]
-                .filter((c) => c.day >= xMin && c.day <= xMax && c.abw_g <= yTop)
-                .map((c): [number, number] => [x(c.day), y(c.abw_g)]),
-            )}
+            points={curves[s]
+              .filter((c) => c.day >= xMin && c.day <= xMax && c.abw_g <= yTop)
+              .map((c) => `${x(c.day)},${y(c.abw_g)}`)
+              .join(" ")}
             fill="none"
             stroke={CURVE_STYLE[s].color}
-            strokeWidth={MODEL_WIDTH}
-            strokeDasharray={MODEL_DASH}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            strokeWidth="1.6"
+            strokeDasharray={CURVE_STYLE[s].dash}
           />
         ))}
-        <path
-          d={smoothPath(recorded.map((p): [number, number] => [x(p.model_age_days), y(p.abw_g)]))}
-          fill="none"
-          stroke={RECORDED}
-          strokeWidth={RECORDED_WIDTH}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {recorded.map((p) => (
-          <circle key={`${p.kind}-${p.date}`} cx={x(p.model_age_days)} cy={y(p.abw_g)} r="3" fill={RECORDED} stroke="#fffdf9" strokeWidth="1.5">
-            <title>{`${p.date}: ${p.abw_g.toFixed(1)} g, ${p.age_days} days since stocking (model age ${p.model_age_days})`}</title>
-          </circle>
-        ))}
-        {harvests.map((p) => (
-          <rect key={`h-${p.date}`} x={x(p.model_age_days) - 4} y={y(p.abw_g) - 4} width="8" height="8" fill={HARVEST} stroke="#fffdf9" strokeWidth="1.5" transform={`rotate(45 ${x(p.model_age_days)} ${y(p.abw_g)})`}>
-            <title>{`Harvest ${p.date}: ${p.abw_g.toFixed(1)} g at ${p.age_days} days`}</title>
-          </rect>
-        ))}
+        {series.map((s) => {
+          const sorted = [...s.points].sort((a, b) => a.date.localeCompare(b.date))
+          const recorded = sorted.filter((p) => p.kind !== "harvest")
+          const harvests = sorted.filter((p) => p.kind === "harvest")
+          return (
+            <g key={s.key}>
+              <polyline points={recorded.map((p) => `${x(p.model_age_days)},${y(p.abw_g)}`).join(" ")} fill="none" stroke={s.color} strokeWidth="1.5" strokeOpacity="0.75" />
+              {recorded.map((p) => (
+                <circle key={`${p.kind}-${p.date}`} cx={x(p.model_age_days)} cy={y(p.abw_g)} r="3.2" fill={s.color}>
+                  <title>{`${s.name} - ${p.date}: ${p.abw_g.toFixed(1)} g, ${p.age_days} days since stocking (model age ${p.model_age_days})`}</title>
+                </circle>
+              ))}
+              {harvests.map((p) => (
+                <rect key={`h-${p.date}`} x={x(p.model_age_days) - 4} y={y(p.abw_g) - 4} width="8" height="8" fill={s.harvestColor} stroke="#fffdf9" strokeWidth="1.5" transform={`rotate(45 ${x(p.model_age_days)} ${y(p.abw_g)})`}>
+                  <title>{`${s.name} - harvest ${p.date}: ${p.abw_g.toFixed(1)} g at ${p.age_days} days`}</title>
+                </rect>
+              ))}
+            </g>
+          )
+        })}
         <text x={PAD.l + plotW / 2} y={H - 8} textAnchor="middle" fontSize="11" fill="#6f746f">
           Age on the growth model (days)
         </text>
-        <text x={12} y={PAD.t + plotH / 2} textAnchor="middle" fontSize="11" fill="#6f746f" transform={`rotate(-90 12 ${PAD.t + plotH / 2})`}>
+        <text x={14} y={PAD.t + plotH / 2} textAnchor="middle" fontSize="11" fill="#6f746f" transform={`rotate(-90 14 ${PAD.t + plotH / 2})`}>
           Average body weight (g)
         </text>
       </svg>
@@ -143,23 +124,50 @@ function verdictSentence(v: HarvestCurveVerdict) {
 
 export default function BatchHarvestCards({ rows, points, curves }: { rows: CageHarvestRow[]; points: HarvestPointRow[]; curves: GrowthCurveRow[] }) {
   const byScenario = useMemo(() => curvesByScenario(curves), [curves])
+  // Rows arrive most recent first; one entry per closed batch cycle.
+  const batches = useMemo(() => rows.map((r) => ({ cycleId: String(r.cycle_id), name: r.batch_name, own: points.filter((p) => p.cycle_id === r.cycle_id) })), [rows, points])
+  const [selected, setSelected] = useState(batches[0]?.cycleId ?? ALL)
   if (rows.length === 0) return null
+
+  const current = selected === ALL || batches.some((b) => b.cycleId === selected) ? selected : batches[0].cycleId
+  const batch = batches.find((b) => b.cycleId === current)
+  const compareAll = current === ALL
+  const series: Series[] = compareAll
+    ? batches.filter((b) => b.own.length > 0).map((b, i) => ({ key: b.cycleId, name: b.name, color: BATCH_COLORS[i % BATCH_COLORS.length], harvestColor: BATCH_COLORS[i % BATCH_COLORS.length], points: b.own }))
+    : batch
+      ? [{ key: batch.cycleId, name: batch.name, color: RECORDED, harvestColor: HARVEST, points: batch.own }]
+      : []
+  const verdict = batch ? judgeBatchAgainstCurves(batch.own, byScenario) : null
+
   return (
-    <div className="grid gap-3">
-      {rows.map((row) => {
-        const own = points.filter((p) => p.cycle_id === row.cycle_id)
-        const verdict = judgeBatchAgainstCurves(own, byScenario)
-        const title = `ABW against age - batch ${row.batch_name}`
-        return (
-          <article key={row.cycle_id} className="rounded-xl border border-[#e6ddd0] bg-[#fffdf9] p-3 grid gap-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="rpt-small">{verdictSentence(verdict)}</p>
-              <span className="rounded-full bg-[#f6f1e8] px-3 py-1 text-xs font-semibold">{verdict.closest ? `Followed: ${verdictLabel(verdict)}` : verdictLabel(verdict)}</span>
-            </div>
-            {own.length > 0 ? <HarvestCurveChart title={title} points={own} curves={byScenario} /> : <p className="planner-note">No weights recorded for this batch.</p>}
-          </article>
-        )
-      })}
+    <div className="grid gap-2">
+      <div className="rpt-actions">
+        <label className="rpt-small" htmlFor="harvest-batch">
+          Batch
+        </label>
+        <select
+          id="harvest-batch"
+          value={current}
+          onChange={(e) => setSelected(e.target.value)}
+          className="h-9 rounded-full border border-[#e6ddd0] bg-[#fffdf9] px-3 text-sm font-semibold"
+        >
+          {batches.length > 1 ? <option value={ALL}>All batches</option> : null}
+          {batches.map((b) => (
+            <option key={b.cycleId} value={b.cycleId}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <article className="rounded-xl border border-[#e6ddd0] bg-[#fffdf9] p-3 grid gap-2">
+        {verdict ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="rpt-small">{verdictSentence(verdict)}</p>
+            <span className="rounded-full bg-[#f6f1e8] px-3 py-1 text-xs font-semibold">{verdict.closest ? `Followed: ${verdictLabel(verdict)}` : verdictLabel(verdict)}</span>
+          </div>
+        ) : null}
+        <HarvestCurveChart title={compareAll ? "ABW against age - all batches" : `ABW against age - batch ${batch?.name ?? ""}`} series={series} curves={byScenario} multi={compareAll} />
+      </article>
     </div>
   )
 }
