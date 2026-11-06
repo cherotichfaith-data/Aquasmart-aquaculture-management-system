@@ -7,6 +7,7 @@ import {
   parseSelectedNumericId,
 } from "@/features/shared/scoped-analytics.server"
 import { resolveScopedTimeBounds } from "@/features/shared/time-bounds.server"
+import { parseAnalyticsPeriod } from "@/features/analytics/report-period"
 import { selectSystemCohortStarts } from "@/features/shared/cohort"
 import { selectOccupiedSystemIds } from "@/features/shared/occupied-systems"
 import type { ProductionDailyTrendRow, ProductionSummaryRpcRow } from "@/features/production/types"
@@ -197,6 +198,12 @@ export type ProductionPageFilters = {
   selectedStage: "all" | Enums<"system_growth_stage">
   timePeriod: TimePeriod
   customTimeRange: CustomTimeRange | null
+  /** Same calendar-month logic as /analytics (`month` + `period` URL params). */
+  periodMode: "month" | "cycle"
+  /** `YYYY-MM-01` reporting month. */
+  month: string
+  /** Cycle-to-date is clamped to this date when a month was chosen explicitly. */
+  periodEnd: string | null
 }
 
 export type ProductionPageInitialData = {
@@ -228,13 +235,30 @@ export function parseProductionPageFilters(
     (typeof selectedBatchRaw === "string" && selectedBatchRaw !== "all") ||
     (typeof selectedSystemRaw === "string" && selectedSystemRaw !== "all")
 
+  // Calendar-month reporting shared with /analytics (parseAnalyticsPeriod).
+  const period = parseAnalyticsPeriod(searchParams ?? {})
+  const customTimeRange = parseCustomPeriodUrlValue(dateRaw)
+  const explicitMonth = typeof searchParams?.month === "string"
+  const explicitMode = typeof searchParams?.period === "string"
+  const legacyPeriod = resolveTimePeriod(dateRaw, hasScope ? "all history" : DEFAULT_TIME_PERIOD)
+  // A single batch or cage defaults to its whole cycle ("Cycle to date"); the farm-wide view stays on a month.
+  const periodMode: "month" | "cycle" = explicitMode
+    ? period.mode
+    : legacyPeriod === "all history" && !explicitMonth
+      ? "cycle"
+      : "month"
+  // Legacy rolling presets (week, quarter, ...) from old links still resolve; the default month is the calendar month.
+  const legacyPreset = !explicitMonth && !explicitMode && !customTimeRange && legacyPeriod !== "month" && legacyPeriod !== "all history"
+
   return {
     selectedBatch: typeof selectedBatchRaw === "string" ? selectedBatchRaw : "all",
     selectedSystem: typeof selectedSystemRaw === "string" ? selectedSystemRaw : "all",
     selectedStage: normalizeStageFilter(selectedStageRaw),
-    // A single batch or cage defaults to its whole cycle ("Cycle to date"); the farm-wide view stays on a month.
-    timePeriod: resolveTimePeriod(dateRaw, hasScope ? "all history" : DEFAULT_TIME_PERIOD),
-    customTimeRange: parseCustomPeriodUrlValue(dateRaw),
+    timePeriod: legacyPreset ? legacyPeriod : periodMode === "cycle" ? "all history" : "month",
+    customTimeRange: customTimeRange ?? (!legacyPreset && periodMode === "month" ? { start: period.from, end: period.to } : null),
+    periodMode,
+    month: period.month,
+    periodEnd: explicitMonth ? period.to : null,
   }
 }
 
@@ -314,7 +338,10 @@ async function loadProductionPageInitialData(
   }
 
   const dateFrom = bounds.start
-  const dateTo = bounds.end
+  const dateTo =
+    params.filters.periodMode === "cycle" && params.filters.periodEnd && params.filters.periodEnd < bounds.end
+      ? params.filters.periodEnd
+      : bounds.end
 
   const productionSummary = (await listProductionSummaryRowsDirectServer(supabase, {
     farmId: params.farmId,
