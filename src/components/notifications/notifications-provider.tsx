@@ -238,15 +238,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     refetchInterval: ACTIVE_ALERT_REFETCH_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+    retry: 2,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("api_recommended_actions", {
         p_farm_id: farmId!,
       })
       if (error) {
-        if (!isSbPermissionDenied(error) && !isAbortLikeError(error)) {
-          logSbError("notifications:activeAlerts", error)
-        }
-        return [] as ActiveAlert[]
+        if (isSbPermissionDenied(error)) return [] as ActiveAlert[]
+        if (!isAbortLikeError(error)) logSbError("notifications:activeAlerts", error)
+        // A failed or aborted request (e.g. the page was refreshed mid-fetch) must not be cached as
+        // "no alerts": throw so the query retries and keeps showing the last known alerts.
+        throw error
       }
       const rows = (data ?? []) as RecommendedActionRow[]
       const deduped = new Map<string, ActiveAlert>()
@@ -625,9 +627,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       dismiss,
       clearAll,
       activeAlerts,
-      activeAlertsLoading: activeAlertsQuery.isLoading,
+      // True until the first answer arrives (also while the query waits for the session / farm after a refresh).
+      activeAlertsLoading: activeAlertsQuery.isPending && !activeAlertsQuery.isError,
     }),
-    [activeAlerts, activeAlertsQuery.isLoading, clearAll, dismiss, markAllRead, markRead, notifications, unreadCount],
+    [activeAlerts, activeAlertsQuery.isPending, activeAlertsQuery.isError, clearAll, dismiss, markAllRead, markRead, notifications, unreadCount],
   )
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>
