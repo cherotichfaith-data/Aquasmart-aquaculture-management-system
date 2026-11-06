@@ -8,7 +8,14 @@ import { Button } from "@/components/app-ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/app-ui/card"
 import { DataTable } from "@/components/shared/data-table"
 import { EmptyState } from "@/components/shared/data-states"
-import TimePeriodSelector from "@/components/shared/time-period-selector"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/app-ui/select"
 import ProductionChart from "@/features/production/components/production-chart"
 import ProductionMetricFilter from "@/features/production/components/metrics-filter"
 import ProductionCompareFilter from "@/features/production/components/compare-filter"
@@ -20,61 +27,64 @@ import { buildProductionPeriodViewRows } from "@/features/production/period-view
 import type { ProductionPageInitialData, ProductionPageFilters } from "@/features/production/queries.server"
 import type { BatchOptionItem } from "@/features/shared/batch-options"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
-import { formatCustomRangeLabel, parseCustomPeriodUrlValue, TIME_PERIOD_LABELS, type TimePeriod } from "@/lib/time-period"
+import { formatCustomRangeLabel, TIME_PERIOD_LABELS } from "@/lib/time-period"
 import { downloadCsv } from "@/lib/utils/report-export"
 import { cn } from "@/lib/utils"
 
-const PRODUCTION_DATE_TYPES: TimePeriod[] = [
-  "day",
-  "week",
-  "2 weeks",
-  "month",
-  "quarter",
-  "6 months",
-  "year",
-  "all history",
-]
-
+/** Same period controls as /analytics: Monthly / Cycle to date plus a calendar-month picker. */
 function ProductionPeriodFilter({
-  selectedPeriod,
+  periodMode,
+  month,
   startTransition,
 }: {
-  selectedPeriod: TimePeriod
+  periodMode: "month" | "cycle"
+  month: string
   /** See ProductionMetricFilter's `startTransition` prop for why this exists. */
   startTransition?: (callback: () => void) => void
 }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const customRange = useMemo(() => parseCustomPeriodUrlValue(searchParams.get("date")), [searchParams])
 
-  const handleChange = (value: TimePeriod) => {
+  const update = (updates: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString())
-    params.set("date", value)
-    const navigate = () => router.replace(`${pathname}?${params.toString()}`)
-    if (startTransition) startTransition(navigate)
-    else navigate()
-  }
-
-  const handleCustomRangeChange = (range: { start: string; end: string }) => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("date", `custom_${range.start}_${range.end}`)
+    // The calendar controls replace the old rolling-window `date` param.
+    params.delete("date")
+    Object.entries(updates).forEach(([key, value]) => params.set(key, value))
     const navigate = () => router.replace(`${pathname}?${params.toString()}`)
     if (startTransition) startTransition(navigate)
     else navigate()
   }
 
   return (
-    <div className="min-w-[190px] shrink-0">
-      <TimePeriodSelector
-        selectedPeriod={selectedPeriod}
-        onPeriodChange={handleChange}
-        label={null}
-        customRange={customRange}
-        onCustomRangeChange={handleCustomRangeChange}
-        variant="compact"
-        periods={PRODUCTION_DATE_TYPES}
-        customLabels={{ "all history": "Cycle to date" }}
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <div className="w-[160px]">
+        <Select
+          value={periodMode}
+          onValueChange={(value) => update({ period: value, month: month.slice(0, 7) })}
+        >
+          <SelectTrigger className="production-select" aria-label="Date type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="month">Monthly</SelectItem>
+              <SelectItem value="cycle">Cycle to date</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+      <input
+        type="month"
+        aria-label="Reporting month"
+        value={month.slice(0, 7)}
+        max={new Date().toISOString().slice(0, 7)}
+        onInput={(event) => {
+          const next = event.currentTarget.value
+          if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(next)) return
+          update({ month: next, period: periodMode })
+        }}
+        className="h-10 w-[160px] rounded-full border border-border bg-background px-4 text-sm"
       />
     </div>
   )
@@ -281,11 +291,19 @@ export default function ProductionPageClient({
   }, [allSystems, resolvedSelectedSystemId])
   const periodLabel = useMemo(() => {
     if (!initialData.bounds.start || !initialData.bounds.end) return null
-    const rangeLabel = initialFilters.customTimeRange
-      ? formatCustomRangeLabel(initialFilters.customTimeRange)
-      : initialFilters.timePeriod === "all history"
-        ? "Cycle to date"
-        : TIME_PERIOD_LABELS[initialFilters.timePeriod]
+    const monthName = new Date(`${initialFilters.month}T00:00:00Z`).toLocaleDateString("en-GB", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    })
+    const isLegacyPreset = initialFilters.timePeriod !== "month" && initialFilters.timePeriod !== "all history"
+    const rangeLabel = initialFilters.customTimeRange && !isLegacyPreset && initialFilters.periodMode === "month" && !searchParams.get("date")
+      ? monthName
+      : initialFilters.customTimeRange
+        ? formatCustomRangeLabel(initialFilters.customTimeRange)
+        : initialFilters.timePeriod === "all history"
+          ? `Cycle to date · ${monthName}`
+          : TIME_PERIOD_LABELS[initialFilters.timePeriod]
     if (scopeMode === "batch") {
       return `${rangeLabel} · ${initialData.batchName ?? "All batches"}`
     }
@@ -297,6 +315,9 @@ export default function ProductionPageClient({
     initialData.bounds.start,
     initialFilters.customTimeRange,
     initialFilters.timePeriod,
+    initialFilters.periodMode,
+    initialFilters.month,
+    searchParams,
     isConsolidated,
     scopeMode,
     selectedSystemLabel,
@@ -348,7 +369,7 @@ export default function ProductionPageClient({
             <section className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
               <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Production</h1>
               <div className="flex flex-wrap gap-2">
-                <ProductionPeriodFilter selectedPeriod={initialFilters.timePeriod} startTransition={startTransition} />
+                <ProductionPeriodFilter periodMode={initialFilters.periodMode} month={initialFilters.month} startTransition={startTransition} />
                 <Button asChild variant="secondary" className="h-10 px-4">
                   <Link href={addDataHref}>Add data</Link>
                 </Button>

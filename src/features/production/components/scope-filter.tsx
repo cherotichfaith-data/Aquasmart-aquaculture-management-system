@@ -14,7 +14,6 @@ import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useBatchOptions, useSystemOptions } from "@/lib/hooks/use-options"
 import type { BatchOptionItem } from "@/features/shared/batch-options"
 import { formatCageLabel, type SystemOption } from "@/lib/system-options"
-import { toTimePeriodUrlValue } from "@/lib/time-period"
 
 /**
  * Production page scope selector: one small "Cages / Batches" switch, and the
@@ -107,7 +106,8 @@ export default function ProductionScopeFilter({
       system: null,
       cage: null,
       // One batch defaults to its whole cycle; back on "All" the farm view returns to the month default.
-      date: value === "all" ? null : toTimePeriodUrlValue("all history"),
+      date: null,
+      period: value === "all" ? "month" : "cycle",
     })
   }
 
@@ -118,7 +118,8 @@ export default function ProductionScopeFilter({
       system: value === "all" ? null : value,
       cage: null,
       batch: null,
-      date: value === "all" ? null : toTimePeriodUrlValue("all history"),
+      date: null,
+      period: value === "all" ? "month" : "cycle",
     })
   }
 
