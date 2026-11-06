@@ -6,7 +6,6 @@ import { Button } from "@/components/app-ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
-import { useStockedSystemIds } from "@/lib/hooks/use-stocked-system-ids"
 import { useSystemOptions } from "@/lib/hooks/use-options"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/lib/hooks/app/use-toast"
@@ -348,42 +347,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     })
   }, [addNotification, farmId, inFarmWorkspace, session, systemsLoaded, systemRows])
 
-  // The harvest/transfer realtime listener below only catches a cage going
-  // empty *after* this page is open and subscribed -- it can't see a cage
-  // that was already empty before that (e.g. emptied out yesterday, or
-  // before this feature shipped). This reconciles against the live
-  // "currently stocked" set on every load/refresh so an already-empty cage
-  // still shows up here, using a stable per-system id so it doesn't re-fire
-  // on every render once seen.
-  const { stockedIds: currentlyStockedIds, query: stockedSystemsQuery } = useStockedSystemIds(farmId, {
-    enabled: Boolean(session) && Boolean(farmId),
-  })
-  useEffect(() => {
-    if (!session || !farmId || !systemsLoaded || !stockedSystemsQuery.isSuccess || !inFarmWorkspace) return
-
-    systemRows.forEach((system) => {
-      if (currentlyStockedIds.has(system.id)) return
-
-      addNotification({
-        id: `cage-empty-current-${system.id}`,
-        title: "Cage Now Empty",
-        description: `${buildSystemLabel(systemMap, system.id)} has no fish remaining and is now available for restocking.`,
-        createdAt: new Date().toISOString(),
-        systemId: system.id,
-        kind: "cage_empty",
-        severity: "warning",
-        read: false,
-        href: `${DATA_ENTRY_PATH}?type=stocking&system=${system.id}`,
-        actionLabel: "Restock cage",
-      })
-    })
-  }, [addNotification, currentlyStockedIds, farmId, inFarmWorkspace, session, stockedSystemsQuery.isSuccess, systemMap, systemsLoaded, systemRows])
-
-  useEffect(() => {
-    setNotifications((prev) =>
-      prev.filter((item) => !(item.kind === "cage_empty" && item.systemId != null && currentlyStockedIds.has(item.systemId))),
-    )
-  }, [currentlyStockedIds, setNotifications])
+  // Empty cages are not worked out in the browser: the database derives them (api_recommended_actions,
+  // `cage_empty`) from stocking, transfers, mortality, harvests and reconciliations, and they stay in the
+  // bell's Alerts tab until the cage is restocked.
 
   useEffect(() => {
     seenIds.current = new Set(notifications.map((item) => item.id))
@@ -551,40 +517,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
   }, [addNotification, farmId, invalidateActiveAlerts, session, supabase, systemMap, systemsLoaded, systemRows, thresholdsLoaded, thresholds])
 
-  // Fires a "cage now empty" pop notification the moment a harvest or transfer
-  // brings a cage's live fish count to zero, and refreshes the cached
-  // "currently stocked" system lists (dashboard tables, report/production
-  // filters) so the now-empty cage drops out of them right away.
+  // A harvest or transfer can empty a cage. The database decides that (see the Alerts tab); the browser only
+  // refetches the alert feed and the cached "currently stocked" lists (dashboard tables, report/production
+  // filters) so the change shows up right away.
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded) return
 
     const farmSystemIds = systemRows.map((s) => s.id)
     if (!farmSystemIds.length) return
 
-    const notifyIfEmptied = async (systemId: number, sourceId: string) => {
-      if (!systemMap[systemId]) return
+    const refreshAfterStockChange = () => {
       invalidateActiveAlerts()
-      const { data: fishCount, error } = await supabase.rpc("current_fish_count", { p_system_id: systemId })
-      if (error) {
-        logSbError("notifications:cageEmpty", error)
-        return
-      }
-      if ((fishCount ?? 0) > 0) return
-
-      const systemLabel = buildSystemLabel(systemMap, systemId)
-      addNotification({
-        id: `cage-empty-${sourceId}`,
-        title: "Cage Now Empty",
-        description: `${systemLabel} has no fish remaining and is now available for restocking.`,
-        createdAt: new Date().toISOString(),
-        systemId,
-        kind: "cage_empty",
-        severity: "warning",
-        read: false,
-        href: `${DATA_ENTRY_PATH}?type=stocking&system=${systemId}`,
-        actionLabel: "Restock cage",
-      })
-
       void queryClient.invalidateQueries({ queryKey: ["stocked-systems", farmId] })
       void queryClient.invalidateQueries({
         predicate: ({ queryKey }) =>
@@ -605,7 +548,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         (payload) => {
           const row = payload.new as HarvestRow
           if (!row?.system_id) return
-          void notifyIfEmptied(row.system_id, `harvest-${row.id}`)
+          refreshAfterStockChange()
         },
       )
       .subscribe()
@@ -623,7 +566,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         (payload) => {
           const row = payload.new as TransferRow
           if (!row?.origin_system_id) return
-          void notifyIfEmptied(row.origin_system_id, `transfer-${row.id}`)
+          refreshAfterStockChange()
         },
       )
       .subscribe()
@@ -632,7 +575,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       supabase.removeChannel(harvestChannel)
       supabase.removeChannel(transferChannel)
     }
-  }, [addNotification, farmId, invalidateActiveAlerts, queryClient, session, supabase, systemMap, systemsLoaded, systemRows])
+  }, [farmId, invalidateActiveAlerts, queryClient, session, supabase, systemsLoaded, systemRows])
 
   useEffect(() => {
     if (!session || !farmId || !systemsLoaded) return
