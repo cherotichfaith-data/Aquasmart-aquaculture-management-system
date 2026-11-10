@@ -282,10 +282,11 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
   const label = cycleToDate ? `Cycle to date — ${monthLabel(data.month)}` : monthLabel(data.month)
   // Oldest batch first, so legend colours stay stable as new batches are added.
   const growthBatchNames = Array.from(new Set(data.growthByBatch.map((b) => b.batch_name))).reverse()
+  const weightHistory = data.abwHistoryPoints ?? data.abwPoints
   const weightAtAgeBatchNames = growthBatchNames.filter((name) =>
-    data.abwPoints.some((point) => point.batch_name === name))
+    weightHistory.some((point) => point.batch_name === name))
   const above100BatchNames = weightAtAgeBatchNames.filter((name) =>
-    data.abwPoints.some((point) => point.batch_name === name && point.abw_g >= 100))
+    weightHistory.some((point) => point.batch_name === name && point.abw_g >= 100))
   const batchVerdicts = new Map<number, HarvestCurveVerdict>()
   if (data.batchHarvests.length > 0) {
     const curves = curvesByScenario(data.growthCurve)
@@ -461,7 +462,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
                 <AbwAgeChart
                   title={`Weight at age · ${weightBand === "below100" ? "Below 100 g" : "100 g and above"}`}
                   weightBand={weightBand}
-                  points={data.abwHistoryPoints ?? data.abwPoints}
+                  points={weightHistory}
                   curves={data.growthCurve}
                   batchNames={weightBand === "from100" ? above100BatchNames : weightAtAgeBatchNames.filter((name) => !above100BatchNames.includes(name))}
                 />

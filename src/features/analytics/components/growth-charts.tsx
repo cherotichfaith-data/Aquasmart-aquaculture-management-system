@@ -256,6 +256,12 @@ export function AbwAgeChart({
             {t}
           </text>
         ))}
+        {weightBand === "from100" && (
+          <g>
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(100)} y2={y(100)} stroke="#6f746f" strokeDasharray="4 4" />
+            <text x={W - PAD.r - 3} y={y(100) - 5} textAnchor="end" fontSize="10" fill="#6f746f">100 g</text>
+          </g>
+        )}
         {scenarios.map((sc) => (
           <polyline
             key={sc}
