@@ -76,6 +76,7 @@ export type StockProfileRow = {
   abw_from_g: number
   abw_to_g: number | null
   ideal_fish: number
+  ideal_monthly_stocking?: number
   recorded_fish: number
   recorded_cages: number
   cage_names: string[]
