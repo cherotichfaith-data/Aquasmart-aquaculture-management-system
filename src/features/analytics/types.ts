@@ -161,6 +161,7 @@ export type AnalyticsReportData = {
   feedVsExpected: FeedVsExpectedRow[]
   growthByBatch: GrowthByBatchRow[]
   abwPoints: AbwPointRow[]
+  abwHistoryPoints?: AbwPointRow[]
   growthCurve: GrowthCurveRow[]
   stockProfile: StockProfileRow[]
   farmForecast: FarmForecastRow[]

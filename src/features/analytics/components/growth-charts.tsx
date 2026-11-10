@@ -200,7 +200,13 @@ export function AbwAgeChart({
       batchNames.map((name, i) => ({
         name,
         color: BATCH_COLORS[i % BATCH_COLORS.length],
-        pts: points.filter((p) => p.batch_name === name && (weightBand === "below100" ? p.abw_g < 100 : weightBand === "from100" ? p.abw_g >= 100 : true)).sort((a, b) => a.model_age_days - b.model_age_days),
+        pts: (() => {
+          const history = points.filter((p) => p.batch_name === name).sort((a, b) => a.model_age_days - b.model_age_days)
+          if (weightBand === "below100") return history.filter((p) => p.abw_g < 100)
+          if (weightBand !== "from100") return history
+          const crossing = history.findIndex((p) => p.abw_g >= 100)
+          return crossing < 0 ? [] : history.slice(Math.max(0, crossing - 1))
+        })(),
       })),
     [batchNames, points, weightBand],
   )
@@ -211,9 +217,11 @@ export function AbwAgeChart({
   const minAge = Math.min(...drawn.flatMap((s) => s.pts.map((p) => p.model_age_days)))
   const xMin = Math.max(0, Math.floor((minAge - 10) / 10) * 10)
   const xMax = Math.ceil((maxAge + 15) / 10) * 10
-  const curvesInRange = curves.filter((c) => c.day >= xMin && c.day <= xMax && inBand(c.abw_g))
+  const minAbw = Math.min(...drawn.flatMap((s) => s.pts.map((p) => p.abw_g)))
+  const yBottom = weightBand === "from100" ? Math.floor(Math.min(100, minAbw) / 25) * 25 : 0
+  const curvesInRange = curves.filter((c) => c.day >= xMin && c.day <= xMax
+    && (weightBand === "from100" ? c.abw_g >= yBottom : inBand(c.abw_g)))
   const maxAbw = Math.max(...drawn.flatMap((s) => s.pts.map((p) => p.abw_g)))
-  const yBottom = weightBand === "from100" ? 100 : 0
   const yTop = weightBand === "below100" ? 100 : niceTop(Math.max(maxAbw, ...curvesInRange.filter((c) => c.scenario === "slow").map((c) => c.abw_g)) * 1.05)
   const plotW = W - PAD.l - PAD.r
   const plotH = H - PAD.t - PAD.b

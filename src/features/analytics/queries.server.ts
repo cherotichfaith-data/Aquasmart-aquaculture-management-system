@@ -44,7 +44,7 @@ const SECTIONS_BY_VIEW: Record<AnalyticsView, { performance: string[]; outlook: 
   outlook: { performance: [], outlook: ["stock_profile"] },
   planning: { performance: [], outlook: ["farm_forecast", "forward_plan"] },
   batches: { performance: ["batches"], outlook: [] },
-  growth: { performance: ["growth_by_batch", "abw_points", "growth_curve"], outlook: [] },
+  growth: { performance: ["growth_by_batch", "abw_points", "abw_history", "growth_curve"], outlook: [] },
   harvests: { performance: ["cage_harvests", "batch_harvests", "growth_curve"], outlook: [] },
   cages: { performance: ["feed_vs_expected"], outlook: [] },
 }
@@ -193,7 +193,8 @@ export async function getAnalyticsReportData(params: {
     cageHarvests: perf?.cage_harvests ?? [],
     feedVsExpected: perf?.feed_vs_expected ?? [],
     growthByBatch: perf?.growth_by_batch ?? [],
-    abwPoints: perf?.abw_points ?? [],
+    abwPoints: (perf?.abw_points ?? []).filter((point) => period.mode === "cycle" || point.date >= period.from),
+    abwHistoryPoints: perf?.abw_points ?? [],
     growthCurve: perf?.growth_curve ?? [],
     stockProfile: out?.stock_profile ?? [],
     farmForecast,
