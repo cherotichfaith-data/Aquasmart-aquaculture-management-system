@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import type { AbwPointRow, BatchReportRow, GrowthByBatchRow, GrowthCurveRow } from "@/features/analytics/types"
 
 const W = 900
@@ -194,7 +194,7 @@ export function AbwAgeChart({
   weightBand?: "below100" | "from100"
 }) {
   const W = weightBand ? 600 : 900
-  const inBand = (weight: number) => weightBand === "below100" ? weight < 100 : weightBand === "from100" ? weight >= 100 : true
+  const plotId = useId()
   const series = useMemo(
     () =>
       batchNames.map((name, i) => ({
@@ -203,9 +203,7 @@ export function AbwAgeChart({
         pts: (() => {
           const history = points.filter((p) => p.batch_name === name).sort((a, b) => a.model_age_days - b.model_age_days)
           if (weightBand === "below100") return history.filter((p) => p.abw_g < 100)
-          if (weightBand !== "from100") return history
-          const crossing = history.findIndex((p) => p.abw_g >= 100)
-          return crossing < 0 ? [] : history.slice(Math.max(0, crossing - 1))
+          return history
         })(),
       })),
     [batchNames, points, weightBand],
@@ -217,17 +215,14 @@ export function AbwAgeChart({
   const minAge = Math.min(...drawn.flatMap((s) => s.pts.map((p) => p.model_age_days)))
   const xMin = Math.max(0, Math.floor((minAge - 10) / 10) * 10)
   const xMax = Math.ceil((maxAge + 15) / 10) * 10
-  const minAbw = Math.min(...drawn.flatMap((s) => s.pts.map((p) => p.abw_g)))
-  const yBottom = weightBand === "from100" ? Math.floor(Math.min(100, minAbw) / 25) * 25 : 0
-  const curvesInRange = curves.filter((c) => c.day >= xMin && c.day <= xMax
-    && (weightBand === "from100" ? c.abw_g >= yBottom : inBand(c.abw_g)))
+  const curvesInRange = curves.filter((c) => c.day >= xMin && c.day <= xMax)
   const maxAbw = Math.max(...drawn.flatMap((s) => s.pts.map((p) => p.abw_g)))
   const yTop = weightBand === "below100" ? 100 : niceTop(Math.max(maxAbw, ...curvesInRange.filter((c) => c.scenario === "slow").map((c) => c.abw_g)) * 1.05)
   const plotW = W - PAD.l - PAD.r
   const plotH = H - PAD.t - PAD.b
   const x = (d: number) => PAD.l + ((d - xMin) / Math.max(xMax - xMin, 1)) * plotW
-  const y = (v: number) => PAD.t + plotH - ((Math.min(v, yTop) - yBottom) / (yTop - yBottom)) * plotH
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => yBottom + (yTop - yBottom) * f)
+  const y = (v: number) => PAD.t + plotH - (v / yTop) * plotH
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => yTop * f)
   const xTickCount = 6
   const xTicks = Array.from({ length: xTickCount + 1 }, (_, i) => Math.round(xMin + ((xMax - xMin) / xTickCount) * i))
 
@@ -243,6 +238,11 @@ export function AbwAgeChart({
         ]}
       />
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title} className="rpt-chart__svg">
+        <defs>
+          <clipPath id={plotId}>
+            <rect x={PAD.l} y={PAD.t} width={plotW} height={plotH} />
+          </clipPath>
+        </defs>
         {yTicks.map((t) => (
           <g key={t}>
             <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke="#e6ddd0" />
@@ -267,6 +267,7 @@ export function AbwAgeChart({
             stroke={CURVE_STYLE[sc].color}
             strokeWidth="1.6"
             strokeDasharray={CURVE_STYLE[sc].dash}
+            clipPath={`url(#${plotId})`}
           />
         ))}
         {drawn.map((s) => (

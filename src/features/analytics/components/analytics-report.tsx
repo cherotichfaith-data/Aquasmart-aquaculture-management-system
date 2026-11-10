@@ -466,9 +466,9 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
                 <AbwAgeChart
                   title={`Weight at age · ${weightBand === "below100" ? "Below 100 g" : "100 g and above"}`}
                   weightBand={weightBand}
-                  points={weightBand === "from100" ? data.abwHistoryPoints ?? data.abwPoints : data.abwPoints}
+                  points={data.abwHistoryPoints ?? data.abwPoints}
                   curves={data.growthCurve}
-                  batchNames={weightBand === "from100" ? above100BatchNames : weightAtAgeBatchNames}
+                  batchNames={weightBand === "from100" ? above100BatchNames : weightAtAgeBatchNames.filter((name) => !above100BatchNames.includes(name))}
                 />
               </CopyZoom>
             ))}
