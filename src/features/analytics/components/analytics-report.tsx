@@ -470,7 +470,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
             ))}
           </div>
           <CopyZoom type="chart" name="Selected batch ABW chart">
-            <SelectedBatchAbwChart points={data.abwPoints} curves={data.growthCurve} batchNames={growthBatchNames} />
+            <SelectedBatchAbwChart points={weightHistory} curves={data.growthCurve} batchNames={growthBatchNames} />
           </CopyZoom>
         </Section>
       ) : null}

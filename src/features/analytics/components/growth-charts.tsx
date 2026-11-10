@@ -300,9 +300,8 @@ export function AbwAgeChart({
 /** Chart 3 wrapper: pick one batch and compare it with the model curves. */
 export function SelectedBatchAbwChart({ points, curves, batchNames }: { points: AbwPointRow[]; curves: GrowthCurveRow[]; batchNames: string[] }) {
   const withPoints = batchNames.filter((n) => points.some((p) => p.batch_name === n))
-  const initial = withPoints.includes("02.26b") ? "02.26b" : (withPoints[0] ?? "")
-  const [batch, setBatch] = useState(initial)
-  const current = withPoints.includes(batch) ? batch : initial
+  const [batch, setBatch] = useState("")
+  const current = withPoints.includes(batch) ? batch : withPoints[0] ?? ""
   if (withPoints.length === 0) return <p className="planner-note">No weight samples to plot.</p>
 
   return (
