@@ -282,13 +282,8 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
   const label = cycleToDate ? `Cycle to date — ${monthLabel(data.month)}` : monthLabel(data.month)
   // Oldest batch first, so legend colours stay stable as new batches are added.
   const growthBatchNames = Array.from(new Set(data.growthByBatch.map((b) => b.batch_name))).reverse()
-  const reportYear = data.periodEnd.slice(0, 4)
-  const weightAtAgeBatchNames = growthBatchNames.filter((name) => {
-    const batch = data.growthByBatch.find((row) => row.batch_name === name)
-    return batch?.date_in?.slice(0, 4) === reportYear
-      && data.abwPoints.some((point) => point.batch_name === name)
-      && data.abwPoints.every((point) => point.batch_name !== name || point.model_age_days <= 450)
-  })
+  const weightAtAgeBatchNames = growthBatchNames.filter((name) =>
+    data.abwPoints.some((point) => point.batch_name === name))
   const above100BatchNames = weightAtAgeBatchNames.filter((name) =>
     data.abwPoints.some((point) => point.batch_name === name && point.abw_g >= 100))
   const batchVerdicts = new Map<number, HarvestCurveVerdict>()
