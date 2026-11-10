@@ -355,7 +355,9 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
         <Section
           title={`Stock Profile - ${dayLabel(data.periodEnd)}`}
           noteAsInfo
-          note={`Fish in the cages at the end of the period, grouped by each cage's average weight, against the ideal if ${num(data.forwardPlanInputs.plannedFish)} juveniles were stocked every month and grown on the ${data.forwardPlanInputs.scenario} growth model.`}
+          note={data.stockProfile[0]?.ideal_monthly_stocking == null
+            ? `Fish in the cages at the end of the period, grouped by each cage's average weight, against the ideal if ${num(data.forwardPlanInputs.plannedFish)} juveniles were stocked every month and grown on the ${data.forwardPlanInputs.scenario} growth model.`
+            : `Fish in the cages at the end of the period, grouped by each cage's average weight, against a model illustration of ${num(data.stockProfile[0].ideal_monthly_stocking)} juveniles stocked monthly.`}
         >
           <CopyZoom type="chart" name="Stock profile chart">
             <StockProfileChart rows={data.stockProfile} />
