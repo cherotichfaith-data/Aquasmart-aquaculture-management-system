@@ -439,7 +439,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       ) : null}
 
       {show("batches") ? (
-        <Section title={`Stock Loss Analysis - ${label}`} note="Cumulative recorded losses from stocking through the selected cutoff, divided by total fish received. Grey shows mortalities and documented discards; purple shows unaccounted transfer/count losses; red shows unaccounted fish at final harvest. Extra fish found and batch mixing are not unaccounted losses. Shading marks the fixed 10% maximum automatically.">
+        <Section title={`Stock Loss Analysis - ${label}`}>
           <CopyZoom type="chart" name="Stock loss chart">
             <StockLossChart rows={data.batches} cycleToDate={cycleToDate} />
           </CopyZoom>

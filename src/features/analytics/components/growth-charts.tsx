@@ -148,12 +148,11 @@ export function stockLossSegments(row: BatchReportRow) {
 
 /** Cumulative loss components through the selected cutoff, against a fixed 10% threshold. */
 export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchReportRow[]; cycleToDate?: boolean }) {
-  const limitVisible = true
   const data = rows.filter((r) => r.batch_id != null).map(row => ({ row, segments: stockLossSegments(row) }))
   if (data.length === 0) return <p className="planner-note">No stock loss data for this period.</p>
 
   const endpoints = data.flatMap(({ segments }) => segments.flatMap(segment => [segment.start, segment.end]))
-  const high = Math.max(1, limitVisible ? 10 : 0, ...endpoints)
+  const high = Math.max(10, ...endpoints)
   const low = Math.min(0, ...endpoints)
   const rawBottom = low < 0 ? low * 1.1 : 0
   const targetStep = (high * 1.12 - rawBottom) / 6
@@ -166,20 +165,20 @@ export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchRepor
   const group = plotW / data.length
   const bar = Math.min(34, group * 0.6)
   const y = (v: number) => PAD.t + plotH - ((v - bottom) / (top - bottom)) * plotH
-  const ticks = Array.from({ length: Math.round((top - bottom) / tickStep) + 1 }, (_, i) => bottom + i * tickStep)
+  const ticks = Array.from(new Set([10, ...Array.from({ length: Math.round((top - bottom) / tickStep) + 1 }, (_, i) => bottom + i * tickStep)])).sort((a, b) => a - b)
 
   return (
     <div className="space-y-2">
       <figure className="rpt-chart">
         <figcaption className="rpt-chart__title">Stock loss per batch (%) · {cycleToDate ? "Cycle to date" : "Cumulative through month-end"}</figcaption>
         <Legend items={[
-          ...(limitVisible ? [{ label: "10% maximum", color: STOCK_LOSS_COLORS.limit }] : []),
+          { label: "Expected stock loss (%)", color: STOCK_LOSS_COLORS.limit },
           { label: "Mortalities / discards (%)", color: STOCK_LOSS_COLORS.mortality },
           { label: "Unaccounted at transfer / adjustments (%)", color: STOCK_LOSS_COLORS.adjustment },
           { label: "Harvest shortfalls (%)", color: STOCK_LOSS_COLORS.harvest },
         ]} />
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Stock loss percentage per batch by cause" className="rpt-chart__svg">
-          {limitVisible && <rect x={PAD.l} y={y(10)} width={plotW} height={y(0) - y(10)} fill={STOCK_LOSS_COLORS.limit} />}
+          <rect x={PAD.l} y={y(10)} width={plotW} height={y(0) - y(10)} fill={STOCK_LOSS_COLORS.limit} />
           {ticks.map(t => (
             <g key={t}>
               <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke={t === 0 ? "#8da9db" : "#e6ddd0"} />
@@ -199,14 +198,6 @@ export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchRepor
               </g>
             )
           })}
-          {limitVisible && (
-            <g>
-              <line x1={PAD.l} x2={W - PAD.r} y1={y(10)} y2={y(10)} stroke="#b45309" strokeWidth="1.5" strokeDasharray="6 4">
-                <title>Maximum allowed stock loss: 10%</title>
-              </line>
-              <text x={W - PAD.r - 4} y={y(10) - 5} textAnchor="end" fontSize="10" fill="#b45309">Maximum allowed: 10%</text>
-            </g>
-          )}
           <text x={PAD.l + plotW / 2} y={H - 5} textAnchor="middle" fontSize="10" fill="#6f746f">Batch ID (youngest to oldest)</text>
           <text x={14} y={PAD.t + plotH / 2} textAnchor="middle" fontSize="11" fill="#6f746f" transform={`rotate(-90 14 ${PAD.t + plotH / 2})`}>% of population</text>
         </svg>

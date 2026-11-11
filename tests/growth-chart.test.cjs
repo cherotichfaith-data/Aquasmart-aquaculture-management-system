@@ -43,11 +43,13 @@ test("stock loss threshold is automatic in monthly and cycle views", () => {
     const rows = [{ batch_id: 1, batch_name: "low", stock_loss_chart_pct: 2, stock_loss_pct: null }, { batch_id: 2, batch_name: "blank", stock_loss_pct: null }]
     const markup = renderToStaticMarkup(React.createElement(loaded.exports.StockLossChart, { rows, cycleToDate }))
     assert.doesNotMatch(markup, /type="checkbox"/)
-    assert.match(markup, /Maximum allowed: 10%/)
+    assert.doesNotMatch(markup, /Maximum allowed|10% maximum/)
+    assert.match(markup, /Expected stock loss/)
+    assert.match(markup, />10<\/text>/)
     assert.match(markup, /blank<\/text>/)
     assert.equal((markup.match(/<rect /g) || []).length, 4)
-    const line = markup.match(/<line[^>]*y1="([\d.]+)"[^>]*stroke="#b45309"/)
-    assert.ok(line && Number(line[1]) > 14 && Number(line[1]) < 266)
+    const band = markup.match(/<rect[^>]*y="([\d.]+)"[^>]*fill="#fce4d6"/)
+    assert.ok(band && Number(band[1]) > 14 && Number(band[1]) < 266)
   }
 })
 
