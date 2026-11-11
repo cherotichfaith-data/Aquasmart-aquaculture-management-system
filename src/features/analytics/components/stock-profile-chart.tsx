@@ -1,6 +1,7 @@
 "use client"
 
 import type { StockProfileRow } from "@/features/analytics/types"
+import { CopyZoomChartTitle } from "@/components/shared/copy-zoom"
 
 const W = 900
 const H = 300
@@ -46,7 +47,7 @@ export default function StockProfileChart({ rows }: { rows: StockProfileRow[] })
 
   return (
     <figure className="rpt-chart">
-      <figcaption className="rpt-chart__title">Number of fish per weight class</figcaption>
+      <CopyZoomChartTitle>Number of fish per weight class</CopyZoomChartTitle>
       <div className="rpt-chart__legend">
         <span>
           <i style={{ background: AREA_COLOR, opacity: 0.6 }} />

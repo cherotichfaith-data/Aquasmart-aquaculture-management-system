@@ -58,6 +58,11 @@
 }
 .tb-monthly .rpt-small { color: var(--muted); font-size: 0.74rem; line-height: 1.5; margin: 0; }
 .tb-monthly .rpt-heading { font-weight: 800; font-size: 1rem; margin: 6px 0 -4px; }
+.tb-monthly .analytics-report-section { gap: 8px; }
+.tb-monthly .rpt-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.tb-monthly .rpt-section-head .rpt-heading,
+.tb-monthly .copy-zoom__heading .rpt-heading { margin: 0; }
+.tb-monthly .rpt-section-tools { margin-left: auto; max-width: 100%; }
 
 .tb-monthly .plan-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
 .tb-monthly .plan-table { border-collapse: collapse; font-size: 0.78rem; width: 100%; }

@@ -9,7 +9,10 @@ const { renderToStaticMarkup } = require("react-dom/server")
 const source = fs.readFileSync(path.join(__dirname, "../src/features/analytics/components/growth-charts.tsx"), "utf8")
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText
 const loaded = { exports: {} }
-new Function("require", "module", "exports", compiled)(require, loaded, loaded.exports)
+new Function("require", "module", "exports", compiled)(id =>
+  id === "@/components/shared/copy-zoom"
+    ? { CopyZoomChartTitle: ({ children }) => React.createElement("figcaption", { className: "rpt-chart__title" }, children) }
+    : require(id), loaded, loaded.exports)
 const chart = (rows) => renderToStaticMarkup(React.createElement(loaded.exports.GrowthByBatchChart, { rows }))
 const row = (name, recorded, expected) => ({ batch_id: name, batch_name: name, date_in: "2026-10-01", gain_recorded_kg: recorded, gain_expected_kg: expected })
 

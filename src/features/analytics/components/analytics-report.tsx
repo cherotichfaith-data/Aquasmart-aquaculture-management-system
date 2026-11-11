@@ -1,7 +1,7 @@
 "use client"
 import PlanningAutoRefresh from "./planning-auto-refresh"
 
-import { useCallback, useState, type ReactNode } from "react"
+import { Children, cloneElement, isValidElement, useCallback, useState, type ReactNode } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Info } from "lucide-react"
@@ -21,7 +21,7 @@ import { curvesByScenario, judgeBatchAgainstCurves, signedPct, verdictLabel, typ
 import StockProfileChart, { classLabel } from "./stock-profile-chart"
 import { AbwAgeChart, GrowthByBatchChart, SelectedBatchAbwChart, StockLossChart } from "./growth-charts"
 import { DASH, ReportTable, dateText, num, pct, type Column } from "./report-table"
-import { CopyZoom } from "@/components/shared/copy-zoom"
+import { CopyZoom, type CopyZoomProps } from "@/components/shared/copy-zoom"
 import "@/features/reports/monthly/monthly-reports.css"
 
 function dayLabel(date: string) {
@@ -34,10 +34,14 @@ function monthLabel(month: string) {
 
 function Section({ title, note, noteAsInfo = false, infoLabel, children }: { title?: string; note?: string; noteAsInfo?: boolean; infoLabel?: string; children: ReactNode }) {
   const [infoOpen, setInfoOpen] = useState(false)
+  const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
+  const items = Children.toArray(children)
+  const firstTools = items.findIndex(child => isValidElement(child) && child.type === CopyZoom)
   return (
-    <section className="planner-card">
+    <section className="planner-card analytics-report-section">
       {title || (note && noteAsInfo) ? (
-        <div className="flex items-center gap-2">
+        <div className="rpt-section-head">
+          <div className="flex min-w-0 items-center gap-2">
           {title ? <h3 className="rpt-heading">{title}</h3> : null}
           {note && noteAsInfo ? (
             <button
@@ -50,6 +54,8 @@ function Section({ title, note, noteAsInfo = false, infoLabel, children }: { tit
               <Info size={16} aria-hidden="true" />
             </button>
           ) : null}
+          </div>
+          {firstTools >= 0 ? <div className="rpt-section-tools" ref={setToolbarTarget} /> : null}
         </div>
       ) : null}
       {note && !noteAsInfo ? <p className="rpt-small">{note}</p> : null}
@@ -58,7 +64,8 @@ function Section({ title, note, noteAsInfo = false, infoLabel, children }: { tit
           <p className="text-sm leading-relaxed">{note}</p>
         </Dialog>
       ) : null}
-      {children}
+      {items.map((child, index) => index === firstTools && isValidElement<CopyZoomProps>(child)
+        ? cloneElement(child, { toolbarTarget }) : child)}
     </section>
   )
 }
@@ -430,7 +437,6 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("batches") ? (
         <Section
           title={`Detailed Batch Report - ${label}`}
-          note="Monthly reports include batches active at any point in the month or with records that month. Stock loss is cumulative from entry through the cutoff."
         >
           <CopyZoom type="table" name="Detailed batch report">
             <BatchReportTable rows={data.batches} />

@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { Check, Copy, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react"
 import { Button } from "@/components/app-ui/button"
 
@@ -9,6 +10,19 @@ const MAX_ZOOM = 2
 const ZOOM_STEP = 0.1
 
 type CopyState = "idle" | "copied" | "failed"
+
+const ChartTools = createContext<ReactNode>(null)
+
+/** Keep chart controls beside the chart's own caption, outside the zoomed plot. */
+export function CopyZoomChartTitle({ children }: { children: ReactNode }) {
+  const tools = useContext(ChartTools)
+  return (
+    <figcaption className="rpt-chart__title copy-zoom__heading">
+      <span data-copy-title="">{children}</span>
+      {tools}
+    </figcaption>
+  )
+}
 
 function tableToClipboard(table: HTMLTableElement) {
   const clone = table.cloneNode(true) as HTMLTableElement
@@ -142,7 +156,7 @@ async function chartToPng(figure: HTMLElement): Promise<Blob> {
 
   try {
     const image = await loadImage(svgUrl)
-    const title = figure.querySelector(".rpt-chart__title")?.textContent?.trim() ?? ""
+    const title = (figure.querySelector("[data-copy-title]") ?? figure.querySelector(".rpt-chart__title"))?.textContent?.trim() ?? ""
     const legend = Array.from(figure.querySelectorAll(".rpt-chart__legend span")).map((item) => {
       const swatch = item.querySelector("i")
       const line = item.querySelector("line")
@@ -200,15 +214,19 @@ async function chartToPng(figure: HTMLElement): Promise<Blob> {
  *  - table: copies it as a table (pastes into Excel, Sheets, Word) plus tab-separated text.
  *  - chart: copies it as a PNG image (title, legend and plot); offers a PNG download if image copy is blocked.
  */
+export type CopyZoomProps = {
+  type: "table" | "chart"
+  name: string
+  children: ReactNode
+  toolbarTarget?: HTMLElement | null
+}
+
 export function CopyZoom({
   type,
   name,
   children,
-}: {
-  type: "table" | "chart"
-  name: string
-  children: ReactNode
-}) {
+  toolbarTarget,
+}: CopyZoomProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
   const [copyState, setCopyState] = useState<CopyState>("idle")
@@ -278,9 +296,8 @@ export function CopyZoom({
 
   const clamp = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 10) / 10))
 
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-end gap-1.5" role="toolbar" aria-label={`${name} tools`}>
+  const tools = (
+      <div className="copy-zoom__tools flex flex-wrap items-center justify-end gap-1.5" role="toolbar" aria-label={`${name} tools`}>
         <Button
           type="button"
           variant="outline"
@@ -308,14 +325,23 @@ export function CopyZoom({
           <RotateCcw className="size-4" />
         </Button>
       </div>
+  )
+
+  return (
+    <div className="copy-zoom space-y-2">
+      {toolbarTarget !== undefined
+        ? toolbarTarget && createPortal(tools, toolbarTarget)
+        : type === "table" ? <div className="copy-zoom__heading"><h3 className="rpt-heading">{name}</h3>{tools}</div> : null}
       {download && (
         <p className="text-sm text-muted-foreground" role="status">
           Image copying is unavailable or was blocked. <a className="underline" href={download.url} download={download.filename}>Save PNG</a> to attach or insert the chart.
         </p>
       )}
       <div className="overflow-auto">
-        <div ref={contentRef} style={{ zoom }}>
-          {children}
+        <div ref={contentRef} className="copy-zoom__content" style={{ "--copy-zoom": zoom } as CSSProperties}>
+          <ChartTools.Provider value={toolbarTarget === undefined && type === "chart" ? tools : null}>
+            {children}
+          </ChartTools.Provider>
         </div>
       </div>
     </div>

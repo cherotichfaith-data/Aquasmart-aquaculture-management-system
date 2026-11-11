@@ -1,6 +1,7 @@
 "use client"
 
 import { useId, useMemo, useState } from "react"
+import { CopyZoomChartTitle } from "@/components/shared/copy-zoom"
 import type { AbwPointRow, StockLossChartRow, GrowthByBatchRow, GrowthCurveRow } from "@/features/analytics/types"
 
 const W = 900
@@ -66,7 +67,7 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
 
   return (
     <figure className="rpt-chart">
-      <figcaption className="rpt-chart__title">Growth per batch (kg gained {cycleToDate ? "cycle to date" : "in the selected period"})</figcaption>
+      <CopyZoomChartTitle>Growth per batch (kg gained {cycleToDate ? "cycle to date" : "in the selected period"})</CopyZoomChartTitle>
       <Legend
         items={[
           { label: "Recorded biomass gain", color: RECORDED },
@@ -188,7 +189,7 @@ export function StockLossChart({ rows, cycleToDate = false }: { rows: StockLossC
   return (
     <div className="space-y-2">
       <figure className="rpt-chart">
-        <figcaption className="rpt-chart__title">Stock loss per batch (%) · {cycleToDate ? "Cycle to date" : "Cumulative through month-end"}</figcaption>
+        <CopyZoomChartTitle>Stock loss per batch (%) · {cycleToDate ? "Cycle to date" : "Cumulative through month-end"}</CopyZoomChartTitle>
         <Legend items={[
           { label: "Expected loss (%)", color: STOCK_LOSS_COLORS.limit },
           { label: "Mortalities / discards (%)", color: STOCK_LOSS_COLORS.mortality },
@@ -259,7 +260,7 @@ export function AbwAgeChart({
     [batchNames, points, weightBand],
   )
   const drawn = series.filter((s) => s.pts.length > 0)
-  if (drawn.length === 0) return <figure className="rpt-chart"><figcaption className="rpt-chart__title">{title}</figcaption><p className="planner-note">No weight samples to plot for this selection.</p></figure>
+  if (drawn.length === 0) return <figure className="rpt-chart"><CopyZoomChartTitle>{title}</CopyZoomChartTitle><p className="planner-note">No weight samples to plot for this selection.</p></figure>
 
   const maxAge = Math.max(...drawn.flatMap((s) => s.pts.map((p) => p.model_age_days)))
   const minAge = Math.min(...drawn.flatMap((s) => s.pts.map((p) => p.model_age_days)))
@@ -280,7 +281,7 @@ export function AbwAgeChart({
 
   return (
     <figure className="rpt-chart">
-      <figcaption className="rpt-chart__title">{title}</figcaption>
+      <CopyZoomChartTitle>{title}</CopyZoomChartTitle>
       <Legend
         items={[
           ...drawn.map((s) => ({ label: s.name, color: s.color })),

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { CopyZoomChartTitle } from "@/components/shared/copy-zoom"
 import type { CageHarvestRow, GrowthCurveRow, HarvestPointRow } from "@/features/analytics/types"
 import { curvesByScenario, judgeBatchAgainstCurves, signedPct, verdictLabel, type HarvestCurveVerdict } from "@/features/analytics/harvest-curve"
 import { BATCH_COLORS, CURVE_STYLE, Legend, compact, niceTop } from "./growth-charts"
@@ -45,7 +46,7 @@ function HarvestCurveChart({ title, series, curves, multi }: { title: string; se
 
   return (
     <figure className="rpt-chart">
-      <figcaption className="rpt-chart__title">{title}</figcaption>
+      <CopyZoomChartTitle>{title}</CopyZoomChartTitle>
       <Legend
         items={[
           ...(multi
