@@ -128,11 +128,12 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
 const STOCK_LOSS_COLORS = { mortality: "#a6a6a6", adjustment: "#7030a0", harvest: "#ff0000", limit: "#fce4d6" }
 
 export function stockLossSegments(row: BatchReportRow) {
-  if (row.stock_loss_pct == null) return []
+  const chartTotal = row.stock_loss_chart_pct ?? row.stock_loss_pct
+  if (chartTotal == null) return []
   const values = [
-    { label: "Recorded mortalities %", color: STOCK_LOSS_COLORS.mortality, value: row.stock_loss_mortality_pct ?? row.stock_loss_pct },
-    { label: "Recorded transfer / adjustment losses %", color: STOCK_LOSS_COLORS.adjustment, value: row.stock_loss_adjustment_pct ?? 0 },
-    { label: "Recorded unaccounted fish at harvest %", color: STOCK_LOSS_COLORS.harvest, value: row.stock_loss_harvest_pct ?? 0 },
+    { label: "Recorded mortalities / discards %", color: STOCK_LOSS_COLORS.mortality, value: row.stock_loss_mortality_pct ?? chartTotal },
+    { label: "Recorded unaccounted fish at transfer / adjustments %", color: STOCK_LOSS_COLORS.adjustment, value: Math.max(0, row.stock_loss_adjustment_pct ?? 0) },
+    { label: "Recorded unaccounted fish at harvest %", color: STOCK_LOSS_COLORS.harvest, value: Math.max(0, row.stock_loss_harvest_pct ?? 0) },
   ]
   let positive = 0
   let negative = 0
@@ -145,10 +146,9 @@ export function stockLossSegments(row: BatchReportRow) {
   })
 }
 
-/** Signed stock loss components share one population denominator for each batch. */
+/** Cumulative loss components through the selected cutoff, against a fixed 10% threshold. */
 export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchReportRow[]; cycleToDate?: boolean }) {
-  const [showLimit, setShowLimit] = useState(true)
-  const limitVisible = !cycleToDate && showLimit
+  const limitVisible = true
   const data = rows.filter((r) => r.batch_id != null).map(row => ({ row, segments: stockLossSegments(row) }))
   if (data.length === 0) return <p className="planner-note">No stock loss data for this period.</p>
 
@@ -170,18 +170,12 @@ export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchRepor
 
   return (
     <div className="space-y-2">
-      {!cycleToDate && (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={showLimit} onChange={event => setShowLimit(event.target.checked)} />
-          Show 10% maximum stock loss
-        </label>
-      )}
       <figure className="rpt-chart">
-        <figcaption className="rpt-chart__title">Stock loss per batch (%) · {cycleToDate ? "Cycle to date" : "Monthly"}</figcaption>
+        <figcaption className="rpt-chart__title">Stock loss per batch (%) · {cycleToDate ? "Cycle to date" : "Cumulative through month-end"}</figcaption>
         <Legend items={[
           ...(limitVisible ? [{ label: "10% maximum", color: STOCK_LOSS_COLORS.limit }] : []),
-          { label: "Recorded mortalities (%)", color: STOCK_LOSS_COLORS.mortality },
-          { label: "Transfer / adjustment losses (%)", color: STOCK_LOSS_COLORS.adjustment },
+          { label: "Mortalities / discards (%)", color: STOCK_LOSS_COLORS.mortality },
+          { label: "Unaccounted at transfer / adjustments (%)", color: STOCK_LOSS_COLORS.adjustment },
           { label: "Harvest shortfalls (%)", color: STOCK_LOSS_COLORS.harvest },
         ]} />
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Stock loss percentage per batch by cause" className="rpt-chart__svg">
@@ -208,7 +202,7 @@ export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchRepor
           {limitVisible && (
             <g>
               <line x1={PAD.l} x2={W - PAD.r} y1={y(10)} y2={y(10)} stroke="#b45309" strokeWidth="1.5" strokeDasharray="6 4">
-                <title>Maximum allowed monthly stock loss: 10%</title>
+                <title>Maximum allowed stock loss: 10%</title>
               </line>
               <text x={W - PAD.r - 4} y={y(10) - 5} textAnchor="end" fontSize="10" fill="#b45309">Maximum allowed: 10%</text>
             </g>

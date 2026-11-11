@@ -12,8 +12,12 @@ BEGIN
         'ae4f719b-e29e-4f60-bae0-2429cf840c5d',report_month,report_month,
         least((report_month + interval '1 month - 1 day')::date,date '2026-11-11'),period_sections,'main');
       FOR entry IN SELECT e FROM jsonb_array_elements(result->'batches') e LOOP
-        IF entry->>'stock_loss_pct' IS NOT NULL AND abs(
-          (entry->>'stock_loss_pct')::numeric
+        IF (entry->>'stock_loss_adjustment_pct')::numeric < 0
+          OR (entry->>'stock_loss_harvest_pct')::numeric < 0 THEN
+          RAISE EXCEPTION 'Unaccounted losses must not be negative: %',entry;
+        END IF;
+        IF entry->>'stock_loss_chart_pct' IS NOT NULL AND abs(
+          (entry->>'stock_loss_chart_pct')::numeric
           - (entry->>'stock_loss_mortality_pct')::numeric
           - (entry->>'stock_loss_adjustment_pct')::numeric
           - (entry->>'stock_loss_harvest_pct')::numeric) > 0.000001 THEN
@@ -36,11 +40,15 @@ BEGIN
 
   result := public.api_analytics_performance(
     'ae4f719b-e29e-4f60-bae0-2429cf840c5d',date '2026-10-01',date '2026-10-01',date '2026-10-31',ARRAY['batches','growth_custom'],'main');
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(result->'batches') e
+    WHERE e->>'batch_name' = '03.26c' AND (e->>'stock_loss_harvest_pct')::numeric > 0) THEN
+    RAISE EXCEPTION 'November harvest shortfall leaked into October';
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(result->'batches') e
     WHERE e->>'batch_name' = '05.26mixi' AND (e->>'stock_loss_adjustment_pct')::numeric = 0)
     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(result->'batches') e
-    WHERE e->>'batch_name' = '05.26cK' AND (e->>'stock_loss_adjustment_pct')::numeric < 0) THEN
-    RAISE EXCEPTION 'Mixed movements counted as losses or signed corrections lost';
+    WHERE e->>'batch_name' = '05.26cK' AND (e->>'stock_loss_adjustment_pct')::numeric = 0) THEN
+    RAISE EXCEPTION 'Mixed movements or extra fish were misclassified as unaccounted losses';
   END IF;
 
   result := public.api_analytics_performance(
@@ -48,6 +56,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(result->'batches') e
     WHERE e->>'batch_name' = '03.26c' AND (e->>'stock_loss_harvest_pct')::numeric > 0) THEN
     RAISE EXCEPTION 'Final harvest shortfall missing from harvest loss component';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(result->'batches') e
+    WHERE e->>'batch_name' = '03.26aK' AND (e->>'stock_loss_adjustment_pct')::numeric > 0)
+    OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(result->'batches') e
+    WHERE e->>'batch_name' = '02.26cK' AND (e->>'stock_loss_adjustment_pct')::numeric > 0) THEN
+    RAISE EXCEPTION 'Earlier transfer losses disappeared from the November cumulative chart';
   END IF;
 END $test$;
 ROLLBACK;
