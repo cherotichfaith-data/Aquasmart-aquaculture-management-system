@@ -91,12 +91,7 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
               {[
                 { v: rec, c: RECORDED, n: "Recorded" },
                 { v: exp, c: EXPECTED, n: "Expected" },
-              ].map((b, bi) => b.v == null ? (
-                <text key={b.n} x={x0 + bi * bar + (bar - 2) / 2} y={y(0) - 5} textAnchor="middle" fontSize="8" fill="#6f746f">
-                  <title>{`${r.batch_name} - ${b.n.toLowerCase()} growth unavailable`}</title>
-                  N/A
-                </text>
-              ) : (
+              ].map((b, bi) => b.v == null ? null : (
                 <rect
                   key={b.n}
                   x={x0 + bi * bar}
@@ -126,9 +121,6 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
           Growth (kg)
         </text>
       </svg>
-      {data.some((r) => r.gain_recorded_kg == null || r.gain_expected_kg == null) && (
-        <p className="planner-note">N/A means growth could not be calculated from the available measurements. It does not mean zero growth.</p>
-      )}
     </figure>
   )
 }
