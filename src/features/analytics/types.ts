@@ -24,6 +24,12 @@ export type BatchReportRow = {
   feed_kg: number | null
   efcr: number | null
   acc_efcr: number | null
+  /** Actual sampling-to-sampling intervals ending in the selected period. */
+  efcr_feed_kg?: number | null
+  efcr_growth_kg?: number | null
+  /** All valid actual sampling intervals through the reporting cutoff. */
+  acc_efcr_feed_kg?: number | null
+  acc_efcr_growth_kg?: number | null
 }
 
 export type StockLossChartRow = Pick<BatchReportRow,

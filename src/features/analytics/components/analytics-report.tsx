@@ -430,7 +430,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("batches") ? (
         <Section
           title={`Detailed Batch Report - ${label}`}
-          note="Stock and biomass use the latest recorded weights available at the cutoff. Growth and recorded feed cover the selected period; accumulated eFCR runs from stocking. Negative growth is retained; eFCR is blank when growth is zero, negative or unavailable."
+          note="Growth and feed used cover the selected period. eFCR uses only valid intervals between two actual samplings, with matching feed from the opening sampling day up to the day before the closing sampling. Monthly eFCR includes intervals ending in that month; accumulated eFCR includes all valid intervals through the cutoff. The eFCR feed and growth columns show its inputs. Missing intervals and non-positive measured growth leave eFCR blank."
         >
           <CopyZoom type="table" name="Detailed batch report">
             <BatchReportTable rows={data.batches} />

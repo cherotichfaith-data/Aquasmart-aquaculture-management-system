@@ -11,14 +11,15 @@ from periods p cross join lateral jsonb_to_recordset(public.api_analytics_perfor
  'ae4f719b-e29e-4f60-bae0-2429cf840c5d',p.month,p.month,p.finish,
  case when mode='month' then array['batches','growth_custom'] else array['batches','stock_loss_cycle'] end,'main')->'batches')
 as r(batch_id bigint,batch_name text,stock_end numeric,abw_g numeric,biomass_kg numeric,growth_kg numeric,
- feed_kg numeric,efcr numeric,acc_efcr numeric,stock_loss_pct numeric);
+ feed_kg numeric,efcr numeric,acc_efcr numeric,stock_loss_pct numeric,
+ efcr_feed_kg numeric,efcr_growth_kg numeric,acc_efcr_feed_kg numeric,acc_efcr_growth_kg numeric);
 DO $test$
 BEGIN
  if exists(select 1 from batch_performance_check where batch_name ~* '^(BATCH-|INFERRED-)') then
  raise exception 'Legacy batches leaked into table'; end if;
  if exists(select 1 from batch_performance_check where efcr is not null and
-   (growth_kg<=0 or feed_kg<0 or abs(efcr-feed_kg/growth_kg)>0.000001)) then
- raise exception 'eFCR does not match the visible row'; end if;
+   (efcr_growth_kg<=0 or efcr_feed_kg<0 or abs(efcr-efcr_feed_kg/efcr_growth_kg)>0.000001)) then
+ raise exception 'eFCR does not match its sampling feed and growth'; end if;
  if exists(select 1 from batch_performance_check where stock_loss_pct<0 or stock_end<0) then
  raise exception 'Invalid stock loss or fish count'; end if;
  if exists(select 1 from batch_performance_check where batch_id is not null and stock_end>0 and biomass_kg is not null
@@ -43,6 +44,35 @@ BEGIN
  and fr.date<=c.finish and (c.mode='cycle' or fr.date>=c.month)
  ) raw where c.batch_id is not null and abs(c.feed_kg-raw.kg)>0.00001
  ) then raise exception 'Feed differs from actual records'; end if;
+
+ if exists(select 1 from batch_performance_check where acc_efcr is not null and
+   (acc_efcr_growth_kg<=0 or acc_efcr_feed_kg<0 or abs(acc_efcr-acc_efcr_feed_kg/acc_efcr_growth_kg)>0.000001)) then
+ raise exception 'Accumulated eFCR does not match sampled intervals'; end if;
+ if exists(select 1 from batch_performance_check where batch_name='05.26mixi'
+   and (efcr is not null or acc_efcr is not null or efcr_feed_kg is not null)) then
+ raise exception 'One-sampling mixed batch acquired eFCR'; end if;
+ if not exists(select 1 from batch_performance_check where batch_name='03.25'
+   and month=date '2026-11-01' and acc_efcr>0) then
+ raise exception '03.25 valid later measured intervals were dropped'; end if;
+ if exists(
+ select batch_id from batch_performance_check where batch_id is not null group by batch_id
+ having abs(sum(efcr_feed_kg) filter(where mode='month')-
+ max(efcr_feed_kg) filter(where mode='cycle' and month=date '2026-11-01'))>0.00001
+ or abs(sum(efcr_growth_kg) filter(where mode='month')-
+ max(efcr_growth_kg) filter(where mode='cycle' and month=date '2026-11-01'))>0.00001
+ ) then raise exception 'Sampling intervals are omitted or double-counted between monthly and cycle views'; end if;
+ if exists(
+ select 1 from batch_performance_check oct join batch_performance_check nov using(batch_id,mode)
+ where oct.batch_name='03.25' and oct.month=date '2026-10-01' and nov.month=date '2026-11-01'
+ and (oct.acc_efcr is distinct from nov.acc_efcr or oct.acc_efcr_feed_kg is distinct from nov.acc_efcr_feed_kg)
+ ) then raise exception 'Feed after the latest sampling changed accumulated eFCR'; end if;
+ if exists(
+ select 1 from batch_performance_check c where c.batch_name='03.25' and c.mode='month'
+ and c.month=date '2026-10-01' and abs(c.efcr_feed_kg-(
+ select sum(feeding_amount) from public.feeding_record where batch_id=c.batch_id and system_id=51 and cycle_id=9
+ and date>=date '2026-09-23' and date<date '2026-10-23'))>0.00001
+ ) then raise exception '03.25 October feed did not match its two actual sampling dates'; end if;
+
 END $test$;
 DO $access_test$
 BEGIN
