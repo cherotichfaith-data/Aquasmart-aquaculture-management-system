@@ -12,7 +12,7 @@ const moduleCopy = { exports: {} }
 new Function("require", "module", "exports", compiled)(id =>
   id === "@/components/app-ui/button" ? {
     Button: ({ variant, size, children, ...props }) => React.createElement("button", props, children),
-  } : require(id), moduleCopy, moduleCopy.exports)
+  } : id === "./clipboard" ? {} : require(id), moduleCopy, moduleCopy.exports)
 const { CopyZoom, CopyZoomChartTitle } = moduleCopy.exports
 
 test("chart copy and zoom tools share the chart caption, with a separate export title", () => {
