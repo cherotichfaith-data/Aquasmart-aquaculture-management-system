@@ -94,3 +94,22 @@
 .tb-monthly .rpt-chart__legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
 .tb-monthly .rpt-chart__legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 .tb-monthly .rpt-chart__svg { width: 100%; height: auto; display: block; font-family: inherit; }
+@media (min-width: 1280px) {
+  .tb-monthly .weight-age-grid > .copy-zoom,
+  .tb-monthly .weight-age-grid > .copy-zoom > .overflow-auto,
+  .tb-monthly .weight-age-grid .copy-zoom__content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .tb-monthly .weight-age-grid > .copy-zoom > .overflow-auto,
+  .tb-monthly .weight-age-grid .copy-zoom__content { flex: 1; }
+  .tb-monthly .weight-age-grid .rpt-chart {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  .tb-monthly .weight-age-grid .rpt-chart__title { flex-shrink: 0; }
+  .tb-monthly .weight-age-grid .rpt-chart__legend { flex: 1; align-content: flex-start; }
+  .tb-monthly .weight-age-grid .rpt-chart__svg { flex-shrink: 0; }
+}

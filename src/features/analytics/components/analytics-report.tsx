@@ -462,7 +462,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           <CopyZoom type="chart" name="Growth per batch chart">
             <GrowthByBatchChart rows={data.growthByBatch} cycleToDate={cycleToDate} />
           </CopyZoom>
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="weight-age-grid grid gap-4 xl:grid-cols-2">
             {(["below100", "from100"] as const).map((weightBand) => (
               <CopyZoom key={weightBand} type="chart" name={`Weight at age chart - ${weightBand === "below100" ? "below 100 g" : "100 g and above"}`}>
                 <AbwAgeChart
