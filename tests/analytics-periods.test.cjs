@@ -73,6 +73,9 @@ test("monthly reports send October bounds to the backend and never expand to May
   assert.equal(calls[0].args.p_period_end, "2026-10-26")
   assert.equal(data.periodStart, "2026-10-01")
   assert.equal(data.periodMode, "month")
+  const stockLoss = calls.find(c => c.name === "api_stock_loss_sources")
+  assert.equal(stockLoss.args.p_as_of, "2026-10-26")
+  assert.equal(stockLoss.args.p_farm_id, "farm")
 })
 
 test("cycle-to-date reports include the original May start, including harvest reports", async () => {

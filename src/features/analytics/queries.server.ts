@@ -1,6 +1,7 @@
 import { loadAutomaticFeedPlan } from "./automatic-feed-plan.server"
 import { addMonths } from "./automatic-feed-plan"
 import { buildHarvestPoints } from "./harvest-curve"
+import { buildStockLossRows, type StockLossSources } from "./stock-loss"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { logSbError } from "@/lib/supabase/log"
 import {
@@ -63,6 +64,7 @@ export async function getAnalyticsReportData(params: {
     periodStart: params.period.from,
     periodEnd: params.period.to,
     batches: [],
+    stockLossRows: [],
     batchHarvests: [],
     batchHarvestPoints: [],
     cageHarvests: [],
@@ -111,7 +113,7 @@ export async function getAnalyticsReportData(params: {
     p_scenario: params.forwardPlanInputs.scenario,
   }
   const needs = SECTIONS_BY_VIEW[params.view]
-  const [performance, outlook] = await Promise.all([
+  const [performance, outlook, stockLoss] = await Promise.all([
     needs.performance.length > 0
       ? supabase.rpc("api_analytics_performance", {
           ...periodArgs,
@@ -128,9 +130,12 @@ export async function getAnalyticsReportData(params: {
           ...planArgs,
         })
       : Promise.resolve(null),
+    params.view === "batches"
+      ? supabase.rpc("api_stock_loss_sources", { p_farm_id: params.farmId, p_as_of: period.to })
+      : Promise.resolve(null),
   ])
 
-  const failed = [performance, outlook].find((r) => r?.error)
+  const failed = [performance, outlook, stockLoss].find((r) => r?.error)
   if (failed?.error) logSbError("analytics:getAnalyticsReportData", failed.error)
   const perf = (performance?.data ?? null) as PerformanceReports | null
   const out = (outlook?.data ?? null) as OutlookReports | null
@@ -189,6 +194,7 @@ export async function getAnalyticsReportData(params: {
     periodStart: period.from,
     periodEnd: period.to,
     batches: perf?.batches ?? [],
+    stockLossRows: stockLoss?.error ? [] : buildStockLossRows(stockLoss?.data as unknown as StockLossSources | null, period.to),
     batchHarvests: perf?.batch_harvests ?? [],
     batchHarvestPoints,
     cageHarvests: perf?.cage_harvests ?? [],

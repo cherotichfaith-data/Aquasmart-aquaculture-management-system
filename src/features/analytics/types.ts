@@ -19,11 +19,16 @@ export type BatchReportRow = {
   stock_loss_mortality_pct?: number | null
   stock_loss_adjustment_pct?: number | null
   stock_loss_harvest_pct?: number | null
+  stock_loss_expected_pct?: number | null
   growth_kg: number | null
   feed_kg: number | null
   efcr: number | null
   acc_efcr: number | null
 }
+
+export type StockLossChartRow = Pick<BatchReportRow,
+  "batch_id" | "batch_name" | "stock_loss_pct" | "stock_loss_chart_pct" |
+  "stock_loss_mortality_pct" | "stock_loss_adjustment_pct" | "stock_loss_harvest_pct" | "stock_loss_expected_pct">
 
 export type CageHarvestRow = {
   cycle_id: number
@@ -151,6 +156,7 @@ export type GrowthScenario = (typeof GROWTH_SCENARIOS)[number]
 export type ForwardPlanInputs = { plannedFish: number; plannedAbwG: number; scenario: GrowthScenario }
 
 export type AnalyticsReportData = {
+  stockLossRows?: StockLossChartRow[]
   /** First day of the reporting month, YYYY-MM-01. */
   /** First day of the month containing the period end (anchors the forecast and forward plan). */
   month: string

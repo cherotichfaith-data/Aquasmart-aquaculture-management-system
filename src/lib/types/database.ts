@@ -2119,6 +2119,10 @@ export type Database = {
         }
         Returns: Json
       }
+      api_stock_loss_sources: {
+        Args: { p_farm_id: string; p_as_of: string }
+        Returns: Json
+      }
       api_batch_growth_trend: {
         Args: {
           p_batch_ids: number[]

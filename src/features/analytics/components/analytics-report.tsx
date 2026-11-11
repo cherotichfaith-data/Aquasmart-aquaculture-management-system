@@ -441,7 +441,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("batches") ? (
         <Section title={`Stock Loss Analysis - ${label}`}>
           <CopyZoom type="chart" name="Stock loss chart">
-            <StockLossChart rows={data.batches} cycleToDate={cycleToDate} />
+            <StockLossChart rows={data.stockLossRows ?? []} cycleToDate={cycleToDate} />
           </CopyZoom>
         </Section>
       ) : null}

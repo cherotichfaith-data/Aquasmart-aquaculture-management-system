@@ -38,17 +38,16 @@ test("all-negative growth and empty periods have valid output", () => {
   assert.match(chart([]), /No growth data for this period/)
 })
 
-test("stock loss threshold is automatic in monthly and cycle views", () => {
+test("stock loss expected area is automatic and follows per-batch expectations in both views", () => {
   for (const cycleToDate of [false, true]) {
-    const rows = [{ batch_id: 1, batch_name: "low", stock_loss_chart_pct: 2, stock_loss_pct: null }, { batch_id: 2, batch_name: "blank", stock_loss_pct: null }]
+    const rows = [{ batch_id: 1, batch_name: "low", stock_loss_chart_pct: 2, stock_loss_pct: null, stock_loss_expected_pct: 4 }, { batch_id: 2, batch_name: "blank", stock_loss_pct: null, stock_loss_expected_pct: null }]
     const markup = renderToStaticMarkup(React.createElement(loaded.exports.StockLossChart, { rows, cycleToDate }))
     assert.doesNotMatch(markup, /type="checkbox"/)
     assert.doesNotMatch(markup, /Maximum allowed|10% maximum/)
     assert.match(markup, /Expected loss/)
-    assert.match(markup, />10<\/text>/)
     assert.match(markup, /blank<\/text>/)
     assert.equal((markup.match(/<rect /g) || []).length, 3)
-    assert.match(markup, /<path[^>]*fill="#f4b183" fill-opacity="0.35"/)
+    assert.match(markup, /<path[^>]*data-series="expected-loss"[^>]*fill="#f4b183" fill-opacity="0.35"/)
     assert.doesNotMatch(markup, /stroke-dasharray/)
   }
 })
@@ -71,4 +70,20 @@ test("unaccounted loss series are positive and stacked above zero", () => {
   assert.match(markup, /transfer \/ adjustments %: 7.00%/)
   assert.match(markup, /harvest %: 4.00%/)
   assert.doesNotMatch(markup, /NaN|Infinity|height="-\d/)
+})
+
+test("expected-loss shading varies by batch and leaves missing expectations blank", () => {
+  const rows = [
+    { batch_id: 1, batch_name: "young", stock_loss_pct: 0, stock_loss_expected_pct: 4 },
+    { batch_id: 2, batch_name: "older", stock_loss_pct: 0, stock_loss_expected_pct: 12 },
+    { batch_id: 3, batch_name: "unknown", stock_loss_pct: null, stock_loss_expected_pct: null },
+    { batch_id: 4, batch_name: "oldest", stock_loss_pct: 0, stock_loss_expected_pct: 18 },
+  ]
+  const html = renderToStaticMarkup(React.createElement(loaded.exports.StockLossChart, { rows }))
+  const areas = [...html.matchAll(/data-series="expected-loss" d="([^"]+)"/g)]
+  assert.equal(areas.length, 2, "missing expectations break the shaded area")
+  const points = [...areas[0][1].matchAll(/L[\d.]+,([\d.]+)/g)].map(match => Number(match[1]))
+  assert.notEqual(points[0], points[1], "young and older batches have different expected loss heights")
+  assert.match(html, /unknown<\/text>/)
+  assert.doesNotMatch(html, /10%|stroke-dasharray/)
 })

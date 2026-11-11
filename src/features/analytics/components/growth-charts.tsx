@@ -1,7 +1,7 @@
 "use client"
 
 import { useId, useMemo, useState } from "react"
-import type { AbwPointRow, BatchReportRow, GrowthByBatchRow, GrowthCurveRow } from "@/features/analytics/types"
+import type { AbwPointRow, StockLossChartRow, GrowthByBatchRow, GrowthCurveRow } from "@/features/analytics/types"
 
 const W = 900
 const H = 320
@@ -127,7 +127,7 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
 
 const STOCK_LOSS_COLORS = { mortality: "#a6a6a6", adjustment: "#7030a0", harvest: "#ff0000", limit: "#f4b183" }
 
-export function stockLossSegments(row: BatchReportRow) {
+export function stockLossSegments(row: StockLossChartRow) {
   const chartTotal = row.stock_loss_chart_pct ?? row.stock_loss_pct
   if (chartTotal == null) return []
   const values = [
@@ -146,13 +146,14 @@ export function stockLossSegments(row: BatchReportRow) {
   })
 }
 
-/** Cumulative loss components through the selected cutoff, against a fixed 10% threshold. */
-export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchReportRow[]; cycleToDate?: boolean }) {
+/** Cumulative workbook loss components and the batch-specific expected-loss area. */
+export function StockLossChart({ rows, cycleToDate = false }: { rows: StockLossChartRow[]; cycleToDate?: boolean }) {
   const data = rows.filter((r) => r.batch_id != null).map(row => ({ row, segments: stockLossSegments(row) }))
   if (data.length === 0) return <p className="planner-note">No stock loss data for this period.</p>
 
   const endpoints = data.flatMap(({ segments }) => segments.flatMap(segment => [segment.start, segment.end]))
-  const high = Math.max(10, ...endpoints)
+  const expected = data.map(({ row }, index) => ({ index, value: row.stock_loss_expected_pct }))
+  const high = Math.max(1, ...endpoints, ...expected.map(point => point.value ?? 0))
   const low = Math.min(0, ...endpoints)
   const rawBottom = low < 0 ? low * 1.1 : 0
   const targetStep = (high * 1.12 - rawBottom) / 6
@@ -165,7 +166,24 @@ export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchRepor
   const group = plotW / data.length
   const bar = Math.min(34, group * 0.6)
   const y = (v: number) => PAD.t + plotH - ((v - bottom) / (top - bottom)) * plotH
-  const ticks = Array.from(new Set([10, ...Array.from({ length: Math.round((top - bottom) / tickStep) + 1 }, (_, i) => bottom + i * tickStep)])).sort((a, b) => a - b)
+  const ticks = Array.from({ length: Math.round((top - bottom) / tickStep) + 1 }, (_, i) => bottom + i * tickStep)
+  const expectedRuns: { index: number; value: number }[][] = []
+  let run: { index: number; value: number }[] = []
+  for (const point of expected) {
+    if (point.value == null || !Number.isFinite(point.value)) {
+      if (run.length) expectedRuns.push(run)
+      run = []
+    } else run.push({ index: point.index, value: point.value })
+  }
+  if (run.length) expectedRuns.push(run)
+  const cx = (index: number) => PAD.l + index * group + group / 2
+  const expectedAreas = expectedRuns.map(points => {
+    if (points.length === 1) {
+      const center = cx(points[0].index)
+      return `M${center - group * .3},${y(0)} L${center - group * .3},${y(points[0].value)} L${center + group * .3},${y(points[0].value)} L${center + group * .3},${y(0)} Z`
+    }
+    return `M${cx(points[0].index)},${y(0)} L${points.map(point => `${cx(point.index)},${y(point.value)}`).join(" L")} L${cx(points[points.length - 1].index)},${y(0)} Z`
+  })
 
   return (
     <div className="space-y-2">
@@ -178,7 +196,7 @@ export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchRepor
           { label: "Harvest shortfalls (%)", color: STOCK_LOSS_COLORS.harvest },
         ]} />
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Stock loss percentage per batch by cause" className="rpt-chart__svg">
-          <path d={`M${PAD.l},${y(0)} L${PAD.l},${y(10)} L${W - PAD.r},${y(10)} L${W - PAD.r},${y(0)} Z`} fill={STOCK_LOSS_COLORS.limit} fillOpacity="0.35" />
+          {expectedAreas.map((path, index) => <path key={index} data-series="expected-loss" d={path} fill={STOCK_LOSS_COLORS.limit} fillOpacity="0.35" />)}
           {ticks.map(t => (
             <g key={t}>
               <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke={t === 0 ? "#8da9db" : "#e6ddd0"} />
