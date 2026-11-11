@@ -14,6 +14,32 @@ const event = (date, delta, kind, extras = {}) => ({ batch_id: 1, system_id: 1, 
 const sources = events => ({ batches: [{ batch_id: 1, batch_name: "valid", date_in: "2026-01-15" }], events })
 const stock = () => event("2026-01-15", 1000, "stocking", { received: 1000, abw: 2 })
 
+test("monthly membership includes overlapping cycles and any monthly record, with cumulative losses", () => {
+  const input = sources([stock(), event("2026-01-20", -100, "mortality")])
+  input.batches[0].active_periods = [{ from: "2026-01-15", to: "2026-02-10" }]
+  input.batches.push(
+    { batch_id: 2, batch_name: "closed earlier", date_in: "2026-01-01", active_periods: [{ from: "2026-01-01", to: "2026-01-31" }] },
+    { batch_id: 3, batch_name: "feeding only", date_in: "2026-01-01", active_periods: [], record_dates: ["2026-02-05"] },
+    { batch_id: 4, batch_name: "sampling only", date_in: "2026-01-01", active_periods: [] },
+    { batch_id: 5, batch_name: "empty active", date_in: "2026-01-01", active_periods: [{ from: "2026-01-01", to: null }] },
+    { batch_id: 6, batch_name: "future record", date_in: "2026-01-01", active_periods: [], record_dates: ["2026-03-01"] },
+  )
+  input.events.push(event("2026-02-07", 0, "sampling", { batch_id: 4, abw: 20, sample_n: 50 }))
+  const rows = buildStockLossRows(input, "2026-02-28", "2026-02-01")
+  assert.deepEqual(new Set(rows.map(row => row.batch_id)), new Set([1, 3, 4, 5]))
+  assert.equal(rows.find(row => row.batch_id === 1).stock_loss_chart_pct, 10)
+  assert.equal(rows.find(row => row.batch_id === 5).stock_loss_chart_pct, null)
+  assert.equal(buildStockLossRows(input, "2026-02-28").length, 6) // Cycle view keeps historical batches.
+})
+
+test("a closure on the first day counts, while a later-month closure does not rewrite history", () => {
+  const input = sources([stock()])
+  input.batches[0].active_periods = [{ from: "2026-01-15", to: "2026-03-01" }]
+  assert.equal(buildStockLossRows(input, "2026-02-28", "2026-02-01").length, 1)
+  assert.equal(buildStockLossRows(input, "2026-03-31", "2026-03-01").length, 1)
+  assert.equal(buildStockLossRows(input, "2026-04-30", "2026-04-01").length, 0)
+})
+
 test("workbook correction netting offsets categories without negative unaccounted losses", () => {
   assert.deepEqual(workbookStockLoss(1000, 20, 100, -40), { population: 1000, mortality: 2, adjustment: 6, harvest: 0 })
   assert.deepEqual(workbookStockLoss(1000, 20, -40, 100), { population: 1000, mortality: 2, adjustment: 0, harvest: 6 })

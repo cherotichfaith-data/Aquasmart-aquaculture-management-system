@@ -194,7 +194,7 @@ export async function getAnalyticsReportData(params: {
     periodStart: period.from,
     periodEnd: period.to,
     batches: perf?.batches ?? [],
-    stockLossRows: stockLoss?.error ? [] : buildStockLossRows(stockLoss?.data as unknown as StockLossSources | null, period.to),
+    stockLossRows: stockLoss?.error ? [] : buildStockLossRows(stockLoss?.data as unknown as StockLossSources | null, period.to, period.mode === "month" ? period.month : undefined),
     batchHarvests: perf?.batch_harvests ?? [],
     batchHarvestPoints,
     cageHarvests: perf?.cage_harvests ?? [],

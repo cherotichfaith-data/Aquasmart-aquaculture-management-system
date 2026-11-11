@@ -7,7 +7,11 @@ export type StockLossEvent = {
   abw: number | null; sample_n: number
 }
 export type StockLossSources = {
-  batches: { batch_id: number; batch_name: string; date_in: string }[]
+  batches: {
+    batch_id: number; batch_name: string; date_in: string
+    active_periods?: { from: string; to: string | null }[]
+    record_dates?: string[]
+  }[]
   events: StockLossEvent[]
 }
 type Weight = { date: string; abw: number }
@@ -102,8 +106,9 @@ function expectedDeaths(events: StockLossEvent[], weights: Map<string, Weight[]>
   return total
 }
 
-export function buildStockLossRows(source: StockLossSources | null, cutoff: string): StockLossChartRow[] {
+export function buildStockLossRows(source: StockLossSources | null, cutoff: string, monthStart?: string): StockLossChartRow[] {
   if (!validDate(cutoff)) throw new Error("Choose a valid stock loss cutoff.")
+  if (monthStart && (!validDate(monthStart) || monthStart > cutoff)) throw new Error("Choose a valid stock loss month.")
   const events = (source?.events ?? []).filter(event => event.date <= cutoff).map(event => ({ ...event }))
     .sort((a, b) => a.date.localeCompare(b.date))
   const initialWeights = observations(events)
@@ -129,9 +134,13 @@ export function buildStockLossRows(source: StockLossSources | null, cutoff: stri
   }
   return (source?.batches ?? []).map(batch => ({ ...batch, batch_name: batch.batch_name?.trim() || `Batch #${batch.batch_id}` }))
     .filter(batch => batch.date_in <= cutoff && !/^(BATCH-|INFERRED-)/i.test(batch.batch_name))
+    .filter(batch => !monthStart
+      || batch.active_periods?.some(period => period.from <= cutoff && (period.to == null || period.to >= monthStart))
+      || batch.record_dates?.some(date => date >= monthStart && date <= cutoff)
+      || byBatch.get(batch.batch_id)?.some(event => event.date >= monthStart))
     .sort((a, b) => b.date_in.localeCompare(a.date_in) || a.batch_name.localeCompare(b.batch_name))
     .map(batch => {
-      const history = byBatch.get(batch.batch_id) ?? []
+      const history = (byBatch.get(batch.batch_id) ?? []).filter(event => event.date >= batch.date_in)
       const sum = (read: (event: StockLossEvent) => number) => history.reduce((total, event) => total + read(event), 0)
       const population = sum(event => event.received)
       const losses = history.some(event => event.kind === "ambiguous") ? null : workbookStockLoss(population,
