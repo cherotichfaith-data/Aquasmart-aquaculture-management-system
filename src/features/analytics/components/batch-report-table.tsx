@@ -18,8 +18,6 @@ const BATCH_COLUMNS: Column<BatchReportRow>[] = [
   { label: "Stock loss (%)", cell: (r) => pct(r.stock_loss_pct, 2), numeric: true },
   { label: "Growth (kg)", cell: (r) => num(r.growth_kg, 1), numeric: true },
   { label: "Feed used (kg)", cell: (r) => num(r.feed_kg, 1), numeric: true },
-  { label: "eFCR feed (kg)", cell: (r) => num(r.efcr_feed_kg, 1), numeric: true },
-  { label: "eFCR growth (kg)", cell: (r) => num(r.efcr_growth_kg, 1), numeric: true },
   { label: "eFCR", cell: (r) => num(r.efcr, 2), numeric: true },
   { label: "Acc. eFCR", cell: (r) => num(r.acc_efcr, 2), numeric: true },
 ]
