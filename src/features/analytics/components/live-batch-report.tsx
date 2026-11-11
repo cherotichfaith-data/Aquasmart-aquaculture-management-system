@@ -73,7 +73,8 @@ export default function LiveBatchReport({
     <>
       <p className="rpt-small">
         {period ? `${dayLabel(period.from)} to ${dayLabel(period.to)}` : monthLabel(month)}. Stock, ABW and biomass are as at the end of the
-        period. Mortality, cage corrections, harvest, growth and feed are for the period; accumulated eFCR runs from stocking.
+        period, using the latest recorded weights available at that cutoff. Mortality, cage corrections, harvest, growth and feed
+        cover the selected period; accumulated eFCR runs from stocking. Negative growth is retained; eFCR is blank when growth is zero, negative or unavailable.
       </p>
       <BatchReportTable rows={batchRows(query.data)} />
     </>

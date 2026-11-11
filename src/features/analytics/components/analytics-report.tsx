@@ -430,7 +430,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("batches") ? (
         <Section
           title={`Detailed Batch Report - ${label}`}
-          note="Stock, ABW and biomass are as at the end of the period. Mortality, cage corrections, harvest, growth and feed are for the period; accumulated eFCR runs from stocking."
+          note="Stock and biomass use the latest recorded weights available at the cutoff. Growth and recorded feed cover the selected period; accumulated eFCR runs from stocking. Negative growth is retained; eFCR is blank when growth is zero, negative or unavailable."
         >
           <CopyZoom type="table" name="Detailed batch report">
             <BatchReportTable rows={data.batches} />

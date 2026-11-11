@@ -6,7 +6,7 @@ import { ReportTable, dateText, num, pct, type Column } from "./report-table"
 const BATCH_COLUMNS: Column<BatchReportRow>[] = [
   { label: "Batch ID", cell: (r) => r.batch_name },
   { label: "Date in", cell: (r) => dateText(r.date_in) },
-  { label: "Age (days)", cell: (r) => num(r.age_days), numeric: true },
+  { label: "Days since stocking", cell: (r) => num(r.age_days), numeric: true },
   { label: "Stock end no.", cell: (r) => num(r.stock_end), numeric: true },
   { label: "ABW (g)", cell: (r) => num(r.abw_g, 1), numeric: true },
   { label: "Harvest number", cell: (r) => num(r.harvest_number), numeric: true },
@@ -29,7 +29,7 @@ export default function BatchReportTable({ rows }: { rows: BatchReportRow[] }) {
       columns={BATCH_COLUMNS}
       rows={rows}
       rowKey={(r, i) => `${r.batch_id ?? "total"}-${i}`}
-      emptyText="No active batches for this period."
+      emptyText="No batches for this period."
       hasTotalRow={rows.at(-1)?.batch_name === "Total"}
     />
   )
