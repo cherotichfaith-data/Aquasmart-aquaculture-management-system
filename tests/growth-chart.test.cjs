@@ -44,12 +44,12 @@ test("stock loss threshold is automatic in monthly and cycle views", () => {
     const markup = renderToStaticMarkup(React.createElement(loaded.exports.StockLossChart, { rows, cycleToDate }))
     assert.doesNotMatch(markup, /type="checkbox"/)
     assert.doesNotMatch(markup, /Maximum allowed|10% maximum/)
-    assert.match(markup, /Expected stock loss/)
+    assert.match(markup, /Expected loss/)
     assert.match(markup, />10<\/text>/)
     assert.match(markup, /blank<\/text>/)
-    assert.equal((markup.match(/<rect /g) || []).length, 4)
-    const band = markup.match(/<rect[^>]*y="([\d.]+)"[^>]*fill="#fce4d6"/)
-    assert.ok(band && Number(band[1]) > 14 && Number(band[1]) < 266)
+    assert.equal((markup.match(/<rect /g) || []).length, 3)
+    assert.match(markup, /<path[^>]*fill="#f4b183" fill-opacity="0.35"/)
+    assert.doesNotMatch(markup, /stroke-dasharray/)
   }
 })
 
@@ -67,7 +67,7 @@ test("unaccounted loss series are positive and stacked above zero", () => {
   const markup = renderToStaticMarkup(React.createElement(loaded.exports.StockLossChart, {
     rows: [{ batch_id: 1, batch_name: "loss", stock_loss_chart_pct: 13, stock_loss_mortality_pct: 2, stock_loss_adjustment_pct: 7, stock_loss_harvest_pct: 4 }],
   }))
-  for (const color of ["#a6a6a6", "#7030a0", "#ff0000", "#fce4d6"]) assert.ok(markup.includes(color))
+  for (const color of ["#a6a6a6", "#7030a0", "#ff0000", "#f4b183"]) assert.ok(markup.includes(color))
   assert.match(markup, /transfer \/ adjustments %: 7.00%/)
   assert.match(markup, /harvest %: 4.00%/)
   assert.doesNotMatch(markup, /NaN|Infinity|height="-\d/)

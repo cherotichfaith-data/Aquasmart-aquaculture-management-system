@@ -125,7 +125,7 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
   )
 }
 
-const STOCK_LOSS_COLORS = { mortality: "#a6a6a6", adjustment: "#7030a0", harvest: "#ff0000", limit: "#fce4d6" }
+const STOCK_LOSS_COLORS = { mortality: "#a6a6a6", adjustment: "#7030a0", harvest: "#ff0000", limit: "#f4b183" }
 
 export function stockLossSegments(row: BatchReportRow) {
   const chartTotal = row.stock_loss_chart_pct ?? row.stock_loss_pct
@@ -172,13 +172,13 @@ export function StockLossChart({ rows, cycleToDate = false }: { rows: BatchRepor
       <figure className="rpt-chart">
         <figcaption className="rpt-chart__title">Stock loss per batch (%) · {cycleToDate ? "Cycle to date" : "Cumulative through month-end"}</figcaption>
         <Legend items={[
-          { label: "Expected stock loss (%)", color: STOCK_LOSS_COLORS.limit },
+          { label: "Expected loss (%)", color: STOCK_LOSS_COLORS.limit },
           { label: "Mortalities / discards (%)", color: STOCK_LOSS_COLORS.mortality },
           { label: "Unaccounted at transfer / adjustments (%)", color: STOCK_LOSS_COLORS.adjustment },
           { label: "Harvest shortfalls (%)", color: STOCK_LOSS_COLORS.harvest },
         ]} />
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Stock loss percentage per batch by cause" className="rpt-chart__svg">
-          <rect x={PAD.l} y={y(10)} width={plotW} height={y(0) - y(10)} fill={STOCK_LOSS_COLORS.limit} />
+          <path d={`M${PAD.l},${y(0)} L${PAD.l},${y(10)} L${W - PAD.r},${y(10)} L${W - PAD.r},${y(0)} Z`} fill={STOCK_LOSS_COLORS.limit} fillOpacity="0.35" />
           {ticks.map(t => (
             <g key={t}>
               <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke={t === 0 ? "#8da9db" : "#e6ddd0"} />
