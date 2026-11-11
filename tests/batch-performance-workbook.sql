@@ -51,6 +51,9 @@ BEGIN
  if exists(select 1 from batch_performance_check where batch_name='05.26mixi'
    and (efcr is not null or acc_efcr is not null or efcr_feed_kg is not null)) then
  raise exception 'One-sampling mixed batch acquired eFCR'; end if;
+ if not exists(select 1 from batch_performance_check where batch_name='10.26a'
+   and month=date '2026-10-01' and mode='month' and efcr>0 and efcr_feed_kg>0) then
+ raise exception 'Recorded stocking weight and first sampling did not establish eFCR'; end if;
  if not exists(select 1 from batch_performance_check where batch_name='03.25'
    and month=date '2026-11-01' and acc_efcr>0) then
  raise exception '03.25 valid later measured intervals were dropped'; end if;

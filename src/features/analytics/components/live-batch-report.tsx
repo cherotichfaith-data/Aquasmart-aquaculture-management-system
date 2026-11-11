@@ -75,9 +75,7 @@ export default function LiveBatchReport({
         {period ? `${dayLabel(period.from)} to ${dayLabel(period.to)}` : monthLabel(month)}. Stock, ABW and biomass are as at the end of the
         period, using the latest recorded weights available at that cutoff. Stock loss is cumulative from entry through the cutoff.
         Batches are included if active at any point in the period or with records in it. Mortality, cage corrections, harvest, growth and feed
-        cover the selected period. eFCR uses matching feed and growth between two actual samplings, with feed counted from the
-        opening sampling day up to the day before the closing sampling. It includes intervals ending in the selected period;
-        accumulated eFCR includes all valid intervals through the cutoff. Missing intervals and non-positive measured growth leave eFCR blank.
+        cover the selected period.
       </p>
       <BatchReportTable rows={batchRows(query.data)} />
     </>
