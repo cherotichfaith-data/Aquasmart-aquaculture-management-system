@@ -49,19 +49,20 @@ export function Legend({ items }: { items: { label: string; color: string; dash?
 
 /** Chart 1: biomass gain per batch in the period, recorded against what the growth model expects. */
 export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthByBatchRow[]; cycleToDate?: boolean }) {
-  const data = rows.filter((r) => r.gain_recorded_kg != null || r.gain_expected_kg != null)
+  const data = rows
   if (data.length === 0) return <p className="planner-note">No growth data for this period.</p>
 
   const values = data.flatMap((r) => [r.gain_recorded_kg ?? 0, r.gain_expected_kg ?? 0])
   const lo = Math.min(0, ...values)
-  const top = niceTop(Math.max(...values, 0))
+  const max = Math.max(...values, 0)
+  const top = max > 0 ? niceTop(max) : lo < 0 ? 0 : 1
   const bottom = lo < 0 ? -niceTop(-lo) : 0
   const plotW = W - PAD.l - PAD.r
   const plotH = H - PAD.t - PAD.b
   const group = plotW / data.length
   const bar = Math.min(26, (group * 0.78) / 2)
   const y = (v: number) => PAD.t + plotH - ((v - bottom) / (top - bottom)) * plotH
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => bottom + (top - bottom) * f)
+  const ticks = Array.from(new Set([0, ...[0, 0.25, 0.5, 0.75, 1].map((f) => bottom + (top - bottom) * f)])).sort((a, b) => a - b)
 
   return (
     <figure className="rpt-chart">
@@ -75,7 +76,7 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Recorded and expected biomass gain per batch" className="rpt-chart__svg">
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke="#e6ddd0" />
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke={t === 0 ? "#6f746f" : "#e6ddd0"} />
             <text x={PAD.l - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#6f746f">
               {compact(t)}
             </text>
@@ -83,14 +84,19 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
         ))}
         {data.map((r, i) => {
           const x0 = PAD.l + i * group + (group - bar * 2) / 2
-          const rec = r.gain_recorded_kg ?? 0
-          const exp = r.gain_expected_kg ?? 0
+          const rec = r.gain_recorded_kg
+          const exp = r.gain_expected_kg
           return (
             <g key={r.batch_id}>
               {[
                 { v: rec, c: RECORDED, n: "Recorded" },
                 { v: exp, c: EXPECTED, n: "Expected" },
-              ].map((b, bi) => (
+              ].map((b, bi) => b.v == null ? (
+                <text key={b.n} x={x0 + bi * bar + (bar - 2) / 2} y={y(0) - 5} textAnchor="middle" fontSize="8" fill="#6f746f">
+                  <title>{`${r.batch_name} - ${b.n.toLowerCase()} growth unavailable`}</title>
+                  N/A
+                </text>
+              ) : (
                 <rect
                   key={b.n}
                   x={x0 + bi * bar}
@@ -120,6 +126,9 @@ export function GrowthByBatchChart({ rows, cycleToDate = true }: { rows: GrowthB
           Growth (kg)
         </text>
       </svg>
+      {data.some((r) => r.gain_recorded_kg == null || r.gain_expected_kg == null) && (
+        <p className="planner-note">N/A means growth could not be calculated from the available measurements. It does not mean zero growth.</p>
+      )}
     </figure>
   )
 }
