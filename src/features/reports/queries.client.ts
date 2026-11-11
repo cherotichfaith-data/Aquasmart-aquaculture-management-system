@@ -13,6 +13,8 @@ import { isSbAuthMissing, isSbPermissionDenied } from "@/lib/supabase/log"
 import { toRpcDate } from "@/lib/rpc-params"
 import { getProductionSummary } from "@/features/production/queries.client"
 import type { ProductionSummaryRpcRow } from "@/features/production/types"
+import { loadMeasuredIntervals } from "@/features/analytics/measured-intervals.client"
+import { summarizeMeasuredIntervals } from "@/features/analytics/measured-intervals"
 import type {
   ChangeLogRow,
   FeedingBreakdownRow,
@@ -313,19 +315,13 @@ export async function getFeedingSummary(params?: {
 }): Promise<QueryResult<FeedingSummaryRow>> {
   if (!params?.farmId || !params.dateFrom || !params.dateTo) return empty<FeedingSummaryRow>()
 
-  const [recordsResult, productionRowsResult] = await Promise.all([
+  const [recordsResult, measuredResult] = await Promise.all([
     getFeedingRecords(params),
-    listProductionSummaryRows({
-      farmId: params.farmId,
-      systemId: params.systemId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-      signal: params.signal,
-    }),
+    loadMeasuredIntervals(params),
   ])
 
   if (recordsResult.status === "error") return recordsResult
-  if (productionRowsResult.status === "error") return productionRowsResult
+  if (measuredResult.status === "error") return measuredResult
 
   const totalKgFed = recordsResult.data.reduce((sum, row) => sum + (row.feeding_amount ?? 0), 0)
   const relevantFeedRows = recordsResult.data.filter((row) => (row.feeding_amount ?? 0) > 0)
@@ -344,26 +340,14 @@ export async function getFeedingSummary(params?: {
         return weighted.amount > 0 ? weighted.proteinMass / weighted.amount : null
       })()
 
-  const efcrWeighted = productionRowsResult.data.reduce(
-    (acc, row) => {
-      if (!isFiniteNumber(row.efcr_period)) return acc
-      const weight = row.total_feed_amount_period ?? 0
-      if (weight <= 0) return acc
-      acc.value += row.efcr_period * weight
-      acc.weight += weight
-      return acc
-    },
-    { value: 0, weight: 0 },
-  )
-
-  const biomassGainKg = productionRowsResult.data.reduce((sum, row) => sum + Math.max(0, row.biomass_increase_period ?? 0), 0)
+  const measured = summarizeMeasuredIntervals(measuredResult.data)
 
   return toQuerySuccess<FeedingSummaryRow>([
     {
       total_kg_fed: totalKgFed,
       average_protein_pct: averageProteinPct,
-      average_efcr: efcrWeighted.weight > 0 ? efcrWeighted.value / efcrWeighted.weight : null,
-      biomass_gain_kg: biomassGainKg,
+      average_efcr: measured.efcr,
+      biomass_gain_kg: measured.growthKg,
     },
   ])
 }
@@ -443,9 +427,10 @@ export async function getGrowthTrend(params: {
 
     const startDate = toRpcDate(params.dateFrom)
     const endDate = toRpcDate(params.dateTo)
+    const measuredPromise = loadMeasuredIntervals({ ...params, systemIds })
     const rowsBySystem = await Promise.all(
       systemIds.map(async (systemId): Promise<FeedGrowthTrendRow[]> => {
-        const result = await fetchRpc<ProductionSummaryRpcRow>(
+        const [result, measuredResult] = await Promise.all([fetchRpc<ProductionSummaryRpcRow>(
           "getGrowthTrend",
           "api_production_summary",
           {
@@ -455,7 +440,8 @@ export async function getGrowthTrend(params: {
             p_end_date: endDate ?? undefined,
           },
           params.signal,
-        )
+        ), measuredPromise])
+        if (measuredResult.status === "error") throw new Error(measuredResult.error)
         // fetchRpc already collapses abort/permission/auth-missing errors to
         // an empty success result, so a leftover "error" status is genuine.
         if (result.status === "error") {
@@ -468,7 +454,9 @@ export async function getGrowthTrend(params: {
           adg_g_day: row.agr,
           sgr_pct_day: row.sgr,
           days_interval: row.days_in_period,
-          weight_gain_g: row.biomass_increase_period,
+          weight_gain_g: summarizeMeasuredIntervals(measuredResult.data.filter(interval =>
+            interval.system_id === systemId && interval.cycle_id === row.cycle_id && interval.date === row.date,
+          )).growthKg,
           age_days: null,
           expected_abw_g: row.target_weight_g,
           growth_deviation_pct: null,
@@ -494,8 +482,12 @@ export async function getPerformanceSummary(params?: {
 }): Promise<QueryResult<PerformanceSummaryRow>> {
   if (!params?.farmId || !params.dateFrom || !params.dateTo) return empty<PerformanceSummaryRow>()
 
-  const rowsResult = await listProductionSummaryRows(params)
+  const [rowsResult, measuredResult] = await Promise.all([
+    listProductionSummaryRows(params),
+    loadMeasuredIntervals({ ...params, dateFrom: undefined }),
+  ])
   if (rowsResult.status === "error") return rowsResult
+  if (measuredResult.status === "error") return measuredResult
 
   const byCycle = new Map<string, ProductionSummaryRpcRow>()
   rowsResult.data.forEach((row) => {
@@ -508,6 +500,8 @@ export async function getPerformanceSummary(params?: {
 
   const latestCycleRows = Array.from(byCycle.values())
   if (!latestCycleRows.length) return empty<PerformanceSummaryRow>()
+  const reportedCycles = new Set(latestCycleRows.map(row => row.cycle_id))
+  const measured = summarizeMeasuredIntervals(measuredResult.data.filter(row => reportedCycles.has(row.cycle_id)))
 
   const totals = latestCycleRows.reduce(
     (acc, row) => {
@@ -521,9 +515,6 @@ export async function getPerformanceSummary(params?: {
         acc.survivalWeightedValue += row.survival_rate_pct * survivalWeight
         acc.survivalWeight += survivalWeight
       }
-      if (acc.efcrAggregated == null && isFiniteNumber(row.efcr_aggregated)) {
-        acc.efcrAggregated = row.efcr_aggregated
-      }
       return acc
     },
     {
@@ -532,7 +523,6 @@ export async function getPerformanceSummary(params?: {
       totalMortality: 0,
       totalHarvestKg: 0,
       totalHarvestFish: 0,
-      efcrAggregated: null as number | null,
       survivalWeightedValue: 0,
       survivalWeight: 0,
     },
@@ -540,7 +530,7 @@ export async function getPerformanceSummary(params?: {
 
   return toQuerySuccess<PerformanceSummaryRow>([
     {
-      efcr_aggregated_consolidated: totals.efcrAggregated,
+      efcr_aggregated_consolidated: measured.efcr,
       average_biomass: totals.totalBiomass,
       mortality_rate: totals.totalFish > 0 ? totals.totalMortality / totals.totalFish : null,
       survival_rate_pct:
@@ -562,8 +552,12 @@ export async function getPerformanceRecords(params?: {
 }): Promise<QueryResult<PerformanceRecordRow>> {
   if (!params?.farmId || !params.dateFrom || !params.dateTo) return empty<PerformanceRecordRow>()
 
-  const rowsResult = await listProductionSummaryRows(params)
+  const [rowsResult, measuredResult] = await Promise.all([
+    listProductionSummaryRows(params),
+    loadMeasuredIntervals({ ...params, dateFrom: undefined }),
+  ])
   if (rowsResult.status === "error") return rowsResult
+  if (measuredResult.status === "error") return measuredResult
 
   return toQuerySuccess<PerformanceRecordRow>(
     rowsResult.data.map((row) => ({
@@ -571,7 +565,9 @@ export async function getPerformanceRecords(params?: {
       system_id: row.system_id ?? null,
       system_name: row.system_name ?? null,
       cycle_id: row.cycle_id ?? null,
-      efcr_aggregated: row.efcr_aggregated ?? null,
+      efcr_aggregated: summarizeMeasuredIntervals(measuredResult.data.filter(interval =>
+        interval.cycle_id === row.cycle_id && interval.system_id === row.system_id && interval.date <= row.date,
+      )).efcr,
       survival_rate_pct: row.survival_rate_pct ?? null,
       total_weight_harvested_aggregated: row.total_weight_harvested_aggregated ?? null,
       number_of_fish_harvested: row.number_of_fish_harvested ?? null,

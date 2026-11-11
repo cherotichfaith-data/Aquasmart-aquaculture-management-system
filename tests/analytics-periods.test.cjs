@@ -51,7 +51,7 @@ test("legacy custom links normalize to a month, and invalid/future months cannot
 async function reportCalls(mode, view = "batches") {
   const calls = []
   const query = {
-    select() { return query }, eq() { return query }, lte() { return query }, order() { return query }, limit() { return query },
+    select() { return query }, eq() { return query }, lte(column, date) { calls.push({ cutoffColumn: column, cutoffDate: date }); return query }, order() { return query }, limit() { return query },
     or(filter) { calls.push({ cutoffFilter: filter }); return query },
     async maybeSingle() { calls.push({ cycleLookup: true }); return { data: { cycle_start: "2026-05-18" }, error: null } },
   }
@@ -78,15 +78,16 @@ test("monthly reports send October bounds to the backend and never expand to May
   assert.equal(stockLoss.args.p_farm_id, "farm")
 })
 
-test("cycle-to-date reports include the original May start, including harvest reports", async () => {
-  for (const view of ["batches", "harvests"]) {
+test("cycle-to-date reports use historical cycle starts without requiring cycles to remain open", async () => {
+  for (const view of ["batches", "growth", "harvests"]) {
     const { data, calls } = await reportCalls("cycle", view)
     assert.equal(calls.find(c => c.cycleLookup).cycleLookup, true)
-    assert.equal(calls.find(c => c.cutoffFilter).cutoffFilter, "and(cycle_end.is.null,ongoing_cycle.eq.true),cycle_end.gt.2026-10-26")
+    assert.equal(calls.some(c => c.cutoffFilter), false)
+    assert.deepEqual(calls.find(c => c.cutoffColumn), { cutoffColumn: "cycle_start", cutoffDate: "2026-10-26" })
     const performance = calls.find(c => c.name === "api_analytics_performance")
     assert.equal(performance.args.p_period_start, "2026-05-18")
     assert.equal(performance.args.p_period_end, "2026-10-26")
-    assert.equal(performance.args.p_sections.includes("stock_loss_cycle"), view === "batches")
+    assert.equal(performance.args.p_sections.includes("stock_loss_cycle"), ["batches", "growth"].includes(view))
     assert.equal(data.periodStart, "2026-05-18")
     assert.equal(data.periodMode, "cycle")
   }

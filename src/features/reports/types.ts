@@ -32,7 +32,7 @@ export type FeedingSummaryRow = {
   total_kg_fed: number
   average_protein_pct: number | null
   average_efcr: number | null
-  biomass_gain_kg: number
+  biomass_gain_kg: number | null
 }
 
 export type PerformanceSummaryRow = {

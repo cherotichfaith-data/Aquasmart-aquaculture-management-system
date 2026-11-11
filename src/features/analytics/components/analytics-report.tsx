@@ -86,7 +86,7 @@ const HARVEST_COLUMNS: Column<CageHarvestRow>[] = [
 
 const BATCH_HARVEST_COLUMNS = HARVEST_COLUMNS.filter((column) => column.label !== "Unit" && column.label !== "Cage")
 
-const HARVEST_METHOD_NOTE = "Stocked excludes count corrections. Corrections are signed count adjustments; correction and mortality percentages use original stock. Survival is harvested fish divided by original estimated stock and may exceed 100%; it is not a measured biological survival rate. eFCR uses recorded feed divided by harvested biomass plus productive transfers out minus input biomass; escapes and count-only adjustments are excluded from biomass. Age runs from original stocking to final harvest. Missing weights leave eFCR blank."
+const HARVEST_METHOD_NOTE = "Stocked excludes count corrections. Corrections are signed count adjustments; correction and mortality percentages use original stock. Survival is harvested fish divided by original estimated stock and may exceed 100%; it is not a measured biological survival rate. eFCR uses the same valid recorded-weight intervals and matching feed as batch performance, restricted to this harvest's cycle and cages. Age runs from original stocking to final harvest."
 
 const FEED_COLUMNS: Column<FeedVsExpectedRow>[] = [
   { label: "Cage", cell: (r) => r.cage_name },
