@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Check, Copy, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react"
 import { Button } from "@/components/app-ui/button"
 
@@ -125,7 +125,8 @@ function loadImage(url: string) {
 
 /** Renders a chart (title, legend and the SVG) to a PNG so it pastes cleanly into Word, Slides or chat. */
 async function chartToPng(figure: HTMLElement): Promise<Blob> {
-  const svg = figure.querySelector("svg")
+  // Legends also contain SVGs; export the plot, not a legend swatch.
+  const svg = figure.querySelector<SVGSVGElement>("svg.rpt-chart__svg") ?? figure.querySelector<SVGSVGElement>("svg[viewBox]")
   if (!svg) throw new Error("No chart to copy.")
   const viewBox = svg.viewBox.baseVal
   const width = viewBox.width || svg.clientWidth || 900
@@ -194,19 +195,10 @@ async function chartToPng(figure: HTMLElement): Promise<Blob> {
   }
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
 /**
  * Puts Copy and zoom controls beside a table or a chart.
  *  - table: copies it as a table (pastes into Excel, Sheets, Word) plus tab-separated text.
- *  - chart: copies it as a PNG image (title, legend and plot); downloads the PNG if the browser blocks image copy.
+ *  - chart: copies it as a PNG image (title, legend and plot); offers a PNG download if image copy is blocked.
  */
 export function CopyZoom({
   type,
@@ -220,6 +212,12 @@ export function CopyZoom({
   const contentRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
   const [copyState, setCopyState] = useState<CopyState>("idle")
+  const [copying, setCopying] = useState(false)
+  const [download, setDownload] = useState<{ url: string; filename: string } | null>(null)
+
+  useEffect(() => () => {
+    if (download) URL.revokeObjectURL(download.url)
+  }, [download])
 
   function flash(next: CopyState) {
     setCopyState(next)
@@ -228,7 +226,9 @@ export function CopyZoom({
 
   async function handleCopy() {
     const root = contentRef.current
-    if (!root) return
+    if (!root || copying) return
+    setCopying(true)
+    setDownload(null)
     try {
       if (type === "table") {
         const table = root.querySelector("table")
@@ -258,15 +258,21 @@ export function CopyZoom({
           try {
             await navigator.clipboard.write([new ClipboardItem({ "image/png": pngPromise })])
           } catch {
-            downloadBlob(await pngPromise, filename)
+            setDownload({ url: URL.createObjectURL(await pngPromise), filename })
+            setCopyState("idle")
+            return
           }
         } else {
-          downloadBlob(await pngPromise, filename)
+          setDownload({ url: URL.createObjectURL(await pngPromise), filename })
+          setCopyState("idle")
+          return
         }
       }
       flash("copied")
     } catch {
       flash("failed")
+    } finally {
+      setCopying(false)
     }
   }
 
@@ -280,6 +286,7 @@ export function CopyZoom({
           variant="outline"
           size="icon-sm"
           onClick={() => void handleCopy()}
+          disabled={copying}
           aria-label={`Copy ${name}`}
           title={copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : `Copy ${type}`}
         >
@@ -301,6 +308,11 @@ export function CopyZoom({
           <RotateCcw className="size-4" />
         </Button>
       </div>
+      {download && (
+        <p className="text-sm text-muted-foreground" role="status">
+          Image copying is unavailable or was blocked. <a className="underline" href={download.url} download={download.filename}>Save PNG</a> to attach or insert the chart.
+        </p>
+      )}
       <div className="overflow-auto">
         <div ref={contentRef} style={{ zoom }}>
           {children}
