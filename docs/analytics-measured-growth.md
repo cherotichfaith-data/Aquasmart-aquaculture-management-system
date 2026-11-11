@@ -36,3 +36,18 @@ through the cutoff, with the workbook's discrepancy netting and corrected
 positive denominator.
 
 These are data-driven rules, with no special batch-name overrides.
+
+Harvest reports include every cage/batch with a positive recorded harvest in
+the period and carry earlier partial harvests forward while stock remains or
+the cage/batch was active in the period. A known cycle closure prevents stale
+legacy balances from reviving long-closed harvests. Historical status uses only
+events and closure dates through the selected cutoff.
+
+Harvest totals, mortality, corrections and feed are cumulative through that
+cutoff. Survival follows the workbook: 100% minus mortality% plus signed
+correction%, with original genuine receipts as the denominator. Partial
+harvest recovery is not used as survival. Missing opening counts leave ratios
+blank; inconsistent stock is marked for checking rather than forced to zero.
+Harvest eFCR uses the shared measured intervals through the same cutoff.
+Curves retain actual recorded weights after a partial harvest; without a
+reliable stocking weight, the first recorded weight anchors the curve.

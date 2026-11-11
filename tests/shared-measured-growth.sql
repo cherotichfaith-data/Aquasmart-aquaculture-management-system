@@ -28,7 +28,7 @@ BEGIN
  FROM private.analytics_measured_intervals('ae4f719b-e29e-4f60-bae0-2429cf840c5d',cutoff) i
  WHERE i.cycle_id=(h->>'cycle_id')::bigint AND i.batch_id=(h->>'batch_id')::bigint
  AND (h->>'system_id' IS NULL OR i.system_id=(h->>'system_id')::bigint)
- AND i.date<=(h->>'harvest_date')::date
+ AND i.date<=coalesce(h->>'report_cutoff',h->>'harvest_date')::date
  ) v WHERE ((h->>'efcr') IS NULL)<>(v.expected IS NULL)
  OR abs((h->>'efcr')::numeric-v.expected)>0.000001
  ) THEN RAISE EXCEPTION 'Harvest eFCR diverged from shared measured intervals at %',month; END IF;

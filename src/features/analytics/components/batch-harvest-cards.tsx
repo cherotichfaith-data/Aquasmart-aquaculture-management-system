@@ -25,7 +25,7 @@ function modelAt(curve: GrowthCurveRow[], day: number) {
   return a.abw_g + ((b.abw_g - a.abw_g) * (day - a.day)) / Math.max(b.day - a.day, 1)
 }
 
-/** One batch (blue line, orange harvest diamonds) or every closed batch at once (one colour per batch). */
+/** Recorded weights for one or all harvested batches, including ongoing harvests. */
 function HarvestCurveChart({ title, series, curves, multi }: { title: string; series: Series[]; curves: Record<(typeof SCENARIOS)[number], GrowthCurveRow[]>; multi: boolean }) {
   const all = useMemo(() => series.flatMap((s) => s.points), [series])
   if (all.length === 0) return <p className="planner-note">No weights recorded for this batch.</p>
@@ -117,15 +117,15 @@ function HarvestCurveChart({ title, series, curves, multi }: { title: string; se
 }
 
 function verdictSentence(v: HarvestCurveVerdict) {
-  if (!v.closest || v.gap === null) return `Too few weights to judge (${v.pointCount} after stocking).`
-  const vs = v.finalVsMain === null ? "" : `; final weight ${signedPct(v.finalVsMain)} against Main`
+  if (!v.closest || v.gap === null) return `Too few weights to judge (${v.pointCount} after the opening baseline).`
+  const vs = v.finalVsMain === null ? "" : `; latest weight ${signedPct(v.finalVsMain)} against Main`
   const name = verdictLabel(v)
   return v.outside ? `${name} curve${vs}.` : `Closest to the ${name} curve (${signedPct(v.gap)} on average)${vs}.`
 }
 
 export default function BatchHarvestCards({ rows, points, curves }: { rows: CageHarvestRow[]; points: HarvestPointRow[]; curves: GrowthCurveRow[] }) {
   const byScenario = useMemo(() => curvesByScenario(curves), [curves])
-  // Rows arrive most recent first; one entry per closed batch cycle.
+  // Rows arrive most recent first; one entry per harvested batch cycle.
   const batches = useMemo(() => rows.map((r) => ({ cycleId: String(r.cycle_id), name: r.batch_name, own: points.filter((p) => p.cycle_id === r.cycle_id) })), [rows, points])
   const [selected, setSelected] = useState(batches[0]?.cycleId ?? ALL)
   if (rows.length === 0) return null

@@ -75,7 +75,8 @@ const HARVEST_COLUMNS: Column<CageHarvestRow>[] = [
   { label: "Unit", cell: (r) => r.unit ?? DASH },
   { label: "Cage", cell: (r) => r.cage_name ?? DASH },
   { label: "Batch ID", cell: (r) => r.batch_name },
-  { label: "Harvest completed", cell: (r) => dateText(r.harvest_date) },
+  { label: "Latest harvest", cell: (r) => dateText(r.harvest_date) },
+  { label: "Status", cell: (r) => r.harvest_status === "ongoing" ? "Ongoing" : r.harvest_status === "complete" ? "Complete" : r.harvest_status === "check_stock" ? "Check stock" : DASH },
   { label: "Original stock date", cell: (r) => dateText(r.original_stock_date) },
   { label: "Age (days)", cell: (r) => num(r.age_days), numeric: true },
   { label: "Production number stocked", cell: (r) => num(r.total_stocked), numeric: true },
@@ -93,7 +94,7 @@ const HARVEST_COLUMNS: Column<CageHarvestRow>[] = [
 
 const BATCH_HARVEST_COLUMNS = HARVEST_COLUMNS.filter((column) => column.label !== "Unit" && column.label !== "Cage")
 
-const HARVEST_METHOD_NOTE = "Stocked excludes count corrections. Corrections are signed count adjustments; correction and mortality percentages use original stock. Survival is harvested fish divided by original estimated stock and may exceed 100%; it is not a measured biological survival rate. eFCR uses the same valid recorded-weight intervals and matching feed as batch performance, restricted to this harvest's cycle and cages. Age runs from original stocking to final harvest."
+const HARVEST_METHOD_NOTE = "Figures accumulate from stocking through the reporting cutoff. Stocked includes genuine receipts and excludes count corrections. Mortality and correction percentages use original stock. Survival follows the workbook: 100% minus mortality% plus signed correction%; it includes fish still alive during partial harvesting. eFCR uses the same valid recorded-weight intervals and matching feed as batch performance, restricted to this cycle and cages."
 
 const FEED_COLUMNS: Column<FeedVsExpectedRow>[] = [
   { label: "Cage", cell: (r) => r.cage_name },
@@ -502,7 +503,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("harvests") ? (
         <Section
           title={`Cage Harvest Report - ${label}`}
-          note={`Cages with a harvest in the selected period and a reconciled zero balance at their last harvest. Figures cover only the batch in that cage. Unit is the recorded cage unit. ${HARVEST_METHOD_NOTE}`}
+          note={`Includes harvest activity in the selected period and ongoing harvests started earlier. Figures cover the batch in each cage. ${HARVEST_METHOD_NOTE}`}
           noteAsInfo
         >
           <CopyZoom type="table" name="Cage harvest report">
@@ -510,7 +511,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
               columns={HARVEST_COLUMNS}
               rows={data.cageHarvests}
               rowKey={(r) => `${r.cycle_id}:${r.system_id}`}
-              emptyText="No fully harvested cages are confirmed for this period."
+              emptyText="No recorded harvests or ongoing harvested cages for this period."
             />
           </CopyZoom>
         </Section>
@@ -518,16 +519,16 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("harvests") && data.batchHarvests.length > 0 ? (
         <Section
           title={`Batch Harvest Curves - ${label}`}
-          note="Each batch's recorded weight from stocking to final harvest, drawn against the Slow, Main and Potential growth-model curves on the same model age axis. The batch is matched to the curve with the smallest average gap across its weights (stocking excluded). It needs at least 3 weights after stocking; fewer are not judged. The model curves are references only, so this is a comparison, not a recorded setting."
+          note="Recorded stocking, transfer, sampling and harvest weights through the cutoff, compared with the growth-model curves. Ongoing harvests remain visible. At least three weights after the opening baseline are needed to compare growth patterns."
           noteAsInfo
         >
           <BatchHarvestCards rows={data.batchHarvests} points={data.batchHarvestPoints} curves={data.growthCurve} />
         </Section>
       ) : null}
       {show("harvests") ? (
-        <Section title={`Batch Harvest Report - ${label}`} note={`Completed batches harvested in the selected period. Figures cover all cages from stocking through final harvest. Followed is the growth-model curve closest to the batch's weights; ABW vs Main compares the final harvest weight with the Main curve at the same model age. ${HARVEST_METHOD_NOTE}`} noteAsInfo>
+        <Section title={`Batch Harvest Report - ${label}`} note={`Includes harvest activity in the selected period and ongoing harvests started earlier. Figures cover all cages through the cutoff. ${HARVEST_METHOD_NOTE}`} noteAsInfo>
           <CopyZoom type="table" name="Batch harvest report">
-            <ReportTable columns={batchHarvestColumns} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No fully harvested batches are confirmed for this period." />
+            <ReportTable columns={batchHarvestColumns} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No recorded harvests or ongoing harvested batches for this period." />
           </CopyZoom>
         </Section>
       ) : null}

@@ -15,7 +15,7 @@ export type HarvestCurveVerdict = {
   gap: number | null
   /** True when the batch sits clear of the curve range (below Slow or above Potential). */
   outside: boolean
-  /** Final harvest weight against the Main curve at the same model age, as a fraction. */
+  /** Latest recorded weight against the Main curve at the same model age, as a fraction. */
   finalVsMain: number | null
   finalAbwG: number | null
   finalMainAbwG: number | null
@@ -49,8 +49,8 @@ export function curvesByScenario(rows: GrowthCurveRow[]): Record<Scenario, Growt
 
 export function judgeBatchAgainstCurves(points: HarvestPointRow[], curves: Record<Scenario, GrowthCurveRow[]>): HarvestCurveVerdict {
   const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date))
-  const judged = sorted.filter((p) => p.kind !== "stocking")
-  const finalPoint = [...sorted].reverse().find((p) => p.kind === "harvest") ?? sorted[sorted.length - 1]
+  const judged = sorted.filter((p) => p.kind !== "stocking" && !p.is_baseline)
+  const finalPoint = sorted[sorted.length - 1]
   const finalMain = finalPoint ? modelAbw(curves.main, finalPoint.model_age_days) : null
   const base = {
     finalAbwG: finalPoint?.abw_g ?? null,
@@ -94,61 +94,74 @@ export function signedPct(fraction: number | null, digits = 0): string {
   return `${v > 0 ? "+" : ""}${v.toFixed(digits)}%`
 }
 
-type StockingSource = { batch_id: number | null; date: string; number_of_fish_stocking: number | null; total_weight_stocking: number | null }
-type SamplingSource = { batch_id: number | null; date: string; number_of_fish_sampling: number | null; abw: number | null }
+type StockingSource = { batch_id: number | null; cycle_id?: number | null; date: string; number_of_fish_stocking: number | null; total_weight_stocking: number | null; abw?: number | null }
+type SamplingSource = { batch_id: number | null; cycle_id?: number | null; date: string; number_of_fish_sampling: number | null; abw: number | null }
 type HarvestSource = { batch_id: number | null; cycle_id: number | null; date: string; number_of_fish_harvest: number | null; total_weight_harvest: number | null }
+type TransferSource = { batch_id: number | null; cycle_id: number | null; date: string; target_system_id: number | null; number_of_fish_transfer: number | null; total_weight_transfer: number | null; abw: number | null; transfer_type: string | null }
 
 function dayDiff(from: string, to: string) {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000)
 }
 
-/**
- * Weights on each harvested batch's history, from the stocking, sampling and harvest records. The stocking weight sets where the
- * batch starts on the growth model (the first day the curve reaches it), as on the Growth tab; model age then advances one day
- * per day. `curve` is the selected scenario's curve.
- */
+/** Recorded weights only, with the first reliable observation anchoring model age. */
 export function buildHarvestPoints(
-  batches: CageHarvestRow[],
-  stocking: StockingSource[],
-  sampling: SamplingSource[],
-  harvests: HarvestSource[],
-  curve: GrowthCurveRow[],
+  batches: CageHarvestRow[], stocking: StockingSource[], sampling: SamplingSource[],
+  harvests: HarvestSource[], curve: GrowthCurveRow[], transfers: TransferSource[] = [],
 ): HarvestPointRow[] {
   const out: HarvestPointRow[] = []
   for (const batch of batches) {
-    const stock = stocking.filter((s) => s.batch_id === batch.batch_id)
-    if (stock.length === 0) continue
-    const d0 = stock.reduce((min, s) => (s.date < min ? s.date : min), stock[0].date)
-    const fish = stock.reduce((sum, s) => sum + (s.number_of_fish_stocking ?? 0), 0)
-    const kg = stock.reduce((sum, s) => sum + (s.total_weight_stocking ?? 0), 0)
-    const abw0 = fish > 0 && kg > 0 ? (kg / fish) * 1000 : null
-    const age0 = abw0 === null ? 0 : (curve.find((c) => c.abw_g >= abw0)?.day ?? 0)
-    const push = (kind: HarvestPointRow["kind"], date: string, abw: number | null) => {
-      if (abw === null || !(abw > 0) || date < d0 || date > batch.harvest_date) return
-      const age = dayDiff(d0, date)
-      out.push({ cycle_id: batch.cycle_id, batch_id: batch.batch_id, batch_name: batch.batch_name, kind, date, age_days: age, model_age_days: age0 + age, abw_g: abw })
+    const cutoff = batch.report_cutoff ?? batch.harvest_date
+    const own = (r: { batch_id: number | null; cycle_id?: number | null; date: string }) =>
+      r.batch_id === batch.batch_id && (r.cycle_id == null || r.cycle_id === batch.cycle_id)
+      && r.date >= batch.original_stock_date && r.date <= cutoff
+    type Observation = { kind: HarvestPointRow["kind"]; date: string; abw: number }
+    const observed: Observation[] = []
+    const stock = stocking.filter(own)
+    const firstStock = stock.map(r => r.date).sort()[0]
+    if (firstStock) {
+      const opening = stock.filter(r => r.date === firstStock)
+      const n = opening.reduce((sum, r) => sum + (r.number_of_fish_stocking ?? 0), 0)
+      const kg = opening.map(r => r.total_weight_stocking ?? ((r.number_of_fish_stocking ?? 0) * (r.abw ?? 0) / 1000))
+      if (n > 0 && kg.every(value => value > 0))
+        observed.push({ kind: "stocking", date: firstStock, abw: kg.reduce((a, b) => a + b, 0) * 1000 / n })
     }
-    push("stocking", d0, abw0)
-
+    if (!observed.length) {
+      const receipts = transfers.filter(r => own(r) && r.target_system_id != null && r.transfer_type !== "count_check")
+      const date = receipts.map(r => r.date).sort()[0]
+      const first = receipts.filter(r => r.date === date)
+      const n = first.reduce((sum, r) => sum + (r.number_of_fish_transfer ?? 0), 0)
+      const kg = first.map(r => r.total_weight_transfer ?? ((r.number_of_fish_transfer ?? 0) * (r.abw ?? 0) / 1000))
+      if (n > 0 && kg.every(value => value > 0))
+        observed.push({ kind: "transfer", date, abw: kg.reduce((a, b) => a + b, 0) * 1000 / n })
+    }
     const sampled = new Map<string, { weight: number; n: number; plain: number[] }>()
-    for (const s of sampling.filter((r) => r.batch_id === batch.batch_id && r.abw !== null)) {
+    for (const s of sampling.filter(r => own(r) && r.abw != null && r.abw > 0)) {
       const entry = sampled.get(s.date) ?? { weight: 0, n: 0, plain: [] }
       const n = s.number_of_fish_sampling ?? 0
-      entry.weight += (s.abw as number) * n
-      entry.n += n
-      entry.plain.push(s.abw as number)
+      entry.weight += s.abw! * n; entry.n += n; entry.plain.push(s.abw!)
       sampled.set(s.date, entry)
     }
-    for (const [date, e] of sampled) push("sampling", date, e.n > 0 ? e.weight / e.n : e.plain.reduce((a, b) => a + b, 0) / e.plain.length)
-
-    const harvested = new Map<string, { n: number; kg: number }>()
-    for (const h of harvests.filter((r) => r.cycle_id === batch.cycle_id)) {
-      const entry = harvested.get(h.date) ?? { n: 0, kg: 0 }
+    for (const [date, e] of sampled)
+      observed.push({ kind: "sampling", date, abw: e.n > 0 ? e.weight / e.n : e.plain.reduce((a, b) => a + b, 0) / e.plain.length })
+    const harvested = new Map<string, { n: number; kg: number; missing: boolean }>()
+    for (const h of harvests.filter(own)) {
+      const entry = harvested.get(h.date) ?? { n: 0, kg: 0, missing: false }
       entry.n += h.number_of_fish_harvest ?? 0
       entry.kg += h.total_weight_harvest ?? 0
+      entry.missing ||= !(h.total_weight_harvest != null && h.total_weight_harvest > 0 && (h.number_of_fish_harvest ?? 0) > 0)
       harvested.set(h.date, entry)
     }
-    for (const [date, e] of harvested) push("harvest", date, e.n > 0 && e.kg > 0 ? (e.kg / e.n) * 1000 : null)
+    for (const [date, e] of harvested)
+      if (!e.missing && e.n > 0 && e.kg > 0) observed.push({ kind: "harvest", date, abw: e.kg / e.n * 1000 })
+    observed.sort((a, b) => a.date.localeCompare(b.date))
+    const baseline = observed[0]
+    if (!baseline) continue
+    const modelAge = curve.find(c => c.abw_g >= baseline.abw)?.day ?? 0
+    for (const point of observed) {
+      out.push({ cycle_id: batch.cycle_id, batch_id: batch.batch_id, batch_name: batch.batch_name,
+        kind: point.kind, date: point.date, abw_g: point.abw, age_days: dayDiff(batch.original_stock_date, point.date),
+        model_age_days: modelAge + dayDiff(baseline.date, point.date), is_baseline: point === baseline })
+    }
   }
   return out.sort((a, b) => a.cycle_id - b.cycle_id || a.date.localeCompare(b.date))
 }

@@ -42,6 +42,10 @@ export type CageHarvestRow = {
   system_id: number | null
   unit: string | null
   harvest_date: string
+  first_harvest_date?: string
+  report_cutoff?: string
+  stock_remaining?: number | null
+  harvest_status?: "ongoing" | "complete" | "check_stock"
   cage_name: string | null
   batch_name: string
   original_stock_date: string
@@ -131,7 +135,8 @@ export type HarvestPointRow = {
   cycle_id: number
   batch_id: number
   batch_name: string
-  kind: "stocking" | "sampling" | "harvest"
+  kind: "stocking" | "transfer" | "sampling" | "harvest"
+  is_baseline?: boolean
   date: string
   age_days: number
   model_age_days: number

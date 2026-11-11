@@ -143,12 +143,13 @@ export async function getAnalyticsReportData(params: {
   const harvestedBatches = perf?.batch_harvests ?? []
   if (harvestedBatches.length > 0) {
     const batchIds = harvestedBatches.map((r) => r.batch_id)
-    const [stocking, sampling, harvests] = await Promise.all([
-      supabase.from("fish_stocking").select("batch_id, date, number_of_fish_stocking, total_weight_stocking").in("batch_id", batchIds),
-      supabase.from("fish_sampling_weight").select("batch_id, date, number_of_fish_sampling, abw").in("batch_id", batchIds),
-      supabase.from("fish_harvest").select("batch_id, cycle_id, date, number_of_fish_harvest, total_weight_harvest").in("batch_id", batchIds),
+    const [stocking, sampling, harvests, transfers] = await Promise.all([
+      supabase.from("fish_stocking").select("batch_id, cycle_id, date, number_of_fish_stocking, total_weight_stocking, abw").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_sampling_weight").select("batch_id, cycle_id, date, number_of_fish_sampling, abw").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_harvest").select("batch_id, cycle_id, date, number_of_fish_harvest, total_weight_harvest").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_transfer").select("batch_id, cycle_id, date, target_system_id, number_of_fish_transfer, total_weight_transfer, abw, transfer_type").in("batch_id", batchIds).lte("date", period.to),
     ])
-    const readError = stocking.error ?? sampling.error ?? harvests.error
+    const readError = stocking.error ?? sampling.error ?? harvests.error ?? transfers.error
     if (readError) logSbError("analytics:batchHarvestPoints", readError)
     else {
       batchHarvestPoints = buildHarvestPoints(
@@ -157,6 +158,7 @@ export async function getAnalyticsReportData(params: {
         sampling.data ?? [],
         harvests.data ?? [],
         (perf?.growth_curve ?? []).filter((c) => c.scenario === params.forwardPlanInputs.scenario),
+        transfers.data ?? [],
       )
     }
   }
