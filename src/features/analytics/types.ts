@@ -95,6 +95,7 @@ export type StockProfileRow = {
   recorded_fish: number
   recorded_cages: number
   cage_names: string[]
+  batch_names?: string[]
 }
 
 export type FarmForecastRow = {

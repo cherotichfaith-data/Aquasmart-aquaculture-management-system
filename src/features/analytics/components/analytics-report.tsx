@@ -383,6 +383,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
                     <th>Ideal fish</th>
                     <th>Recorded fish</th>
                     <th>Cages</th>
+                    <th>Batches</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -392,6 +393,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
                       <td className="n">{r.ideal_fish > 0 ? num(r.ideal_fish) : DASH}</td>
                       <td className="n">{r.recorded_fish > 0 ? num(r.recorded_fish) : DASH}</td>
                       <td>{r.cage_names?.length ? r.cage_names.join(", ") : DASH}</td>
+                      <td>{r.batch_names?.length ? r.batch_names.join(", ") : DASH}</td>
                     </tr>
                   ))}
                 </tbody>
