@@ -15,6 +15,17 @@ as r(batch_id bigint,batch_name text,stock_end numeric,abw_g numeric,biomass_kg 
  efcr_feed_kg numeric,efcr_growth_kg numeric,acc_efcr_feed_kg numeric,acc_efcr_growth_kg numeric);
 DO $test$
 BEGIN
+ if exists(select 1 from batch_performance_check where growth_kg is distinct from efcr_growth_kg) then
+ raise exception 'Growth was inferred outside valid recorded-weight intervals'; end if;
+ if exists(select 1 from batch_performance_check
+   where batch_name in ('05.26mixi','10.26b') and growth_kg is not null) then
+ raise exception 'A single baseline was incorrectly treated as measured growth'; end if;
+ if exists(select 1 from batch_performance_check c cross join lateral (
+   select sum(r.growth_kg) as growth from batch_performance_check r
+   where r.month=c.month and r.mode=c.mode and r.batch_id is not null
+ ) totals where c.batch_id is null and (
+   (c.growth_kg is null) <> (totals.growth is null) or abs(c.growth_kg-totals.growth)>0.00001)) then
+ raise exception 'Total growth differs from the available measured rows'; end if;
  if exists(select 1 from batch_performance_check where batch_name ~* '^(BATCH-|INFERRED-)') then
  raise exception 'Legacy batches leaked into table'; end if;
  if exists(select 1 from batch_performance_check where efcr is not null and
