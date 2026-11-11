@@ -439,9 +439,9 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       ) : null}
 
       {show("batches") ? (
-        <Section title={`Stock Loss Analysis - ${label}`} note="Stock loss (%) per batch, as in the Detailed Batch Report.">
+        <Section title={`Stock Loss Analysis - ${label}`} note={cycleToDate ? "Losses since each batch's entry, divided by total fish received. Includes cycles active at the selected cutoff. Count adjustments remain signed; batch mixing is excluded from losses." : "Monthly mortalities, transfer/count adjustments and final-harvest shortfalls, divided by opening fish plus fish received during the month. Negative adjustments represent extra fish found. The optional shaded band marks the fixed 10% maximum."}>
           <CopyZoom type="chart" name="Stock loss chart">
-            <StockLossChart rows={data.batches} />
+            <StockLossChart rows={data.batches} cycleToDate={cycleToDate} />
           </CopyZoom>
         </Section>
       ) : null}

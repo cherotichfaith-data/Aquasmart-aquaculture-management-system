@@ -85,7 +85,7 @@ export async function getAnalyticsReportData(params: {
       .from("production_cycle")
       .select("cycle_start, fingerling_batch!inner(farm_id)")
       .eq("fingerling_batch.farm_id", params.farmId)
-      .eq("ongoing_cycle", true)
+      .or(`and(cycle_end.is.null,ongoing_cycle.eq.true),cycle_end.gt.${period.to}`)
       .lte("cycle_start", period.to)
       .order("cycle_start", { ascending: true })
       .limit(1)
@@ -115,7 +115,8 @@ export async function getAnalyticsReportData(params: {
     needs.performance.length > 0
       ? supabase.rpc("api_analytics_performance", {
           ...periodArgs,
-          p_sections: period.mode === "month" ? [...needs.performance, "growth_custom"] : needs.performance,
+          p_sections: period.mode === "month" ? [...needs.performance, "growth_custom"]
+            : params.view === "batches" ? [...needs.performance, "stock_loss_cycle"] : needs.performance,
           p_scenario: params.forwardPlanInputs.scenario,
         })
       : Promise.resolve(null),

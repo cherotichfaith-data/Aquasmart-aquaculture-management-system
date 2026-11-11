@@ -15,6 +15,9 @@ export type BatchReportRow = {
   cage_corrections: number | null
   mortality: number | null
   stock_loss_pct: number | null
+  stock_loss_mortality_pct?: number | null
+  stock_loss_adjustment_pct?: number | null
+  stock_loss_harvest_pct?: number | null
   growth_kg: number | null
   feed_kg: number | null
   efcr: number | null

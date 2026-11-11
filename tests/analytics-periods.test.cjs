@@ -52,9 +52,11 @@ async function reportCalls(mode, view = "batches") {
   const calls = []
   const query = {
     select() { return query }, eq() { return query }, lte() { return query }, order() { return query }, limit() { return query },
+    or(filter) { calls.push({ cutoffFilter: filter }); return query },
     async maybeSingle() { calls.push({ cycleLookup: true }); return { data: { cycle_start: "2026-05-18" }, error: null } },
   }
   const { getAnalyticsReportData } = load("src/features/analytics/queries.server.ts", {
+    "./automatic-feed-plan.server": { loadAutomaticFeedPlan: async () => { throw new Error("Unexpected planning query") } },
     "@/lib/supabase/server": { createAccessTokenClient: () => ({ from: () => query, rpc: async (name, args) => { calls.push({ name, args }); return { data: {}, error: null } } }) },
     "@/lib/supabase/log": { logSbError: () => {} },
   })
@@ -76,9 +78,12 @@ test("monthly reports send October bounds to the backend and never expand to May
 test("cycle-to-date reports include the original May start, including harvest reports", async () => {
   for (const view of ["batches", "harvests"]) {
     const { data, calls } = await reportCalls("cycle", view)
-    assert.equal(calls[0].cycleLookup, true)
-    assert.equal(calls[1].args.p_period_start, "2026-05-18")
-    assert.equal(calls[1].args.p_period_end, "2026-10-26")
+    assert.equal(calls.find(c => c.cycleLookup).cycleLookup, true)
+    assert.equal(calls.find(c => c.cutoffFilter).cutoffFilter, "and(cycle_end.is.null,ongoing_cycle.eq.true),cycle_end.gt.2026-10-26")
+    const performance = calls.find(c => c.name === "api_analytics_performance")
+    assert.equal(performance.args.p_period_start, "2026-05-18")
+    assert.equal(performance.args.p_period_end, "2026-10-26")
+    assert.equal(performance.args.p_sections.includes("stock_loss_cycle"), view === "batches")
     assert.equal(data.periodStart, "2026-05-18")
     assert.equal(data.periodMode, "cycle")
   }
@@ -97,8 +102,12 @@ test("report controls offer only Monthly and Cycle to date with the selected cal
     "@/features/analytics/types": { GROWTH_SCENARIOS: ["main"] },
     "@/components/shared/filter-popover": { FilterPopover: ({ options, value, placeholder }) => React.createElement("select", { value, readOnly: true, "aria-label": placeholder }, options.map(o => React.createElement("option", { key: o.value, value: o.value }, o.label))) },
     "./batch-report-table": { default: noop },
+    "./batch-harvest-cards": { default: noop },
+    "./planning-auto-refresh": { default: noop },
+    "@/features/analytics/harvest-curve": { curvesByScenario: () => ({}), judgeBatchAgainstCurves: noop, signedPct: noop, verdictLabel: noop },
+    "@/components/shared/copy-zoom": { CopyZoom: ({ children }) => children },
     "./stock-profile-chart": { default: noop, classLabel: () => "" },
-    "./growth-charts": { AbwAgeChart: noop, GrowthByBatchChart: noop, SelectedBatchAbwChart: noop },
+    "./growth-charts": { AbwAgeChart: noop, GrowthByBatchChart: noop, SelectedBatchAbwChart: noop, StockLossChart: noop },
     "./report-table": { DASH: "-", ReportTable: noop, dateText: value => value, num: value => value, pct: value => value },
     "@/features/reports/monthly/monthly-reports.css": {},
   }).default
