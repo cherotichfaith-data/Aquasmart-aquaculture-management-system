@@ -45,9 +45,9 @@ test("water quality allows PM, different depth, different parameter and blank me
   }
 })
 
-function correctionRoute({ status = "rejected", owner = "operator", role = "system_operator", user = "operator", sourceError = null } = {}) {
+function correctionRoute({ status = "rejected", owner = "operator", role = "system_operator", user = "operator", sourceError = null, entryType = "feeding", originalPayload = { system_id: 7 } } = {}) {
   const submissions = []
-  const source = { id: 42, farm_id: "farm-original", entry_type: "feeding", status, submitted_by: owner, payload: { system_id: 7 } }
+  const source = { id: 42, farm_id: "farm-original", entry_type: entryType, status, submitted_by: owner, payload: originalPayload }
   const supabase = { from(table) {
     const query = { select() { return query }, eq() { return query }, async single() { return table === "production_pending_entry" ? { data: source, error: sourceError } : { data: { role }, error: null } } }
     return query
@@ -58,17 +58,40 @@ function correctionRoute({ status = "rejected", owner = "operator", role = "syst
     "@/lib/server/rate-limit": { apiRateLimits: { mutation: {} } },
     "@/lib/server/approvals": { submitApproval: async (_client, type, farmId, payload) => { submissions.push({ type, farmId, payload }); return [{ id: 43, status: "pending" }] } },
   })
-  return { route, submissions }
+  return { route, submissions, source }
 }
-function request() { return new Request("http://localhost/api/approvals/42", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload: { farm_id: "wrong-farm", system_id: 99, date: "2026-09-10", feeding_amount: 1 } }) }) }
+function request(payload = { farm_id: "wrong-farm", system_id: 99, date: "2026-09-10", feeding_amount: 1 }) { return new Request("http://localhost/api/approvals/42", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload }) }) }
 const context = { params: Promise.resolve({ entryId: "42" }) }
-test("rejected corrections retain farm/cage identity and a stable source id", async () => {
+test("rejected corrections allow cage edits while retaining the farm and stable source id", async () => {
   const { route, submissions } = correctionRoute()
   assert.equal((await route.POST(request(), context)).status, 202)
   assert.equal(submissions[0].farmId, "farm-original")
-  assert.equal(submissions[0].payload.system_id, 7)
+  assert.equal(submissions[0].payload.system_id, 99)
+  assert.equal(submissions[0].payload.farm_id, "farm-original")
+  assert.equal(submissions[0].payload.feeding_amount, 1)
   assert.equal(submissions[0].payload.local_id, "correction:42")
 })
+test("omitted cages fall back to the rejected record, which remains unchanged", async () => {
+  const { route, submissions, source } = correctionRoute()
+  const before = structuredClone(source)
+  assert.equal((await route.POST(request({ date: "2026-09-10", feeding_amount: 2, local_id: "spoofed" }), context)).status, 202)
+  assert.equal(submissions[0].payload.system_id, 7)
+  assert.equal(submissions[0].payload.local_id, "correction:42")
+  assert.deepEqual(source, before)
+})
+
+test("transfer corrections allow source-cage edits and otherwise retain the original source cage", async () => {
+  for (const [payload, expected] of [[{ origin_system_id: 99 }, 99], [{}, 7]]) {
+    const { route, submissions, source } = correctionRoute({ entryType: "transfer", originalPayload: { origin_system_id: 7 } })
+    assert.equal((await route.POST(request(payload), context)).status, 202)
+    assert.equal(submissions[0].type, "transfer")
+    assert.equal(submissions[0].payload.origin_system_id, expected)
+    assert.equal(submissions[0].farmId, "farm-original")
+    assert.equal(submissions[0].payload.local_id, "correction:42")
+    assert.deepEqual(source.payload, { origin_system_id: 7 })
+  }
+})
+
 test("operators cannot correct another operator's submission", async () => {
   const { route, submissions } = correctionRoute({ owner: "someone-else" })
   assert.equal((await route.POST(request(), context)).status, 403)
