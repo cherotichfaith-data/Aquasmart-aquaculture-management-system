@@ -65,6 +65,8 @@ async function reportCalls(mode, view = "batches") {
     { cycle_id: 3, batch_id: 30, harvest_date: "2026-10-06", harvest_status: "complete" },
     { cycle_id: 2, batch_id: 20, harvest_date: "2026-10-23", harvest_status: "ongoing" },
     { cycle_id: 2, batch_id: 20, harvest_date: "2026-11-03", harvest_status: "complete" },
+    { cycle_id: 1, batch_id: 10, harvest_date: "2025-12-24", harvest_status: "check_stock" },
+    { cycle_id: 3, batch_id: 30, harvest_date: "2026-10-10", harvest_status: "check_stock" },
   ]
   const { getAnalyticsReportData } = load("src/features/analytics/queries.server.ts", {
     "./harvest-curve": { buildHarvestPoints: () => [] },
@@ -118,6 +120,17 @@ test("cycle-to-date harvests retain completed historical cycles and earlier part
   assert.equal(data.periodStart, "2025-01-01")
   assert.deepEqual(data.batchHarvests.map(r => r.harvest_date), ["2025-12-31", "2026-09-22", "2026-10-06", "2026-10-23"])
   assert.deepEqual(data.cageHarvests.map(r => r.harvest_date), data.batchHarvests.map(r => r.harvest_date))
+})
+
+test("both harvest tables exclude Check stock rows in monthly and cycle-to-date views", async () => {
+  for (const mode of ["month", "cycle"]) {
+    const { data } = await reportCalls(mode, "harvests")
+    for (const rows of [data.batchHarvests, data.cageHarvests]) {
+      assert.ok(rows.length > 0)
+      assert.ok(rows.every(row => ["ongoing", "complete"].includes(row.harvest_status)))
+      assert.ok(!rows.some(row => row.harvest_date === "2026-10-10" || row.harvest_date === "2025-12-24"))
+    }
+  }
 })
 
 const { monthCycles, monthSystemIds, cohortBatchRows } = load("src/features/analytics/cycle-cohort.ts")
