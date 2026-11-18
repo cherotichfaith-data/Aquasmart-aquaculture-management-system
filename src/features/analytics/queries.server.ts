@@ -87,7 +87,7 @@ export async function getAnalyticsReportData(params: {
   if (period.mode === "cycle") {
     const cycles = await supabase
       .from("production_cycle")
-      .select("cycle_id, batch_id, cycle_start, cycle_end, system_id, production_cycle_system(system_id, started_at, ended_at), fingerling_batch!inner(farm_id)")
+      .select("cycle_id, batch_id, cycle_start, cycle_end, system_id, fingerling_batch!inner(farm_id)")
       .eq("fingerling_batch.farm_id", params.farmId)
       .lte("cycle_start", period.to)
       .order("cycle_start", { ascending: true })
@@ -131,7 +131,7 @@ export async function getAnalyticsReportData(params: {
           ...planArgs,
         })
       : Promise.resolve(null),
-    params.view === "batches"
+    ["batches", "cages"].includes(params.view)
       ? supabase.rpc("api_stock_loss_sources", { p_farm_id: params.farmId, p_as_of: period.to })
       : Promise.resolve(null),
   ])
@@ -144,7 +144,7 @@ export async function getAnalyticsReportData(params: {
   const cycleIds = cohort == null ? null : new Set(cohort.map(c => c.cycle_id))
   const sources = stockLoss?.data as unknown as StockLossSources | null
   if (perf && batchIds && cycleIds) {
-    const systems = monthSystemIds(cohort ?? [], period.month, period.to)
+    const systems = monthSystemIds(cohort ?? [], period.month, period.to, sources)
     perf.batches = cohortBatchRows(perf.batches ?? [], batchIds, sources)
     perf.batch_harvests = (perf.batch_harvests ?? []).filter(r => cycleIds.has(r.cycle_id))
     perf.cage_harvests = (perf.cage_harvests ?? []).filter(r => cycleIds.has(r.cycle_id))
