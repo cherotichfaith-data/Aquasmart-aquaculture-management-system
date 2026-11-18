@@ -360,7 +360,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
         </div>
       </div>
 
-      <p className="rpt-small">{cycleToDate ? "Cycle to date" : "Monthly activity"}: {dayLabel(data.periodStart)} to {dayLabel(data.periodEnd)}. Stock and weight use the latest available records through this date.</p>
+      <p className="rpt-small">{cycleToDate ? "Cycle to date" : "Monthly activity"}: {dayLabel(data.periodStart)} to {dayLabel(data.periodEnd)}. {cycleToDate ? `Includes batches and cage placements active or completed in ${monthLabel(data.month)}, with cumulative figures from stocking. ` : ""}Stock and weight use the latest available records through this date.</p>
 
       {data.error ? <p className="rpt-note">{data.error}</p> : null}
 
