@@ -3,6 +3,7 @@ import { addMonths } from "./automatic-feed-plan"
 import { buildHarvestPoints } from "./harvest-curve"
 import { buildStockLossRows, type StockLossSources } from "./stock-loss"
 import { monthCycles, monthSystemIds, cohortBatchRows, type ReportCycle } from "./cycle-cohort"
+import { harvestRowsForPeriod } from "./harvest-period"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { logSbError } from "@/lib/supabase/log"
 import {
@@ -95,7 +96,7 @@ export async function getAnalyticsReportData(params: {
       logSbError("analytics:cyclePeriod", cycles.error)
       return { ...empty, error: "The cycle reporting period could not be loaded. Try again shortly." }
     }
-    cohort = monthCycles(cycles.data ?? [], period.month, period.to)
+    cohort = params.view === "harvests" ? cycles.data ?? [] : monthCycles(cycles.data ?? [], period.month, period.to)
     period = { ...period, from: cohort.map(c => c.cycle_start).sort()[0] ?? period.month }
   }
   // Forecast and forward plan are monthly and anchored to the month holding the period end;
@@ -104,8 +105,7 @@ export async function getAnalyticsReportData(params: {
   const periodArgs = {
     p_farm_id: params.farmId,
     p_month: period.to,
-    // Harvest amounts are cumulative; the month selects eligible placements.
-    p_period_start: period.mode === "cycle" && params.view === "harvests" ? period.month : period.from,
+    p_period_start: period.from,
     p_period_end: period.to,
   }
   const planArgs = {
@@ -151,6 +151,10 @@ export async function getAnalyticsReportData(params: {
     perf.growth_by_batch = (perf.growth_by_batch ?? []).filter(r => batchIds.has(r.batch_id))
     perf.abw_points = (perf.abw_points ?? []).filter(r => batchIds.has(r.batch_id))
     perf.feed_vs_expected = (perf.feed_vs_expected ?? []).filter(r => systems.has(r.system_id))
+  }
+  if (perf && params.view === "harvests") {
+    perf.batch_harvests = harvestRowsForPeriod(perf.batch_harvests ?? [], period)
+    perf.cage_harvests = harvestRowsForPeriod(perf.cage_harvests ?? [], period)
   }
 
   let batchHarvestPoints: HarvestPointRow[] = []

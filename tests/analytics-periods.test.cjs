@@ -51,7 +51,7 @@ test("legacy custom links normalize to a month, and invalid/future months cannot
 async function reportCalls(mode, view = "batches") {
   const calls = []
   const query = {
-    select() { return query }, eq() { return query }, lte(column, date) { calls.push({ cutoffColumn: column, cutoffDate: date }); return query }, order() { return query }, limit() { return query },
+    select() { return query }, eq() { return query }, in() { return query }, lte(column, date) { calls.push({ cutoffColumn: column, cutoffDate: date }); return query }, order() { return query }, limit() { return query },
     or(filter) { calls.push({ cutoffFilter: filter }); return query },
     then(resolve) { calls.push({ cycleLookup: true }); return Promise.resolve({ data: [
       { cycle_id: 1, batch_id: 10, cycle_start: "2025-01-01", cycle_end: "2025-12-31" },
@@ -59,9 +59,17 @@ async function reportCalls(mode, view = "batches") {
       { cycle_id: 3, batch_id: 30, cycle_start: "2026-06-01", cycle_end: "2026-10-06" },
     ], error: null }).then(resolve) },
   }
+  const harvestRows = [
+    { cycle_id: 1, batch_id: 10, harvest_date: "2025-12-31", harvest_status: "complete" },
+    { cycle_id: 2, batch_id: 20, harvest_date: "2026-09-22", harvest_status: "ongoing" },
+    { cycle_id: 3, batch_id: 30, harvest_date: "2026-10-06", harvest_status: "complete" },
+    { cycle_id: 2, batch_id: 20, harvest_date: "2026-10-23", harvest_status: "ongoing" },
+    { cycle_id: 2, batch_id: 20, harvest_date: "2026-11-03", harvest_status: "complete" },
+  ]
   const { getAnalyticsReportData } = load("src/features/analytics/queries.server.ts", {
+    "./harvest-curve": { buildHarvestPoints: () => [] },
     "./automatic-feed-plan.server": { loadAutomaticFeedPlan: async () => { throw new Error("Unexpected planning query") } },
-    "@/lib/supabase/server": { createAccessTokenClient: () => ({ from: () => query, rpc: async (name, args) => { calls.push({ name, args }); return { data: {}, error: null } } }) },
+    "@/lib/supabase/server": { createAccessTokenClient: () => ({ from: () => query, rpc: async (name, args) => { calls.push({ name, args }); return { data: view === "harvests" && name === "api_analytics_performance" ? { batch_harvests: harvestRows, cage_harvests: harvestRows } : {}, error: null } } }) },
     "@/lib/supabase/log": { logSbError: () => {} },
   })
   const data = await getAnalyticsReportData({ farmId: "farm", accessToken: "test", view,
@@ -83,18 +91,33 @@ test("monthly reports send October bounds to the backend and never expand to May
 })
 
 test("cycle-to-date retains lifetime calculations only for cycles overlapping the selected month", async () => {
-  for (const view of ["batches", "growth", "harvests"]) {
+  for (const view of ["batches", "growth"]) {
     const { data, calls } = await reportCalls("cycle", view)
     assert.equal(calls.find(c => c.cycleLookup).cycleLookup, true)
     assert.equal(calls.some(c => c.cutoffFilter), false)
     assert.deepEqual(calls.find(c => c.cutoffColumn), { cutoffColumn: "cycle_start", cutoffDate: "2026-10-26" })
     const performance = calls.find(c => c.name === "api_analytics_performance")
-    assert.equal(performance.args.p_period_start, view === "harvests" ? "2026-10-01" : "2026-05-18")
+    assert.equal(performance.args.p_period_start, "2026-05-18")
     assert.equal(performance.args.p_period_end, "2026-10-26")
     assert.equal(performance.args.p_sections.includes("stock_loss_cycle"), ["batches", "growth"].includes(view))
     assert.equal(data.periodStart, "2026-05-18")
     assert.equal(data.periodMode, "cycle")
   }
+})
+
+test("monthly harvests include current-month partial and final activity, excluding older ongoing harvests", async () => {
+  const { data, calls } = await reportCalls("month", "harvests")
+  assert.equal(calls.find(c => c.name === "api_analytics_performance").args.p_period_start, "2026-10-01")
+  assert.deepEqual(data.batchHarvests.map(r => r.harvest_date), ["2026-10-06", "2026-10-23"])
+  assert.deepEqual(data.cageHarvests.map(r => r.harvest_status), ["complete", "ongoing"])
+})
+
+test("cycle-to-date harvests retain completed historical cycles and earlier partial harvest activity", async () => {
+  const { data, calls } = await reportCalls("cycle", "harvests")
+  assert.equal(calls.find(c => c.name === "api_analytics_performance").args.p_period_start, "2025-01-01")
+  assert.equal(data.periodStart, "2025-01-01")
+  assert.deepEqual(data.batchHarvests.map(r => r.harvest_date), ["2025-12-31", "2026-09-22", "2026-10-06", "2026-10-23"])
+  assert.deepEqual(data.cageHarvests.map(r => r.harvest_date), data.batchHarvests.map(r => r.harvest_date))
 })
 
 const { monthCycles, monthSystemIds, cohortBatchRows } = load("src/features/analytics/cycle-cohort.ts")
