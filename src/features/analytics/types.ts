@@ -37,6 +37,8 @@ export type StockLossChartRow = Pick<BatchReportRow,
   "stock_loss_mortality_pct" | "stock_loss_adjustment_pct" | "stock_loss_harvest_pct" | "stock_loss_expected_pct">
 
 export type CageHarvestRow = {
+  /** Explicitly confirmed cage scope for batches with unconfirmed legacy history. */
+  report_system_id?: number
   cycle_id: number
   batch_id: number
   system_id: number | null

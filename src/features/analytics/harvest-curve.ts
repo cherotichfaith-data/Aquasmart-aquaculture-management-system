@@ -94,9 +94,9 @@ export function signedPct(fraction: number | null, digits = 0): string {
   return `${v > 0 ? "+" : ""}${v.toFixed(digits)}%`
 }
 
-type StockingSource = { batch_id: number | null; cycle_id?: number | null; date: string; number_of_fish_stocking: number | null; total_weight_stocking: number | null; abw?: number | null }
-type SamplingSource = { batch_id: number | null; cycle_id?: number | null; date: string; number_of_fish_sampling: number | null; abw: number | null }
-type HarvestSource = { batch_id: number | null; cycle_id: number | null; date: string; number_of_fish_harvest: number | null; total_weight_harvest: number | null }
+type StockingSource = { system_id?: number | null; batch_id: number | null; cycle_id?: number | null; date: string; number_of_fish_stocking: number | null; total_weight_stocking: number | null; abw?: number | null }
+type SamplingSource = { system_id?: number | null; batch_id: number | null; cycle_id?: number | null; date: string; number_of_fish_sampling: number | null; abw: number | null }
+type HarvestSource = { system_id?: number | null; batch_id: number | null; cycle_id: number | null; date: string; number_of_fish_harvest: number | null; total_weight_harvest: number | null }
 type TransferSource = { batch_id: number | null; cycle_id: number | null; date: string; target_system_id: number | null; number_of_fish_transfer: number | null; total_weight_transfer: number | null; abw: number | null; transfer_type: string | null }
 
 function dayDiff(from: string, to: string) {
@@ -111,8 +111,9 @@ export function buildHarvestPoints(
   const out: HarvestPointRow[] = []
   for (const batch of batches) {
     const cutoff = batch.report_cutoff ?? batch.harvest_date
-    const own = (r: { batch_id: number | null; cycle_id?: number | null; date: string }) =>
+    const own = (r: { batch_id: number | null; cycle_id?: number | null; system_id?: number | null; target_system_id?: number | null; date: string }) =>
       r.batch_id === batch.batch_id && (r.cycle_id == null || r.cycle_id === batch.cycle_id)
+      && (batch.report_system_id == null || (r.target_system_id ?? r.system_id) === batch.report_system_id)
       && r.date >= batch.original_stock_date && r.date <= cutoff
     type Observation = { kind: HarvestPointRow["kind"]; date: string; abw: number }
     const observed: Observation[] = []
