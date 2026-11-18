@@ -249,11 +249,11 @@ function parseReportKey(raw: string | null): ReportKey {
   return REPORT_OPTIONS.find((o) => o.value === raw)?.value ?? "outlook"
 }
 
-export default function AnalyticsReport({ data }: { data: AnalyticsReportData }) {
+export default function AnalyticsReport({ data, harvestsOnly = false }: { data: AnalyticsReportData; harvestsOnly?: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const report = parseReportKey(searchParams.get("report"))
+  const report = harvestsOnly ? "harvests" : parseReportKey(searchParams.get("report"))
   const cycleToDate = data.periodMode === "cycle"
   const show = (key: ReportKey) => report === key
 
@@ -317,18 +317,18 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
   return (
     <div className="tb-monthly">
       <div className="rpt-titlebar">
-        <Link className="underline text-sm" href={`/analytics/inputs${searchParams.get("farmId") ? `?farmId=${encodeURIComponent(searchParams.get("farmId")!)}` : ""}`}>Feed planning</Link>
+        {!harvestsOnly ? <Link className="underline text-sm" href={`/analytics/inputs${searchParams.get("farmId") ? `?farmId=${encodeURIComponent(searchParams.get("farmId")!)}` : ""}`}>Feed planning</Link> : <h1 className="text-2xl font-semibold">Harvests</h1>}
         <div className="rpt-actions">
-          <div className="w-full sm:w-[320px]">
+          {!harvestsOnly ? <div className="w-full sm:w-[320px]">
             <FilterPopover
               value={report}
-              options={REPORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              options={REPORT_OPTIONS.filter(o => o.value !== "harvests").map((o) => ({ value: o.value, label: o.label }))}
               placeholder="Select report"
               onChange={onReportChange}
               searchable={false}
               className="w-full"
             />
-          </div>
+          </div> : null}
           <div className="w-full sm:w-[240px]">
             <FilterPopover
               value={cycleToDate ? "cycle" : "month"}
