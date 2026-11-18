@@ -4,6 +4,7 @@ import { buildHarvestPoints } from "./harvest-curve"
 import { buildStockLossRows, type StockLossSources } from "./stock-loss"
 import { monthCycles, monthSystemIds, cohortBatchRows, type ReportCycle } from "./cycle-cohort"
 import { harvestRowsForPeriod } from "./harvest-period"
+import { confirmedHarvestScopes } from "./harvest-scope"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { logSbError } from "@/lib/supabase/log"
 import {
@@ -153,8 +154,9 @@ export async function getAnalyticsReportData(params: {
     perf.feed_vs_expected = (perf.feed_vs_expected ?? []).filter(r => systems.has(r.system_id))
   }
   if (perf && params.view === "harvests") {
-    perf.batch_harvests = harvestRowsForPeriod(perf.batch_harvests ?? [], period)
-    perf.cage_harvests = harvestRowsForPeriod(perf.cage_harvests ?? [], period)
+    const confirmed = confirmedHarvestScopes(perf.cage_harvests ?? [], perf.batch_harvests ?? [], params.farmId)
+    perf.batch_harvests = harvestRowsForPeriod(confirmed.batchHarvests, period)
+    perf.cage_harvests = harvestRowsForPeriod(confirmed.cageHarvests, period)
   }
 
   let batchHarvestPoints: HarvestPointRow[] = []
@@ -162,9 +164,9 @@ export async function getAnalyticsReportData(params: {
   if (harvestedBatches.length > 0) {
     const batchIds = harvestedBatches.map((r) => r.batch_id)
     const [stocking, sampling, harvests, transfers] = await Promise.all([
-      supabase.from("fish_stocking").select("batch_id, cycle_id, date, number_of_fish_stocking, total_weight_stocking, abw").in("batch_id", batchIds).lte("date", period.to),
-      supabase.from("fish_sampling_weight").select("batch_id, cycle_id, date, number_of_fish_sampling, abw").in("batch_id", batchIds).lte("date", period.to),
-      supabase.from("fish_harvest").select("batch_id, cycle_id, date, number_of_fish_harvest, total_weight_harvest").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_stocking").select("batch_id, cycle_id, system_id, date, number_of_fish_stocking, total_weight_stocking, abw").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_sampling_weight").select("batch_id, cycle_id, system_id, date, number_of_fish_sampling, abw").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_harvest").select("batch_id, cycle_id, system_id, date, number_of_fish_harvest, total_weight_harvest").in("batch_id", batchIds).lte("date", period.to),
       supabase.from("fish_transfer").select("batch_id, cycle_id, date, target_system_id, number_of_fish_transfer, total_weight_transfer, abw, transfer_type").in("batch_id", batchIds).lte("date", period.to),
     ])
     const readError = stocking.error ?? sampling.error ?? harvests.error ?? transfers.error

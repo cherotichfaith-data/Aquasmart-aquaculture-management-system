@@ -134,6 +134,20 @@ test("both harvest tables exclude Check stock rows in monthly and cycle-to-date 
 })
 
 const { monthCycles, monthSystemIds, cohortBatchRows } = load("src/features/analytics/cycle-cohort.ts")
+test("03.25 cage and batch harvest reporting uses only confirmed 2E figures", () => {
+  const { confirmedHarvestScopes } = load("src/features/analytics/harvest-scope.ts")
+  const legacy = { cycle_id:9,batch_id:11,batch_name:"03.25",system_id:12,cage_name:"Cage 4.1",harvest_status:"complete",harvest_number:62,harvest_kg:41.14 }
+  const current = { ...legacy,system_id:51,cage_name:"2E",harvest_status:"ongoing",harvest_number:1858,harvest_kg:608.61 }
+  const other = { ...legacy,cycle_id:15,batch_name:"03.26c",cage_name:"1D" }
+  const farmId = "ae4f719b-e29e-4f60-bae0-2429cf840c5d"
+  const result = confirmedHarvestScopes([legacy,current,other],[{ ...legacy,harvest_number:1920 },other],farmId)
+  assert.deepEqual(result.cageHarvests,[current,other])
+  assert.equal(result.batchHarvests[0].harvest_number,1858)
+  assert.equal(result.batchHarvests[0].harvest_kg,608.61)
+  assert.equal(result.batchHarvests[0].report_system_id,51)
+  assert.deepEqual(confirmedHarvestScopes([legacy],[legacy],farmId).batchHarvests,[])
+  assert.deepEqual(confirmedHarvestScopes([legacy],[legacy],"other-farm").batchHarvests,[legacy])
+})
 test("month cohort keeps completions on the first day, open and later-closed cycles, but excludes historical and future cycles", () => {
   const cycle = (cycle_id, cycle_start, cycle_end) => ({ cycle_id, batch_id: cycle_id, cycle_start, cycle_end })
   const rows = [cycle(1,"2025-01-01","2025-12-31"), cycle(2,"2026-01-01","2026-10-01"),

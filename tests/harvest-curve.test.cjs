@@ -48,3 +48,13 @@ test('future stocking cannot replace the historical sampling baseline', () => {
   assert.equal(points[0].date,'2026-01-10')
   assert.equal(points[0].is_baseline,true)
 })
+
+test('confirmed cage scope excludes other cages from batch weights and transfer baselines', () => {
+  const scoped = { ...row, report_system_id: 51 }
+  const samples = [{ ...sample('2026-01-10',20),system_id:51 },{ ...sample('2026-01-10',900),system_id:12 }]
+  const harvests = [{ ...harvest('2026-02-01',1),system_id:51 },{ ...harvest('2026-02-01',9),system_id:12 }]
+  const transfers = [{ batch_id:1,cycle_id:1,date:'2026-01-01',target_system_id:12,number_of_fish_transfer:100,total_weight_transfer:9 },
+    { batch_id:1,cycle_id:1,date:'2026-01-02',target_system_id:51,number_of_fish_transfer:100,total_weight_transfer:1 }]
+  const points = buildHarvestPoints([scoped],[],samples,harvests,curve,transfers)
+  assert.deepEqual(points.map(p=>p.abw_g),[10,20,100])
+})
