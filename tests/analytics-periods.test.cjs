@@ -53,7 +53,11 @@ async function reportCalls(mode, view = "batches") {
   const query = {
     select() { return query }, eq() { return query }, lte(column, date) { calls.push({ cutoffColumn: column, cutoffDate: date }); return query }, order() { return query }, limit() { return query },
     or(filter) { calls.push({ cutoffFilter: filter }); return query },
-    async maybeSingle() { calls.push({ cycleLookup: true }); return { data: { cycle_start: "2026-05-18" }, error: null } },
+    then(resolve) { calls.push({ cycleLookup: true }); return Promise.resolve({ data: [
+      { cycle_id: 1, batch_id: 10, cycle_start: "2025-01-01", cycle_end: "2025-12-31" },
+      { cycle_id: 2, batch_id: 20, cycle_start: "2026-05-18", cycle_end: null },
+      { cycle_id: 3, batch_id: 30, cycle_start: "2026-06-01", cycle_end: "2026-10-06" },
+    ], error: null }).then(resolve) },
   }
   const { getAnalyticsReportData } = load("src/features/analytics/queries.server.ts", {
     "./automatic-feed-plan.server": { loadAutomaticFeedPlan: async () => { throw new Error("Unexpected planning query") } },
@@ -78,19 +82,56 @@ test("monthly reports send October bounds to the backend and never expand to May
   assert.equal(stockLoss.args.p_farm_id, "farm")
 })
 
-test("cycle-to-date reports use historical cycle starts without requiring cycles to remain open", async () => {
+test("cycle-to-date retains lifetime calculations only for cycles overlapping the selected month", async () => {
   for (const view of ["batches", "growth", "harvests"]) {
     const { data, calls } = await reportCalls("cycle", view)
     assert.equal(calls.find(c => c.cycleLookup).cycleLookup, true)
     assert.equal(calls.some(c => c.cutoffFilter), false)
     assert.deepEqual(calls.find(c => c.cutoffColumn), { cutoffColumn: "cycle_start", cutoffDate: "2026-10-26" })
     const performance = calls.find(c => c.name === "api_analytics_performance")
-    assert.equal(performance.args.p_period_start, "2026-05-18")
+    assert.equal(performance.args.p_period_start, view === "harvests" ? "2026-10-01" : "2026-05-18")
     assert.equal(performance.args.p_period_end, "2026-10-26")
     assert.equal(performance.args.p_sections.includes("stock_loss_cycle"), ["batches", "growth"].includes(view))
     assert.equal(data.periodStart, "2026-05-18")
     assert.equal(data.periodMode, "cycle")
   }
+})
+
+const { monthCycles, monthSystemIds, cohortBatchRows } = load("src/features/analytics/cycle-cohort.ts")
+test("month cohort keeps completions on the first day, open and later-closed cycles, but excludes historical and future cycles", () => {
+  const cycle = (cycle_id, cycle_start, cycle_end) => ({ cycle_id, batch_id: cycle_id, cycle_start, cycle_end })
+  const rows = [cycle(1,"2025-01-01","2025-12-31"), cycle(2,"2026-01-01","2026-10-01"),
+    cycle(3,"2026-10-26",null), cycle(4,"2026-10-27",null), cycle(5,"2026-01-01","2026-11-03")]
+  assert.deepEqual(monthCycles(rows,"2026-10-01","2026-10-26").map(c=>c.cycle_id),[2,3,5])
+})
+test("cage cohort excludes an old placement of an active batch and keeps a cage completed in the month", () => {
+  const cycles = [{ cycle_id: 9, batch_id: 11, cycle_start: "2025-03-13", cycle_end: null, system_id: 51,
+    production_cycle_system: [
+      { system_id: 12, started_at: "2025-03-13", ended_at: "2025-12-31" },
+      { system_id: 14, started_at: "2026-01-01", ended_at: "2026-11-01" },
+      { system_id: 51, started_at: "2026-08-19", ended_at: null },
+      { system_id: 99, started_at: "2026-11-30", ended_at: null },
+    ] }]
+  assert.deepEqual([...monthSystemIds(cycles,"2026-11-01","2026-11-18")],[14,51])
+})
+test("cohort totals exclude hidden rows and retain weighted ABW, ratio-of-totals eFCR and cumulative losses", () => {
+  const row = (batch_id, fish, kg, feed, gain) => ({ batch_id, batch_name: String(batch_id),
+    total_stocked: fish, stock_end: fish, biomass_kg: kg, harvest_number: fish, harvest_kg: kg,
+    feed_kg: feed, efcr_feed_kg: feed, efcr_growth_kg: gain, acc_efcr_feed_kg: feed, acc_efcr_growth_kg: gain })
+  const sources = { batches: [], events: [
+    { batch_id: 2, received: 100, delta: 100, kind: "stocking" },
+    { batch_id: 2, received: 0, delta: -10, kind: "mortality" },
+    { batch_id: 3, received: 300, delta: 300, kind: "stocking" },
+  ] }
+  const selected = cohortBatchRows([row(1,9000,9000,9000,1),row(2,100,10,20,10),row(3,300,90,60,20),
+    { batch_id: null, batch_name: "Total", biomass_kg: 99999 }],new Set([2,3]),sources)
+  assert.deepEqual(selected.map(r=>r.batch_id),[2,3,null])
+  const total = selected.at(-1)
+  assert.equal(total.abw_g,250)
+  assert.equal(total.harvest_abw_g,250)
+  assert.equal(total.efcr,80/30)
+  assert.equal(total.stock_loss_pct,2.5)
+  assert.deepEqual(cohortBatchRows(selected,new Set(),sources),[])
 })
 
 test("report controls offer only Monthly and Cycle to date with the selected calendar month", async () => {
