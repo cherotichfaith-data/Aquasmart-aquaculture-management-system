@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/app-ui/select"
+import ProductionNavigation from "@/features/production/components/production-navigation"
 import ProductionChart from "@/features/production/components/production-chart"
 import ProductionMetricFilter from "@/features/production/components/metrics-filter"
 import ProductionCompareFilter from "@/features/production/components/compare-filter"
@@ -359,6 +360,7 @@ export default function ProductionPageClient({
       headerDataOverrides={{ role: initialFarmRole ?? null }}
     >
       <div className="page-shell">
+        <ProductionNavigation active="overview" />
         {allSystems.length === 0 ? (
           <EmptyState
             title="No systems available"
