@@ -105,14 +105,11 @@ test("month cohort keeps completions on the first day, open and later-closed cyc
   assert.deepEqual(monthCycles(rows,"2026-10-01","2026-10-26").map(c=>c.cycle_id),[2,3,5])
 })
 test("cage cohort excludes an old placement of an active batch and keeps a cage completed in the month", () => {
-  const cycles = [{ cycle_id: 9, batch_id: 11, cycle_start: "2025-03-13", cycle_end: null, system_id: 51,
-    production_cycle_system: [
-      { system_id: 12, started_at: "2025-03-13", ended_at: "2025-12-31" },
-      { system_id: 14, started_at: "2026-01-01", ended_at: "2026-11-01" },
-      { system_id: 51, started_at: "2026-08-19", ended_at: null },
-      { system_id: 99, started_at: "2026-11-30", ended_at: null },
-    ] }]
-  assert.deepEqual([...monthSystemIds(cycles,"2026-11-01","2026-11-18")],[14,51])
+  const cycles = [{ cycle_id: 9, batch_id: 11, cycle_start: "2025-03-13", cycle_end: null, system_id: 51 }]
+  const event = (system_id,date,delta) => ({ batch_id: 11,system_id,date,delta })
+  const sources = { batches: [], events: [event(12,"2025-03-13",100),event(12,"2025-12-31",-100),
+    event(14,"2026-01-01",200),event(14,"2026-11-01",-200),event(51,"2026-08-19",300),event(99,"2026-11-30",100)] }
+  assert.deepEqual([...monthSystemIds(cycles,"2026-11-01","2026-11-18",sources)],[14,51])
 })
 test("cohort totals exclude hidden rows and retain weighted ABW, ratio-of-totals eFCR and cumulative losses", () => {
   const row = (batch_id, fish, kg, feed, gain) => ({ batch_id, batch_name: String(batch_id),

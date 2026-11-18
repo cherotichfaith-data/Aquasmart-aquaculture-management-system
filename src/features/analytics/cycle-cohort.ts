@@ -1,19 +1,26 @@
 import type { BatchReportRow } from "./types"
 import type { StockLossSources } from "./stock-loss"
 
-export type ReportCycle = { cycle_id: number; batch_id: number; cycle_start: string; cycle_end: string | null
-  system_id?: number | null
-  production_cycle_system?: { system_id: number; started_at: string; ended_at: string | null }[] }
+export type ReportCycle = { cycle_id: number; batch_id: number; cycle_start: string; cycle_end: string | null; system_id?: number | null }
 
 /** Select by the calendar month, independently of the lifetime calculation window. */
 export function monthCycles(cycles: ReportCycle[], month: string, cutoff: string) {
   return cycles.filter(c => c.cycle_start <= cutoff && (c.cycle_end == null || c.cycle_end >= month))
 }
 
-export function monthSystemIds(cycles: ReportCycle[], month: string, cutoff: string) {
-  return new Set(cycles.flatMap(c => c.production_cycle_system?.length
-    ? c.production_cycle_system.filter(p => p.started_at.slice(0, 10) <= cutoff && (p.ended_at == null || p.ended_at.slice(0, 10) >= month)).map(p => p.system_id)
-    : c.system_id == null ? [] : [c.system_id]))
+/** Use the authorized stock ledger: placement-table reads are restricted for report users. */
+export function monthSystemIds(cycles: ReportCycle[], month: string, cutoff: string, sources: StockLossSources | null) {
+  const batches = new Set(cycles.map(c => c.batch_id))
+  const positions = new Map<string, { system: number; opening: number; activity: boolean }>()
+  for (const event of sources?.events ?? []) {
+    if (!batches.has(event.batch_id) || event.system_id == null || event.date > cutoff) continue
+    const key = `${event.batch_id}:${event.system_id}`
+    const position = positions.get(key) ?? { system: event.system_id, opening: 0, activity: false }
+    if (event.date < month) position.opening += event.delta
+    else if (event.delta !== 0) position.activity = true
+    positions.set(key, position)
+  }
+  return new Set([...positions.values()].filter(p => p.opening > 0 || p.activity).map(p => p.system))
 }
 
 /** Rebuild the SQL total after selecting a cohort; never retain a total of hidden batches. */
