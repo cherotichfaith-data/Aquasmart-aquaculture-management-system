@@ -107,6 +107,7 @@ async function loadWorkspaceAssets(userId: string, accessToken?: string | null) 
     name: row.name,
     location: row.location ?? null,
     organizationId: row.organization_id ?? null,
+    role: memberships.find((membership) => membership.farm_id === row.id)?.role,
   }))
 
   const farmOrganizationIds = farms

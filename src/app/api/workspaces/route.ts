@@ -6,6 +6,8 @@ import { isSbPermissionDenied, logSbError } from "@/lib/supabase/log"
 const createWorkspaceSchema = z.object({
   organizationName: z.string().trim().min(2).max(120),
   farmName: z.string().trim().min(2).max(120),
+  environment: z.enum(["lake", "land", "both"]).optional(),
+  mainSpecies: z.string().trim().min(1).max(120).optional(),
   location: z.string().trim().min(2).max(255),
   organizationId: z.string().uuid().nullable().optional(),
 })
@@ -24,6 +26,8 @@ export async function POST(request: Request) {
   try {
     const result = await createFarmWorkspaceAction({
       name: payload.farmName,
+      environment: payload.environment,
+      mainSpecies: payload.mainSpecies,
       location: payload.location,
       organizationId: payload.organizationId ?? null,
       organizationName: payload.organizationName,

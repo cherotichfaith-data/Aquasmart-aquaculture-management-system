@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import {
-  ONBOARDING_CREATE_WORKSPACE_PATH,
   sanitizeNextPath,
   WORKSPACE_SELECT_PATH,
 } from "@/lib/app-entry"
@@ -33,9 +32,6 @@ export default async function SelectWorkspacePage({
   const { user, accessToken } = await requireUserContext(`${WORKSPACE_SELECT_PATH}?next=${encodeURIComponent(nextPath)}`)
   const initialOrganizations = await loadWorkspaceOrganizationsForUser(user.id, accessToken)
 
-  if (initialOrganizations.length === 0) {
-    redirect(`${ONBOARDING_CREATE_WORKSPACE_PATH}?next=${encodeURIComponent(nextPath)}`)
-  }
 
   const supabase = createAccessTokenClient(accessToken)
   const { data: profile } = await supabase

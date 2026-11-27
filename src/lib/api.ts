@@ -79,7 +79,7 @@ export async function getOrganizations() {
   return body.organizations
 }
 
-export async function getFarmsByOrganization(orgId: string) {
+export async function getFarmsByOrganization(orgId: string, summary = false) {
   const response = await fetch("/api/farms", {
     method: "POST",
     headers: {
@@ -87,7 +87,7 @@ export async function getFarmsByOrganization(orgId: string) {
     },
     credentials: "include",
     cache: "no-store",
-    body: JSON.stringify({ orgId }),
+    body: JSON.stringify({ orgId, summary }),
   })
 
   return parseResponse<FarmSummary[]>(response)
@@ -96,6 +96,8 @@ export async function getFarmsByOrganization(orgId: string) {
 export async function createWorkspace(params: {
   organizationName: string
   farmName: string
+  environment?: "lake" | "land" | "both"
+  mainSpecies?: string
   location: string
   organizationId?: string | null
 }): Promise<{ organizationId: string; farmId: string }> {

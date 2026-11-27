@@ -524,6 +524,8 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          farming_environment: string | null
+          main_species: string | null
           location: string | null
           name: string
           organization_id: string | null
@@ -532,6 +534,8 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          farming_environment?: string | null
+          main_species?: string | null
           location?: string | null
           name: string
           organization_id?: string | null
@@ -540,6 +544,8 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          farming_environment?: string | null
+          main_species?: string | null
           location?: string | null
           name?: string
           organization_id?: string | null

@@ -1,0 +1,69 @@
+.ws { min-height:100svh; background:#f7f8fa; color:#16313d; font:16px/1.5 var(--font-plex),Arial,sans-serif }
+.ws header,.ws-panel,.ws table,.ws dialog,.ws-mobile-list { background:white }
+.ws header { border-bottom:1px solid #d8dee6 }
+.ws-bar,.ws main { width:min(1120px,calc(100% - 64px)); margin:auto }
+.ws-bar { min-height:72px; display:flex; align-items:center; gap:20px }
+.ws-bar>a { margin-right:auto }
+.ws-bar img { width:195px; height:auto }
+.ws main { padding-block:44px }
+.ws main.ws-empty { max-width:620px }
+.ws :is(h1,h2,strong) { font-family:var(--font-manrope),Arial,sans-serif; font-weight:700; line-height:1.2 }
+.ws h1 { font-size:clamp(26px,3vw,36px); letter-spacing:-.035em }
+.ws h2 { font-size:22px }
+.ws p,.ws footer,.ws small { color:#526675 }
+.ws p { margin:6px 0 0 }
+.ws small { font-size:14px }
+.ws :is(button,summary,select) { cursor:pointer }
+.ws :focus-visible { outline:3px solid #367bac; outline-offset:3px }
+.ws button:disabled { opacity:.65; cursor:wait }
+.ws button,.ws a { color:#0f4c81 }
+.ws :is(input:not([type=radio]),select) { border:1px solid #82909b; border-radius:4px; background:white; color:#16313d; min-height:44px; padding:8px 12px; max-width:100% }
+.ws .ws-primary,.ws-add,.ws-mobile-add,.ws-actions>a,.ws-actions>button { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:10px 18px; min-height:44px; border:1px solid #0f4c81; border-radius:4px; font-weight:600 }
+.ws .ws-primary { background:#0f4c81; color:white }
+.ws-account { position:relative }
+.ws-account summary { list-style:none; display:flex; align-items:center; gap:8px }
+.ws-account b { padding:8px; border-radius:50%; background:#e5eff6; color:#0f4c81 }
+.ws-account button { position:absolute; top:100%; right:0; min-width:100px; background:white; padding:12px; box-shadow:0 2px 10px #16313d26; z-index:2 }
+.ws .ws-mobile-picker,.ws-mobile-list,.ws .ws-mobile-add { display:none }
+.ws-feature,.ws-panel { border:1px solid #d8dee6; border-radius:8px; padding:24px; margin:28px 0 }
+.ws-feature { display:flex; align-items:center; gap:24px; background:#edf3f8 }
+.ws-feature img { width:140px; height:100px; object-fit:cover; border-radius:4px }
+.ws-feature small { display:block; margin-bottom:6px; text-transform:uppercase; font-size:12px; letter-spacing:.09em; font-weight:700; color:#0f4c81 }
+.ws-feature button { margin-left:auto }
+.ws-tools,.ws-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap }
+.ws-tools { margin:32px 0 16px }
+.ws-tools h2 { margin-right:auto }
+.ws-tools h2 span { font-weight:400 }
+.ws table { width:100%; border-collapse:collapse; font-size:14px }
+.ws th,.ws td { text-align:left; padding:15px 12px; border-bottom:1px solid #d8dee6 }
+.ws thead { background:#edf2f7 }
+.ws td button,.ws footer a,.ws-empty>p button { text-decoration:underline }
+.ws footer { margin-top:22px; font-size:14px }
+.ws ol { list-style:decimal; margin:16px 0 24px; padding-left:22px }
+.ws li+li { margin-top:8px }
+.ws dialog { margin:auto; width:min(500px,calc(100% - 32px)); max-height:92svh; overflow:auto; padding:28px; border-radius:8px; color:#16313d; box-shadow:0 12px 40px #152e3b30 }
+.ws dialog::backdrop { background:#122b3c70 }
+.ws-close { float:right; padding:6px }
+.ws dialog form,.ws dialog form>label { display:grid; gap:6px }
+.ws dialog form { margin-top:20px; gap:16px }
+.ws dialog form>label,.ws legend { font-weight:600 }
+.ws dialog small { font-weight:400 }
+.ws fieldset label { display:flex; gap:10px; align-items:center; padding:5px 0 }
+.ws input[type=radio] { accent-color:#0f4c81 }
+@media(max-width:760px) {
+ .ws-bar,.ws main { width:calc(100% - 40px) }
+ .ws-bar { min-height:64px }
+ .ws-bar img { width:155px }
+ .ws main { padding-block:28px }
+ .ws-desktop-picker,.ws-account summary span,.ws-feature img,.ws table,.ws-tools .ws-add,.ws-tools input { display:none }
+ .ws .ws-mobile-picker { display:flex; align-items:center; gap:8px; margin-top:16px }
+ .ws-feature { display:block; margin:22px 0; padding:20px }
+ .ws-feature button,.ws .ws-mobile-add { width:100%; margin-top:16px }
+ .ws-tools { margin:24px 0 12px }
+ .ws-mobile-list { display:block; border:1px solid #d8dee6; border-radius:6px }
+ .ws-mobile-list button { width:100%; text-align:left; display:flex; align-items:center; justify-content:space-between; padding:14px }
+ .ws-mobile-list button+button { border-top:1px solid #d8dee6 }
+ .ws-mobile-list small { display:block }
+ .ws .ws-mobile-add { display:flex }
+ .ws dialog { padding:22px }
+}
