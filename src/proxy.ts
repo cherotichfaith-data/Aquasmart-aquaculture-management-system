@@ -145,7 +145,7 @@ function buildLegacyTimePeriodRedirect(request: NextRequest) {
   const legacyPeriod = request.nextUrl.searchParams.get("period")
   if (!legacyPeriod) return null
   // Analytics owns cycle/custom report scope; it is not the legacy dashboard date key.
-  if (stripDashboardPath(request.nextUrl.pathname) === "/analytics" && (legacyPeriod === "cycle" || legacyPeriod === "custom")) return null
+  if (["/analytics", "/production/harvests"].includes(stripDashboardPath(request.nextUrl.pathname)) && (legacyPeriod === "cycle" || legacyPeriod === "custom")) return null
 
   const redirectUrl = request.nextUrl.clone()
   const normalizedCustomRange = parseCustomPeriodUrlValue(legacyPeriod)
@@ -346,6 +346,7 @@ export async function proxy(request: NextRequest) {
     }
 
     if (hasActiveWorkspaceContext) {
+      if (isWorkspaceSelectionRoute(pathname) && request.nextUrl.searchParams.get("switch") === "1") return response
       if (isOnboardingRoute(pathname) || isWorkspaceSelectionRoute(pathname)) {
         const redirectPath = await resolveEntryPathForActiveFarm({ supabase, userId, farmId: activeFarmId })
         return withSupabaseCookies(

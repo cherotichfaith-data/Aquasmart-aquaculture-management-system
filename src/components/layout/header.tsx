@@ -2,17 +2,15 @@
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
-import {
-  Bell,
-  Droplets,
-  Fish,
-  FlaskConical,
-  Menu as MenuIcon,
-  PackageOpen,
-  PlusCircle,
-  Sparkles,
-  X,
-} from "lucide-react"
+import { Menu as MenuIcon, X } from "lucide-react"
+import { GrainsIcon } from "@phosphor-icons/react/dist/icons/Grains"
+import { FishSimpleIcon } from "@phosphor-icons/react/dist/icons/FishSimple"
+import { DropIcon } from "@phosphor-icons/react/dist/icons/Drop"
+import { FlaskIcon } from "@phosphor-icons/react/dist/icons/Flask"
+import { PackageIcon } from "@phosphor-icons/react/dist/icons/Package"
+import { BellIcon } from "@phosphor-icons/react/dist/icons/Bell"
+import { ChatCircleIcon } from "@phosphor-icons/react/dist/icons/ChatCircle"
+import { NotePencilIcon } from "@phosphor-icons/react/dist/icons/NotePencil"
 import { useNotifications } from "@/components/notifications/notifications-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 import { getHeaderPageMeta, getHeaderPageTimeConfig } from "@/components/layout/header-config"
@@ -49,10 +47,10 @@ import {
 // Leading icon per alert kind (water quality / mortality / empty cage), so the
 // notification list is scannable by type at a glance instead of reading titles.
 function notificationIcon(kind: string) {
-  if (kind === "water_quality") return Droplets
-  if (kind === "mortality") return Fish
-  if (kind === "cage_empty") return PackageOpen
-  return Bell
+  if (kind === "water_quality") return DropIcon
+  if (kind === "mortality") return FishSimpleIcon
+  if (kind === "cage_empty") return PackageIcon
+  return BellIcon
 }
 
 // Icon-circle tint by severity, using the accessible destructive/warning tokens.
@@ -115,7 +113,7 @@ function NotificationRow({
   return (
     <div className="flex items-start gap-3 border-t border-border/60 px-4 py-3 first:border-t-0">
       <span className={cn("mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg", tint)}>
-        <Icon size={17} aria-hidden />
+        <Icon weight="fill" size={17} aria-hidden />
       </span>
       <button
         type="button"
@@ -225,6 +223,7 @@ export default function Header({
 
   const pageMeta = getHeaderPageMeta(appPathname, searchParams.get("tab"))
   const pageTimeConfig = useMemo(() => getHeaderPageTimeConfig(appPathname), [appPathname])
+  const hasScopeFilters = pageTimeConfig.showSystemFilter !== false || pageTimeConfig.showBatchFilter || pageTimeConfig.showStageFilter
   const resolvedRole = (roleOverride ?? activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
   // The persistent "cage empty" condition is now owned by activeAlerts; drop it
   // from the point-in-time history list so it isn't shown twice.
@@ -565,7 +564,7 @@ export default function Header({
                       isCondensed ? "text-lg sm:text-xl" : "text-xl sm:text-3xl",
                     )}
                   >
-                    {pageMeta.title}
+                    {appPathname === "/" ? <><span className="sm:hidden">Dashboard</span><span className="hidden sm:inline">{pageMeta.title}</span></> : pageMeta.title}
                   </h1>
                   {isReportsPage ? null : <p className="mt-1 block text-xs font-medium text-muted-foreground">{appPathname.startsWith("/production") ? timeWindowSummary.replace("All History", "Cycle to date") : timeWindowSummary}</p>}
                 </div>
@@ -576,16 +575,17 @@ export default function Header({
                 href="/assistant"
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground hover:bg-accent"
               >
-                <Sparkles size={16} />
+                <ChatCircleIcon weight="fill" aria-hidden="true" size={16} />
                 Ask AI
               </Link>
               <Tooltip content="Notifications">
                 <button
                   type="button"
+                  aria-label={bellBadgeCount ? `Notifications, ${bellBadgeCount} unread` : "Notifications"}
                   onClick={openMenu(setNotificationsAnchor)}
                   className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
-                  <Bell size={18} />
+                  <BellIcon weight="fill" aria-hidden="true" size={18} />
                   {bellBadgeCount > 0 ? (
                     <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-micro font-bold leading-none text-destructive-foreground">
                       {bellBadgeCount > 9 ? "9+" : bellBadgeCount}
@@ -596,10 +596,10 @@ export default function Header({
             </div>
           </div>
 
-          {showToolbar ? (
-            <div className="grid gap-2">
+          {showToolbar && (hasScopeFilters || pageTimeConfig.showTimePeriod !== false || showAddData) ? (
+            <div className={cn("grid gap-2", !hasScopeFilters && pageTimeConfig.showTimePeriod === false && "hidden md:grid")}>
               <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {hasScopeFilters && <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <div className="hidden min-w-0 md:flex md:flex-wrap md:items-center md:gap-2">
                     <FarmSelector
                       initialFarmId={initialFarmId}
@@ -631,8 +631,8 @@ export default function Header({
                       ) : null}
                     </Button>
                   </div>
-                </div>
-                <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+                </div>}
+                <div className="flex w-full flex-col gap-2 md:ml-auto md:w-auto md:flex-row md:items-center">
                   {pageTimeConfig.showTimePeriod !== false ? (
                     <div className="w-full shrink-0 md:w-[170px]">
                       <TimePeriodSelector
@@ -653,7 +653,7 @@ export default function Header({
                       onClick={openMenu(setAddDataAnchor)}
                       className="hidden h-10 justify-center rounded-lg px-4 font-bold md:inline-flex md:min-w-[140px]"
                     >
-                      <PlusCircle size={18} />
+                      <NotePencilIcon weight="fill" aria-hidden="true" size={18} />
                       Add Data
                     </Button>
                   ) : null}
@@ -774,7 +774,7 @@ export default function Header({
             router.push(`${DATA_ENTRY_PATH}?type=feeding${systemParam}${batchParam}`)
           }}
         >
-          <Fish size={16} />
+          <GrainsIcon weight="fill" aria-hidden="true" size={16} />
           Record Feeding
         </MenuItem>
         <MenuItem
@@ -783,7 +783,7 @@ export default function Header({
             router.push(`${DATA_ENTRY_PATH}?type=sampling${systemParam}${batchParam}`)
           }}
         >
-          <FlaskConical size={16} />
+          <FlaskIcon weight="fill" aria-hidden="true" size={16} />
           Record Sampling
         </MenuItem>
         <MenuItem
@@ -792,7 +792,7 @@ export default function Header({
             router.push(`${DATA_ENTRY_PATH}?type=water_quality${systemParam}`)
           }}
         >
-          <Droplets size={16} />
+          <DropIcon weight="fill" aria-hidden="true" size={16} />
           Record Water Quality
         </MenuItem>
         <Separator />

@@ -965,6 +965,18 @@ next-router-prefetch {
   font-variant-numeric: tabular-nums;
 }
 
+.copy-zoom__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.copy-zoom__tools { flex-shrink: 0; margin-left: auto; }
+.copy-zoom__content .plan-table,
+.copy-zoom__content .rpt-chart__svg,
+.copy-zoom__content .rpt-chart__legend { zoom: var(--copy-zoom, 1); }
+
 [data-slot="table-footer"] > [data-slot="table-row"],
 [data-slot="table-footer"] [data-slot="table-cell"] {
   background: var(--table-head-bg);

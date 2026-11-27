@@ -6,6 +6,11 @@ const bounds = [1, 5, 10, 70, 140, 210, 320, 450, Infinity]
 const growth = [5.675857610599987, 3.958466719947626, 3.1870056090599994, 1.6906028794145007, 1.30795196163924, 1.0028892025626273, .725375716958709, .5280807775319769, .5280807775319769]
 const mortality = [.02, .02, .015, .015, .01, .01, .01, .01, .01]
 const efcr = [1, 1, 1.2, 1.3, 1.35, 1.4, 1.5, 1.6, 1.7]
+export function workbookWeightRates(abw: number) {
+ if (!Number.isFinite(abw) || abw <= 0) throw new Error("A positive fish weight is required.")
+ const phase = bounds.findIndex(bound => abw < bound)
+ return { mortality: mortality[phase], dailyGrowth: growth[phase] / 100 }
+}
 export function validDate(s: string) { return /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(Date.parse(s)) && new Date(s).toISOString().slice(0,10) === s }
 export function planDays(start: string, end: string) {
  if (!validDate(start) || !validDate(end)) throw new Error("Choose valid planning dates.")

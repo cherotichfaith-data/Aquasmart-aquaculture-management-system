@@ -16,19 +16,17 @@ import { Sheet } from "@/components/app-ui/sheet"
 import { Skeleton } from "@/components/app-ui/skeleton"
 import { Tooltip } from "@/components/app-ui/tooltip"
 import { cn } from "@/lib/utils"
-import {
-  BarChart3,
-  MessageSquare,
-  Fish,
-  LayoutDashboard,
-  LogOut,
-  Menu as MenuIcon,
-  PlusCircle,
-  Settings,
-  Rows3,
-  Users,
-  X,
-} from "lucide-react"
+import { LogOut, Menu as MenuIcon, X } from "lucide-react"
+import { GaugeIcon } from "@phosphor-icons/react/dist/icons/Gauge"
+import { RowsIcon } from "@phosphor-icons/react/dist/icons/Rows"
+import { FishIcon } from "@phosphor-icons/react/dist/icons/Fish"
+import { GrainsIcon } from "@phosphor-icons/react/dist/icons/Grains"
+import { FishSimpleIcon } from "@phosphor-icons/react/dist/icons/FishSimple"
+import { ChartBarIcon } from "@phosphor-icons/react/dist/icons/ChartBar"
+import { ChatCircleIcon } from "@phosphor-icons/react/dist/icons/ChatCircle"
+import { NotePencilIcon } from "@phosphor-icons/react/dist/icons/NotePencil"
+import { GearIcon } from "@phosphor-icons/react/dist/icons/Gear"
+import { UsersThreeIcon } from "@phosphor-icons/react/dist/icons/UsersThree"
 
 export const DASHBOARD_SIDEBAR_WIDTH = 248
 export const DASHBOARD_SIDEBAR_COLLAPSED_WIDTH = 88
@@ -37,29 +35,29 @@ const ALL_NAV_SECTIONS = [
   {
     title: "Operate",
     items: [
-      { name: "Dashboard", href: toDashboardPath("/"), icon: LayoutDashboard },
-      { name: "Cages", href: toDashboardPath("/systems"), icon: Rows3 },
-      { name: "Batches", href: toDashboardPath("/batches"), icon: Fish },
+      { name: "Dashboard", href: toDashboardPath("/"), icon: GaugeIcon },
+      { name: "Cages", href: toDashboardPath("/systems"), icon: RowsIcon },
+      { name: "Batches", href: toDashboardPath("/batches"), icon: FishIcon },
     ],
   },
   {
     title: "Analyze",
     items: [
-      { name: "Feed", href: toDashboardPath("/feed"), icon: Fish },
-      { name: "Production", href: toDashboardPath("/production"), icon: BarChart3 },
-      { name: "Analytics", href: toDashboardPath("/analytics"), icon: BarChart3 },
-      { name: "Assistant", href: toDashboardPath("/assistant"), icon: MessageSquare },
+      { name: "Feed", href: toDashboardPath("/feed"), icon: GrainsIcon },
+      { name: "Production", href: toDashboardPath("/production"), icon: FishSimpleIcon },
+      { name: "Analytics", href: toDashboardPath("/analytics"), icon: ChartBarIcon },
+      { name: "Assistant", href: toDashboardPath("/assistant"), icon: ChatCircleIcon },
     ],
   },
   {
     title: "Capture",
-    items: [{ name: "Data Entry", href: DATA_ENTRY_PATH, icon: PlusCircle }],
+    items: [{ name: "Data Entry", href: DATA_ENTRY_PATH, icon: NotePencilIcon }],
   },
   {
     title: "Configure",
     items: [
-      { name: "Settings", href: toDashboardPath("/settings"), icon: Settings },
-      { name: "Users", href: "/users", icon: Users },
+      { name: "Settings", href: toDashboardPath("/settings"), icon: GearIcon },
+      { name: "Users", href: "/users", icon: UsersThreeIcon },
     ],
   },
 ] as const
@@ -293,7 +291,7 @@ function SidebarContent({
           </div>
         </div>
       ) : null}
-      <div className="flex-1 px-2.5 py-3">
+      <nav aria-label="Workspace" className="flex-1 px-2.5 py-3">
         {isRoleLoading ? (
           <div className="grid gap-1.5 px-1">
             {[...Array(6)].map((_, i) => (
@@ -330,10 +328,10 @@ function SidebarContent({
                       className={cn(
                         "flex min-h-12 items-center gap-3 rounded-2xl text-current no-underline transition-colors hover:bg-white/10",
                         collapsed && !mobile ? "justify-center px-3" : "px-3.5",
-                        isActive && "bg-white/15",
+                        isActive && "bg-white/15 shadow-[inset_3px_0_0_currentColor]",
                       )}
                     >
-                      <Icon size={18} />
+                      <Icon weight="fill" size={18} />
                       {!collapsed || mobile ? <span className="truncate text-sm font-semibold">{resolvedLabel}</span> : null}
                     </Link>
                   )
@@ -354,7 +352,7 @@ function SidebarContent({
             </div>
           ))
         )}
-      </div>
+      </nav>
       <div className="grid gap-1 p-3">
         <button
           type="button"
@@ -400,7 +398,7 @@ function SidebarContent({
           <>
             <Separator />
             <MenuItem href={toDashboardPath("/settings")} onClick={() => setAccountAnchor(null)}>
-              <Settings size={16} />
+              <GearIcon weight="fill" aria-hidden="true" size={16} />
               Settings
             </MenuItem>
           </>
@@ -447,7 +445,7 @@ export default function Sidebar({
         />
       </Sheet>
       <div
-        className="fixed left-0 top-0 z-40 hidden h-screen transition-[width] duration-300 md:block"
+        className="fixed left-0 top-0 z-40 hidden h-screen transition-[width] duration-300 motion-reduce:transition-none md:block"
         style={{ width: collapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH }}
       >
         <SidebarContent

@@ -15,18 +15,39 @@ export type BatchReportRow = {
   cage_corrections: number | null
   mortality: number | null
   stock_loss_pct: number | null
+  stock_loss_chart_pct?: number | null
+  stock_loss_mortality_pct?: number | null
+  stock_loss_adjustment_pct?: number | null
+  stock_loss_harvest_pct?: number | null
+  stock_loss_expected_pct?: number | null
   growth_kg: number | null
   feed_kg: number | null
   efcr: number | null
   acc_efcr: number | null
+  /** Recorded stocking, transfer or sampling measurement intervals ending in the selected period. */
+  efcr_feed_kg?: number | null
+  efcr_growth_kg?: number | null
+  /** All valid recorded-weight intervals through the reporting cutoff. */
+  acc_efcr_feed_kg?: number | null
+  acc_efcr_growth_kg?: number | null
 }
 
+export type StockLossChartRow = Pick<BatchReportRow,
+  "batch_id" | "batch_name" | "stock_loss_pct" | "stock_loss_chart_pct" |
+  "stock_loss_mortality_pct" | "stock_loss_adjustment_pct" | "stock_loss_harvest_pct" | "stock_loss_expected_pct">
+
 export type CageHarvestRow = {
+  /** Explicitly confirmed cage scope for batches with unconfirmed legacy history. */
+  report_system_id?: number
   cycle_id: number
   batch_id: number
   system_id: number | null
   unit: string | null
   harvest_date: string
+  first_harvest_date?: string
+  report_cutoff?: string
+  stock_remaining?: number | null
+  harvest_status?: "ongoing" | "complete" | "check_stock"
   cage_name: string | null
   batch_name: string
   original_stock_date: string
@@ -79,6 +100,7 @@ export type StockProfileRow = {
   recorded_fish: number
   recorded_cages: number
   cage_names: string[]
+  batch_names?: string[]
 }
 
 export type FarmForecastRow = {
@@ -114,7 +136,8 @@ export type HarvestPointRow = {
   cycle_id: number
   batch_id: number
   batch_name: string
-  kind: "stocking" | "sampling" | "harvest"
+  kind: "stocking" | "transfer" | "sampling" | "harvest"
+  is_baseline?: boolean
   date: string
   age_days: number
   model_age_days: number
@@ -146,6 +169,7 @@ export type GrowthScenario = (typeof GROWTH_SCENARIOS)[number]
 export type ForwardPlanInputs = { plannedFish: number; plannedAbwG: number; scenario: GrowthScenario }
 
 export type AnalyticsReportData = {
+  stockLossRows?: StockLossChartRow[]
   /** First day of the reporting month, YYYY-MM-01. */
   /** First day of the month containing the period end (anchors the forecast and forward plan). */
   month: string

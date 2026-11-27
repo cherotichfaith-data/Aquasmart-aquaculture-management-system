@@ -8,7 +8,7 @@ import { createQueryClient } from "@/lib/react-query/query-client"
 
 export function ReactQueryProvider({ children }: { children: React.ReactNode }) {
   const [client] = useState(() => createQueryClient())
-  const showDevtools = process.env.NODE_ENV !== "production"
+  const showDevtools = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_QUERY_DEVTOOLS === "true"
 
   return (
     <QueryClientProvider client={client}>

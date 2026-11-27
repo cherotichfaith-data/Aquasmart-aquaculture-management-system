@@ -1,5 +1,7 @@
 "use client"
 
+import type { ReactNode as HarvestSummarySlot } from "react"
+
 import type { ReactNode } from "react"
 
 import type { DashboardPageInitialData, DashboardPageInitialFilters } from "@/features/dashboard/types"
@@ -39,11 +41,13 @@ export default function DashboardPage({
   initialFilters,
   initialData,
   renderedAt,
+  harvestSummary,
 }: {
   initialFarmId?: string | null
   initialFilters?: DashboardPageInitialFilters
   initialData: DashboardPageInitialData
   renderedAt?: number
+  harvestSummary?: HarvestSummarySlot
 }) {
   const farmId = initialFarmId ?? null
   const selectedStage = initialFilters?.selectedStage ?? "all"
@@ -71,6 +75,8 @@ export default function DashboardPage({
           system={selectedSystem}
         />
       </section>
+
+      {harvestSummary}
 
       <section>
         <SectionLabel title="Production" />

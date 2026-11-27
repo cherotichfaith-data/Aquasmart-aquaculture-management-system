@@ -1,6 +1,10 @@
 import { loadAutomaticFeedPlan } from "./automatic-feed-plan.server"
 import { addMonths } from "./automatic-feed-plan"
 import { buildHarvestPoints } from "./harvest-curve"
+import { buildStockLossRows, type StockLossSources } from "./stock-loss"
+import { monthCycles, monthSystemIds, cohortBatchRows, type ReportCycle } from "./cycle-cohort"
+import { harvestRowsForPeriod } from "./harvest-period"
+import { confirmedHarvestScopes } from "./harvest-scope"
 import { createAccessTokenClient } from "@/lib/supabase/server"
 import { logSbError } from "@/lib/supabase/log"
 import {
@@ -63,6 +67,7 @@ export async function getAnalyticsReportData(params: {
     periodStart: params.period.from,
     periodEnd: params.period.to,
     batches: [],
+    stockLossRows: [],
     batchHarvests: [],
     batchHarvestPoints: [],
     cageHarvests: [],
@@ -80,21 +85,20 @@ export async function getAnalyticsReportData(params: {
 
   const supabase = createAccessTokenClient(params.accessToken)
   let period = params.period
+  let cohort: ReportCycle[] | null = null
   if (period.mode === "cycle") {
     const cycles = await supabase
       .from("production_cycle")
-      .select("cycle_start, fingerling_batch!inner(farm_id)")
+      .select("cycle_id, batch_id, cycle_start, cycle_end, system_id, fingerling_batch!inner(farm_id)")
       .eq("fingerling_batch.farm_id", params.farmId)
-      .eq("ongoing_cycle", true)
       .lte("cycle_start", period.to)
       .order("cycle_start", { ascending: true })
-      .limit(1)
-      .maybeSingle()
     if (cycles.error) {
       logSbError("analytics:cyclePeriod", cycles.error)
       return { ...empty, error: "The cycle reporting period could not be loaded. Try again shortly." }
     }
-    period = { ...period, from: cycles.data?.cycle_start ?? period.month }
+    cohort = params.view === "harvests" ? cycles.data ?? [] : monthCycles(cycles.data ?? [], period.month, period.to)
+    period = { ...period, from: cohort.map(c => c.cycle_start).sort()[0] ?? period.month }
   }
   // Forecast and forward plan are monthly and anchored to the month holding the period end;
   // the three period reports use the exact from/to dates.
@@ -111,11 +115,12 @@ export async function getAnalyticsReportData(params: {
     p_scenario: params.forwardPlanInputs.scenario,
   }
   const needs = SECTIONS_BY_VIEW[params.view]
-  const [performance, outlook] = await Promise.all([
+  const [performance, outlook, stockLoss] = await Promise.all([
     needs.performance.length > 0
       ? supabase.rpc("api_analytics_performance", {
           ...periodArgs,
-          p_sections: period.mode === "month" ? [...needs.performance, "growth_custom"] : needs.performance,
+          p_sections: period.mode === "month" ? [...needs.performance, "growth_custom"]
+            : ["batches", "growth"].includes(params.view) ? [...needs.performance, "stock_loss_cycle"] : needs.performance,
           p_scenario: params.forwardPlanInputs.scenario,
         })
       : Promise.resolve(null),
@@ -127,23 +132,45 @@ export async function getAnalyticsReportData(params: {
           ...planArgs,
         })
       : Promise.resolve(null),
+    ["batches", "cages"].includes(params.view)
+      ? supabase.rpc("api_stock_loss_sources", { p_farm_id: params.farmId, p_as_of: period.to })
+      : Promise.resolve(null),
   ])
 
-  const failed = [performance, outlook].find((r) => r?.error)
+  const failed = [performance, outlook, stockLoss].find((r) => r?.error)
   if (failed?.error) logSbError("analytics:getAnalyticsReportData", failed.error)
   const perf = (performance?.data ?? null) as PerformanceReports | null
   const out = (outlook?.data ?? null) as OutlookReports | null
+  const batchIds = cohort == null ? null : new Set(cohort.map(c => c.batch_id))
+  const cycleIds = cohort == null ? null : new Set(cohort.map(c => c.cycle_id))
+  const sources = stockLoss?.data as unknown as StockLossSources | null
+  if (perf && batchIds && cycleIds) {
+    const systems = monthSystemIds(cohort ?? [], period.month, period.to, sources)
+    perf.batches = cohortBatchRows(perf.batches ?? [], batchIds, sources)
+    perf.batch_harvests = (perf.batch_harvests ?? []).filter(r => cycleIds.has(r.cycle_id))
+    perf.cage_harvests = (perf.cage_harvests ?? []).filter(r => cycleIds.has(r.cycle_id))
+    perf.growth_by_batch = (perf.growth_by_batch ?? []).filter(r => batchIds.has(r.batch_id))
+    perf.abw_points = (perf.abw_points ?? []).filter(r => batchIds.has(r.batch_id))
+    perf.feed_vs_expected = (perf.feed_vs_expected ?? []).filter(r => systems.has(r.system_id))
+  }
+
+  if (perf && params.view === "harvests") {
+    const confirmed = confirmedHarvestScopes(perf.cage_harvests ?? [], perf.batch_harvests ?? [], params.farmId)
+    perf.batch_harvests = harvestRowsForPeriod(confirmed.batchHarvests, period)
+    perf.cage_harvests = harvestRowsForPeriod(confirmed.cageHarvests, period)
+  }
 
   let batchHarvestPoints: HarvestPointRow[] = []
   const harvestedBatches = perf?.batch_harvests ?? []
   if (harvestedBatches.length > 0) {
     const batchIds = harvestedBatches.map((r) => r.batch_id)
-    const [stocking, sampling, harvests] = await Promise.all([
-      supabase.from("fish_stocking").select("batch_id, date, number_of_fish_stocking, total_weight_stocking").in("batch_id", batchIds),
-      supabase.from("fish_sampling_weight").select("batch_id, date, number_of_fish_sampling, abw").in("batch_id", batchIds),
-      supabase.from("fish_harvest").select("batch_id, cycle_id, date, number_of_fish_harvest, total_weight_harvest").in("batch_id", batchIds),
+    const [stocking, sampling, harvests, transfers] = await Promise.all([
+      supabase.from("fish_stocking").select("batch_id, cycle_id, system_id, date, number_of_fish_stocking, total_weight_stocking, abw").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_sampling_weight").select("batch_id, cycle_id, system_id, date, number_of_fish_sampling, abw").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_harvest").select("batch_id, cycle_id, system_id, date, number_of_fish_harvest, total_weight_harvest").in("batch_id", batchIds).lte("date", period.to),
+      supabase.from("fish_transfer").select("batch_id, cycle_id, date, target_system_id, number_of_fish_transfer, total_weight_transfer, abw, transfer_type").in("batch_id", batchIds).lte("date", period.to),
     ])
-    const readError = stocking.error ?? sampling.error ?? harvests.error
+    const readError = stocking.error ?? sampling.error ?? harvests.error ?? transfers.error
     if (readError) logSbError("analytics:batchHarvestPoints", readError)
     else {
       batchHarvestPoints = buildHarvestPoints(
@@ -152,6 +179,7 @@ export async function getAnalyticsReportData(params: {
         sampling.data ?? [],
         harvests.data ?? [],
         (perf?.growth_curve ?? []).filter((c) => c.scenario === params.forwardPlanInputs.scenario),
+        transfers.data ?? [],
       )
     }
   }
@@ -188,6 +216,7 @@ export async function getAnalyticsReportData(params: {
     periodStart: period.from,
     periodEnd: period.to,
     batches: perf?.batches ?? [],
+    stockLossRows: stockLoss?.error ? [] : buildStockLossRows(sources, period.to, period.month).filter(r => batchIds == null || r.batch_id != null && batchIds.has(r.batch_id)),
     batchHarvests: perf?.batch_harvests ?? [],
     batchHarvestPoints,
     cageHarvests: perf?.cage_harvests ?? [],
