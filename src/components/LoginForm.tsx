@@ -61,23 +61,19 @@ export default function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [credentialsRejected, setCredentialsRejected] = useState(false)
   const [capsLockOn, setCapsLockOn] = useState(false)
-  const [videoPaused, setVideoPaused] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
-
-  // The farm video starts on its still frame and only plays when the device
-  // has not asked for reduced motion. Button state follows the video's own
-  // play/pause events.
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
-    void videoRef.current?.play().catch(() => undefined)
-  }, [])
-
-  const toggleVideo = () => {
     const video = videoRef.current
     if (!video) return
-    if (video.paused) void video.play().catch(() => undefined)
-    else video.pause()
-  }
+    const motion = window.matchMedia("(prefers-reduced-motion: no-preference)")
+    const syncPlayback = () => {
+      if (motion.matches) void video.play().catch(() => undefined)
+      else video.pause()
+    }
+    syncPlayback()
+    motion.addEventListener("change", syncPlayback)
+    return () => motion.removeEventListener("change", syncPlayback)
+  }, [])
 
   const trackCapsLock = (event: KeyboardEvent<HTMLInputElement>) => {
     setCapsLockOn(event.getModifierState("CapsLock"))
@@ -211,13 +207,8 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="grid min-h-svh bg-card font-sans text-foreground lg:grid-cols-[5fr_7fr]">
-      <div className="flex min-w-0 flex-col">
-        {/* Phones get a still frame from the farm video instead of the video itself. */}
-        <div className="relative h-[120px] shrink-0 bg-[#0b3a63] lg:hidden">
-          <Image src="/Multi-region-aquaculture-scaled.webp" alt="" fill sizes="100vw" className="object-cover" priority />
-        </div>
-
+    <div className="grid min-h-svh grid-rows-[auto_1fr] lg:grid-rows-1 bg-card font-sans text-foreground lg:grid-cols-[5fr_7fr]">
+      <div className="flex min-w-0 flex-col lg:col-start-1 lg:row-start-1">
         <main className="flex flex-1 flex-col px-5 py-6 sm:px-10 lg:px-14 lg:py-8">
           <div className="flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center" aria-label="SUSTAIN Aquasmart home">
@@ -229,9 +220,6 @@ export default function LoginForm() {
                 className="h-7 w-auto"
                 priority
               />
-            </Link>
-            <Link href="/" className="whitespace-nowrap text-sm text-primary underline underline-offset-4 hover:text-[#0b3a63] sm:text-[15px]">
-              Back to website
             </Link>
           </div>
 
@@ -449,35 +437,23 @@ export default function LoginForm() {
         </main>
       </div>
 
-      <aside className="hidden min-w-0 flex-col gap-7 bg-primary p-12 text-primary-foreground lg:flex">
-        <div className="relative min-h-[360px] flex-1 overflow-hidden rounded-lg bg-[#0b3a63]">
-          <video
-            ref={videoRef}
-            className="absolute inset-0 h-full w-full object-cover"
-            loop
-            muted
-            playsInline
-            poster="/Multi-region-aquaculture-scaled.webp"
-            aria-hidden="true"
-            onPlay={() => setVideoPaused(false)}
-            onPause={() => setVideoPaused(true)}
-          >
-            <source src="/login-hero.mp4" type="video/mp4" />
-          </video>
-          <button
-            type="button"
-            onClick={toggleVideo}
-            aria-label={videoPaused ? "Play background video" : "Pause background video"}
-            className="absolute bottom-4 right-4 h-11 rounded-[4px] bg-card px-4 text-sm font-semibold text-primary transition hover:bg-accent"
-          >
-            {videoPaused ? "Play video" : "Pause video"}
-          </button>
-        </div>
-        <div>
+      <aside className="relative row-start-1 h-32 overflow-hidden bg-[#0b3a63] text-white sm:h-44 lg:col-start-2 lg:h-auto">
+        <video
+          ref={videoRef}
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          muted
+          loop
+          playsInline
+          disablePictureInPicture
+          preload="none"
+          aria-hidden="true"
+        >
+          <source src="/login-hero.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-x-0 bottom-0 hidden bg-gradient-to-t from-black/85 via-black/65 to-transparent px-12 pb-12 pt-28 lg:block">
           <p className="mb-2 font-[family-name:var(--font-heading)] text-[22px] font-bold leading-snug">
             Every fish, every feed, every decision, on record.
           </p>
-          <p className="text-[15px] text-[#c9daea]">Used every day at Tanganyika Blue, Kigoma, Tanzania.</p>
         </div>
       </aside>
     </div>
