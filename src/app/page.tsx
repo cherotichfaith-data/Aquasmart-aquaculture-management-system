@@ -4,9 +4,9 @@ import LandingPage from "@/components/marketing/landing-page"
 import { WORKSPACE_SELECT_PATH } from "@/lib/app-entry"
 
 export const metadata: Metadata = {
-  title: "SUSTAIN Aquasmart | Aquaculture Management Software",
+  title: "SUSTAIN Aquasmart | Fish farm management software",
   description:
-    "SUSTAIN Aquasmart is aquaculture management software for fish farms with KPI dashboards, feed tracking, mortality records, water quality monitoring, inventory control, and reporting.",
+    "Record-based management for cages, ponds and tanks. Plan feed by pellet size, track fish growth and review production costs.",
   keywords: [
     "aquaculture management software",
     "fish farm management",
@@ -21,9 +21,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "SUSTAIN Aquasmart | Aquaculture Management Software",
+    title: "SUSTAIN Aquasmart | Fish farm management software",
     description:
-      "Manage aquaculture operations with real-time KPIs, feed control, mortality tracking, and water quality monitoring.",
+      "Record-based management for cages, ponds and tanks. Plan feed by pellet size, track fish growth and review production costs.",
     url: "/",
     siteName: "SUSTAIN Aquasmart",
     type: "website",
@@ -38,9 +38,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SUSTAIN Aquasmart | Aquaculture Management Software",
+    title: "SUSTAIN Aquasmart | Fish farm management software",
     description:
-      "Aquaculture management software for KPI monitoring, feed tracking, water quality, inventory, and reporting.",
+      "Record-based management for cages, ponds and tanks. Plan feed by pellet size, track fish growth and review production costs.",
     images: ["/og-image.png"],
   },
   robots: {
