@@ -131,12 +131,13 @@ export default function LandingPage() {
         </video></details></div></section>
       <section id="ai" className="aq-operator"><div className="aq-wrap aq-section aq-split"><div><h2>Ask your farm a question. Get an answer from your own records.</h2><p>Use the AI Operator to explore questions about feed requirements and production plans using farm-scoped records. Forecasts are identified as projections.</p></div><Image src="/aquasmart-operator.webp" width={1280} height={702} alt="SUSTAIN AI Operator workspace"/></div></section>
       <section id="data" className="aq-tint"><div className="aq-wrap aq-section"><h2>Your data, your farm</h2><div className="aq-grid">{trust.map(([title,desc]) => <article key={title}><h3>{title}</h3><p>{desc}</p></article>)}</div></div></section>
-      <section id="field" className="aq-wrap aq-section aq-split"><div><h2>In the field at Tanganyika Blue</h2><p>In Kigoma, Tanzania, Tanganyika Blue uses Aquasmart to record feeding and track its native tilapia on Lake Tanganyika.</p></div><div><strong className="aq-stat">97.8%</strong><p>of batch-days had feeding recorded in the first 90 days for 2026 batches, up from 56.7% for 2024 batches kept in farm books.</p></div>
+      <section id="field" className="aq-wrap aq-section aq-split">
+        <div className="aq-field-intro"><h2>In the field at Tanganyika Blue</h2><p>In Kigoma, Tanzania, Tanganyika Blue uses Aquasmart to record feeding and track its native tilapia on Lake Tanganyika.</p></div>
         <div className="aq-field-photos">
           <Image className="aq-weighing" src="/aquasmart-weighing.webp" alt="Farm crew weighing fish in a suspended net basket beside a cage" width={1204} height={1600} sizes="(max-width: 700px) 100vw, 46vw" />
           
         </div>
-        <div><h3>WAS AFRAQ 2026</h3><details><summary>Read the talk summary</summary><p>The Aquasmart presentation follows a farm record from field entry and approval to a production decision. It shows how sampled weights shape growth curves and how feed stock and projected demand inform purchasing on Lake Tanganyika.</p></details></div>
+        <div><strong className="aq-stat">97.8%</strong><p>of batch-days had feeding recorded in the first 90 days for 2026 batches, up from 56.7% for 2024 batches kept in farm books.</p></div>
       </section>
       <section id="about" className="aq-wrap aq-section aq-split">
         <Image src="/aquasmart-floating-cage.webp" width={1204} height={1600} alt="Farm team tending a floating cage" /><div><h2>Built by people who farm</h2><p>SUSTAIN Switzerland develops Aquasmart with farm teams. The production-management application connects observations made at the water’s edge with the records managers use to plan and report.</p></div>
