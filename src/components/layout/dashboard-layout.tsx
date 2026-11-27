@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { SyncStatusBar } from "@/components/offline/sync-status-bar"
 import { useActiveFarm } from "@/lib/hooks/app/use-active-farm"
 import { useActiveFarmRole } from "@/lib/hooks/use-active-farm-role"
-import { canAccessDataEntry, WORKSPACE_SELECT_PATH, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath } from "@/lib/app-entry"
+import { canAccessDataEntry, WORKSPACE_SELECT_PATH, DATA_ENTRY_PATH, stripDashboardPath, toDashboardPath, withCurrentSearchContext } from "@/lib/app-entry"
 import Header from "./header"
 import MobileQuickEntry from "./mobile-quick-entry"
 import Sidebar, { DASHBOARD_SIDEBAR_COLLAPSED_WIDTH, DASHBOARD_SIDEBAR_WIDTH } from "./sidebar"
@@ -40,6 +40,9 @@ export default function DashboardLayout({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const navigate = useCallback((href: string) => {
+    router.push(withCurrentSearchContext(href, searchParams))
+  }, [router, searchParams])
   const routeKey = `${pathname}?${searchParams.toString()}`
   // Viewport width and the collapsed-sidebar preference are only knowable in
   // the browser (window size, localStorage), so the server always renders the
@@ -140,30 +143,31 @@ export default function DashboardLayout({
       if (key === "n") {
         if (!allowDataEntry) return
         event.preventDefault()
-        router.push(DATA_ENTRY_PATH)
+        navigate(DATA_ENTRY_PATH)
         return
       }
       if (key === "f" && event.shiftKey) {
         if (!allowDataEntry) return
         event.preventDefault()
-        router.push(`${DATA_ENTRY_PATH}?type=feeding`)
+        navigate(`${DATA_ENTRY_PATH}?type=feeding`)
         return
       }
       if (key === "s" && event.shiftKey) {
         if (!allowDataEntry) return
         event.preventDefault()
-        router.push(`${DATA_ENTRY_PATH}?type=sampling`)
+        navigate(`${DATA_ENTRY_PATH}?type=sampling`)
       }
     }
 
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [allowDataEntry, router, setCommandOpen])
+  }, [allowDataEntry, navigate, setCommandOpen])
 
   const desktopOffset = sidebarCollapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH
 
   return (
     <div className="min-h-screen bg-background">
+      <a href="#workspace-content" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-background focus:px-4 focus:py-3 focus:text-foreground focus:shadow-lg">Skip to main content</a>
       <Sidebar
         initialFarmId={initialFarmId}
         initialFarmName={initialFarmName}
@@ -187,7 +191,7 @@ export default function DashboardLayout({
       />
       <div
         id="app-scroll-root"
-        className="flex min-h-screen flex-col overflow-x-hidden transition-[margin-left] duration-300 md:ml-[var(--dashboard-offset)]"
+        className="flex min-h-screen flex-col overflow-x-hidden transition-[margin-left] duration-300 motion-reduce:transition-none md:ml-[var(--dashboard-offset)]"
         style={{ "--dashboard-offset": `${desktopOffset}px` } as React.CSSProperties}
       >
         {hideHeader ? (
@@ -195,7 +199,7 @@ export default function DashboardLayout({
             <header className="flex items-center gap-3 border-b bg-background px-3 py-2 md:hidden">
               <Button variant="ghost" size="icon" aria-label="Open navigation" aria-expanded={mobileSidebarOpen} onClick={() => setMobileSidebarOpen((open) => !open)}><Menu className="size-5" /></Button>
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">{farm?.name ?? initialFarmName ?? "Farm workspace"}</span>
-              <Link className="text-sm underline" href={WORKSPACE_SELECT_PATH}>Switch farm</Link>
+              <Link className="text-sm underline" href={`${WORKSPACE_SELECT_PATH}?switch=1`}>Switch farm</Link>
             </header>
             <SyncStatusBar />
           </>
@@ -218,8 +222,11 @@ export default function DashboardLayout({
           </>
         )}
         <main
+          id="workspace-content"
+          tabIndex={-1}
           className={cn(
-            "flex-1 overflow-x-hidden px-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 md:px-8 md:pb-16 lg:px-12",
+            "flex-1 overflow-x-hidden px-3 sm:px-6 md:px-8 md:pb-16 lg:px-12",
+            showMobileQuickEntry ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))]" : "pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
             hideHeader ? "pt-2 md:pt-3" : showHeaderToolbar ? "pt-2 md:pt-3" : "pt-0",
           )}
         >
@@ -238,7 +245,7 @@ export default function DashboardLayout({
             variant="outline"
             onClick={() => {
               setCommandOpen(false)
-              router.push(toDashboardPath("/"))
+              navigate(toDashboardPath("/"))
             }}
           >
             Go to Dashboard
@@ -249,7 +256,7 @@ export default function DashboardLayout({
                 variant="outline"
                 onClick={() => {
                   setCommandOpen(false)
-                  router.push(DATA_ENTRY_PATH)
+                  navigate(DATA_ENTRY_PATH)
                 }}
               >
                 New Data Entry
@@ -258,7 +265,7 @@ export default function DashboardLayout({
                 variant="outline"
                 onClick={() => {
                   setCommandOpen(false)
-                  router.push(`${DATA_ENTRY_PATH}?type=feeding`)
+                  navigate(`${DATA_ENTRY_PATH}?type=feeding`)
                 }}
               >
                 Record Feeding
@@ -267,7 +274,7 @@ export default function DashboardLayout({
                 variant="outline"
                 onClick={() => {
                   setCommandOpen(false)
-                  router.push(`${DATA_ENTRY_PATH}?type=sampling`)
+                  navigate(`${DATA_ENTRY_PATH}?type=sampling`)
                 }}
               >
                 Record Sampling

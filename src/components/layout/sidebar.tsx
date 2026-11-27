@@ -291,7 +291,7 @@ function SidebarContent({
           </div>
         </div>
       ) : null}
-      <div className="flex-1 px-2.5 py-3">
+      <nav aria-label="Workspace" className="flex-1 px-2.5 py-3">
         {isRoleLoading ? (
           <div className="grid gap-1.5 px-1">
             {[...Array(6)].map((_, i) => (
@@ -352,7 +352,7 @@ function SidebarContent({
             </div>
           ))
         )}
-      </div>
+      </nav>
       <div className="grid gap-1 p-3">
         <button
           type="button"
@@ -445,7 +445,7 @@ export default function Sidebar({
         />
       </Sheet>
       <div
-        className="fixed left-0 top-0 z-40 hidden h-screen transition-[width] duration-300 md:block"
+        className="fixed left-0 top-0 z-40 hidden h-screen transition-[width] duration-300 motion-reduce:transition-none md:block"
         style={{ width: collapsed ? DASHBOARD_SIDEBAR_COLLAPSED_WIDTH : DASHBOARD_SIDEBAR_WIDTH }}
       >
         <SidebarContent

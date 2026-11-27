@@ -50,7 +50,7 @@ export default function MobileQuickEntry() {
         <div className="flex items-start justify-between gap-3 px-4 py-4">
           <div>
             <h2 className="text-base font-bold">Quick Entry</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">Log a reading without leaving this page.</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">Choose the record you want to add.</p>
           </div>
           <button
             type="button"

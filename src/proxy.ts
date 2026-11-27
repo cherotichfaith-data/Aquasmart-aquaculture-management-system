@@ -346,6 +346,7 @@ export async function proxy(request: NextRequest) {
     }
 
     if (hasActiveWorkspaceContext) {
+      if (isWorkspaceSelectionRoute(pathname) && request.nextUrl.searchParams.get("switch") === "1") return response
       if (isOnboardingRoute(pathname) || isWorkspaceSelectionRoute(pathname)) {
         const redirectPath = await resolveEntryPathForActiveFarm({ supabase, userId, farmId: activeFarmId })
         return withSupabaseCookies(
