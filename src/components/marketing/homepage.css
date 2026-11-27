@@ -34,6 +34,7 @@
 .aq-split { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:center; gap:6% }
 .aq-field-photos { grid-column:1 / -1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px }
 #field { row-gap:28px }
+.aq-field-intro { grid-column:1 / -1 }
 .aq-field-photos img { aspect-ratio:16/9; object-fit:cover; object-position:50% 38% }
 .aq-field-photos img:nth-child(2) { object-position:50% 16% }
 .aq-field-photos .aq-weighing,.aq-field-photos .aq-cage-detail { aspect-ratio:4/3; object-position:50% 52% }
