@@ -46,7 +46,7 @@ const faqs = [
   ["Can we export our data?", "Yes. You can export production and feed reports for your farm."],
 ]
 const fields = ["Name", "Email", "Farm name and country", "Species and number of cages, ponds or tanks", "How do you keep records today?"]
-const contact = "info@samaki.fish"
+const contact = "severin@sustain-aquaculture.com"
 
 export default function LandingPage() {
   const [open, setOpen] = useState(false)

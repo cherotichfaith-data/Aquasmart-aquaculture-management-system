@@ -442,7 +442,7 @@ export default function LoginForm() {
 
           <p className="text-[13px] text-muted-foreground">
             © 2026 SUSTAIN Switzerland GmbH ·{" "}
-            <a href="mailto:info@samaki.fish" className="text-primary underline underline-offset-4">
+            <a href="mailto:severin@sustain-aquaculture.com" className="text-primary underline underline-offset-4">
               Help
             </a>
           </p>
