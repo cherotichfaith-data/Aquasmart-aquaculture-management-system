@@ -1,0 +1,115 @@
+.aqua-home { --aq-field-border:#6b7c88; background:#f7f8fa; color:var(--foreground); font-family:var(--font-plex),Arial,sans-serif; font-size:16px; line-height:1.55 }
+.aq-wrap { width:min(1360px,92%); margin-inline:auto }
+.aq-header { background:var(--card); border-bottom:1px solid var(--border) }
+.aq-bar,.aq-bar nav,.aq-actions { display:flex; align-items:center; gap:24px }
+.aq-bar { min-height:78px; justify-content:space-between }
+.aq-bar img { width:clamp(150px,14vw,206px); height:auto }
+.aq-bar nav { flex:1; margin-left:2vw }
+.aqua-home a { color:inherit; text-decoration:none }
+.aqua-home a:hover { text-decoration:underline; text-underline-offset:4px }
+.aq-signin { margin-left:auto }
+.aq-menu { display:none }
+.aq-button,.aqua-home a.aq-button { display:inline-flex; align-items:center; justify-content:center; background:var(--primary); color:var(--primary-foreground); border:1px solid var(--primary); border-radius:4px; padding:12px 20px; font-weight:600; cursor:pointer }
+.aqua-home .aq-button:not(.secondary):hover { background:#0b3a63; border-color:#0b3a63 }
+.aqua-home a.secondary { color:var(--primary); background:var(--card); border-color:var(--primary) }
+.aq-hero { display:grid; grid-template-columns:minmax(0,.88fr) minmax(0,1.3fr); gap:4%; align-items:center; padding-block:clamp(46px,6vw,88px) }
+.aqua-home h1,.aqua-home h2,.aqua-home h3 { font-family:var(--font-manrope),sans-serif; font-weight:700; line-height:1.12; text-wrap:balance; margin:0 }
+.aqua-home h1 { font-size:clamp(37px,4.2vw,64px); letter-spacing:-.052em }
+.aqua-home h2 { font-size:clamp(28px,3vw,43px); letter-spacing:-.04em; max-width:32ch }
+.aqua-home h3 { font-size:21px; letter-spacing:-.025em }
+.aqua-home p { color:var(--foreground); margin:12px 0 0 }
+.aq-hero p { font-size:clamp(17px,1.45vw,20px) }
+.aq-actions { flex-wrap:wrap; gap:12px; margin:25px 0 16px }
+.aqua-home small { color:var(--muted-foreground); font-size:14px }
+.aq-hero>img,.aq-split img { width:100%; height:auto; border-radius:8px }
+.aq-section { padding-block:clamp(40px,5vw,72px) }
+.aq-tint { background:var(--accent) }
+.aq-grid { margin-top:30px; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:24px }
+.aq-grid.aq-industry { grid-template-columns:repeat(2,minmax(0,1fr)) }
+.aq-grid article { border-top:2px solid var(--border); padding-top:16px }
+.aq-grid .aq-card,.aq-split form { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:24px }
+.aq-card svg { color:var(--primary); margin-bottom:18px }
+.aq-grid small { display:block; margin-bottom:12px }
+.aq-stat { font-size:clamp(40px,4vw,60px); font-weight:600; letter-spacing:-.05em; line-height:1; color:var(--primary) }
+.aq-split { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:center; gap:6% }
+.aq-field-photos { grid-column:1 / -1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px }
+#field { row-gap:28px }
+.aq-field-intro { grid-column:1 / -1 }
+.aq-field-photos img { aspect-ratio:16/9; object-fit:cover; object-position:50% 38% }
+.aq-field-photos img:nth-child(2) { object-position:50% 16% }
+.aq-field-photos .aq-weighing,.aq-field-photos .aq-cage-detail { aspect-ratio:4/3; object-position:50% 52% }
+.aq-split ul { list-style:disc; padding-left:20px; margin-top:16px }
+.aq-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:center }
+.aq-split .aq-faq-heading { margin:28px 0 10px }
+.aqua-home details { border-bottom:1px solid var(--border); padding:12px 0 }
+.aqua-home summary { display:list-item; cursor:pointer; font-weight:600 }
+.aq-split form,.aq-split label,.aq-foot>div { display:grid; gap:9px }
+.aq-split form { gap:16px }
+.aq-split label { font-weight:600 }
+.aq-split input { width:100%; background:var(--card); border:1px solid var(--aq-field-border); border-radius:4px; padding:10px; color:var(--foreground) }
+.aq-foot { display:flex; align-items:start; justify-content:space-between; gap:24px }
+.aq-foot p { margin:0 }
+.aqua-home :focus-visible { outline:3px solid var(--ring); outline-offset:3px }
+@media(max-width:950px) {
+ .aq-bar { flex-wrap:wrap; gap:0; padding:14px 0; min-height:62px }
+ .aq-menu { display:grid; place-items:center; width:44px; height:44px; cursor:pointer }
+ .aq-bar nav { display:none }
+ .aq-bar nav.is-open { display:grid; flex-basis:100%; margin:0; padding:12px 0; gap:12px }
+ .aq-signin { margin-left:0 }
+ .aq-grid { grid-template-columns:repeat(2,minmax(0,1fr)) }
+}
+@media(max-width:700px) {
+ .aq-wrap { width:calc(100% - 40px) }
+ .aq-hero,.aq-split { grid-template-columns:1fr; gap:26px }
+ .aq-field-photos { grid-template-columns:1fr }
+ .aq-actions { display:grid }
+ .aq-hero { padding-block:32px }
+ .aq-grid,.aq-grid.aq-industry { grid-template-columns:1fr; gap:16px }
+ #features .aq-grid, #farms .aq-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px }
+ #features .aq-card, #farms .aq-card { padding:14px }
+ #features h3, #farms h3 { font-size:18px }
+ .aq-foot { display:grid }
+}
+
+.aq-grid.three { grid-template-columns:1.35fr 1fr 1fr }
+.aq-path img { width:100%; height:auto; aspect-ratio:16/9; object-fit:cover; margin-bottom:18px; border-radius:4px }
+.aq-path a { display:inline-block; margin-top:16px; color:var(--primary); text-decoration:underline; text-underline-offset:4px }
+@media(max-width:700px) { .aq-grid.three { grid-template-columns:1fr } }
+
+.aq-hero>img { border:1px solid #d8dee6; background:white }
+.aqua-home footer { background:var(--primary); color:white }
+.aqua-home footer :is(p,small,a) { color:white }
+.aqua-home footer a { text-decoration:underline; text-underline-offset:3px }
+.aq-bar nav a,.aq-foot a,.aq-path a { display:inline-flex; align-items:center; min-height:44px }
+.aqua-home summary { min-height:44px; align-content:center }
+.aqua-home details { padding:2px 0 }
+.aqua-home footer :focus-visible { outline-color:white }
+.aq-path a { color:var(--primary) }
+#about { grid-template-columns:1fr }
+#about p { max-width:65ch }
+@media(prefers-reduced-motion:no-preference) {
+ .aqua-home :is(a,button) { transition:background-color 100ms ease-out,color 100ms ease-out }
+}
+
+.aq-operator { background:var(--primary); color:white }
+.aq-operator p { color:inherit }
+#about { grid-template-columns:repeat(2,minmax(0,1fr)) }
+#about img { aspect-ratio:16/9; object-fit:cover; object-position:center 23% }
+.aq-field-photos { grid-column:auto; display:block }
+.aq-feed-scroll { overflow-x:auto }
+@media(max-width:700px) {
+ #about { grid-template-columns:1fr }
+ #features .aq-grid { grid-template-columns:1fr; gap:0 }
+ #features .aq-card { display:grid; grid-template-columns:28px 1fr; column-gap:12px; border:0; border-bottom:1px solid var(--border); border-radius:0; background:transparent }
+ #features .aq-card svg { grid-row:span 2; margin:0 }
+ #features .aq-card p { margin-top:4px }
+ .aq-path img { display:none }
+ .aq-feed-scroll img { min-width:620px }
+ #feeding h2 { margin-bottom:12px }
+ #feeding .aq-feed-scroll { grid-row:2 }
+ #demo form { grid-row:1 }
+}
+.aqua-home a.aq-email { color:var(--primary); text-decoration:underline; text-underline-offset:3px }
+.aq-device-scene { position:relative; overflow:hidden; border-radius:8px }
+.aq-device-scene img { display:block; width:100%; height:auto }
+.aq-device-scene svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none }
