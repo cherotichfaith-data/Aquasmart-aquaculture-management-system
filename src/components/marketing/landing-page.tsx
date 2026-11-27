@@ -1,445 +1,154 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
-import {
-  ArrowRight,
-  ArrowUpRight,
-  BarChart3,
-  ChevronLeft,
-  ChevronRight,
-  Droplets,
-  Fish,
-  FlaskConical,
-} from "lucide-react"
+import Link from "next/link"
+import { useState, type FormEvent } from "react"
+import { Menu, X } from "lucide-react"
+import { NotePencilIcon } from "@phosphor-icons/react/dist/icons/NotePencil"
+import { GaugeIcon } from "@phosphor-icons/react/dist/icons/Gauge"
+import { FishSimpleIcon } from "@phosphor-icons/react/dist/icons/FishSimple"
+import { ChartLineIcon } from "@phosphor-icons/react/dist/icons/ChartLine"
+import { CalendarDotsIcon } from "@phosphor-icons/react/dist/icons/CalendarDots"
+import { GrainsIcon } from "@phosphor-icons/react/dist/icons/Grains"
+import { ScalesIcon } from "@phosphor-icons/react/dist/icons/Scales"
+import { FileArrowDownIcon } from "@phosphor-icons/react/dist/icons/FileArrowDown"
+import "./homepage.css"
 
-import { Button } from "@/components/app-ui/button"
-
-const navItems = [
-  { label: "Platform", href: "#platform" },
-  { label: "Modules", href: "#modules" },
-]
-
-const capabilities = [
-  {
-    title: "Water Quality Monitoring",
-    description: "Track dissolved oxygen, pH, temperature, ammonia, and depth from one daily workspace.",
-    icon: Droplets,
-  },
-  {
-    title: "Feed and Inventory Control",
-    description: "Manage stock movement, feed balance, and issue history without spreadsheet sprawl.",
-    icon: Fish,
-  },
-  {
-    title: "Production Visibility",
-    description: "Monitor biomass, growth, mortality, and system performance in a manager-friendly dashboard.",
-    icon: BarChart3,
-  },
-  {
-    title: "Sampling and Health Logs",
-    description: "Capture interventions, mortality causes, and growth checks with reliable historical traceability.",
-    icon: FlaskConical,
-  },
-]
-
+const nav = [["Product", "how"], ["Features", "features"], ["For farms", "farms"], ["About", "about"], ["Contact", "contact"]]
 const modules = [
-  {
-    category: "LIVE PARAMETERS",
-    title: "Water Quality Intelligence",
-    description:
-      "Watch pond and tank conditions in real time and surface threshold breaches before they become production losses.",
-    metric: "92%",
-    metricLabel: "systems within target range",
-    imageSrc: "/Multi-region-aquaculture-scaled.webp",
-  },
-  {
-    category: "FEED CONTROL",
-    title: "Feeding Operations",
-    description:
-      "Connect feed issue records, stock movement, and performance outcomes so operators can act before waste compounds.",
-    metric: "1.42",
-    metricLabel: "rolling eFCR",
-    imageSrc: "/tanga_tilapia4.jpg",
-  },
-  {
-    category: "STOCK HEALTH",
-    title: "Health and Mortality Logs",
-    description:
-      "Record abnormal events, suspected causes, and interventions in one structured timeline instead of scattered notes.",
-    metric: "14d",
-    metricLabel: "trend window",
-    imageSrc: "/cage mapping.png",
-  },
-  {
-    category: "MANAGEMENT VIEW",
-    title: "Farm Performance Dashboard",
-    description:
-      "Give managers a clear view of biomass, survival, feed efficiency, and operational pressure across the farm.",
-    metric: "24/7",
-    metricLabel: "operational visibility",
-    imageSrc: "/Multi-region-aquaculture-scaled.webp",
-  },
+  [NotePencilIcon, "Data entry", "Record feeding, mortality, sampling and stock movements for review."],
+  [GaugeIcon, "Dashboard", "Review fish count, biomass, mortality and feed use across cages, ponds and tanks."],
+  [FishSimpleIcon, "Production", "Follow each system and batch through stocking, transfers and harvests."],
+  [ChartLineIcon, "Growth models", "Compare sampled weights with projected growth curves."],
+  [CalendarDotsIcon, "Planning", "Explore harvest scenarios and future biomass."],
+  [GrainsIcon, "Feed", "Plan by pellet size and compare feed requirements with stock."],
+  [ScalesIcon, "Economics", "Review feed costs, fish valuation and supplier prices."],
+  [FileArrowDownIcon, "Reports and exports", "Bring production and feed records together for month-end review."],
+] as const
+const steps = [
+  ["Record", "Staff log feeding, mortality, sampling, transfers, harvests and feed stock."],
+  ["Approve", "A manager reviews each entry before it becomes an official farm record."],
+  ["Calculate", "Approved records inform fish counts, biomass, feeding rates and feed conversion."],
+  ["Decide", "Use dashboards, feed plans and forecasts to prepare for the next feeding round."],
 ]
-
-function scrollToId(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
-}
+const trust = [
+  ["Run it your way", "Choose a farm-local or cloud-hosted setup."],
+  ["Review history", "See who submitted and reviewed an operational record."],
+  ["Month-end reporting", "Bring feed usage and production economics into the monthly review."],
+  ["Trace corrections", "Follow a corrected submission back to its earlier record."],
+]
+const faqs = [
+  ["Do we need sensors or a constant internet connection?", "No. Your team can record observations by hand. Open the app online first. Supported field forms then save entries offline and sync when the connection returns."],
+  ["Which species and systems does Aquasmart support?", "Aquasmart supports cages, ponds and tanks. You can add species to your farm’s register."],
+  ["Who enters the data?", "Farm operators enter daily records. Farm managers or administrators review and approve them."],
+  ["Can Aquasmart handle more than one farm?", "Yes. Your organization can manage multiple farms in Aquasmart. Each farm has its own workspace, so its records stay separate. Team members can switch between the farms they have access to."],
+  ["Who can see our farm’s records?", "People with access to your farm workspace can see its records. Their assigned role determines what they can enter, review or approve."],
+  ["Can we export our data?", "Yes. You can export production and feed reports for your farm."],
+]
+const fields = ["Name", "Email", "Farm name and country", "Species and number of cages, ponds or tanks", "How do you keep records today?"]
+const contact = "info@samaki.fish"
 
 export default function LandingPage() {
-  const router = useRouter()
-  const carouselRef = useRef<HTMLDivElement>(null)
-  const isCarouselPausedRef = useRef(false)
-
-  const scrollCards = (direction: "left" | "right") => {
-    if (!carouselRef.current) return
-
-    carouselRef.current.scrollBy({
-      left: direction === "left" ? -420 : 420,
-      behavior: "smooth",
-    })
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(false)
+  function prepareRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    const body = fields.map(label => label + ": " + data.get(label)).join("\n")
+    window.location.href = "mailto:" + contact + "?subject=SUSTAIN%20Aquasmart%20demo%20request&body=" + encodeURIComponent(body)
+    setDraft(true)
   }
 
-  useEffect(() => {
-    const carousel = carouselRef.current
-    if (!carousel) return
-
-    const interval = window.setInterval(() => {
-      if (!carouselRef.current || isCarouselPausedRef.current) return
-
-      const node = carouselRef.current
-      const maxScrollLeft = node.scrollWidth - node.clientWidth
-      const nextScrollLeft = node.scrollLeft + 420
-
-      node.scrollTo({
-        left: nextScrollLeft >= maxScrollLeft - 8 ? 0 : nextScrollLeft,
-        behavior: "smooth",
-      })
-    }, 3200)
-
-    return () => {
-      window.clearInterval(interval)
-    }
-  }, [])
-
-  return (
-    <main className="bg-background text-foreground">
-      <section className="relative min-h-screen overflow-hidden">
-        <div className="absolute inset-0">
-          <Image
-            src="/tanga_tilapia4.jpg"
-            alt="Tilapia fish underwater"
-            fill
-            priority
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,var(--brand-hero-from)_0%,var(--brand-hero-mid)_42%,var(--brand-hero-to)_100%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-primary)_42%,black)_0%,color-mix(in_srgb,var(--color-primary)_12%,transparent)_46%,transparent_100%)]" />
+  return <div className="aqua-home">
+    <header className="aq-header"><div className="aq-wrap aq-bar">
+      <a href="#product" aria-label="SUSTAIN Aquasmart home"><Image src="/sustain-aquasmart-wordmark.png" width={206} height={30} alt="SUSTAIN Aquasmart" /></a>
+      <button type="button" className="aq-menu" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="aq-nav" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
+      <nav id="aq-nav" className={open ? "is-open" : ""} aria-label="Main navigation">
+        {nav.map(([label,id]) => <a key={id} href={"#"+id} onClick={() => setOpen(false)}>{label}</a>)}
+        <Link className="aq-signin" href="/auth">Sign in</Link><a className="aq-button" href="#demo" onClick={() => setOpen(false)}>Request a demo</a>
+      </nav>
+    </div></header>
+    <main>
+      <section id="product" className="aq-wrap aq-hero">
+        <div><h1>Every fish, every feed, every decision, on record.</h1>
+        <p>Farm teams record feeding, stock movements and fish weights. Managers review the entries. Aquasmart uses those approved records to plan feed, forecast growth and track costs across cages, ponds and tanks.</p>
+        <div className="aq-actions"><a className="aq-button" href="#demo">Request a demo</a><a className="aq-button secondary" href="#how">See how it works</a></div>
         </div>
-
-        <header className="absolute inset-x-0 top-0 z-20 px-4 pt-5 md:px-6">
-          <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 py-2 text-white">
-            <div className="flex items-center gap-3">
-              <Image
-                src="/sustain-aquasmart-wordmark-white.png"
-                alt="SUSTAIN Aquasmart"
-                width={1200}
-                height={131}
-                className="h-8 w-auto shrink-0"
-                priority
-              />
-              <p className="hidden border-l border-white/20 pl-3 text-xs text-white/70 sm:block">
-                Aquaculture management software
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-8 text-sm font-medium tracking-[0.08em] text-white/82 md:flex">
-              {navItems.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => scrollToId(item.href.slice(1))}
-                  className="transition-colors hover:text-white"
-                >
-                  {item.label}
-                </button>
+        <div className="aq-device-scene">
+          <Image priority src="/aquasmart-dashboard-drone.webp" width={1909} height={824} sizes="(max-width:700px) 100vw, 55vw" alt="Aquasmart dashboard on a laptop beside the mobile view, overlooking lake cages" />
+          <svg viewBox="0 0 1909 824" aria-hidden="true" focusable="false">
+            <defs>
+              <image id="aq-desktop-screen" href="/aquasmart-dashboard-screen.png" width="1" height="1" preserveAspectRatio="none" />
+              <clipPath id="aq-screen-upper"><path d="M0 0H1V1Z" /></clipPath>
+              <clipPath id="aq-screen-lower"><path d="M0 0L1 1H0Z" /></clipPath>
+            </defs>
+            {/* Two triangles fit the screenshot to the four corners of the photographed display. */}
+            <g transform="matrix(874 1 66 500 333 99)" clipPath="url(#aq-screen-upper)"><use href="#aq-desktop-screen" /></g>
+            <g transform="matrix(891 -22 49 523 333 99)" clipPath="url(#aq-screen-lower)"><use href="#aq-desktop-screen" /></g>
+            {/* The phone follows the same snapshot as the laptop, in its stacked card layout. */}
+            <g transform="translate(93 309) matrix(1 -.025 .044 1 0 0)">
+              <rect x="-4" width="217" height="319" fill="#e8eef5" />
+              {[
+                ["# FISH", "524,975"],
+                ["BIOMASS", "29,933.6 kg"],
+                ["PRODUCTION EFCR", "1.57"],
+                ["FEED STOCK", "14,540 kg"],
+              ].map(([label, value], index) => (
+                <g key={label} transform={`translate(0 ${index * 80 + 4})`}>
+                  <rect width="209" height="68" rx="7" fill="#f8fafc" stroke="#cbd5df" />
+                  <text x="12" y="23" fontFamily="Arial, sans-serif" fontSize="10" fontWeight="700" fill="#293e54">{label}</text>
+                  <text x="12" y="51" fontFamily="Arial, sans-serif" fontSize="20" fontWeight="700" fill="#123957">{value}</text>
+                </g>
               ))}
-            </nav>
-
-            <Button
-              variant="ghost"
-              className="ml-auto h-9 rounded-full bg-white/10 px-4 text-sm text-white hover:bg-white/18 hover:text-white sm:px-5 md:ml-0 md:h-10 md:px-6"
-              onClick={() => router.push("/auth")}
-            >
-              Sign In
-            </Button>
-
-          </div>
-        </header>
-
-        <div className="relative z-10 flex min-h-[calc(100svh-84px)] items-center px-4 py-20 md:min-h-[calc(100vh-84px)] md:px-6 md:py-24">
-          <div className="container mx-auto">
-            <div className="flex flex-col items-center justify-between gap-12 md:flex-row md:gap-16">
-              <div className="max-w-2xl text-center text-white md:text-left">
-                <div className="mb-8 inline-flex rounded-full border border-primary/50 bg-white/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/92">
-                  SMART FARM MANAGEMENT MADE PRACTICAL
-                </div>
-
-                <h1 className="max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-5xl md:text-6xl lg:text-[4.5rem]">
-                  Making aquaculture operations smarter
-                  <span className="block md:inline"> with </span>
-                  <span className="text-primary">SUSTAIN Aquasmart</span>
-                </h1>
-
-                <p className="mt-7 max-w-2xl text-sm leading-7 text-white/84 sm:text-base sm:leading-8 md:text-[1.05rem]">
-                  Monitor water quality, feeding, biomass, health, and reporting from one modern platform designed for
-                  real fish farm workflows.
-                </p>
-
-                <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center md:justify-start">
-                  <Button
-                    className="w-full rounded-full px-8 text-base sm:w-auto"
-                    size="lg"
-                    onClick={() => router.push("/auth?mode=signup")}
-                  >
-                    Get started
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full rounded-full border-white/35 bg-transparent px-8 text-base text-white hover:bg-white/10 hover:text-white sm:w-auto"
-                    onClick={() => router.push("/auth")}
-                  >
-                    Sign in
-                  </Button>
-                </div>
-              </div>
-
-              <div className="hidden w-[220px] md:flex lg:mr-20 lg:w-[270px]">
-                <div className="relative w-full rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,var(--brand-panel-from),var(--brand-panel-to))] p-3 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.7)]">
-                  <div className="overflow-hidden rounded-[22px] bg-[linear-gradient(180deg,var(--brand-panel-shell-from),var(--brand-panel-shell-to))]">
-                    <div className="flex items-center justify-between gap-2 bg-primary px-4 py-3 text-primary-foreground">
-                      <Image
-                        src="/sustain-aquasmart-wordmark-white.png"
-                        alt="SUSTAIN Aquasmart"
-                        width={1200}
-                        height={131}
-                        className="h-3.5 w-auto"
-                      />
-                      <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                        Live
-                      </span>
-                    </div>
-
-                    <div className="space-y-3 p-3">
-                      <div className="rounded-2xl bg-white/6 p-3 text-white">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">Water quality</p>
-                        <p className="mt-2 text-xl font-semibold">Stable</p>
-                        <p className="mt-1 text-xs text-white/72">DO, pH, and temperature inside target bands</p>
-                      </div>
-
-                      <div className="rounded-2xl bg-white/6 p-3 text-white">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">Performance</p>
-                        <div className="mt-3 flex h-20 items-end gap-2">
-                          {[34, 48, 42, 62, 70, 78].map((height) => (
-                            <div
-                              key={height}
-                              className="w-full rounded-t-full bg-gradient-to-t from-[var(--color-primary-hover)] to-primary"
-                              style={{ height: `${height}px` }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-white/6 p-3 text-sm text-white/84">
-                        3 alerts reviewed. No abnormal mortality spike detected.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            </g>
+          </svg>
         </div>
       </section>
-
-      <section
-        id="platform"
-        className="bg-[linear-gradient(180deg,var(--background)_0%,color-mix(in_srgb,var(--color-primary)_8%,var(--background))_100%)] py-20 md:py-28"
-      >
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="mx-auto mb-5 w-fit rounded-full bg-card px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground shadow-sm">
-            Built for Daily Farm Operations
-          </div>
-          <h2 className="text-center font-serif text-3xl font-semibold tracking-[-0.03em] md:text-5xl">
-            Choose what matters most
-            <br />
-            for your farm
-          </h2>
-
-          <div className="mt-16 flex flex-col items-center justify-center gap-14 md:flex-row md:gap-16">
-            <div className="w-full space-y-6">
-              {capabilities.slice(0, 2).map((item) => {
-                const Icon = item.icon
-                return (
-                  <div key={item.title} className="flex max-w-md items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold tracking-tight text-foreground">{item.title}</h3>
-                      <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.description}</p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="w-full max-w-[320px] self-center">
-              <div className="overflow-hidden rounded-[30px] border border-border/80 bg-card shadow-[0_22px_55px_-36px_rgba(15,23,32,0.45)]">
-                <div className="relative aspect-[4/5] overflow-hidden">
-                  <video
-                    className="h-full w-full object-cover"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="metadata"
-                    poster="/cage mapping.png"
-                  >
-                    <source src="/fish video.mp4" type="video/mp4" />
-                  </video>
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--brand-media-overlay-from),var(--brand-media-overlay-to))]" />
-                </div>
-              </div>
-            </div>
-
-            <div className="w-full space-y-6">
-              {capabilities.slice(2).map((item) => {
-                const Icon = item.icon
-                return (
-                  <div key={item.title} className="flex max-w-md items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold tracking-tight text-foreground">{item.title}</h3>
-                      <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.description}</p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+      <section className="aq-tint"><div className="aq-wrap aq-section">
+        <h2>Feed is your biggest cost. Your records decide how well you spend it.</h2>
+        <p>When feeding goes unrecorded or stock counts drift, it becomes difficult to explain a farm’s costs. Aquasmart connects feeding, mortality, sampling and inventory through reviewed records so teams can track feed conversion and cost per kilo of gain.</p>
+        <div className="aq-grid aq-industry">{[["40–60%", "of production costs go on feed in intensive systems (FAO)."], ["455%", "growth in African aquaculture since 2000 (FAO, 2024)."]].map(([n,t]) => <article key={n}><strong className="aq-stat">{n}</strong><p>{t}</p></article>)}</div>
+      </div></section>
+      <section id="farms" className="aq-wrap aq-section">
+        <h2>Find your way in</h2>
+        <div className="aq-grid three">
+          {[
+            ["Lake cage farms", "Track rectangular and circular cages from nursery to harvest.", "#feeding", "For cage farms", "/aquasmart-farm.webp", "Floating cages viewed from above"],
+            ["Pond and tank farms", "Manage depth, volume and feed requirements for each system.", "#feeding", "For pond and tank farms", "/aquasmart-pond-nets.webp", "A net being gathered in a lined pond"],
+            ["Investors and partners", "See how production records are reviewed and traced through month-end reporting.", "#data", "For investors and partners", "/aquasmart-production.webp", "Production reporting in Aquasmart"],
+          ].map(([title, description, href, label, image, alt]) => <article className="aq-card aq-path" key={href}>
+            <Image src={image} width={640} height={360} sizes="(max-width:700px) 90vw, 30vw" alt={alt}/>
+            <h3>{title}</h3><p>{description}</p><a href={href}>{label}</a>
+          </article>)}
         </div>
       </section>
-
-      <section
-        id="modules"
-        className="relative overflow-hidden bg-[linear-gradient(180deg,var(--brand-section-from)_0%,var(--brand-section-to)_100%)] py-20 md:py-28"
-      >
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <div className="inline-block rounded-full bg-white/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/86">
-                Core Modules
-              </div>
-              <h2 className="max-w-3xl font-serif text-3xl font-semibold tracking-[-0.03em] text-white md:text-5xl">
-                Operate every farm day from one system
-              </h2>
-            </div>
-
-            <div className="relative">
-              <div
-                ref={carouselRef}
-                className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 scroll-smooth md:gap-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                onMouseEnter={() => {
-                  isCarouselPausedRef.current = true
-                }}
-                onMouseLeave={() => {
-                  isCarouselPausedRef.current = false
-                }}
-              >
-                {modules.map((module) => (
-                  <article
-                    key={module.title}
-                    className="min-w-[min(100%,18.5rem)] snap-start rounded-[30px] bg-card p-5 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.45)] sm:min-w-[320px] sm:p-6 md:min-w-[390px]"
-                  >
-                    <div className="relative h-52 overflow-hidden rounded-[24px]">
-                      <Image src={module.imageSrc} alt={module.title} fill className="object-cover" />
-                      <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--brand-card-image-overlay-from),var(--brand-card-image-overlay-to))]" />
-                      <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-card/90 p-4 backdrop-blur-sm">
-                        <span className="text-xs font-semibold tracking-[0.18em] text-muted-foreground">
-                          {module.category}
-                        </span>
-                        <div className="mt-2 flex items-end justify-between gap-4">
-                          <div>
-                            <p className="text-3xl font-bold text-foreground">{module.metric}</p>
-                            <p className="text-sm text-muted-foreground">{module.metricLabel}</p>
-                          </div>
-                          <ArrowUpRight className="h-5 w-5 text-primary" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 space-y-2">
-                      <h3 className="text-2xl font-semibold tracking-tight text-foreground">{module.title}</h3>
-                      <p className="text-sm leading-7 text-muted-foreground">{module.description}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => scrollCards("left")}
-                className="absolute left-4 top-1/2 hidden -translate-y-1/2 rounded-full border border-border/80 bg-card/95 p-2 text-card-foreground shadow-lg md:block"
-                aria-label="Scroll modules left"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollCards("right")}
-                className="absolute right-4 top-1/2 hidden -translate-y-1/2 rounded-full border border-border/80 bg-card/95 p-2 text-card-foreground shadow-lg md:block"
-                aria-label="Scroll modules right"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
+      <section id="how" className="aq-wrap aq-section"><h2>From the farm to the decision in four steps</h2><div className="aq-grid">{steps.map(([title,desc],i) => <article key={title}><small>Step {i+1}</small><h3>{title}</h3><p>{desc}</p></article>)}</div></section>
+      <section id="features" className="aq-tint"><div className="aq-wrap aq-section"><h2>Everything a fish farm runs on, in one place</h2><div className="aq-grid">{modules.map(([Icon,title,desc]) => <article className="aq-card" key={title}><Icon size={28} weight="fill" aria-hidden="true"/><h3>{title}</h3><p>{desc}</p></article>)}</div></div></section>
+      <section id="feeding" className="aq-wrap aq-section aq-split">
+        <div className="aq-feed-scroll" tabIndex={0} role="region" aria-label="Monthly feed plan"><Image src="/aquasmart-feed-plan.webp" width={1280} height={720} alt="Monthly feed plan broken down by production system" /></div><div><h2>Plan feed for each cage, pond or tank</h2><p>Match pellet size to fish weight and compare monthly requirements with stock and confirmed deliveries.</p><ul><li>Daily and weekly feed amounts</li><li>Projected purchasing shortfalls</li><li>Plan versus actual, system by system</li></ul><details><summary>Watch feeding in the field</summary><video className="aq-feeding-video" controls playsInline preload="none" poster="/aquasmart-feeding-poster.webp" aria-label="Feeding activity at a floating fish cage">
+          <source src="/aquasmart-feeding.mp4" type="video/mp4" />
+          <a href="/aquasmart-feeding.mp4">Open the feeding video</a>
+        </video></details></div></section>
+      <section id="ai" className="aq-operator"><div className="aq-wrap aq-section aq-split"><div><h2>Ask your farm a question. Get an answer from your own records.</h2><p>Use the AI Operator to explore questions about feed requirements and production plans using farm-scoped records. Forecasts are identified as projections.</p></div><Image src="/aquasmart-operator.webp" width={1280} height={702} alt="SUSTAIN AI Operator workspace"/></div></section>
+      <section id="data" className="aq-tint"><div className="aq-wrap aq-section"><h2>Your data, your farm</h2><div className="aq-grid">{trust.map(([title,desc]) => <article key={title}><h3>{title}</h3><p>{desc}</p></article>)}</div></div></section>
+      <section id="field" className="aq-wrap aq-section aq-split"><div><h2>In the field at Tanganyika Blue</h2><p>In Kigoma, Tanzania, Tanganyika Blue uses Aquasmart to record feeding and track its native tilapia on Lake Tanganyika.</p></div><div><strong className="aq-stat">97.8%</strong><p>of batch-days had feeding recorded in the first 90 days for 2026 batches, up from 56.7% for 2024 batches kept in farm books.</p></div>
+        <div className="aq-field-photos">
+          <Image className="aq-weighing" src="/aquasmart-weighing.webp" alt="Farm crew weighing fish in a suspended net basket beside a cage" width={1204} height={1600} sizes="(max-width: 700px) 100vw, 46vw" />
+          
         </div>
+        <div><h3>WAS AFRAQ 2026</h3><details><summary>Read the talk summary</summary><p>The Aquasmart presentation follows a farm record from field entry and approval to a production decision. It shows how sampled weights shape growth curves and how feed stock and projected demand inform purchasing on Lake Tanganyika.</p></details></div>
       </section>
-
-      <footer className="bg-[linear-gradient(180deg,var(--brand-footer-from)_0%,var(--brand-footer-to)_100%)] px-4 py-16 text-sm text-white/60 md:px-6 md:py-18">
-        <div className="container mx-auto flex flex-col gap-4 border-t border-white/10 pt-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col items-start gap-2">
-            <Image
-              src="/sustain-aquasmart-wordmark-white.png"
-              alt="SUSTAIN Aquasmart"
-              width={1200}
-              height={131}
-              className="h-7 w-auto opacity-90"
-            />
-            <p>&copy; 2026 SUSTAIN Aquasmart. Aquaculture operations and analytics platform.</p>
-          </div>
-          <div className="flex flex-wrap gap-4 self-start md:self-auto">
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => scrollToId(item.href.slice(1))}
-                className="transition-colors hover:text-white"
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </footer>
+      <section id="about" className="aq-wrap aq-section aq-split">
+        <Image src="/aquasmart-floating-cage.webp" width={1204} height={1600} alt="Farm team tending a floating cage" /><div><h2>Built by people who farm</h2><p>SUSTAIN Switzerland develops Aquasmart with farm teams. The production-management application connects observations made at the water’s edge with the records managers use to plan and report.</p></div>
+      </section>
+      <section id="checklist" className="aq-tint"><div className="aq-wrap aq-section aq-split">
+        <div><h2>Start with your daily records</h2><p>A printable checklist for cage, pond and tank farms. Use it to record feed, reconcile stock movements and review the day’s entries.</p></div>
+        <div><a className="aq-button" href="/aquasmart-daily-records.pdf" download>Download the checklist (PDF)</a></div>
+      </div></section>
+      <section id="demo" className="aq-tint"><div className="aq-wrap aq-section aq-split"><div><h2>See Aquasmart on your farm’s numbers</h2><p>Tell us about your species, number of cages, ponds or tanks, and how you keep records so we can tailor your demo.</p>
+      <h3 className="aq-faq-heading">Frequently asked questions</h3>{faqs.map(([q,a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}</div>
+      <form id="contact" onSubmit={prepareRequest}><h3>Request a demo</h3><p>Contact us directly at <a className="aq-email" href={"mailto:"+contact}>{contact}</a>.</p>{fields.map((label,i) => <label key={label}>{label}<input required={i<3} name={label} type={i===1 ? "email" : "text"} maxLength={300} autoComplete={i===0 ? "name" : i===1 ? "email" : undefined}/></label>)}<button className="aq-button">Prepare email request</button><small>Review and send your request in your email app.</small>{draft && <p role="status">If your email app didn’t open, contact {contact}.</p>}</form></div></section>
     </main>
-  )
+    <footer><div className="aq-wrap aq-section aq-foot"><div><strong>SUSTAIN Aquasmart</strong><p>Record-based management for farms with cages, ponds and tanks.<br/>Part of the SUSTAIN Platform.</p></div><div><a href="#features">Features</a><a href="#ai">AI Operator</a><a href="#demo">Request a demo</a></div><div><a href="#about">About us</a><a href="#field">In the field</a><a href={"mailto:"+contact}>Contact the team</a><small>© 2026 SUSTAIN Switzerland GmbH</small></div></div></footer>
+  </div>
 }

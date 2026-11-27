@@ -2,15 +2,18 @@
 
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Droplets, Fish, FlaskConical, Plus, X } from "lucide-react"
+import { Plus, X } from "lucide-react"
+import { GrainsIcon } from "@phosphor-icons/react/dist/icons/Grains"
+import { FlaskIcon } from "@phosphor-icons/react/dist/icons/Flask"
+import { DropIcon } from "@phosphor-icons/react/dist/icons/Drop"
 import { Separator } from "@/components/app-ui/separator"
 import { Sheet } from "@/components/app-ui/sheet"
 import { DATA_ENTRY_PATH, withCurrentSearchContext } from "@/lib/app-entry"
 
 const QUICK_ENTRY_ITEMS = [
-  { type: "feeding", label: "Record Feeding", icon: Fish },
-  { type: "sampling", label: "Record Sampling", icon: FlaskConical },
-  { type: "water_quality", label: "Record Water Quality", icon: Droplets },
+  { type: "feeding", label: "Record Feeding", icon: GrainsIcon },
+  { type: "sampling", label: "Record Sampling", icon: FlaskIcon },
+  { type: "water_quality", label: "Record Water Quality", icon: DropIcon },
 ] as const
 
 /**
@@ -67,7 +70,7 @@ export default function MobileQuickEntry() {
               onClick={() => go(`${DATA_ENTRY_PATH}?type=${item.type}`)}
               className="flex min-h-12 items-center gap-3 rounded-xl px-3.5 text-left text-sm font-semibold text-foreground transition-colors hover:bg-accent"
             >
-              <item.icon size={18} className="text-muted-foreground" />
+              <item.icon weight="fill" aria-hidden="true" size={18} className="text-muted-foreground" />
               {item.label}
             </button>
           ))}

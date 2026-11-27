@@ -2,17 +2,15 @@
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
-import {
-  Bell,
-  Droplets,
-  Fish,
-  FlaskConical,
-  Menu as MenuIcon,
-  PackageOpen,
-  PlusCircle,
-  Sparkles,
-  X,
-} from "lucide-react"
+import { Menu as MenuIcon, X } from "lucide-react"
+import { GrainsIcon } from "@phosphor-icons/react/dist/icons/Grains"
+import { FishSimpleIcon } from "@phosphor-icons/react/dist/icons/FishSimple"
+import { DropIcon } from "@phosphor-icons/react/dist/icons/Drop"
+import { FlaskIcon } from "@phosphor-icons/react/dist/icons/Flask"
+import { PackageIcon } from "@phosphor-icons/react/dist/icons/Package"
+import { BellIcon } from "@phosphor-icons/react/dist/icons/Bell"
+import { ChatCircleIcon } from "@phosphor-icons/react/dist/icons/ChatCircle"
+import { NotePencilIcon } from "@phosphor-icons/react/dist/icons/NotePencil"
 import { useNotifications } from "@/components/notifications/notifications-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 import { getHeaderPageMeta, getHeaderPageTimeConfig } from "@/components/layout/header-config"
@@ -49,10 +47,10 @@ import {
 // Leading icon per alert kind (water quality / mortality / empty cage), so the
 // notification list is scannable by type at a glance instead of reading titles.
 function notificationIcon(kind: string) {
-  if (kind === "water_quality") return Droplets
-  if (kind === "mortality") return Fish
-  if (kind === "cage_empty") return PackageOpen
-  return Bell
+  if (kind === "water_quality") return DropIcon
+  if (kind === "mortality") return FishSimpleIcon
+  if (kind === "cage_empty") return PackageIcon
+  return BellIcon
 }
 
 // Icon-circle tint by severity, using the accessible destructive/warning tokens.
@@ -115,7 +113,7 @@ function NotificationRow({
   return (
     <div className="flex items-start gap-3 border-t border-border/60 px-4 py-3 first:border-t-0">
       <span className={cn("mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg", tint)}>
-        <Icon size={17} aria-hidden />
+        <Icon weight="fill" size={17} aria-hidden />
       </span>
       <button
         type="button"
@@ -576,7 +574,7 @@ export default function Header({
                 href="/assistant"
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground hover:bg-accent"
               >
-                <Sparkles size={16} />
+                <ChatCircleIcon weight="fill" aria-hidden="true" size={16} />
                 Ask AI
               </Link>
               <Tooltip content="Notifications">
@@ -585,7 +583,7 @@ export default function Header({
                   onClick={openMenu(setNotificationsAnchor)}
                   className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
-                  <Bell size={18} />
+                  <BellIcon weight="fill" aria-hidden="true" size={18} />
                   {bellBadgeCount > 0 ? (
                     <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-micro font-bold leading-none text-destructive-foreground">
                       {bellBadgeCount > 9 ? "9+" : bellBadgeCount}
@@ -653,7 +651,7 @@ export default function Header({
                       onClick={openMenu(setAddDataAnchor)}
                       className="hidden h-10 justify-center rounded-lg px-4 font-bold md:inline-flex md:min-w-[140px]"
                     >
-                      <PlusCircle size={18} />
+                      <NotePencilIcon weight="fill" aria-hidden="true" size={18} />
                       Add Data
                     </Button>
                   ) : null}
@@ -774,7 +772,7 @@ export default function Header({
             router.push(`${DATA_ENTRY_PATH}?type=feeding${systemParam}${batchParam}`)
           }}
         >
-          <Fish size={16} />
+          <GrainsIcon weight="fill" aria-hidden="true" size={16} />
           Record Feeding
         </MenuItem>
         <MenuItem
@@ -783,7 +781,7 @@ export default function Header({
             router.push(`${DATA_ENTRY_PATH}?type=sampling${systemParam}${batchParam}`)
           }}
         >
-          <FlaskConical size={16} />
+          <FlaskIcon weight="fill" aria-hidden="true" size={16} />
           Record Sampling
         </MenuItem>
         <MenuItem
@@ -792,7 +790,7 @@ export default function Header({
             router.push(`${DATA_ENTRY_PATH}?type=water_quality${systemParam}`)
           }}
         >
-          <Droplets size={16} />
+          <DropIcon weight="fill" aria-hidden="true" size={16} />
           Record Water Quality
         </MenuItem>
         <Separator />
