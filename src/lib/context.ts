@@ -15,6 +15,10 @@ export type OrganizationSummary = {
 }
 
 export type FarmSummary = {
+  role?: string | null
+  systems?: number | null
+  latestRecord?: string | null
+  pending?: number | null
   id: string
   name: string
   location: string | null

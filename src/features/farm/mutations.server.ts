@@ -56,6 +56,8 @@ const feedTypeSchema = z.object({
 })
 
 const farmWorkspaceSchema = z.object({
+  environment: z.enum(["lake", "land", "both"]).optional(),
+  mainSpecies: z.string().trim().min(1).max(120).optional(),
   name: z.string().trim().min(2, "Farm name is required.").max(120),
   location: z.string().trim().min(2, "Location is required.").max(255),
   organizationId: z.string().uuid().nullable().optional(),
@@ -198,6 +200,8 @@ export async function createFarmWorkspaceAction(input: FarmWorkspaceInput): Prom
     .insert({
       name: payload.name,
       location: payload.location,
+      farming_environment: payload.environment,
+      main_species: payload.mainSpecies,
       organization_id: organizationId,
     })
     .select("id")
