@@ -11,7 +11,7 @@ import { completeOnboardingProfileAction } from "@/features/onboarding/mutations
 import type { OnboardingPageInitialData } from "@/features/onboarding/queries.server"
 import {
   AQUASMART_ROLE_OPTIONS,
-  ONBOARDING_CREATE_WORKSPACE_PATH,
+  WORKSPACE_SELECT_PATH,
   normalizeRole,
   resolveAppEntryPath,
   sanitizeNextPath,
@@ -117,7 +117,7 @@ export default function OnboardingPageClient() {
   const effectiveRole = (assignedRole ?? role) as Exclude<AquasmartRole, null>
   const canChooseRole = !assignedRole
   const nextPath = sanitizeNextPath(searchParams.get("next"), resolveAppEntryPath(effectiveRole))
-  const createWorkspaceHref = `${ONBOARDING_CREATE_WORKSPACE_PATH}?next=${encodeURIComponent(nextPath)}`
+  const workspaceHref = `${WORKSPACE_SELECT_PATH}?next=${encodeURIComponent(nextPath)}`
 
   const displayEmail = user?.email?.trim() || onboardingState?.displayEmail || ""
   const effectiveNoticeMessage = noticeMessage ?? onboardingState?.notice ?? null
@@ -156,10 +156,7 @@ export default function OnboardingPageClient() {
       }
 
       if (!result?.membershipAssigned || !farmId) {
-        setNoticeMessage(
-          result?.notice ?? "Profile saved. Create a workspace or ask your farm admin for an invite before continuing.",
-        )
-        setIsSaving(false)
+        router.replace(workspaceHref)
         return
       }
 
@@ -245,10 +242,10 @@ export default function OnboardingPageClient() {
                   Join an existing farm with an admin invite, or create a new workspace if you are setting one up for the first time.
                 </p>
                 <Link
-                  href={createWorkspaceHref}
+                  href={workspaceHref}
                   className="mt-4 inline-flex items-center justify-center rounded-xl border border-border/70 px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent"
                 >
-                  Create new workspace
+                  Open farm workspace
                 </Link>
               </div>
             ) : null}
