@@ -1,10 +1,8 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 import { type FormEvent, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
-import { GoogleSignInButton } from "@/components/auth/google-sign-in-button"
 
 export default function ForgotPasswordPageClient() {
   const { resetPasswordForEmail } = useAuth()
@@ -37,81 +35,69 @@ export default function ForgotPasswordPageClient() {
   }
 
   return (
-    <main
-      className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10"
-      style={{
-        backgroundImage:
-          'linear-gradient(135deg, var(--brand-hero-from), var(--brand-hero-mid), var(--brand-hero-to)), url("/Multi-region-aquaculture-scaled.webp")',
-        backgroundPosition: "center",
-        backgroundSize: "cover",
-      }}
-    >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_12%,transparent),color-mix(in_srgb,var(--brand-panel-shell-from)_32%,transparent))]" />
-      <div className="relative z-10 w-full max-w-md rounded-[24px] border border-[color:color-mix(in_srgb,var(--card)_70%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card)_82%,transparent),color-mix(in_srgb,var(--card)_68%,transparent))] p-6 shadow-[0_24px_70px_color-mix(in_srgb,var(--chart-5)_18%,transparent)] backdrop-blur-[18px]">
-        <div className="flex flex-col gap-3">
-          <Image
-            src="/sustain-aquasmart-wordmark.png"
-            alt="SUSTAIN Aquasmart"
-            width={1200}
-            height={131}
-            className="h-8 w-auto self-start"
-            priority
-          />
-          <h1 className="text-xl font-semibold tracking-tight text-card-foreground">Forgot your password?</h1>
-        </div>
-        <p className="mt-3 text-sm text-[color:color-mix(in_srgb,var(--card-foreground)_76%,transparent)]">
-          Enter your registered email and we will send password reset instructions.
+    <main className="flex min-h-svh justify-center bg-card px-5 py-10 font-sans text-foreground sm:items-center sm:px-10">
+      <div className="w-full max-w-[400px]">
+        <Link href="/auth" className="mb-7 inline-block text-[15px] text-primary underline underline-offset-4 hover:text-[#0b3a63]">
+          <span aria-hidden="true">&larr; </span>Back to sign in
+        </Link>
+        <h1 className="mb-3 font-[family-name:var(--font-heading)] text-[30px] font-bold leading-tight tracking-tight">
+          Reset your password
+        </h1>
+        <p className="mb-7 text-base text-muted-foreground">
+          Enter the email you sign in with. We&apos;ll send you a link to choose a new password.
         </p>
 
-        <form onSubmit={(event) => void handleSubmit(event)} className="mt-5 space-y-4">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-card-foreground">Email address</span>
+        {errorMessage ? (
+          <div role="alert" className="mb-6 rounded-[4px] border-[3px] border-destructive-strong px-[18px] py-4">
+            <p className="mb-1.5 text-[17px] font-bold">There is a problem</p>
+            <a href="#reset-email" className="text-[15px] font-semibold text-destructive-strong underline underline-offset-2">
+              {errorMessage}
+            </a>
+          </div>
+        ) : null}
+
+        {noticeMessage ? (
+          <div role="status" className="mb-6 rounded-lg bg-accent px-5 py-4 text-[15px]">
+            {noticeMessage}
+          </div>
+        ) : null}
+
+        <form onSubmit={(event) => void handleSubmit(event)} noValidate className="flex flex-col gap-5">
+          <div className={errorMessage ? "flex flex-col gap-1.5 border-l-4 border-destructive-strong pl-3.5" : "flex flex-col gap-1.5"}>
+            <label htmlFor="reset-email" className="text-[15px] font-semibold">
+              Email address
+            </label>
             <input
+              id="reset-email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
-              placeholder="you@example.com"
-              className="w-full rounded-[14px] border border-[color:color-mix(in_srgb,var(--border)_92%,transparent)] bg-[color:color-mix(in_srgb,var(--card)_74%,transparent)] px-3 py-2 text-sm text-card-foreground outline-none backdrop-blur-[10px] transition placeholder:text-[color:color-mix(in_srgb,var(--card-foreground)_56%,transparent)] focus:border-primary focus:bg-[color:color-mix(in_srgb,var(--card)_92%,transparent)] focus:ring-2 focus:ring-primary/20"
+              spellCheck={false}
+              aria-invalid={Boolean(errorMessage)}
+              className={
+                "h-12 w-full rounded-[4px] border bg-card px-3.5 text-base text-foreground outline-none focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-primary " +
+                (errorMessage ? "border-2 border-destructive-strong" : "border-[#6b7c88]")
+              }
             />
-          </label>
-
-          {errorMessage ? (
-            <div className="rounded-[12px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-strong">
-              {errorMessage}
-            </div>
-          ) : null}
-
-          {noticeMessage ? (
-            <div className="rounded-[12px] border border-[color:color-mix(in_srgb,var(--card)_70%,transparent)] bg-[color:color-mix(in_srgb,var(--card)_52%,transparent)] px-3 py-2 text-sm text-[color:color-mix(in_srgb,var(--card-foreground)_78%,transparent)]">
-              {noticeMessage}
-            </div>
-          ) : null}
+          </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-[12px] bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[0_12px_28px_color-mix(in_srgb,var(--primary)_40%,transparent)] transition hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_18px_36px_color-mix(in_srgb,var(--primary)_45%,transparent)] disabled:opacity-70"
+            className="h-12 w-full rounded-[4px] bg-primary px-4 text-base font-semibold text-primary-foreground transition hover:bg-[#0b3a63] disabled:opacity-70"
           >
             {isSubmitting ? "Sending..." : "Send reset link"}
           </button>
         </form>
 
-        <div className="my-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-[color:color-mix(in_srgb,var(--card-foreground)_58%,transparent)]">
-          <span className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--border)_90%,transparent)]" />
-          or
-          <span className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--border)_90%,transparent)]" />
+        <div className="mt-7 rounded-lg bg-accent px-5 py-[18px]">
+          <p className="mb-1 text-[15px] font-semibold">No email arrived?</p>
+          <p className="text-sm text-[#4b5d69]">
+            Check your spam folder, or ask your farm administrator to reset your password. Signed up with Google?
+            You have no password to reset: sign in with Google instead.
+          </p>
         </div>
-        <GoogleSignInButton />
-        <p className="mt-2 text-xs text-[color:color-mix(in_srgb,var(--card-foreground)_66%,transparent)]">
-          Signed up with Google? You have no password to reset — just continue with Google.
-        </p>
-
-        <p className="mt-5 text-center text-sm text-[color:color-mix(in_srgb,var(--card-foreground)_88%,transparent)]">
-          <Link href="/auth" className="font-medium text-primary hover:underline">
-            Back to Sign In
-          </Link>
-        </p>
       </div>
     </main>
   )

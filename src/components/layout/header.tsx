@@ -223,6 +223,7 @@ export default function Header({
 
   const pageMeta = getHeaderPageMeta(appPathname, searchParams.get("tab"))
   const pageTimeConfig = useMemo(() => getHeaderPageTimeConfig(appPathname), [appPathname])
+  const hasScopeFilters = pageTimeConfig.showSystemFilter !== false || pageTimeConfig.showBatchFilter || pageTimeConfig.showStageFilter
   const resolvedRole = (roleOverride ?? activeFarmRoleQuery.data ?? role ?? null) as Parameters<typeof canAccessDataEntry>[0]
   // The persistent "cage empty" condition is now owned by activeAlerts; drop it
   // from the point-in-time history list so it isn't shown twice.
@@ -563,7 +564,7 @@ export default function Header({
                       isCondensed ? "text-lg sm:text-xl" : "text-xl sm:text-3xl",
                     )}
                   >
-                    {pageMeta.title}
+                    {appPathname === "/" ? <><span className="sm:hidden">Dashboard</span><span className="hidden sm:inline">{pageMeta.title}</span></> : pageMeta.title}
                   </h1>
                   {isReportsPage ? null : <p className="mt-1 block text-xs font-medium text-muted-foreground">{appPathname.startsWith("/production") ? timeWindowSummary.replace("All History", "Cycle to date") : timeWindowSummary}</p>}
                 </div>
@@ -580,6 +581,7 @@ export default function Header({
               <Tooltip content="Notifications">
                 <button
                   type="button"
+                  aria-label={bellBadgeCount ? `Notifications, ${bellBadgeCount} unread` : "Notifications"}
                   onClick={openMenu(setNotificationsAnchor)}
                   className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
@@ -594,10 +596,10 @@ export default function Header({
             </div>
           </div>
 
-          {showToolbar ? (
-            <div className="grid gap-2">
+          {showToolbar && (hasScopeFilters || pageTimeConfig.showTimePeriod !== false || showAddData) ? (
+            <div className={cn("grid gap-2", !hasScopeFilters && pageTimeConfig.showTimePeriod === false && "hidden md:grid")}>
               <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {hasScopeFilters && <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <div className="hidden min-w-0 md:flex md:flex-wrap md:items-center md:gap-2">
                     <FarmSelector
                       initialFarmId={initialFarmId}
@@ -629,8 +631,8 @@ export default function Header({
                       ) : null}
                     </Button>
                   </div>
-                </div>
-                <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+                </div>}
+                <div className="flex w-full flex-col gap-2 md:ml-auto md:w-auto md:flex-row md:items-center">
                   {pageTimeConfig.showTimePeriod !== false ? (
                     <div className="w-full shrink-0 md:w-[170px]">
                       <TimePeriodSelector

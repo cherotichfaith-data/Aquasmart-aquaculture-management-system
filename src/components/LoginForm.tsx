@@ -3,8 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { type FormEvent, useMemo, useState } from "react"
-import { Eye, EyeOff } from "lucide-react"
+import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button"
 import { login } from "@/lib/api"
@@ -60,6 +59,29 @@ export default function LoginForm() {
   const [formError, setFormError] = useState<string | null>(null)
   const [formNotice, setFormNotice] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [credentialsRejected, setCredentialsRejected] = useState(false)
+  const [capsLockOn, setCapsLockOn] = useState(false)
+  const [videoPaused, setVideoPaused] = useState(true)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  // The farm video starts on its still frame and only plays when the device
+  // has not asked for reduced motion. Button state follows the video's own
+  // play/pause events.
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    void videoRef.current?.play().catch(() => undefined)
+  }, [])
+
+  const toggleVideo = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) void video.play().catch(() => undefined)
+    else video.pause()
+  }
+
+  const trackCapsLock = (event: KeyboardEvent<HTMLInputElement>) => {
+    setCapsLockOn(event.getModifierState("CapsLock"))
+  }
 
   const selectHref = useMemo(
     () => buildWorkspaceSelectHref(searchParams.get("next")),
@@ -114,6 +136,7 @@ export default function LoginForm() {
     setFieldErrors(nextErrors)
     setFormError(null)
     setFormNotice(null)
+    setCredentialsRejected(false)
 
     if (Object.keys(nextErrors).length > 0) {
       return
@@ -153,9 +176,11 @@ export default function LoginForm() {
       router.replace(createWorkspaceHref)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to continue."
+      const rejected = /invalid login credentials/i.test(message)
+      setCredentialsRejected(rejected)
       setFormError(
-        /invalid login credentials/i.test(message)
-          ? "Invalid email or password. If this account was just created, confirm the email first or use the invite setup link."
+        rejected
+          ? "The email or password is not right. Check them and try again. If this account was just created, confirm the email first or use the invite setup link."
           : /already registered|already exists/i.test(message)
             ? "This email already has an account. Sign in, use Forgot password, or ask an admin for a fresh setup link."
             : message,
@@ -164,57 +189,96 @@ export default function LoginForm() {
     }
   }
 
+  const fieldHasError = (field: FieldName) =>
+    Boolean(fieldErrors[field]) || (credentialsRejected && (field === "email" || field === "password"))
+
   const fieldInputClass = (field: FieldName) =>
     cn(
-      "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20",
-      field === "password" && "pr-10",
-      fieldErrors[field] && "border-destructive focus:border-destructive focus:ring-destructive/20",
+      "h-12 w-full min-w-0 rounded-[4px] border border-[#6b7c88] bg-card px-3.5 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-primary",
+      field === "password" && "rounded-r-none border-r-0",
+      fieldHasError(field) && "border-2 border-destructive-strong",
     )
 
+  // A red bar beside each field in error, as in the sign-in error state.
+  const fieldGroupClass = (field: FieldName) =>
+    cn("flex flex-col gap-1.5", fieldHasError(field) && "border-l-4 border-destructive-strong pl-3.5")
+
+  const switchMode = (mode: AuthMode) => {
+    setAuthMode(mode)
+    setFieldErrors({})
+    setFormError(null)
+    setCredentialsRejected(false)
+  }
+
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <div className="flex flex-col gap-4 p-6 md:p-10">
-        <div className="flex justify-center gap-2 md:justify-start">
-          <Link href="/" className="flex items-center gap-2 font-medium" aria-label="SUSTAIN Aquasmart home">
-            <Image
-              src="/sustain-aquasmart-wordmark.png"
-              alt="SUSTAIN Aquasmart"
-              width={1200}
-              height={131}
-              className="h-7 w-auto"
-              priority
-            />
-          </Link>
+    <div className="grid min-h-svh bg-card font-sans text-foreground lg:grid-cols-[5fr_7fr]">
+      <div className="flex min-w-0 flex-col">
+        {/* Phones get a still frame from the farm video instead of the video itself. */}
+        <div className="relative h-[120px] shrink-0 bg-[#0b3a63] lg:hidden">
+          <Image src="/Multi-region-aquaculture-scaled.webp" alt="" fill sizes="100vw" className="object-cover" priority />
         </div>
 
-        <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-sm">
-            <form onSubmit={(event) => void handlePasswordAuth(event)} noValidate className="flex flex-col gap-6">
-              <div className="flex flex-col items-center gap-1 text-center">
-                <h1 className="text-2xl font-bold text-foreground">
-                  {authMode === "signin" ? "Sign in to your dashboard" : "Create your account"}
-                </h1>
-                {isInviteContinuation ? (
-                  <p className="text-sm text-balance text-muted-foreground">
-                    If you arrived from an invite, continue with Google using the invited email address, or open
-                    the latest invite email to set a password. Either way your assigned role is applied on first
-                    sign-in.
-                  </p>
-                ) : null}
-              </div>
+        <main className="flex flex-1 flex-col px-5 py-6 sm:px-10 lg:px-14 lg:py-8">
+          <div className="flex items-center justify-between gap-4">
+            <Link href="/" className="flex items-center" aria-label="SUSTAIN Aquasmart home">
+              <Image
+                src="/sustain-aquasmart-wordmark.png"
+                alt="SUSTAIN Aquasmart"
+                width={1200}
+                height={131}
+                className="h-7 w-auto"
+                priority
+              />
+            </Link>
+            <Link href="/" className="whitespace-nowrap text-sm text-primary underline underline-offset-4 hover:text-[#0b3a63] sm:text-[15px]">
+              Back to website
+            </Link>
+          </div>
 
+          <div className="mx-auto flex w-full max-w-[400px] flex-1 flex-col justify-center py-8 lg:py-12">
+            <h1 className="mb-2 font-[family-name:var(--font-heading)] text-[26px] font-bold leading-tight tracking-tight sm:text-[32px]">
+              {authMode === "signin" ? "Sign in to Aquasmart" : "Create your account"}
+            </h1>
+            <p className="mb-6 text-base text-muted-foreground sm:mb-8">
+              {isInviteContinuation
+                ? "If you arrived from an invite, continue with Google using the invited email address, or open the latest invite email to set a password. Either way your assigned role is applied on first sign-in."
+                : authMode === "signin"
+                  ? "Record, approve and plan for your farm."
+                  : "Set up your account, then create or join your farm workspace."}
+            </p>
+
+            {formError ? (
+              <div role="alert" className="mb-6 rounded-[4px] border-[3px] border-destructive-strong px-[18px] py-4">
+                <p className="mb-1.5 text-[17px] font-bold">There is a problem</p>
+                <a href="#email" className="text-[15px] font-semibold text-destructive-strong underline underline-offset-2">
+                  {formError}
+                </a>
+              </div>
+            ) : null}
+
+            {formNotice ? (
+              <div className="mb-6 rounded-lg bg-accent px-5 py-4 text-[15px]" role="status">
+                {formNotice}
+              </div>
+            ) : null}
+
+            <form onSubmit={(event) => void handlePasswordAuth(event)} noValidate className="flex flex-col gap-5">
               {authMode === "signup" ? (
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="fullName" className="text-sm font-medium text-foreground">
+                <div className={fieldGroupClass("fullName")}>
+                  <label htmlFor="fullName" className="text-[15px] font-semibold">
                     Full name
                   </label>
+                  {fieldErrors.fullName ? (
+                    <p id="fullName-error" className="text-sm font-semibold text-destructive-strong">
+                      {fieldErrors.fullName}
+                    </p>
+                  ) : null}
                   <input
                     id="fullName"
                     type="text"
                     className={fieldInputClass("fullName")}
-                    placeholder="Jane Otieno"
                     autoComplete="name"
-                    aria-invalid={Boolean(fieldErrors.fullName)}
+                    aria-invalid={fieldHasError("fullName")}
                     aria-describedby={fieldErrors.fullName ? "fullName-error" : undefined}
                     value={fullName}
                     onBlur={() => handleBlur("fullName")}
@@ -223,26 +287,26 @@ export default function LoginForm() {
                       clearFieldError("fullName")
                     }}
                   />
-                  {fieldErrors.fullName ? (
-                    <p id="fullName-error" className="text-sm text-destructive" role="alert">
-                      {fieldErrors.fullName}
-                    </p>
-                  ) : null}
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-2">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">
-                  Email
+              <div className={fieldGroupClass("email")}>
+                <label htmlFor="email" className="text-[15px] font-semibold">
+                  Email address
                 </label>
+                {fieldErrors.email ? (
+                  <p id="email-error" className="text-sm font-semibold text-destructive-strong">
+                    {fieldErrors.email}
+                  </p>
+                ) : null}
                 <input
                   id="email"
                   type="email"
                   className={fieldInputClass("email")}
-                  placeholder="name@company.com"
                   autoComplete="email"
                   inputMode="email"
-                  aria-invalid={Boolean(fieldErrors.email)}
+                  spellCheck={false}
+                  aria-invalid={fieldHasError("email")}
                   aria-describedby={fieldErrors.email ? "email-error" : undefined}
                   value={email}
                   onBlur={() => handleBlur("email")}
@@ -251,37 +315,47 @@ export default function LoginForm() {
                     clearFieldError("email")
                   }}
                 />
-                {fieldErrors.email ? (
-                  <p id="email-error" className="text-sm text-destructive" role="alert">
-                    {fieldErrors.email}
-                  </p>
-                ) : null}
               </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center">
-                  <label htmlFor="password" className="text-sm font-medium text-foreground">
+              <div className={fieldGroupClass("password")}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <label htmlFor="password" className="text-[15px] font-semibold">
                     Password
                   </label>
                   {authMode === "signin" ? (
-                    <Link
-                      href="/forgot-password"
-                      className="ml-auto text-sm text-primary underline-offset-4 hover:underline"
-                    >
-                      Forgot password?
+                    <Link href="/forgot-password" className="text-sm text-primary underline underline-offset-4 hover:text-[#0b3a63]">
+                      Forgot your password?
                     </Link>
                   ) : null}
                 </div>
-                <div className="relative">
+                {fieldErrors.password ? (
+                  <p id="password-error" className="text-sm font-semibold text-destructive-strong">
+                    {fieldErrors.password}
+                  </p>
+                ) : null}
+                <div className="flex">
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     className={fieldInputClass("password")}
-                    autoComplete="off"
-                    aria-invalid={Boolean(fieldErrors.password)}
-                    aria-describedby={fieldErrors.password ? "password-error" : authMode === "signup" ? "password-hint" : undefined}
+                    autoComplete={authMode === "signin" ? "current-password" : "new-password"}
+                    aria-invalid={fieldHasError("password")}
+                    aria-describedby={
+                      [
+                        fieldErrors.password ? "password-error" : null,
+                        authMode === "signup" ? "password-hint" : null,
+                        capsLockOn ? "password-caps" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || undefined
+                    }
                     value={password}
-                    onBlur={() => handleBlur("password")}
+                    onKeyDown={trackCapsLock}
+                    onKeyUp={trackCapsLock}
+                    onBlur={() => {
+                      setCapsLockOn(false)
+                      handleBlur("password")
+                    }}
                     onChange={(event) => {
                       setPassword(event.target.value)
                       clearFieldError("password")
@@ -289,47 +363,33 @@ export default function LoginForm() {
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                    className={cn(
+                      "h-12 shrink-0 rounded-r-[4px] border border-[#6b7c88] bg-[#f7f8fa] px-4 text-sm font-semibold text-primary transition hover:bg-accent",
+                      fieldHasError("password") && "border-2 border-destructive-strong",
+                    )}
                     onClick={() => setShowPassword((current) => !current)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    title={showPassword ? "Hide password" : "Show password"}
+                    aria-controls="password"
+                    aria-pressed={showPassword}
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
-                {fieldErrors.password ? (
-                  <p id="password-error" className="text-sm text-destructive" role="alert">
-                    {fieldErrors.password}
-                  </p>
-                ) : authMode === "signup" ? (
+                {authMode === "signup" ? (
                   <p id="password-hint" className="text-sm text-muted-foreground">
                     Use at least 8 characters.
                   </p>
                 ) : null}
+                {capsLockOn ? (
+                  <p id="password-caps" className="text-sm text-muted-foreground" aria-live="polite">
+                    Caps Lock is on
+                  </p>
+                ) : null}
               </div>
-
-              {formError ? (
-                <div
-                  className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                  role="alert"
-                >
-                  {formError}
-                </div>
-              ) : null}
-
-              {formNotice ? (
-                <div
-                  className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground"
-                  role="status"
-                >
-                  {formNotice}
-                </div>
-              ) : null}
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-70"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-primary px-4 text-base font-semibold text-primary-foreground transition hover:bg-[#0b3a63] disabled:opacity-70"
               >
                 {isSubmitting ? (
                   <span
@@ -342,74 +402,84 @@ export default function LoginForm() {
                     ? "Signing in..."
                     : "Creating account..."
                   : authMode === "signin"
-                    ? "Sign In"
-                    : "Create Account"}
+                    ? "Sign in"
+                    : "Create account"}
               </button>
-
-              <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <span className="h-px flex-1 bg-border" />
-                or
-                <span className="h-px flex-1 bg-border" />
-              </div>
-
-              <GoogleSignInButton
-                nextPath={isInviteContinuation ? ONBOARDING_PATH : null}
-                label={authMode === "signup" ? "Sign up with Google" : "Continue with Google"}
-                className="flex w-full items-center justify-center gap-2.5 rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent disabled:opacity-70"
-              />
-
-              <div className="text-center text-sm text-muted-foreground">
-                {isInviteContinuation ? (
-                  <span>Need a fresh invite link? Ask your farm admin to resend the invitation.</span>
-                ) : authMode === "signin" ? (
-                  <>
-                    New here?{" "}
-                    <button
-                      type="button"
-                      className="font-medium text-primary underline underline-offset-4"
-                      onClick={() => {
-                        setAuthMode("signup")
-                        setFieldErrors({})
-                        setFormError(null)
-                      }}
-                    >
-                      Create your account
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Already have an account?{" "}
-                    <button
-                      type="button"
-                      className="font-medium text-primary underline underline-offset-4"
-                      onClick={() => {
-                        setAuthMode("signin")
-                        setFieldErrors({})
-                        setFormError(null)
-                      }}
-                    >
-                      Sign in instead
-                    </button>
-                  </>
-                )}
-              </div>
             </form>
+
+            <div className="my-6 flex items-center gap-3 text-[13px] text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+
+            <GoogleSignInButton
+              nextPath={isInviteContinuation ? ONBOARDING_PATH : null}
+              label={authMode === "signup" ? "Sign up with Google" : "Continue with Google"}
+              className="flex h-12 w-full items-center justify-center gap-2.5 rounded-[4px] border border-[#6b7c88] bg-card px-4 text-[15px] font-semibold text-foreground transition hover:bg-accent disabled:opacity-70"
+            />
+
+            <p className="mt-7 text-[15px] text-muted-foreground">
+              {isInviteContinuation ? (
+                "Need a fresh invite link? Ask your farm admin to resend the invitation."
+              ) : authMode === "signin" ? (
+                <>
+                  New to Aquasmart?{" "}
+                  <button type="button" className="text-primary underline underline-offset-4" onClick={() => switchMode("signup")}>
+                    Create your account
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button type="button" className="text-primary underline underline-offset-4" onClick={() => switchMode("signin")}>
+                    Sign in instead
+                  </button>
+                </>
+              )}
+            </p>
           </div>
-        </div>
+
+          <p className="text-[13px] text-muted-foreground">
+            © 2026 SUSTAIN Switzerland GmbH ·{" "}
+            <a href="mailto:info@samaki.fish" className="text-primary underline underline-offset-4">
+              Help
+            </a>
+          </p>
+        </main>
       </div>
 
-      <div className="relative hidden bg-muted lg:block">
-        <video
-          className="absolute inset-0 h-full w-full object-cover"
-          autoPlay
-          loop
-          muted
-          playsInline
-          poster="/Multi-region-aquaculture-scaled.webp"
-        >
-          <source src="/login-hero.mp4" type="video/mp4" />
-        </video>
-      </div>
+      <aside className="hidden min-w-0 flex-col gap-7 bg-primary p-12 text-primary-foreground lg:flex">
+        <div className="relative min-h-[360px] flex-1 overflow-hidden rounded-lg bg-[#0b3a63]">
+          <video
+            ref={videoRef}
+            className="absolute inset-0 h-full w-full object-cover"
+            loop
+            muted
+            playsInline
+            poster="/Multi-region-aquaculture-scaled.webp"
+            aria-hidden="true"
+            onPlay={() => setVideoPaused(false)}
+            onPause={() => setVideoPaused(true)}
+          >
+            <source src="/login-hero.mp4" type="video/mp4" />
+          </video>
+          <button
+            type="button"
+            onClick={toggleVideo}
+            aria-label={videoPaused ? "Play background video" : "Pause background video"}
+            className="absolute bottom-4 right-4 h-11 rounded-[4px] bg-card px-4 text-sm font-semibold text-primary transition hover:bg-accent"
+          >
+            {videoPaused ? "Play video" : "Pause video"}
+          </button>
+        </div>
+        <div>
+          <p className="mb-2 font-[family-name:var(--font-heading)] text-[22px] font-bold leading-snug">
+            Every fish, every feed, every decision, on record.
+          </p>
+          <p className="text-[15px] text-[#c9daea]">Used every day at Tanganyika Blue, Kigoma, Tanzania.</p>
+        </div>
+      </aside>
     </div>
   )
 }

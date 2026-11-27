@@ -48,7 +48,7 @@ export default function AutomaticPlanner({ farmId, data }: { farmId: string; dat
       {sources.length===0?<p>No stocked cages were found. This plan includes future stocking assumptions only.</p>:null}
     </section>
     <section className="rounded-xl border bg-card p-5 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">3. Set future assumptions</h2><Link className="text-sm underline" href={`/analytics/inputs?farmId=${farmId}&view=planning`}>Set farm defaults</Link></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">3. Set future assumptions</h2></div>
       <p className="text-sm">{fmt(options.plannedFish)} new fish at {fmt(options.plannedAbwG)} g on day {options.stockingDay ?? 15}. Harvest is forecast at {fmt(options.harvestWeightG ?? 500)} g unless a dated harvest is specified. These assumptions do not create production records.</p>
       <details onToggle={e=>setEditing(e.currentTarget.open)}><summary className="cursor-pointer text-sm font-medium underline">Adjust stocking and harvest assumptions</summary>
         <form key={JSON.stringify(options)} method="get" className="mt-4 space-y-4">
