@@ -116,7 +116,7 @@ export default function LandingPage() {
             ["Lake cage farms", "Track rectangular and circular cages from nursery to harvest.", "#feeding", "For cage farms", "/aquasmart-farm.webp", "Floating cages viewed from above"],
             ["Pond and tank farms", "Manage depth, volume and feed requirements for each system.", "#feeding", "For pond and tank farms", "/aquasmart-pond-nets.webp", "A net being gathered in a lined pond"],
             ["Investors and partners", "See how production records are reviewed and traced through month-end reporting.", "#data", "For investors and partners", "/aquasmart-production.webp", "Production reporting in Aquasmart"],
-          ].map(([title, description, href, label, image, alt]) => <article className="aq-card aq-path" key={href}>
+          ].map(([title, description, href, label, image, alt]) => <article className="aq-card aq-path" key={title}>
             <Image src={image} width={640} height={360} sizes="(max-width:700px) 90vw, 30vw" alt={alt}/>
             <h3>{title}</h3><p>{description}</p><a href={href}>{label}</a>
           </article>)}
@@ -125,10 +125,7 @@ export default function LandingPage() {
       <section id="how" className="aq-wrap aq-section"><h2>From the farm to the decision in four steps</h2><div className="aq-grid">{steps.map(([title,desc],i) => <article key={title}><small>Step {i+1}</small><h3>{title}</h3><p>{desc}</p></article>)}</div></section>
       <section id="features" className="aq-tint"><div className="aq-wrap aq-section"><h2>Everything a fish farm runs on, in one place</h2><div className="aq-grid">{modules.map(([Icon,title,desc]) => <article className="aq-card" key={title}><Icon size={28} weight="fill" aria-hidden="true"/><h3>{title}</h3><p>{desc}</p></article>)}</div></div></section>
       <section id="feeding" className="aq-wrap aq-section aq-split">
-        <div className="aq-feed-scroll" tabIndex={0} role="region" aria-label="Monthly feed plan"><Image src="/aquasmart-feed-plan.webp" width={1280} height={720} alt="Monthly feed plan broken down by production system" /></div><div><h2>Plan feed for each cage, pond or tank</h2><p>Match pellet size to fish weight and compare monthly requirements with stock and confirmed deliveries.</p><ul><li>Daily and weekly feed amounts</li><li>Projected purchasing shortfalls</li><li>Plan versus actual, system by system</li></ul><details><summary>Watch feeding in the field</summary><video className="aq-feeding-video" controls playsInline preload="none" poster="/aquasmart-feeding-poster.webp" aria-label="Feeding activity at a floating fish cage">
-          <source src="/aquasmart-feeding.mp4" type="video/mp4" />
-          <a href="/aquasmart-feeding.mp4">Open the feeding video</a>
-        </video></details></div></section>
+        <div className="aq-feed-scroll" tabIndex={0} role="region" aria-label="Monthly feed plan"><Image src="/aquasmart-feed-plan.webp" width={1280} height={720} alt="Monthly feed plan broken down by production system" /></div><div><h2>Plan feed for each cage, pond or tank</h2><p>Match pellet size to fish weight and compare monthly requirements with stock and confirmed deliveries.</p><ul><li>Daily and weekly feed amounts</li><li>Projected purchasing shortfalls</li><li>Plan versus actual, system by system</li></ul></div></section>
       <section id="ai" className="aq-operator"><div className="aq-wrap aq-section aq-split"><div><h2>Ask your farm a question. Get an answer from your own records.</h2><p>Use the AI Operator to explore questions about feed requirements and production plans using farm-scoped records. Forecasts are identified as projections.</p></div><Image src="/aquasmart-operator.webp" width={1280} height={702} alt="SUSTAIN AI Operator workspace"/></div></section>
       <section id="data" className="aq-tint"><div className="aq-wrap aq-section"><h2>Your data, your farm</h2><div className="aq-grid">{trust.map(([title,desc]) => <article key={title}><h3>{title}</h3><p>{desc}</p></article>)}</div></div></section>
       <section id="field" className="aq-wrap aq-section aq-split">

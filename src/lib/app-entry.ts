@@ -174,7 +174,7 @@ export function isWorkspaceSelectionRoute(pathname: string) {
 }
 
 export function isPublicRoute(pathname: string) {
-  return pathname === "/" || isAuthRoute(pathname)
+  return pathname === "/" || isAuthRoute(pathname) || pathname === "/aquasmart-daily-records.pdf"
 }
 
 export function mapDashboardPathToStandalone(pathname: string) {

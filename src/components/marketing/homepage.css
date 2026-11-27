@@ -38,7 +38,6 @@
 .aq-field-photos img { aspect-ratio:16/9; object-fit:cover; object-position:50% 38% }
 .aq-field-photos img:nth-child(2) { object-position:50% 16% }
 .aq-field-photos .aq-weighing,.aq-field-photos .aq-cage-detail { aspect-ratio:4/3; object-position:50% 52% }
-.aq-feeding-video { display:block; width:auto; max-width:100%; height:auto; max-height: min(65vh, 480px); aspect-ratio:478/850; justify-self:center; border-radius:8px; background:#12232b }
 .aq-split ul { list-style:disc; padding-left:20px; margin-top:16px }
 .aq-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:center }
 .aq-split .aq-faq-heading { margin:28px 0 10px }
