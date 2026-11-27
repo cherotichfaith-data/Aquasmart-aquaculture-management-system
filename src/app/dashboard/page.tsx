@@ -1,3 +1,4 @@
+import HarvestSummary from "@/features/dashboard/components/harvest-summary"
 import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { cookies } from "next/headers"
@@ -93,6 +94,7 @@ export default async function DashboardPage({
         initialFarmId={farmId}
         initialFilters={effectiveFilters}
         initialData={initialData}
+        harvestSummary={<HarvestSummary farmId={farmId} accessToken={accessToken} />}
       />
     </DashboardLayout>
   )

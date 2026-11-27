@@ -1,7 +1,7 @@
 "use client"
 import PlanningAutoRefresh from "./planning-auto-refresh"
 
-import { useCallback, useState, type ReactNode } from "react"
+import { Children, cloneElement, isValidElement, useCallback, useState, type ReactNode } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Info } from "lucide-react"
@@ -21,7 +21,7 @@ import { curvesByScenario, judgeBatchAgainstCurves, signedPct, verdictLabel, typ
 import StockProfileChart, { classLabel } from "./stock-profile-chart"
 import { AbwAgeChart, GrowthByBatchChart, SelectedBatchAbwChart, StockLossChart } from "./growth-charts"
 import { DASH, ReportTable, dateText, num, pct, type Column } from "./report-table"
-import { CopyZoom } from "@/components/shared/copy-zoom"
+import { CopyZoom, type CopyZoomProps } from "@/components/shared/copy-zoom"
 import "@/features/reports/monthly/monthly-reports.css"
 
 function dayLabel(date: string) {
@@ -34,10 +34,14 @@ function monthLabel(month: string) {
 
 function Section({ title, note, noteAsInfo = false, infoLabel, children }: { title?: string; note?: string; noteAsInfo?: boolean; infoLabel?: string; children: ReactNode }) {
   const [infoOpen, setInfoOpen] = useState(false)
+  const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
+  const items = Children.toArray(children)
+  const firstTools = items.findIndex(child => isValidElement(child) && child.type === CopyZoom)
   return (
-    <section className="planner-card">
+    <section className="planner-card analytics-report-section">
       {title || (note && noteAsInfo) ? (
-        <div className="flex items-center gap-2">
+        <div className="rpt-section-head">
+          <div className="flex min-w-0 items-center gap-2">
           {title ? <h3 className="rpt-heading">{title}</h3> : null}
           {note && noteAsInfo ? (
             <button
@@ -50,6 +54,8 @@ function Section({ title, note, noteAsInfo = false, infoLabel, children }: { tit
               <Info size={16} aria-hidden="true" />
             </button>
           ) : null}
+          </div>
+          {firstTools >= 0 ? <div className="rpt-section-tools" ref={setToolbarTarget} /> : null}
         </div>
       ) : null}
       {note && !noteAsInfo ? <p className="rpt-small">{note}</p> : null}
@@ -58,7 +64,8 @@ function Section({ title, note, noteAsInfo = false, infoLabel, children }: { tit
           <p className="text-sm leading-relaxed">{note}</p>
         </Dialog>
       ) : null}
-      {children}
+      {items.map((child, index) => index === firstTools && isValidElement<CopyZoomProps>(child)
+        ? cloneElement(child, { toolbarTarget }) : child)}
     </section>
   )
 }
@@ -68,7 +75,8 @@ const HARVEST_COLUMNS: Column<CageHarvestRow>[] = [
   { label: "Unit", cell: (r) => r.unit ?? DASH },
   { label: "Cage", cell: (r) => r.cage_name ?? DASH },
   { label: "Batch ID", cell: (r) => r.batch_name },
-  { label: "Harvest completed", cell: (r) => dateText(r.harvest_date) },
+  { label: "Latest harvest", cell: (r) => dateText(r.harvest_date) },
+  { label: "Status", cell: (r) => r.harvest_status === "ongoing" ? "Ongoing" : r.harvest_status === "complete" ? "Complete" : r.harvest_status === "check_stock" ? "Check stock" : DASH },
   { label: "Original stock date", cell: (r) => dateText(r.original_stock_date) },
   { label: "Age (days)", cell: (r) => num(r.age_days), numeric: true },
   { label: "Production number stocked", cell: (r) => num(r.total_stocked), numeric: true },
@@ -86,7 +94,7 @@ const HARVEST_COLUMNS: Column<CageHarvestRow>[] = [
 
 const BATCH_HARVEST_COLUMNS = HARVEST_COLUMNS.filter((column) => column.label !== "Unit" && column.label !== "Cage")
 
-const HARVEST_METHOD_NOTE = "Stocked excludes count corrections. Corrections are signed count adjustments; correction and mortality percentages use original stock. Survival is harvested fish divided by original estimated stock and may exceed 100%; it is not a measured biological survival rate. eFCR uses recorded feed divided by harvested biomass plus productive transfers out minus input biomass; escapes and count-only adjustments are excluded from biomass. Age runs from original stocking to final harvest. Missing weights leave eFCR blank."
+const HARVEST_METHOD_NOTE = "Figures accumulate from stocking through the reporting cutoff. Stocked includes genuine receipts and excludes count corrections. Mortality and correction percentages use original stock. Survival follows the workbook: 100% minus mortality% plus signed correction%; it includes fish still alive during partial harvesting. eFCR uses the same valid recorded-weight intervals and matching feed as batch performance, restricted to this cycle and cages."
 
 const FEED_COLUMNS: Column<FeedVsExpectedRow>[] = [
   { label: "Cage", cell: (r) => r.cage_name },
@@ -241,11 +249,11 @@ function parseReportKey(raw: string | null): ReportKey {
   return REPORT_OPTIONS.find((o) => o.value === raw)?.value ?? "outlook"
 }
 
-export default function AnalyticsReport({ data }: { data: AnalyticsReportData }) {
+export default function AnalyticsReport({ data, harvestsOnly = false }: { data: AnalyticsReportData; harvestsOnly?: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const report = parseReportKey(searchParams.get("report"))
+  const report = harvestsOnly ? "harvests" : parseReportKey(searchParams.get("report"))
   const cycleToDate = data.periodMode === "cycle"
   const show = (key: ReportKey) => report === key
 
@@ -282,6 +290,11 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
   const label = cycleToDate ? `Cycle to date — ${monthLabel(data.month)}` : monthLabel(data.month)
   // Oldest batch first, so legend colours stay stable as new batches are added.
   const growthBatchNames = Array.from(new Set(data.growthByBatch.map((b) => b.batch_name))).reverse()
+  const weightHistory = data.abwHistoryPoints ?? data.abwPoints
+  const weightAtAgeBatchNames = growthBatchNames.filter((name) =>
+    weightHistory.some((point) => point.batch_name === name))
+  const above100BatchNames = weightAtAgeBatchNames.filter((name) =>
+    weightHistory.some((point) => point.batch_name === name && point.abw_g >= 100))
   const batchVerdicts = new Map<number, HarvestCurveVerdict>()
   if (data.batchHarvests.length > 0) {
     const curves = curvesByScenario(data.growthCurve)
@@ -304,18 +317,18 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
   return (
     <div className="tb-monthly">
       <div className="rpt-titlebar">
-        <Link className="underline text-sm" href={`/analytics/inputs${searchParams.get("farmId") ? `?farmId=${encodeURIComponent(searchParams.get("farmId")!)}` : ""}`}>Feed planning</Link>
+        {!harvestsOnly ? <Link className="underline text-sm" href={`/analytics/inputs${searchParams.get("farmId") ? `?farmId=${encodeURIComponent(searchParams.get("farmId")!)}` : ""}`}>Feed planning</Link> : <h1 className="text-2xl font-semibold">Harvests</h1>}
         <div className="rpt-actions">
-          <div className="w-full sm:w-[320px]">
+          {!harvestsOnly ? <div className="w-full sm:w-[320px]">
             <FilterPopover
               value={report}
-              options={REPORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              options={REPORT_OPTIONS.filter(o => o.value !== "harvests").map((o) => ({ value: o.value, label: o.label }))}
               placeholder="Select report"
               onChange={onReportChange}
               searchable={false}
               className="w-full"
             />
-          </div>
+          </div> : null}
           <div className="w-full sm:w-[240px]">
             <FilterPopover
               value={cycleToDate ? "cycle" : "month"}
@@ -347,7 +360,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
         </div>
       </div>
 
-      <p className="rpt-small">{cycleToDate ? "Cycle to date" : "Monthly activity"}: {dayLabel(data.periodStart)} to {dayLabel(data.periodEnd)}. Stock and weight use the latest available records through this date.</p>
+      {!show("harvests") ? <p className="rpt-small">{cycleToDate ? "Cycle to date" : "Monthly activity"}: {dayLabel(data.periodStart)} to {dayLabel(data.periodEnd)}. {cycleToDate ? `Includes batches and cage placements active or completed in ${monthLabel(data.month)}, with cumulative figures from stocking. ` : ""}Stock and weight use the latest available records through this date.</p> : null}
 
       {data.error ? <p className="rpt-note">{data.error}</p> : null}
 
@@ -355,7 +368,9 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
         <Section
           title={`Stock Profile - ${dayLabel(data.periodEnd)}`}
           noteAsInfo
-          note={`Fish in the cages at the end of the period, grouped by each cage's average weight, against the ideal if ${num(data.forwardPlanInputs.plannedFish)} juveniles were stocked every month and grown on the ${data.forwardPlanInputs.scenario} growth model.`}
+          note={data.stockProfile[0]?.ideal_monthly_stocking == null
+            ? `Fish in the cages at the end of the period, grouped by each cage's average weight, against the ideal if ${num(data.forwardPlanInputs.plannedFish)} juveniles were stocked every month and grown on the ${data.forwardPlanInputs.scenario} growth model.`
+            : `Fish in the cages at the end of the period, grouped by each cage's average weight, against a model illustration of ${num(data.stockProfile[0].ideal_monthly_stocking)} juveniles stocked monthly.`}
         >
           <CopyZoom type="chart" name="Stock profile chart">
             <StockProfileChart rows={data.stockProfile} />
@@ -369,6 +384,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
                     <th>Ideal fish</th>
                     <th>Recorded fish</th>
                     <th>Cages</th>
+                    <th>Batches</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -378,6 +394,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
                       <td className="n">{r.ideal_fish > 0 ? num(r.ideal_fish) : DASH}</td>
                       <td className="n">{r.recorded_fish > 0 ? num(r.recorded_fish) : DASH}</td>
                       <td>{r.cage_names?.length ? r.cage_names.join(", ") : DASH}</td>
+                      <td>{r.batch_names?.length ? r.batch_names.join(", ") : DASH}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -423,7 +440,6 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("batches") ? (
         <Section
           title={`Detailed Batch Report - ${label}`}
-          note="Stock, ABW and biomass are as at the end of the period. Mortality, cage corrections, harvest, growth and feed are for the period; accumulated eFCR runs from stocking."
         >
           <CopyZoom type="table" name="Detailed batch report">
             <BatchReportTable rows={data.batches} />
@@ -432,9 +448,9 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       ) : null}
 
       {show("batches") ? (
-        <Section title={`Stock Loss Analysis - ${label}`} note="Stock loss (%) per batch, as in the Detailed Batch Report.">
+        <Section title={`Stock Loss Analysis - ${label}`}>
           <CopyZoom type="chart" name="Stock loss chart">
-            <StockLossChart rows={data.batches} />
+            <StockLossChart rows={data.stockLossRows ?? []} cycleToDate={cycleToDate} />
           </CopyZoom>
         </Section>
       ) : null}
@@ -449,21 +465,21 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
           <CopyZoom type="chart" name="Growth per batch chart">
             <GrowthByBatchChart rows={data.growthByBatch} cycleToDate={cycleToDate} />
           </CopyZoom>
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="weight-age-grid grid gap-4 xl:grid-cols-2">
             {(["below100", "from100"] as const).map((weightBand) => (
               <CopyZoom key={weightBand} type="chart" name={`Weight at age chart - ${weightBand === "below100" ? "below 100 g" : "100 g and above"}`}>
                 <AbwAgeChart
                   title={`Weight at age · ${weightBand === "below100" ? "Below 100 g" : "100 g and above"}`}
                   weightBand={weightBand}
-                  points={data.abwPoints}
+                  points={weightHistory}
                   curves={data.growthCurve}
-                  batchNames={growthBatchNames.filter((n) => Math.max(0, ...data.abwPoints.filter((p) => p.batch_name === n).map((p) => p.model_age_days)) <= 450)}
+                  batchNames={weightBand === "from100" ? above100BatchNames : weightAtAgeBatchNames.filter((name) => !above100BatchNames.includes(name))}
                 />
               </CopyZoom>
             ))}
           </div>
           <CopyZoom type="chart" name="Selected batch ABW chart">
-            <SelectedBatchAbwChart points={data.abwPoints} curves={data.growthCurve} batchNames={growthBatchNames} />
+            <SelectedBatchAbwChart points={weightHistory} curves={data.growthCurve} batchNames={growthBatchNames} />
           </CopyZoom>
         </Section>
       ) : null}
@@ -487,7 +503,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("harvests") ? (
         <Section
           title={`Cage Harvest Report - ${label}`}
-          note={`Cages with a harvest in the selected period and a reconciled zero balance at their last harvest. Figures cover only the batch in that cage. Unit is the recorded cage unit. ${HARVEST_METHOD_NOTE}`}
+          note={`Includes harvest activity in the selected period and ongoing harvests started earlier. Figures cover the batch in each cage. ${HARVEST_METHOD_NOTE}`}
           noteAsInfo
         >
           <CopyZoom type="table" name="Cage harvest report">
@@ -495,7 +511,7 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
               columns={HARVEST_COLUMNS}
               rows={data.cageHarvests}
               rowKey={(r) => `${r.cycle_id}:${r.system_id}`}
-              emptyText="No fully harvested cages are confirmed for this period."
+              emptyText="No recorded harvests or ongoing harvested cages for this period."
             />
           </CopyZoom>
         </Section>
@@ -503,16 +519,16 @@ export default function AnalyticsReport({ data }: { data: AnalyticsReportData })
       {show("harvests") && data.batchHarvests.length > 0 ? (
         <Section
           title={`Batch Harvest Curves - ${label}`}
-          note="Each batch's recorded weight from stocking to final harvest, drawn against the Slow, Main and Potential growth-model curves on the same model age axis. The batch is matched to the curve with the smallest average gap across its weights (stocking excluded). It needs at least 3 weights after stocking; fewer are not judged. The model curves are references only, so this is a comparison, not a recorded setting."
+          note="Recorded stocking, transfer, sampling and harvest weights through the cutoff, compared with the growth-model curves. Ongoing harvests remain visible. At least three weights after the opening baseline are needed to compare growth patterns."
           noteAsInfo
         >
           <BatchHarvestCards rows={data.batchHarvests} points={data.batchHarvestPoints} curves={data.growthCurve} />
         </Section>
       ) : null}
       {show("harvests") ? (
-        <Section title={`Batch Harvest Report - ${label}`} note={`Completed batches harvested in the selected period. Figures cover all cages from stocking through final harvest. Followed is the growth-model curve closest to the batch's weights; ABW vs Main compares the final harvest weight with the Main curve at the same model age. ${HARVEST_METHOD_NOTE}`} noteAsInfo>
+        <Section title={`Batch Harvest Report - ${label}`} note={`Includes harvest activity in the selected period and ongoing harvests started earlier. Figures cover all cages through the cutoff. ${HARVEST_METHOD_NOTE}`} noteAsInfo>
           <CopyZoom type="table" name="Batch harvest report">
-            <ReportTable columns={batchHarvestColumns} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No fully harvested batches are confirmed for this period." />
+            <ReportTable columns={batchHarvestColumns} rows={data.batchHarvests} rowKey={(r) => String(r.cycle_id)} emptyText="No recorded harvests or ongoing harvested batches for this period." />
           </CopyZoom>
         </Section>
       ) : null}

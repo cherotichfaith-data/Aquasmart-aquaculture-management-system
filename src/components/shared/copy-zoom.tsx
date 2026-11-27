@@ -1,14 +1,30 @@
 "use client"
 
-import { useRef, useState, type ReactNode } from "react"
-import { Check, Copy, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react"
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { createPortal } from "react-dom"
+import { Check, ChevronDown, Copy, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react"
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu"
 import { Button } from "@/components/app-ui/button"
+import { copyEditableTable, copyImage } from "./clipboard"
 
 const MIN_ZOOM = 0.6
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.1
 
 type CopyState = "idle" | "copied" | "failed"
+
+const ChartTools = createContext<ReactNode>(null)
+
+/** Keep chart controls beside the chart's own caption, outside the zoomed plot. */
+export function CopyZoomChartTitle({ children }: { children: ReactNode }) {
+  const tools = useContext(ChartTools)
+  return (
+    <figcaption className="rpt-chart__title copy-zoom__heading">
+      <span data-copy-title="">{children}</span>
+      {tools}
+    </figcaption>
+  )
+}
 
 function tableToClipboard(table: HTMLTableElement) {
   const clone = table.cloneNode(true) as HTMLTableElement
@@ -125,7 +141,8 @@ function loadImage(url: string) {
 
 /** Renders a chart (title, legend and the SVG) to a PNG so it pastes cleanly into Word, Slides or chat. */
 async function chartToPng(figure: HTMLElement): Promise<Blob> {
-  const svg = figure.querySelector("svg")
+  // Legends also contain SVGs; export the plot, not a legend swatch.
+  const svg = figure.querySelector<SVGSVGElement>("svg.rpt-chart__svg") ?? figure.querySelector<SVGSVGElement>("svg[viewBox]")
   if (!svg) throw new Error("No chart to copy.")
   const viewBox = svg.viewBox.baseVal
   const width = viewBox.width || svg.clientWidth || 900
@@ -141,7 +158,7 @@ async function chartToPng(figure: HTMLElement): Promise<Blob> {
 
   try {
     const image = await loadImage(svgUrl)
-    const title = figure.querySelector(".rpt-chart__title")?.textContent?.trim() ?? ""
+    const title = (figure.querySelector("[data-copy-title]") ?? figure.querySelector(".rpt-chart__title"))?.textContent?.trim() ?? ""
     const legend = Array.from(figure.querySelectorAll(".rpt-chart__legend span")).map((item) => {
       const swatch = item.querySelector("i")
       const line = item.querySelector("line")
@@ -194,97 +211,105 @@ async function chartToPng(figure: HTMLElement): Promise<Blob> {
   }
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
 /**
  * Puts Copy and zoom controls beside a table or a chart.
- *  - table: copies it as a table (pastes into Excel, Sheets, Word) plus tab-separated text.
- *  - chart: copies it as a PNG image (title, legend and plot); downloads the PNG if the browser blocks image copy.
+ * Copies charts/tables as PNG images, with an explicit editable-table alternative.
+ * Offers a PNG download if image copying is unavailable or blocked.
  */
+export type CopyZoomProps = {
+  type: "table" | "chart"
+  name: string
+  children: ReactNode
+  toolbarTarget?: HTMLElement | null
+}
+
 export function CopyZoom({
   type,
   name,
   children,
-}: {
-  type: "table" | "chart"
-  name: string
-  children: ReactNode
-}) {
+  toolbarTarget,
+}: CopyZoomProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
   const [copyState, setCopyState] = useState<CopyState>("idle")
+  const [copying, setCopying] = useState(false)
+  const [download, setDownload] = useState<{ url: string; filename: string } | null>(null)
+
+  useEffect(() => () => {
+    if (download) URL.revokeObjectURL(download.url)
+  }, [download])
 
   function flash(next: CopyState) {
     setCopyState(next)
     window.setTimeout(() => setCopyState("idle"), 2000)
   }
 
-  async function handleCopy() {
+  async function handleCopy(format: "image" | "table" = "image") {
     const root = contentRef.current
-    if (!root) return
+    if (!root || copying) return
+    setCopying(true)
+    setDownload(null)
     try {
-      if (type === "table") {
+      if (format === "table") {
         const table = root.querySelector("table")
         if (!table) throw new Error("No table to copy.")
         const { html, text } = tableToClipboard(table)
-        const textParts = {
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([text], { type: "text/plain" }),
-        }
-        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-          // One clipboard entry in three forms: Excel/Word take the table, chat apps and slides take the picture
-          // of the table, anything else takes the tab-separated text.
-          try {
-            await navigator.clipboard.write([new ClipboardItem({ ...textParts, "image/png": tableToPng(table) })])
-          } catch {
-            await navigator.clipboard.write([new ClipboardItem(textParts)])
-          }
-        } else {
-          await navigator.clipboard.writeText(text)
-        }
+        await copyEditableTable(html, text)
       } else {
-        const figure = (root.querySelector("figure") as HTMLElement | null) ?? root
         const filename = `${name.replace(/[^\w-]+/g, "_").toLowerCase() || "chart"}.png`
-        // The image is passed as a promise so the browser still treats the copy as a direct click.
-        const pngPromise = chartToPng(figure)
-        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-          try {
-            await navigator.clipboard.write([new ClipboardItem({ "image/png": pngPromise })])
-          } catch {
-            downloadBlob(await pngPromise, filename)
-          }
-        } else {
-          downloadBlob(await pngPromise, filename)
+        const table = root.querySelector("table")
+        const figure = (root.querySelector("figure") as HTMLElement | null) ?? root
+        if (type === "table" && !table) throw new Error("No table to copy.")
+        const pngPromise = type === "table" ? tableToPng(table!) : chartToPng(figure)
+        const result = await copyImage(pngPromise)
+        if (!result.copied) {
+          setDownload({ url: URL.createObjectURL(result.blob), filename })
+          setCopyState("idle")
+          return
         }
       }
       flash("copied")
     } catch {
       flash("failed")
+    } finally {
+      setCopying(false)
     }
   }
 
   const clamp = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 10) / 10))
 
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-end gap-1.5" role="toolbar" aria-label={`${name} tools`}>
+  const tools = (
+      <div className="copy-zoom__tools flex flex-wrap items-center justify-end gap-1.5" role="toolbar" aria-label={`${name} tools`}>
         <Button
           type="button"
           variant="outline"
           size="icon-sm"
           onClick={() => void handleCopy()}
+          disabled={copying}
           aria-label={`Copy ${name}`}
-          title={copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : `Copy ${type}`}
+          title={copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy image"}
         >
           {copyState === "copied" ? <Check className="size-4" /> : copyState === "failed" ? <X className="size-4 text-destructive-strong" /> : <Copy className="size-4" />}
         </Button>
+        {type === "table" ? (
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" disabled={copying}
+                aria-label={`Copy options for ${name}`} title="Copy options" className="w-5">
+                <ChevronDown className="size-3" />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={4}
+                className="z-50 min-w-48 rounded-md border border-border bg-popover p-1 text-sm text-popover-foreground shadow-md">
+                <DropdownMenu.Item onSelect={() => void handleCopy("image")}
+                  className="cursor-pointer rounded px-3 py-2 outline-none focus:bg-accent">Copy image</DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={() => void handleCopy("table")}
+                  className="cursor-pointer rounded px-3 py-2 outline-none focus:bg-accent">Copy editable table (Word / Excel)</DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+        ) : null}
         <span className="sr-only" aria-live="polite">
           {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : ""}
         </span>
@@ -301,9 +326,23 @@ export function CopyZoom({
           <RotateCcw className="size-4" />
         </Button>
       </div>
+  )
+
+  return (
+    <div className="copy-zoom space-y-2">
+      {toolbarTarget !== undefined
+        ? toolbarTarget && createPortal(tools, toolbarTarget)
+        : type === "table" ? <div className="copy-zoom__heading"><h3 className="rpt-heading">{name}</h3>{tools}</div> : null}
+      {download && (
+        <p className="text-sm text-muted-foreground" role="status">
+          Image copying is unavailable or was blocked. <a className="underline" href={download.url} download={download.filename}>Save PNG</a> to attach or insert the image.
+        </p>
+      )}
       <div className="overflow-auto">
-        <div ref={contentRef} style={{ zoom }}>
-          {children}
+        <div ref={contentRef} className="copy-zoom__content" style={{ "--copy-zoom": zoom } as CSSProperties}>
+          <ChartTools.Provider value={toolbarTarget === undefined && type === "chart" ? tools : null}>
+            {children}
+          </ChartTools.Provider>
         </div>
       </div>
     </div>

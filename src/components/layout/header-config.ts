@@ -19,6 +19,8 @@ export type PageTimeConfig = {
 }
 
 export const getHeaderPageTimeConfig = (pathname: string): PageTimeConfig => {
+  if (pathname.startsWith("/production/harvests")) return { defaultPeriod: "month", scope: "production", useSystemBounds: false, showBatchFilter: false, showStageFilter: false, showSystemFilter: false, showTimePeriod: false }
+
   if (pathname.startsWith("/feed")) {
     return { defaultPeriod: "month", scope: "production", useSystemBounds: true, showBatchFilter: true, showStageFilter: true }
   }
@@ -81,6 +83,7 @@ export const getHeaderPageMeta = (pathname: string, tab: string | null): PageMet
       description: "Model-guided feed planning, actual feed execution, feeding response, and feed-risk alerts.",
     }
   }
+  if (pathname.startsWith("/production/harvests")) return { title: "Harvests" }
   if (pathname.startsWith("/production")) {
     return {
       title: "Production",
